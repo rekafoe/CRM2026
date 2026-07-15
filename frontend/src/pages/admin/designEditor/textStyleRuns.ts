@@ -13,7 +13,7 @@ export type TextStyleRun = {
 
 type FabricStyles = Record<number, Record<number, Record<string, unknown>>>;
 
-type TextLikeObject = FabricObject & {
+export type TextLikeObject = FabricObject & {
   text?: string;
   fontSize?: number;
   fontFamily?: string;
@@ -187,8 +187,13 @@ export function hydrateTextObjectStyles(obj: TextLikeObject): void {
   }
   if (!runs?.length) {
     const baseFont = String(obj.fontFamily ?? '').trim();
-    // Стили из SVG могут содержать fontFamily по символам — не затираем при отсутствии runs.
-    if (obj.styles && baseFont) {
+    let hasStyledFont = false;
+    if (obj.styles && typeof obj.styles === 'object' && !Array.isArray(obj.styles)) {
+      const probe = new Set<string>();
+      collectFontFamiliesFromTextField({ styles: obj.styles } as Record<string, unknown>, probe);
+      hasStyledFont = probe.size > 0;
+    }
+    if (obj.styles && baseFont && !hasStyledFont) {
       obj.set('styles', undefined as unknown as FabricStyles);
     }
     return;
@@ -318,6 +323,126 @@ export function collectFontFamiliesFromTextField(o: Record<string, unknown>, out
   }
 }
 
+function appendFontLoadSpec(
+  out: Set<string>,
+  family: string,
+  fontSize: number,
+  fontWeight?: unknown,
+  fontStyle?: unknown,
+): void {
+  const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const size = Math.max(6, fontSize || 16);
+  const parts: string[] = [];
+  const style = typeof fontStyle === 'string' ? fontStyle.trim() : '';
+  const weight = typeof fontWeight === 'string' || typeof fontWeight === 'number'
+    ? String(fontWeight).trim()
+    : '';
+  if (style && style !== 'normal') parts.push(style);
+  if (weight && weight !== 'normal' && weight !== '400') parts.push(weight);
+  parts.push(`${size}px`);
+  parts.push(`"${escaped}"`);
+  out.add(parts.join(' '));
+  out.add(`16px "${escaped}"`);
+}
+
+/** Спеки для document.fonts.load — семейство, размер, weight/style из styles и runs. */
+export function collectFontLoadSpecsFromTextField(o: Record<string, unknown>): string[] {
+  const specs = new Set<string>();
+  const baseSize = Math.max(6, Number(o.fontSize) || 16);
+  const families = new Set<string>();
+  collectFontFamiliesFromTextField(o, families);
+  for (const family of families) {
+    appendFontLoadSpec(specs, family, baseSize, o.fontWeight, o.fontStyle);
+  }
+  const styles = o.styles;
+  if (styles && typeof styles === 'object' && !Array.isArray(styles)) {
+    for (const line of Object.values(styles as Record<string, unknown>)) {
+      const lineRec = asRecord(line);
+      if (!lineRec) continue;
+      for (const style of Object.values(lineRec)) {
+        const styleRec = asRecord(style);
+        if (!styleRec) continue;
+        const segFamily = styleRec.fontFamily;
+        if (typeof segFamily !== 'string' || !segFamily.trim()) continue;
+        appendFontLoadSpec(
+          specs,
+          segFamily.trim(),
+          Number(styleRec.fontSize) || baseSize,
+          styleRec.fontWeight,
+          styleRec.fontStyle,
+        );
+      }
+    }
+  }
+  const runs = o.textStyleRuns;
+  if (Array.isArray(runs)) {
+    for (const run of runs) {
+      if (!run || typeof run !== 'object') continue;
+      const r = run as TextStyleRun;
+      if (!r.fontFamily?.trim()) continue;
+      appendFontLoadSpec(
+        specs,
+        r.fontFamily.trim(),
+        Number(r.fontSize) || baseSize,
+        r.fontWeight,
+        r.fontStyle,
+      );
+    }
+  }
+  return [...specs];
+}
+
+function cloneFabricStyles(styles: FabricStyles): FabricStyles {
+  const out: FabricStyles = {};
+  for (const [lineKey, lineStyles] of Object.entries(styles)) {
+    if (!lineStyles) continue;
+    const lineIndex = Number(lineKey);
+    if (!Number.isFinite(lineIndex)) continue;
+    out[lineIndex] = {};
+    for (const [charKey, patch] of Object.entries(lineStyles)) {
+      const charIndex = Number(charKey);
+      if (!Number.isFinite(charIndex) || !patch) continue;
+      out[lineIndex]![charIndex] = { ...patch };
+    }
+  }
+  return out;
+}
+
+/** Сброс кэша Fabric и повторный layout после document.fonts (без hydrate). */
+export function kickTextObjectFontRerender(obj: TextLikeObject): void {
+  const textObj = obj as TextLikeObject & {
+    _clearCache?: () => void;
+    dirty?: boolean;
+    styles?: FabricStyles;
+  };
+  try {
+    textObj._clearCache?.();
+  } catch {
+    /* noop */
+  }
+  const styles = textObj.styles;
+  if (styles && typeof styles === 'object' && !Array.isArray(styles) && Object.keys(styles).length > 0) {
+    textObj.set('styles', cloneFabricStyles(styles));
+  }
+  const family = String(textObj.fontFamily ?? '').trim();
+  if (family) {
+    textObj.set({ fontFamily: family });
+  }
+  try {
+    textObj.initDimensions?.();
+  } catch {
+    /* noop */
+  }
+  textObj.dirty = true;
+  textObj.setCoords?.();
+}
+
+export function isDesignedTemplateText(obj: TextLikeObject | Record<string, unknown>): boolean {
+  const o = obj as { id?: string; textFieldClientAdded?: boolean };
+  const id = String(o.id ?? '');
+  return id.toLowerCase().startsWith('text_') && o.textFieldClientAdded !== true;
+}
+
 function walkFabricJsonObjects(
   objects: unknown[],
   visit: (obj: Record<string, unknown>) => void,
@@ -365,13 +490,17 @@ export function prepareTextObjectsOnCanvas(objects: FabricObject[]): void {
   }
 }
 
-/** Пересчитать ширину/метрики текста после document.fonts (иначе остаётся fallback и обрезка). */
+/** Пересчитать ширину/метрики текста после document.fonts (без повторного hydrate). */
 export function remeasureTextObjectsAfterFontLoad(objects: FabricObject[]): void {
   for (const obj of objects) {
     if (isFabricTextObjectType(obj.type)) {
       const textObj = obj as TextLikeObject;
-      textObj.initDimensions?.();
-      normalizeImportedSingleLineTextboxWidth(textObj);
+      if (isDesignedTemplateText(textObj)) {
+        normalizeImportedSingleLineTextboxWidth(textObj);
+      } else {
+        textObj.initDimensions?.();
+        normalizeImportedSingleLineTextboxWidth(textObj);
+      }
       lockTemplateImportedTextPosition(textObj);
       textObj.setCoords?.();
     }
