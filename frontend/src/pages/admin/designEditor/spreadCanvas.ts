@@ -1,9 +1,17 @@
 import type { Canvas } from 'fabric';
 import { canvasToJSON } from './canvas/canvasSerialization';
 import { PUBLIC_EDITOR_DEV, recordPublicEditorPerfMetric } from '../../../features/publicDesignEditor/publicEditorPerf';
+import { restoreSpreadPageFabricObjectIds } from './spreadPageObjectIds';
 
 function deepCloneJson<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
+}
+
+function cloneSpreadSerializedObject(serialized: Record<string, unknown>): Record<string, unknown> {
+  const copy = deepCloneJson(serialized);
+  clearSpreadMirrorMeta(copy);
+  restoreSpreadPageFabricObjectIds(copy);
+  return copy;
 }
 
 function isSyntheticTemplatePreviewBackground(obj: Record<string, unknown>): boolean {
@@ -24,8 +32,7 @@ function assignSerializedObjectToSingleSpreadPage(input: {
   const centerX = bounds
     ? bounds.left + (bounds.right - bounds.left) / 2
     : (toFiniteNumber(input.serializedObject.left) ?? 0);
-  const copy = deepCloneJson(input.serializedObject);
-  clearSpreadMirrorMeta(copy);
+  const copy = cloneSpreadSerializedObject(input.serializedObject);
   if (centerX < input.spine) {
     input.leftJson.push(copy);
     return;
@@ -149,14 +156,11 @@ export function splitSpreadCanvasToPagesSync(
 
     const bounds = getSerializedObjectHorizontalBounds(serializedObject);
 
-    // Never drop an object from both pages: if bounds are invalid, duplicate defensively.
     if (!bounds) {
       fallbackCount += 1;
-      const leftCopy = deepCloneJson(serializedObject);
-      clearSpreadMirrorMeta(leftCopy);
+      const leftCopy = cloneSpreadSerializedObject(serializedObject);
       leftJson.push(leftCopy);
-      const rightCopy = deepCloneJson(serializedObject);
-      clearSpreadMirrorMeta(rightCopy);
+      const rightCopy = cloneSpreadSerializedObject(serializedObject);
       shiftLeftInSerialized(rightCopy, -spine);
       rightJson.push(rightCopy);
       continue;
@@ -170,10 +174,10 @@ export function splitSpreadCanvasToPagesSync(
         bounds,
         spine,
       });
-      const leftCopy = deepCloneJson(serializedObject);
+      const leftCopy = cloneSpreadSerializedObject(serializedObject);
       markSpreadMirrorMeta(leftCopy, mirrorId, 'left', spine);
       leftJson.push(leftCopy);
-      const rightCopy = deepCloneJson(serializedObject);
+      const rightCopy = cloneSpreadSerializedObject(serializedObject);
       markSpreadMirrorMeta(rightCopy, mirrorId, 'right', spine);
       shiftLeftInSerialized(rightCopy, -spine);
       rightJson.push(rightCopy);
@@ -182,12 +186,10 @@ export function splitSpreadCanvasToPagesSync(
 
     const centerX = bounds.left + (bounds.right - bounds.left) / 2;
     if (centerX < spine) {
-      const leftCopy = deepCloneJson(serializedObject);
-      clearSpreadMirrorMeta(leftCopy);
+      const leftCopy = cloneSpreadSerializedObject(serializedObject);
       leftJson.push(leftCopy);
     } else {
-      const o = deepCloneJson(serializedObject);
-      clearSpreadMirrorMeta(o);
+      const o = cloneSpreadSerializedObject(serializedObject);
       shiftLeftInSerialized(o, -spine);
       rightJson.push(o);
     }

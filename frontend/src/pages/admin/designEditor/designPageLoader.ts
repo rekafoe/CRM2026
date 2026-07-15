@@ -16,6 +16,7 @@ import {
   hardenFabricObjectForIosSafari,
   isIosSafariCanvasSafeMode,
 } from './canvas/iosSafariCanvasSafeMode';
+import { prefixSpreadPageFabricObjectIds } from './spreadPageObjectIds';
 
 type AnyObj = Record<string, unknown>;
 
@@ -309,6 +310,8 @@ function normalizeSerializedBackgroundObject(obj: Record<string, unknown>, pageW
 function buildSpreadMergedFabricJson(input: {
   leftPage: DesignPage | undefined;
   rightPage: DesignPage | undefined;
+  leftPageIndex: number;
+  rightPageIndex: number;
   pageW: number;
   pageH: number;
 }): Record<string, unknown> | null {
@@ -324,6 +327,7 @@ function buildSpreadMergedFabricJson(input: {
     }
     clearSpreadMirrorMeta(next);
     normalizeSerializedBackgroundObject(next, input.pageW, input.pageH);
+    prefixSpreadPageFabricObjectIds(next, input.leftPageIndex);
     return next;
   });
   let dedupedMirrorCount = 0;
@@ -340,6 +344,7 @@ function buildSpreadMergedFabricJson(input: {
     }
     normalizeSerializedBackgroundObject(next, input.pageW, input.pageH);
     shiftSerializedLeft(next, input.pageW);
+    prefixSpreadPageFabricObjectIds(next, input.rightPageIndex);
     return [next];
   });
   recordPublicEditorPerfMetric('spread.merge.dedupedMirrors', dedupedMirrorCount, {
@@ -486,7 +491,14 @@ export async function loadSpreadMergedScene(input: {
   apiBaseUrl: string;
 }): Promise<void> {
   const { canvas, leftPage, rightPage, leftPageIndex, rightPageIndex, pageW, pageH, template, apiBaseUrl } = input;
-  const mergedJson = buildSpreadMergedFabricJson({ leftPage, rightPage, pageW, pageH });
+  const mergedJson = buildSpreadMergedFabricJson({
+    leftPage,
+    rightPage,
+    leftPageIndex: leftPageIndex ?? 0,
+    rightPageIndex: rightPageIndex ?? 1,
+    pageW,
+    pageH,
+  });
 if (mergedJson) {
     canvas.clear();
     canvas.setDimensions({ width: pageW * 2, height: pageH });
