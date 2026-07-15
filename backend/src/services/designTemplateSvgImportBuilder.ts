@@ -586,11 +586,10 @@ function buildPageFromSvg(input: {
       `Страница ${input.pageIndex + 1}: интерактивные и направляющие слои вырезаны из SVG-фона.`,
     )
   }
-  const unclassifiedNamed = parsed.parserReport.countsByReasonCode.LAYER_NOT_CLASSIFIED ?? 0
   const drawableInStripped = countDrawableSvgNodes(parsed.strippedSvg)
-  if (!parsed.lockedBgDetected && (unclassifiedNamed > 0 || drawableInStripped > 0)) {
+  if (!parsed.lockedBgDetected && drawableInStripped > 0) {
     input.warnings.push(
-      `Страница ${input.pageIndex + 1}: найдено ${Math.max(unclassifiedNamed, drawableInStripped)} объектов без интерактивного префикса и без locked_bg — в редактор они не попадут. Переименуйте в decor_* или добавьте явный locked_bg.`,
+      `Страница ${input.pageIndex + 1}: в SVG-фоне осталось ${drawableInStripped} нераспознанных фигур (image/text/polygon и т.п.). Rect/circle/ellipse/path без подписи импортируются как decor_auto_*; для фона добавьте locked_bg на весь лист.`,
     )
   }
 

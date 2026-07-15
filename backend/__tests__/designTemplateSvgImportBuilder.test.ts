@@ -83,7 +83,7 @@ describe('fabricTextFromSvgText', () => {
     expect(docWithBg.pages[0]?.designPage.fabricJSON.objects.some((obj) => obj.id === 'locked_bg')).toBe(true)
   })
 
-  it('конвертирует decor_* в fabric-объекты и пишет warning без locked_bg', () => {
+  it('конвертирует decor_* и безымянные фигуры в fabric-объекты', () => {
     const warnings: string[] = []
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 90 50">
@@ -99,8 +99,9 @@ describe('fabricTextFromSvgText', () => {
     }, 'decor', warnings)
     const objects = doc.pages[0]!.designPage.fabricJSON.objects
     const decorObjects = objects.filter((obj) => String(obj.id).startsWith('decor_'))
-    expect(decorObjects).toHaveLength(3)
-    expect(decorObjects.map((obj) => obj.type).sort()).toEqual(['circle', 'path', 'rect'])
-    expect(warnings.some((w) => w.includes('без интерактивного префикса') && w.includes('decor_*'))).toBe(true)
+    expect(decorObjects).toHaveLength(4)
+    expect(decorObjects.map((obj) => obj.type).sort()).toEqual(['circle', 'path', 'rect', 'rect'])
+    expect(decorObjects.some((obj) => obj.id === 'decor_auto_rect_1')).toBe(true)
+    expect(warnings.some((w) => w.includes('без интерактивного префикса') && w.includes('decor_*'))).toBe(false)
   })
 })

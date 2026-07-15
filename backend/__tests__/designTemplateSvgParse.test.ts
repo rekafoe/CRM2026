@@ -230,6 +230,52 @@ describe('parseImportedSvgLayers', () => {
     expect(r.parserReport.countsByReasonCode.DECOR_NO_VALID_SHAPE).toBe(1)
   })
 
+  it('импортирует безымянный rect как decor_auto_rect', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect x="5" y="5" width="30" height="10" fill="#000000"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
+    expect(decor).toHaveLength(1)
+    expect(decor[0]?.data.name).toBe('decor_auto_rect_1')
+    expect(r.parserReport.countsByReasonCode.DECOR_AUTO_PARSED).toBe(1)
+    expect(r.strippedSvg).not.toMatch(/<rect\b/)
+  })
+
+  it('импортирует безымянный path (кривую) как decor_auto_path', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <path d="M 10 10 C 30 5 70 15 90 10 L 90 20 L 10 20 Z" fill="#000000"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
+    expect(decor).toHaveLength(1)
+    expect(decor[0]?.data.name).toMatch(/^decor_auto_path_/)
+    expect(decor[0]?.data.shape).toBe('path')
+    expect(r.parserReport.countsByReasonCode.DECOR_AUTO_PARSED).toBe(1)
+  })
+
+  it('импортирует rect с произвольным именем как decor_auto', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect id="BlackBar" x="0" y="0" width="50" height="25" fill="#000"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.some((layer) => layer.kind === 'decor' && layer.data.name === 'decor_auto_rect_1')).toBe(true)
+  })
+
+  it('не превращает locked_bg в decor', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect id="locked_bg" x="0" y="0" width="50" height="25" fill="#000"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.filter((layer) => layer.kind === 'decor')).toHaveLength(0)
+    expect(r.lockedBgDetected).toBe(true)
+    expect(r.strippedSvg).toContain('locked_bg')
+  })
+
   it('наследует font-family с родительской группы text_* (Corel/AI)', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">

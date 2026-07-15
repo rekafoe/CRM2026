@@ -95,6 +95,7 @@ export type ParserReasonCode =
   | 'PHOTO_PARSED'
   | 'TEXT_PARSED'
   | 'DECOR_PARSED'
+  | 'DECOR_AUTO_PARSED'
   | 'PHOTO_NO_VALID_RECT'
   | 'TXT_NO_VALID_NODE'
   | 'DECOR_NO_VALID_SHAPE'
@@ -1463,9 +1464,34 @@ function warnUnhandledLayerName(kind: string, name: string, warnings: string[], 
       warnings.push('Слой locked_bg сохранится в SVG-фоне (поверх редакторских overlay).')
     return
   }
+  if (kind === 'rect' || kind === 'circle' || kind === 'ellipse' || kind === 'path') return
   warnings.push(
-    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg, hidden_*, guide_*.`,
+    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg, hidden_*, guide_*. Без имени rect/circle/ellipse/path импортируются как decor_auto_*.`,
   )
+}
+
+function isReservedLayerName(name: string): boolean {
+  if (name === 'locked_bg') return true
+  if (GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe')) return true
+  if (TECH_PREFIXES.some((p) => name.startsWith(p))) return true
+  if (name.startsWith('photo_')) return true
+  if (name.startsWith('text_')) return true
+  return false
+}
+
+function resolveDecorLayerName(
+  explicit: string | null,
+  inherited: string | null,
+  shape: SvgDecorShape,
+  autoDecorSeq: { value: number },
+): string | null {
+  if (explicit?.startsWith('decor_')) return explicit
+  if (!explicit && inherited?.startsWith('decor_')) return inherited
+  if ((explicit && isReservedLayerName(explicit)) || (!explicit && inherited && isReservedLayerName(inherited))) {
+    return null
+  }
+  autoDecorSeq.value += 1
+  return `decor_auto_${shape}_${autoDecorSeq.value}`
 }
 
 function findOuterTextCloseEnd(svg: string, openingGt: number): number | null {
@@ -1545,6 +1571,44 @@ export function parseImportedSvgLayers(
   const interactiveLayers: SvgInteractiveLayer[] = []
   const guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>> = {}
   let lockedBgDetected = false
+  const autoDecorSeq = { value: 0 }
+
+  function pushParsedDecor(input: {
+    name: string
+    shape: SvgDecorShape
+    tr: { x: number; y: number; width: number; height: number }
+    attrs: Record<string, string>
+    pathData?: string
+    removalStart: number
+    removalEnd: number
+    autoAssigned: boolean
+  }): void {
+    const mmRect = geometry.svgRectToMm(input.tr)
+    const sceneRect = geometry.mmRectToScene(mmRect)
+    const decorEntry: SvgDecor = {
+      name: input.name,
+      shape: input.shape,
+      ...(input.pathData ? { pathData: input.pathData } : {}),
+      ...resolveDecorPresentation(
+        input.attrs,
+        groupStyleStack[groupStyleStack.length - 1] ?? {},
+        cssClassStyles,
+      ),
+      svg: input.tr,
+      scene: sceneRect,
+    }
+    decorItems.push(decorEntry)
+    interactiveLayers.push({ kind: 'decor', data: decorEntry })
+    parsedDecorLayerNames.add(input.name)
+    seenDecorLayerNames.add(input.name)
+    markLayerReport(input.name, {
+      status: 'parsed_interactive',
+      reasonCode: input.autoAssigned ? 'DECOR_AUTO_PARSED' : 'DECOR_PARSED',
+      bboxSvg: input.tr,
+      bboxScene: sceneRect,
+    })
+    removalRanges.push({ start: input.removalStart, end: input.removalEnd })
+  }
   const warnedNames = new Set<string>()
   const removalRanges: RemovalRange[] = []
   const seenPhotoLayerNames = new Set<string>()
@@ -1777,33 +1841,59 @@ export function parseImportedSvgLayers(
           bboxScene: photoEntry.scene,
         })
         removalRanges.push({ start: lt, end: gt + 1 })
+      } else {
+        const explicitName = getLayerName(attrs)
+        const decorName = resolveDecorLayerName(explicitName, inherited, 'rect', autoDecorSeq)
+        if (decorName && width != null && height != null && width > 0 && height > 0) {
+          const tr = transformedRect(x, y, width, height, objectTransform)
+          pushParsedDecor({
+            name: decorName,
+            shape: 'rect',
+            tr,
+            attrs,
+            removalStart: lt,
+            removalEnd: gt + 1,
+            autoAssigned: decorName.startsWith('decor_auto_'),
+          })
+        }
       }
 
-      if (ef?.startsWith('decor_') && width != null && height != null && width > 0 && height > 0) {
-        const tr = transformedRect(x, y, width, height, objectTransform)
-        const mmRect = geometry.svgRectToMm(tr)
-        const sceneRect = geometry.mmRectToScene(mmRect)
-        const decorEntry: SvgDecor = {
-          name: ef,
-          shape: 'rect',
-          ...resolveDecorPresentation(
-            attrs,
-            groupStyleStack[groupStyleStack.length - 1] ?? {},
-            cssClassStyles,
-          ),
-          svg: tr,
-          scene: sceneRect,
-        }
-        decorItems.push(decorEntry)
-        interactiveLayers.push({ kind: 'decor', data: decorEntry })
-        parsedDecorLayerNames.add(ef)
-        markLayerReport(ef, {
-          status: 'parsed_interactive',
-          reasonCode: 'DECOR_PARSED',
-          bboxSvg: tr,
-          bboxScene: sceneRect,
+      i = gt + 1
+      continue
+    }
+
+    if (tagLc === 'ellipse') {
+      const attrs = parseAttributes(attrPart)
+      const explicitName = getLayerName(attrs)
+      const inheritedName = inherited
+      const ef = explicitName ?? inheritedName
+      if (ef) {
+        markFallbackLayer(ef)
+        if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+      }
+      if (ef === 'locked_bg') lockedBgDetected = true
+      if (ef) warnUnhandledLayerName('ellipse', ef, warnings, warnedNames)
+
+      const cx = parseNumber(attrs.cx) ?? 0
+      const cy = parseNumber(attrs.cy) ?? 0
+      const rx = parseNumber(attrs.rx) ?? parseNumber(attrs.r) ?? 0
+      const ry = parseNumber(attrs.ry) ?? parseNumber(attrs.r) ?? rx
+      const objectTransform = multiplyTransform(
+        inheritedTransform,
+        parseSvgTransform(attrs.transform, unsupportedFeatures),
+      )
+      const decorName = resolveDecorLayerName(explicitName, inheritedName, 'circle', autoDecorSeq)
+      if (decorName && rx > 0 && ry > 0) {
+        const tr = transformedRect(cx - rx, cy - ry, rx * 2, ry * 2, objectTransform)
+        pushParsedDecor({
+          name: decorName,
+          shape: 'circle',
+          tr,
+          attrs,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          autoAssigned: decorName.startsWith('decor_auto_'),
         })
-        removalRanges.push({ start: lt, end: gt + 1 })
       }
 
       i = gt + 1
@@ -1812,110 +1902,80 @@ export function parseImportedSvgLayers(
 
     if (tagLc === 'circle') {
       const attrs = parseAttributes(attrPart)
-      const ef = getLayerName(attrs) ?? inherited
+      const explicitName = getLayerName(attrs)
+      const inheritedName = inherited
+      const ef = explicitName ?? inheritedName
       if (ef) {
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
       }
       if (ef === 'locked_bg') lockedBgDetected = true
       if (ef) warnUnhandledLayerName('circle', ef, warnings, warnedNames)
-      if (!ef?.startsWith('decor_')) {
-        i = gt + 1
-        continue
-      }
+
       const cx = parseNumber(attrs.cx) ?? 0
       const cy = parseNumber(attrs.cy) ?? 0
       const r = parseNumber(attrs.r)
-      if (r == null || r <= 0) {
-        i = gt + 1
-        continue
-      }
       const objectTransform = multiplyTransform(
         inheritedTransform,
         parseSvgTransform(attrs.transform, unsupportedFeatures),
       )
-      const tr = transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform)
-      const mmRect = geometry.svgRectToMm(tr)
-      const sceneRect = geometry.mmRectToScene(mmRect)
-      const decorEntry: SvgDecor = {
-        name: ef,
-        shape: 'circle',
-        ...resolveDecorPresentation(
+      const decorName = resolveDecorLayerName(explicitName, inheritedName, 'circle', autoDecorSeq)
+      if (decorName && r != null && r > 0) {
+        const tr = transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform)
+        pushParsedDecor({
+          name: decorName,
+          shape: 'circle',
+          tr,
           attrs,
-          groupStyleStack[groupStyleStack.length - 1] ?? {},
-          cssClassStyles,
-        ),
-        svg: tr,
-        scene: sceneRect,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          autoAssigned: decorName.startsWith('decor_auto_'),
+        })
       }
-      decorItems.push(decorEntry)
-      interactiveLayers.push({ kind: 'decor', data: decorEntry })
-      parsedDecorLayerNames.add(ef)
-      markLayerReport(ef, {
-        status: 'parsed_interactive',
-        reasonCode: 'DECOR_PARSED',
-        bboxSvg: tr,
-        bboxScene: sceneRect,
-      })
-      removalRanges.push({ start: lt, end: gt + 1 })
+
       i = gt + 1
       continue
     }
 
     if (tagLc === 'path') {
       const attrs = parseAttributes(attrPart)
-      const ef = getLayerName(attrs) ?? inherited
+      const explicitName = getLayerName(attrs)
+      const inheritedName = inherited
+      const ef = explicitName ?? inheritedName
       if (ef) {
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
       }
       if (ef === 'locked_bg') lockedBgDetected = true
       if (ef) warnUnhandledLayerName('path', ef, warnings, warnedNames)
-      if (!ef?.startsWith('decor_')) {
-        i = gt + 1
-        continue
-      }
+
+      const decorName = resolveDecorLayerName(explicitName, inheritedName, 'path', autoDecorSeq)
       const d = attrs.d?.trim()
       const baseBounds = d ? parseSvgPathApproxBounds(d) : null
-      if (!d || !baseBounds || baseBounds.width <= 0 || baseBounds.height <= 0) {
-        i = gt + 1
-        continue
-      }
-      const objectTransform = multiplyTransform(
-        inheritedTransform,
-        parseSvgTransform(attrs.transform, unsupportedFeatures),
-      )
-      const tr = transformedRect(
-        baseBounds.x,
-        baseBounds.y,
-        baseBounds.width,
-        baseBounds.height,
-        objectTransform,
-      )
-      const mmRect = geometry.svgRectToMm(tr)
-      const sceneRect = geometry.mmRectToScene(mmRect)
-      const decorEntry: SvgDecor = {
-        name: ef,
-        shape: 'path',
-        pathData: d,
-        ...resolveDecorPresentation(
+      if (decorName && d && baseBounds && baseBounds.width > 0 && baseBounds.height > 0) {
+        const objectTransform = multiplyTransform(
+          inheritedTransform,
+          parseSvgTransform(attrs.transform, unsupportedFeatures),
+        )
+        const tr = transformedRect(
+          baseBounds.x,
+          baseBounds.y,
+          baseBounds.width,
+          baseBounds.height,
+          objectTransform,
+        )
+        pushParsedDecor({
+          name: decorName,
+          shape: 'path',
+          tr,
           attrs,
-          groupStyleStack[groupStyleStack.length - 1] ?? {},
-          cssClassStyles,
-        ),
-        svg: tr,
-        scene: sceneRect,
+          pathData: d,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          autoAssigned: decorName.startsWith('decor_auto_'),
+        })
       }
-      decorItems.push(decorEntry)
-      interactiveLayers.push({ kind: 'decor', data: decorEntry })
-      parsedDecorLayerNames.add(ef)
-      markLayerReport(ef, {
-        status: 'parsed_interactive',
-        reasonCode: 'DECOR_PARSED',
-        bboxSvg: tr,
-        bboxScene: sceneRect,
-      })
-      removalRanges.push({ start: lt, end: gt + 1 })
+
       i = gt + 1
       continue
     }
