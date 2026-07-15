@@ -11,6 +11,17 @@ function readImportStackIndex(obj: FabricObject): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+/** Метаданные z-order из SVG-импорта — переносим при замене rect → group. */
+export const IMPORT_STACK_META_KEYS = ['importStackIndex', 'isDecorElement', 'decorLayerName'] as const;
+
+export function copyImportStackMetadata(from: unknown, to: unknown): void {
+  const src = ax(from as FabricObject);
+  const dst = ax(to as FabricObject);
+  for (const key of IMPORT_STACK_META_KEYS) {
+    if (src[key] != null) dst[key] = src[key];
+  }
+}
+
 /**
  * Восстанавливает z-order из SVG-импорта после нормализаций canvas
  * (например normalizeTemplateEmptyPhotoFieldStack).

@@ -3,7 +3,11 @@
  * Один Fabric Rect на сцене ломал ресайз в Fabric 7 — группа с noop layout и relayoutEmptyPhotoFieldChrome.
  */
 import { Circle, Group, Point, Rect, Text, type Canvas, type FabricObject } from 'fabric';
-import { createPhotoFieldStaticLayoutManager, ensurePhotoFieldStaticLayout } from './photoFieldFit';
+import {
+  createPhotoFieldStaticLayoutManager,
+  ensurePhotoFieldStaticLayout,
+} from './photoFieldFit';
+import { copyImportStackMetadata } from './designFields/importStackOrder';
 import {
   resolvePhotoFieldFrameSceneTL,
   relayoutEmptyPhotoFieldChrome,
@@ -184,7 +188,7 @@ export function upgradePlainEmptyPhotoField(field: FabricObject): FabricObject |
   const o = ax(field);
   const { fw, fh } = resolvePhotoFieldFrameSize(field);
   const anchor = resolveFieldAnchorTL(field);
-  return createEmptyPhotoField({
+  const upgraded = createEmptyPhotoField({
     id: String(o.id ?? '').trim() || `field-${Date.now()}`,
     left: anchor.x,
     top: anchor.y,
@@ -192,6 +196,8 @@ export function upgradePlainEmptyPhotoField(field: FabricObject): FabricObject |
     height: fh,
     clientAdded: o.photoFieldClientAdded === true,
   });
+  copyImportStackMetadata(field, upgraded);
+  return upgraded;
 }
 
 /** После loadFromJSON: шаблонные photo_* без chrome получают фон и иконку камеры. */

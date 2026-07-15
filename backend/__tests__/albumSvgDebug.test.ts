@@ -56,6 +56,8 @@ describe('album wedding SVG', () => {
     const decor = objects.find((obj) => obj.id === 'decor_4')
     const pageW = doc.pages[0]!.parsed.geometry.scenePx.width
     expect(decor?.type).toBe('rect')
+    expect(Number(decor?.importStackIndex)).toBe(2)
+    expect(objects.filter((obj) => obj.importStackIndex != null)).toHaveLength(5)
     expect(Number(decor?.width) / pageW).toBeGreaterThan(0.48)
     expect(Number(decor?.width) / pageW).toBeLessThan(0.52)
     expect(objects.map((obj) => String(obj.id))).toEqual([
