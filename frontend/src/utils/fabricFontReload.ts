@@ -9,14 +9,33 @@ function isTextObject(obj: FabricObject): boolean {
   return type === 'i-text' || type === 'textbox' || type === 'text';
 }
 
+type TextLikeObject = FabricObject & {
+  fontSize?: number;
+  initDimensions?: () => void;
+  setCoords?: () => void;
+};
+
 function collectTextObjectFontFamilies(obj: FabricObject, out: Set<string>): void {
   if (!isTextObject(obj)) return;
   collectFontFamiliesFromTextField(obj as unknown as Record<string, unknown>, out);
 }
 
+function collectTextObjectFontLoads(obj: FabricObject, out: Set<string>): void {
+  if (!isTextObject(obj)) return;
+  const textObj = obj as TextLikeObject;
+  const family = String((textObj as unknown as { fontFamily?: string }).fontFamily ?? '').trim();
+  if (!family) return;
+  const fontSize = Math.max(6, Number(textObj.fontSize) || 16);
+  const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  out.add(`${fontSize}px "${escaped}"`);
+}
+
 function refreshTextObjectFont(obj: FabricObject): void {
   if (!isTextObject(obj)) return;
-  hydrateTextObjectStyles(obj as Parameters<typeof hydrateTextObjectStyles>[0]);
+  const textObj = obj as TextLikeObject;
+  hydrateTextObjectStyles(textObj as Parameters<typeof hydrateTextObjectStyles>[0]);
+  textObj.initDimensions?.();
+  textObj.setCoords?.();
 }
 
 function walkObjects(objects: FabricObject[], visit: (obj: FabricObject) => void): void {
@@ -39,12 +58,14 @@ export function collectCanvasFontFamilies(canvas: Canvas): string[] {
 
 /** После FontFace / document.fonts — пересчитать метрики текста Fabric (иначе остаётся fallback). */
 export async function reloadFabricCanvasFonts(canvas: Canvas): Promise<void> {
-  const families = collectCanvasFontFamilies(canvas);
+  const loads = new Set<string>();
+  walkObjects(canvas.getObjects(), (obj) => {
+    collectTextObjectFontLoads(obj, loads);
+  });
   await Promise.all(
-    families.map(async (family) => {
-      const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    [...loads].map(async (spec) => {
       try {
-        await document.fonts.load(`16px "${escaped}"`);
+        await document.fonts.load(spec);
       } catch {
         /* системный шрифт или ещё не в document.fonts */
       }

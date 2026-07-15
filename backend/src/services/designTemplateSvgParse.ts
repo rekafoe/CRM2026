@@ -1480,7 +1480,7 @@ function warnUnhandledLayerName(kind: string, name: string, warnings: string[], 
       warnings.push('Слой locked_bg сохранится в SVG-фоне (поверх редакторских overlay).')
     return
   }
-  if (kind === 'rect' || kind === 'circle' || kind === 'ellipse' || kind === 'path') return
+  if (kind === 'rect' || kind === 'circle' || kind === 'ellipse' || kind === 'path' || kind === 'polygon' || kind === 'polyline') return
   warnings.push(
     `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg, hidden_*, guide_*. Без имени rect/circle/ellipse/path импортируются как decor_auto_*.`,
   )
@@ -1523,6 +1523,49 @@ function nextDocumentStackIndex(counter: { value: number }): number {
 
 function sortInteractiveLayersByStackIndex(layers: SvgInteractiveLayer[]): SvgInteractiveLayer[] {
   return [...layers].sort((a, b) => (a.data.stackIndex ?? 0) - (b.data.stackIndex ?? 0))
+}
+
+function findInheritedLayerName(
+  groupStack: Array<string | null>,
+  predicate: (name: string) => boolean,
+): string | null {
+  for (let i = groupStack.length - 1; i >= 0; i -= 1) {
+    const name = groupStack[i]
+    if (name && predicate(name)) return name
+  }
+  return null
+}
+
+function parsePolygonPointPairs(pointsAttr: string | undefined): Array<{ x: number; y: number }> {
+  if (!pointsAttr?.trim()) return []
+  const nums = pointsAttr.trim().split(/[\s,]+/).map(Number).filter(Number.isFinite)
+  const out: Array<{ x: number; y: number }> = []
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    out.push({ x: nums[i]!, y: nums[i + 1]! })
+  }
+  return out
+}
+
+function polygonPointsToPath(pointsAttr: string): string | null {
+  const pts = parsePolygonPointPairs(pointsAttr)
+  if (pts.length < 3) return null
+  const head = pts[0]!
+  const tail = pts.slice(1).map((p) => `L ${p.x} ${p.y}`).join(' ')
+  return `M ${head.x} ${head.y} ${tail} Z`
+}
+
+function boundsFromPointPairs(points: Array<{ x: number; y: number }>): GeometryRect | null {
+  if (points.length < 3) return null
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  const width = maxX - minX
+  const height = maxY - minY
+  if (!(width > 0 && height > 0)) return null
+  return { x: minX, y: minY, width, height }
 }
 
 function findOuterTextCloseEnd(svg: string, openingGt: number): number | null {
@@ -1812,6 +1855,7 @@ export function parseImportedSvgLayers(
     }
 
     const inherited = groupStack[groupStack.length - 1] ?? null
+    const inheritedDecor = findInheritedLayerName(groupStack, (name) => name.startsWith('decor_'))
     const inheritedTransform = transformStack[transformStack.length - 1]
 
     if (tagLc === 'rect') {
@@ -1882,7 +1926,7 @@ export function parseImportedSvgLayers(
         removalRanges.push({ start: lt, end: gt + 1 })
       } else {
         const explicitName = getLayerName(attrs)
-        const decorName = resolveDecorLayerName(explicitName, inherited, 'rect', autoDecorSeq)
+        const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'rect', autoDecorSeq)
         if (decorName && width != null && height != null && width > 0 && height > 0) {
           const tr = transformedRect(x, y, width, height, objectTransform)
           pushParsedDecor({
@@ -1921,7 +1965,7 @@ export function parseImportedSvgLayers(
         inheritedTransform,
         parseSvgTransform(attrs.transform, unsupportedFeatures),
       )
-      const decorName = resolveDecorLayerName(explicitName, inheritedName, 'circle', autoDecorSeq)
+      const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'circle', autoDecorSeq)
       if (decorName && rx > 0 && ry > 0) {
         const tr = transformedRect(cx - rx, cy - ry, rx * 2, ry * 2, objectTransform)
         pushParsedDecor({
@@ -1958,7 +2002,7 @@ export function parseImportedSvgLayers(
         inheritedTransform,
         parseSvgTransform(attrs.transform, unsupportedFeatures),
       )
-      const decorName = resolveDecorLayerName(explicitName, inheritedName, 'circle', autoDecorSeq)
+      const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'circle', autoDecorSeq)
       if (decorName && r != null && r > 0) {
         const tr = transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform)
         pushParsedDecor({
@@ -1988,7 +2032,7 @@ export function parseImportedSvgLayers(
       if (ef === 'locked_bg') lockedBgDetected = true
       if (ef) warnUnhandledLayerName('path', ef, warnings, warnedNames)
 
-      const decorName = resolveDecorLayerName(explicitName, inheritedName, 'path', autoDecorSeq)
+      const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'path', autoDecorSeq)
       const d = attrs.d?.trim()
       const baseBounds = d ? parseSvgPathApproxBounds(d) : null
       if (decorName && d && baseBounds && baseBounds.width > 0 && baseBounds.height > 0) {
@@ -2009,6 +2053,50 @@ export function parseImportedSvgLayers(
           tr,
           attrs,
           pathData: d,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          autoAssigned: decorName.startsWith('decor_auto_'),
+        })
+      }
+
+      i = gt + 1
+      continue
+    }
+
+    if (tagLc === 'polygon' || tagLc === 'polyline') {
+      const attrs = parseAttributes(attrPart)
+      const explicitName = getLayerName(attrs)
+      const inheritedName = inherited
+      const ef = explicitName ?? inheritedName
+      if (ef) {
+        markFallbackLayer(ef)
+        if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+      }
+      if (ef === 'locked_bg') lockedBgDetected = true
+      if (ef) warnUnhandledLayerName(tagLc, ef, warnings, warnedNames)
+
+      const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'path', autoDecorSeq)
+      const pointsAttr = attrs.points
+      const baseBounds = boundsFromPointPairs(parsePolygonPointPairs(pointsAttr))
+      const pathData = pointsAttr ? polygonPointsToPath(pointsAttr) : null
+      if (decorName && pathData && baseBounds && tagLc === 'polygon') {
+        const objectTransform = multiplyTransform(
+          inheritedTransform,
+          parseSvgTransform(attrs.transform, unsupportedFeatures),
+        )
+        const tr = transformedRect(
+          baseBounds.x,
+          baseBounds.y,
+          baseBounds.width,
+          baseBounds.height,
+          objectTransform,
+        )
+        pushParsedDecor({
+          baseName: decorName,
+          shape: 'path',
+          tr,
+          attrs,
+          pathData,
           removalStart: lt,
           removalEnd: gt + 1,
           autoAssigned: decorName.startsWith('decor_auto_'),
@@ -2232,7 +2320,7 @@ export function parseImportedSvgLayers(
     warnWithCode(
       warnings,
       'DECOR_NO_VALID_SHAPE',
-      `Слой ${name} оставлен в фоне: для decor_* поддержаны rect/circle/path с валидной геометрией.`,
+      `Слой ${name} оставлен в фоне: для decor_* поддержаны rect/circle/ellipse/path/polygon с валидной геометрией.`,
     )
   }
   if (unsupportedFeatures.size > 0) {

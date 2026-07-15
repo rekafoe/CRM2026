@@ -100,16 +100,17 @@ export function usePublicDesignBootstrap({
         setCoverPages(nextCoverPages);
         setPrepressConfig(normalizePrepressConfig(sourceState?.prepress ?? spec.prepress));
         setPages(spreadLayout.pages);
-        void loadDesignFontsForEditor({
-          spec,
-          pages: spreadLayout.pages,
-        }).then((fontResult) => {
-          if (fontResult.loaded.length > 0) {
+        try {
+          const fontResult = await loadDesignFontsForEditor({
+            spec,
+            pages: spreadLayout.pages,
+          });
+          if (!cancelled && fontResult.loaded.length > 0) {
             setFontsLoadedTick((tick) => tick + 1);
           }
-        }).catch(() => {
+        } catch {
           /* шрифты не должны блокировать монтирование холста */
-        });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось открыть клиентский редактор');
       } finally {

@@ -3,6 +3,7 @@ import { normalizeFilledPhotoFieldsOnCanvas } from '../photoFieldFit';
 import { prepareTextObjectsOnCanvas } from '../textStyleRuns';
 import { isTemplatePhotoField } from './fieldMeta';
 import { syncImportedPhotoFieldsOnCanvas, upgradeEmptyPhotoFieldsOnCanvas } from './photoField';
+import { applyImportStackOrder } from './importStackOrder';
 
 // Re-assert positions of template text fields after all normalizations.
 // This is the final seat-belt so that no combination of hydrate/width/coords
@@ -88,5 +89,6 @@ export async function normalizeDesignFieldsOnCanvas(
   upgradeEmptyPhotoFieldsOnCanvas(canvas);
   normalizeTemplateEmptyPhotoFieldStack(canvas);
   await normalizeFilledPhotoFieldsOnCanvas(canvas);
+  applyImportStackOrder(canvas);
   lockAllTemplateTextPositions(canvas);
 }

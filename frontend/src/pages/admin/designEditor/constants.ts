@@ -87,6 +87,10 @@ export const FABRIC_CUSTOM_PROPS = [
   'spreadFallbackProxy',
   /** Диапазоны шрифтов в текстовом поле (источник правды; Fabric styles — runtime). */
   'textStyleRuns',
+  /** Порядок слоя при SVG-импорте (z-order). */
+  'importStackIndex',
+  'isDecorElement',
+  'decorLayerName',
 ];
 
 /** Пункты меню сайдбара */

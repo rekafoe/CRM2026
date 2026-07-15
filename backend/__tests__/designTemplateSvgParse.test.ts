@@ -252,6 +252,26 @@ describe('parseImportedSvgLayers', () => {
     expect(r.interactiveLayers.map((l) => l.data.stackIndex)).toEqual([1, 2, 3, 4])
   })
 
+  it('импортирует decor polygon и наследует decor_* из вложенной группы', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <g id="decor_id">
+    <g>
+      <polygon points="1,1 20,1 20,10 1,10" fill="#cccccc"/>
+      <polygon points="25,1 45,1 45,10 25,10" fill="#cccccc"/>
+    </g>
+    <rect x="50" y="1" width="20" height="10" fill="#cccccc"/>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
+    expect(decor).toHaveLength(3)
+    expect(decor.map((layer) => layer.data.layerName)).toEqual(['decor_id', 'decor_id', 'decor_id'])
+    expect(decor.map((layer) => layer.data.name)).toEqual(['decor_id', 'decor_id__2', 'decor_id__3'])
+    expect(decor.filter((layer) => layer.data.shape === 'path')).toHaveLength(2)
+    expect(decor.filter((layer) => layer.data.shape === 'rect')).toHaveLength(1)
+  })
+
   it('для невалидного decor_* пишет DECOR_NO_VALID_SHAPE', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">

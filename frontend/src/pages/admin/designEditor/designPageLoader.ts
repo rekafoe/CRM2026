@@ -3,6 +3,7 @@ import type { DesignTemplate } from '../../../api';
 import type { DesignPage } from './types';
 import { FABRIC_CUSTOM_PROPS } from './constants';
 import { normalizeDesignFieldsOnCanvas } from './designFields';
+import { reloadFabricCanvasFonts } from '../../../utils/fabricFontReload';
 import { prepareTextObjectsOnCanvas } from './textStyleRuns';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from '../../../features/publicDesignEditor/publicEditorFeatureFlags';
 import {
@@ -456,6 +457,7 @@ canvas.clear();
     ensureWhiteCanvasBackground(canvas);
     await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
     normalizeBackgroundObjects(canvas, pageW, pageH);
+    await reloadFabricCanvasFonts(canvas);
     hardenCanvasObjectsForIosSafari(canvas);
     if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
       await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
