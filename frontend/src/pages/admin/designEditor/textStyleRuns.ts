@@ -364,6 +364,24 @@ export function prepareTextObjectsOnCanvas(objects: FabricObject[]): void {
   }
 }
 
+/** Пересчитать ширину/метрики текста после document.fonts (иначе остаётся fallback и обрезка). */
+export function remeasureTextObjectsAfterFontLoad(objects: FabricObject[]): void {
+  for (const obj of objects) {
+    if (isFabricTextObjectType(obj.type)) {
+      const textObj = obj as TextLikeObject;
+      hydrateTextObjectStyles(textObj);
+      textObj.initDimensions?.();
+      normalizeImportedSingleLineTextboxWidth(textObj);
+      lockTemplateImportedTextPosition(textObj);
+      textObj.setCoords?.();
+    }
+    const group = obj as { getObjects?: () => FabricObject[] };
+    if (typeof group.getObjects === 'function') {
+      remeasureTextObjectsAfterFontLoad(group.getObjects());
+    }
+  }
+}
+
 export function patchTextStyleRunsFontInFabricJSON(
   fabricJSON: Record<string, unknown>,
   fontFamily: string,

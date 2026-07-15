@@ -51,12 +51,14 @@ export function usePublicDesignBootstrap({
   const [organizationLogoError, setOrganizationLogoError] = useState(false);
   const [minimumPageCount, setMinimumPageCount] = useState(1);
   const [fontsLoadedTick, setFontsLoadedTick] = useState(0);
+  const [fontsBootstrapDone, setFontsBootstrapDone] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         setLoading(true);
+        setFontsBootstrapDone(false);
         setError(null);
         const res = await getPublicDesignTemplate(templateId);
         if (cancelled) return;
@@ -110,9 +112,12 @@ export function usePublicDesignBootstrap({
           }
         } catch {
           /* шрифты не должны блокировать монтирование холста */
+        } finally {
+          if (!cancelled) setFontsBootstrapDone(true);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось открыть клиентский редактор');
+        if (!cancelled) setFontsBootstrapDone(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -155,6 +160,7 @@ export function usePublicDesignBootstrap({
     setOrganizationLogoError,
     template,
     fontsLoadedTick,
+    fontsBootstrapDone,
   };
 }
 

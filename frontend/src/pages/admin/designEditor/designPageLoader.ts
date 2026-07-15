@@ -497,6 +497,7 @@ if (mergedJson) {
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
       ensureWhiteCanvasBackground(canvas);
       await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
+      await reloadFabricCanvasFonts(canvas);
       hardenCanvasObjectsForIosSafari(canvas);
       canvas.renderAll();
       canvas.requestRenderAll();
@@ -563,6 +564,7 @@ canvas.clear();
 
   ensureWhiteCanvasBackground(canvas);
   hardenCanvasObjectsForIosSafari(canvas);
+  await reloadFabricCanvasFonts(canvas);
   canvas.renderAll();
   canvas.requestRenderAll();
 }

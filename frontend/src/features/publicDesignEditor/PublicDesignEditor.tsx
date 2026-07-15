@@ -243,6 +243,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setOrganizationLogoError,
     template,
     fontsLoadedTick,
+    fontsBootstrapDone,
   } = usePublicDesignBootstrap({
     adapter,
     documentMode,
@@ -592,6 +593,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       void canvasHandleRef.current?.reloadTextFonts();
     });
   }, [fontsLoadedTick]);
+
+  useEffect(() => {
+    if (!fontsBootstrapDone || loading) return;
+    requestAnimationFrame(() => {
+      void canvasHandleRef.current?.reloadTextFonts();
+    });
+  }, [fontsBootstrapDone, loading]);
 
   useEffect(() => {
     const reload = () => {

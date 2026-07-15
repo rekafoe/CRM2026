@@ -10,6 +10,30 @@ function isSyntheticTemplatePreviewBackground(obj: Record<string, unknown>): boo
   return obj.isBackground === true && obj.backgroundFit === 'page';
 }
 
+function isDecorElementSerialized(serialized: Record<string, unknown>): boolean {
+  return serialized.isDecorElement === true;
+}
+
+function assignSerializedObjectToSingleSpreadPage(input: {
+  serializedObject: Record<string, unknown>;
+  spine: number;
+  leftJson: Record<string, unknown>[];
+  rightJson: Record<string, unknown>[];
+}): void {
+  const bounds = getSerializedObjectHorizontalBounds(input.serializedObject);
+  const centerX = bounds
+    ? bounds.left + (bounds.right - bounds.left) / 2
+    : (toFiniteNumber(input.serializedObject.left) ?? 0);
+  const copy = deepCloneJson(input.serializedObject);
+  clearSpreadMirrorMeta(copy);
+  if (centerX < input.spine) {
+    input.leftJson.push(copy);
+    return;
+  }
+  shiftLeftInSerialized(copy, -input.spine);
+  input.rightJson.push(copy);
+}
+
 function shiftLeftInSerialized(o: Record<string, unknown>, delta: number): void {
   const raw = o.left;
   const n = typeof raw === 'number' ? raw : Number(raw ?? 0);
@@ -112,6 +136,17 @@ export function splitSpreadCanvasToPagesSync(
       continue;
     }
     sourceCount += 1;
+
+    if (isDecorElementSerialized(serializedObject)) {
+      assignSerializedObjectToSingleSpreadPage({
+        serializedObject,
+        spine,
+        leftJson,
+        rightJson,
+      });
+      continue;
+    }
+
     const bounds = getSerializedObjectHorizontalBounds(serializedObject);
 
     // Never drop an object from both pages: if bounds are invalid, duplicate defensively.

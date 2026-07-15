@@ -1,7 +1,7 @@
 import type { Canvas, FabricObject } from 'fabric';
 import {
   collectFontFamiliesFromTextField,
-  hydrateTextObjectStyles,
+  remeasureTextObjectsAfterFontLoad,
 } from '../pages/admin/designEditor/textStyleRuns';
 
 function isTextObject(obj: FabricObject): boolean {
@@ -30,13 +30,6 @@ function collectTextObjectFontLoads(obj: FabricObject, out: Set<string>): void {
   out.add(`${fontSize}px "${escaped}"`);
 }
 
-function refreshTextObjectFont(obj: FabricObject): void {
-  if (!isTextObject(obj)) return;
-  const textObj = obj as TextLikeObject;
-  hydrateTextObjectStyles(textObj as Parameters<typeof hydrateTextObjectStyles>[0]);
-  textObj.initDimensions?.();
-  textObj.setCoords?.();
-}
 
 function walkObjects(objects: FabricObject[], visit: (obj: FabricObject) => void): void {
   for (const obj of objects) {
@@ -72,6 +65,6 @@ export async function reloadFabricCanvasFonts(canvas: Canvas): Promise<void> {
     }),
   );
   await document.fonts.ready;
-  walkObjects(canvas.getObjects(), refreshTextObjectFont);
+  remeasureTextObjectsAfterFontLoad(canvas.getObjects());
   canvas.requestRenderAll();
 }
