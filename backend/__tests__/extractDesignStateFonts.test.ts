@@ -116,6 +116,25 @@ describe('normalizeDesignStateFontFamilies', () => {
     const obj = (normalized.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
     expect(obj.fontFamily).toBe('Ceremonious One')
   })
+
+  it('приводит усечённое имя Sign That к family_name библиотеки', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            fontFamily: 'Sign That',
+            text: 'Hello',
+          }],
+        },
+      }],
+    }
+    const normalized = normalizeDesignStateFontFamilies(designState, [{
+      family_name: 'Sign That S (kerning)',
+    }]) as typeof designState
+    const obj = (normalized.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
+    expect(obj.fontFamily).toBe('Sign That S (kerning)')
+  })
 })
 
 describe('extractUsedFontFamiliesFromDesignState textStyleRuns', () => {
@@ -186,6 +205,26 @@ describe('buildRequiredFontEntries', () => {
       source: 'global',
       fontId: 5,
       name_aliases: ['CeremoniousOne-Regular'],
+    })
+  })
+
+  it('находит Sign That S (kerning) по усечённому имени Sign That', () => {
+    const globalByFamily = new Map([
+      ['signthat', {
+        id: 12,
+        url: '/api/design-fonts/public/12/content',
+        format: 'otf',
+        family: 'Sign That S (kerning)',
+      }],
+    ])
+    const entries = buildRequiredFontEntries({
+      families: ['Sign That'],
+      globalByFamily,
+    })
+    expect(entries[0]).toMatchObject({
+      family: 'Sign That S (kerning)',
+      source: 'global',
+      fontId: 12,
     })
   })
 })

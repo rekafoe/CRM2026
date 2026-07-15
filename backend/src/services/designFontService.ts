@@ -23,6 +23,7 @@ import {
 } from '../utils/fontFileMetadata'
 import {
   fontFamilyCompactKey,
+  fontFamilyBaseCompactKey,
   fontFamilyNamesMatch,
   guessFontFamilyFromFilename,
   normalizeFontFamilyName,
@@ -356,8 +357,9 @@ async function buildGlobalFontMap(): Promise<Map<string, GlobalFontRef>> {
     }
     const names = [font.family_name, ...font.name_aliases]
     for (const name of names) {
-      const key = fontFamilyCompactKey(name)
-      if (key) map.set(key, ref)
+      for (const key of [fontFamilyCompactKey(name), fontFamilyBaseCompactKey(name)]) {
+        if (key) map.set(key, ref)
+      }
     }
   }
   return map

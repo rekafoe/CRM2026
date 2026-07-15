@@ -10,11 +10,33 @@ export function fontFamilyCompactKey(value: string | undefined | null): string {
   return normalizeFontFamilyName(value).toLowerCase().replace(/[\s_-]+/g, '')
 }
 
+/**
+ * Имя без (kerning)/(opentype) и одиночного стилевого суффикса « S» / « R».
+ * Sign That S (kerning) → Sign That (как часто в SVG после CSS-парсинга).
+ */
+export function fontFamilyLooseMatchName(value: string | undefined | null): string {
+  let name = normalizeFontFamilyName(value)
+  if (!name) return ''
+  name = name.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim()
+  if (/\s+[A-Z]$/.test(name)) {
+    name = name.replace(/\s+[A-Z]$/, '').trim()
+  }
+  return name
+}
+
+/** Ключ «мягкого» сопоставления для библиотеки CRM и SVG. */
+export function fontFamilyBaseCompactKey(value: string | undefined | null): string {
+  return fontFamilyLooseMatchName(value).toLowerCase().replace(/[\s_-]+/g, '')
+}
+
 export function fontFamilyNamesMatch(a: string | undefined, b: string | undefined): boolean {
   const na = fontFamilyCompactKey(a)
   const nb = fontFamilyCompactKey(b)
-  if (!na || !nb) return false
-  return na === nb
+  if (na && nb && na === nb) return true
+  const ba = fontFamilyBaseCompactKey(a)
+  const bb = fontFamilyBaseCompactKey(b)
+  if (!ba || !bb) return false
+  return ba === bb
 }
 
 const GENERIC_FONT_KEYS = new Set([

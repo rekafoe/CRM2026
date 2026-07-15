@@ -1,4 +1,5 @@
 import {
+  fontFamilyBaseCompactKey,
   fontFamilyCompactKey,
   fontFamilyNamesMatch,
   isGenericFontFamily,
@@ -94,6 +95,7 @@ export function buildRequiredFontEntries(input: {
   const bundled = input.bundledFonts ?? []
   return input.families.map((family) => {
     const global = input.globalByFamily.get(fontFamilyCompactKey(family))
+      ?? input.globalByFamily.get(fontFamilyBaseCompactKey(family))
     if (global) {
       return {
         family: global.family,
@@ -126,13 +128,9 @@ type LibraryFontRef = { family_name: string; name_aliases?: string[] }
 function isFontKnownInLibrary(family: string, libraryFonts: LibraryFontRef[]): boolean {
   const current = normalizeFontFamilyName(family)
   if (!current || isGenericFontFamily(current)) return false
-  const currentKey = fontFamilyCompactKey(current)
-  if (!currentKey) return false
   for (const font of libraryFonts) {
     const names = [font.family_name, ...(font.name_aliases ?? [])]
-    for (const name of names) {
-      if (fontFamilyCompactKey(name) === currentKey) return true
-    }
+    if (names.some((name) => fontFamilyNamesMatch(name, current))) return true
   }
   return false
 }
@@ -231,8 +229,9 @@ export function normalizeDesignStateFontFamilies(
     if (!canonical) continue
     const names = [canonical, ...(font.name_aliases ?? [])]
     for (const name of names) {
-      const key = fontFamilyCompactKey(name)
-      if (key) aliasToCanonical.set(key, canonical)
+      for (const key of [fontFamilyCompactKey(name), fontFamilyBaseCompactKey(name)]) {
+        if (key) aliasToCanonical.set(key, canonical)
+      }
     }
   }
 
@@ -241,18 +240,21 @@ export function normalizeDesignStateFontFamilies(
       const current = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
       if (current) {
         const canonical = aliasToCanonical.get(fontFamilyCompactKey(current))
+          ?? aliasToCanonical.get(fontFamilyBaseCompactKey(current))
         if (canonical) obj.fontFamily = canonical
       }
       walkFabricTextStyles(obj, (style) => {
         const segFont = normalizeFontFamilyName(String(style.fontFamily ?? ''))
         if (!segFont) return
         const canonical = aliasToCanonical.get(fontFamilyCompactKey(segFont))
+          ?? aliasToCanonical.get(fontFamilyBaseCompactKey(segFont))
         if (canonical) style.fontFamily = canonical
       })
       walkFabricTextStyleRuns(obj, (run) => {
         const segFont = normalizeFontFamilyName(String(run.fontFamily ?? ''))
         if (!segFont) return
         const canonical = aliasToCanonical.get(fontFamilyCompactKey(segFont))
+          ?? aliasToCanonical.get(fontFamilyBaseCompactKey(segFont))
         if (canonical) run.fontFamily = canonical
       })
     })

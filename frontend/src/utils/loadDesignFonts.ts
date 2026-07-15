@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config/constants';
 import { APP_CONFIG } from '../types';
 import { collectFontNameAliases, readFontMetadataFromBuffer } from './fontFileMetadata';
-import { fontFamilyCompactKey, normalizeFontFamilyName } from './fontFamilyNormalize';
+import { fontFamilyCompactKey, fontFamilyBaseCompactKey, fontFamilyLooseMatchName, normalizeFontFamilyName } from './fontFamilyNormalize';
 
 export type RequiredFontSpecEntry = {
   family: string;
@@ -25,11 +25,14 @@ export function findCrmFontByFamily(
   family: string,
   libraryFonts: CrmLibraryFont[],
 ): CrmLibraryFont | undefined {
-  const key = fontFamilyCompactKey(family);
-  if (!key) return undefined;
+  const keys = [fontFamilyCompactKey(family), fontFamilyBaseCompactKey(family)].filter(Boolean);
+  if (keys.length === 0) return undefined;
   return libraryFonts.find((font) => {
     const names = [font.family_name, ...(font.name_aliases ?? [])];
-    return names.some((name) => fontFamilyCompactKey(name) === key);
+    return names.some((name) => {
+      const nameKeys = [fontFamilyCompactKey(name), fontFamilyBaseCompactKey(name)].filter(Boolean);
+      return keys.some((key) => nameKeys.includes(key));
+    });
   });
 }
 
@@ -212,7 +215,12 @@ function collectFontRegistrationNames(
 ): Promise<string[]> {
   return blob.arrayBuffer().then((buffer) => {
     const detected = collectFontNameAliases(readFontMetadataFromBuffer(buffer));
-    return [...new Set([family, ...(nameAliases ?? []), ...detected].map((n) => n.trim()).filter(Boolean))];
+    const names = [...new Set([family, ...(nameAliases ?? []), ...detected].map((n) => n.trim()).filter(Boolean))];
+    for (const name of [...names]) {
+      const loose = fontFamilyLooseMatchName(name);
+      if (loose) names.push(loose);
+    }
+    return [...new Set(names.map((n) => n.trim()).filter(Boolean))];
   });
 }
 
