@@ -104,4 +104,31 @@ describe('fabricTextFromSvgText', () => {
     expect(decorObjects.some((obj) => obj.id === 'decor_auto_rect_1')).toBe(true)
     expect(warnings.some((w) => w.includes('без интерактивного префикса') && w.includes('decor_*'))).toBe(false)
   })
+
+  it('сохраняет порядок fabric-объектов при нескольких decor_id и смешанных слоях', () => {
+    const warnings: string[] = []
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 90 50">
+  <rect id="photo_main" x="0" y="0" width="90" height="50"/>
+  <rect id="decor_id" x="5" y="5" width="20" height="10" fill="#cccccc"/>
+  <text id="text_title" x="10" y="30" font-size="12">Title</text>
+  <rect id="decor_id" x="60" y="35" width="20" height="10" fill="#999999"/>
+</svg>`
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(svg, 'utf8'),
+      originalname: 'decor-z.svg',
+      mimetype: 'image/svg+xml',
+    }, 'decor-z', warnings)
+    const objects = doc.pages[0]!.designPage.fabricJSON.objects
+    expect(objects.map((obj) => String(obj.id))).toEqual([
+      'photo_main',
+      'decor_id',
+      'text_title',
+      'decor_id__2',
+    ])
+    const decorObjects = objects.filter((obj) => String(obj.id).startsWith('decor_'))
+    expect(decorObjects.every((obj) => obj.isDecorElement === true)).toBe(true)
+    expect(decorObjects[0]?.decorLayerName).toBe('decor_id')
+    expect(decorObjects[1]?.decorLayerName).toBe('decor_id')
+  })
 })

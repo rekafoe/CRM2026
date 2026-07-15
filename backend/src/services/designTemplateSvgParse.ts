@@ -15,6 +15,10 @@ import {
 
 export type SvgRect = {
   name: string
+  /** Исходное имя слоя в SVG (до уникализации instance id). */
+  layerName?: string
+  /** Порядок в документе SVG → z-index в Fabric. */
+  stackIndex?: number
   x: number
   y: number
   width: number
@@ -35,6 +39,8 @@ export type SvgTextStyleSegment = {
 
 export type SvgText = {
   name: string
+  layerName?: string
+  stackIndex?: number
   x: number
   y: number
   fontSize: number
@@ -58,7 +64,10 @@ export type SvgText = {
 export type SvgDecorShape = 'rect' | 'circle' | 'path'
 
 export type SvgDecor = {
+  /** Уникальный id для Fabric (несколько фигур могут иметь один layerName). */
   name: string
+  layerName?: string
+  stackIndex?: number
   shape: SvgDecorShape
   fill?: string
   stroke?: string
@@ -1254,6 +1263,11 @@ function pickAnchorMmX(items: SvgText[], anchor: SvgText['textAnchor']): number 
   return Math.min(...xs)
 }
 
+function minStackIndex(items: Array<{ stackIndex?: number }>): number | undefined {
+  const vals = items.map((item) => item.stackIndex).filter((v): v is number => v != null)
+  return vals.length > 0 ? Math.min(...vals) : undefined
+}
+
 function mergeInlineTextItems(items: SvgText[]): SvgText {
   const source = requireTextItemsWithScene(
     items,
@@ -1322,6 +1336,7 @@ function mergeInlineTextItems(items: SvgText[]): SvgText {
     y: base.y,
     text,
     textAnchor,
+    stackIndex: minStackIndex(sorted) ?? base.stackIndex,
     textStyles: textStyles.length > 0 ? textStyles : undefined,
     frameWidthScene: computeTextFrameWidthScene(lines, metrics, fontSizeScene, textAnchor),
     scene: { ...base.scene, x: sceneX },
@@ -1355,6 +1370,7 @@ function mergeStackedTextItems(items: SvgText[]): SvgText {
     y: base.y,
     text,
     textAnchor,
+    stackIndex: minStackIndex(sorted) ?? base.stackIndex,
     frameWidthScene: computeTextFrameWidthScene(lines, metrics, fontSizeScene, textAnchor),
     scene: { ...base.scene, x: sceneX },
     svg: { ...base.svg, x: sceneX },
@@ -1494,6 +1510,21 @@ function resolveDecorLayerName(
   return `decor_auto_${shape}_${autoDecorSeq.value}`
 }
 
+function allocUniqueLayerInstanceId(baseName: string, counters: Map<string, number>): string {
+  const next = (counters.get(baseName) ?? 0) + 1
+  counters.set(baseName, next)
+  return next === 1 ? baseName : `${baseName}__${next}`
+}
+
+function nextDocumentStackIndex(counter: { value: number }): number {
+  counter.value += 1
+  return counter.value
+}
+
+function sortInteractiveLayersByStackIndex(layers: SvgInteractiveLayer[]): SvgInteractiveLayer[] {
+  return [...layers].sort((a, b) => (a.data.stackIndex ?? 0) - (b.data.stackIndex ?? 0))
+}
+
 function findOuterTextCloseEnd(svg: string, openingGt: number): number | null {
   let depth = 1
   let pos = openingGt + 1
@@ -1572,9 +1603,11 @@ export function parseImportedSvgLayers(
   const guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>> = {}
   let lockedBgDetected = false
   const autoDecorSeq = { value: 0 }
+  const decorInstanceCounters = new Map<string, number>()
+  const documentStack = { value: 0 }
 
   function pushParsedDecor(input: {
-    name: string
+    baseName: string
     shape: SvgDecorShape
     tr: { x: number; y: number; width: number; height: number }
     attrs: Record<string, string>
@@ -1583,10 +1616,13 @@ export function parseImportedSvgLayers(
     removalEnd: number
     autoAssigned: boolean
   }): void {
+    const fabricId = allocUniqueLayerInstanceId(input.baseName, decorInstanceCounters)
     const mmRect = geometry.svgRectToMm(input.tr)
     const sceneRect = geometry.mmRectToScene(mmRect)
     const decorEntry: SvgDecor = {
-      name: input.name,
+      name: fabricId,
+      layerName: input.baseName,
+      stackIndex: nextDocumentStackIndex(documentStack),
       shape: input.shape,
       ...(input.pathData ? { pathData: input.pathData } : {}),
       ...resolveDecorPresentation(
@@ -1599,9 +1635,10 @@ export function parseImportedSvgLayers(
     }
     decorItems.push(decorEntry)
     interactiveLayers.push({ kind: 'decor', data: decorEntry })
-    parsedDecorLayerNames.add(input.name)
-    seenDecorLayerNames.add(input.name)
-    markLayerReport(input.name, {
+    parsedDecorLayerNames.add(input.baseName)
+    parsedDecorLayerNames.add(fabricId)
+    seenDecorLayerNames.add(input.baseName)
+    markLayerReport(fabricId, {
       status: 'parsed_interactive',
       reasonCode: input.autoAssigned ? 'DECOR_AUTO_PARSED' : 'DECOR_PARSED',
       bboxSvg: input.tr,
@@ -1827,6 +1864,8 @@ export function parseImportedSvgLayers(
         const mmRect = geometry.svgRectToMm(tr)
         const photoEntry: SvgRect = {
           name: ef,
+          layerName: ef,
+          stackIndex: nextDocumentStackIndex(documentStack),
           ...mmRect,
           svg: tr,
           scene: geometry.mmRectToScene(mmRect),
@@ -1847,7 +1886,7 @@ export function parseImportedSvgLayers(
         if (decorName && width != null && height != null && width > 0 && height > 0) {
           const tr = transformedRect(x, y, width, height, objectTransform)
           pushParsedDecor({
-            name: decorName,
+            baseName: decorName,
             shape: 'rect',
             tr,
             attrs,
@@ -1886,7 +1925,7 @@ export function parseImportedSvgLayers(
       if (decorName && rx > 0 && ry > 0) {
         const tr = transformedRect(cx - rx, cy - ry, rx * 2, ry * 2, objectTransform)
         pushParsedDecor({
-          name: decorName,
+          baseName: decorName,
           shape: 'circle',
           tr,
           attrs,
@@ -1923,7 +1962,7 @@ export function parseImportedSvgLayers(
       if (decorName && r != null && r > 0) {
         const tr = transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform)
         pushParsedDecor({
-          name: decorName,
+          baseName: decorName,
           shape: 'circle',
           tr,
           attrs,
@@ -1965,7 +2004,7 @@ export function parseImportedSvgLayers(
           objectTransform,
         )
         pushParsedDecor({
-          name: decorName,
+          baseName: decorName,
           shape: 'path',
           tr,
           attrs,
@@ -2122,6 +2161,8 @@ export function parseImportedSvgLayers(
         const angle = transformAngleDeg(textTransform)
         const textEntry: SvgText = {
           name: ef,
+          layerName: ef,
+          stackIndex: nextDocumentStackIndex(documentStack),
           x: mmPoint.x,
           y: mmPoint.y,
           fontSize: fontSizeMm,
@@ -2210,7 +2251,9 @@ export function parseImportedSvgLayers(
   const textStageStart = performance.now()
   const mergedTextItems = mergeTextItemsByName(textItems)
   const mergedTextByName = new Map(mergedTextItems.map((t) => [t.name, t]))
-  const mergedInteractiveLayers = alignInteractiveTextLayers(interactiveLayers, mergedTextByName)
+  const mergedInteractiveLayers = sortInteractiveLayersByStackIndex(
+    alignInteractiveTextLayers(interactiveLayers, mergedTextByName),
+  )
   timing.textMs = Math.round((performance.now() - textStageStart) * 1000) / 1000
   if (mergedTextItems.length < textItems.length) {
     warnWithCode(

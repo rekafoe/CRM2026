@@ -219,6 +219,39 @@ describe('parseImportedSvgLayers', () => {
     expect(r.parserReport.countsByReasonCode.DECOR_PARSED).toBe(3)
   })
 
+  it('импортирует несколько фигур с одним decor_id как отдельные объекты', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect id="decor_id" x="1" y="1" width="20" height="10" fill="#cccccc"/>
+  <rect id="decor_id" x="30" y="1" width="20" height="10" fill="#cccccc"/>
+  <rect id="decor_id" x="60" y="1" width="20" height="10" fill="#cccccc"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
+    expect(decor).toHaveLength(3)
+    expect(decor.map((layer) => layer.data.name)).toEqual(['decor_id', 'decor_id__2', 'decor_id__3'])
+    expect(decor.every((layer) => layer.data.layerName === 'decor_id')).toBe(true)
+    expect(r.summary.decorFields).toBe(3)
+  })
+
+  it('сохраняет z-order decor между photo и text', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect id="photo_bg" x="0" y="0" width="100" height="50"/>
+  <rect id="decor_id" x="5" y="5" width="30" height="10" fill="#cccccc"/>
+  <text id="text_title" x="10" y="30" font-size="12">Заголовок</text>
+  <rect id="decor_id" x="70" y="35" width="20" height="10" fill="#999999"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.map((l) => `${l.kind}:${l.data.name}`)).toEqual([
+      'photo:photo_bg',
+      'decor:decor_id',
+      'text:text_title',
+      'decor:decor_id__2',
+    ])
+    expect(r.interactiveLayers.map((l) => l.data.stackIndex)).toEqual([1, 2, 3, 4])
+  })
+
   it('для невалидного decor_* пишет DECOR_NO_VALID_SHAPE', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
