@@ -239,6 +239,63 @@ function toFabricPathCommands(pathData: string): Array<[string, ...number[]]> | 
   return commands.length > 0 ? commands : null
 }
 
+function translateFabricPathCommands(
+  commands: Array<[string, ...number[]]>,
+  dx: number,
+  dy: number,
+): Array<[string, ...number[]]> {
+  return commands.map(([cmd, ...args]) => {
+    const lower = cmd.toLowerCase()
+    if (lower === 'z') return [cmd] as [string, ...number[]]
+    const absolute = cmd === lower ? false : true
+    const out: [string, ...number[]] = [cmd]
+    let i = 0
+    while (i < args.length) {
+      if (lower === 'h') {
+        out.push(absolute ? args[i]! - dx : args[i]!)
+        i += 1
+        continue
+      }
+      if (lower === 'v') {
+        out.push(absolute ? args[i]! - dy : args[i]!)
+        i += 1
+        continue
+      }
+      if (lower === 'c') {
+        for (let j = 0; j < 6 && i + j < args.length; j += 1) {
+          out.push(j % 2 === 0
+            ? (absolute ? args[i + j]! - dx : args[i + j]!)
+            : (absolute ? args[i + j]! - dy : args[i + j]!))
+        }
+        i += 6
+        continue
+      }
+      if (lower === 's' || lower === 'q') {
+        for (let j = 0; j < 4 && i + j < args.length; j += 1) {
+          out.push(j % 2 === 0
+            ? (absolute ? args[i + j]! - dx : args[i + j]!)
+            : (absolute ? args[i + j]! - dy : args[i + j]!))
+        }
+        i += 4
+        continue
+      }
+      if (lower === 'a') {
+        for (let j = 0; j < 7 && i + j < args.length; j += 1) {
+          if (j === 5) out.push(absolute ? args[i + j]! - dx : args[i + j]!)
+          else if (j === 6) out.push(absolute ? args[i + j]! - dy : args[i + j]!)
+          else out.push(args[i + j]!)
+        }
+        i += 7
+        continue
+      }
+      out.push(absolute ? args[i]! - dx : args[i]!)
+      if (i + 1 < args.length) out.push(absolute ? args[i + 1]! - dy : args[i + 1]!)
+      i += 2
+    }
+    return out
+  })
+}
+
 function toFabricDecor(item: SvgDecor): Record<string, unknown> {
   const base: Record<string, unknown> = {
     version: '6.0.0',
@@ -274,7 +331,7 @@ function toFabricDecor(item: SvgDecor): Record<string, unknown> {
       return {
         ...base,
         type: 'path',
-        path,
+        path: translateFabricPathCommands(path, item.svg.x, item.svg.y),
       }
     }
   }

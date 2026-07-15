@@ -1546,14 +1546,6 @@ function parsePolygonPointPairs(pointsAttr: string | undefined): Array<{ x: numb
   return out
 }
 
-function polygonPointsToPath(pointsAttr: string): string | null {
-  const pts = parsePolygonPointPairs(pointsAttr)
-  if (pts.length < 3) return null
-  const head = pts[0]!
-  const tail = pts.slice(1).map((p) => `L ${p.x} ${p.y}`).join(' ')
-  return `M ${head.x} ${head.y} ${tail} Z`
-}
-
 function boundsFromPointPairs(points: Array<{ x: number; y: number }>): GeometryRect | null {
   if (points.length < 3) return null
   const xs = points.map((p) => p.x)
@@ -1566,6 +1558,21 @@ function boundsFromPointPairs(points: Array<{ x: number; y: number }>): Geometry
   const height = maxY - minY
   if (!(width > 0 && height > 0)) return null
   return { x: minX, y: minY, width, height }
+}
+
+function isAxisAlignedRectPoints(points: Array<{ x: number; y: number }>): boolean {
+  if (points.length !== 4) return false
+  const xs = [...new Set(points.map((p) => Math.round(p.x * 100) / 100))]
+  const ys = [...new Set(points.map((p) => Math.round(p.y * 100) / 100))]
+  return xs.length === 2 && ys.length === 2
+}
+
+function polygonPointsToPath(pointsAttr: string, originX = 0, originY = 0): string | null {
+  const pts = parsePolygonPointPairs(pointsAttr)
+  if (pts.length < 3) return null
+  const head = pts[0]!
+  const tail = pts.slice(1).map((p) => `L ${p.x - originX} ${p.y - originY}`).join(' ')
+  return `M ${head.x - originX} ${head.y - originY} ${tail} Z`
 }
 
 function findOuterTextCloseEnd(svg: string, openingGt: number): number | null {
@@ -2077,9 +2084,9 @@ export function parseImportedSvgLayers(
 
       const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'path', autoDecorSeq)
       const pointsAttr = attrs.points
-      const baseBounds = boundsFromPointPairs(parsePolygonPointPairs(pointsAttr))
-      const pathData = pointsAttr ? polygonPointsToPath(pointsAttr) : null
-      if (decorName && pathData && baseBounds && tagLc === 'polygon') {
+      const pts = parsePolygonPointPairs(pointsAttr)
+      const baseBounds = boundsFromPointPairs(pts)
+      if (decorName && baseBounds && tagLc === 'polygon') {
         const objectTransform = multiplyTransform(
           inheritedTransform,
           parseSvgTransform(attrs.transform, unsupportedFeatures),
@@ -2091,12 +2098,13 @@ export function parseImportedSvgLayers(
           baseBounds.height,
           objectTransform,
         )
+        const axisRect = isAxisAlignedRectPoints(pts)
         pushParsedDecor({
           baseName: decorName,
-          shape: 'path',
+          shape: axisRect ? 'rect' : 'path',
           tr,
           attrs,
-          pathData,
+          ...(axisRect ? {} : { pathData: polygonPointsToPath(pointsAttr ?? '', baseBounds.x, baseBounds.y) ?? undefined }),
           removalStart: lt,
           removalEnd: gt + 1,
           autoAssigned: decorName.startsWith('decor_auto_'),

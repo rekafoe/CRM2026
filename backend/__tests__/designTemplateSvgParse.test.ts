@@ -268,8 +268,7 @@ describe('parseImportedSvgLayers', () => {
     expect(decor).toHaveLength(3)
     expect(decor.map((layer) => layer.data.layerName)).toEqual(['decor_id', 'decor_id', 'decor_id'])
     expect(decor.map((layer) => layer.data.name)).toEqual(['decor_id', 'decor_id__2', 'decor_id__3'])
-    expect(decor.filter((layer) => layer.data.shape === 'path')).toHaveLength(2)
-    expect(decor.filter((layer) => layer.data.shape === 'rect')).toHaveLength(1)
+    expect(decor.filter((layer) => layer.data.shape === 'rect')).toHaveLength(3)
   })
 
   it('для невалидного decor_* пишет DECOR_NO_VALID_SHAPE', () => {
