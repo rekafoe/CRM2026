@@ -156,19 +156,30 @@ function toFabricText(item: SvgText) {
     ? item.scene.y
     : item.scene.y - fontSizePx * 0.8
   const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
-  /**
-   * 0.55 часто недостаточно для декоративных serif/uppercase (например "ISABELLE MATHERS"):
-   * textbox начинает переносить строку, хотя в SVG она однострочная.
-   * Делаем более безопасную базовую ширину + небольшой запас.
-   */
-  const estimatedLineWidth = maxLineLen * fontSizePx * 0.7
-  const defaultWidth = Math.max(120, estimatedLineWidth + fontSizePx * 0.9)
   const textStyleRuns = item.textStyles?.length
     ? toTextStyleRuns(item.textStyles, fontSizePx)
     : undefined
   const baseFontFamily = item.textStyles?.[0]?.fontFamily?.trim()
     || item.fontFamily?.trim()
     || 'Arial'
+  const baseFill = item.fill?.trim()
+    || item.textStyles?.[0]?.fill?.trim()
+    || '#111827'
+  const baseFontWeight = item.fontWeight || item.textStyles?.[0]?.fontWeight
+  const baseFontStyle = item.fontStyle || item.textStyles?.[0]?.fontStyle
+  /**
+   * frameWidthScene из SVG — приоритет. Math.max(frame, estimate) раньше всегда
+   * раздувал поле, если estimate (maxLineLen * 0.7) был больше реального кадра.
+   * Script/decorative — более щедрый estimate, когда frame неизвестен.
+   */
+  const looksScript = /script|ceremon|cursive|handwrit|calligraph|italic/i.test(baseFontFamily)
+  const widthCoeff = looksScript ? 0.85 : 0.55
+  const estimatedLineWidth = maxLineLen * fontSizePx * widthCoeff
+  const defaultWidth = Math.max(120, estimatedLineWidth + fontSizePx * 0.9)
+  const frameW = item.frameWidthScene
+  const width = typeof frameW === 'number' && Number.isFinite(frameW) && frameW > 0
+    ? Math.max(frameW, fontSizePx * 1.5)
+    : defaultWidth
   return {
     version: '6.0.0',
     type: 'textbox',
@@ -176,16 +187,16 @@ function toFabricText(item: SvgText) {
     originY: 'top' as const,
     left: item.scene.x,
     top,
-    width: Math.max(item.frameWidthScene ?? 0, defaultWidth),
+    width,
     text: item.text,
     fontSize: fontSizePx,
     fontFamily: baseFontFamily,
-    fill: item.fill?.trim() || '#111827',
+    fill: baseFill,
     textAlign,
     id: item.name,
     ...(item.stackIndex != null ? { importStackIndex: item.stackIndex } : {}),
-    ...(item.fontWeight ? { fontWeight: item.fontWeight } : {}),
-    ...(item.fontStyle ? { fontStyle: item.fontStyle } : {}),
+    ...(baseFontWeight ? { fontWeight: baseFontWeight } : {}),
+    ...(baseFontStyle ? { fontStyle: baseFontStyle } : {}),
     ...(textStyleRuns ? { textStyleRuns } : {}),
     ...(Math.abs(angle) > 0.5 ? { angle } : {}),
   }
@@ -311,7 +322,9 @@ function toFabricDecor(item: SvgDecor): Record<string, unknown> {
     isDecorElement: true,
     selectable: false,
     evented: false,
-    fill: item.fill ?? '#111827',
+    // Без fill в SVG не подставляем тёмный дефолт — иначе page underlay / пустые фигуры
+    // превращаются в чёрный прямоугольник на весь лист.
+    fill: item.fill ?? 'transparent',
     ...(item.stroke ? { stroke: item.stroke } : {}),
     ...(item.strokeWidth != null ? { strokeWidth: item.strokeWidth } : {}),
     ...(item.opacity != null ? { opacity: item.opacity } : {}),
@@ -520,9 +533,15 @@ function matchBundledFontToTextLayer(
 
 function collectNonGenericFontFamilies(parsed: ReturnType<typeof parseImportedSvgLayers>): string[] {
   const families = new Set<string>()
+  const add = (family?: string) => {
+    if (!isGenericFontFamily(family) && family?.trim()) {
+      families.add(family.trim())
+    }
+  }
   for (const item of parsed.textItems) {
-    if (!isGenericFontFamily(item.fontFamily) && item.fontFamily?.trim()) {
-      families.add(item.fontFamily.trim())
+    add(item.fontFamily)
+    for (const seg of item.textStyles ?? []) {
+      add(seg.fontFamily)
     }
   }
   return [...families]
@@ -557,12 +576,16 @@ function applyBundledFontFallbacks(
   for (const layer of parsed.interactiveLayers) {
     if (layer.kind !== 'text') continue
     const text = layer.data
-    if (!isGenericFontFamily(text.fontFamily)) continue
-
     const matched = matchBundledFontToTextLayer(text.name, bundledFonts)
-    if (matched) {
+    if (matched && isGenericFontFamily(text.fontFamily)) {
       text.fontFamily = matched.family
-      continue
+    }
+    if (matched && text.textStyles?.length) {
+      for (const seg of text.textStyles) {
+        if (isGenericFontFamily(seg.fontFamily)) {
+          seg.fontFamily = matched.family
+        }
+      }
     }
   }
 
@@ -693,7 +716,7 @@ function buildPageFromSvg(input: {
                 : toFabricDecor(layer.data)
           )),
         ],
-        background: 'white',
+        background: parsed.pageBackgroundFill || 'white',
       },
     },
   }

@@ -111,6 +111,7 @@ export type ParserReasonCode =
   | 'GUIDE_IGNORED'
   | 'TECHNICAL_IGNORED'
   | 'LAYER_NOT_CLASSIFIED'
+  | 'PAGE_UNDERLAY_IGNORED'
 
 export type ParserLayerReport = {
   name: string
@@ -147,6 +148,8 @@ export interface ImportedSvgLayers {
   interactiveLayers: SvgInteractiveLayer[]
   guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>>
   lockedBgDetected: boolean
+  /** Цвет page-size подложки Corel (если снята как underlay, а не decor_auto). */
+  pageBackgroundFill?: string
   prepressHints: PrepressFromSvgGuides | null
   geometry: DesignTemplateGeometryDebug
   summary: {
@@ -1510,6 +1513,30 @@ function resolveDecorLayerName(
   return `decor_auto_${shape}_${autoDecorSeq.value}`
 }
 
+/**
+ * Corel часто кладёт page-size подложку (rect/polygon) без имени слоя.
+ * После auto-decor она становилась «придуманным» чёрным фоном на пустых страницах.
+ */
+export function isLikelyPageUnderlayRect(
+  tr: { x: number; y: number; width: number; height: number },
+  page: { minX: number; minY: number; width: number; height: number },
+): boolean {
+  const pageArea = page.width * page.height
+  if (!(pageArea > 0) || !(tr.width > 0) || !(tr.height > 0)) return false
+  const overlapW = Math.max(
+    0,
+    Math.min(tr.x + tr.width, page.minX + page.width) - Math.max(tr.x, page.minX),
+  )
+  const overlapH = Math.max(
+    0,
+    Math.min(tr.y + tr.height, page.minY + page.height) - Math.max(tr.y, page.minY),
+  )
+  const overlapArea = overlapW * overlapH
+  const coverage = overlapArea / pageArea
+  const rectArea = tr.width * tr.height
+  return coverage >= 0.92 && rectArea >= pageArea * 0.85
+}
+
 function allocUniqueLayerInstanceId(baseName: string, counters: Map<string, number>): string {
   const next = (counters.get(baseName) ?? 0) + 1
   counters.set(baseName, next)
@@ -1645,6 +1672,13 @@ export function parseImportedSvgLayers(
   timing.geometryMs = Math.round((performance.now() - geometryStart) * 1000) / 1000
   pushTrace(`geometry-ready viewBox=${viewBox ? 'yes' : 'no'} scale=${geometry.sceneScale}`)
 
+  const pageSvgBounds = viewBox ?? {
+    minX: 0,
+    minY: 0,
+    width: widthMm / PX_TO_MM,
+    height: heightMm / PX_TO_MM,
+  }
+
   const warnings = [...dims.warnings]
   const photoRects: SvgRect[] = []
   const textItems: SvgText[] = []
@@ -1652,9 +1686,11 @@ export function parseImportedSvgLayers(
   const interactiveLayers: SvgInteractiveLayer[] = []
   const guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>> = {}
   let lockedBgDetected = false
+  let pageBackgroundFill: string | undefined
   const autoDecorSeq = { value: 0 }
   const decorInstanceCounters = new Map<string, number>()
   const documentStack = { value: 0 }
+  const removalRanges: RemovalRange[] = []
 
   function pushParsedDecor(input: {
     baseName: string
@@ -1666,6 +1702,25 @@ export function parseImportedSvgLayers(
     removalEnd: number
     autoAssigned: boolean
   }): void {
+    // Page underlay из Corel: не создавать decor_auto на весь лист — цвет уходит в background.
+    if (input.autoAssigned && isLikelyPageUnderlayRect(input.tr, pageSvgBounds)) {
+      removalRanges.push({ start: input.removalStart, end: input.removalEnd })
+      const presentation = resolveDecorPresentation(
+        input.attrs,
+        groupStyleStack[groupStyleStack.length - 1] ?? {},
+        cssClassStyles,
+      )
+      const fill = presentation.fill?.trim()
+      if (fill && fill.toLowerCase() !== 'none' && fill.toLowerCase() !== 'transparent') {
+        if (!pageBackgroundFill) pageBackgroundFill = fill
+      }
+      markLayerReport(input.baseName, {
+        status: 'ignored_technical',
+        reasonCode: 'PAGE_UNDERLAY_IGNORED',
+        bboxSvg: input.tr,
+      })
+      return
+    }
     const fabricId = allocUniqueLayerInstanceId(input.baseName, decorInstanceCounters)
     const mmRect = geometry.svgRectToMm(input.tr)
     const sceneRect = geometry.mmRectToScene(mmRect)
@@ -1697,7 +1752,6 @@ export function parseImportedSvgLayers(
     removalRanges.push({ start: input.removalStart, end: input.removalEnd })
   }
   const warnedNames = new Set<string>()
-  const removalRanges: RemovalRange[] = []
   const seenPhotoLayerNames = new Set<string>()
   const seenTextLayerNames = new Set<string>()
   const seenDecorLayerNames = new Set<string>()
@@ -2400,6 +2454,7 @@ export function parseImportedSvgLayers(
     interactiveLayers: mergedInteractiveLayers,
     guideRectsMm,
     lockedBgDetected,
+    ...(pageBackgroundFill ? { pageBackgroundFill } : {}),
     prepressHints,
     geometry,
     summary: {

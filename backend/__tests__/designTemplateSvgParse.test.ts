@@ -295,6 +295,19 @@ describe('parseImportedSvgLayers', () => {
     expect(r.strippedSvg).not.toMatch(/<rect\b/)
   })
 
+  it('не импортирует page-size подложку как decor_auto на пустой странице', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect x="0" y="0" width="100" height="50" fill="black"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.filter((layer) => layer.kind === 'decor')).toHaveLength(0)
+    expect(r.interactiveLayers).toHaveLength(0)
+    expect(r.parserReport.countsByReasonCode.PAGE_UNDERLAY_IGNORED).toBe(1)
+    expect(r.pageBackgroundFill).toBe('#000000')
+    expect(r.strippedSvg).not.toMatch(/<rect\b/)
+  })
+
   it('импортирует безымянный path (кривую) как decor_auto_path', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
