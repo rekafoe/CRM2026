@@ -1,4 +1,6 @@
 import {
+  allocateEditableFabricId,
+  createEditableIdAllocator,
   decodeCorelUnicodeEscapes,
   decodeXmlText,
   normalizeSvgPaintColor,
@@ -6,6 +8,28 @@ import {
   resolveTextAnchor,
   transformAngleDeg,
 } from '../src/services/designTemplateSvgParse'
+
+describe('allocateEditableFabricId', () => {
+  it('нумерует bare photo_/text_/decor_', () => {
+    const alloc = createEditableIdAllocator()
+    expect(allocateEditableFabricId('photo', 'photo_', alloc)).toEqual({
+      fabricId: 'photo_1',
+      layerName: 'photo_',
+    })
+    expect(allocateEditableFabricId('photo', 'photo_', alloc)).toEqual({
+      fabricId: 'photo_2',
+      layerName: 'photo_',
+    })
+    expect(allocateEditableFabricId('text', 'text_', alloc).fabricId).toBe('text_1')
+    expect(allocateEditableFabricId('decor', 'decor_', alloc).fabricId).toBe('decor_1')
+  })
+
+  it('сохраняет осмысленное имя, если оно свободно', () => {
+    const alloc = createEditableIdAllocator()
+    expect(allocateEditableFabricId('photo', 'photo_slot', alloc).fabricId).toBe('photo_slot')
+    expect(allocateEditableFabricId('photo', 'photo_slot', alloc).fabricId).toBe('photo_slot_2')
+  })
+})
 
 describe('parseImportedSvgLayers', () => {
   it('наследует photo_* с <g> если у rect нет id', () => {
@@ -18,8 +42,29 @@ describe('parseImportedSvgLayers', () => {
     const r = parseImportedSvgLayers(svg)
     expect(r.photoRects).toHaveLength(1)
     expect(r.photoRects[0].name).toBe('photo_slot')
+    expect(r.photoRects[0].layerName).toBe('photo_slot')
     expect(r.photoRects[0].width).toBeGreaterThan(20)
     expect(r.warnings.every((w) => !w.includes('Не найдено'))).toBe(true)
+  })
+
+  it('нумерует bare photo_/text_ и разводит дубликаты id', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <rect id="photo_" x="10" y="10" width="100" height="80"/>
+  <rect id="photo_" x="200" y="10" width="100" height="80"/>
+  <text id="text_" x="40" y="200" font-size="24">Строка A</text>
+  <text id="text_" x="40" y="240" font-size="24">Строка B</text>
+  <text id="text_other" x="400" y="200" font-size="18">Другой блок</text>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.photoRects.map((p) => p.name)).toEqual(['photo_1', 'photo_2'])
+    expect(r.photoRects.every((p) => p.layerName === 'photo_')).toBe(true)
+    // Два text_ склеиваются в один блок с уникальным id; text_other — отдельно
+    expect(r.textItems).toHaveLength(2)
+    const ids = r.textItems.map((t) => t.name)
+    expect(new Set(ids).size).toBe(2)
+    expect(ids.some((id) => id.startsWith('text_'))).toBe(true)
+    expect(ids).toContain('text_other')
   })
 
   it('rect с id photo_* приоритетнее имени группы', () => {
@@ -229,7 +274,7 @@ describe('parseImportedSvgLayers', () => {
     const r = parseImportedSvgLayers(svg)
     const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
     expect(decor).toHaveLength(3)
-    expect(decor.map((layer) => layer.data.name)).toEqual(['decor_id', 'decor_id__2', 'decor_id__3'])
+    expect(decor.map((layer) => layer.data.name)).toEqual(['decor_id', 'decor_id_2', 'decor_id_3'])
     expect(decor.every((layer) => layer.data.layerName === 'decor_id')).toBe(true)
     expect(r.summary.decorFields).toBe(3)
   })
@@ -247,8 +292,9 @@ describe('parseImportedSvgLayers', () => {
       'photo:photo_bg',
       'decor:decor_id',
       'text:text_title',
-      'decor:decor_id__2',
+      'decor:decor_id_2',
     ])
+    expect(r.interactiveLayers.some((l) => l.kind === 'decor' && l.data.layerName === 'decor_id')).toBe(true)
     expect(r.interactiveLayers.map((l) => l.data.stackIndex)).toEqual([1, 2, 3, 4])
   })
 
@@ -267,7 +313,7 @@ describe('parseImportedSvgLayers', () => {
     const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
     expect(decor).toHaveLength(3)
     expect(decor.map((layer) => layer.data.layerName)).toEqual(['decor_id', 'decor_id', 'decor_id'])
-    expect(decor.map((layer) => layer.data.name)).toEqual(['decor_id', 'decor_id__2', 'decor_id__3'])
+    expect(decor.map((layer) => layer.data.name)).toEqual(['decor_id', 'decor_id_2', 'decor_id_3'])
     expect(decor.filter((layer) => layer.data.shape === 'rect')).toHaveLength(3)
   })
 

@@ -2,6 +2,9 @@
  * Именованные слои импортного SVG → photo_* rect, text_* text, decor_* (rect/circle/path),
  * trim/bleed/safe → prepress (грубая эстимация мм),
  * фоновый файл без этих элементов и без дубля с редактором overlay.
+ *
+ * Оператор в Corel задаёт только префикс (photo_ / text_ / decor_) или осмысленный
+ * photo_cover — уникальный Fabric id выдаёт парсер (photo_1, photo_2, …).
  */
 
 import { performance } from 'perf_hooks'
@@ -1569,6 +1572,76 @@ function allocUniqueLayerInstanceId(baseName: string, counters: Map<string, numb
   return next === 1 ? baseName : `${baseName}__${next}`
 }
 
+export type EditableLayerKind = 'photo' | 'text' | 'decor'
+
+export type EditableIdAllocator = {
+  used: Set<string>
+  seq: Record<EditableLayerKind, number>
+}
+
+export function createEditableIdAllocator(): EditableIdAllocator {
+  return {
+    used: new Set<string>(),
+    seq: { photo: 0, text: 0, decor: 0 },
+  }
+}
+
+function isBareEditablePrefix(raw: string, kind: EditableLayerKind): boolean {
+  const trimmed = raw.trim()
+  if (!trimmed) return true
+  return trimmed === kind || trimmed === `${kind}_`
+}
+
+/**
+ * Уникальный Fabric id для photo_/text_/decor_.
+ * Bare `photo_` → photo_1, photo_2…; дубликаты имён тоже разводятся.
+ * layerName сохраняет исходную подпись оператора в SVG.
+ */
+export function allocateEditableFabricId(
+  kind: EditableLayerKind,
+  sourceName: string,
+  alloc: EditableIdAllocator,
+): { fabricId: string; layerName: string } {
+  const prefix = `${kind}_`
+  const raw = String(sourceName ?? '').trim()
+  const layerName = isBareEditablePrefix(raw, kind) ? prefix : raw
+
+  const takeNextSequential = (): string => {
+    while (true) {
+      alloc.seq[kind] += 1
+      const id = `${prefix}${alloc.seq[kind]}`
+      if (!alloc.used.has(id)) {
+        alloc.used.add(id)
+        return id
+      }
+    }
+  }
+
+  const noteNumericId = (id: string) => {
+    const match = id.match(new RegExp(`^${prefix}(\\d+)$`, 'i'))
+    if (match) {
+      alloc.seq[kind] = Math.max(alloc.seq[kind], Number(match[1]))
+    }
+  }
+
+  if (isBareEditablePrefix(raw, kind)) {
+    return { fabricId: takeNextSequential(), layerName }
+  }
+
+  const candidate = raw.toLowerCase().startsWith(prefix) ? raw : `${prefix}${raw}`
+  if (!alloc.used.has(candidate)) {
+    alloc.used.add(candidate)
+    noteNumericId(candidate)
+    return { fabricId: candidate, layerName }
+  }
+
+  let suffix = 2
+  while (alloc.used.has(`${candidate}_${suffix}`)) suffix += 1
+  const fabricId = `${candidate}_${suffix}`
+  alloc.used.add(fabricId)
+  return { fabricId, layerName }
+}
+
 function nextDocumentStackIndex(counter: { value: number }): number {
   counter.value += 1
   return counter.value
@@ -1715,6 +1788,7 @@ export function parseImportedSvgLayers(
   let pageBackgroundFill: string | undefined
   const autoDecorSeq = { value: 0 }
   const decorInstanceCounters = new Map<string, number>()
+  const editableIds = createEditableIdAllocator()
   const documentStack = { value: 0 }
   const removalRanges: RemovalRange[] = []
 
@@ -1747,7 +1821,9 @@ export function parseImportedSvgLayers(
       })
       return
     }
-    const fabricId = allocUniqueLayerInstanceId(input.baseName, decorInstanceCounters)
+    const fabricId = input.autoAssigned
+      ? allocUniqueLayerInstanceId(input.baseName, decorInstanceCounters)
+      : allocateEditableFabricId('decor', input.baseName, editableIds).fabricId
     const mmRect = geometry.svgRectToMm(input.tr)
     const sceneRect = geometry.mmRectToScene(mmRect)
     const decorEntry: SvgDecor = {
@@ -1993,9 +2069,10 @@ export function parseImportedSvgLayers(
       if (ef?.startsWith('photo_') && width != null && height != null && width > 0 && height > 0) {
         const tr = transformedRect(x, y, width, height, objectTransform)
         const mmRect = geometry.svgRectToMm(tr)
+        const { fabricId, layerName } = allocateEditableFabricId('photo', ef, editableIds)
         const photoEntry: SvgRect = {
-          name: ef,
-          layerName: ef,
+          name: fabricId,
+          layerName,
           stackIndex: nextDocumentStackIndex(documentStack),
           ...mmRect,
           svg: tr,
@@ -2004,7 +2081,8 @@ export function parseImportedSvgLayers(
         photoRects.push(photoEntry)
         interactiveLayers.push({ kind: 'photo', data: photoEntry })
         parsedPhotoLayerNames.add(ef)
-        markLayerReport(ef, {
+        parsedPhotoLayerNames.add(fabricId)
+        markLayerReport(fabricId, {
           status: 'parsed_interactive',
           reasonCode: 'PHOTO_PARSED',
           bboxSvg: tr,
@@ -2425,10 +2503,24 @@ export function parseImportedSvgLayers(
       : null
 
   const textStageStart = performance.now()
-  const mergedTextItems = mergeTextItemsByName(textItems)
-  const mergedTextByName = new Map(mergedTextItems.map((t) => [t.name, t]))
+  // Сначала merge по исходному имени слоя (несколько <text>/tspan с одним text_*),
+  // затем выдаём уникальные Fabric id — иначе merge сломается.
+  const mergedBySourceName = mergeTextItemsByName(textItems)
+  const mergedTextBySourceName = new Map<string, SvgText>()
+  const mergedTextItems = mergedBySourceName.map((item) => {
+    const sourceName = item.name
+    const { fabricId, layerName } = allocateEditableFabricId(
+      'text',
+      item.layerName ?? sourceName,
+      editableIds,
+    )
+    const next: SvgText = { ...item, name: fabricId, layerName }
+    mergedTextBySourceName.set(sourceName, next)
+    parsedTextLayerNames.add(fabricId)
+    return next
+  })
   const mergedInteractiveLayers = sortInteractiveLayersByStackIndex(
-    alignInteractiveTextLayers(interactiveLayers, mergedTextByName),
+    alignInteractiveTextLayers(interactiveLayers, mergedTextBySourceName),
   )
   timing.textMs = Math.round((performance.now() - textStageStart) * 1000) / 1000
   if (mergedTextItems.length < textItems.length) {
