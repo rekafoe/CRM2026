@@ -22,10 +22,14 @@ function isDesignFontContentPath(req: Request): boolean {
 function isBinaryFileResponsePath(req: Request): boolean {
   const path = req.path || ''
   const base = (req.originalUrl || '').split('?')[0] || path
+  // sendFile для content/thumb: нельзя заранее ставить Content-Encoding —
+  // иначе клиент (fetch/Next BFF) пытается gunzip сырой JPEG → 500 / битый preview.
+  const draftFileBinaryRe =
+    /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/(content|thumb)\/?$/
   return (
     isDesignFontContentPath(req) ||
-    /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/.test(path) ||
-    /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/.test(base)
+    draftFileBinaryRe.test(path) ||
+    draftFileBinaryRe.test(base)
   )
 }
 
