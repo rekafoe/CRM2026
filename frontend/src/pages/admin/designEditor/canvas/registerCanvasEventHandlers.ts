@@ -41,6 +41,7 @@ import {
   detachFabricObject,
   deletePhotoFieldTargetInBasicMode,
   duplicateActiveObjects,
+  enforceSingleObjectSelectionOnCoarse,
   getObjProps,
   isClientAddedPhotoField,
   isCoarsePointerEnvironment,
@@ -55,6 +56,7 @@ import {
   resolveInteractiveTargetAtScene,
   resolveKeyboardNudgePx,
   resolvePhotoFieldTarget,
+  resolveCanvasMarqueeSelectionEnabled,
   scenePointFromInteractionEvent,
   scenePointToClient,
   activateClonedObjects,
@@ -177,6 +179,8 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
     onTextFloatingAnchorRef,
   } = deps;
 
+        canvas.selection = resolveCanvasMarqueeSelectionEnabled(true);
+
         const trackPasteScene = (ev: Event) => {
           try {
             photoPasteSceneRef.current = canvas.getScenePoint(ev as never);
@@ -199,8 +203,11 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           }
         };
 
+        let objectDragActive = false;
+
         const scheduleTextAnchor = () => {
           if (!onTextFloatingAnchorRef.current) return;
+          if (objectDragActive) return;
           cancelAnimationFrame(textAnchorRafRef.current);
           textAnchorRafRef.current = requestAnimationFrame(() => {
             const cb = onTextFloatingAnchorRef.current;
@@ -262,6 +269,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
 
         // Selection events
         const updateSel = () => {
+          enforceSingleObjectSelectionOnCoarse(canvas);
           const active = canvas.getActiveObject();
           if (active && isTextLikeObject(active)) {
             const text = active as IText;
@@ -291,7 +299,10 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           onSelectionChange(null);
           scheduleTextAnchor();
         });
-        canvas.on('after:render', scheduleTextAnchor);
+        canvas.on('after:render', () => {
+          if (objectDragActive) return;
+          scheduleTextAnchor();
+        });
 
         canvas.on('object:scaling', (opt) => {
           const target = opt.target;
@@ -394,6 +405,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           }
           const active = canvas.getActiveObject();
           if (active) onSelectionChange(getObjProps(active));
+          objectDragActive = false;
           saveSnapshot();
         };
         canvas.on('object:modified', handleModified);
@@ -409,6 +421,10 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
 
         // Smart guides: targets are fixed for one drag, hysteresis keeps snapping stable.
         canvas.on('object:moving', (opt) => {
+          objectDragActive = true;
+          if (isCoarsePointerEnvironment()) {
+            enforceSingleObjectSelectionOnCoarse(canvas);
+          }
           const movingField = resolvePhotoFieldTarget(opt.target);
           if (movingField && isClientAddedPhotoField(asAny(movingField))) {
             photoFieldResizeDraftRef.current = null;
@@ -433,7 +449,10 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           if (!smartGuideSessionRef.current) {
             const excludePeerSnap =
               !!(asAny(target).isPhotoField || (target.group && asAny(target.group).isPhotoField));
-            const others = excludePeerSnap
+            const skipPeerSnapOnCoarse =
+              isCoarsePointerEnvironment()
+              && isTextLikeObject(target);
+            const others = excludePeerSnap || skipPeerSnapOnCoarse
               ? []
               : canvas
                   .getObjects()
@@ -488,6 +507,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           }
         });
         const clearSnaps = () => {
+          objectDragActive = false;
           smartGuideSessionRef.current = null;
           snapOverlayKeyRef.current = '';
           setLocalSnapLines([]);
@@ -718,7 +738,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
         });
         canvas.on('mouse:up', (opt) => {
           isPanning = false;
-          canvas.selection = true;
+          canvas.selection = resolveCanvasMarqueeSelectionEnabled(true);
           restoreBasicTextClickLock();
           if (shouldUseCoarseTapActions() || isCoarsePointerEvent(opt.e)) {
             handleCoarseTap(opt.e, opt.target as FabricObject | undefined);

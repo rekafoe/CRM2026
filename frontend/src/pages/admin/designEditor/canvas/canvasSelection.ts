@@ -1,6 +1,9 @@
 import type { Canvas, FabricObject, Group } from 'fabric';
+import { ActiveSelection } from 'fabric';
 import type { SelectedObjProps } from '../types';
-import { asAny } from './canvasUtils';
+import { isClientAddedPhotoField } from '../designFields';
+import { isCoarsePointerEnvironment } from './canvasPointer';
+import { asAny, isTextLikeObject } from './canvasUtils';
 
 export function resolvePhotoFieldTarget(target: FabricObject | undefined): FabricObject | undefined {
   let field = target;
@@ -9,20 +12,93 @@ export function resolvePhotoFieldTarget(target: FabricObject | undefined): Fabri
   return field;
 }
 
+/** Рамочное выделение нескольких объектов — только десктоп с точным указателем. */
+export function isCanvasMarqueeSelectionAllowed(): boolean {
+  return !isCoarsePointerEnvironment();
+}
+
+export function resolveCanvasMarqueeSelectionEnabled(interactionEnabled: boolean): boolean {
+  return interactionEnabled && isCanvasMarqueeSelectionAllowed();
+}
+
+function resolvePreferredSingleSelectionTarget(objects: FabricObject[]): FabricObject | null {
+  if (objects.length === 0) return null;
+  const texts = objects.filter(isTextLikeObject);
+  const hasLockedTemplatePhoto = objects.some((obj) => {
+    const field = resolvePhotoFieldTarget(obj) ?? (asAny(obj).isPhotoField ? obj : undefined);
+    return field && !isClientAddedPhotoField(asAny(field));
+  });
+  if (hasLockedTemplatePhoto && texts.length > 0) {
+    return texts[texts.length - 1] ?? null;
+  }
+  if (texts.length > 0) return texts[texts.length - 1] ?? null;
+  const clientPhotos = objects.filter((obj) => {
+    const field = resolvePhotoFieldTarget(obj) ?? (asAny(obj).isPhotoField ? obj : undefined);
+    return field && isClientAddedPhotoField(asAny(field));
+  });
+  if (clientPhotos.length > 0) return clientPhotos[clientPhotos.length - 1] ?? null;
+  return objects[objects.length - 1] ?? null;
+}
+
+/** На мобилке не допускаем ActiveSelection из нескольких объектов (ломает drag фото-полей). */
+export function enforceSingleObjectSelectionOnCoarse(canvas: Canvas): boolean {
+  if (!isCoarsePointerEnvironment()) return false;
+  const active = canvas.getActiveObject();
+  if (!active) return false;
+  const type = String(active.type ?? '').toLowerCase();
+  if (type !== 'activeselection') return false;
+  const selection = active as ActiveSelection;
+  const objects = typeof selection.getObjects === 'function' ? selection.getObjects() : [];
+  if (objects.length <= 1) return false;
+  const keep = resolvePreferredSingleSelectionTarget(objects);
+  if (!keep) return false;
+  canvas.discardActiveObject();
+  canvas.setActiveObject(keep);
+  keep.setCoords?.();
+  return true;
+}
+
 /** Поле для фото может быть внутри группы; `canvas.getObjects().find` его не находит. */
-export function findPhotoFieldByIdDeep(canvas: Canvas, fieldId: string): FabricObject | undefined {
+const SPREAD_OBJECT_ID_RE = /^p(\d+):(.+)$/;
+
+export function photoFieldIdsMatch(objectId: string, fieldId: string): boolean {
+  if (!objectId || !fieldId) return false;
+  if (objectId === fieldId) return true;
+  const objectMatch = objectId.match(SPREAD_OBJECT_ID_RE);
+  if (objectMatch && objectMatch[2] === fieldId) return true;
+  const fieldMatch = fieldId.match(SPREAD_OBJECT_ID_RE);
+  if (fieldMatch && fieldMatch[2] === objectId) return true;
+  if (objectMatch && fieldMatch && objectMatch[2] === fieldMatch[2]) return true;
+  return false;
+}
+
+export function findPhotoFieldByIdDeep(
+  canvas: Canvas,
+  fieldId: string,
+  preferredPageIndex?: number,
+): FabricObject | undefined {
   if (!fieldId) return undefined;
-  const walk = (list: FabricObject[]): FabricObject | undefined => {
+  const matches: FabricObject[] = [];
+  const walk = (list: FabricObject[]) => {
     for (const o of list) {
-      if (asAny(o).isPhotoField && String(asAny(o).id ?? '') === fieldId) return o;
+      const id = String(asAny(o).id ?? '');
+      if (asAny(o).isPhotoField && photoFieldIdsMatch(id, fieldId)) {
+        matches.push(o);
+      }
       if (typeof (o as Group).getObjects === 'function') {
-        const nested = walk((o as Group).getObjects());
-        if (nested) return nested;
+        walk((o as Group).getObjects());
       }
     }
-    return undefined;
   };
-  return walk(canvas.getObjects());
+  walk(canvas.getObjects());
+  if (matches.length === 0) return undefined;
+  if (matches.length === 1) return matches[0];
+  if (preferredPageIndex != null) {
+    const preferredPrefix = `p${preferredPageIndex}:`;
+    const onPage = matches.find((o) => String(asAny(o).id ?? '').startsWith(preferredPrefix));
+    if (onPage) return onPage;
+  }
+  return matches[0];
 }
 
 export function findDesignObjectByIdDeep(canvas: Canvas, id: string): FabricObject | undefined {

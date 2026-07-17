@@ -1,5 +1,6 @@
 import type { FabricObject } from 'fabric';
 import { isFabricTextObjectType } from './patchFabricTextObjects';
+import { isTemplateTextLayerId } from './spreadPageObjectIds';
 
 export type TextStyleRun = {
   start: number;
@@ -439,8 +440,7 @@ export function kickTextObjectFontRerender(obj: TextLikeObject): void {
 
 export function isDesignedTemplateText(obj: TextLikeObject | Record<string, unknown>): boolean {
   const o = obj as { id?: string; textFieldClientAdded?: boolean };
-  const id = String(o.id ?? '');
-  return id.toLowerCase().startsWith('text_') && o.textFieldClientAdded !== true;
+  return isTemplateTextLayerId(o.id) && o.textFieldClientAdded !== true;
 }
 
 function walkFabricJsonObjects(

@@ -1,5 +1,19 @@
 const SPREAD_PAGE_ID_PREFIX_RE = /^p(\d+):(.+)$/;
 
+/** Снимает префикс разворота `pN:` — шаблонные проверки text_/photo_ смотрят на базовый id. */
+export function stripSpreadPageIdPrefix(id: string): string {
+  const match = SPREAD_PAGE_ID_PREFIX_RE.exec(String(id ?? '').trim());
+  return match?.[2] ?? String(id ?? '').trim();
+}
+
+export function resolveFabricObjectBaseId(id: unknown): string {
+  return stripSpreadPageIdPrefix(String(id ?? ''));
+}
+
+export function isTemplateTextLayerId(id: unknown): boolean {
+  return resolveFabricObjectBaseId(id).toLowerCase().startsWith('text_');
+}
+
 /** Уникальный id объекта на холсте разворота (шаблонные id повторяются на каждой странице). */
 export function prefixSpreadPageFabricObjectIds(
   obj: Record<string, unknown>,

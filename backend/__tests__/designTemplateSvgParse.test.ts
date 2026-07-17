@@ -514,6 +514,19 @@ describe('parseImportedSvgLayers', () => {
     expect(text?.scene.x).toBeGreaterThan(100)
   })
 
+  it('выводит center по разным x строк (Corel poetry без text-align)', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <text id="text_quote" font-size="36" text-anchor="start">
+    <tspan x="200" y="200">Пусть этот журнал станет отражением того,</tspan>
+    <tspan x="280" y="250">сколько ты значишь для меня</tspan>
+  </text>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.textAnchor).toBe('middle')
+    expect(text?.text).toContain('\n')
+  })
+
   it('склеивает Corel-разбитое слово: декоративная первая буква + остаток базовым шрифтом', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">

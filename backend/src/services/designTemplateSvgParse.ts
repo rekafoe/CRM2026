@@ -660,7 +660,7 @@ export function resolveTextAnchor(...sources: Array<Record<string, string> | und
   let anchorFromAttr: SvgText['textAnchor'] | undefined
   for (const source of sources) {
     if (!source) continue
-    const anchor = source['text-anchor']?.trim()
+    const anchor = (source['text-anchor'] ?? source.textAnchor)?.trim()
     if (!anchor) continue
     const normalized = normalizeTextAnchor(anchor)
     if (normalized !== 'start') return normalized
@@ -668,7 +668,11 @@ export function resolveTextAnchor(...sources: Array<Record<string, string> | und
   }
   for (const source of sources) {
     if (!source) continue
-    const align = source['text-align']?.trim()
+    const align = (
+      source['text-align']
+      ?? source.textAlign
+      ?? source['text-align-last']
+    )?.trim()
     if (!align) continue
     const normalized = normalizeTextAnchor(align)
     if (normalized !== 'start') return normalized
@@ -703,16 +707,38 @@ function inferAlignedTextAnchor(
   fontSizeSvg: number,
 ): { anchor: SvgText['textAnchor']; anchorX: number; anchorY: number } | undefined {
   if (metrics.length < 2) return undefined
-  const rights = metrics.map((m) => m.right)
   const lefts = metrics.map((m) => m.left)
-  const centers = metrics.map((m) => (m.left + m.right) / 2)
-  const rightSpread = Math.max(...rights) - Math.min(...rights)
   const leftSpread = Math.max(...lefts) - Math.min(...lefts)
-  const centerSpread = Math.max(...centers) - Math.min(...centers)
   const tol = fontSizeSvg * 0.35
-  if (centerSpread <= tol && (leftSpread > tol || rightSpread > tol)) {
-    return { anchor: 'middle', anchorX: centers[0]!, anchorY: metrics[0]!.y }
+  const baseWidths = metrics.map((m) => Math.max(1, m.right - m.left))
+
+  // Оценка ширины (0.55) часто ошибается для script — ищем scale, при котором центры строк сходятся.
+  const scales = new Set<number>([1, 0.75, 0.85, 1.15, 1.35, 1.55])
+  for (let i = 0; i < metrics.length; i += 1) {
+    for (let j = i + 1; j < metrics.length; j += 1) {
+      const dw = baseWidths[i]! - baseWidths[j]!
+      if (Math.abs(dw) < 1) continue
+      const scale = (2 * (lefts[j]! - lefts[i]!)) / dw
+      if (scale > 0.25 && scale < 2.5) scales.add(scale)
+    }
   }
+
+  for (const scale of scales) {
+    const rights = metrics.map((m, i) => m.left + baseWidths[i]! * scale)
+    const centers = metrics.map((m, i) => m.left + (baseWidths[i]! * scale) / 2)
+    const rightSpread = Math.max(...rights) - Math.min(...rights)
+    const centerSpread = Math.max(...centers) - Math.min(...centers)
+    if (centerSpread <= tol && (leftSpread > tol || rightSpread > tol)) {
+      return {
+        anchor: 'middle',
+        anchorX: centers.reduce((sum, value) => sum + value, 0) / centers.length,
+        anchorY: metrics[0]!.y,
+      }
+    }
+  }
+
+  const rights = metrics.map((m) => m.right)
+  const rightSpread = Math.max(...rights) - Math.min(...rights)
   if (rightSpread <= tol && leftSpread > tol) {
     return { anchor: 'end', anchorX: Math.max(...rights), anchorY: metrics[0]!.y }
   }

@@ -45,6 +45,9 @@ export {
   findPhotoFieldByIdDeep,
   getObjProps,
   resolvePhotoFieldTarget,
+  enforceSingleObjectSelectionOnCoarse,
+  isCanvasMarqueeSelectionAllowed,
+  resolveCanvasMarqueeSelectionEnabled,
 } from './canvasSelection';
 export { canvasToJSON, parsePageLoadKey } from './canvasSerialization';
 export { createDesignEditorCanvasHandle } from './createDesignEditorCanvasHandle';

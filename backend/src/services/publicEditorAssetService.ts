@@ -71,10 +71,11 @@ async function buildImageMetadata(buffer: Buffer | undefined, originalName?: str
   try {
     const image = sharp(buffer, { failOn: 'none' }).rotate()
     const meta = await image.metadata()
+    // Крупный thumb для сетки библиотеки / превью клиента (не 420 — выглядит «мыльно»).
     const thumb = await image
       .clone()
-      .resize({ width: 420, height: 420, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true })
+      .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 88, mozjpeg: true })
       .toBuffer()
     const savedThumb = saveBufferToOrderFiles(thumb, `thumb-${originalName || 'photo'}.jpg`)
 
