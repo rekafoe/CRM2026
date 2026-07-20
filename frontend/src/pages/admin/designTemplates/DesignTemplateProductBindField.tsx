@@ -11,12 +11,15 @@ type Props = {
   value: ProductBindValue;
   onChange: (value: ProductBindValue) => void;
   requiredSize?: boolean;
+  /** Компактный вид в строках семьи (без длинной подсказки) */
+  compact?: boolean;
 };
 
 export const DesignTemplateProductBindField: React.FC<Props> = ({
   value,
   onChange,
   requiredSize = false,
+  compact = false,
 }) => {
   const products = useProductDirectoryStore((s) => s.products);
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
@@ -88,7 +91,7 @@ export const DesignTemplateProductBindField: React.FC<Props> = ({
   };
 
   return (
-    <div className="design-product-bind-field">
+    <div className={`design-product-bind-field${compact ? ' design-product-bind-field--compact' : ''}`}>
       <div className="design-product-bind-field__row">
         <label>
           Продукт
@@ -130,10 +133,12 @@ export const DesignTemplateProductBindField: React.FC<Props> = ({
       {value.productId && !configLoading && !configError && sizes.length === 0 && simplified && (
         <p className="design-product-bind-field__hint">Нет размеров у выбранного подтипа.</p>
       )}
-      <p className="design-product-bind-field__hint">
-        Для появления на сайте нужна привязка в матрице размеров (вкладка «Привязки» или «Дизайн» в продукте).
-        {requiredSize ? ' При импорте укажите размер — иначе запись только в каталоге.' : ''}
-      </p>
+      {!compact && (
+        <p className="design-product-bind-field__hint">
+          Для появления на сайте нужна привязка в матрице размеров (вкладка «Привязки» или «Дизайн» в продукте).
+          {requiredSize ? ' При импорте укажите размер — иначе запись только в каталоге.' : ''}
+        </p>
+      )}
     </div>
   );
 };

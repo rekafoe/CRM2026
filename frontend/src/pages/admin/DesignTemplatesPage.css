@@ -358,6 +358,66 @@
   border-color: #fcd34d;
 }
 
+/* Семья: на всю ширину сетки, сверху превью + мета, снизу строки размеров */
+.design-template-card--family {
+  grid-column: 1 / -1;
+  flex-direction: column;
+}
+
+.design-template-family-top {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.design-template-card--family .design-template-preview {
+  aspect-ratio: 1;
+  max-height: 180px;
+  border-radius: 0;
+}
+
+.design-template-card--family .design-template-info {
+  padding: 14px 16px;
+  justify-content: center;
+}
+
+.design-template-family-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.design-template-actions--family-top {
+  padding: 0;
+  border-top: none;
+  background: transparent;
+  margin-top: 4px;
+}
+
+.design-template-actions--family-top .design-template-actions__primary {
+  display: flex;
+  flex-wrap: wrap;
+  grid-template-columns: none;
+  gap: 6px;
+}
+
+.design-template-card--family .design-family-variant-rows {
+  padding: 12px 14px 14px;
+}
+
+@media (max-width: 640px) {
+  .design-template-family-top {
+    grid-template-columns: 1fr;
+  }
+
+  .design-template-card--family .design-template-preview {
+    max-height: 140px;
+    aspect-ratio: 16 / 10;
+  }
+}
+
 .design-template-preview {
   position: relative;
   display: flex;

@@ -46,6 +46,7 @@ import { DesignTemplateBindingsPanel } from './designTemplates/DesignTemplateBin
 import { DesignTemplateCategoriesModal } from './designTemplates/DesignTemplateCategoriesModal';
 import { DesignTemplateCategoryField } from './designTemplates/DesignTemplateCategoryField';
 import { DesignTemplateProductBindField } from './designTemplates/DesignTemplateProductBindField';
+import { DesignTemplateFamilyVariantRows } from './designTemplates/DesignTemplateFamilyVariantRows';
 import { DesignTemplateReimportModal } from './designTemplates/DesignTemplateReimportModal';
 import { DesignTemplateUsagePanel } from './designTemplates/DesignTemplateUsagePanel';
 import { buildCategorySections, UNCATEGORIZED_KEY } from './designTemplates/designTemplateCategoryUtils';
@@ -685,9 +686,7 @@ export const DesignTemplatesPage: React.FC = () => {
     const t = family.primary;
     const status = familyCatalogStatus(family);
     const codeLabel = family.design_code ?? formatDesignCodeLabel(t);
-    const binding = formatBinding(parseTemplateSpec(t));
     const previewSrc = resolveTemplatePreviewUrl(t.site_preview_url || t.preview_url, API_BASE_URL);
-    const hasUnlinked = family.variants.some((v) => (v.subtype_link_count ?? 0) === 0);
     const warningCount = family.variants.reduce(
       (n, v) => n + parseTemplateSpec(v).importWarnings.length,
       0,
@@ -696,184 +695,111 @@ export const DesignTemplatesPage: React.FC = () => {
       const p = parseTemplateSpec(v);
       return p.hasDesignState && !p.fontsResolved;
     });
+    const unlinkedCount = family.variants.filter((v) => (v.subtype_link_count ?? 0) === 0).length;
 
     return (
       <div key={family.key} className={`design-template-card design-template-card--family design-template-card--${status}`}>
-        <div className="design-template-preview">
-          {previewSrc ? (
-            <img src={previewSrc} alt={codeLabel} />
-          ) : (
-            <div className="design-template-placeholder">
-              <AppIcon name="image" size="lg" />
+        <div className="design-template-family-top">
+          <div className="design-template-preview">
+            {previewSrc ? (
+              <img src={previewSrc} alt={codeLabel} />
+            ) : (
+              <div className="design-template-placeholder">
+                <AppIcon name="image" size="lg" />
+              </div>
+            )}
+            <span className={`design-template-status design-template-status--${status}`}>
+              {STATUS_LABELS[status]}
+            </span>
+          </div>
+          <div className="design-template-info">
+            <h4 className="design-template-name">
+              <span className="design-template-code">{codeLabel}</span>
+              <span className="design-template-id">семья · {family.variants.length} размер{family.variants.length === 1 ? '' : family.variants.length < 5 ? 'а' : 'ов'}</span>
+            </h4>
+            <p className="design-template-family-hint">
+              У каждого размера макета — своя привязка: продукт → подтип → размер в калькуляторе.
+            </p>
+            <div className="design-template-meta-row">
+              {unlinkedCount > 0 && (
+                <span className="design-template-meta design-template-binding-warn">
+                  без привязки: {unlinkedCount}
+                </span>
+              )}
+              {warningCount > 0 && (
+                <span className="design-template-meta design-template-warnings-badge" title="Предупреждения импорта">
+                  {warningCount} предупр.
+                </span>
+              )}
+              {fontsIssue && (
+                <span className="design-template-meta design-template-warnings-badge" title="Не все шрифты найдены в библиотеке CRM">
+                  шрифты
+                </span>
+              )}
             </div>
-          )}
-          <span className={`design-template-status design-template-status--${status}`}>
-            {STATUS_LABELS[status]}
-          </span>
-        </div>
-        <div className="design-template-info">
-          <h4 className="design-template-name">
-            <span className="design-template-code">{codeLabel}</span>
-            <span className="design-template-id">#{t.id}</span>
-          </h4>
-          {family.variants.length > 1 && (
-            <span className="design-template-family-count">
-              вариантов: {family.variants.length}
-            </span>
-          )}
-          <ul className="design-template-variants">
-            {family.variants.map((variant) => {
-              const parsed = parseTemplateSpec(variant);
-              const sizeStr = formatTemplateSize(parsed) ?? 'без размера';
-              const variantStatus = getTemplateCatalogStatus(variant);
-              return (
-                <li key={variant.id} className="design-template-variant">
-                  <button
-                    type="button"
-                    className="design-template-variant__link"
-                    onClick={() => navigate(`${editorPathPrefix}/${variant.id}`)}
-                    title={`Открыть редактор #${variant.id}`}
-                  >
-                    <span className="design-template-variant__size">{sizeStr}</span>
-                    <span className="design-template-variant__id">#{variant.id}</span>
-                  </button>
-                  <span className={`design-template-variant__status design-template-variant__status--${variantStatus}`}>
-                    {STATUS_LABELS[variantStatus]}
-                  </span>
-                  <button
-                    type="button"
-                    className="lg-btn lg-btn--icon design-template-variant__client"
-                    onClick={() => navigate(`/adminpanel/public-design-editor-preview/${variant.id}`)}
-                    title="Клиентский sandbox"
-                    aria-label="Клиент"
-                  >
-                    <AppIcon name="image" size="xs" />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="design-template-meta-row">
-            {binding && <span className="design-template-meta design-template-binding">{binding}</span>}
-            {hasUnlinked && (
-              <button
-                type="button"
-                className="design-template-meta design-template-binding-warn"
-                title={
-                  parseTemplateSpec(t).productId != null
-                    ? 'Открыть матрицу привязок для этого продукта'
-                    : 'Сначала укажите продукт в карточке семьи'
-                }
-                onClick={() => {
-                  if (parseTemplateSpec(t).productId != null) openBindingsForTemplate(t);
-                  else openEdit(t);
-                }}
-              >
-                нет привязки · настроить
-              </button>
-            )}
-            {warningCount > 0 && (
-              <span className="design-template-meta design-template-warnings-badge" title="Предупреждения импорта">
-                {warningCount} предупр.
+            {(t.author_name || t.author_user_id) && (
+              <span className="design-template-author">
+                <AppIcon name="user" size="xs" />
+                {t.author_name ?? `user #${t.author_user_id}`}
               </span>
             )}
-            {fontsIssue && (
-              <span className="design-template-meta design-template-warnings-badge" title="Не все шрифты найдены в библиотеке CRM">
-                шрифты
+            {formatAuthorRoyaltyLine(t) && (
+              <span className="design-template-royalty" title="Плата и % — на всю семью (синхронизируются при сохранении)">
+                <BynSymbol className="design-template-royalty__sign" />
+                {formatAuthorRoyaltyLine(t)}
+                <span className="design-template-royalty-hint"> · на семью</span>
               </span>
             )}
-          </div>
-          {(t.author_name || t.author_user_id) && (
-            <span className="design-template-author">
-              <AppIcon name="user" size="xs" />
-              {t.author_name ?? `user #${t.author_user_id}`}
-            </span>
-          )}
-          {formatAuthorRoyaltyLine(t) && (
-            <span className="design-template-royalty" title="Плата и % — на всю семью (синхронизируются при сохранении)">
-              <BynSymbol className="design-template-royalty__sign" />
-              {formatAuthorRoyaltyLine(t)}
-              <span className="design-template-royalty-hint"> · на семью</span>
-            </span>
-          )}
-        </div>
-        <div className="design-template-actions">
-          <div className="design-template-actions__primary">
-            <button
-              type="button"
-              className="lg-btn lg-btn--primary"
-              onClick={() => navigate(`${editorPathPrefix}/${t.id}`)}
-              title="Master-редактор (первый размер)"
-            >
-              <AppIcon name="edit" size="xs" /> Шаблон
-            </button>
-            {family.design_code && (
-              <button
-                type="button"
-                className="lg-btn"
-                onClick={() => openImportIntoFamily(family)}
-                title="Импорт ещё одного размера в эту семью"
-              >
-                <AppIcon name="plus" size="xs" /> Размер
-              </button>
-            )}
-          </div>
-          <div className="design-template-actions__secondary">
-            <button
-              type="button"
-              className="lg-btn lg-btn--icon"
-              onClick={() => setReimportTemplate(t)}
-              title="Обновить из SVG (первый вариант)"
-              aria-label="Обновить SVG"
-            >
-              <AppIcon name="download" size="xs" />
-            </button>
-            <button type="button" className="lg-btn lg-btn--icon" onClick={() => setInfoTemplate(t)} title="Импорт и метаданные" aria-label="Инфо">
-              <AppIcon name="info" size="xs" />
-            </button>
-            {(parseTemplateSpec(t).productId != null || parseTemplateSpec(t).typeId != null) && (
-              <button type="button" className="lg-btn lg-btn--icon" onClick={() => openBindingsForTemplate(t)} title="Привязки к продукту" aria-label="Привязки">
-                <AppIcon name="link" size="xs" />
-              </button>
-            )}
-            <button
-              type="button"
-              className="lg-btn lg-btn--icon"
-              onClick={() => openEdit(t)}
-              title="Карточка семьи (автор, плата Y, % Z — на все размеры)"
-              aria-label="Карточка"
-            >
-              <AppIcon name="edit" size="xs" />
-            </button>
-            <button type="button" className="lg-btn lg-btn--icon" onClick={() => void handleDuplicate(t)} title="Копия с новым кодом семьи" aria-label="Копия">
-              <AppIcon name="copy" size="xs" />
-            </button>
-            <label className="design-template-active-toggle lg-btn lg-btn--icon" title="Активен на сайте (первый вариант)">
-              <input
-                type="checkbox"
-                checked={t.is_active === 1}
-                disabled={!parseTemplateSpec(t).hasDesignState}
-                onChange={() => void handleToggleActive(t)}
-              />
-            </label>
-            <button type="button" className="lg-btn lg-btn--icon lg-btn--danger" onClick={() => handleDelete(t.id)} title="Удалить вариант" aria-label="Удалить">
-              <AppIcon name="trash" size="xs" />
-            </button>
+            <div className="design-template-actions design-template-actions--family-top">
+              <div className="design-template-actions__primary">
+                {family.design_code && (
+                  <button
+                    type="button"
+                    className="lg-btn"
+                    onClick={() => openImportIntoFamily(family)}
+                    title="Импорт ещё одного размера в эту семью"
+                  >
+                    <AppIcon name="plus" size="xs" /> Добавить размер
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="lg-btn lg-btn--icon"
+                  onClick={() => openEdit(t)}
+                  title="Карточка семьи (автор, плата Y, % Z)"
+                  aria-label="Карточка"
+                >
+                  <AppIcon name="edit" size="xs" />
+                </button>
+                <button type="button" className="lg-btn lg-btn--icon" onClick={() => setInfoTemplate(t)} title="Импорт и метаданные" aria-label="Инфо">
+                  <AppIcon name="info" size="xs" />
+                </button>
+                <button type="button" className="lg-btn lg-btn--icon" onClick={() => setReimportTemplate(t)} title="Обновить из SVG (первый вариант)" aria-label="Обновить SVG">
+                  <AppIcon name="download" size="xs" />
+                </button>
+                <button type="button" className="lg-btn lg-btn--icon" onClick={() => void handleDuplicate(t)} title="Копия с новым кодом семьи" aria-label="Копия">
+                  <AppIcon name="copy" size="xs" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
+        <DesignTemplateFamilyVariantRows
+          family={family}
+          editorPathPrefix={editorPathPrefix}
+          formatBinding={formatBinding}
+          onBound={loadTemplates}
+        />
       </div>
     );
   }, [
-    navigate,
     editorPathPrefix,
-    openBindingsForTemplate,
+    formatBinding,
+    handleDuplicate,
+    loadTemplates,
     openEdit,
     openImportIntoFamily,
-    setReimportTemplate,
-    handleDuplicate,
-    handleToggleActive,
-    handleDelete,
-    formatBinding,
   ]);
 
   return (
