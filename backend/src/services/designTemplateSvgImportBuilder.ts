@@ -341,10 +341,18 @@ function toFabricDecor(item: SvgDecor): Record<string, unknown> {
   if (item.shape === 'path' && item.pathData) {
     const path = toFabricPathCommands(item.pathData)
     if (path) {
+      // Path-команды в SVG user units; scene — в px холста. Без scale Fabric
+      // пересчитает width/height из path и декор станет в ~sceneScale раз больше.
+      const svgW = Math.max(Number(item.svg.width) || 0, 1e-6)
+      const svgH = Math.max(Number(item.svg.height) || 0, 1e-6)
       return {
         ...base,
         type: 'path',
         path: translateFabricPathCommands(path, item.svg.x, item.svg.y),
+        width: item.svg.width,
+        height: item.svg.height,
+        scaleX: item.scene.width / svgW,
+        scaleY: item.scene.height / svgH,
       }
     }
   }

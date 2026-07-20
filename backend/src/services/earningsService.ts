@@ -334,17 +334,17 @@ export class EarningsService {
 
         const qty = Number(row.quantity) || 0;
         const lineTotal = (Number(row.price) || 0) * qty;
-        // База оператора = X (без платы за дизайн Y). Y идёт только автору макета.
+        // База оператора = X (без платы за дизайн Y). Y — один раз на позицию с макетом.
         let designUsageTotal = 0;
         const designTemplateIdForFee = Number(params?.designTemplateId);
         if (Number.isFinite(designTemplateIdForFee) && designTemplateIdForFee > 0) {
           const feeFromParams = Number(params?.designUsageFee ?? params?.usage_fee);
           if (Number.isFinite(feeFromParams) && feeFromParams >= 0) {
-            designUsageTotal = feeFromParams * qty;
+            designUsageTotal = feeFromParams;
           } else {
             const tpl = designTemplateMap.get(designTemplateIdForFee);
             const usageFee = Number(tpl?.usage_fee) || 0;
-            if (usageFee > 0 && qty > 0) designUsageTotal = usageFee * qty;
+            if (usageFee > 0 && qty > 0) designUsageTotal = usageFee;
           }
         }
         const itemTotal = Math.max(0, lineTotal - designUsageTotal);
@@ -397,7 +397,8 @@ export class EarningsService {
           const usageFee = Number(template?.usage_fee) || 0;
           const authorPercent = Number(template?.author_percent) || 0;
           if (authorId && usageFee > 0 && authorPercent > 0 && qty > 0) {
-            const authorBase = usageFee * qty;
+            // Y один раз на позицию; автор получает Z% от Y.
+            const authorBase = usageFee;
             const authorAmount = (authorBase * authorPercent) / 100;
             await db.run(
               `
