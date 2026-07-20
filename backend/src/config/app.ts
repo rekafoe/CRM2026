@@ -55,6 +55,6 @@ export const config = {
   flyersAnchorPromo: Number(process.env.FLYERS_ANCHOR_PROMO || 41.23),
   jwtSecret: process.env.JWT_SECRET || 'change-me-in-production',
   jwtExpiry: process.env.JWT_EXPIRY || '24h',
-  rateLimitMax: Number(process.env.RATE_LIMIT_MAX || 2000),
+  rateLimitMax: Number(process.env.RATE_LIMIT_MAX || 20_000),
   rateLimitWindow: Number(process.env.RATE_LIMIT_WINDOW_MS || 60 * 1000), // синхронно с rateLimiter.ts generalRateLimit
 }

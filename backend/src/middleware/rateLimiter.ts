@@ -221,10 +221,10 @@ function envPositiveInt(envKey: string, fallback: number): number {
 
 export const generalRateLimit = rateLimiter.middleware({
   windowMs: envPositiveInt('RATE_LIMIT_WINDOW_MS', DEFAULT_RATE_WINDOW_MS),
-  // Гость (без Bearer): сайт/боты — консервативный потолок
-  max: envPositiveInt('RATE_LIMIT_MAX', 2000),
+  // Гость (без Bearer): публичный редактор — несколько клиентов с одного Wi‑Fi / NAT
+  max: envPositiveInt('RATE_LIMIT_MAX', 20_000),
   // CRM с Bearer: параллельные запросы одной страницы (заказы, прайсинг, принтеры, активность)
-  maxAuthenticated: envPositiveInt('RATE_LIMIT_AUTH_MAX', 12000),
+  maxAuthenticated: envPositiveInt('RATE_LIMIT_AUTH_MAX', 120_000),
   message: 'Too many requests from this IP, please try again later',
   keyPrefix: 'general',
   skip: skipRateLimitForPublicUploadStatic,
