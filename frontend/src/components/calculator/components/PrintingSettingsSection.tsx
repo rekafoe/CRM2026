@@ -148,36 +148,35 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     return Array.isArray(rows) ? rows : [];
   }, [effectiveSizesProp, backendProductSchema, selectedSizeId]);
 
-  // Проверяем, поддерживает ли технология двухстороннюю печать
-  // Приоритет: если в print_prices выбранного размера нет duplex для выбранной технологии
-  // (и выбранного цвета, если он задан) — считаем, что для продукта duplex недоступен.
-  const supportsDuplex = useMemo(() => {
-    const normalize = (value: any) => String(value ?? '').trim().toLowerCase();
+  // Стороны печати — только из print_prices шаблона (как цвет), не из справочника технологий.
+  const allowedSides = useMemo((): Array<1 | 2> => {
+    const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase();
+    if (!printTechnology) return [];
 
-    const productDuplexSupport = (() => {
-      if (!printTechnology) return null as boolean | null;
-      if (!selectedSizePrintPrices.length) return null as boolean | null;
+    const matching = selectedSizePrintPrices.filter((row: any) => {
+      const sameTech = normalize(row.technology_code ?? row.technologyCode) === normalize(printTechnology);
+      if (!sameTech) return false;
+      if (!printColorMode) return true;
+      return normalize(row.color_mode ?? row.colorMode) === normalize(printColorMode);
+    });
 
-      const matching = selectedSizePrintPrices.filter((row: any) => {
-        const sameTech = normalize(row.technology_code ?? row.technologyCode) === normalize(printTechnology);
-        if (!sameTech) return false;
-        if (!printColorMode) return true;
-        return normalize(row.color_mode ?? row.colorMode) === normalize(printColorMode);
-      });
+    if (!matching.length) return [];
 
-      if (!matching.length) return false;
-      return matching.some((row: any) => {
-        const mode = normalize(row.sides_mode ?? row.sidesMode);
-        return mode === 'duplex' || mode === 'duplex_bw_back';
-      });
-    })();
+    const modes = new Set<1 | 2>();
+    for (const row of matching) {
+      const mode = normalize(row.sides_mode ?? row.sidesMode);
+      if (mode === 'duplex' || mode === 'duplex_bw_back') modes.add(2);
+      else if (mode === 'single') modes.add(1);
+    }
+    const out: Array<1 | 2> = [];
+    if (modes.has(1)) out.push(1);
+    if (modes.has(2)) out.push(2);
+    return out;
+  }, [selectedSizePrintPrices, printTechnology, printColorMode]);
 
-    const supports = selectedPrintTechnology?.supports_duplex;
-    const techSupportsDuplex = selectedPrintTechnology ? (supports === 1 || supports === true) : true;
-
-    if (productDuplexSupport === null) return techSupportsDuplex;
-    return techSupportsDuplex && productDuplexSupport;
-  }, [selectedPrintTechnology, selectedSizePrintPrices, printTechnology, printColorMode]);
+  const supportsDuplex = allowedSides.includes(2);
+  const supportsSingle = allowedSides.includes(1);
+  const sidesChoiceAvailable = supportsDuplex && supportsSingle;
 
   // Проверяем, поддерживает ли технология только цветную печать
   // Для струйных пигментных технологий обычно только цветная печать
@@ -271,14 +270,13 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     }
   }, [printTechnology, allowedColorModes, printColorMode, onPrintColorModeChange]);
 
-  // 🆕 Если технология не поддерживает двухстороннюю печать - устанавливаем sides = 1
+  // Стороны: только варианты из print_prices шаблона (не даём выбрать single, если его нет в ценах).
   useEffect(() => {
-    if (!printTechnology || !supportsDuplex) {
-      if (sides === 2) {
-        onSidesChange(1);
-      }
+    if (!printTechnology || allowedSides.length === 0) return;
+    if (!allowedSides.includes(sides as 1 | 2)) {
+      onSidesChange(allowedSides[0]);
     }
-  }, [printTechnology, supportsDuplex, sides, onSidesChange]);
+  }, [printTechnology, allowedSides, sides, onSidesChange]);
 
   // Если продукт не выбран, не показываем раздел печати
   if (!selectedProduct?.id) {
@@ -399,40 +397,46 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
           )
         ) : null}
 
-        {/* Двухсторонняя печать - скрываем, если технология не поддерживает duplex */}
-        {supportsDuplex ? (
-          <div className="param-group">
-            <label>
-              Двухсторонняя печать <span style={{ color: 'red' }}>*</span>
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={sides === 2}
-                  onChange={(e) => {
-                    onSidesChange(e.target.checked ? 2 : 1);
-                  }}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span>Двухсторонняя</span>
+        {/* Стороны печати — только из print_prices шаблона */}
+        {printTechnology && allowedSides.length > 0 ? (
+          sidesChoiceAvailable ? (
+            <div className="param-group">
+              <label>
+                Двухсторонняя печать <span style={{ color: 'red' }}>*</span>
               </label>
-              {sides === 1 && (
-                <span style={{ color: '#666', fontSize: '14px' }}>Односторонняя</span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={sides === 2}
+                    onChange={(e) => {
+                      onSidesChange(e.target.checked ? 2 : 1);
+                    }}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span>Двухсторонняя</span>
+                </label>
+                {sides === 1 && (
+                  <span style={{ color: '#666', fontSize: '14px' }}>Односторонняя</span>
+                )}
+              </div>
             </div>
-          </div>
-        ) : (
-          // Если не поддерживает duplex - показываем как текст "Односторонняя"
-          <div className="param-group">
-            <label>
-              Двухсторонняя печать
-            </label>
-            <div className="form-control" style={{ color: '#666', fontWeight: 500 }}>
-              Односторонняя (только)
+          ) : supportsDuplex ? (
+            <div className="param-group">
+              <label>Стороны печати</label>
+              <div className="form-control" style={{ color: '#1a202c', fontWeight: 500 }}>
+                Двухсторонняя (только)
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="param-group">
+              <label>Стороны печати</label>
+              <div className="form-control" style={{ color: '#666', fontWeight: 500 }}>
+                Односторонняя (только)
+              </div>
+            </div>
+          )
+        ) : null}
       </div>
     </div>
   );
