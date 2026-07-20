@@ -333,10 +333,13 @@ export async function getPublicDesignTemplates(params: {
          WHERE psd.product_id = ? AND psd.type_id = ? AND (psd.size_id IS NULL OR psd.size_id = '') AND dt.is_active = 1`,
         [params.productId, params.typeId],
       ) as DesignTemplateRow[]
+      // Legacy-линки без size_id: только если в spec явно указан тот же sizeId.
+      // Раньше `spec.sizeId == null` попадал в ответ для ЛЮБОГО размера →
+      // на сайте размер без sibling семьи ошибочно считался доступным.
       const legacyFiltered = legacy.filter((row) => {
         try {
           const spec = row.spec ? JSON.parse(row.spec) as Record<string, unknown> : {}
-          return spec.sizeId == null || String(spec.sizeId) === sizeId
+          return spec.sizeId != null && String(spec.sizeId) === sizeId
         } catch {
           return false
         }
