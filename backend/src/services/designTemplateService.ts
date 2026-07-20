@@ -122,11 +122,56 @@ async function enrichPublicTemplateSpec(spec: string | null): Promise<string | n
   }
 }
 
+/**
+ * Лёгкий spec для сетки каталога: без designState / fabricJSON / шрифтов.
+ * Полный designState — только в GET /public/:id (редактор).
+ */
+function toPublicListSpec(spec: string | null): string | null {
+  if (!spec) return null
+  try {
+    const parsed = JSON.parse(spec) as Record<string, unknown>
+    const designState =
+      parsed.designState && typeof parsed.designState === 'object' && !Array.isArray(parsed.designState)
+        ? (parsed.designState as Record<string, unknown>)
+        : null
+    const pages = Array.isArray(designState?.pages) ? designState.pages.length : 0
+    const pageCount = Math.max(
+      pages,
+      Math.floor(Number(designState?.pageCount)) || 0,
+      Math.floor(Number(parsed.page_count)) || 0,
+    )
+    const light: Record<string, unknown> = {}
+    for (const key of ['productId', 'typeId', 'sizeId', 'width_mm', 'height_mm'] as const) {
+      if (parsed[key] != null) light[key] = parsed[key]
+    }
+    if (pageCount > 0) light.page_count = pageCount
+    const importMeta = parsed.import
+    if (importMeta && typeof importMeta === 'object' && !Array.isArray(importMeta)) {
+      const imp = importMeta as Record<string, unknown>
+      light.import = {
+        ...(imp.status != null ? { status: imp.status } : {}),
+        ...(Array.isArray(imp.warnings) ? { warnings: imp.warnings.slice(0, 5) } : {}),
+      }
+    }
+    return Object.keys(light).length > 0 ? JSON.stringify(light) : null
+  } catch {
+    return null
+  }
+}
+
 async function enrichPublicTemplateRow(row: DesignTemplateRow): Promise<DesignTemplateRow> {
   const stripped = stripPrivateImportFields(stripAuthorRoyaltyFields(row))
   return {
     ...stripped,
     spec: await enrichPublicTemplateSpec(stripped.spec),
+  }
+}
+
+function mapPublicListRow(row: DesignTemplateRow): DesignTemplateRow {
+  const stripped = stripAuthorRoyaltyFields(row)
+  return {
+    ...stripped,
+    spec: toPublicListSpec(stripped.spec),
   }
 }
 
@@ -371,7 +416,8 @@ export async function getPublicDesignTemplates(params: {
     ? rows
     : dedupePublicByDesignCode(rows)
 
-  return Promise.all(prepared.map((row) => enrichPublicTemplateRow(row)))
+  // List: без designState и без enrich шрифтов (иначе N× listDesignFonts на каждый макет).
+  return prepared.map((row) => mapPublicListRow(row))
 }
 
 async function resolveInputCategory(
