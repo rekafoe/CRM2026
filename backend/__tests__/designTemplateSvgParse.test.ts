@@ -10,7 +10,7 @@ import {
 } from '../src/services/designTemplateSvgParse'
 
 describe('allocateEditableFabricId', () => {
-  it('нумерует bare photo_/text_/decor_', () => {
+  it('нумерует bare photo_/text_/decor_/locked_bg', () => {
     const alloc = createEditableIdAllocator()
     expect(allocateEditableFabricId('photo', 'photo_', alloc)).toEqual({
       fabricId: 'photo_1',
@@ -22,12 +22,15 @@ describe('allocateEditableFabricId', () => {
     })
     expect(allocateEditableFabricId('text', 'text_', alloc).fabricId).toBe('text_1')
     expect(allocateEditableFabricId('decor', 'decor_', alloc).fabricId).toBe('decor_1')
+    expect(allocateEditableFabricId('locked_bg', 'locked_bg', alloc).fabricId).toBe('locked_bg_1')
+    expect(allocateEditableFabricId('locked_bg', 'locked_bg_', alloc).fabricId).toBe('locked_bg_2')
   })
 
   it('сохраняет осмысленное имя, если оно свободно', () => {
     const alloc = createEditableIdAllocator()
     expect(allocateEditableFabricId('photo', 'photo_slot', alloc).fabricId).toBe('photo_slot')
     expect(allocateEditableFabricId('photo', 'photo_slot', alloc).fabricId).toBe('photo_slot_2')
+    expect(allocateEditableFabricId('locked_bg', 'locked_bg_hero', alloc).fabricId).toBe('locked_bg_hero')
   })
 })
 
@@ -384,7 +387,24 @@ describe('parseImportedSvgLayers', () => {
     const r = parseImportedSvgLayers(svg)
     expect(r.interactiveLayers.filter((layer) => layer.kind === 'decor')).toHaveLength(0)
     expect(r.lockedBgDetected).toBe(true)
-    expect(r.strippedSvg).toContain('locked_bg')
+    expect(r.lockedBgIds).toEqual(['locked_bg_1'])
+    expect(r.strippedSvg).toContain('locked_bg_1')
+  })
+
+  it('автонумерует несколько locked_bg и не делает их decor', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect id="locked_bg" x="0" y="0" width="100" height="50" fill="#111"/>
+  <rect id="locked_bg_" x="0" y="40" width="100" height="10" fill="#222"/>
+  <rect id="locked_bg_band" x="0" y="0" width="20" height="50" fill="#333"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.filter((layer) => layer.kind === 'decor')).toHaveLength(0)
+    expect(r.lockedBgDetected).toBe(true)
+    expect(r.lockedBgIds).toEqual(['locked_bg_1', 'locked_bg_2', 'locked_bg_band'])
+    expect(r.strippedSvg).toContain('id="locked_bg_1"')
+    expect(r.strippedSvg).toContain('id="locked_bg_2"')
+    expect(r.strippedSvg).toContain('id="locked_bg_band"')
   })
 
   it('наследует font-family с родительской группы text_* (Corel/AI)', () => {

@@ -676,7 +676,7 @@ function buildPageFromSvg(input: {
   const drawableInStripped = countDrawableSvgNodes(parsed.strippedSvg)
   if (!parsed.lockedBgDetected && drawableInStripped > 0) {
     input.warnings.push(
-      `Страница ${input.pageIndex + 1}: в SVG-фоне осталось ${drawableInStripped} нераспознанных фигур (image/text/polygon и т.п.). Rect/circle/ellipse/path без подписи импортируются как decor_auto_*; для фона добавьте locked_bg на весь лист.`,
+      `Страница ${input.pageIndex + 1}: в SVG-фоне осталось ${drawableInStripped} нераспознанных фигур (image/text/polygon и т.п.). Rect/circle/ellipse/path без подписи импортируются как decor_auto_*; для фона добавьте locked_bg / locked_bg_ на весь лист.`,
     )
   }
 

@@ -1,10 +1,11 @@
 /**
  * Именованные слои импортного SVG → photo_* rect, text_* text, decor_* (rect/circle/path),
  * trim/bleed/safe → prepress (грубая эстимация мм),
- * фоновый файл без этих элементов и без дубля с редактором overlay.
+ * locked_bg / locked_bg_* → залоченный SVG-фон (с автонумерацией),
+ * фоновый файл без интерактивных элементов и без дубля с редактором overlay.
  *
- * Оператор в Corel задаёт только префикс (photo_ / text_ / decor_) или осмысленный
- * photo_cover — уникальный Fabric id выдаёт парсер (photo_1, photo_2, …).
+ * Оператор в Corel задаёт только префикс (photo_ / text_ / decor_ / locked_bg) или осмысленный
+ * photo_cover — уникальный id выдаёт парсер (photo_1, locked_bg_1, …).
  */
 
 import { performance } from 'perf_hooks'
@@ -151,6 +152,8 @@ export interface ImportedSvgLayers {
   interactiveLayers: SvgInteractiveLayer[]
   guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>>
   lockedBgDetected: boolean
+  /** Уникальные id слоёв locked_bg_* после автонумерации. */
+  lockedBgIds: string[]
   /** Цвет page-size подложки Corel (если снята как underlay, а не decor_auto). */
   pageBackgroundFill?: string
   prepressHints: PrepressFromSvgGuides | null
@@ -180,6 +183,13 @@ export interface ImportedSvgLayers {
 const TECH_PREFIXES = ['hidden_', 'guide_', '___FAKE_']
 
 const GUIDE_NAMES = new Set(['trim', 'bleed', 'safe'])
+
+/** locked_bg, locked_bg_, locked_bg_1, locked_bg_hero — залоченный фон, не decor. */
+export function isLockedBgLayerName(name: string | null | undefined): boolean {
+  if (!name) return false
+  const n = String(name).trim().toLowerCase()
+  return n === 'locked_bg' || n.startsWith('locked_bg_')
+}
 const MAX_SVG_GROUP_DEPTH = 128
 
 type SvgTransform = {
@@ -201,6 +211,7 @@ function inferKindExpected(name: string): ParserLayerReport['kindExpected'] {
   if (name.startsWith('photo_')) return 'photo'
   if (name.startsWith('text_')) return 'text'
   if (name.startsWith('decor_')) return 'decor'
+  if (isLockedBgLayerName(name)) return 'technical'
   if (GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe')) return 'guide'
   if (TECH_PREFIXES.some((p) => name.startsWith(p))) return 'technical'
   return 'unknown'
@@ -564,6 +575,30 @@ export function applyRemovalRanges(svg: string, ranges: RemovalRange[]): string 
     sliceFrom = r.end
   }
   out += svg.slice(sliceFrom)
+  return out
+}
+
+/** Точечная замена текста (например id→locked_bg_1) + вырезание removal-диапазонов. */
+export function applySvgRemovalsAndRewrites(
+  svg: string,
+  removals: RemovalRange[],
+  rewrites: Array<{ start: number; end: number; text: string }>,
+): string {
+  const mergedRemovals = mergeRemovalRanges(removals)
+  type Op = { start: number; end: number; text: string }
+  const ops: Op[] = [
+    ...rewrites.map((r) => ({ start: r.start, end: r.end, text: r.text })),
+    ...mergedRemovals.map((r) => ({ start: r.start, end: r.end, text: '' })),
+  ]
+  ops.sort((a, b) => b.start - a.start || b.end - a.end)
+  const filtered = ops.filter((op) => {
+    if (op.text === '') return true
+    return !mergedRemovals.some((r) => op.start >= r.start && op.end <= r.end)
+  })
+  let out = svg
+  for (const op of filtered) {
+    out = out.slice(0, op.start) + op.text + out.slice(op.end)
+  }
   return out
 }
 
@@ -1502,24 +1537,24 @@ function warnUnhandledLayerName(kind: string, name: string, warnings: string[], 
 
   if (name.startsWith('photo_') || name.startsWith('text_') || name.startsWith('decor_')) return
   if (
-    name === 'locked_bg' ||
+    isLockedBgLayerName(name) ||
     name === 'trim' ||
     name === 'bleed' ||
     name === 'safe' ||
     TECH_PREFIXES.some((p) => name.startsWith(p))
   ) {
-    if (name === 'locked_bg')
+    if (isLockedBgLayerName(name))
       warnings.push('Слой locked_bg сохранится в SVG-фоне (поверх редакторских overlay).')
     return
   }
   if (kind === 'rect' || kind === 'circle' || kind === 'ellipse' || kind === 'path' || kind === 'polygon' || kind === 'polyline') return
   warnings.push(
-    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg, hidden_*, guide_*. Без имени rect/circle/ellipse/path импортируются как decor_auto_*.`,
+    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg / locked_bg_*, hidden_*, guide_*. Без имени rect/circle/ellipse/path импортируются как decor_auto_*.`,
   )
 }
 
 function isReservedLayerName(name: string): boolean {
-  if (name === 'locked_bg') return true
+  if (isLockedBgLayerName(name)) return true
   if (GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe')) return true
   if (TECH_PREFIXES.some((p) => name.startsWith(p))) return true
   if (name.startsWith('photo_')) return true
@@ -1572,7 +1607,7 @@ function allocUniqueLayerInstanceId(baseName: string, counters: Map<string, numb
   return next === 1 ? baseName : `${baseName}__${next}`
 }
 
-export type EditableLayerKind = 'photo' | 'text' | 'decor'
+export type EditableLayerKind = 'photo' | 'text' | 'decor' | 'locked_bg'
 
 export type EditableIdAllocator = {
   used: Set<string>
@@ -1582,7 +1617,7 @@ export type EditableIdAllocator = {
 export function createEditableIdAllocator(): EditableIdAllocator {
   return {
     used: new Set<string>(),
-    seq: { photo: 0, text: 0, decor: 0 },
+    seq: { photo: 0, text: 0, decor: 0, locked_bg: 0 },
   }
 }
 
@@ -1593,8 +1628,8 @@ function isBareEditablePrefix(raw: string, kind: EditableLayerKind): boolean {
 }
 
 /**
- * Уникальный Fabric id для photo_/text_/decor_.
- * Bare `photo_` → photo_1, photo_2…; дубликаты имён тоже разводятся.
+ * Уникальный id для photo_/text_/decor_/locked_bg_.
+ * Bare `photo_` → photo_1; bare `locked_bg` → locked_bg_1; дубликаты тоже разводятся.
  * layerName сохраняет исходную подпись оператора в SVG.
  */
 export function allocateEditableFabricId(
@@ -1640,6 +1675,38 @@ export function allocateEditableFabricId(
   const fabricId = `${candidate}_${suffix}`
   alloc.used.add(fabricId)
   return { fabricId, layerName }
+}
+
+/** Переписать id / inkscape:label / data-name внутри открывающего тега на unique locked_bg_N. */
+function pushLayerNameAttributeRewrite(
+  svg: string,
+  tagLt: number,
+  tagGtExclusive: number,
+  attrs: Record<string, string>,
+  newId: string,
+  rewrites: Array<{ start: number; end: number; text: string }>,
+): void {
+  const tag = svg.slice(tagLt, tagGtExclusive)
+  const keys = ['id', 'inkscape:label', 'data-name'] as const
+  for (const key of keys) {
+    if (attrs[key] == null) continue
+    const escapedKey = key.replace(/:/g, '\\:')
+    const re = new RegExp(`(?:^|\\s)(${escapedKey})\\s*=\\s*(["'])([^"']*)\\2`, 'i')
+    const m = tag.match(re)
+    if (!m || m.index == null) continue
+    const full = m[0]
+    const quoteChar = m[2]
+    const value = m[3]
+    const eqIdx = full.indexOf('=')
+    const qIdx = full.indexOf(quoteChar, eqIdx)
+    if (qIdx < 0) continue
+    const valueStart = tagLt + m.index + qIdx + 1
+    const valueEnd = valueStart + value.length
+    if (value !== newId) {
+      rewrites.push({ start: valueStart, end: valueEnd, text: newId })
+    }
+    return
+  }
 }
 
 function nextDocumentStackIndex(counter: { value: number }): number {
@@ -1727,7 +1794,7 @@ function findOuterTextCloseEnd(svg: string, openingGt: number): number | null {
 }
 
 function groupRemovable(layerName: string | null): boolean {
-  if (!layerName || layerName === 'locked_bg') return false
+  if (!layerName || isLockedBgLayerName(layerName)) return false
   if (GUIDE_NAMES.has(layerName)) return true
   // Fail-open: interactive groups stay in background unless parser extracted them.
   return TECH_PREFIXES.some((p) => layerName.startsWith(p))
@@ -1785,12 +1852,27 @@ export function parseImportedSvgLayers(
   const interactiveLayers: SvgInteractiveLayer[] = []
   const guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>> = {}
   let lockedBgDetected = false
+  const lockedBgIds: string[] = []
+  const idRewrites: Array<{ start: number; end: number; text: string }> = []
   let pageBackgroundFill: string | undefined
   const autoDecorSeq = { value: 0 }
   const decorInstanceCounters = new Map<string, number>()
   const editableIds = createEditableIdAllocator()
   const documentStack = { value: 0 }
   const removalRanges: RemovalRange[] = []
+
+  function registerLockedBgOnTag(
+    sourceName: string,
+    tagLt: number,
+    tagGtExclusive: number,
+    attrs: Record<string, string>,
+  ): string {
+    lockedBgDetected = true
+    const { fabricId } = allocateEditableFabricId('locked_bg', sourceName, editableIds)
+    if (!lockedBgIds.includes(fabricId)) lockedBgIds.push(fabricId)
+    pushLayerNameAttributeRewrite(svg, tagLt, tagGtExclusive, attrs, fabricId, idRewrites)
+    return fabricId
+  }
 
   function pushParsedDecor(input: {
     baseName: string
@@ -1900,7 +1982,7 @@ export function parseImportedSvgLayers(
             ? 'DECOR_NO_VALID_SHAPE'
             : (GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
     })
-    if (!isPhoto && !isText && !isDecor && !GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe') && !TECH_PREFIXES.some((p) => name.startsWith(p)) && name !== 'locked_bg') {
+    if (!isPhoto && !isText && !isDecor && !GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe') && !TECH_PREFIXES.some((p) => name.startsWith(p)) && !isLockedBgLayerName(name)) {
       markLayerReport(name, {
         status: 'kept_as_background',
         reasonCode: 'LAYER_NOT_CLASSIFIED',
@@ -1988,15 +2070,18 @@ export function parseImportedSvgLayers(
     if (!closing && tagLc === 'g') {
       const attrs = parseAttributes(attrPart)
       const ln = getLayerName(attrs)
+      let stackName = ln
       if (ln) {
         markFallbackLayer(ln)
       }
       if (ln?.startsWith('photo_')) seenPhotoLayerNames.add(ln)
       if (ln?.startsWith('text_')) seenTextLayerNames.add(ln)
       if (ln?.startsWith('decor_')) seenDecorLayerNames.add(ln)
-      if (ln === 'locked_bg') lockedBgDetected = true
+      if (ln && isLockedBgLayerName(ln)) {
+        stackName = registerLockedBgOnTag(ln, lt, gt + 1, attrs)
+      }
       if (ln) warnUnhandledLayerName('группа', ln, warnings, warnedNames)
-      groupStack.push(ln)
+      groupStack.push(stackName)
       if (groupStack.length > MAX_SVG_GROUP_DEPTH) {
         throw new Error(`[SVG_GROUP_DEPTH_LIMIT_EXCEEDED] Превышена глубина групп SVG: ${groupStack.length} > ${MAX_SVG_GROUP_DEPTH}.`)
       }
@@ -2007,7 +2092,7 @@ export function parseImportedSvgLayers(
         ),
       )
       groupStyleStack.push(mergeGroupPresentationStyle(attrs))
-      groupFrameStack.push({ openLt: lt, removable: groupRemovable(ln), layerName: ln })
+      groupFrameStack.push({ openLt: lt, removable: groupRemovable(stackName), layerName: stackName })
       i = gt + 1
       continue
     }
@@ -2028,7 +2113,11 @@ export function parseImportedSvgLayers(
       if (ef) {
         markFallbackLayer(ef)
       }
-      if (ef === 'locked_bg') lockedBgDetected = true
+      if (explicit && isLockedBgLayerName(explicit)) {
+        registerLockedBgOnTag(explicit, lt, gt + 1, attrs)
+      } else if (ef && isLockedBgLayerName(ef)) {
+        lockedBgDetected = true
+      }
       if (ef?.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       if (ef?.startsWith('text_')) seenTextLayerNames.add(ef)
       if (ef?.startsWith('decor_')) seenDecorLayerNames.add(ef)
@@ -2119,7 +2208,11 @@ export function parseImportedSvgLayers(
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
       }
-      if (ef === 'locked_bg') lockedBgDetected = true
+      if (explicitName && isLockedBgLayerName(explicitName)) {
+        registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
+      } else if (ef && isLockedBgLayerName(ef)) {
+        lockedBgDetected = true
+      }
       if (ef) warnUnhandledLayerName('ellipse', ef, warnings, warnedNames)
 
       const cx = parseNumber(attrs.cx) ?? 0
@@ -2157,7 +2250,11 @@ export function parseImportedSvgLayers(
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
       }
-      if (ef === 'locked_bg') lockedBgDetected = true
+      if (explicitName && isLockedBgLayerName(explicitName)) {
+        registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
+      } else if (ef && isLockedBgLayerName(ef)) {
+        lockedBgDetected = true
+      }
       if (ef) warnUnhandledLayerName('circle', ef, warnings, warnedNames)
 
       const cx = parseNumber(attrs.cx) ?? 0
@@ -2194,7 +2291,11 @@ export function parseImportedSvgLayers(
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
       }
-      if (ef === 'locked_bg') lockedBgDetected = true
+      if (explicitName && isLockedBgLayerName(explicitName)) {
+        registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
+      } else if (ef && isLockedBgLayerName(ef)) {
+        lockedBgDetected = true
+      }
       if (ef) warnUnhandledLayerName('path', ef, warnings, warnedNames)
 
       const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'path', autoDecorSeq)
@@ -2237,7 +2338,11 @@ export function parseImportedSvgLayers(
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
       }
-      if (ef === 'locked_bg') lockedBgDetected = true
+      if (explicitName && isLockedBgLayerName(explicitName)) {
+        registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
+      } else if (ef && isLockedBgLayerName(ef)) {
+        lockedBgDetected = true
+      }
       if (ef) warnUnhandledLayerName(tagLc, ef, warnings, warnedNames)
 
       const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'path', autoDecorSeq)
@@ -2281,11 +2386,16 @@ export function parseImportedSvgLayers(
       }
 
       const attrs = parseAttributes(attrPart)
-      const ef = getLayerName(attrs) ?? inherited
+      const explicit = getLayerName(attrs)
+      const ef = explicit ?? inherited
       if (ef) {
         markFallbackLayer(ef)
       }
-      if (ef === 'locked_bg') lockedBgDetected = true
+      if (explicit && isLockedBgLayerName(explicit)) {
+        registerLockedBgOnTag(explicit, lt, gt + 1, attrs)
+      } else if (ef && isLockedBgLayerName(ef)) {
+        lockedBgDetected = true
+      }
       if (ef?.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       if (ef?.startsWith('text_')) seenTextLayerNames.add(ef)
       if (ef?.startsWith('decor_')) seenDecorLayerNames.add(ef)
@@ -2463,7 +2573,7 @@ export function parseImportedSvgLayers(
   timing.scanMs = Math.round((performance.now() - scanStart) * 1000) / 1000
 
   const mergedRanges = mergeRemovalRanges(removalRanges)
-  const strippedSvg = applyRemovalRanges(svg, mergedRanges)
+  const strippedSvg = applySvgRemovalsAndRewrites(svg, mergedRanges, idRewrites)
 
   for (const name of seenTextLayerNames) {
     if (parsedTextLayerNames.has(name)) continue
@@ -2572,6 +2682,7 @@ export function parseImportedSvgLayers(
     interactiveLayers: mergedInteractiveLayers,
     guideRectsMm,
     lockedBgDetected,
+    lockedBgIds,
     ...(pageBackgroundFill ? { pageBackgroundFill } : {}),
     prepressHints,
     geometry,
