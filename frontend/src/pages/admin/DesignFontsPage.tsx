@@ -23,6 +23,8 @@ const FONT_PREVIEW = 'Съешь ещё этих мягких французск
 const FONT_PREVIEW_LATIN = 'VOGUE · Birthday girl · 10.02.2004';
 const PREVIEW_STYLE_ID = 'design-fonts-preview-styles';
 const FONT_EXTENSIONS = /\.(woff2|woff|ttf|otf)$/i;
+/** Сервер принимает до 500; грузим чанками, чтобы не упереться в лимит multipart. */
+const FONT_UPLOAD_CHUNK_SIZE = 80;
 
 function isFontFile(file: File): boolean {
   return FONT_EXTENSIONS.test(file.name);
@@ -180,8 +182,22 @@ export const DesignFontsPage: React.FC = () => {
         invalidateCrmDesignFontsCache();
         await loadFonts();
       } else {
-        const res = await createDesignFontsBatch(form.files);
-        const { created, updated, skipped, failed, results } = res.data;
+        const allResults: DesignFontBatchItemResult[] = [];
+        let created = 0;
+        let updated = 0;
+        let skipped = 0;
+        let failed = 0;
+        for (let offset = 0; offset < form.files.length; offset += FONT_UPLOAD_CHUNK_SIZE) {
+          const chunk = form.files.slice(offset, offset + FONT_UPLOAD_CHUNK_SIZE);
+          const res = await createDesignFontsBatch(chunk);
+          const data = res.data;
+          allResults.push(...(data.results ?? []));
+          created += data.created ?? 0;
+          updated += data.updated ?? 0;
+          skipped += data.skipped ?? 0;
+          failed += data.failed ?? 0;
+        }
+        const results = allResults;
         setBatchResults(results);
         setForm({ family_name: '', files: [] });
         setEditFamilyName(false);
@@ -331,7 +347,7 @@ export const DesignFontsPage: React.FC = () => {
                       ? form.files[0].name
                       : `Выбрано файлов: ${form.files.length}`}
                 </span>
-                <span className="design-fonts-dropzone__hint">woff2, woff, ttf, otf · до 100 за раз</span>
+                <span className="design-fonts-dropzone__hint">woff2, woff, ttf, otf · папку можно целиком (чанки по 80)</span>
                 <input
                   type="file"
                   className="design-fonts-file-picker__input"

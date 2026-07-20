@@ -27,7 +27,7 @@ export const errorHandler = (err: ApiError, req: Request, res: Response, _next: 
     } else if (multerCode === 'LIMIT_FILE_COUNT' || multerCode === 'LIMIT_UNEXPECTED_FILE') {
       status = 400
       code = 'TOO_MANY_FILES'
-      message = 'Слишком много файлов в одном запросе (см. UPLOAD_MAX_FILES)'
+      message = 'Слишком много файлов в одном запросе (макс. 500 шрифтов за раз)'
     } else if (multerCode === 'LIMIT_FIELD_KEY' || multerCode === 'LIMIT_FIELD_VALUE' || multerCode === 'LIMIT_FIELD_COUNT') {
       status = 400
       code = 'MULTIPART_FIELDS_LIMIT'

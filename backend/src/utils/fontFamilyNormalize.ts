@@ -58,8 +58,10 @@ function titleCaseFontWords(value: string): string {
 
 /** Эвристика: HappyTime.woff2 → Happy Time, ceremoniousone.ttf → Ceremonious One */
 export function guessFontFamilyFromFilename(filename: string): string {
-  const base = filename.replace(/\.[^.]+$/, '').trim()
+  let base = filename.replace(/\.[^.]+$/, '').trim()
   if (!base) return ''
+  // ofont.ru_Shampanskoe script → Shampanskoe script
+  base = base.replace(/^ofont\.ru[_-]+/i, '')
   let spaced = base
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/([A-Za-z])(\d+)/g, '$1 $2')

@@ -22,7 +22,9 @@ function fontUploadFileFilter(
   file: { originalname?: string },
   cb: (error: Error | null, accept: boolean) => void,
 ): void {
-  const ext = (file.originalname || '').toLowerCase().slice(file.originalname.lastIndexOf('.'))
+  const name = file.originalname || ''
+  const dot = name.lastIndexOf('.')
+  const ext = (dot >= 0 ? name.slice(dot) : '').toLowerCase()
   if (!isFontUploadExtension(ext)) {
     cb(new Error('Допустимы woff2, woff, ttf, otf'), false)
     return
@@ -38,7 +40,7 @@ const fontUpload = multer({
 
 const fontBatchUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024, files: 100 },
+  limits: { fileSize: 15 * 1024 * 1024, files: 500 },
   fileFilter: fontUploadFileFilter,
 })
 
@@ -50,7 +52,7 @@ router.get('/', authenticate, asyncHandler(async (_req: Request, res: Response) 
 router.post(
   '/batch',
   authenticate,
-  fontBatchUpload.array('files', 100),
+  fontBatchUpload.array('files', 500),
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const files = req.files
     if (!Array.isArray(files) || files.length === 0) {
