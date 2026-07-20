@@ -450,8 +450,20 @@ function listZipSvgEntries(zip: PizZip): Array<{ name: string; svg: string }> {
 }
 
 /**
- * Если все SVG лежат в папках вида 204x204 — multi-size ZIP.
- * Иначе (SVG в корне) — обычный single-size ZIP.
+ * Ищет сегмент пути вида 204x204 (на любой глубине: и `204x204/a.svg`, и `Свадьба/204x204/a.svg`).
+ */
+export function findSizeFolderSegment(entryPath: string): string | null {
+  const parts = entryPath.replace(/\\/g, '/').split('/').filter(Boolean)
+  for (const part of parts.slice(0, -1)) {
+    // последний сегмент — имя файла; папки размера только среди родителей
+    if (parseSizeFolderLabel(part)) return part
+  }
+  return null
+}
+
+/**
+ * Если все SVG лежат в папках вида 204x204 (в т.ч. под одной обёрткой) — multi-size ZIP.
+ * Иначе (SVG без size-папки) — обычный single-size ZIP.
  */
 export function groupZipSvgEntriesBySizeFolder(
   entries: Array<{ name: string; svg: string }>,
@@ -460,16 +472,11 @@ export function groupZipSvgEntriesBySizeFolder(
   if (nonFont.length === 0) return null
 
   const groups = new Map<string, Array<{ name: string; svg: string }>>()
-  let rootCount = 0
+  let ungrouped = 0
   for (const entry of nonFont) {
-    const parts = entry.name.split('/').filter(Boolean)
-    if (parts.length < 2) {
-      rootCount += 1
-      continue
-    }
-    const folder = parts[0]
-    if (!parseSizeFolderLabel(folder)) {
-      rootCount += 1
+    const folder = findSizeFolderSegment(entry.name)
+    if (!folder) {
+      ungrouped += 1
       continue
     }
     const list = groups.get(folder) ?? []
@@ -477,7 +484,7 @@ export function groupZipSvgEntriesBySizeFolder(
     groups.set(folder, list)
   }
 
-  if (groups.size === 0 || rootCount > 0) return null
+  if (groups.size === 0 || ungrouped > 0) return null
   return groups
 }
 
