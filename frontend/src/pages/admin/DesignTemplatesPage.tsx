@@ -66,7 +66,7 @@ type BindingFilter = 'all' | 'linked' | 'unlinked';
 type SortKey = 'sort_order' | 'design_code' | 'updated';
 type PageTab = 'catalog' | 'bindings' | 'analytics';
 
-const DEFAULT_USAGE_FEE = 3;
+const DEFAULT_USAGE_FEE = 4;
 const DEFAULT_AUTHOR_PERCENT = 10;
 const CATEGORY_COLLAPSE_STORAGE_KEY = 'design-templates-category-collapsed';
 
@@ -421,7 +421,7 @@ export const DesignTemplatesPage: React.FC = () => {
       name: '',
       design_code: '',
       description: '',
-      category_id: defaultCategoryId,
+      category_id: null,
       productId: '',
       typeId: '',
       sizeId: '',
