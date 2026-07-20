@@ -1,21 +1,29 @@
 import path from 'path'
+import { getDb } from '../config/database'
 import {
   createDesignTemplate,
   getDesignTemplate,
   updateDesignTemplate,
+  getDesignTemplatesByCode,
+  isValidDesignCode,
   type DesignTemplateRow,
 } from './designTemplateService'
+import { allocateNextDesignCode } from './designCodeService'
 import { addSubtypeDesign } from './subtypeDesignService'
 import { saveBufferToUploads } from '../config/upload'
 import {
   buildImportedSvgTemplateDocument,
+  buildImportedMultiSizeSvgDocuments,
   isSupportedNormalizedTemplateExt,
   layerDebug,
+  type ImportedSvgTemplateDocument,
+  type ImportedSizeVariantDocument,
 } from './designTemplateSvgImportBuilder'
 import { enrichSpecWithRequiredFonts } from './designFontService'
 import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
 
 const IMPORTER_VERSION = 7
+const MM_MATCH_TOLERANCE = 1.0
 
 export interface ImportDesignTemplateInput {
   file?: {
@@ -28,7 +36,10 @@ export interface ImportDesignTemplateInput {
     originalname?: string
     mimetype?: string
   }
-  name: string
+  /** Если пусто — будет design_code */
+  name?: string
+  /** Добавить размеры к существующей семье (без нового кода) */
+  design_code?: string
   description?: string
   category_id?: number | null
   category?: string
@@ -44,6 +55,8 @@ export interface ImportDesignTemplateInput {
 
 export interface ImportDesignTemplateResult {
   template: DesignTemplateRow
+  templates?: DesignTemplateRow[]
+  design_code?: string
   warnings: string[]
   errors: string[]
 }
@@ -60,6 +73,166 @@ function parseTemplateSpec(row: DesignTemplateRow): Record<string, unknown> {
     return typeof row.spec === 'string' ? JSON.parse(row.spec) as Record<string, unknown> : { ...(row.spec as object) }
   } catch {
     return {}
+  }
+}
+
+function buildImportSpecFromDocument(
+  importedDocument: ImportedSvgTemplateDocument,
+  input: ImportDesignTemplateInput,
+  warnings: string[],
+  errors: string[],
+  sourceFileUrl: string,
+  storedSource: { filename: string; size: number; originalName: string } | null,
+  sourceExt: string,
+  sizeId?: string,
+  folderLabel?: string,
+): Record<string, unknown> {
+  const previewUrl = importedDocument.previewUrl
+  const normalizedFileUrl = importedDocument.normalizedFileUrl
+  const documentPrepress = importedDocument.pages.find((page) => page.prepress)?.prepress
+  const designState: Record<string, unknown> = {
+    templateId: null,
+    pageWidth: importedDocument.pageWidthMm,
+    pageHeight: importedDocument.pageHeightMm,
+    pageCount: importedDocument.pageCount,
+    sceneScale: 3,
+    pages: importedDocument.pages.map((page) => page.designPage),
+  }
+  if (documentPrepress) designState.prepress = documentPrepress
+
+  const bundledFonts: BundledTemplateFont[] = importedDocument.bundledFonts ?? []
+  return {
+    width_mm: importedDocument.pageWidthMm,
+    height_mm: importedDocument.pageHeightMm,
+    page_count: importedDocument.pageCount,
+    productId: input.productId,
+    typeId: input.typeId,
+    sizeId: sizeId ?? input.sizeId,
+    sizeFolder: folderLabel,
+    fonts: bundledFonts,
+    source_format: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
+    import: {
+      importer: importedDocument.pageCount > 1 ? 'svg-named-layers-multipage' : 'svg-named-layers',
+      importerVersion: IMPORTER_VERSION,
+      sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
+      sourceFile: sourceFileUrl,
+      sourceFileUrl,
+      sourceOriginalName: storedSource?.originalName ?? importedDocument.normalizedOriginalName,
+      sourceSize: storedSource?.size ?? importedDocument.normalizedSize,
+      normalizedFormat: importedDocument.normalizedFormat,
+      normalizedFile: normalizedFileUrl,
+      normalizedFileUrl,
+      previewUrl,
+      normalizedFiles: importedDocument.pages.map((page, index) => ({
+        page: index + 1,
+        originalName: page.originalName,
+        normalizedFileUrl: page.normalizedFileUrl,
+        normalizedOriginalName: page.normalizedOriginalName,
+        normalizedSize: page.normalizedSize,
+      })),
+      normalizedOriginalName: importedDocument.normalizedOriginalName,
+      originalName: importedDocument.normalizedOriginalName,
+      warnings,
+      errors,
+      geometry: importedDocument.pages[0]?.parsed.geometry,
+      pages: importedDocument.pages.map((page, index) => ({
+        page: index + 1,
+        originalName: page.originalName,
+        geometry: page.parsed.geometry,
+        layers: layerDebug(page.parsed),
+        parserSummary: page.parsed.summary,
+        parserReport: page.parsed.parserReport,
+        guideRectsMmParsed: page.parsed.guideRectsMm,
+        lockedBgDetected: page.parsed.lockedBgDetected,
+        strippedInteractiveLayers: page.parsed.removalRanges.length > 0,
+        ...(input.trace === true && page.parsed.trace ? { trace: page.parsed.trace } : {}),
+      })),
+      layerConvention:
+        'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
+    },
+    designState,
+  }
+}
+
+async function resolveProductSizeIdByMm(
+  productId: number,
+  typeId: number,
+  widthMm: number,
+  heightMm: number,
+): Promise<string | null> {
+  const db = await getDb()
+  const row = await db.get<{ config_data?: string }>(
+    `SELECT config_data FROM product_template_configs
+     WHERE product_id = ? AND name = 'template' AND is_active = 1
+     ORDER BY id DESC LIMIT 1`,
+    [productId],
+  )
+  if (!row?.config_data) return null
+  let config: Record<string, unknown>
+  try {
+    config = typeof row.config_data === 'string'
+      ? JSON.parse(row.config_data) as Record<string, unknown>
+      : (row.config_data as Record<string, unknown>)
+  } catch {
+    return null
+  }
+  const simplified = (config.simplified ?? config) as Record<string, unknown>
+  const typeConfigs = simplified.typeConfigs as Record<string, { sizes?: unknown[] }> | undefined
+  const typeKey = String(typeId)
+  const sizesRaw = Array.isArray(typeConfigs?.[typeKey]?.sizes)
+    ? typeConfigs![typeKey].sizes!
+    : Array.isArray(simplified.sizes)
+      ? (simplified.sizes as unknown[])
+      : []
+
+  for (const size of sizesRaw) {
+    if (!size || typeof size !== 'object') continue
+    const s = size as Record<string, unknown>
+    const w = Number(s.width_mm ?? s.width ?? s.w)
+    const h = Number(s.height_mm ?? s.height ?? s.h)
+    if (!Number.isFinite(w) || !Number.isFinite(h)) continue
+    if (Math.abs(w - widthMm) <= MM_MATCH_TOLERANCE && Math.abs(h - heightMm) <= MM_MATCH_TOLERANCE) {
+      const id = s.id
+      return id != null ? String(id) : null
+    }
+    // допускаем поворот
+    if (Math.abs(w - heightMm) <= MM_MATCH_TOLERANCE && Math.abs(h - widthMm) <= MM_MATCH_TOLERANCE) {
+      const id = s.id
+      return id != null ? String(id) : null
+    }
+  }
+  return null
+}
+
+async function tryLinkTemplateToProductSize(
+  templateId: number,
+  productId: number,
+  typeId: number,
+  widthMm: number,
+  heightMm: number,
+  explicitSizeId: string | undefined,
+  warnings: string[],
+): Promise<void> {
+  let sizeId = explicitSizeId?.trim() || ''
+  if (!sizeId) {
+    const matched = await resolveProductSizeIdByMm(productId, typeId, widthMm, heightMm)
+    if (matched) {
+      sizeId = matched
+      warnings.push(`Автопривязка к size_id=${sizeId} по мм ${widthMm}×${heightMm}.`)
+    } else {
+      warnings.push(
+        `Не найден размер продукта для ${widthMm}×${heightMm} мм — привяжите шаблон #${templateId} вручную.`,
+      )
+      return
+    }
+  }
+  try {
+    await addSubtypeDesign(productId, typeId, templateId, sizeId)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (!msg.includes('UNIQUE constraint')) {
+      warnings.push(`Шаблон #${templateId} создан, но не привязан к размеру: ${msg}`)
+    }
   }
 }
 
@@ -105,32 +278,20 @@ export async function reimportDesignTemplateFromFile(
   }
 
   let storedSource: { filename: string; size: number; originalName: string } | null = null
-  if (hasSourceFile && input.sourceFile?.buffer) {
+  if (input.sourceFile?.buffer && input.sourceFile.buffer.length > 0) {
     storedSource = saveBufferToUploads(
       input.sourceFile.buffer,
       input.sourceFile.originalname,
-      `${existing.name}-source`,
+      `${existing.design_code || existing.name}-source`,
     )
-    if (!storedSource) {
-      throw Object.assign(new Error('Не удалось сохранить исходник.'), {
-        importErrors: ['Не удалось сохранить исходник.'],
-        importWarnings: warnings,
-      })
-    }
   }
 
   if (!hasNormalizedFile) {
-    warnings.push('Исходник обновлён. Для редактора загрузите SVG с именованными слоями.')
-    const prevImport = (existingSpec.import as Record<string, unknown> | undefined) ?? {}
     const sourceFileUrl = `/api/uploads/${storedSource!.filename}`
-    const mergedSpec = {
+    const nextSpec = {
       ...existingSpec,
       import: {
-        ...prevImport,
-        importer: 'source-only-draft',
-        importerVersion: 5,
-        status: 'draft',
-        sourceFormat: sourceExt.replace(/^\./, '') || 'source',
+        ...(typeof existingSpec.import === 'object' && existingSpec.import ? existingSpec.import : {}),
         sourceFile: sourceFileUrl,
         sourceFileUrl,
         sourceOriginalName: storedSource!.originalName,
@@ -139,93 +300,143 @@ export async function reimportDesignTemplateFromFile(
         errors,
       },
     }
-    const template = await updateDesignTemplate(input.templateId, {
-      spec: mergedSpec,
-      is_active: false,
-    })
-    if (!template) throw new Error('Не удалось обновить шаблон')
-    return { template, warnings, errors }
+    await updateDesignTemplate(existing.id, { spec: nextSpec as never })
+    const fresh = await getDesignTemplate(existing.id)
+    return { template: fresh ?? existing, design_code: existing.design_code, warnings, errors }
   }
 
-  const importedDocument = buildImportedSvgTemplateDocument(input.file!, existing.name, warnings, {
+  // Reimport одного варианта — только flat/single document (не multi-size папки целиком).
+  const multi = buildImportedMultiSizeSvgDocuments(input.file!, existing.design_code || existing.name, warnings, {
     trace: input.trace === true,
   })
-  const previewUrl = importedDocument.previewUrl
-  const normalizedFileUrl = importedDocument.normalizedFileUrl
-  const sourceFileUrl = storedSource ? `/api/uploads/${storedSource.filename}` : normalizedFileUrl
-  const documentPrepress = importedDocument.pages.find((page) => page.prepress)?.prepress
-  const prevImport = (existingSpec.import as Record<string, unknown> | undefined) ?? {}
-
-  const designState: Record<string, unknown> = {
-    templateId: null,
-    pageWidth: importedDocument.pageWidthMm,
-    pageHeight: importedDocument.pageHeightMm,
-    pageCount: importedDocument.pageCount,
-    sceneScale: (existingSpec.designState as Record<string, unknown> | undefined)?.sceneScale ?? 3,
-    pages: importedDocument.pages.map((page) => page.designPage),
+  if (multi && multi.length > 1) {
+    throw Object.assign(
+      new Error('Reimport одного шаблона не принимает multi-size ZIP. Импортируйте размеры отдельно или через «добавить к коду».'),
+      { importErrors: ['Multi-size ZIP не поддерживается в reimport одного варианта.'], importWarnings: warnings },
+    )
   }
-  if (documentPrepress) designState.prepress = documentPrepress
 
-  const bundledFonts: BundledTemplateFont[] = importedDocument.bundledFonts ?? []
-  const mergedSpec: Record<string, unknown> = {
-    ...existingSpec,
-    width_mm: importedDocument.pageWidthMm,
-    height_mm: importedDocument.pageHeightMm,
-    page_count: importedDocument.pageCount,
-    fonts: bundledFonts.length > 0 ? bundledFonts : existingSpec.fonts,
-    source_format: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
-    import: {
-      ...prevImport,
-      importer: importedDocument.pageCount > 1 ? 'svg-named-layers-multipage' : 'svg-named-layers',
-      importerVersion: IMPORTER_VERSION,
-      reimportedAt: new Date().toISOString(),
-      sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
-      sourceFile: sourceFileUrl,
-      sourceFileUrl,
-      sourceOriginalName: storedSource?.originalName ?? importedDocument.normalizedOriginalName,
-      sourceSize: storedSource?.size ?? importedDocument.normalizedSize,
-      normalizedFormat: importedDocument.normalizedFormat,
-      normalizedFile: normalizedFileUrl,
-      normalizedFileUrl,
-      normalizedFiles: importedDocument.pages.map((page, index) => ({
-        page: index + 1,
-        originalName: page.originalName,
-        normalizedFileUrl: page.normalizedFileUrl,
-        normalizedOriginalName: page.normalizedOriginalName,
-        normalizedSize: page.normalizedSize,
-      })),
-      normalizedOriginalName: importedDocument.normalizedOriginalName,
-      originalName: importedDocument.normalizedOriginalName,
-      warnings,
-      errors,
-      geometry: importedDocument.pages[0]?.parsed.geometry,
-      pages: importedDocument.pages.map((page, index) => ({
-        page: index + 1,
-        originalName: page.originalName,
-        geometry: page.parsed.geometry,
-        layers: layerDebug(page.parsed),
-        parserSummary: page.parsed.summary,
-        parserReport: page.parsed.parserReport,
-        guideRectsMmParsed: page.parsed.guideRectsMm,
-        lockedBgDetected: page.parsed.lockedBgDetected,
-        strippedInteractiveLayers: page.parsed.removalRanges.length > 0,
-        ...(input.trace === true && page.parsed.trace ? { trace: page.parsed.trace } : {}),
-      })),
-      layerConvention:
-        'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
+  const importedDocument = multi?.[0]?.document
+    ?? buildImportedSvgTemplateDocument(input.file!, existing.design_code || existing.name, warnings, {
+      trace: input.trace === true,
+    })
+
+  const sourceFileUrl = storedSource
+    ? `/api/uploads/${storedSource.filename}`
+    : importedDocument.normalizedFileUrl
+  const importSpec = buildImportSpecFromDocument(
+    importedDocument,
+    {
+      productId: Number(existingSpec.productId) || undefined,
+      typeId: Number(existingSpec.typeId) || undefined,
+      sizeId: existingSpec.sizeId != null ? String(existingSpec.sizeId) : undefined,
+      trace: input.trace,
     },
-    designState,
+    warnings,
+    errors,
+    sourceFileUrl,
+    storedSource,
+    sourceExt,
+    existingSpec.sizeId != null ? String(existingSpec.sizeId) : undefined,
+  )
+
+  // Сохраняем site_preview_url / category / royalty; обновляем preview из SVG.
+  await updateDesignTemplate(existing.id, {
+    preview_url: importedDocument.previewUrl,
+    spec: await finalizeImportedSpec({
+      ...existingSpec,
+      ...importSpec,
+      productId: existingSpec.productId ?? importSpec.productId,
+      typeId: existingSpec.typeId ?? importSpec.typeId,
+      sizeId: existingSpec.sizeId ?? importSpec.sizeId,
+    }),
+  })
+
+  const fresh = await getDesignTemplate(existing.id)
+  return {
+    template: fresh ?? existing,
+    design_code: existing.design_code,
+    warnings,
+    errors,
+  }
+}
+
+async function createTemplateFromVariant(
+  input: ImportDesignTemplateInput,
+  designCode: string,
+  displayName: string,
+  importedDocument: ImportedSvgTemplateDocument,
+  warnings: string[],
+  errors: string[],
+  sourceFileUrl: string,
+  storedSource: { filename: string; size: number; originalName: string } | null,
+  sourceExt: string,
+  folderLabel?: string,
+  explicitSizeId?: string,
+): Promise<DesignTemplateRow> {
+  const importSpec = buildImportSpecFromDocument(
+    importedDocument,
+    input,
+    warnings,
+    errors,
+    sourceFileUrl,
+    storedSource,
+    sourceExt,
+    explicitSizeId ?? input.sizeId,
+    folderLabel,
+  )
+
+  const family = await getDesignTemplatesByCode(designCode)
+  for (const sibling of family) {
+    try {
+      const spec = sibling.spec ? JSON.parse(sibling.spec) as Record<string, unknown> : {}
+      const w = Number(spec.width_mm)
+      const h = Number(spec.height_mm)
+      if (
+        Number.isFinite(w) && Number.isFinite(h)
+        && Math.abs(w - importedDocument.pageWidthMm) <= MM_MATCH_TOLERANCE
+        && Math.abs(h - importedDocument.pageHeightMm) <= MM_MATCH_TOLERANCE
+      ) {
+        throw Object.assign(
+          new Error(
+            `В семье ${designCode} уже есть вариант ${w}×${h} мм (шаблон #${sibling.id}).`,
+          ),
+          { importErrors: [`Дубликат размера ${w}×${h} мм в семье ${designCode}`], importWarnings: warnings },
+        )
+      }
+    } catch (err) {
+      if ((err as { importErrors?: string[] }).importErrors) throw err
+    }
   }
 
-  const template = await updateDesignTemplate(input.templateId, {
-    preview_url: previewUrl,
-    spec: await finalizeImportedSpec(mergedSpec),
-    is_active: existing.is_active === 1,
+  const template = await createDesignTemplate({
+    design_code: designCode,
+    name: displayName,
+    description: input.description,
+    category_id: input.category_id,
+    category: input.category,
+    preview_url: importedDocument.previewUrl,
+    is_active: true,
+    sort_order: input.sortOrder ?? 0,
+    author_user_id: input.authorUserId ?? null,
+    usage_fee: input.usageFee,
+    author_percent: input.authorPercent,
+    spec: await finalizeImportedSpec(importSpec),
   })
-  if (!template) throw new Error('Не удалось обновить шаблон')
 
-  const fresh = await getDesignTemplate(input.templateId)
-  return { template: fresh ?? template, warnings, errors }
+  if (input.productId && input.typeId) {
+    await tryLinkTemplateToProductSize(
+      template.id,
+      input.productId,
+      input.typeId,
+      importedDocument.pageWidthMm,
+      importedDocument.pageHeightMm,
+      explicitSizeId ?? input.sizeId,
+      warnings,
+    )
+  }
+
+  return (await getDesignTemplate(template.id)) ?? template
 }
 
 export async function importDesignTemplateFromFile(
@@ -239,9 +450,6 @@ export async function importDesignTemplateFromFile(
   const hasNormalizedFile = Boolean(input.file?.buffer && input.file.buffer.length > 0)
   const hasSourceFile = Boolean(input.sourceFile?.buffer && input.sourceFile.buffer.length > 0)
   if (!hasNormalizedFile && !hasSourceFile) errors.push('Файл не загружен или пустой.')
-  if (!input.name.trim()) {
-    errors.push('Укажите название шаблона.')
-  }
   if (hasNormalizedFile && ext === '.pdf') {
     errors.push('PDF importer будет добавлен вторым этапом. Сейчас загрузите SVG или ZIP с SVG-страницами.')
   }
@@ -251,13 +459,31 @@ export async function importDesignTemplateFromFile(
   if (input.sourceFile?.buffer && sourceExt && !MASTER_SOURCE_EXTENSIONS.has(sourceExt)) {
     errors.push('Исходник шаблона должен быть AI, CDR, INDD, INDT, PDF или SVG.')
   }
+
+  let designCode = input.design_code?.trim() ?? ''
+  if (designCode && !isValidDesignCode(designCode)) {
+    errors.push('design_code должен быть 6-значным (000001–999999).')
+  }
+  if (designCode && isValidDesignCode(designCode)) {
+    const existingFamily = await getDesignTemplatesByCode(designCode)
+    if (existingFamily.length === 0) {
+      errors.push(`Семья с кодом ${designCode} не найдена.`)
+    }
+  }
+
   if (errors.length > 0) {
     throw Object.assign(new Error(errors.join(' ')), { importErrors: errors, importWarnings: warnings })
   }
 
+  if (!designCode) {
+    designCode = await allocateNextDesignCode()
+  }
+
+  const displayName = (input.name?.trim() || designCode)
+
   let storedSource: { filename: string; size: number; originalName: string } | null = null
   if (input.sourceFile?.buffer && input.sourceFile.buffer.length > 0) {
-    storedSource = saveBufferToUploads(input.sourceFile.buffer, input.sourceFile.originalname, `${input.name}-source`)
+    storedSource = saveBufferToUploads(input.sourceFile.buffer, input.sourceFile.originalname, `${designCode}-source`)
     if (!storedSource) {
       throw Object.assign(new Error('Не удалось сохранить исходник шаблона.'), {
         importErrors: ['Не удалось сохранить исходник шаблона.'],
@@ -270,7 +496,8 @@ export async function importDesignTemplateFromFile(
     warnings.push('Исходник сохранён как draft-шаблон. Для редактора добавьте SVG с именованными слоями.')
     const sourceFileUrl = `/api/uploads/${storedSource!.filename}`
     const template = await createDesignTemplate({
-      name: input.name.trim(),
+      design_code: designCode,
+      name: displayName,
       description: input.description,
       category_id: input.category_id,
       category: input.category,
@@ -302,105 +529,78 @@ export async function importDesignTemplateFromFile(
       },
     })
     const fresh = await getDesignTemplate(template.id)
-    return { template: fresh ?? template, warnings, errors }
-  }
-
-  const importedDocument = buildImportedSvgTemplateDocument(input.file!, input.name, warnings, {
-    trace: input.trace === true,
-  })
-  const previewUrl = importedDocument.previewUrl
-  const normalizedFileUrl = importedDocument.normalizedFileUrl
-  const sourceFileUrl = storedSource ? `/api/uploads/${storedSource.filename}` : normalizedFileUrl
-  const documentPrepress = importedDocument.pages.find((page) => page.prepress)?.prepress
-
-  const designState: Record<string, unknown> = {
-    templateId: null,
-    pageWidth: importedDocument.pageWidthMm,
-    pageHeight: importedDocument.pageHeightMm,
-    pageCount: importedDocument.pageCount,
-    sceneScale: 3,
-    pages: importedDocument.pages.map((page) => page.designPage),
-  }
-  if (documentPrepress) designState.prepress = documentPrepress
-
-  const bundledFonts: BundledTemplateFont[] = importedDocument.bundledFonts ?? []
-  const importSpec: Record<string, unknown> = {
-      width_mm: importedDocument.pageWidthMm,
-      height_mm: importedDocument.pageHeightMm,
-      page_count: importedDocument.pageCount,
-      productId: input.productId,
-      typeId: input.typeId,
-      sizeId: input.sizeId,
-      fonts: bundledFonts,
-      source_format: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
-      import: {
-        importer: importedDocument.pageCount > 1 ? 'svg-named-layers-multipage' : 'svg-named-layers',
-        importerVersion: IMPORTER_VERSION,
-        sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
-        sourceFile: sourceFileUrl,
-        sourceFileUrl,
-        sourceOriginalName: storedSource?.originalName ?? importedDocument.normalizedOriginalName,
-        sourceSize: storedSource?.size ?? importedDocument.normalizedSize,
-        normalizedFormat: importedDocument.normalizedFormat,
-        normalizedFile: normalizedFileUrl,
-        normalizedFileUrl,
-        normalizedFiles: importedDocument.pages.map((page, index) => ({
-          page: index + 1,
-          originalName: page.originalName,
-          normalizedFileUrl: page.normalizedFileUrl,
-          normalizedOriginalName: page.normalizedOriginalName,
-          normalizedSize: page.normalizedSize,
-        })),
-        normalizedOriginalName: importedDocument.normalizedOriginalName,
-        originalName: importedDocument.normalizedOriginalName,
-        warnings,
-        errors,
-        geometry: importedDocument.pages[0]?.parsed.geometry,
-        pages: importedDocument.pages.map((page, index) => ({
-          page: index + 1,
-          originalName: page.originalName,
-          geometry: page.parsed.geometry,
-          layers: layerDebug(page.parsed),
-          parserSummary: page.parsed.summary,
-          parserReport: page.parsed.parserReport,
-          guideRectsMmParsed: page.parsed.guideRectsMm,
-          lockedBgDetected: page.parsed.lockedBgDetected,
-          strippedInteractiveLayers: page.parsed.removalRanges.length > 0,
-          ...(input.trace === true && page.parsed.trace ? { trace: page.parsed.trace } : {}),
-        })),
-        layerConvention:
-          'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
-      },
-      designState,
-  }
-
-  const template = await createDesignTemplate({
-    name: input.name.trim(),
-    description: input.description,
-    category_id: input.category_id,
-    category: input.category,
-    preview_url: previewUrl,
-    is_active: true,
-    sort_order: input.sortOrder ?? 0,
-    author_user_id: input.authorUserId ?? null,
-    usage_fee: input.usageFee,
-    author_percent: input.authorPercent,
-    spec: await finalizeImportedSpec(importSpec),
-  })
-
-  if (input.productId && input.typeId) {
-    if (!input.sizeId) {
-      warnings.push('Укажите sizeId при импорте, чтобы привязать шаблон к размеру подтипа в продукте.')
-    } else {
-      try {
-        await addSubtypeDesign(input.productId, input.typeId, template.id, input.sizeId)
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        if (!msg.includes('UNIQUE constraint')) warnings.push(`Шаблон создан, но не привязан к размеру: ${msg}`)
-      }
+    return {
+      template: fresh ?? template,
+      templates: [fresh ?? template],
+      design_code: designCode,
+      warnings,
+      errors,
     }
   }
 
-  const fresh = await getDesignTemplate(template.id)
-  return { template: fresh ?? template, warnings, errors }
+  const multi = buildImportedMultiSizeSvgDocuments(input.file!, displayName, warnings, {
+    trace: input.trace === true,
+  })
+
+  if (multi && multi.length > 0) {
+    const created: DesignTemplateRow[] = []
+    const sourceFileUrl = storedSource
+      ? `/api/uploads/${storedSource.filename}`
+      : multi[0].document.normalizedFileUrl
+
+    // Для multi-size не используем один sizeId из формы на все папки — только автолинк по мм.
+    const sharedSizeId = multi.length === 1 ? input.sizeId : undefined
+
+    for (const variant of multi) {
+      const row = await createTemplateFromVariant(
+        input,
+        designCode,
+        designCode,
+        variant.document,
+        warnings,
+        errors,
+        sourceFileUrl,
+        storedSource,
+        sourceExt,
+        variant.folderLabel,
+        sharedSizeId,
+      )
+      created.push(row)
+    }
+
+    return {
+      template: created[0],
+      templates: created,
+      design_code: designCode,
+      warnings,
+      errors,
+    }
+  }
+
+  const importedDocument = buildImportedSvgTemplateDocument(input.file!, displayName, warnings, {
+    trace: input.trace === true,
+  })
+  const sourceFileUrl = storedSource
+    ? `/api/uploads/${storedSource.filename}`
+    : importedDocument.normalizedFileUrl
+
+  const template = await createTemplateFromVariant(
+    input,
+    designCode,
+    displayName,
+    importedDocument,
+    warnings,
+    errors,
+    sourceFileUrl,
+    storedSource,
+    sourceExt,
+  )
+
+  return {
+    template,
+    templates: [template],
+    design_code: designCode,
+    warnings,
+    errors,
+  }
 }

@@ -1,9 +1,14 @@
 import { getDb } from '../config/database'
 import { resolveTemplateCategory } from './designTemplateCategoryResolve'
 import { enrichSpecWithRequiredFonts } from './designFontService'
+import {
+  allocateNextDesignCode,
+  isValidDesignCode,
+} from './designCodeService'
 
 export interface DesignTemplateRow {
   id: number
+  design_code: string
   name: string
   description: string | null
   category_id: number | null
@@ -34,7 +39,9 @@ export interface DesignTemplateSpec {
 }
 
 export interface DesignTemplateInput {
-  name: string
+  name?: string
+  /** 6-значный код семьи; если не задан при create — выделяется автоматически */
+  design_code?: string
   description?: string
   /** Предпочтительно: FK на design_template_categories */
   category_id?: number | null
@@ -52,10 +59,10 @@ export interface DesignTemplateInput {
 }
 
 const PUBLIC_TEMPLATE_COLUMNS = `
-  dt.id, dt.name, dt.description, dt.category_id,
+  dt.id, dt.design_code, dt.name, dt.description, dt.category_id,
   COALESCE(c.name, dt.category) AS category,
   dt.preview_url, dt.site_preview_url, dt.spec,
-  dt.is_active, dt.sort_order, dt.created_at, dt.updated_at
+  dt.is_active, dt.sort_order, dt.usage_fee, dt.created_at, dt.updated_at
 `.trim()
 
 const PUBLIC_TEMPLATE_JOIN = 'design_templates dt LEFT JOIN design_template_categories c ON c.id = dt.category_id'
@@ -95,8 +102,12 @@ function stripPrivateImportFields(row: DesignTemplateRow): DesignTemplateRow {
   }
 }
 
-function stripRoyaltyFields(row: DesignTemplateRow): DesignTemplateRow {
-  const { author_user_id: _a, usage_fee: _u, author_percent: _p, ...rest } = row
+/** Public: отдаём usage_fee, скрываем author_user_id / author_percent. */
+function stripAuthorRoyaltyFields(row: DesignTemplateRow): DesignTemplateRow {
+  const { author_user_id: _a, author_percent: _p, ...rest } = row as DesignTemplateRow & {
+    author_user_id?: number | null
+    author_percent?: number
+  }
   return rest as DesignTemplateRow
 }
 
@@ -112,7 +123,7 @@ async function enrichPublicTemplateSpec(spec: string | null): Promise<string | n
 }
 
 async function enrichPublicTemplateRow(row: DesignTemplateRow): Promise<DesignTemplateRow> {
-  const stripped = stripPrivateImportFields(stripRoyaltyFields(row))
+  const stripped = stripPrivateImportFields(stripAuthorRoyaltyFields(row))
   return {
     ...stripped,
     spec: await enrichPublicTemplateSpec(stripped.spec),
@@ -120,9 +131,11 @@ async function enrichPublicTemplateRow(row: DesignTemplateRow): Promise<DesignTe
 }
 
 function mapListRow(row: Record<string, unknown>): DesignTemplateListRow {
+  const designCode = row.design_code != null ? String(row.design_code) : ''
   return {
     id: Number(row.id),
-    name: String(row.name),
+    design_code: designCode,
+    name: String(row.name ?? designCode),
     description: row.description != null ? String(row.description) : null,
     category_id: row.category_id != null ? Number(row.category_id) : null,
     category: row.category != null ? String(row.category) : null,
@@ -142,6 +155,35 @@ function mapListRow(row: Record<string, unknown>): DesignTemplateListRow {
   }
 }
 
+function parseSpecMm(spec: string | null | undefined): { width_mm: number; height_mm: number } | null {
+  if (!spec) return null
+  try {
+    const parsed = JSON.parse(spec) as Record<string, unknown>
+    const w = Number(parsed.width_mm)
+    const h = Number(parsed.height_mm)
+    if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
+      return { width_mm: w, height_mm: h }
+    }
+  } catch {
+    /* noop */
+  }
+  return null
+}
+
+/** Одна карточка на design_code (первый встретившийся вариант после сортировки). */
+function dedupePublicByDesignCode(rows: DesignTemplateRow[]): DesignTemplateRow[] {
+  const seen = new Set<string>()
+  const out: DesignTemplateRow[] = []
+  for (const row of rows) {
+    const code = String((row as { design_code?: string }).design_code ?? '').trim()
+    const key = code || `id:${row.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(row)
+  }
+  return out
+}
+
 export async function getDesignTemplatesByIds(ids: number[]): Promise<Map<number, DesignTemplateRow>> {
   const map = new Map<number, DesignTemplateRow>()
   if (ids.length === 0) return map
@@ -153,6 +195,50 @@ export async function getDesignTemplatesByIds(ids: number[]): Promise<Map<number
   ) as DesignTemplateRow[]
   rows.forEach((row) => map.set(row.id, mapListRow(row as unknown as Record<string, unknown>)))
   return map
+}
+
+export async function getDesignTemplatesByCode(designCode: string): Promise<DesignTemplateListRow[]> {
+  if (!isValidDesignCode(designCode)) return []
+  const db = await getDb()
+  const rows = await db.all(
+    `SELECT dt.*, u.name AS author_name, COALESCE(c.name, dt.category) AS category,
+      (SELECT COUNT(*) FROM product_subtype_designs psd WHERE psd.design_template_id = dt.id) AS subtype_link_count
+     FROM design_templates dt
+     LEFT JOIN design_template_categories c ON c.id = dt.category_id
+     LEFT JOIN users u ON u.id = dt.author_user_id
+     WHERE dt.design_code = ?
+     ORDER BY dt.sort_order ASC, dt.id ASC`,
+    [designCode],
+  ) as Record<string, unknown>[]
+  return rows.map(mapListRow)
+}
+
+async function syncFamilyRoyaltyFields(
+  designCode: string,
+  fields: {
+    author_user_id: number | null
+    usage_fee: number
+    author_percent: number
+  },
+  exceptId?: number,
+): Promise<void> {
+  if (!isValidDesignCode(designCode)) return
+  const db = await getDb()
+  if (exceptId != null) {
+    await db.run(
+      `UPDATE design_templates SET
+        author_user_id = ?, usage_fee = ?, author_percent = ?, updated_at = datetime('now')
+       WHERE design_code = ? AND id != ?`,
+      [fields.author_user_id, fields.usage_fee, fields.author_percent, designCode, exceptId],
+    )
+  } else {
+    await db.run(
+      `UPDATE design_templates SET
+        author_user_id = ?, usage_fee = ?, author_percent = ?, updated_at = datetime('now')
+       WHERE design_code = ?`,
+      [fields.author_user_id, fields.usage_fee, fields.author_percent, designCode],
+    )
+  }
 }
 
 export async function getAllDesignTemplates(): Promise<DesignTemplateListRow[]> {
@@ -273,11 +359,16 @@ export async function getPublicDesignTemplates(params: {
       `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
        FROM ${PUBLIC_TEMPLATE_JOIN}
        WHERE dt.is_active = 1
-       ORDER BY dt.sort_order ASC, dt.name ASC`,
+       ORDER BY dt.sort_order ASC, dt.design_code ASC, dt.name ASC`,
     ) as DesignTemplateRow[]
   }
 
-  return Promise.all(rows.map((row) => enrichPublicTemplateRow(row)))
+  // Без sizeId — одна карточка на семью; с sizeId уже отфильтрованы варианты размера.
+  const prepared = params.sizeId
+    ? rows
+    : dedupePublicByDesignCode(rows)
+
+  return Promise.all(prepared.map((row) => enrichPublicTemplateRow(row)))
 }
 
 async function resolveInputCategory(
@@ -299,13 +390,19 @@ export async function createDesignTemplate(input: DesignTemplateInput): Promise<
   const db = await getDb()
   const spec = input.spec ? JSON.stringify(input.spec) : null
   const cat = await resolveInputCategory(input, true)
+  let designCode = input.design_code?.trim() ?? ''
+  if (!isValidDesignCode(designCode)) {
+    designCode = await allocateNextDesignCode()
+  }
+  const name = (input.name?.trim() || designCode)
   const result = await db.run(
     `INSERT INTO design_templates (
-      name, description, category_id, category, preview_url, site_preview_url, spec, is_active, sort_order,
+      design_code, name, description, category_id, category, preview_url, site_preview_url, spec, is_active, sort_order,
       author_user_id, usage_fee, author_percent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      input.name,
+      designCode,
+      name,
       input.description ?? null,
       cat.category_id,
       cat.category,
@@ -320,6 +417,37 @@ export async function createDesignTemplate(input: DesignTemplateInput): Promise<
     ],
   )
   const id = (result as { lastID: number }).lastID
+
+  // Если в семье уже есть royalty — подтянуть; иначе при явном input — размазать на семью.
+  const siblings = await getDesignTemplatesByCode(designCode)
+  const siblingWithRoyalty = siblings.find((s) => s.id !== id)
+  if (siblingWithRoyalty) {
+    const fee = input.usage_fee !== undefined
+      ? normalizeUsageFee(input.usage_fee)
+      : siblingWithRoyalty.usage_fee
+    const pct = input.author_percent !== undefined
+      ? normalizeAuthorPercent(input.author_percent)
+      : siblingWithRoyalty.author_percent
+    const author = input.author_user_id !== undefined
+      ? input.author_user_id
+      : siblingWithRoyalty.author_user_id
+    await syncFamilyRoyaltyFields(designCode, {
+      author_user_id: author ?? null,
+      usage_fee: fee,
+      author_percent: pct,
+    })
+  } else if (
+    input.usage_fee !== undefined
+    || input.author_percent !== undefined
+    || input.author_user_id !== undefined
+  ) {
+    await syncFamilyRoyaltyFields(designCode, {
+      author_user_id: input.author_user_id ?? null,
+      usage_fee: normalizeUsageFee(input.usage_fee),
+      author_percent: normalizeAuthorPercent(input.author_percent),
+    })
+  }
+
   const created = await getDesignTemplate(id)
   if (!created) throw new Error('Failed to fetch created template')
   return created
@@ -374,6 +502,7 @@ export async function updateDesignTemplate(
   const author_percent = input.author_percent !== undefined
     ? normalizeAuthorPercent(input.author_percent)
     : existing.author_percent
+  const design_code = existing.design_code
 
   const db = await getDb()
   await db.run(
@@ -387,8 +516,24 @@ export async function updateDesignTemplate(
       is_active, sort_order, author_user_id, usage_fee, author_percent, id,
     ],
   )
+
+  if (
+    input.usage_fee !== undefined
+    || input.author_percent !== undefined
+    || input.author_user_id !== undefined
+  ) {
+    await syncFamilyRoyaltyFields(design_code, {
+      author_user_id: author_user_id ?? null,
+      usage_fee,
+      author_percent,
+    })
+  }
+
   return getDesignTemplate(id)
 }
+
+export { parseSpecMm }
+export { isValidDesignCode } from './designCodeService'
 
 export async function deleteDesignTemplate(id: number): Promise<boolean> {
   const existing = await getDesignTemplate(id)

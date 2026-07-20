@@ -23,13 +23,18 @@ import { API_BASE_URL } from '../../config/constants';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import {
+  familyCatalogStatus,
   formatAuthorRoyaltyLine,
   formatBynAmount,
+  formatDesignCodeLabel,
   formatTemplateSize,
   getTemplateCatalogStatus,
+  groupTemplatesIntoFamilies,
   parseDesignTemplateImportError,
   parseTemplateSpec,
+  resolveDesignCode,
   resolveTemplatePreviewUrl,
+  type DesignTemplateFamily,
   type TemplateCatalogStatus,
 } from './designTemplates/designTemplateCatalogUtils';
 import {
@@ -57,7 +62,7 @@ const STATUS_LABELS: Record<TemplateCatalogStatus, string> = {
 
 type StatusFilter = 'all' | TemplateCatalogStatus;
 type BindingFilter = 'all' | 'linked' | 'unlinked';
-type SortKey = 'sort_order' | 'name' | 'updated';
+type SortKey = 'sort_order' | 'design_code' | 'updated';
 type PageTab = 'catalog' | 'bindings' | 'analytics';
 
 const DEFAULT_USAGE_FEE = 3;
@@ -176,6 +181,7 @@ export const DesignTemplatesPage: React.FC = () => {
   });
   const [importForm, setImportForm] = useState({
     name: '',
+    design_code: '',
     description: '',
     category_id: null as number | null,
     productId: '',
@@ -190,6 +196,7 @@ export const DesignTemplatesPage: React.FC = () => {
   });
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importResultCode, setImportResultCode] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
 
   const loadCategories = useCallback(async () => {
@@ -292,23 +299,32 @@ export const DesignTemplatesPage: React.FC = () => {
       list = list.filter((t) => {
         const parsed = parseTemplateSpec(t);
         const haystack = [
+          t.design_code ?? '',
           t.name,
           t.description ?? '',
           t.category ?? '',
           String(t.id),
           parsed.productId != null ? String(parsed.productId) : '',
           parsed.sizeId ?? '',
+          parsed.width_mm != null && parsed.height_mm != null
+            ? `${parsed.width_mm}x${parsed.height_mm}`
+            : '',
         ].join(' ').toLowerCase();
         return haystack.includes(q);
       });
     }
     const sorted = [...list];
     sorted.sort((a, b) => {
-      if (sortKey === 'name') return a.name.localeCompare(b.name, 'ru');
+      if (sortKey === 'design_code') {
+        return (a.design_code ?? '').localeCompare(b.design_code ?? '', 'ru')
+          || a.id - b.id;
+      }
       if (sortKey === 'updated') {
         return String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? ''));
       }
-      return (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, 'ru');
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0)
+        || (a.design_code ?? '').localeCompare(b.design_code ?? '', 'ru')
+        || a.id - b.id;
     });
     return sorted;
   }, [templates, categoryFilter, statusFilter, bindingFilter, authorFilter, searchQuery, sortKey, currentUser?.id]);
@@ -318,6 +334,11 @@ export const DesignTemplatesPage: React.FC = () => {
     if (!categoryFilter) return sections;
     return sections.filter((s) => s.key === categoryFilter);
   }, [filtered, categoryRegistry, categoryFilter]);
+
+  const familyCount = useMemo(
+    () => groupTemplatesIntoFamilies(filtered).length,
+    [filtered],
+  );
 
   const toggleSectionCollapsed = useCallback((sectionKey: string) => {
     setCollapsedSections((prev) => {
@@ -393,8 +414,11 @@ export const DesignTemplatesPage: React.FC = () => {
 
   const openImport = () => {
     setImportWarnings([]);
+    setImportErrors([]);
+    setImportResultCode(null);
     setImportForm({
       name: '',
+      design_code: '',
       description: '',
       category_id: defaultCategoryId,
       productId: '',
@@ -409,6 +433,33 @@ export const DesignTemplatesPage: React.FC = () => {
     });
     setImportModalOpen(true);
   };
+
+  const openImportIntoFamily = useCallback((family: DesignTemplateFamily) => {
+    const code = family.design_code ?? resolveDesignCode(family.primary);
+    setImportWarnings([]);
+    setImportErrors([]);
+    setImportResultCode(null);
+    setImportForm({
+      name: '',
+      design_code: code ?? '',
+      description: '',
+      category_id: family.primary.category_id ?? defaultCategoryId,
+      productId: '',
+      typeId: '',
+      sizeId: '',
+      sortOrder: templates.length,
+      author_user_id: family.primary.author_user_id != null
+        ? String(family.primary.author_user_id)
+        : (currentUser?.id != null ? String(currentUser.id) : ''),
+      usage_fee: family.primary.usage_fee != null ? String(family.primary.usage_fee) : String(DEFAULT_USAGE_FEE),
+      author_percent: family.primary.author_percent != null
+        ? String(family.primary.author_percent)
+        : String(DEFAULT_AUTHOR_PERCENT),
+      sourceFile: null,
+      file: null,
+    });
+    setImportModalOpen(true);
+  }, [currentUser?.id, defaultCategoryId, templates.length]);
 
   const openEdit = (t: DesignTemplate) => {
     const parsed = parseTemplateSpec(t);
@@ -476,10 +527,6 @@ export const DesignTemplatesPage: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!form.name.trim()) {
-      setError('Укажите название');
-      return;
-    }
     const width_mm = form.width_mm ? parseFloat(form.width_mm) : undefined;
     const height_mm = form.height_mm ? parseFloat(form.height_mm) : undefined;
     const page_count = form.page_count ? parseInt(form.page_count, 10) : undefined;
@@ -501,9 +548,9 @@ export const DesignTemplatesPage: React.FC = () => {
       const authorUserId = form.author_user_id.trim() ? parseInt(form.author_user_id, 10) : null;
       const usageFee = form.usage_fee.trim() ? parseFloat(form.usage_fee) : 0;
       const authorPercent = form.author_percent.trim() ? parseFloat(form.author_percent) : 0;
+      const trimmedName = form.name.trim();
 
       const payload: DesignTemplateInput = {
-        name: form.name.trim(),
         description: form.description.trim() || undefined,
         category_id: form.category_id,
         preview_url: form.preview_url || null,
@@ -515,10 +562,11 @@ export const DesignTemplatesPage: React.FC = () => {
         usage_fee: Number.isFinite(usageFee) ? usageFee : 0,
         author_percent: Number.isFinite(authorPercent) ? authorPercent : 0,
       };
+      if (trimmedName) payload.name = trimmedName;
       if (editingId) {
         await updateDesignTemplate(editingId, payload);
       } else {
-        await createDesignTemplate(payload as DesignTemplateInput & { name: string });
+        await createDesignTemplate(payload);
       }
       await loadTemplates();
       setModalOpen(false);
@@ -550,8 +598,10 @@ export const DesignTemplatesPage: React.FC = () => {
     }
     try {
       setError(null);
+      // Без design_code — бэкенд выделит новый код семьи.
+      const codeLabel = formatDesignCodeLabel(t);
       await createDesignTemplate({
-        name: `${t.name} (копия)`,
+        name: `${codeLabel} (копия)`,
         description: t.description ?? undefined,
         category_id: t.category_id ?? undefined,
         preview_url: t.preview_url ?? undefined,
@@ -574,8 +624,9 @@ export const DesignTemplatesPage: React.FC = () => {
       setError('Выберите исходник или SVG-файл для импорта');
       return;
     }
-    if (!importForm.name.trim()) {
-      setError('Укажите название импортируемого шаблона');
+    const designCode = importForm.design_code.trim();
+    if (designCode && !/^\d{6}$/.test(designCode)) {
+      setError('Код семьи должен быть 6-значным (например 000001)');
       return;
     }
     try {
@@ -583,10 +634,13 @@ export const DesignTemplatesPage: React.FC = () => {
       setError(null);
       setImportWarnings([]);
       setImportErrors([]);
+      setImportResultCode(null);
+      const trimmedName = importForm.name.trim();
       const res = await importDesignTemplateFile({
         file: importForm.file,
         sourceFile: importForm.sourceFile,
-        name: importForm.name.trim(),
+        name: trimmedName || undefined,
+        design_code: designCode || undefined,
         description: importForm.description.trim() || undefined,
         category_id: importForm.category_id,
         productId: importForm.productId.trim() || undefined,
@@ -600,8 +654,11 @@ export const DesignTemplatesPage: React.FC = () => {
         author_percent: importForm.author_percent.trim() ? parseFloat(importForm.author_percent) : undefined,
       });
       setImportWarnings(res.data.warnings ?? []);
+      const resultCode = res.data.design_code
+        ?? res.data.template?.design_code
+        ?? null;
+      setImportResultCode(resultCode);
       await loadTemplates();
-      if ((res.data.warnings ?? []).length === 0) setImportModalOpen(false);
     } catch (err: unknown) {
       const parsed = parseDesignTemplateImportError(err);
       setImportWarnings(parsed.warnings);
@@ -610,7 +667,7 @@ export const DesignTemplatesPage: React.FC = () => {
     } finally {
       setImporting(false);
     }
-  }, [importForm, loadTemplates]);
+  }, [importForm, loadTemplates, currentUser?.id]);
 
   const handleDelete = useCallback(async (id: number) => {
     if (!confirm('Удалить шаблон?')) return;
@@ -624,17 +681,27 @@ export const DesignTemplatesPage: React.FC = () => {
 
   const infoParsed = infoTemplate ? parseTemplateSpec(infoTemplate) : null;
 
-  const renderTemplateCard = useCallback((t: DesignTemplate) => {
-    const parsed = parseTemplateSpec(t);
-    const status = getTemplateCatalogStatus(t);
-    const sizeStr = formatTemplateSize(parsed);
-    const binding = formatBinding(parsed);
+  const renderFamilyCard = useCallback((family: DesignTemplateFamily) => {
+    const t = family.primary;
+    const status = familyCatalogStatus(family);
+    const codeLabel = family.design_code ?? formatDesignCodeLabel(t);
+    const binding = formatBinding(parseTemplateSpec(t));
     const previewSrc = resolveTemplatePreviewUrl(t.site_preview_url || t.preview_url, API_BASE_URL);
+    const hasUnlinked = family.variants.some((v) => (v.subtype_link_count ?? 0) === 0);
+    const warningCount = family.variants.reduce(
+      (n, v) => n + parseTemplateSpec(v).importWarnings.length,
+      0,
+    );
+    const fontsIssue = family.variants.some((v) => {
+      const p = parseTemplateSpec(v);
+      return p.hasDesignState && !p.fontsResolved;
+    });
+
     return (
-      <div key={t.id} className={`design-template-card design-template-card--${status}`}>
+      <div key={family.key} className={`design-template-card design-template-card--family design-template-card--${status}`}>
         <div className="design-template-preview">
           {previewSrc ? (
-            <img src={previewSrc} alt={t.name} />
+            <img src={previewSrc} alt={codeLabel} />
           ) : (
             <div className="design-template-placeholder">
               <AppIcon name="image" size="lg" />
@@ -646,41 +713,76 @@ export const DesignTemplatesPage: React.FC = () => {
         </div>
         <div className="design-template-info">
           <h4 className="design-template-name">
-            <span className="design-template-id">#{t.id}</span> {t.name}
+            <span className="design-template-code">{codeLabel}</span>
+            <span className="design-template-id">#{t.id}</span>
           </h4>
-          {(sizeStr || binding || parsed.importWarnings.length > 0) && (
-            <div className="design-template-meta-row">
-              {sizeStr && <span className="design-template-meta design-template-size">{sizeStr}</span>}
-              {binding && <span className="design-template-meta design-template-binding">{binding}</span>}
-              {(t.subtype_link_count ?? 0) === 0 && (
-                <button
-                  type="button"
-                  className="design-template-meta design-template-binding-warn"
-                  title={
-                    parsed.productId != null
-                      ? 'Открыть матрицу привязок для этого продукта'
-                      : 'Сначала укажите продукт в карточке шаблона'
-                  }
-                  onClick={() => {
-                    if (parsed.productId != null) openBindingsForTemplate(t);
-                    else openEdit(t);
-                  }}
-                >
-                  нет привязки · настроить
-                </button>
-              )}
-              {parsed.importWarnings.length > 0 && (
-                <span className="design-template-meta design-template-warnings-badge" title={parsed.importWarnings.join('\n')}>
-                  {parsed.importWarnings.length} предупр.
-                </span>
-              )}
-              {parsed.hasDesignState && !parsed.fontsResolved && (
-                <span className="design-template-meta design-template-warnings-badge" title="Не все шрифты найдены в библиотеке CRM">
-                  шрифты
-                </span>
-              )}
-            </div>
+          {family.variants.length > 1 && (
+            <span className="design-template-family-count">
+              вариантов: {family.variants.length}
+            </span>
           )}
+          <ul className="design-template-variants">
+            {family.variants.map((variant) => {
+              const parsed = parseTemplateSpec(variant);
+              const sizeStr = formatTemplateSize(parsed) ?? 'без размера';
+              const variantStatus = getTemplateCatalogStatus(variant);
+              return (
+                <li key={variant.id} className="design-template-variant">
+                  <button
+                    type="button"
+                    className="design-template-variant__link"
+                    onClick={() => navigate(`${editorPathPrefix}/${variant.id}`)}
+                    title={`Открыть редактор #${variant.id}`}
+                  >
+                    <span className="design-template-variant__size">{sizeStr}</span>
+                    <span className="design-template-variant__id">#{variant.id}</span>
+                  </button>
+                  <span className={`design-template-variant__status design-template-variant__status--${variantStatus}`}>
+                    {STATUS_LABELS[variantStatus]}
+                  </span>
+                  <button
+                    type="button"
+                    className="lg-btn lg-btn--icon design-template-variant__client"
+                    onClick={() => navigate(`/adminpanel/public-design-editor-preview/${variant.id}`)}
+                    title="Клиентский sandbox"
+                    aria-label="Клиент"
+                  >
+                    <AppIcon name="image" size="xs" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="design-template-meta-row">
+            {binding && <span className="design-template-meta design-template-binding">{binding}</span>}
+            {hasUnlinked && (
+              <button
+                type="button"
+                className="design-template-meta design-template-binding-warn"
+                title={
+                  parseTemplateSpec(t).productId != null
+                    ? 'Открыть матрицу привязок для этого продукта'
+                    : 'Сначала укажите продукт в карточке семьи'
+                }
+                onClick={() => {
+                  if (parseTemplateSpec(t).productId != null) openBindingsForTemplate(t);
+                  else openEdit(t);
+                }}
+              >
+                нет привязки · настроить
+              </button>
+            )}
+            {warningCount > 0 && (
+              <span className="design-template-meta design-template-warnings-badge" title="Предупреждения импорта">
+                {warningCount} предупр.
+              </span>
+            )}
+            {fontsIssue && (
+              <span className="design-template-meta design-template-warnings-badge" title="Не все шрифты найдены в библиотеке CRM">
+                шрифты
+              </span>
+            )}
+          </div>
           {(t.author_name || t.author_user_id) && (
             <span className="design-template-author">
               <AppIcon name="user" size="xs" />
@@ -688,10 +790,10 @@ export const DesignTemplatesPage: React.FC = () => {
             </span>
           )}
           {formatAuthorRoyaltyLine(t) && (
-            <span className="design-template-royalty" title="Внутренняя база для ЗП автора, не в цене клиента">
+            <span className="design-template-royalty" title="Плата и % — на всю семью (синхронизируются при сохранении)">
               <BynSymbol className="design-template-royalty__sign" />
               {formatAuthorRoyaltyLine(t)}
-              <span className="design-template-royalty-hint"> · не в цене клиента</span>
+              <span className="design-template-royalty-hint"> · на семью</span>
             </span>
           )}
         </div>
@@ -701,25 +803,27 @@ export const DesignTemplatesPage: React.FC = () => {
               type="button"
               className="lg-btn lg-btn--primary"
               onClick={() => navigate(`${editorPathPrefix}/${t.id}`)}
-              title="Master-редактор"
+              title="Master-редактор (первый размер)"
             >
               <AppIcon name="edit" size="xs" /> Шаблон
             </button>
-            <button
-              type="button"
-              className="lg-btn"
-              onClick={() => navigate(`/adminpanel/public-design-editor-preview/${t.id}`)}
-              title="Клиентский sandbox"
-            >
-              <AppIcon name="image" size="xs" /> Клиент
-            </button>
+            {family.design_code && (
+              <button
+                type="button"
+                className="lg-btn"
+                onClick={() => openImportIntoFamily(family)}
+                title="Импорт ещё одного размера в эту семью"
+              >
+                <AppIcon name="plus" size="xs" /> Размер
+              </button>
+            )}
           </div>
           <div className="design-template-actions__secondary">
             <button
               type="button"
               className="lg-btn lg-btn--icon"
               onClick={() => setReimportTemplate(t)}
-              title="Обновить из SVG (тот же шаблон)"
+              title="Обновить из SVG (первый вариант)"
               aria-label="Обновить SVG"
             >
               <AppIcon name="download" size="xs" />
@@ -727,26 +831,32 @@ export const DesignTemplatesPage: React.FC = () => {
             <button type="button" className="lg-btn lg-btn--icon" onClick={() => setInfoTemplate(t)} title="Импорт и метаданные" aria-label="Инфо">
               <AppIcon name="info" size="xs" />
             </button>
-            {(parsed.productId != null || parsed.typeId != null) && (
+            {(parseTemplateSpec(t).productId != null || parseTemplateSpec(t).typeId != null) && (
               <button type="button" className="lg-btn lg-btn--icon" onClick={() => openBindingsForTemplate(t)} title="Привязки к продукту" aria-label="Привязки">
                 <AppIcon name="link" size="xs" />
               </button>
             )}
-            <button type="button" className="lg-btn lg-btn--icon" onClick={() => openEdit(t)} title="Карточка" aria-label="Карточка">
+            <button
+              type="button"
+              className="lg-btn lg-btn--icon"
+              onClick={() => openEdit(t)}
+              title="Карточка семьи (автор, плата Y, % Z — на все размеры)"
+              aria-label="Карточка"
+            >
               <AppIcon name="edit" size="xs" />
             </button>
-            <button type="button" className="lg-btn lg-btn--icon" onClick={() => void handleDuplicate(t)} title="Копия" aria-label="Копия">
+            <button type="button" className="lg-btn lg-btn--icon" onClick={() => void handleDuplicate(t)} title="Копия с новым кодом семьи" aria-label="Копия">
               <AppIcon name="copy" size="xs" />
             </button>
-            <label className="design-template-active-toggle lg-btn lg-btn--icon" title="Активен на сайте">
+            <label className="design-template-active-toggle lg-btn lg-btn--icon" title="Активен на сайте (первый вариант)">
               <input
                 type="checkbox"
                 checked={t.is_active === 1}
-                disabled={!parsed.hasDesignState}
+                disabled={!parseTemplateSpec(t).hasDesignState}
                 onChange={() => void handleToggleActive(t)}
               />
             </label>
-            <button type="button" className="lg-btn lg-btn--icon lg-btn--danger" onClick={() => handleDelete(t.id)} title="Удалить" aria-label="Удалить">
+            <button type="button" className="lg-btn lg-btn--icon lg-btn--danger" onClick={() => handleDelete(t.id)} title="Удалить вариант" aria-label="Удалить">
               <AppIcon name="trash" size="xs" />
             </button>
           </div>
@@ -758,6 +868,7 @@ export const DesignTemplatesPage: React.FC = () => {
     editorPathPrefix,
     openBindingsForTemplate,
     openEdit,
+    openImportIntoFamily,
     setReimportTemplate,
     handleDuplicate,
     handleToggleActive,
@@ -782,7 +893,7 @@ export const DesignTemplatesPage: React.FC = () => {
             onClick={() => setPageTab('catalog')}
           >
             <AppIcon name="layers" size="xs" /> Каталог
-            <span className="design-templates-tab__count">{templates.length}</span>
+            <span className="design-templates-tab__count">{groupTemplatesIntoFamilies(templates).length}</span>
           </button>
           <button
             type="button"
@@ -822,10 +933,10 @@ export const DesignTemplatesPage: React.FC = () => {
           </button>
           {helpOpen && (
             <p className="design-templates-help__body">
-              Master-шаблоны для сайта и редактора. Основной вход — <strong>Импорт SVG</strong> (
-              <code>docs/design-template-importer.md</code>). Подробнее:{' '}
-              <code>docs/design-templates-catalog.md</code>. Плата автора — в <strong>бел. руб.</strong>, не в цене
-              клиента.
+              Master-шаблоны для сайта и редактора. Карточка = семья с кодом <code>000001</code>;
+              размеры (мм) — варианты внутри. Основной вход — <strong>Импорт SVG</strong> (
+              <code>docs/design-template-importer.md</code>). В ZIP папки вида <code>204x204/</code> создают
+              варианты одной семьи. Плата автора (Y) и % (Z) задаются один раз на семью.
             </p>
           )}
         </div>
@@ -847,7 +958,7 @@ export const DesignTemplatesPage: React.FC = () => {
           <input
             type="search"
             className="design-templates-search"
-            placeholder="Поиск по названию, ID, продукту…"
+            placeholder="Поиск по коду, ID, размеру…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -894,7 +1005,7 @@ export const DesignTemplatesPage: React.FC = () => {
             <label>Сортировка:</label>
             <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
               <option value="sort_order">Порядок</option>
-              <option value="name">Название</option>
+              <option value="design_code">Код семьи</option>
               <option value="updated">Обновление</option>
             </select>
           </div>
@@ -903,7 +1014,8 @@ export const DesignTemplatesPage: React.FC = () => {
 
         {!loading && filtersActive && filtered.length > 0 && (
           <p className="design-templates-shown-count">
-            Показано <strong>{filtered.length}</strong> из {templates.length} шаблонов
+            Показано <strong>{familyCount}</strong> семей
+            {' '}({filtered.length} из {templates.length} вариантов)
           </p>
         )}
 
@@ -939,12 +1051,14 @@ export const DesignTemplatesPage: React.FC = () => {
                       {collapsed ? '▸' : '▾'}
                     </span>
                     <h3 className="design-templates-category-card__title">{section.label}</h3>
-                    <span className="design-templates-category-card__badge">{section.items.length}</span>
+                    <span className="design-templates-category-card__badge">
+                      {groupTemplatesIntoFamilies(section.items).length}
+                    </span>
                   </button>
                   {!collapsed && (
                     <div className="design-templates-category-card__body">
                       <div className="design-templates-grid">
-                        {section.items.map((t) => renderTemplateCard(t))}
+                        {groupTemplatesIntoFamilies(section.items).map((family) => renderFamilyCard(family))}
                       </div>
                     </div>
                   )}
@@ -957,7 +1071,7 @@ export const DesignTemplatesPage: React.FC = () => {
         {filtered.length === 0 && !loading && (
           <div className="design-templates-empty">
             {templates.length === 0
-              ? 'Шаблонов пока нет. Начните с импорта SVG.'
+              ? 'Шаблонов пока нет. Начните с импорта SVG — код семьи назначится автоматически.'
               : 'Нет шаблонов по выбранным фильтрам.'}
           </div>
         )}
@@ -968,7 +1082,7 @@ export const DesignTemplatesPage: React.FC = () => {
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? 'Карточка шаблона' : 'Новый шаблон (вручную)'}
+        title={editingId ? 'Карточка семьи дизайна' : 'Новый шаблон (вручную)'}
         className="product-management design-templates-modal"
         size="xl"
       >
@@ -977,15 +1091,27 @@ export const DesignTemplatesPage: React.FC = () => {
             <section className="design-template-form-section design-template-form-section--main">
               <header className="design-template-form-section__head">
                 <span>Основное</span>
-                <strong>Название и категория</strong>
+                <strong>Код семьи и категория</strong>
               </header>
+              {editingId != null && (
+                <div className="form-row">
+                  <label>Код семьи</label>
+                  <input
+                    type="text"
+                    value={templates.find((x) => x.id === editingId)?.design_code ?? '—'}
+                    readOnly
+                    disabled
+                  />
+                  <p className="form-hint">Внутренний id: #{editingId}. Код назначается при создании/импорте.</p>
+                </div>
+              )}
               <div className="form-row">
-                <label>Название *</label>
+                <label>Служебное название</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Например: Фотокнига Свадьба"
+                  placeholder="Необязательно — по умолчанию код семьи"
                 />
               </div>
               <div className="form-row">
@@ -1076,8 +1202,11 @@ export const DesignTemplatesPage: React.FC = () => {
             <section className="design-template-form-section">
               <header className="design-template-form-section__head">
                 <span>Автор</span>
-                <strong>Внутренняя ЗП за макет</strong>
+                <strong>ЗП на всю семью (Y и Z)</strong>
               </header>
+              <p className="form-hint design-template-family-royalty-hint">
+                Автор, плата (Y) и % автору (Z) синхронизируются на все размеры с тем же кодом семьи.
+              </p>
               <div className="design-template-compact-fields">
                 <label className="design-template-field--wide">
                   <span><AppIcon name="user" size="xs" /> Автор</span>
@@ -1092,7 +1221,7 @@ export const DesignTemplatesPage: React.FC = () => {
                   </select>
                 </label>
                 <label>
-                  <span>Плата, бел. руб./ед.</span>
+                  <span>Плата Y, бел. руб./ед.</span>
                   <input
                     type="number"
                     min="0"
@@ -1102,7 +1231,7 @@ export const DesignTemplatesPage: React.FC = () => {
                   />
                 </label>
                 <label>
-                  <span>% автору</span>
+                  <span>% автору Z</span>
                   <input
                     type="number"
                     min="0"
@@ -1163,7 +1292,10 @@ export const DesignTemplatesPage: React.FC = () => {
         <div className="design-template-form">
           <div className="design-template-import-intro">
             <strong>Основной способ:</strong>
-            <span>SVG или ZIP со страницами. Исходник AI/CDR — опционально. Без SVG шаблон сохранится как draft (неактивен).</span>
+            <span>
+              SVG или ZIP со страницами. В ZIP папки размеров вида <code>204x204/</code> (ширина×высота в мм)
+              создают варианты одной семьи. Исходник AI/CDR — опционально. Без SVG — draft.
+            </span>
           </div>
           <div className="form-row">
             <label>Исходник для CRM</label>
@@ -1178,12 +1310,38 @@ export const DesignTemplatesPage: React.FC = () => {
             <div className="preview-upload">
               <input ref={importFileInputRef} type="file" accept=".svg,.zip" onChange={(e) => setImportForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))} className="visually-hidden-file-input" />
               <button type="button" className="lg-btn" onClick={() => importFileInputRef.current?.click()}>Выбрать SVG/ZIP</button>
-              <p className="form-hint">{importForm.file ? importForm.file.name : 'photo_*, text_*, trim/bleed/safe'}</p>
+              <p className="form-hint">
+                {importForm.file
+                  ? importForm.file.name
+                  : 'photo_*, text_*, trim/bleed/safe · ZIP: папки 204x204/, 150x150/…'}
+              </p>
             </div>
           </div>
           <div className="form-row">
-            <label>Название *</label>
-            <input type="text" value={importForm.name} onChange={(e) => setImportForm((p) => ({ ...p, name: e.target.value }))} />
+            <label>Код семьи</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="Пусто — новый код; 000001 — добавить размер в семью"
+              value={importForm.design_code}
+              onChange={(e) => setImportForm((p) => ({
+                ...p,
+                design_code: e.target.value.replace(/\D/g, '').slice(0, 6),
+              }))}
+            />
+            <p className="form-hint">
+              Оставьте пустым — система назначит следующий код. Укажите существующий 6-значный код, чтобы добавить размер в эту семью.
+            </p>
+          </div>
+          <div className="form-row">
+            <label>Служебное название</label>
+            <input
+              type="text"
+              value={importForm.name}
+              onChange={(e) => setImportForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="Необязательно — по умолчанию код семьи"
+            />
           </div>
           <div className="form-row">
             <label>Описание</label>
@@ -1212,7 +1370,7 @@ export const DesignTemplatesPage: React.FC = () => {
               </select>
             </label>
             <label>
-              <span>Плата (бел. руб./ед.)</span>
+              <span>Плата Y (бел. руб./ед.)</span>
               <input
                 type="number"
                 min="0"
@@ -1222,7 +1380,7 @@ export const DesignTemplatesPage: React.FC = () => {
               />
             </label>
             <label>
-              <span>% автору</span>
+              <span>% автору Z</span>
               <input
                 type="number"
                 min="0"
@@ -1244,6 +1402,11 @@ export const DesignTemplatesPage: React.FC = () => {
               requiredSize
             />
           </div>
+          {importResultCode && (
+            <div className="design-template-import-success">
+              <strong>Код семьи:</strong> {importResultCode}
+            </div>
+          )}
           {importErrors.length > 0 && (
             <div className="design-template-import-errors">
               <strong>Ошибка импорта:</strong>
@@ -1268,11 +1431,15 @@ export const DesignTemplatesPage: React.FC = () => {
       <Modal
         isOpen={infoTemplate !== null}
         onClose={() => setInfoTemplate(null)}
-        title={infoTemplate ? `Шаблон #${infoTemplate.id}` : ''}
+        title={infoTemplate ? `${formatDesignCodeLabel(infoTemplate)} · #${infoTemplate.id}` : ''}
         className="product-management design-templates-modal"
       >
         {infoTemplate && infoParsed && (
           <div className="design-template-info-panel">
+            {infoTemplate.design_code && (
+              <p><strong>Код семьи:</strong> {infoTemplate.design_code}</p>
+            )}
+            <p><strong>Внутр. id:</strong> #{infoTemplate.id}</p>
             <p><strong>Статус:</strong> {STATUS_LABELS[getTemplateCatalogStatus(infoTemplate)]}</p>
             <p><strong>designState:</strong> {infoParsed.hasDesignState ? 'есть' : 'нет'}</p>
             {infoParsed.importerVersion != null && <p><strong>Importer v:</strong> {infoParsed.importerVersion}</p>}
@@ -1282,7 +1449,7 @@ export const DesignTemplatesPage: React.FC = () => {
               <p><strong>Автор:</strong> {infoTemplate.author_name}</p>
             )}
             {formatAuthorRoyaltyLine(infoTemplate) && (
-              <p><strong>ЗП автора:</strong> {formatAuthorRoyaltyLine(infoTemplate)} (внутр., не клиенту)</p>
+              <p><strong>ЗП автора (на семью):</strong> {formatAuthorRoyaltyLine(infoTemplate)}</p>
             )}
             {infoParsed.requiredFonts.length > 0 && (
               <div className="design-template-fonts-panel">

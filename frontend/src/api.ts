@@ -1061,6 +1061,8 @@ export const saveOrderBlankTemplate = (organizationId: number, html_content: str
 // Design Templates API (каталог шаблонов для редактора макетов)
 export interface DesignTemplate {
   id: number;
+  /** 6-значный код семьи (000001); на сайте показывается вместо name */
+  design_code?: string;
   name: string;
   description?: string | null;
   category_id?: number | null;
@@ -1100,6 +1102,8 @@ export type DesignTemplateInput = Omit<Partial<DesignTemplate>, 'spec' | 'is_act
 
 export interface DesignTemplateImportResult {
   template: DesignTemplate;
+  templates?: DesignTemplate[];
+  design_code?: string;
   warnings: string[];
   errors: string[];
 }
@@ -1211,7 +1215,7 @@ export const getDesignTemplates = () => api.get<DesignTemplate[]>('/design-templ
 export const getDesignTemplatesByCategory = (category: string) =>
   api.get<DesignTemplate[]>(`/design-templates/category/${encodeURIComponent(category)}`);
 export const getDesignTemplate = (id: number) => api.get<DesignTemplate>(`/design-templates/${id}`);
-export const createDesignTemplate = (data: DesignTemplateInput & { name: string }) =>
+export const createDesignTemplate = (data: DesignTemplateInput) =>
   api.post<DesignTemplate>('/design-templates', data);
 export const updateDesignTemplate = (id: number, data: DesignTemplateInput) =>
   api.put<DesignTemplate>(`/design-templates/${id}`, data);
@@ -1247,7 +1251,8 @@ export const uploadDesignTemplateAsset = (
 export const importDesignTemplateFile = (payload: {
   file?: File | null;
   sourceFile?: File | null;
-  name: string;
+  name?: string;
+  design_code?: string;
   description?: string;
   category_id?: number | null;
   category?: string;
@@ -1262,7 +1267,8 @@ export const importDesignTemplateFile = (payload: {
   const formData = new FormData();
   if (payload.file) formData.append('file', payload.file);
   if (payload.sourceFile) formData.append('sourceFile', payload.sourceFile);
-  formData.append('name', payload.name);
+  if (payload.name) formData.append('name', payload.name);
+  if (payload.design_code) formData.append('design_code', payload.design_code);
   if (payload.description) formData.append('description', payload.description);
   if (payload.category_id != null) formData.append('category_id', String(payload.category_id));
   else if (payload.category) formData.append('category', payload.category);

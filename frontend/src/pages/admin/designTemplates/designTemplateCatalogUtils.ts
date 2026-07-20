@@ -195,3 +195,76 @@ export function formatAuthorRoyaltyLine(template: DesignTemplate): string | null
   if (payout == null) return `${formatBynAmount(fee)} · ${pct}%`;
   return `${formatBynAmount(fee)} · ${pct}% → ${formatBynAmount(payout)}/ед.`;
 }
+
+/** Семья вариантов одного design_code (размеры). */
+export type DesignTemplateFamily = {
+  /** Код семьи или fallback `id:N` для legacy без кода */
+  key: string;
+  design_code: string | null;
+  /** Представитель семьи (первый после сортировки) */
+  primary: DesignTemplate;
+  variants: DesignTemplate[];
+};
+
+export function resolveDesignCode(template: Pick<DesignTemplate, 'design_code' | 'id'>): string | null {
+  const code = template.design_code?.trim();
+  return code && /^\d{6}$/.test(code) ? code : null;
+}
+
+export function formatDesignCodeLabel(template: Pick<DesignTemplate, 'design_code' | 'id' | 'name'>): string {
+  return resolveDesignCode(template) ?? template.name?.trim() ?? `#${template.id}`;
+}
+
+function compareVariantsBySize(a: DesignTemplate, b: DesignTemplate): number {
+  const pa = parseTemplateSpec(a);
+  const pb = parseTemplateSpec(b);
+  const wa = pa.width_mm ?? 0;
+  const wb = pb.width_mm ?? 0;
+  if (wa !== wb) return wa - wb;
+  const ha = pa.height_mm ?? 0;
+  const hb = pb.height_mm ?? 0;
+  if (ha !== hb) return ha - hb;
+  return (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id;
+}
+
+/** Группирует шаблоны по design_code; варианты без кода — по одному на карточку. */
+export function groupTemplatesIntoFamilies(templates: DesignTemplate[]): DesignTemplateFamily[] {
+  const buckets = new Map<string, DesignTemplate[]>();
+  for (const t of templates) {
+    const code = resolveDesignCode(t);
+    const key = code ?? `id:${t.id}`;
+    const list = buckets.get(key) ?? [];
+    list.push(t);
+    buckets.set(key, list);
+  }
+
+  const families: DesignTemplateFamily[] = [];
+  for (const [key, items] of buckets) {
+    const variants = [...items].sort(compareVariantsBySize);
+    const design_code = key.startsWith('id:') ? null : key;
+    families.push({
+      key,
+      design_code,
+      primary: variants[0],
+      variants,
+    });
+  }
+
+  families.sort((a, b) => {
+    const codeA = a.design_code ?? '';
+    const codeB = b.design_code ?? '';
+    if (codeA && codeB && codeA !== codeB) return codeA.localeCompare(codeB, 'ru');
+    if (codeA && !codeB) return -1;
+    if (!codeA && codeB) return 1;
+    return (a.primary.sort_order ?? 0) - (b.primary.sort_order ?? 0)
+      || a.primary.id - b.primary.id;
+  });
+
+  return families;
+}
+
+export function familyCatalogStatus(family: DesignTemplateFamily): TemplateCatalogStatus {
+  if (family.variants.some((t) => getTemplateCatalogStatus(t) === 'active')) return 'active';
+  if (family.variants.every((t) => getTemplateCatalogStatus(t) === 'draft')) return 'draft';
+  return 'inactive';
+}

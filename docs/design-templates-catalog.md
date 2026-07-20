@@ -27,25 +27,35 @@
 | **Неактивен** | Выключен вручную |
 | **Draft** | Нет `designState` (только исходник или пустой spec) — на сайт не отдавать |
 
-## Автор макета и внутренняя плата (ЗП)
+## Семейство дизайна (`design_code`)
 
-Поля в `design_templates` (суммы в **бел. руб.**):
+Один публичный код **`design_code`** (6 цифр, `000001`–`999999`) объединяет несколько вариантов размера (отдельные строки `design_templates` с разным `width_mm`×`height_mm`).
+
+- Внутренний `id` — вариант размера (редактор, `designTemplateId` в заказе).
+- На сайте клиенту показывают только **`design_code`**, не текстовый `name`.
+- `usage_fee` / `author_user_id` / `author_percent` общие на семью: правка на одном варианте синхронизируется на все строки с тем же кодом.
+- Счётчик кодов: таблица `design_code_seq`.
+
+## Автор макета и плата за использование (Y)
+
+Поля в `design_templates` (суммы в **бел. руб.**), общие на `design_code`:
 
 | Поле | Смысл |
 |------|--------|
-| `author_user_id` | Пользователь CRM — автор master-шаблона |
-| `usage_fee` | База за использование макета на 1 ед. (пример: 3,00) — **уже в цене продукта**, клиенту отдельно не показывается |
-| `author_percent` | % автору **от `usage_fee`**, не от суммы позиции заказа |
+| `author_user_id` | Пользователь CRM — автор макета |
+| `usage_fee` (Y) | Плата за использование макета на **1 ед.**; на сайте: итог позиции = **X + Y×qty**, где X — цена продукта |
+| `author_percent` (Z) | % автору **от Y**, не от X |
 
-**Начисление ЗП автора:** при пересчёте `order_item_earnings` за день, если в `items.params` есть `designTemplateId` и у шаблона заданы автор, `usage_fee > 0` и `author_percent > 0`, создаётся вторая строка с `earning_type = 'design_author'`:
+**Сайт:** `priceType` (срочный/промо) применяется только к X; на Y не действует. Y начисляется **на каждую позицию** корзины с макетом. Public API отдаёт `design_code` и `usage_fee`, **не** отдаёт `author_user_id` / `author_percent`.
 
-- `user_id` = `author_user_id`
-- `order_item_total` = `usage_fee × quantity`
-- `amount` = `order_item_total × author_percent / 100`
+**Начисление ЗП** (`order_item_earnings`):
 
-Пример: `usage_fee = 3`, `author_percent = 10`, qty = 1 → **0,30 бел. руб.** автору; **% оператора** по позиции считается отдельно (`earning_type = 'operator'`), как раньше.
+| Тип | Кому | База |
+|-----|------|------|
+| `operator` | Исполнитель заказа | Только **X** (из `price×qty` вычитается `usage_fee×qty` / `params.designUsageFee`) |
+| `design_author` | `author_user_id` шаблона | **Y×qty**, выплата × Z% |
 
-Public API (`GET /api/design-templates/public`) **не отдаёт** `author_user_id`, `usage_fee`, `author_percent`.
+Пример: Y = 3, Z = 10%, qty = 1 → автору 0,30; оператор % с Y не получает.
 
 ## Привязка к продукту
 

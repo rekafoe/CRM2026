@@ -332,9 +332,23 @@ export class EarningsService {
           if (Number.isFinite(rawPercent)) percent = rawPercent;
         }
 
-        const itemTotal = (Number(row.price) || 0) * (Number(row.quantity) || 0);
-        const amount = (itemTotal * percent) / 100;
         const qty = Number(row.quantity) || 0;
+        const lineTotal = (Number(row.price) || 0) * qty;
+        // База оператора = X (без платы за дизайн Y). Y идёт только автору макета.
+        let designUsageTotal = 0;
+        const designTemplateIdForFee = Number(params?.designTemplateId);
+        if (Number.isFinite(designTemplateIdForFee) && designTemplateIdForFee > 0) {
+          const feeFromParams = Number(params?.designUsageFee ?? params?.usage_fee);
+          if (Number.isFinite(feeFromParams) && feeFromParams >= 0) {
+            designUsageTotal = feeFromParams * qty;
+          } else {
+            const tpl = designTemplateMap.get(designTemplateIdForFee);
+            const usageFee = Number(tpl?.usage_fee) || 0;
+            if (usageFee > 0 && qty > 0) designUsageTotal = usageFee * qty;
+          }
+        }
+        const itemTotal = Math.max(0, lineTotal - designUsageTotal);
+        const amount = (itemTotal * percent) / 100;
 
         if (hasEarningType) {
           await db.run(

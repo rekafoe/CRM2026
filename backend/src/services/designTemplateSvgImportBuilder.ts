@@ -430,6 +430,178 @@ function shouldSkipZipEntry(name: string): boolean {
     || basename.startsWith('~')
 }
 
+/** Папка размера: 204x204 / 204х204 / 148×210 */
+const SIZE_FOLDER_RE = /^(\d+(?:[.,]\d+)?)\s*[xх×XХ]\s*(\d+(?:[.,]\d+)?)$/u
+
+export function parseSizeFolderLabel(folder: string): { width: number; height: number } | null {
+  const m = folder.trim().match(SIZE_FOLDER_RE)
+  if (!m) return null
+  const width = Number(String(m[1]).replace(',', '.'))
+  const height = Number(String(m[2]).replace(',', '.'))
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
+  return { width, height }
+}
+
+function listZipSvgEntries(zip: PizZip): Array<{ name: string; svg: string }> {
+  return Object.entries(zip.files)
+    .filter(([name, entry]) => !entry.dir && path.extname(name).toLowerCase() === '.svg' && !shouldSkipZipEntry(name))
+    .sort(([a], [b]) => sortPageEntryNames(a, b))
+    .map(([name, entry]) => ({ name: name.replace(/\\/g, '/'), svg: entry.asText() }))
+}
+
+/**
+ * Если все SVG лежат в папках вида 204x204 — multi-size ZIP.
+ * Иначе (SVG в корне) — обычный single-size ZIP.
+ */
+export function groupZipSvgEntriesBySizeFolder(
+  entries: Array<{ name: string; svg: string }>,
+): Map<string, Array<{ name: string; svg: string }>> | null {
+  const nonFont = entries.filter((e) => !/(?:^|\/)fonts\//i.test(e.name))
+  if (nonFont.length === 0) return null
+
+  const groups = new Map<string, Array<{ name: string; svg: string }>>()
+  let rootCount = 0
+  for (const entry of nonFont) {
+    const parts = entry.name.split('/').filter(Boolean)
+    if (parts.length < 2) {
+      rootCount += 1
+      continue
+    }
+    const folder = parts[0]
+    if (!parseSizeFolderLabel(folder)) {
+      rootCount += 1
+      continue
+    }
+    const list = groups.get(folder) ?? []
+    list.push(entry)
+    groups.set(folder, list)
+  }
+
+  if (groups.size === 0 || rootCount > 0) return null
+  return groups
+}
+
+export type ImportedSizeVariantDocument = {
+  folderLabel: string
+  hintWidthMm: number
+  hintHeightMm: number
+  document: ImportedSvgTemplateDocument
+}
+
+function buildDocumentFromSvgEntries(
+  entries: Array<{ name: string; svg: string }>,
+  templateName: string,
+  warnings: string[],
+  options: BuildDocumentOptions,
+  bundledFonts: BundledTemplateFont[],
+  normalizedFormat: 'svg' | 'svg-zip',
+  originalName: string,
+  bufferSize: number,
+): ImportedSvgTemplateDocument {
+  const pages = entries.slice(0, MAX_IMPORTED_SVG_PAGES).map((entry, index) => buildPageFromSvg({
+    svg: entry.svg,
+    originalName: path.basename(entry.name),
+    pageIndex: index,
+    templateName,
+    warnings,
+    bundledFonts,
+    trace: options.trace === true,
+  }))
+  const first = pages[0]
+  if (!first) importError('Не удалось собрать страницы шаблона.', warnings)
+
+  for (let index = 1; index < pages.length; index += 1) {
+    const page = pages[index]
+    if (!samePageSize(first.parsed.widthMm, page.parsed.widthMm) || !samePageSize(first.parsed.heightMm, page.parsed.heightMm)) {
+      importError(
+        `Размер SVG страницы ${index + 1} (${page.parsed.widthMm}×${page.parsed.heightMm} мм) отличается от первой (${first.parsed.widthMm}×${first.parsed.heightMm} мм).`,
+        warnings,
+      )
+    }
+  }
+
+  return {
+    pageWidthMm: first.parsed.widthMm,
+    pageHeightMm: first.parsed.heightMm,
+    pageCount: pages.length,
+    previewUrl: first.previewUrl,
+    normalizedFormat,
+    normalizedFileUrl: first.normalizedFileUrl,
+    normalizedOriginalName: originalName || first.normalizedOriginalName,
+    normalizedSize: bufferSize || first.normalizedSize,
+    pages,
+    bundledFonts,
+  }
+}
+
+/** Multi-size ZIP → один документ на папку размера. */
+export function buildImportedMultiSizeSvgDocuments(
+  file: ImportFile,
+  templateName: string,
+  warnings: string[],
+  options: BuildDocumentOptions = {},
+): ImportedSizeVariantDocument[] | null {
+  const ext = path.extname(file.originalname || '').toLowerCase()
+  if (ext !== '.zip' || !file.buffer?.length) return null
+
+  let zip: PizZip
+  try {
+    zip = new PizZip(file.buffer)
+  } catch {
+    return null
+  }
+
+  const allEntries = listZipSvgEntries(zip)
+  const groups = groupZipSvgEntriesBySizeFolder(allEntries)
+  if (!groups) return null
+
+  const bundledFonts = readZipFontEntries(file, templateName, warnings)
+  const variants: ImportedSizeVariantDocument[] = []
+  const seenMm = new Set<string>()
+
+  for (const [folderLabel, entries] of [...groups.entries()].sort(([a], [b]) => sortPageEntryNames(a, b))) {
+    const hint = parseSizeFolderLabel(folderLabel)!
+    const document = buildDocumentFromSvgEntries(
+      entries,
+      `${templateName}-${folderLabel}`,
+      warnings,
+      options,
+      bundledFonts,
+      'svg-zip',
+      file.originalname || `${folderLabel}.zip`,
+      file.buffer?.length ?? 0,
+    )
+    const mmKey = `${document.pageWidthMm.toFixed(1)}x${document.pageHeightMm.toFixed(1)}`
+    if (seenMm.has(mmKey)) {
+      importError(
+        `В ZIP два размера с одинаковыми мм SVG (${document.pageWidthMm}×${document.pageHeightMm}): папка «${folderLabel}».`,
+        warnings,
+      )
+    }
+    seenMm.add(mmKey)
+
+    if (
+      Math.abs(document.pageWidthMm - hint.width) > 1.5
+      || Math.abs(document.pageHeightMm - hint.height) > 1.5
+    ) {
+      warnings.push(
+        `Папка «${folderLabel}»: мм из SVG (${document.pageWidthMm}×${document.pageHeightMm}) `
+        + `отличаются от имени папки (${hint.width}×${hint.height}). Используем мм из SVG.`,
+      )
+    }
+
+    variants.push({
+      folderLabel,
+      hintWidthMm: hint.width,
+      hintHeightMm: hint.height,
+      document,
+    })
+  }
+
+  if (variants.length === 0) return null
+  return variants
+}
+
 function readZipFontEntries(
   file: ImportFile,
   templateName: string,
@@ -738,38 +910,14 @@ export function buildImportedSvgTemplateDocument(
     ? readZipFontEntries(file, templateName, warnings)
     : []
   const entries = readSvgEntries(file, ext, warnings)
-  const pages = entries.map((entry, index) => buildPageFromSvg({
-    svg: entry.svg,
-    originalName: path.basename(entry.name),
-    pageIndex: index,
+  return buildDocumentFromSvgEntries(
+    entries,
     templateName,
     warnings,
+    options,
     bundledFonts,
-    trace: options.trace === true,
-  }))
-  const first = pages[0]
-  if (!first) importError('Не удалось собрать страницы шаблона.', warnings)
-
-  for (let index = 1; index < pages.length; index += 1) {
-    const page = pages[index]
-    if (!samePageSize(first.parsed.widthMm, page.parsed.widthMm) || !samePageSize(first.parsed.heightMm, page.parsed.heightMm)) {
-      importError(
-        `Размер SVG страницы ${index + 1} (${page.parsed.widthMm}×${page.parsed.heightMm} мм) отличается от первой (${first.parsed.widthMm}×${first.parsed.heightMm} мм).`,
-        warnings,
-      )
-    }
-  }
-
-  return {
-    pageWidthMm: first.parsed.widthMm,
-    pageHeightMm: first.parsed.heightMm,
-    pageCount: pages.length,
-    previewUrl: first.previewUrl,
-    normalizedFormat: ext === '.zip' ? 'svg-zip' : 'svg',
-    normalizedFileUrl: first.normalizedFileUrl,
-    normalizedOriginalName: file.originalname || first.normalizedOriginalName,
-    normalizedSize: file.buffer?.length ?? first.normalizedSize,
-    pages,
-    bundledFonts,
-  }
+    ext === '.zip' ? 'svg-zip' : 'svg',
+    file.originalname || '',
+    file.buffer?.length ?? 0,
+  )
 }

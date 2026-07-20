@@ -21,6 +21,10 @@
 
 CRM **не отдаёт HTML** галереи — только JSON. Плитки «Свой макет», «Создать дизайн», фильтры «Стили» — зона сайта.
 
+**Публичный ID макета:** поле `design_code` (6 цифр). На UI сайта **не показывать** `name` / `description` — только код. Без `sizeId` в `GET …/public` CRM дедуплицирует семью (одна карточка на код); с `sizeId` — вариант, привязанный к размеру.
+
+**Цена дизайна (Y):** public отдаёт `usage_fee`. Итог позиции = цена продукта X (с `priceType`) + `usage_fee × qty`. В params заказа: `designTemplateId` + `designUsageFee`.
+
 ```mermaid
 flowchart LR
   screen2[Экран2_подтип] --> ids[productId_typeId]

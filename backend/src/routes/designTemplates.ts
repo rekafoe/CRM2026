@@ -430,7 +430,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     return
   }
   const input: DesignTemplateInput = {
-    name: String(body.name || '').trim(),
+    name: String(body.name || '').trim() || undefined,
+    design_code: body.design_code != null ? String(body.design_code).trim() : undefined,
     description: body.description != null ? String(body.description) : undefined,
     ...categoryFields,
     preview_url: parseOptionalUrlField(body, 'preview_url'),
@@ -443,10 +444,6 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     author_user_id: royalty.author_user_id ?? authUser?.id ?? null,
     usage_fee: royalty.usage_fee,
     author_percent: royalty.author_percent,
-  }
-  if (!input.name) {
-    res.status(400).json({ message: 'Укажите название шаблона' })
-    return
   }
   const template = await createDesignTemplate(input)
   res.status(201).json(template)
@@ -494,7 +491,10 @@ router.post('/import', uploadOrderFilesMemory.fields([
     const result = await importDesignTemplateFromFile({
       file: files?.file?.[0],
       sourceFile: files?.sourceFile?.[0],
-      name: String(body.name || '').trim(),
+      name: String(body.name || '').trim() || undefined,
+      design_code: body.design_code != null && String(body.design_code).trim()
+        ? String(body.design_code).trim()
+        : undefined,
       description: body.description != null ? String(body.description) : undefined,
       ...categoryFields,
       productId: body.productId != null && body.productId !== '' ? Number(body.productId) : undefined,
