@@ -420,6 +420,65 @@ export async function getPublicDesignTemplates(params: {
   return prepared.map((row) => mapPublicListRow(row))
 }
 
+/**
+ * Лёгкий список size_id для семьи design_code (вместо N полных public list при открытии калькулятора).
+ */
+export async function getPublicAvailableSizeIdsForDesignCode(params: {
+  productId: number
+  typeId: number
+  designCode: string
+}): Promise<string[]> {
+  const designCode = params.designCode.trim()
+  if (!designCode || !Number.isFinite(params.productId) || !Number.isFinite(params.typeId)) {
+    return []
+  }
+  const db = await getDb()
+  const rows = await db.all(
+    `SELECT DISTINCT psd.size_id AS size_id
+     FROM product_subtype_designs psd
+     INNER JOIN design_templates dt ON dt.id = psd.design_template_id
+     WHERE psd.product_id = ?
+       AND psd.type_id = ?
+       AND dt.design_code = ?
+       AND dt.is_active = 1
+       AND psd.size_id IS NOT NULL
+       AND TRIM(psd.size_id) != ''
+     ORDER BY psd.size_id ASC`,
+    [params.productId, params.typeId, designCode],
+  ) as Array<{ size_id: string | null }>
+  return rows
+    .map((row) => String(row.size_id ?? '').trim())
+    .filter(Boolean)
+}
+
+/**
+ * Один вариант семьи по design_code + size (без списка всех макетов subtype).
+ */
+export async function getPublicDesignTemplateByCodeAndSize(params: {
+  productId: number
+  typeId: number
+  designCode: string
+  sizeId: string
+}): Promise<DesignTemplateRow | null> {
+  const designCode = params.designCode.trim()
+  const sizeId = String(params.sizeId ?? '').trim()
+  if (!designCode || !sizeId) return null
+  const db = await getDb()
+  const row = await db.get(
+    `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
+     FROM ${PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK}
+     WHERE psd.product_id = ?
+       AND psd.type_id = ?
+       AND psd.size_id = ?
+       AND dt.design_code = ?
+       AND dt.is_active = 1
+     ORDER BY psd.sort_order ASC, dt.sort_order ASC, dt.id ASC
+     LIMIT 1`,
+    [params.productId, params.typeId, sizeId, designCode],
+  ) as DesignTemplateRow | undefined
+  return row ? mapPublicListRow(row) : null
+}
+
 async function resolveInputCategory(
   input: Pick<DesignTemplateInput, 'category_id' | 'category'>,
   createIfNameMissing = false,

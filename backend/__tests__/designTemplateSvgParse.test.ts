@@ -219,6 +219,29 @@ describe('parseImportedSvgLayers', () => {
     expect(text.fill).toBe('#111111')
   })
 
+  it('переводит decorative tspan fontSize в scene px (не SVG units)', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 9000 5000">
+  <style type="text/css"><![CDATA[
+    .fnt0 { font-size: 635px; font-family: Arial; }
+    .fnt1 { font-size: 900px; font-family: Ceremonious One; }
+  ]]></style>
+  <text id="text_love" text-anchor="middle">
+    <tspan class="fnt0" x="3000" y="2000">Что я в тебе </tspan>
+    <tspan class="fnt1" x="5200" y="2000">л</tspan>
+    <tspan class="fnt0" x="5400" y="2000">юблю</tspan>
+  </text>
+</svg>`
+    const r = parseImportedSvgLayers(svg, { sceneScale: 3 })
+    const text = r.textItems[0]
+    expect(text.scene.fontSize).toBeCloseTo(72, 0)
+    const decorative = text.textStyles?.find((s) => s.fontFamily === 'Ceremonious One')
+    expect(decorative?.fontSize).toBeDefined()
+    expect(decorative!.fontSize!).toBeCloseTo(102, 0)
+    expect(decorative!.fontSize!).toBeLessThan(200)
+    expect(text.frameWidthScene ?? 0).toBeLessThan(r.geometry.scenePx.width)
+  })
+
   it('читает белый цвет текста из fill атрибута и CSS-класса Corel', () => {
     const svgAttr = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
@@ -346,6 +369,29 @@ describe('parseImportedSvgLayers', () => {
     expect(r.interactiveLayers.filter((layer) => layer.kind === 'decor')).toHaveLength(0)
     expect(r.warnings.some((w) => w.includes('DECOR_NO_VALID_SHAPE') && w.includes('decor_bad'))).toBe(true)
     expect(r.parserReport.countsByReasonCode.DECOR_NO_VALID_SHAPE).toBe(1)
+  })
+
+  it('импортирует PNG/JPG <image> как decor_* и decor_auto_image', () => {
+    const pngData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+    const jpgData = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAG/AP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAQUCf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQMBAT8Bf//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQIBAT8Bf//Z'
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <image id="decor_logo" x="5" y="5" width="20" height="10" href="${pngData}"/>
+  <g id="decor_stamp">
+    <image x="30" y="5" width="15" height="15" xlink:href="${jpgData}"/>
+  </g>
+  <image x="60" y="5" width="10" height="10" href="${pngData}"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
+    expect(decor).toHaveLength(3)
+    expect(decor.map((layer) => layer.data.shape)).toEqual(['image', 'image', 'image'])
+    expect(decor[0]?.data.name).toBe('decor_logo')
+    expect(decor[0]?.data.imageSrc?.startsWith('data:image/png')).toBe(true)
+    expect(decor[1]?.data.layerName).toBe('decor_stamp')
+    expect(decor[1]?.data.imageSrc?.startsWith('data:image/jpeg')).toBe(true)
+    expect(decor[2]?.data.name).toBe('decor_auto_image_1')
+    expect(r.strippedSvg).not.toMatch(/<image\b/)
   })
 
   it('импортирует безымянный rect как decor_auto_rect', () => {

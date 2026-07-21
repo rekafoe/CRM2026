@@ -1,4 +1,5 @@
 import { buildImportedSvgTemplateDocument, fabricTextFromSvgText } from '../src/services/designTemplateSvgImportBuilder'
+import { parseImportedSvgLayers } from '../src/services/designTemplateSvgParse'
 
 describe('fabricTextFromSvgText', () => {
   it('экспортирует textbox с textStyleRuns без styles', () => {
@@ -102,6 +103,31 @@ describe('fabricTextFromSvgText', () => {
     expect(decorObjects.map((obj) => obj.type).sort()).toEqual(['circle', 'path', 'rect', 'rect'])
     expect(decorObjects.some((obj) => obj.id === 'decor_auto_rect_1')).toBe(true)
     expect(warnings.some((w) => w.includes('без интерактивного префикса') && w.includes('decor_*'))).toBe(false)
+  })
+
+  it('конвертирует decor_* PNG/JPG image в fabric type=image', () => {
+    const pngData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 90 50">
+  <image id="decor_logo" x="10" y="10" width="20" height="15" href="${pngData}"/>
+</svg>`
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(svg, 'utf8'),
+      originalname: 'decor-image.svg',
+      mimetype: 'image/svg+xml',
+    }, 'decor-image', [])
+    const img = doc.pages[0]!.designPage.fabricJSON.objects.find((obj) => obj.id === 'decor_logo') as {
+      type?: string
+      src?: string
+      width?: number
+      height?: number
+      isDecorElement?: boolean
+    } | undefined
+    expect(img?.type).toBe('image')
+    expect(img?.isDecorElement).toBe(true)
+    expect(img?.src?.startsWith('data:image/png')).toBe(true)
+    expect(Number(img?.width)).toBeGreaterThan(0)
+    expect(Number(img?.height)).toBeGreaterThan(0)
   })
 
   it('скейлит path-decor с group transform до размера scene', () => {

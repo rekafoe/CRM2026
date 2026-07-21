@@ -137,6 +137,7 @@ export function toTextStyleRuns(
     if (seg.fontWeight) run.fontWeight = seg.fontWeight
     if (seg.fontStyle) run.fontStyle = seg.fontStyle
     if (seg.fill) run.fill = seg.fill
+    // fontSize в textStyles уже в scene px после parse; не подставляем сырые SVG units.
     if (seg.fontSize != null && seg.fontSize > baseFontSizePx + 0.5) {
       run.fontSize = Math.max(6, seg.fontSize)
     }
@@ -328,6 +329,31 @@ function toFabricDecor(item: SvgDecor): Record<string, unknown> {
     ...(item.stroke ? { stroke: item.stroke } : {}),
     ...(item.strokeWidth != null ? { strokeWidth: item.strokeWidth } : {}),
     ...(item.opacity != null ? { opacity: item.opacity } : {}),
+  }
+  if (item.shape === 'image' && item.imageSrc) {
+    const w = Math.max(Number(item.scene.width) || 0, 1)
+    const h = Math.max(Number(item.scene.height) || 0, 1)
+    return {
+      version: '6.0.0',
+      type: 'image',
+      originX: 'left',
+      originY: 'top',
+      left: item.scene.x,
+      top: item.scene.y,
+      width: w,
+      height: h,
+      scaleX: 1,
+      scaleY: 1,
+      src: item.imageSrc,
+      crossOrigin: 'anonymous',
+      id: item.name,
+      ...(item.layerName ? { decorLayerName: item.layerName } : {}),
+      ...(item.stackIndex != null ? { importStackIndex: item.stackIndex } : {}),
+      isDecorElement: true,
+      selectable: false,
+      evented: false,
+      ...(item.opacity != null ? { opacity: item.opacity } : {}),
+    }
   }
   if (item.shape === 'circle') {
     return {

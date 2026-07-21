@@ -14,6 +14,8 @@ import {
   getDesignTemplate,
   getPublicDesignTemplate,
   getPublicDesignTemplates,
+  getPublicAvailableSizeIdsForDesignCode,
+  getPublicDesignTemplateByCodeAndSize,
   getDesignTemplatesByCategory,
   createDesignTemplate,
   updateDesignTemplate,
@@ -160,6 +162,42 @@ router.get('/public', asyncHandler(async (req: Request, res: Response) => {
     sizeId,
   })
   res.json(templates)
+}))
+
+/** Доступные size_id для семьи design_code — без полного списка шаблонов. */
+router.get('/public/available-sizes', asyncHandler(async (req: Request, res: Response) => {
+  const productId = req.query.productId != null ? Number(req.query.productId) : NaN
+  const typeId = req.query.typeId != null ? Number(req.query.typeId) : NaN
+  const designCode = req.query.designCode != null ? String(req.query.designCode).trim() : ''
+  if (!Number.isFinite(productId) || productId <= 0 || !Number.isFinite(typeId) || typeId <= 0 || !designCode) {
+    res.status(400).json({ message: 'productId, typeId и designCode обязательны' })
+    return
+  }
+  const sizeIds = await getPublicAvailableSizeIdsForDesignCode({ productId, typeId, designCode })
+  res.json({ sizeIds })
+}))
+
+/** Один вариант семьи по design_code + sizeId (лёгкий spec). */
+router.get('/public/by-code', asyncHandler(async (req: Request, res: Response) => {
+  const productId = req.query.productId != null ? Number(req.query.productId) : NaN
+  const typeId = req.query.typeId != null ? Number(req.query.typeId) : NaN
+  const designCode = req.query.designCode != null ? String(req.query.designCode).trim() : ''
+  const sizeId = req.query.sizeId != null ? String(req.query.sizeId).trim() : ''
+  if (!Number.isFinite(productId) || productId <= 0 || !Number.isFinite(typeId) || typeId <= 0 || !designCode || !sizeId) {
+    res.status(400).json({ message: 'productId, typeId, designCode и sizeId обязательны' })
+    return
+  }
+  const template = await getPublicDesignTemplateByCodeAndSize({
+    productId,
+    typeId,
+    designCode,
+    sizeId,
+  })
+  if (!template) {
+    res.status(404).json({ message: 'Вариант макета не найден' })
+    return
+  }
+  res.json(template)
 }))
 
 /**

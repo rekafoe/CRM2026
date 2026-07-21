@@ -1,5 +1,5 @@
 /**
- * Именованные слои импортного SVG → photo_* rect, text_* text, decor_* (rect/circle/path),
+ * Именованные слои импортного SVG → photo_* rect, text_* text, decor_* (rect/circle/path/image),
  * trim/bleed/safe → prepress (грубая эстимация мм),
  * locked_bg / locked_bg_* → залоченный SVG-фон (с автонумерацией),
  * фоновый файл без интерактивных элементов и без дубля с редактором overlay.
@@ -10,6 +10,14 @@
 
 import { performance } from 'perf_hooks'
 import { normalizeFontFamilyName } from '../utils/fontFamilyNormalize'
+import {
+  parseSvgGradientDefs,
+  resolveSvgPaint,
+  solidColorFromGradient,
+  parsePaintUrlRef,
+  type SvgPaint,
+  type SvgGradientDef,
+} from './designTemplateSvgGradients'
 import {
   createSvgGeometry,
   PX_TO_MM,
@@ -66,7 +74,7 @@ export type SvgText = {
   scene: GeometryPoint & { fontSize: number }
 }
 
-export type SvgDecorShape = 'rect' | 'circle' | 'path'
+export type SvgDecorShape = 'rect' | 'circle' | 'path' | 'image'
 
 export type SvgDecor = {
   /** Уникальный id для Fabric (несколько фигур могут иметь один layerName). */
@@ -74,11 +82,13 @@ export type SvgDecor = {
   layerName?: string
   stackIndex?: number
   shape: SvgDecorShape
-  fill?: string
-  stroke?: string
+  fill?: SvgPaint
+  stroke?: SvgPaint
   strokeWidth?: number
   opacity?: number
   pathData?: string
+  /** src для shape=image: data:image/... или URL. */
+  imageSrc?: string
   svg: GeometryRect
   scene: GeometryRect
 }
@@ -481,6 +491,10 @@ function resolveDecorPresentation(
   attrs: Record<string, string>,
   inheritedStyle: Record<string, string>,
   cssClassStyles: Record<string, Record<string, string>>,
+  gradients: Map<string, SvgGradientDef>,
+  objectSvg: GeometryRect,
+  coordSpace: 'pathLocal' | 'sceneBox',
+  objectScene?: GeometryRect,
 ): Pick<SvgDecor, 'fill' | 'stroke' | 'strokeWidth' | 'opacity'> {
   const style = {
     ...inheritedStyle,
@@ -491,8 +505,22 @@ function resolveDecorPresentation(
   if (attrs.stroke?.trim()) style.stroke = attrs.stroke.trim()
   if (attrs['stroke-width']?.trim()) style['stroke-width'] = attrs['stroke-width'].trim()
   if (attrs.opacity?.trim()) style.opacity = attrs.opacity.trim()
-  const fill = normalizeSvgPaintColor(style.fill)
-  const stroke = normalizeSvgPaintColor(style.stroke)
+  const fill = resolveSvgPaint(
+    style.fill,
+    gradients,
+    objectSvg,
+    coordSpace,
+    objectScene,
+    normalizeSvgPaintColor,
+  )
+  const stroke = resolveSvgPaint(
+    style.stroke,
+    gradients,
+    objectSvg,
+    coordSpace,
+    objectScene,
+    normalizeSvgPaintColor,
+  )
   const strokeWidth = parseNumber(style['stroke-width']) ?? undefined
   const opacity = parseNumber(style.opacity) ?? undefined
   return {
@@ -939,12 +967,15 @@ function computeTextFrameWidthScene(
   metrics: TspanLineMetric[],
   fontSizeScene: number,
   textAnchor: SvgText['textAnchor'],
+  /** Если metrics в SVG user units — перевести горизонтальный span в scene px. */
+  svgSpanToScene?: (spanSvg: number) => number,
 ): number | undefined {
   const widths = lines.map((line) => estimateLineWidthSvg(line, fontSizeScene))
   const maxW = Math.max(...widths, 1)
-  const span = metrics.length > 1
+  const rawSpan = metrics.length > 1
     ? Math.max(...metrics.map((m) => m.right)) - Math.min(...metrics.map((m) => m.left))
     : 0
+  const span = svgSpanToScene && rawSpan > 0 ? svgSpanToScene(rawSpan) : rawSpan
   if (textAnchor === 'end' || textAnchor === 'middle') {
     return Math.max(maxW, span + maxW * 0.08, 120)
   }
@@ -1006,6 +1037,8 @@ export function normalizeSvgPaintColor(value: string | undefined): string | unde
   if (!raw) return undefined
   const lower = raw.toLowerCase()
   if (lower === 'none' || lower === 'transparent' || lower === 'currentcolor') return undefined
+  // url(#grad) резолвится отдельно через resolveSvgPaint / parsePaintUrlRef
+  if (parsePaintUrlRef(raw)) return undefined
 
   if (lower.startsWith('#')) {
     if (lower.length === 4) {
@@ -1037,9 +1070,18 @@ export function normalizeSvgPaintColor(value: string | undefined): string | unde
 }
 
 /** fill на атрибуте / в style / CSS-классе Corel (.fil1 { fill: … }). */
-function resolveTextFill(...sources: Array<Record<string, string> | undefined>): string | undefined {
+function resolveTextFill(
+  gradients: Map<string, SvgGradientDef>,
+  ...sources: Array<Record<string, string> | undefined>
+): string | undefined {
   for (const source of sources) {
     if (!source) continue
+    const ref = parsePaintUrlRef(source.fill)
+    if (ref) {
+      const def = gradients.get(ref)
+      if (def) return solidColorFromGradient(def)
+      continue
+    }
     const fill = normalizeSvgPaintColor(source.fill)
     if (fill) return fill
   }
@@ -1694,9 +1736,9 @@ function warnUnhandledLayerName(kind: string, name: string, warnings: string[], 
       warnings.push('Слой locked_bg сохранится в SVG-фоне (поверх редакторских overlay).')
     return
   }
-  if (kind === 'rect' || kind === 'circle' || kind === 'ellipse' || kind === 'path' || kind === 'polygon' || kind === 'polyline') return
+  if (kind === 'rect' || kind === 'circle' || kind === 'ellipse' || kind === 'path' || kind === 'polygon' || kind === 'polyline' || kind === 'image') return
   warnings.push(
-    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg / locked_bg_*, hidden_*, guide_*. Без имени rect/circle/ellipse/path импортируются как decor_auto_*.`,
+    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg / locked_bg_*, hidden_*, guide_*. Без имени rect/circle/ellipse/path/image импортируются как decor_auto_*.`,
   )
 }
 
@@ -1706,6 +1748,27 @@ function isReservedLayerName(name: string): boolean {
   if (TECH_PREFIXES.some((p) => name.startsWith(p))) return true
   if (name.startsWith('photo_')) return true
   if (name.startsWith('text_')) return true
+  return false
+}
+
+function resolveSvgImageHref(attrs: Record<string, string>): string | null {
+  const raw = (
+    attrs.href
+    ?? attrs['xlink:href']
+    ?? attrs['xlink:Href']
+  )?.trim()
+  if (!raw) return null
+  if (/^javascript:/i.test(raw)) return null
+  return raw
+}
+
+/** PNG/JPG (и webp/gif) — растровый decor; SVG-в-SVG пока не поднимаем в Fabric image. */
+export function isRasterDecorImageHref(href: string): boolean {
+  const lower = href.trim().toLowerCase()
+  if (!lower) return false
+  if (lower.startsWith('data:image/svg')) return false
+  if (lower.startsWith('data:image/')) return true
+  if (/\.(png|jpe?g|webp|gif)(\?|#|$)/i.test(lower)) return true
   return false
 }
 
@@ -1967,6 +2030,7 @@ export function parseImportedSvgLayers(
   const widthMm = dims.widthMm
   const heightMm = dims.heightMm
   const cssClassStyles = parseCssClassStyles(svg)
+  const gradients = parseSvgGradientDefs(svg)
   const unsupportedFeatures = new Set<string>()
   const geometry = createSvgGeometry({
     pageMm: { width: widthMm, height: heightMm },
@@ -2019,21 +2083,39 @@ export function parseImportedSvgLayers(
     tr: { x: number; y: number; width: number; height: number }
     attrs: Record<string, string>
     pathData?: string
+    imageSrc?: string
     removalStart: number
     removalEnd: number
     autoAssigned: boolean
   }): void {
+    const mmRect = geometry.svgRectToMm(input.tr)
+    const sceneRect = geometry.mmRectToScene(mmRect)
+    const coordSpace: 'pathLocal' | 'sceneBox' =
+      input.shape === 'path' ? 'pathLocal' : 'sceneBox'
     // Page underlay из Corel: не создавать decor_auto на весь лист — цвет уходит в background.
-    if (input.autoAssigned && isLikelyPageUnderlayRect(input.tr, pageSvgBounds)) {
+    // Растровые image на весь лист оставляем как decor (иначе пропадут без fill).
+    if (
+      input.autoAssigned
+      && input.shape !== 'image'
+      && isLikelyPageUnderlayRect(input.tr, pageSvgBounds)
+    ) {
       removalRanges.push({ start: input.removalStart, end: input.removalEnd })
       const presentation = resolveDecorPresentation(
         input.attrs,
         groupStyleStack[groupStyleStack.length - 1] ?? {},
         cssClassStyles,
+        gradients,
+        input.tr,
+        coordSpace,
+        sceneRect,
       )
-      const fill = presentation.fill?.trim()
-      if (fill && fill.toLowerCase() !== 'none' && fill.toLowerCase() !== 'transparent') {
-        if (!pageBackgroundFill) pageBackgroundFill = fill
+      const solid = typeof presentation.fill === 'string'
+        ? presentation.fill.trim()
+        : presentation.fill && typeof presentation.fill === 'object'
+          ? presentation.fill.colorStops[Math.floor(presentation.fill.colorStops.length / 2)]?.color
+          : undefined
+      if (solid && solid.toLowerCase() !== 'none' && solid.toLowerCase() !== 'transparent') {
+        if (!pageBackgroundFill) pageBackgroundFill = solid
       }
       markLayerReport(input.baseName, {
         status: 'ignored_technical',
@@ -2045,18 +2127,21 @@ export function parseImportedSvgLayers(
     const fabricId = input.autoAssigned
       ? allocUniqueLayerInstanceId(input.baseName, decorInstanceCounters)
       : allocateEditableFabricId('decor', input.baseName, editableIds).fabricId
-    const mmRect = geometry.svgRectToMm(input.tr)
-    const sceneRect = geometry.mmRectToScene(mmRect)
     const decorEntry: SvgDecor = {
       name: fabricId,
       layerName: input.baseName,
       stackIndex: nextDocumentStackIndex(documentStack),
       shape: input.shape,
       ...(input.pathData ? { pathData: input.pathData } : {}),
+      ...(input.imageSrc ? { imageSrc: input.imageSrc } : {}),
       ...resolveDecorPresentation(
         input.attrs,
         groupStyleStack[groupStyleStack.length - 1] ?? {},
         cssClassStyles,
+        gradients,
+        input.tr,
+        coordSpace,
+        sceneRect,
       ),
       svg: input.tr,
       scene: sceneRect,
@@ -2521,6 +2606,58 @@ export function parseImportedSvgLayers(
       continue
     }
 
+    if (tagLc === 'image') {
+      const attrs = parseAttributes(attrPart)
+      const explicitName = getLayerName(attrs)
+      const inheritedName = inherited
+      const ef = explicitName ?? inheritedName
+      if (ef) {
+        markFallbackLayer(ef)
+        if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+      }
+      if (explicitName && isLockedBgLayerName(explicitName)) {
+        registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
+      } else if (ef && isLockedBgLayerName(ef)) {
+        lockedBgDetected = true
+      }
+      if (ef) warnUnhandledLayerName('image', ef, warnings, warnedNames)
+
+      const href = resolveSvgImageHref(attrs)
+      const x = parseNumber(attrs.x) ?? 0
+      const y = parseNumber(attrs.y) ?? 0
+      const width = parseNumber(attrs.width)
+      const height = parseNumber(attrs.height)
+      const objectTransform = multiplyTransform(
+        inheritedTransform,
+        parseSvgTransform(attrs.transform, unsupportedFeatures),
+      )
+      const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'image', autoDecorSeq)
+      if (
+        decorName
+        && href
+        && isRasterDecorImageHref(href)
+        && width != null
+        && height != null
+        && width > 0
+        && height > 0
+      ) {
+        const tr = transformedRect(x, y, width, height, objectTransform)
+        pushParsedDecor({
+          baseName: decorName,
+          shape: 'image',
+          tr,
+          attrs,
+          imageSrc: href,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          autoAssigned: decorName.startsWith('decor_auto_'),
+        })
+      }
+
+      i = gt + 1
+      continue
+    }
+
     if (tagLc === 'text') {
       if (selfClosing) {
         warnWithCode(warnings, 'TXT_EMPTY_SELF_CLOSING', '<text /> без содержимого пропускается.')
@@ -2574,7 +2711,7 @@ export function parseImportedSvgLayers(
           ...parseStyle(tspanAttrs.style),
         }
         if (tspanAttrs['font-family']?.trim()) tspanStyle['font-family'] = tspanAttrs['font-family'].trim()
-        const fill = resolveTextFill(tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
+        const fill = resolveTextFill(gradients, tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
           ?? normalizeSvgPaintColor(pickAttr(tspanAttrs, attrs, 'fill'))
         const xv = parseNumber(pickAttr(tspanAttrs, attrs, 'x')) ?? 0
         const yv = parseNumber(pickAttr(tspanAttrs, attrs, 'y')) ?? 0
@@ -2603,6 +2740,10 @@ export function parseImportedSvgLayers(
             parseNumber(tspan.attrs['font-size'])
             ?? parseFontSizeFromStyle(style)
             ?? parseFontSizeFromStyle(textStyle)
+          // В тех же единицах, что и transformedFontSize (SVG после transform scale).
+          const fontSizeSvg = tspanFontSize != null
+            ? tspanFontSize * transformScale(textTransform)
+            : undefined
           return {
             fontFamily:
               parseFontFamilyFromStyle(style)
@@ -2616,8 +2757,8 @@ export function parseImportedSvgLayers(
               parseFontStyleFromStyle(style)
               ?? parseFontStyleFromStyle(textStyle)
               ?? parseFontStyleFromStyle(inheritedGroupStyle),
-            fill: resolveTextFill(tspan.attrs, style, attrs, textStyle, inheritedGroupStyle),
-            fontSize: tspanFontSize ?? undefined,
+            fill: resolveTextFill(gradients, tspan.attrs, style, attrs, textStyle, inheritedGroupStyle),
+            fontSize: fontSizeSvg,
           }
         }
         const composed = tspans.length > 0
@@ -2627,7 +2768,17 @@ export function parseImportedSvgLayers(
           || primaryTspan?.text
           || decodeXmlText(innerStr)
           || ef.replace(/^text_/, '')
-        const textStyles = composed?.textStyles?.length ? composed.textStyles : undefined
+        // textStyles.fontSize → scene px (как item.scene.fontSize), иначе Fabric рисует глифы в SVG units.
+        const textStyles = composed?.textStyles?.length
+          ? composed.textStyles.map((seg) => (
+            seg.fontSize == null
+              ? seg
+              : {
+                ...seg,
+                fontSize: geometry.mmToPx(geometry.svgFontSizeToMm(seg.fontSize)),
+              }
+          ))
+          : undefined
         const effectiveTspans = tspans.length > 0
           ? resolveTspanEffectiveY(
             [...tspans].sort((a, b) => a.order - b.order),
@@ -2659,11 +2810,17 @@ export function parseImportedSvgLayers(
           parseFontStyleFromStyle(tspanStyle)
           ?? parseFontStyleFromStyle(textStyle)
           ?? parseFontStyleFromStyle(inheritedGroupStyle)
+        const svgSpanToScene = (spanSvg: number) => {
+          const a = geometry.svgPointToMm({ x: 0, y: 0 })
+          const b = geometry.svgPointToMm({ x: spanSvg, y: 0 })
+          return Math.abs(geometry.mmToPx(b.x - a.x))
+        }
         const frameWidthScene = computeTextFrameWidthScene(
           textContent.split('\n'),
           lineMetrics,
           fontSizeScene,
           textAnchor,
+          svgSpanToScene,
         )
         const angle = transformAngleDeg(textTransform)
         const textEntry: SvgText = {
@@ -2739,7 +2896,7 @@ export function parseImportedSvgLayers(
     warnWithCode(
       warnings,
       'DECOR_NO_VALID_SHAPE',
-      `Слой ${name} оставлен в фоне: для decor_* поддержаны rect/circle/ellipse/path/polygon с валидной геометрией.`,
+      `Слой ${name} оставлен в фоне: для decor_* поддержаны rect/circle/ellipse/path/polygon/image (png/jpg) с валидной геометрией.`,
     )
   }
   if (unsupportedFeatures.size > 0) {

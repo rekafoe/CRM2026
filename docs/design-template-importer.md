@@ -23,8 +23,8 @@
 | `locked_bg` | Явный заблокированный фон/графика. Фон страницы в `fabricJSON` создаётся только при наличии этого слоя. |
 | `photo_1`, `photo_2`, `photo_avatar` | Область для фото клиента. Для первого этапа объект должен быть `rect` с `x`, `y`, `width`, `height`. |
 | `text_name`, `text_phone`, `text_title` | Редактируемое текстовое поле. Для первого этапа объект должен быть `text` с координатами `x`, `y`. |
-| `decor_*` | Интерактивный декоративный объект. На текущем этапе поддержаны SVG `rect`, `circle`, `ellipse`, `path`. |
-| *(без имени)* | `rect`, `circle`, `ellipse`, `path` без `photo_*` / `text_*` / `locked_bg` автоматически импортируются как `decor_auto_*`. |
+| `decor_*` | Интерактивный декоративный объект. Поддержаны SVG `rect`, `circle`, `ellipse`, `path`, `polygon`, растровые `<image>` (PNG/JPG), а также заливки `linearGradient` / `radialGradient` через `fill:url(#id)` (Corel). |
+| *(без имени)* | `rect`, `circle`, `ellipse`, `path`, `image` без `photo_*` / `text_*` / `locked_bg` автоматически импортируются как `decor_auto_*`. |
 | `trim`, `bleed`, `safe` | Опциональные направляющие зон печати. |
 | `hidden_*`, `guide_*` | Технические объекты. В клиентский шаблон не попадают. |
 
@@ -57,7 +57,7 @@
 - **Trace-режим:** при `trace=true` в admin import/reimport в `spec.import.pages[].trace.timeline` сохраняется сжатый трейс решений парсера (по умолчанию trace не пишется).
 - **Импортёр v8:** из текста каждой SVG-страницы перед сохранением в uploads **вырезаются** интерактивные поля (`photo_*`, `text_*`, `decor_*`), технические имена (`hidden_*`, `guide_*`), **`trim` / `bleed` / `safe`**. Если есть явный `locked_bg`, он остаётся фоном страницы (`isBackground`), иначе фон в `fabricJSON` не создаётся.
 - При невозможности распарсить `text_*`, `photo_*` или `decor_*` в интерактивный объект слой остаётся в `strippedSvg`, а в warning фиксируется причина (`TXT_NO_VALID_NODE`, `PHOTO_NO_VALID_RECT`, `DECOR_NO_VALID_SHAPE`).
-- Объекты без префикса (`photo_*`, `text_*`, `decor_*`) и без `locked_bg`: **rect / circle / ellipse / path** импортируются как **`decor_auto_*`**; прочие теги остаются в фоне с предупреждением.
+- Объекты без префикса (`photo_*`, `text_*`, `decor_*`) и без `locked_bg`: **rect / circle / ellipse / path / image (png/jpg)** импортируются как **`decor_auto_*`**; прочие теги остаются в фоне с предупреждением.
 - **Hard limits:** importer останавливает сверхтяжёлые файлы с кодированными ошибками (`SVG_SIZE_LIMIT_EXCEEDED`, `SVG_COMPLEXITY_LIMIT_EXCEEDED`, `SVG_GROUP_DEPTH_LIMIT_EXCEEDED`, `SVG_NODE_COUNT_LIMIT_EXCEEDED`) вместо зависаний.
 - Прямые `rect` **`trim`** / **`bleed`** / **`safe`** служат источником **`designState.prepress`** (дозаливка и безопасная зона **оцениваются** из взаимного положения прямоугольников; значения нужно сверять с производством). Если направляющих в SVG не было — блок `prepress` не записывается.
 - Объекты с нестандартными именами → предупреждение «не используется».
