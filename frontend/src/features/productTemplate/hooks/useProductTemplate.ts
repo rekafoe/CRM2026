@@ -218,6 +218,8 @@ export type SimplifiedConfig = {
    * designState.pageWidth/Height берутся из активной зоны.
    */
   printAreas?: ProductPrintAreaConfig[];
+  /** ID автосозданного пустого design_template под printArea (souvenir_3d). */
+  souvenirBlankTemplateId?: number;
   /** Общие настройки допечатной подготовки для редактора, preflight и production export. */
   prepress?: ProductPrepressConfig;
   /** Типы продукта (варианты): если заданы, у каждого типа свой конфиг в typeConfigs */

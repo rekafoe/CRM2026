@@ -164,8 +164,18 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
               <div className="template-summary-card__field-group">
                 <span className="template-summary-card__field-title">Зоны печати (3D)</span>
                 <small className="template-summary-card__field-hint">
-                  мм + meshName в GLB. Без modelUrl — процедурная майка/кружка.
+                  При сохранении шаблона создаётся пустой макет размера print area. Без готового дизайна клиент рисует сам.
                 </small>
+                {typeof value.souvenirBlankTemplateId === 'number' && value.souvenirBlankTemplateId > 0 && (
+                  <a
+                    className="btn btn-secondary"
+                    href={`/adminpanel/public-design-editor-preview/${value.souvenirBlankTemplateId}?mode=souvenir_3d`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Открыть пустой редактор (#{value.souvenirBlankTemplateId})
+                  </a>
+                )}
                 {(value.printAreas?.length ? value.printAreas : [{
                   id: 'front',
                   label: 'Грудь',

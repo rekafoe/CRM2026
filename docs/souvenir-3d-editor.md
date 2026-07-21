@@ -36,6 +36,7 @@
 
 - Сайт читает `GET /products/:id/schema` → `template.simplified.design_editor_mode` и `printAreas` (в т.ч. compact).
 - `ClientEditorRouter` при `souvenir_3d` монтирует `Souvenir3dEditor` (Fabric + R3F), иначе плоский редактор.
+- **Пустой макет по умолчанию:** при сохранении шаблона продукта с `souvenir_3d` создаётся (если ещё нет) пустой `design_templates` размера первой `printArea` (`fabricJSON: {}`, `editorKind: souvenir_3d`) и привязывается к размеру. В сайдбаре — кнопка «Открыть пустой редактор».
 
 ## Как шаблон указывает kind
 

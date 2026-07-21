@@ -17,3 +17,5 @@ export { Souvenir3dPreview } from './Souvenir3dPreview';
 export { Souvenir3dEditor } from './Souvenir3dEditor';
 export { SouvenirPlacementPreview } from './SouvenirPlacementPreview';
 export { ProceduralProduct, ProceduralMug, ProceduralTshirt } from './ProceduralProduct';
+export { ensureSouvenirBlankDesignTemplate } from './ensureSouvenirBlankTemplate';
+export type { EnsureSouvenirBlankResult } from './ensureSouvenirBlankTemplate';

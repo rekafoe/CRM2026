@@ -21,6 +21,7 @@ import { useProductDirectoryStore } from '../../../stores/productDirectoryStore'
 import { calculatePrice } from '../../../services/pricing'
 import useProductTemplate, { buildDefaultSizes } from './useProductTemplate'
 import type { Material } from '../../../types/shared'
+import { ensureSouvenirBlankDesignTemplate } from '../../souvenir3d'
 
 interface QuickTestPayload {
   qty: number
@@ -365,20 +366,34 @@ export default function useProductTemplatePage(productId: number | undefined): U
       if (!productId) return
       try {
         setSaving(true)
+        let simplified = state.simplified
+        let blankNote = ''
+
+        if (simplified.design_editor_mode === 'souvenir_3d') {
+          const blank = await ensureSouvenirBlankDesignTemplate({
+            productId,
+            productName: product?.name || state.meta.name,
+            simplified,
+          })
+          if (blank) {
+            simplified = blank.simplified
+            dispatch({ type: 'setSimplified', value: simplified })
+            blankNote = blank.created
+              ? `\nПустой макет зоны печати создан: шаблон #${blank.templateId}.`
+              : `\nПустой макет уже есть: шаблон #${blank.templateId}.`
+          }
+        }
+
         const constraints = buildConstraints()
         const payload = {
           name: 'template',
           is_active: true,
-          config_data: buildConfigData(),
-          constraints
-        }
-
-        console.log('💾 [useProductTemplatePage] Сохраняем constraints:', {
-          productId,
+          config_data: {
+            ...buildConfigData(),
+            simplified,
+          },
           constraints,
-          allowedPaperTypes: constraints?.overrides?.allowed_paper_types,
-          fullPayload: payload
-        })
+        }
 
         if (templateConfigId) {
           await updateProductConfig(productId, templateConfigId, payload)
@@ -387,16 +402,25 @@ export default function useProductTemplatePage(productId: number | undefined): U
           setTemplateConfigId(created.id)
         }
 
-        console.log('✅ [useProductTemplatePage] Constraints сохранены успешно')
-        if (message) alert(message)
+        const finalMessage = [message, blankNote].filter(Boolean).join('')
+        if (finalMessage) alert(finalMessage)
       } catch (error) {
         console.error('Failed to persist template config', error)
-        alert('Ошибка сохранения шаблона')
+        alert(error instanceof Error ? error.message : 'Ошибка сохранения шаблона')
       } finally {
         setSaving(false)
       }
     },
-    [productId, templateConfigId, buildConfigData, buildConstraints]
+    [
+      productId,
+      product?.name,
+      state.meta.name,
+      state.simplified,
+      templateConfigId,
+      buildConfigData,
+      buildConstraints,
+      dispatch,
+    ],
   )
 
   // Функция для сохранения размера с автоматическим созданием/обновлением параметра "format"
