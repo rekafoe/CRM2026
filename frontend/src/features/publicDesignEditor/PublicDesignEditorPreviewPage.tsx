@@ -3,10 +3,11 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { Button } from '../../components/common';
 import { AppIcon } from '../../components/ui/AppIcon';
-import { finalizePublicEditorPreviewDraft } from '../../api';
+import { finalizePublicEditorPreviewDraft, getDesignTemplate } from '../../api';
 import { ClientEditorRouter, type ClientEditorMode } from '../clientEditor';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { PublicEditorPreviewModeBar } from './PublicEditorPreviewModeBar';
+import { parseTemplateSpec } from '../../pages/admin/designTemplates/designTemplateCatalogUtils';
 import './publicDesignEditorPreview.css';
 
 const CLIENT_EDITOR_MODES: ClientEditorMode[] = ['single', 'multipage', 'photo_batch', 'souvenir_3d'];
@@ -32,10 +33,39 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
   const [crmError, setCrmError] = React.useState<string | null>(null);
   const id = Number(templateId);
   const requestedMode = searchParams.get('mode') as ClientEditorMode | null;
-  const mode = requestedMode && CLIENT_EDITOR_MODES.includes(requestedMode) ? requestedMode : 'single';
+  const explicitMode = requestedMode && CLIENT_EDITOR_MODES.includes(requestedMode) ? requestedMode : null;
+  const [inferredMode, setInferredMode] = React.useState<ClientEditorMode | null>(null);
+  const mode = explicitMode ?? inferredMode ?? 'single';
   const draftToken = searchParams.get('draft');
   const isMobile = useMediaQuery('(max-width: 760px)');
   const [crmChromeOpen, setCrmChromeOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (explicitMode || !Number.isFinite(id) || id <= 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await getDesignTemplate(id);
+        if (cancelled) return;
+        const parsed = parseTemplateSpec(data);
+        const next: ClientEditorMode = parsed.editorKind === 'souvenir_3d' ? 'souvenir_3d' : 'single';
+        setInferredMode(next);
+        if (next === 'souvenir_3d') {
+          setSearchParams((prev) => {
+            if (prev.get('mode') === 'souvenir_3d') return prev;
+            const params = new URLSearchParams(prev);
+            params.set('mode', 'souvenir_3d');
+            return params;
+          }, { replace: true });
+        }
+      } catch {
+        if (!cancelled) setInferredMode('single');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [explicitMode, id, setSearchParams]);
 
   const updateSearchParam = React.useCallback((key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams);

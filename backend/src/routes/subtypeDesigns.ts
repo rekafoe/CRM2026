@@ -15,8 +15,8 @@ router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
     const productId = parseInt(req.params.productId, 10)
-    const typeId = parseInt((req.query.typeId as string) ?? '0', 10)
-    if (!productId || !typeId) {
+    const typeId = parseInt((req.query.typeId as string) ?? '', 10)
+    if (!Number.isFinite(productId) || productId <= 0 || !Number.isFinite(typeId) || typeId <= 0) {
       res.status(400).json({ error: 'productId и typeId обязательны' })
       return
     }
@@ -35,7 +35,7 @@ router.post(
       designTemplateId: number
       sizeId: string
     }
-    if (!productId || !typeId || !designTemplateId) {
+    if (!Number.isFinite(productId) || productId <= 0 || !Number.isFinite(Number(typeId)) || Number(typeId) <= 0 || !designTemplateId) {
       res.status(400).json({ error: 'productId, typeId и designTemplateId обязательны' })
       return
     }

@@ -62,14 +62,48 @@ function buildSizeFromArea(area: ProductPrintAreaConfig): SimplifiedSizeConfig {
   };
 }
 
-function resolveTypeId(simplified: SimplifiedConfig): number {
+function resolveTypeId(simplified: SimplifiedConfig): number | null {
   const types = simplified.types;
   if (Array.isArray(types) && types.length > 0) {
     const def = types.find((t) => t.default) ?? types[0];
     const id = Number(def?.id);
-    if (Number.isFinite(id)) return id;
+    if (Number.isFinite(id) && id > 0) return id;
   }
-  return 0;
+  return null;
+}
+
+/** Подтип обязателен для product_subtype_designs (typeId > 0). */
+function ensureDefaultType(
+  simplified: SimplifiedConfig,
+  area: ProductPrintAreaConfig,
+): { simplified: SimplifiedConfig; typeId: number; typeAdded: boolean } {
+  const existingId = resolveTypeId(simplified);
+  if (existingId != null) {
+    return { simplified, typeId: existingId, typeAdded: false };
+  }
+
+  const typeId = Date.now();
+  const size = buildSizeFromArea(area);
+  const sizes = Array.isArray(simplified.sizes) && simplified.sizes.length > 0
+    ? simplified.sizes
+    : [size];
+
+  return {
+    typeId,
+    typeAdded: true,
+    simplified: {
+      ...simplified,
+      types: [{ id: typeId, name: 'Основной', default: true }],
+      typeConfigs: {
+        ...(simplified.typeConfigs ?? {}),
+        [String(typeId)]: {
+          sizes,
+          ...(simplified.typeConfigs?.[String(typeId)] ?? {}),
+        },
+      },
+      sizes,
+    },
+  };
 }
 
 /**
@@ -96,24 +130,35 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
     simplified = { ...simplified, printAreas: [area] };
   }
 
-  const typeId = resolveTypeId(simplified);
-  let sizeAdded = false;
+  const typeEnsured = ensureDefaultType(simplified, area);
+  simplified = typeEnsured.simplified;
+  const typeId = typeEnsured.typeId;
+  let sizeAdded = typeEnsured.typeAdded;
 
   let sizes = Array.isArray(simplified.sizes) ? [...simplified.sizes] : [];
-  let size = sizes.find((s) => sizeMatchesArea(s, area));
-  if (!size && simplified.types?.length && simplified.typeConfigs) {
-    const typeKey = String(typeId);
-    const tc = simplified.typeConfigs[typeKey];
-    const typeSizes = tc?.sizes ?? [];
-    size = typeSizes.find((s) => sizeMatchesArea(s, area));
-    if (!size && typeSizes[0]) size = typeSizes[0];
-  }
-  if (!size && sizes[0]) size = sizes[0];
+  const typeKey = String(typeId);
+  const typeSizes = simplified.typeConfigs?.[typeKey]?.sizes ?? [];
+
+  let size =
+    sizes.find((s) => sizeMatchesArea(s, area))
+    ?? typeSizes.find((s) => sizeMatchesArea(s, area))
+    ?? typeSizes[0]
+    ?? sizes[0];
 
   if (!size) {
     size = buildSizeFromArea(area);
     sizes = [...sizes, size];
-    simplified = { ...simplified, sizes };
+    simplified = {
+      ...simplified,
+      sizes,
+      typeConfigs: {
+        ...(simplified.typeConfigs ?? {}),
+        [typeKey]: {
+          ...(simplified.typeConfigs?.[typeKey] ?? {}),
+          sizes: [...(simplified.typeConfigs?.[typeKey]?.sizes ?? []), size],
+        },
+      },
+    };
     sizeAdded = true;
   }
 
@@ -128,7 +173,10 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
       created: false,
       sizeId,
       typeId,
-      simplified,
+      simplified: {
+        ...simplified,
+        souvenirBlankTemplateId: templateId,
+      },
       sizeAdded,
     };
   }

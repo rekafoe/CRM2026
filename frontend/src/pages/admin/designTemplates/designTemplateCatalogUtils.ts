@@ -27,6 +27,8 @@ export type ParsedTemplateCatalogSpec = {
   productId?: number;
   typeId?: number;
   sizeId?: string;
+  /** Клиентский редактор: flat | souvenir_3d */
+  editorKind?: 'flat' | 'souvenir_3d';
   hasDesignState: boolean;
   importStatus?: string;
   importWarnings: string[];
@@ -94,6 +96,7 @@ export function parseTemplateSpec(template: DesignTemplate): ParsedTemplateCatal
       productId: spec.productId != null ? Number(spec.productId) : undefined,
       typeId: spec.typeId != null ? Number(spec.typeId) : undefined,
       sizeId: spec.sizeId != null ? String(spec.sizeId) : undefined,
+      editorKind: spec.editorKind === 'souvenir_3d' ? 'souvenir_3d' : 'flat',
       hasDesignState: Boolean(designState && Array.isArray(designState.pages) && designState.pages.length > 0),
       importStatus: typeof importMeta?.status === 'string' ? importMeta.status : undefined,
       importWarnings: warnings,

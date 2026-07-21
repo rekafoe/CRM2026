@@ -156,8 +156,11 @@ function VariantRow({
           <button
             type="button"
             className="lg-btn lg-btn--sm lg-btn--icon"
-            onClick={() => navigate(`/adminpanel/public-design-editor-preview/${variant.id}`)}
-            title="Клиентский sandbox"
+            onClick={() => {
+              const mode = parsed.editorKind === 'souvenir_3d' ? 'souvenir_3d' : 'single';
+              navigate(`/adminpanel/public-design-editor-preview/${variant.id}?mode=${mode}`);
+            }}
+            title={parsed.editorKind === 'souvenir_3d' ? 'Клиентский sandbox (3D)' : 'Клиентский sandbox'}
             aria-label="Клиент"
           >
             <AppIcon name="image" size="xs" />
