@@ -267,6 +267,23 @@ describe('parseImportedSvgLayers', () => {
     expect(r.parserReport.countsByReasonCode.DECOR_PARSED).toBe(3)
   })
 
+  it('применяет group transform к pathData decor_* (согласованно с bbox)', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <g transform="translate(10 5) scale(2)">
+    <path id="decor_scaled" d="M 10 10 L 20 10 L 20 15 Z" fill="#0000ff"/>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const decor = r.interactiveLayers.find((layer) => layer.kind === 'decor' && layer.data.name === 'decor_scaled')
+    expect(decor?.kind).toBe('decor')
+    if (decor?.kind !== 'decor') return
+    expect(decor.data.svg.width).toBeCloseTo(20, 5)
+    expect(decor.data.svg.height).toBeCloseTo(10, 5)
+    expect(decor.data.pathData).toMatch(/M 30 /)
+    expect(decor.data.pathData).toMatch(/L 50 /)
+  })
+
   it('импортирует несколько фигур с одним decor_id как отдельные объекты', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">

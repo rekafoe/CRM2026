@@ -9,6 +9,7 @@
  */
 
 import { performance } from 'perf_hooks'
+import { normalizeFontFamilyName } from '../utils/fontFamilyNormalize'
 import {
   createSvgGeometry,
   PX_TO_MM,
@@ -233,6 +234,153 @@ function applyTransform(t: SvgTransform, x: number, y: number): { x: number; y: 
     x: t.a * x + t.c * y + t.e,
     y: t.b * x + t.d * y + t.f,
   }
+}
+
+function isIdentityTransform(t: SvgTransform): boolean {
+  return t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && t.e === 0 && t.f === 0
+}
+
+function formatSvgPathNumber(n: number): string {
+  if (!Number.isFinite(n)) return '0'
+  const rounded = Math.round(n * 1e6) / 1e6
+  return String(rounded)
+}
+
+/**
+ * Применяет SVG-матрицу к path `d`, чтобы команды совпадали с трансформированным bbox.
+ * Без этого decor_* в `<g transform>` получают scale от уже увеличенного bbox, а path остаётся старым.
+ */
+function transformSvgPathData(d: string, t: SvgTransform): string {
+  if (!d.trim() || isIdentityTransform(t)) return d
+  const tokenRe = /([a-zA-Z])([^a-zA-Z]*)/g
+  const numberRe = /-?\d*\.?\d+(?:e[-+]?\d+)?/gi
+  const sx = Math.hypot(t.a, t.b) || 1
+  const sy = Math.hypot(t.c, t.d) || 1
+  const rotDeg = transformAngleDeg(t)
+  let currentX = 0
+  let currentY = 0
+  let startX = 0
+  let startY = 0
+  const parts: string[] = []
+  const read = (raw: string): number[] => {
+    const out: number[] = []
+    numberRe.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = numberRe.exec(raw)) !== null) out.push(Number(m[0]))
+    return out.filter(Number.isFinite)
+  }
+  const absPt = (x: number, y: number, rel: boolean) => {
+    const ax = rel ? currentX + x : x
+    const ay = rel ? currentY + y : y
+    return applyTransform(t, ax, ay)
+  }
+  let token: RegExpExecArray | null
+  while ((token = tokenRe.exec(d)) !== null) {
+    const cmd = token[1]!
+    const nums = read(token[2] ?? '')
+    const lower = cmd.toLowerCase()
+    const rel = cmd === lower
+    if (lower === 'z') {
+      parts.push('Z')
+      currentX = startX
+      currentY = startY
+      continue
+    }
+    if (lower === 'm' || lower === 'l') {
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        const p = absPt(nums[i]!, nums[i + 1]!, rel)
+        const outCmd = lower === 'm' && i === 0 ? 'M' : 'L'
+        parts.push(`${outCmd} ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`)
+        currentX = rel ? currentX + nums[i]! : nums[i]!
+        currentY = rel ? currentY + nums[i + 1]! : nums[i + 1]!
+        if (lower === 'm' && i === 0) {
+          startX = currentX
+          startY = currentY
+        }
+        // После первого M последующие пары в SVG — это L
+      }
+      continue
+    }
+    if (lower === 'h') {
+      for (const x of nums) {
+        const p = absPt(x, 0, rel)
+        parts.push(`L ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`)
+        currentX = rel ? currentX + x : x
+      }
+      continue
+    }
+    if (lower === 'v') {
+      for (const y of nums) {
+        const p = absPt(0, y, rel)
+        parts.push(`L ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`)
+        currentY = rel ? currentY + y : y
+      }
+      continue
+    }
+    if (lower === 'c') {
+      for (let i = 0; i + 5 < nums.length; i += 6) {
+        const p1 = absPt(nums[i]!, nums[i + 1]!, rel)
+        const p2 = absPt(nums[i + 2]!, nums[i + 3]!, rel)
+        const p = absPt(nums[i + 4]!, nums[i + 5]!, rel)
+        parts.push(
+          `C ${formatSvgPathNumber(p1.x)} ${formatSvgPathNumber(p1.y)} `
+          + `${formatSvgPathNumber(p2.x)} ${formatSvgPathNumber(p2.y)} `
+          + `${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`,
+        )
+        currentX = rel ? currentX + nums[i + 4]! : nums[i + 4]!
+        currentY = rel ? currentY + nums[i + 5]! : nums[i + 5]!
+      }
+      continue
+    }
+    if (lower === 's' || lower === 'q') {
+      for (let i = 0; i + 3 < nums.length; i += 4) {
+        const p1 = absPt(nums[i]!, nums[i + 1]!, rel)
+        const p = absPt(nums[i + 2]!, nums[i + 3]!, rel)
+        const outCmd = lower === 's' ? 'S' : 'Q'
+        parts.push(
+          `${outCmd} ${formatSvgPathNumber(p1.x)} ${formatSvgPathNumber(p1.y)} `
+          + `${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`,
+        )
+        currentX = rel ? currentX + nums[i + 2]! : nums[i + 2]!
+        currentY = rel ? currentY + nums[i + 3]! : nums[i + 3]!
+      }
+      continue
+    }
+    if (lower === 't') {
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        const p = absPt(nums[i]!, nums[i + 1]!, rel)
+        parts.push(`T ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`)
+        currentX = rel ? currentX + nums[i]! : nums[i]!
+        currentY = rel ? currentY + nums[i + 1]! : nums[i + 1]!
+      }
+      continue
+    }
+    if (lower === 'a') {
+      for (let i = 0; i + 6 < nums.length; i += 7) {
+        const rx = Math.abs(nums[i]!) * sx
+        const ry = Math.abs(nums[i + 1]!) * sy
+        const xRot = (nums[i + 2] ?? 0) + rotDeg
+        const large = nums[i + 3] ?? 0
+        const sweep = nums[i + 4] ?? 0
+        const p = absPt(nums[i + 5]!, nums[i + 6]!, rel)
+        parts.push(
+          `A ${formatSvgPathNumber(rx)} ${formatSvgPathNumber(ry)} ${formatSvgPathNumber(xRot)} `
+          + `${large} ${sweep} ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`,
+        )
+        currentX = rel ? currentX + nums[i + 5]! : nums[i + 5]!
+        currentY = rel ? currentY + nums[i + 6]! : nums[i + 6]!
+      }
+      continue
+    }
+  }
+  return parts.join(' ')
+}
+
+function polygonPointsAbsolutePath(points: Array<{ x: number; y: number }>): string | null {
+  if (points.length < 3) return null
+  const head = points[0]!
+  const tail = points.slice(1).map((p) => `L ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`).join(' ')
+  return `M ${formatSvgPathNumber(head.x)} ${formatSvgPathNumber(head.y)} ${tail} Z`
 }
 
 function transformScale(t: SvgTransform): number {
@@ -928,8 +1076,7 @@ export function parseFontFamilyFromStyle(style: Record<string, string>): string 
 }
 
 function normalizeFontFamilyToken(value: string): string {
-  const first = value.split(',')[0]?.trim() ?? value.trim()
-  return first.replace(/^['"]|['"]$/g, '').trim() || first
+  return normalizeFontFamilyName(value) || value.trim()
 }
 
 function parseNumber(value: string | undefined): number | null {
@@ -1760,14 +1907,6 @@ function isAxisAlignedRectPoints(points: Array<{ x: number; y: number }>): boole
   return xs.length === 2 && ys.length === 2
 }
 
-function polygonPointsToPath(pointsAttr: string, originX = 0, originY = 0): string | null {
-  const pts = parsePolygonPointPairs(pointsAttr)
-  if (pts.length < 3) return null
-  const head = pts[0]!
-  const tail = pts.slice(1).map((p) => `L ${p.x - originX} ${p.y - originY}`).join(' ')
-  return `M ${head.x - originX} ${head.y - originY} ${tail} Z`
-}
-
 function findOuterTextCloseEnd(svg: string, openingGt: number): number | null {
   let depth = 1
   let pos = openingGt + 1
@@ -2306,7 +2445,9 @@ export function parseImportedSvgLayers(
           inheritedTransform,
           parseSvgTransform(attrs.transform, unsupportedFeatures),
         )
-        const tr = transformedRect(
+        // pathData и bbox должны быть в одной системе: иначе scaleX/Y = scene/svg ломает размер.
+        const pathData = transformSvgPathData(d, objectTransform)
+        const tr = parseSvgPathApproxBounds(pathData) ?? transformedRect(
           baseBounds.x,
           baseBounds.y,
           baseBounds.width,
@@ -2318,7 +2459,7 @@ export function parseImportedSvgLayers(
           shape: 'path',
           tr,
           attrs,
-          pathData: d,
+          pathData,
           removalStart: lt,
           removalEnd: gt + 1,
           autoAssigned: decorName.startsWith('decor_auto_'),
@@ -2354,20 +2495,22 @@ export function parseImportedSvgLayers(
           inheritedTransform,
           parseSvgTransform(attrs.transform, unsupportedFeatures),
         )
-        const tr = transformedRect(
+        const transformedPts = pts.map((p) => applyTransform(objectTransform, p.x, p.y))
+        const tr = boundsFromPointPairs(transformedPts) ?? transformedRect(
           baseBounds.x,
           baseBounds.y,
           baseBounds.width,
           baseBounds.height,
           objectTransform,
         )
-        const axisRect = isAxisAlignedRectPoints(pts)
+        const axisRect = isAxisAlignedRectPoints(transformedPts)
         pushParsedDecor({
           baseName: decorName,
           shape: axisRect ? 'rect' : 'path',
           tr,
           attrs,
-          ...(axisRect ? {} : { pathData: polygonPointsToPath(pointsAttr ?? '', baseBounds.x, baseBounds.y) ?? undefined }),
+          // Абсолютные координаты (как у path) — builder один раз локализует на svg.x/y.
+          ...(axisRect ? {} : { pathData: polygonPointsAbsolutePath(transformedPts) ?? undefined }),
           removalStart: lt,
           removalEnd: gt + 1,
           autoAssigned: decorName.startsWith('decor_auto_'),

@@ -705,7 +705,8 @@ export const DesignTemplatesPage: React.FC = () => {
               <img src={previewSrc} alt={codeLabel} />
             ) : (
               <div className="design-template-placeholder">
-                <AppIcon name="image" size="lg" />
+                <span className="design-template-placeholder-mark" aria-hidden>×</span>
+                <span className="design-template-placeholder-text">У этого дизайна ещё не загружено превью</span>
               </div>
             )}
             <span className={`design-template-status design-template-status--${status}`}>

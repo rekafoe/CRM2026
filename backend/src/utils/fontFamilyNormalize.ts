@@ -1,8 +1,40 @@
 /** Нормализация font-family для сопоставления с библиотекой CRM. */
+
+const FONT_VENDOR_PREFIX_RE = /^(?:ofont\.ru|dafont\.com|fontsquirrel)[_-]+/i
+
+/** Стилевые хвосты в имени family (не часть семейства вроде Arial Black). */
+const FONT_STYLE_SUFFIX_RE = /[\s_-]+(regular|normal|medium|bold|italic|oblique|light|thin|semibold|semilight|demibold|extrabold|extralight|ultralight|ultrabold|book|roman)$/i
+const FONT_STYLE_CAMEL_RE = /(?<=[a-z])(Regular|Normal|Medium|Bold|Italic|Oblique|Light|Thin|SemiBold|Demibold|ExtraBold|ExtraLight|UltraLight|UltraBold|Book|Roman)$/
+
+export function stripFontVendorPrefixes(value: string): string {
+  let name = value.trim()
+  for (let i = 0; i < 2; i += 1) {
+    const next = name.replace(FONT_VENDOR_PREFIX_RE, '').trim()
+    if (next === name) break
+    name = next
+  }
+  return name
+}
+
+function stripTrailingFontStyleTokens(value: string): string {
+  let name = value.trim()
+  for (let i = 0; i < 3; i += 1) {
+    const next = name
+      .replace(FONT_STYLE_SUFFIX_RE, '')
+      .replace(FONT_STYLE_CAMEL_RE, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (next === name || !next) break
+    name = next
+  }
+  return name
+}
+
 export function normalizeFontFamilyName(value: string | undefined | null): string {
   if (!value) return ''
   const first = String(value).split(',')[0]?.trim() ?? ''
-  return first.replace(/^['"]|['"]$/g, '').trim()
+  const unquoted = first.replace(/^['"]|['"]$/g, '').trim()
+  return stripFontVendorPrefixes(unquoted)
 }
 
 /** Ключ сравнения: без пробелов/дефисов, lower — HappyTimeTwo = Happy Time Two. */
@@ -11,8 +43,8 @@ export function fontFamilyCompactKey(value: string | undefined | null): string {
 }
 
 /**
- * Имя без (kerning)/(opentype) и одиночного стилевого суффикса « S» / « R».
- * Sign That S (kerning) → Sign That (как часто в SVG после CSS-парсинга).
+ * Имя без (kerning)/(opentype), одиночного суффикса « S» / « R» и стилевых хвостов Bold/Italic.
+ * Sign That S (kerning) → Sign That; ofont.ru_Shampanskoe Bold → Shampanskoe.
  */
 export function fontFamilyLooseMatchName(value: string | undefined | null): string {
   let name = normalizeFontFamilyName(value)
@@ -21,6 +53,7 @@ export function fontFamilyLooseMatchName(value: string | undefined | null): stri
   if (/\s+[A-Z]$/.test(name)) {
     name = name.replace(/\s+[A-Z]$/, '').trim()
   }
+  name = stripTrailingFontStyleTokens(name)
   return name
 }
 
@@ -61,7 +94,7 @@ export function guessFontFamilyFromFilename(filename: string): string {
   let base = filename.replace(/\.[^.]+$/, '').trim()
   if (!base) return ''
   // ofont.ru_Shampanskoe script → Shampanskoe script
-  base = base.replace(/^ofont\.ru[_-]+/i, '')
+  base = stripFontVendorPrefixes(base)
   let spaced = base
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/([A-Za-z])(\d+)/g, '$1 $2')
@@ -73,5 +106,6 @@ export function guessFontFamilyFromFilename(filename: string): string {
       '$1 $2',
     )
   }
+  spaced = stripTrailingFontStyleTokens(spaced)
   return titleCaseFontWords(spaced) || base
 }

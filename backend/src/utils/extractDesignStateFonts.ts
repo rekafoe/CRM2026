@@ -139,16 +139,23 @@ function matchLibraryFontToTextLayer(
   textId: string,
   libraryFonts: LibraryFontRef[],
 ): string | undefined {
-  const suffixKey = fontFamilyCompactKey(textId.replace(/^text_/i, ''))
-  if (!suffixKey) return undefined
+  const suffixRaw = textId.replace(/^text_/i, '')
+  const suffixKey = fontFamilyCompactKey(suffixRaw)
+  const suffixBase = fontFamilyBaseCompactKey(suffixRaw)
+  if (!suffixKey && !suffixBase) return undefined
   for (const font of libraryFonts) {
     const canonical = normalizeFontFamilyName(font.family_name)
     if (!canonical) continue
     const names = [canonical, ...(font.name_aliases ?? [])]
     for (const name of names) {
       const familyKey = fontFamilyCompactKey(name)
-      if (!familyKey) continue
-      if (familyKey.includes(suffixKey) || suffixKey.includes(familyKey)) {
+      const familyBase = fontFamilyBaseCompactKey(name)
+      if (!familyKey && !familyBase) continue
+      if (
+        (suffixKey && familyKey && (familyKey === suffixKey || familyKey.includes(suffixKey) || suffixKey.includes(familyKey)))
+        || (suffixBase && familyBase && (familyBase === suffixBase || familyBase.includes(suffixBase) || suffixBase.includes(familyBase)))
+        || fontFamilyNamesMatch(name, suffixRaw)
+      ) {
         return canonical
       }
     }

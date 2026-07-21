@@ -1,5 +1,4 @@
 import { buildImportedSvgTemplateDocument, fabricTextFromSvgText } from '../src/services/designTemplateSvgImportBuilder'
-import { parseImportedSvgLayers } from '../src/services/designTemplateSvgParse'
 
 describe('fabricTextFromSvgText', () => {
   it('экспортирует textbox с textStyleRuns без styles', () => {
@@ -105,6 +104,40 @@ describe('fabricTextFromSvgText', () => {
     expect(warnings.some((w) => w.includes('без интерактивного префикса') && w.includes('decor_*'))).toBe(false)
   })
 
+  it('скейлит path-decor с group transform до размера scene', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 90 50">
+  <g transform="translate(5 0) scale(2)">
+    <path id="decor_scaled" d="M 10 10 L 20 10 L 20 15 Z" fill="#0000ff"/>
+  </g>
+</svg>`
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(svg, 'utf8'),
+      originalname: 'decor-scale.svg',
+      mimetype: 'image/svg+xml',
+    }, 'decor-scale', [])
+    const page = doc.pages[0]!
+    const decor = page.parsed.interactiveLayers.find(
+      (layer) => layer.kind === 'decor' && layer.data.name === 'decor_scaled',
+    )
+    expect(decor?.kind).toBe('decor')
+    if (decor?.kind !== 'decor') return
+
+    const pathObj = page.designPage.fabricJSON.objects.find((obj) => obj.id === 'decor_scaled') as {
+      width?: number
+      height?: number
+      scaleX?: number
+      scaleY?: number
+    } | undefined
+    expect(pathObj).toBeDefined()
+    const visualW = Number(pathObj!.width) * Number(pathObj!.scaleX ?? 1)
+    const visualH = Number(pathObj!.height) * Number(pathObj!.scaleY ?? 1)
+    expect(visualW).toBeCloseTo(decor.data.scene.width, 4)
+    expect(visualH).toBeCloseTo(decor.data.scene.height, 4)
+    expect(decor.data.svg.width).toBeCloseTo(20, 5)
+    expect(decor.data.svg.height).toBeCloseTo(10, 5)
+  })
+
   it('сохраняет порядок fabric-объектов при нескольких decor_id и смешанных слоях', () => {
     const warnings: string[] = []
     const svg = `
@@ -124,7 +157,7 @@ describe('fabricTextFromSvgText', () => {
       'photo_main',
       'decor_id',
       'text_title',
-      'decor_id__2',
+      'decor_id_2',
     ])
     const decorObjects = objects.filter((obj) => String(obj.id).startsWith('decor_'))
     expect(decorObjects.every((obj) => obj.isDecorElement === true)).toBe(true)

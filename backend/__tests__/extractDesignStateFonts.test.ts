@@ -117,6 +117,26 @@ describe('normalizeDesignStateFontFamilies', () => {
     expect(obj.fontFamily).toBe('Ceremonious One')
   })
 
+  it('снимает ofont.ru_ и Bold при сопоставлении с библиотекой CRM', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            fontFamily: 'ofont.ru_Shampanskoe Bold',
+            text: 'Текст',
+          }],
+        },
+      }],
+    }
+    const normalized = normalizeDesignStateFontFamilies(designState, [{
+      family_name: 'Shampanskoe',
+      name_aliases: [],
+    }]) as typeof designState
+    const obj = (normalized.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
+    expect(obj.fontFamily).toBe('Shampanskoe')
+  })
+
   it('приводит усечённое имя Sign That к family_name библиотеки', () => {
     const designState = {
       pages: [{

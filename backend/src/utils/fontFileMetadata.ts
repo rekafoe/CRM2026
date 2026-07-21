@@ -1,6 +1,6 @@
 /** Минимальный парсер name table TTF/OTF (без WOFF/WOFF2). */
 
-import { fontFamilyLooseMatchName } from './fontFamilyNormalize'
+import { fontFamilyLooseMatchName, normalizeFontFamilyName, stripFontVendorPrefixes } from './fontFamilyNormalize'
 
 export type FontFileMetadata = {
   family?: string
@@ -120,6 +120,8 @@ export function collectFontNameAliases(meta: FontFileMetadata | null | undefined
     if (!trimmed) continue
     const variants = [
       trimmed,
+      stripFontVendorPrefixes(trimmed),
+      normalizeFontFamilyName(trimmed),
       trimmed.replace(/[-_](regular|normal|medium|bold|italic)$/i, ''),
       fontFamilyLooseMatchName(trimmed),
     ].filter(Boolean)
