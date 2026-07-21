@@ -28,6 +28,7 @@ interface EditorCanvasViewportProps {
   showSafeZone: boolean;
   showGuides: boolean;
   guideLinesPx: Array<{ axis: 'h' | 'v'; pos: number }>;
+  fitZoom?: number;
   sidebarPhotos?: Array<{ id: string; file: File }>;
   onSelectionChange: Parameters<typeof DesignEditorCanvas>[0]['onSelectionChange'];
   onHistoryChange: Parameters<typeof DesignEditorCanvas>[0]['onHistoryChange'];
@@ -65,6 +66,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
   showSafeZone,
   showGuides,
   guideLinesPx,
+  fitZoom = 1,
   sidebarPhotos = [],
   onSelectionChange,
   onHistoryChange,
@@ -90,6 +92,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
           pageWidthPx={pageWidthPx}
           canvasWidthPx={canvasWidthPx}
           pageHeightPx={pageHeightPx}
+          fitZoom={fitZoom}
           safeZonePx={safeZonePx}
           bleedPx={bleedPx}
           showBleed={showBleed}

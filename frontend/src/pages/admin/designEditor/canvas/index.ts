@@ -67,6 +67,12 @@ export { useDesignEditorCanvasSetup } from './useDesignEditorCanvasSetup';
 export { useDesignEditorRuntimeEffects } from './useDesignEditorRuntimeEffects';
 export { useDesignEditorPhotoFileInput } from './useDesignEditorPhotoFileInput';
 export {
+  resolveEditorDisplayBoost,
+  applyEditorDisplayBoost,
+  EDITOR_MAX_DISPLAY_BOOST,
+  EDITOR_MAX_BACKSTORE_SIDE,
+} from './editorCanvasDisplaySharpness';
+export {
   beginTextEditingOnCanvas,
   normalizeTextForDisplay,
   normalizeTextForFabric,

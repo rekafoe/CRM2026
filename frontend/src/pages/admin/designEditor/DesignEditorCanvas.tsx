@@ -156,6 +156,8 @@ interface DesignEditorCanvasProps {
   /** Фактическая ширина Fabric-холста: pageWidthPx или 2× при развороте */
   canvasWidthPx: number;
   pageHeightPx: number;
+  /** CSS fit-zoom редактора — для плотности backstore при upscale */
+  fitZoom?: number;
   safeZonePx: number;
   bleedPx: number;
   showBleed: boolean;
@@ -209,6 +211,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       pageWidthPx,
       canvasWidthPx,
       pageHeightPx,
+      fitZoom = 1,
       safeZonePx,
       bleedPx,
       showBleed,
@@ -492,6 +495,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       pageTransitionLockRef,
       canvasWidthPx,
       pageHeightPx,
+      fitZoom,
       mode,
       selectionDisplayScaleRef,
     });

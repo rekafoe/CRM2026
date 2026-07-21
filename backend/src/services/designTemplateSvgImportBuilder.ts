@@ -15,7 +15,44 @@ import {
   type SvgText,
 } from './designTemplateSvgParse'
 
-const IMPORTED_TEMPLATE_SCENE_SCALE = 3
+const IMPORTED_TEMPLATE_SCENE_SCALE_DEFAULT = 3
+/** Визитки и мелкие форматы — выше sceneScale, чтобы превью/экран не мылились. */
+const IMPORTED_TEMPLATE_SCENE_SCALE_SMALL = 6
+const SMALL_FORMAT_LONG_SIDE_MM = 100
+
+export function resolveImportedTemplateSceneScale(widthMm: number, heightMm: number): number {
+  const longSide = Math.max(widthMm, heightMm)
+  if (Number.isFinite(longSide) && longSide > 0 && longSide <= SMALL_FORMAT_LONG_SIDE_MM) {
+    return IMPORTED_TEMPLATE_SCENE_SCALE_SMALL
+  }
+  return IMPORTED_TEMPLATE_SCENE_SCALE_DEFAULT
+}
+
+/** Быстрый peek мм из корневого <svg> — до полного parse, чтобы выбрать sceneScale. */
+function peekSvgRootSizeMm(svg: string): { widthMm: number; heightMm: number } {
+  const tag = svg.match(/<svg\b[^>]*>/i)?.[0] ?? ''
+  const attr = (name: string): string | undefined => {
+    const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i'))
+    return m?.[1] ?? m?.[2]
+  }
+  const toMm = (raw: string | undefined): number | null => {
+    if (!raw) return null
+    const t = raw.trim()
+    const mm = t.match(/^(-?\d+(?:\.\d+)?)\s*mm$/i)
+    if (mm) return Number(mm[1])
+    const num = t.match(/^(-?\d+(?:\.\d+)?)\s*(?:px)?$/i)
+    if (num) return Number(num[1]) * (25.4 / 96)
+    return null
+  }
+  const widthMm = toMm(attr('width'))
+  const heightMm = toMm(attr('height'))
+  if (widthMm != null && heightMm != null) return { widthMm, heightMm }
+  const vb = (attr('viewBox') || '').trim().split(/\s+/).map(Number)
+  if (vb.length === 4 && vb.every(Number.isFinite)) {
+    return { widthMm: vb[2]! * (25.4 / 96), heightMm: vb[3]! * (25.4 / 96) }
+  }
+  return { widthMm: 90, heightMm: 50 }
+}
 const MAX_IMPORTED_SVG_PAGES = 99
 const DEFAULT_MAX_IMPORTED_SVG_BYTES = 32 * 1024 * 1024
 const ABSOLUTE_MAX_IMPORTED_SVG_BYTES = 64 * 1024 * 1024
@@ -872,8 +909,11 @@ function buildPageFromSvg(input: {
     }
   }
 
-  const parsed = parseImportedSvgLayers(sanitizeSvg(input.svg), {
-    sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE,
+  const sanitized = sanitizeSvg(input.svg)
+  const peek = peekSvgRootSizeMm(sanitized)
+  const sceneScale = resolveImportedTemplateSceneScale(peek.widthMm, peek.heightMm)
+  const parsed = parseImportedSvgLayers(sanitized, {
+    sceneScale,
     trace: input.trace === true,
   })
   const bundledFonts = input.bundledFonts ?? []

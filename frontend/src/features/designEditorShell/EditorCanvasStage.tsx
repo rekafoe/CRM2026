@@ -192,6 +192,7 @@ export const EditorCanvasStage: React.FC<EditorCanvasStageProps> = ({
         showSafeZone={view.showSafeZone}
         showGuides={view.viewOptions.showGuides}
         guideLinesPx={view.guideLinesPx}
+        fitZoom={view.fitZoom}
         sidebarPhotos={assets?.sidebarPhotos}
         onSelectionChange={handlers.onSelectionChange}
         onHistoryChange={handlers.onHistoryChange}

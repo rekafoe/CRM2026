@@ -1,5 +1,17 @@
-import { buildImportedSvgTemplateDocument, fabricTextFromSvgText } from '../src/services/designTemplateSvgImportBuilder'
+import {
+  buildImportedSvgTemplateDocument,
+  fabricTextFromSvgText,
+  resolveImportedTemplateSceneScale,
+} from '../src/services/designTemplateSvgImportBuilder'
 import { parseImportedSvgLayers } from '../src/services/designTemplateSvgParse'
+
+describe('resolveImportedTemplateSceneScale', () => {
+  it('даёт scale=6 для визиток и 3 для крупных форматов', () => {
+    expect(resolveImportedTemplateSceneScale(50, 90)).toBe(6)
+    expect(resolveImportedTemplateSceneScale(90, 50)).toBe(6)
+    expect(resolveImportedTemplateSceneScale(210, 297)).toBe(3)
+  })
+})
 
 describe('fabricTextFromSvgText', () => {
   it('экспортирует textbox с textStyleRuns без styles', () => {

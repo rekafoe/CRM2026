@@ -16,6 +16,7 @@ import {
   buildImportedMultiSizeSvgDocuments,
   isSupportedNormalizedTemplateExt,
   layerDebug,
+  resolveImportedTemplateSceneScale,
   type ImportedSvgTemplateDocument,
   type ImportedSizeVariantDocument,
 } from './designTemplateSvgImportBuilder'
@@ -95,7 +96,10 @@ function buildImportSpecFromDocument(
     pageWidth: importedDocument.pageWidthMm,
     pageHeight: importedDocument.pageHeightMm,
     pageCount: importedDocument.pageCount,
-    sceneScale: 3,
+    sceneScale: resolveImportedTemplateSceneScale(
+      importedDocument.pageWidthMm,
+      importedDocument.pageHeightMm,
+    ),
     pages: importedDocument.pages.map((page) => page.designPage),
   }
   if (documentPrepress) designState.prepress = documentPrepress
