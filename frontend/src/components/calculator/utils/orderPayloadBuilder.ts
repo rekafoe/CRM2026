@@ -9,7 +9,7 @@ export function getPriceTypeMultiplier(priceType: string, multiplierMap?: Record
   return multiplierMap[priceType] ?? 1;
 }
 
-type DesignEditorMode = 'none' | 'single' | 'multipage' | 'photo_batch';
+type DesignEditorMode = 'none' | 'single' | 'multipage' | 'photo_batch' | 'souvenir_3d';
 
 interface BuildOrderPayloadParams {
   result: CalculationResult;
@@ -20,7 +20,14 @@ interface BuildOrderPayloadParams {
   printTechnology: string;
   printColorMode: 'bw' | 'color' | null;
   /** Схема продукта (GET /products/:id/schema) — design_editor_mode и пр. */
-  backendProductSchema?: { template?: { simplified?: { design_editor_mode?: DesignEditorMode } } } | null;
+  backendProductSchema?: {
+    template?: {
+      simplified?: {
+        design_editor_mode?: DesignEditorMode;
+        printAreas?: unknown;
+      };
+    };
+  } | null;
 }
 
 export function buildOrderPayload({
@@ -140,6 +147,14 @@ export function buildOrderPayload({
   const designEditorMode = backendProductSchema?.template?.simplified?.design_editor_mode;
   const editorDraftMode =
     designEditorMode && designEditorMode !== 'none' ? designEditorMode : undefined;
+  const printAreasRaw = backendProductSchema?.template?.simplified?.printAreas;
+  const souvenirMeta =
+    editorDraftMode === 'souvenir_3d'
+      ? {
+          editorKind: 'souvenir_3d' as const,
+          ...(Array.isArray(printAreasRaw) ? { printAreas: printAreasRaw } : {}),
+        }
+      : {};
   const orderPages =
     result.specifications.pages != null ? Number(result.specifications.pages) : undefined;
   const initialDesignState =
@@ -179,6 +194,7 @@ export function buildOrderPayload({
     layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined,
     customFormat: isCustomFormat ? customFormat : undefined,
     ...(editorDraftMode ? { editorDraftMode } : {}),
+    ...souvenirMeta,
     ...(orderPages != null && Number.isFinite(orderPages) ? { pages: Math.floor(orderPages) } : {}),
     ...(initialDesignState ? { designState: initialDesignState } : {}),
     ...(roundedTotalCost != null

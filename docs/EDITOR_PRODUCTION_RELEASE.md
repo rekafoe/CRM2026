@@ -38,6 +38,7 @@
 - Генерация **только в CRM** (очередь + ручной перезапуск).
 - Триггер: заказ `source=website` или `mini_app` со статусом пула (status=1) → job `production_pdf`.
 - Формат: **один multipage PDF** на позицию (`artifactType=production_pdf`, версии не удаляются).
+- **Сувенирка (`souvenir_3d`):** в PDF только плоский макет зоны печати из `designState` (мм). 3D/GLB в `production_pdf` не входят. Схема размещения для оператора — UI Order Pool / опциональный артефакт `placement_preview` (см. [souvenir-3d-editor.md](./souvenir-3d-editor.md)).
 - Качество: **Fabric-based raster 300 DPI**, размер страницы в **мм** (`pageSize + 2*bleed`), рендер в headless Chromium через реальный Fabric canvas из `order_items.params.designState`, затем упаковка PNG-страниц в multipage PDF.
 - Production PDF по умолчанию — только постраничный (в размер продукта), без автоматической раскладки на SRA3.
 - Защита от брака: если страница не загрузила assets/fonts или отрендерилась пустой, почти полностью белой/чёрной либо одноцветной, job должен упасть с понятной ошибкой и не сохранять плохой `production_pdf`.

@@ -32,6 +32,11 @@ const DESIGN_EDITOR_MODE_OPTIONS: Array<{
     label: 'Пакетная фотопечать',
     hint: 'Много отдельных фото одного формата: 10×15, 15×20 и т.д.',
   },
+  {
+    value: 'souvenir_3d',
+    label: 'Сувенирный 3D-редактор',
+    hint: 'Майка/кружка: плоский макет зоны печати + 3D-превью. В печать — только PDF.',
+  },
 ];
 
 export interface SimplifiedTemplateSidebarProps {
@@ -155,6 +160,141 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
                 <small className="template-summary-card__field-hint">{selectedEditorModeHint}</small>
               )}
             </label>
+            {selectedEditorMode === 'souvenir_3d' && (
+              <div className="template-summary-card__field-group">
+                <span className="template-summary-card__field-title">Зоны печати (3D)</span>
+                <small className="template-summary-card__field-hint">
+                  мм + meshName в GLB. Без modelUrl — процедурная майка/кружка.
+                </small>
+                {(value.printAreas?.length ? value.printAreas : [{
+                  id: 'front',
+                  label: 'Грудь',
+                  widthMm: 300,
+                  heightMm: 400,
+                  meshName: 'print_front',
+                  procedural: 'tshirt' as const,
+                }]).map((area, index) => (
+                  <div key={area.id || index} className="template-summary-card__field-group">
+                    <label className="template-summary-card__field">
+                      <span>ID / label</span>
+                      <input
+                        className="form-input"
+                        value={area.label}
+                        onChange={(e) => {
+                          const next = [...(value.printAreas ?? [{ ...area }])];
+                          const row = { ...(next[index] ?? area), label: e.target.value };
+                          if (!row.id) row.id = e.target.value || `area_${index + 1}`;
+                          next[index] = row;
+                          onChange({ ...value, printAreas: next });
+                        }}
+                      />
+                    </label>
+                    <label className="template-summary-card__field">
+                      <span>Ширина × высота, мм</span>
+                      <div className="template-summary-card__field-row">
+                        <input
+                          className="form-input"
+                          type="number"
+                          min={1}
+                          value={area.widthMm}
+                          onChange={(e) => {
+                            const next = [...(value.printAreas ?? [{ ...area }])];
+                            next[index] = { ...(next[index] ?? area), widthMm: Number(e.target.value) || 1 };
+                            onChange({ ...value, printAreas: next });
+                          }}
+                        />
+                        <input
+                          className="form-input"
+                          type="number"
+                          min={1}
+                          value={area.heightMm}
+                          onChange={(e) => {
+                            const next = [...(value.printAreas ?? [{ ...area }])];
+                            next[index] = { ...(next[index] ?? area), heightMm: Number(e.target.value) || 1 };
+                            onChange({ ...value, printAreas: next });
+                          }}
+                        />
+                      </div>
+                    </label>
+                    <label className="template-summary-card__field">
+                      <span>meshName</span>
+                      <input
+                        className="form-input"
+                        value={area.meshName}
+                        onChange={(e) => {
+                          const next = [...(value.printAreas ?? [{ ...area }])];
+                          next[index] = { ...(next[index] ?? area), meshName: e.target.value };
+                          onChange({ ...value, printAreas: next });
+                        }}
+                      />
+                    </label>
+                    <label className="template-summary-card__field">
+                      <span>modelUrl (GLB)</span>
+                      <input
+                        className="form-input"
+                        placeholder="/models/tshirt.glb"
+                        value={area.modelUrl ?? ''}
+                        onChange={(e) => {
+                          const next = [...(value.printAreas ?? [{ ...area }])];
+                          const modelUrl = e.target.value.trim() || undefined;
+                          next[index] = { ...(next[index] ?? area), modelUrl };
+                          onChange({ ...value, printAreas: next });
+                        }}
+                      />
+                    </label>
+                    <label className="template-summary-card__field">
+                      <span>Заглушка</span>
+                      <select
+                        className="form-input"
+                        value={area.procedural ?? 'tshirt'}
+                        onChange={(e) => {
+                          const procedural = e.target.value === 'mug' ? 'mug' : 'tshirt';
+                          const next = [...(value.printAreas ?? [{ ...area }])];
+                          next[index] = {
+                            ...(next[index] ?? area),
+                            procedural,
+                            id: procedural === 'mug' ? 'wrap' : (next[index]?.id || 'front'),
+                            meshName: procedural === 'mug' ? 'print_wrap' : (next[index]?.meshName || 'print_front'),
+                          };
+                          onChange({ ...value, printAreas: next });
+                        }}
+                      >
+                        <option value="tshirt">Майка</option>
+                        <option value="mug">Кружка</option>
+                      </select>
+                    </label>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const next = [...(value.printAreas ?? [])];
+                    if (next.length === 0) {
+                      next.push({
+                        id: 'front',
+                        label: 'Грудь',
+                        widthMm: 300,
+                        heightMm: 400,
+                        meshName: 'print_front',
+                        procedural: 'tshirt',
+                      });
+                    }
+                    next.push({
+                      id: `area_${next.length + 1}`,
+                      label: `Зона ${next.length + 1}`,
+                      widthMm: 200,
+                      heightMm: 200,
+                      meshName: `print_area_${next.length + 1}`,
+                      procedural: 'tshirt',
+                    });
+                    onChange({ ...value, printAreas: next });
+                  }}
+                >
+                  Добавить зону
+                </button>
+              </div>
+            )}
             <div className="template-summary-card__field-group">
               <span className="template-summary-card__field-title">Допечатная подготовка</span>
               <label className="template-summary-card__field">

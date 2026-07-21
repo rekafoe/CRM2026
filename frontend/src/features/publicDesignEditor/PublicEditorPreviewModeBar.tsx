@@ -1,12 +1,13 @@
 import React from 'react';
 import type { ClientEditorMode } from '../clientEditor/ClientEditorRouter';
 
-const MODES: ClientEditorMode[] = ['single', 'multipage', 'photo_batch'];
+const MODES: ClientEditorMode[] = ['single', 'multipage', 'photo_batch', 'souvenir_3d'];
 
 const MOBILE_MODE_LABELS: Record<ClientEditorMode, string> = {
   single: 'Лист',
   multipage: 'Книга',
   photo_batch: 'Печать',
+  souvenir_3d: '3D',
 };
 
 interface PublicEditorPreviewModeBarProps {

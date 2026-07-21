@@ -76,7 +76,19 @@ export type MultiPageStructureConfig = {
     units_per_item?: number;
   };
 }
-export type DesignEditorMode = 'none' | 'single' | 'multipage' | 'photo_batch'
+export type DesignEditorMode = 'none' | 'single' | 'multipage' | 'photo_batch' | 'souvenir_3d'
+
+/** Зона печати сувенирки (мм + GLB mesh). См. features/souvenir3d. */
+export type ProductPrintAreaConfig = {
+  id: string;
+  label: string;
+  widthMm: number;
+  heightMm: number;
+  modelUrl?: string;
+  meshName: string;
+  uvRect?: { u0: number; v0: number; u1: number; v1: number };
+  procedural?: 'tshirt' | 'mug';
+}
 
 export type ProductPrepressConfig = {
   /** Дозаливка наружу от trim-формата, мм. */
@@ -201,6 +213,11 @@ export type SimplifiedConfig = {
   multiPageStructure?: MultiPageStructureConfig;
   /** Какой сценарий макетов открывать для продукта на сайте/в CRM. */
   design_editor_mode?: DesignEditorMode;
+  /**
+   * Зоны печати для souvenir_3d: мм + modelUrl/meshName.
+   * designState.pageWidth/Height берутся из активной зоны.
+   */
+  printAreas?: ProductPrintAreaConfig[];
   /** Общие настройки допечатной подготовки для редактора, preflight и production export. */
   prepress?: ProductPrepressConfig;
   /** Типы продукта (варианты): если заданы, у каждого типа свой конфиг в typeConfigs */

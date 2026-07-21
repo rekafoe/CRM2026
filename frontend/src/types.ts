@@ -60,7 +60,10 @@ export interface ItemParams {
   /** Token пользовательского draft из онлайн-редактора. */
   editorDraftToken?: string;
   /** Режим редактора, в котором создан draft. */
-  editorDraftMode?: 'single' | 'multipage' | 'photo_batch' | string;
+  editorDraftMode?: 'single' | 'multipage' | 'photo_batch' | 'souvenir_3d' | string;
+  /** Сувенирка: editorKind + printAreas дублируются из продукта/draft. */
+  editorKind?: 'flat' | 'souvenir_3d' | string;
+  printAreas?: unknown;
   /** Выбранные параметры редактора, перенесённые из draft. */
   selectedEditorParams?: Record<string, unknown>;
   /** Пакетная фотопечать: группы по размерам и список фото с crop/quantity. */

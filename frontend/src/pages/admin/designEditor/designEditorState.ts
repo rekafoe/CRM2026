@@ -12,6 +12,8 @@ export type DesignTemplateSpec = {
   cover_pages?: number;
   prepress?: unknown;
   designState?: DesignState;
+  /** flat | souvenir_3d — какой клиентский редактор открывать для шаблона. */
+  editorKind?: 'flat' | 'souvenir_3d';
   [key: string]: unknown;
 };
 

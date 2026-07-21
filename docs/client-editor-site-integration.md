@@ -72,6 +72,7 @@ flowchart LR
 | `single` | Одностраничный макет | `PublicDesignEditor` (`documentMode="single"`) |
 | `multipage` | Многостраничный / развороты | `PublicDesignEditor` (`documentMode="multipage"`) |
 | `photo_batch` | Пакет фото на печать | `ClientPhotoBatchEditor` |
+| `souvenir_3d` | Сувенир: зона печати + 3D | `Souvenir3dEditor` (см. [souvenir-3d-editor.md](./souvenir-3d-editor.md)) |
 
 Роутер режимов: `frontend/src/features/clientEditor/ClientEditorRouter.tsx`.
 

@@ -18,6 +18,7 @@ import {
   revokeEditorPreviewObjectUrls,
 } from './editorPreviewSources';
 import { getEditorItemSummary } from './editorItemSummary';
+import { SouvenirPlacementPreview, parsePrintAreas, DEFAULT_PRINT_AREA_TSHIRT } from '../../features/souvenir3d';
 import './EditorItemPreviewModal.css';
 
 type ProductionJobRow = {
@@ -375,6 +376,27 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
               <p className="editor-preview-modal__review-path">Путь: {summary.layoutReviewPath}</p>
             )}
           </div>
+        )}
+
+        {summary.kind === 'souvenir3d' && designState && (
+          <section className="editor-preview-modal__placement" aria-labelledby="editor-placement-heading">
+            <h4 id="editor-placement-heading">Куда наносить принт (для оператора)</h4>
+            <p className="editor-preview-modal__production-hint">
+              3D в печать не идёт — только схема размещения. Production PDF ниже остаётся плоским макетом зоны.
+            </p>
+            <SouvenirPlacementPreview
+              printArea={
+                parsePrintAreas(item.params.printAreas)[0]
+                ?? {
+                  ...DEFAULT_PRINT_AREA_TSHIRT,
+                  widthMm: Number(designState.pageWidth) || DEFAULT_PRINT_AREA_TSHIRT.widthMm,
+                  heightMm: Number(designState.pageHeight) || DEFAULT_PRINT_AREA_TSHIRT.heightMm,
+                  label: summary.printAreaLabel || DEFAULT_PRINT_AREA_TSHIRT.label,
+                }
+              }
+              printImageUrl={pagePreviews[0]?.url ?? null}
+            />
+          </section>
         )}
 
         {designState && (

@@ -21,13 +21,15 @@
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
 }
 
-.editor-preview-modal__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 20px;
+.editor-preview-modal__placement {
+  padding: 0 20px 12px;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.editor-preview-modal__placement h4 {
+  margin: 12px 0 6px;
+  color: #0f172a;
+  font-size: 0.95rem;
 }
 
 .editor-preview-modal__header h3 {

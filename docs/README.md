@@ -35,6 +35,7 @@ npm run dev  # Запуск на порту 5173
 ### Интеграция клиентского редактора на сайт
 
 - **[client-editor-site-integration.md](./client-editor-site-integration.md)** — единый гайд: архитектура, встраивание React, BFF-прокси, API, корзина и checkout
+- **[souvenir-3d-editor.md](./souvenir-3d-editor.md)** — сувенирный 3D-редактор (майка/кружка): Fabric + R3F, зоны печати, production без 3D
 
 - [📋 Order Management](./order-management.md) - Управление заказами
 - [🤖 Telegram Bot](./telegram-bot.md) - Telegram бот для заказов

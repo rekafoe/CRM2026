@@ -9,12 +9,13 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { PublicEditorPreviewModeBar } from './PublicEditorPreviewModeBar';
 import './publicDesignEditorPreview.css';
 
-const CLIENT_EDITOR_MODES: ClientEditorMode[] = ['single', 'multipage', 'photo_batch'];
+const CLIENT_EDITOR_MODES: ClientEditorMode[] = ['single', 'multipage', 'photo_batch', 'souvenir_3d'];
 
 const MODE_LABELS: Record<ClientEditorMode, string> = {
   single: 'Один макет',
   multipage: 'Многостраничный',
   photo_batch: 'Пачка фото',
+  souvenir_3d: 'Сувенир 3D',
 };
 
 export const PublicDesignEditorPreviewPage: React.FC = () => {

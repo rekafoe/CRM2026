@@ -437,6 +437,16 @@
   border-radius: 10px;
 }
 
+.template-summary-card__field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.template-summary-card__field-row .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .template-summary-card__field-title {
   color: var(--text-primary, #0f172a);
   font-size: 13px;

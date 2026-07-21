@@ -7,10 +7,11 @@ import {
 } from '../publicDesignEditor/publicDesignEditorAdapter';
 import type { PublicDesignDocumentMode } from '../publicDesignEditor/useDesignDocumentNavigation';
 import type { PublicDesignPageCountLimits } from '../publicDesignEditor/usePublicDesignPageActions';
+import { Souvenir3dEditor } from '../souvenir3d';
 import { ClientPhotoBatchEditor } from './ClientPhotoBatchEditor';
 import './clientEditor.css';
 
-export type ClientEditorMode = 'single' | 'multipage' | 'photo_batch';
+export type ClientEditorMode = 'single' | 'multipage' | 'photo_batch' | 'souvenir_3d';
 
 export interface ClientEditorRouterProps {
   mode: ClientEditorMode;
@@ -28,6 +29,8 @@ export interface ClientEditorRouterProps {
   selectedParams?: Record<string, unknown>;
   pageCountLimits?: PublicDesignPageCountLimits;
   onPageCountChange?: (pageCount: number) => void;
+  /** Зоны печати для souvenir_3d (из product schema). */
+  printAreas?: unknown;
 }
 
 const SCENARIO_COPY: Record<ClientEditorMode, { title: string; text: string }> = {
@@ -42,6 +45,10 @@ const SCENARIO_COPY: Record<ClientEditorMode, { title: string; text: string }> =
   photo_batch: {
     title: 'Загрузить фото на печать',
     text: 'Добавьте фото, выберите формат, количество и способ вписывания для печати.',
+  },
+  souvenir_3d: {
+    title: 'Оформить сувенир',
+    text: 'Разместите текст и фото в зоне печати и проверьте результат на 3D-модели. В производство уходит плоский макет.',
   },
 };
 
@@ -61,9 +68,10 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
   selectedParams,
   pageCountLimits,
   onPageCountChange,
+  printAreas,
 }) => {
   const scenario = SCENARIO_COPY[mode];
-  const showIntro = mode === 'photo_batch';
+  const showIntro = mode === 'photo_batch' || mode === 'souvenir_3d';
 
   return (
     <div className={`client-editor client-editor--${mode}`}>
@@ -92,6 +100,25 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
           typeId={typeId}
           sizeId={sizeId}
         />
+      ) : mode === 'souvenir_3d' ? (
+        templateId != null && Number.isFinite(templateId) ? (
+          <Souvenir3dEditor
+            templateId={templateId}
+            initialDraftToken={initialDraftToken}
+            onDraftTokenChange={onDraftTokenChange}
+            adapter={adapter}
+            showFinalizeButton={showFinalizeButton}
+            onReadyForCart={onReadyForCart}
+            showClientActionBar={showClientActionBar}
+            orderButtonLabel={orderButtonLabel}
+            selectedParams={selectedParams}
+            pageCountLimits={pageCountLimits}
+            onPageCountChange={onPageCountChange}
+            printAreas={printAreas}
+          />
+        ) : (
+          <Alert type="error">Для сувенирного редактора нужен templateId.</Alert>
+        )
       ) : templateId != null && Number.isFinite(templateId) ? (
         <PublicDesignEditor
           templateId={templateId}

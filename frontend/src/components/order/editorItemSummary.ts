@@ -1,7 +1,7 @@
 import type { Item } from '../../types';
 import { formatBynAmount } from '../../pages/admin/designTemplates/designTemplateCatalogUtils';
 
-export type EditorItemKind = 'designState' | 'photoBatch' | 'clientFiles' | 'noLayout';
+export type EditorItemKind = 'designState' | 'photoBatch' | 'clientFiles' | 'noLayout' | 'souvenir3d';
 
 export type DesignTemplateRoyaltyInfo = {
   authorName?: string | null;
@@ -25,6 +25,16 @@ export interface EditorItemSummary {
   layoutIncomplete?: boolean;
   layoutIssues?: EditorLayoutIssue[];
   layoutReviewPath?: string;
+  /** Зона печати сувенирки для бланка оператора. */
+  printAreaLabel?: string;
+  printAreaMm?: string;
+}
+
+function isSouvenirMode(params: Item['params']): boolean {
+  const mode = params.editorDraftMode;
+  if (mode === 'souvenir_3d') return true;
+  const kind = (params as { editorKind?: unknown }).editorKind;
+  return kind === 'souvenir_3d';
 }
 
 export function getEditorItemSummary(
@@ -59,16 +69,30 @@ export function getEditorItemSummary(
     const royaltySuffix = designRoyalty?.authorName && designRoyalty.authorPayoutPerUnit != null
       ? ` · автор ${designRoyalty.authorName} · ${formatBynAmount(designRoyalty.authorPayoutPerUnit)}/ед. (внутр.)`
       : '';
+    const printAreas = (params as { printAreas?: unknown }).printAreas;
+    const firstArea = Array.isArray(printAreas) && printAreas[0] && typeof printAreas[0] === 'object'
+      ? printAreas[0] as { label?: string; widthMm?: number; heightMm?: number }
+      : null;
+    const souvenir = isSouvenirMode(params);
     return {
-      kind: 'designState',
-      label: 'Макет из редактора',
+      kind: souvenir ? 'souvenir3d' : 'designState',
+      label: souvenir ? 'Сувенирный макет' : 'Макет из редактора',
       detail: layoutIncomplete
         ? `${pageCount} стр. · макет неполный${royaltySuffix}`
-        : `${pageCount} стр. · шаблон ${params.designTemplateId ?? '—'}${royaltySuffix}`,
+        : souvenir
+          ? `${pageCount} стр. · зона печати${royaltySuffix}`
+          : `${pageCount} стр. · шаблон ${params.designTemplateId ?? '—'}${royaltySuffix}`,
       pages: pageCount,
       layoutIncomplete,
       layoutIssues,
       layoutReviewPath,
+      printAreaLabel: typeof firstArea?.label === 'string' ? firstArea.label : undefined,
+      printAreaMm:
+        firstArea && Number(firstArea.widthMm) > 0 && Number(firstArea.heightMm) > 0
+          ? `${firstArea.widthMm}×${firstArea.heightMm} мм`
+          : designState
+            ? `${(designState as { pageWidth?: number }).pageWidth}×${(designState as { pageHeight?: number }).pageHeight} мм`
+            : undefined,
     };
   }
 

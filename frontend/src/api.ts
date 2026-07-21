@@ -1087,6 +1087,8 @@ export interface DesignTemplateSpec {
   width_mm?: number;
   height_mm?: number;
   page_count?: number;
+  /** flat (полиграфия) | souvenir_3d. Default flat для старых шаблонов. */
+  editorKind?: 'flat' | 'souvenir_3d';
   [key: string]: unknown;
 }
 

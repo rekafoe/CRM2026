@@ -38,6 +38,10 @@ interface UsePublicDesignDraftActionsInput {
   customerForm: CustomerFormState;
   dirtyVersion: number;
   documentMode: PublicDesignDocumentMode;
+  /** Режим в editor_drafts.mode (например souvenir_3d). По умолчанию = documentMode. */
+  draftMode?: string;
+  /** Доп. поля в payload draft (editorKind, printAreas). */
+  draftPayloadExtras?: Record<string, unknown>;
   draftToken: string | null;
   loading: boolean;
   pageSpec: PublicDesignPageSpec;
@@ -124,6 +128,8 @@ export function usePublicDesignDraftActions({
   customerForm,
   dirtyVersion,
   documentMode,
+  draftMode,
+  draftPayloadExtras,
   draftToken,
   loading,
   pageSpec,
@@ -207,8 +213,8 @@ export function usePublicDesignDraftActions({
     if (draftToken) return draftToken;
     const res = await adapter.createDraft({
       designTemplateId: templateId,
-      mode: documentMode,
-      payload: {},
+      mode: draftMode || documentMode,
+      payload: { ...(draftPayloadExtras ?? {}) },
     });
     const token = res.token;
     if (!token) throw new Error('Не удалось подготовить макет.');
@@ -216,7 +222,7 @@ export function usePublicDesignDraftActions({
     setDraftToken(token);
     onDraftTokenChange?.(token);
     return token;
-  }, [adapter, documentMode, draftToken, onDraftTokenChange, setDraftToken, templateId]);
+  }, [adapter, documentMode, draftMode, draftPayloadExtras, draftToken, onDraftTokenChange, setDraftToken, templateId]);
 
   const hydrateDraftVersion = useCallback(async (token: string) => {
     if (!token) return;
@@ -313,7 +319,11 @@ export function usePublicDesignDraftActions({
         return;
       }
 
-      const patch: Record<string, unknown> = { designState, productionDesignState };
+      const patch: Record<string, unknown> = {
+        designState,
+        productionDesignState,
+        ...(draftPayloadExtras ?? {}),
+      };
       if (nextSelectedParams) patch.selectedParams = nextSelectedParams;
       if (!options?.skipExpectedVersion && draftVersionRef.current != null) {
         patch.expectedVersion = draftVersionRef.current;
@@ -341,6 +351,7 @@ export function usePublicDesignDraftActions({
     buildCurrentDesignState,
     canvasHandleRef,
     dirtyVersion,
+    draftPayloadExtras,
     ensureDraft,
     hydrateDraftVersion,
     setSaveState,

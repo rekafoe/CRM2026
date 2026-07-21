@@ -137,6 +137,10 @@ interface PublicDesignEditorProps {
   autosaveDelayMs?: number;
   showFinalizeButton?: boolean;
   documentMode?: PublicDesignDocumentMode;
+  /** Режим editor_drafts.mode (souvenir_3d и т.п.). По умолчанию documentMode. */
+  draftMode?: string;
+  /** Доп. поля payload draft (editorKind, printAreas). */
+  draftPayloadExtras?: Record<string, unknown>;
   onReadyForCart?: (draftToken: string) => void;
   showClientActionBar?: boolean;
   orderButtonLabel?: string;
@@ -153,6 +157,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   autosaveDelayMs = 30000,
   showFinalizeButton = false,
   documentMode = 'single',
+  draftMode,
+  draftPayloadExtras,
   onReadyForCart,
   showClientActionBar = false,
   orderButtonLabel = 'Заказать',
@@ -649,6 +655,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     customerForm,
     dirtyVersion,
     documentMode,
+    draftMode,
+    draftPayloadExtras,
     draftToken,
     loading,
     pageSpec,

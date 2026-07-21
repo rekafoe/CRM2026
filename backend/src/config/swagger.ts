@@ -252,7 +252,7 @@ const options: swaggerJsdoc.Options = {
             productId: { type: 'integer' },
             typeId: { type: 'integer' },
             sizeId: { type: 'string', example: '90x50' },
-            mode: { type: 'string', enum: ['single', 'multipage', 'photo_batch'], example: 'single' },
+            mode: { type: 'string', enum: ['single', 'multipage', 'photo_batch', 'souvenir_3d'], example: 'single' },
             payload: { $ref: '#/components/schemas/EditorDraftPayload' },
           },
         },
