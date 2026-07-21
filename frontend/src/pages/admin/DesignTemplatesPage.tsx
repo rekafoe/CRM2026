@@ -670,13 +670,31 @@ export const DesignTemplatesPage: React.FC = () => {
     }
   }, [importForm, loadTemplates, currentUser?.id]);
 
-  const handleDelete = useCallback(async (id: number) => {
-    if (!confirm('Удалить шаблон?')) return;
+  const handleDelete = useCallback(async (id: number, label?: string) => {
+    const title = label?.trim() ? ` «${label.trim()}»` : '';
+    if (!confirm(`Удалить макет${title} (#${id})? Это действие необратимо.`)) return;
     try {
       await deleteDesignTemplate(id);
       await loadTemplates();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ошибка удаления');
+    }
+  }, [loadTemplates]);
+
+  const handleDeleteFamily = useCallback(async (family: DesignTemplateFamily) => {
+    const code = family.design_code ?? formatDesignCodeLabel(family.primary);
+    const n = family.variants.length;
+    if (!confirm(
+      `Удалить всю семью «${code}» (${n} размер${n === 1 ? '' : n < 5 ? 'а' : 'ов'})? Это действие необратимо.`,
+    )) return;
+    try {
+      for (const variant of family.variants) {
+        await deleteDesignTemplate(variant.id);
+      }
+      await loadTemplates();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления');
+      await loadTemplates();
     }
   }, [loadTemplates]);
 
@@ -781,6 +799,15 @@ export const DesignTemplatesPage: React.FC = () => {
                 <button type="button" className="lg-btn lg-btn--icon" onClick={() => void handleDuplicate(t)} title="Копия с новым кодом семьи" aria-label="Копия">
                   <AppIcon name="copy" size="xs" />
                 </button>
+                <button
+                  type="button"
+                  className="lg-btn lg-btn--icon lg-btn--danger"
+                  onClick={() => void handleDeleteFamily(family)}
+                  title="Удалить всю семью"
+                  aria-label="Удалить семью"
+                >
+                  <AppIcon name="trash" size="xs" />
+                </button>
               </div>
             </div>
           </div>
@@ -791,12 +818,15 @@ export const DesignTemplatesPage: React.FC = () => {
           editorPathPrefix={editorPathPrefix}
           formatBinding={formatBinding}
           onBound={loadTemplates}
+          onDelete={handleDelete}
         />
       </div>
     );
   }, [
     editorPathPrefix,
     formatBinding,
+    handleDelete,
+    handleDeleteFamily,
     handleDuplicate,
     loadTemplates,
     openEdit,

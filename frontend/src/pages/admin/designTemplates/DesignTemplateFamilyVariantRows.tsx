@@ -45,6 +45,7 @@ type Props = {
   editorPathPrefix: string;
   formatBinding: (parsed: ReturnType<typeof parseTemplateSpec>) => string | null;
   onBound: () => Promise<void>;
+  onDelete: (id: number, label?: string) => void | Promise<void>;
 };
 
 function bindValueFromTemplate(t: DesignTemplate): ProductBindValue {
@@ -61,11 +62,13 @@ function VariantRow({
   editorPathPrefix,
   formatBinding,
   onBound,
+  onDelete,
 }: {
   variant: DesignTemplate;
   editorPathPrefix: string;
   formatBinding: Props['formatBinding'];
   onBound: Props['onBound'];
+  onDelete: Props['onDelete'];
 }) {
   const navigate = useNavigate();
   const parsed = useMemo(() => parseTemplateSpec(variant), [variant]);
@@ -159,6 +162,15 @@ function VariantRow({
           >
             <AppIcon name="image" size="xs" />
           </button>
+          <button
+            type="button"
+            className="lg-btn lg-btn--sm lg-btn--icon lg-btn--danger"
+            onClick={() => void onDelete(variant.id, sizeStr)}
+            title="Удалить этот размер"
+            aria-label="Удалить"
+          >
+            <AppIcon name="trash" size="xs" />
+          </button>
         </div>
       </div>
 
@@ -201,6 +213,7 @@ export const DesignTemplateFamilyVariantRows: React.FC<Props> = ({
   editorPathPrefix,
   formatBinding,
   onBound,
+  onDelete,
 }) => (
   <ul className="design-family-variant-rows">
     {family.variants.map((variant) => (
@@ -210,6 +223,7 @@ export const DesignTemplateFamilyVariantRows: React.FC<Props> = ({
         editorPathPrefix={editorPathPrefix}
         formatBinding={formatBinding}
         onBound={onBound}
+        onDelete={onDelete}
       />
     ))}
   </ul>
