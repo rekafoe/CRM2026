@@ -1,5 +1,7 @@
 # Импорт дизайн-шаблонов для сайта
 
+> **Для дизайнеров (ТЗ по подготовке файла):** [design-template-designer-guide.md](./design-template-designer-guide.md)
+
 ## Назначение
 
 Дизайнер не собирает шаблон вручную в CRM-редакторе. Он готовит исходник в AI/CDR и экспортирует файл для импорта. Backend импортирует этот файл в `designState`, а отдельный сайт использует готовый шаблон через публичные API.
@@ -23,6 +25,7 @@
 | `locked_bg` | Явный заблокированный фон/графика. Фон страницы в `fabricJSON` создаётся только при наличии этого слоя. |
 | `photo_1`, `photo_2`, `photo_avatar` | Область для фото клиента. Для первого этапа объект должен быть `rect` с `x`, `y`, `width`, `height`. |
 | `text_name`, `text_phone`, `text_title` | Редактируемое текстовое поле. Для первого этапа объект должен быть `text` с координатами `x`, `y`. |
+| `text_title_center`, `text_name_right`, `text_center` | То же `text_*`, плюс суффикс выравнивания: `_center` / `_right` / `_left` → в Fabric `textAlign` (`center`/`right`/`left`). **Id поля** остаётся без суффикса (`text_title`, или авто `text_1` для голого `text_center`). |
 | `decor_*` | Интерактивный декоративный объект. Поддержаны SVG `rect`, `circle`, `ellipse`, `path`, `polygon`, растровые `<image>` (PNG/JPG), а также заливки `linearGradient` / `radialGradient` через `fill:url(#id)` (Corel). |
 | *(без имени)* | `rect`, `circle`, `ellipse`, `path`, `image` без `photo_*` / `text_*` / `locked_bg` автоматически импортируются как `decor_auto_*`. |
 | `trim`, `bleed`, `safe` | Опциональные направляющие зон печати. |

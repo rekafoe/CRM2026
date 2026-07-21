@@ -6,6 +6,8 @@
  *
  * Оператор в Corel задаёт только префикс (photo_ / text_ / decor_ / locked_bg) или осмысленный
  * photo_cover — уникальный id выдаёт парсер (photo_1, locked_bg_1, …).
+ * Выравнивание текста: суффикс имени text_*_center|_right|_left → textAlign в Fabric;
+ * Fabric id остаётся без суффикса (text_title_center → text_title / text_1).
  */
 
 import { performance } from 'perf_hooks'
@@ -866,6 +868,48 @@ function normalizeTextAnchor(value: string | undefined): SvgText['textAnchor'] {
   return 'start'
 }
 
+const TEXT_ALIGN_NAME_SUFFIX: Record<string, SvgText['textAnchor']> = {
+  center: 'middle',
+  middle: 'middle',
+  right: 'end',
+  end: 'end',
+  left: 'start',
+  start: 'start',
+}
+
+/**
+ * Суффикс выравнивания в имени слоя Corel.
+ * text_title_center → base text_title + middle;
+ * text_center / text__center → bare text_ + middle (id станет text_1).
+ */
+export function splitTextLayerAlignHint(layerName: string): {
+  baseName: string
+  anchor?: SvgText['textAnchor']
+} {
+  const raw = String(layerName ?? '').trim()
+  if (!raw) return { baseName: raw }
+  const lower = raw.toLowerCase()
+  if (!lower.startsWith('text_') && lower !== 'text') return { baseName: raw }
+
+  const withLabel = raw.match(/^(text_.+?)_(center|middle|right|end|left|start)$/i)
+  if (withLabel) {
+    const suffix = withLabel[2]!.toLowerCase()
+    const anchor = TEXT_ALIGN_NAME_SUFFIX[suffix]
+    const baseName = withLabel[1]!
+    // text_center уже пойман как text + _center ниже; text_x_center → text_x
+    if (baseName.toLowerCase() === 'text_') return { baseName: 'text_', anchor }
+    return { baseName, anchor }
+  }
+
+  const bareAlign = raw.match(/^text_+(center|middle|right|end|left|start)$/i)
+  if (bareAlign) {
+    const suffix = bareAlign[1]!.toLowerCase()
+    return { baseName: 'text_', anchor: TEXT_ALIGN_NAME_SUFFIX[suffix] }
+  }
+
+  return { baseName: raw }
+}
+
 /**
  * SVG text-anchor + CSS text-align.
  * Corel часто ставит text-anchor="start" и text-align:right — start не должен блокировать align.
@@ -923,19 +967,26 @@ function inferAlignedTextAnchor(
   if (metrics.length < 2) return undefined
   const lefts = metrics.map((m) => m.left)
   const leftSpread = Math.max(...lefts) - Math.min(...lefts)
-  const tol = fontSizeSvg * 0.35
+  const tol = fontSizeSvg * 0.45
   const baseWidths = metrics.map((m) => Math.max(1, m.right - m.left))
 
-  // Оценка ширины (0.55) часто ошибается для script — ищем scale, при котором центры строк сходятся.
+  // Оценка ширины (0.55) часто ошибается для script — ищем scale, при котором якоря строк сходятся.
   const scales = new Set<number>([1, 0.75, 0.85, 1.15, 1.35, 1.55])
   for (let i = 0; i < metrics.length; i += 1) {
     for (let j = i + 1; j < metrics.length; j += 1) {
       const dw = baseWidths[i]! - baseWidths[j]!
       if (Math.abs(dw) < 1) continue
-      const scale = (2 * (lefts[j]! - lefts[i]!)) / dw
-      if (scale > 0.25 && scale < 2.5) scales.add(scale)
+      // centers equal: 2*(Lj-Li)/(Wi-Wj)
+      const scaleCenter = (2 * (lefts[j]! - lefts[i]!)) / dw
+      if (scaleCenter > 0.25 && scaleCenter < 2.5) scales.add(scaleCenter)
+      // rights equal: (Lj-Li)/(Wi-Wj)
+      const scaleRight = (lefts[j]! - lefts[i]!) / dw
+      if (scaleRight > 0.25 && scaleRight < 2.5) scales.add(scaleRight)
     }
   }
+
+  let bestCenter: { spread: number; anchorX: number } | undefined
+  let bestEnd: { spread: number; anchorX: number } | undefined
 
   for (const scale of scales) {
     const rights = metrics.map((m, i) => m.left + baseWidths[i]! * scale)
@@ -943,19 +994,35 @@ function inferAlignedTextAnchor(
     const rightSpread = Math.max(...rights) - Math.min(...rights)
     const centerSpread = Math.max(...centers) - Math.min(...centers)
     if (centerSpread <= tol && (leftSpread > tol || rightSpread > tol)) {
-      return {
-        anchor: 'middle',
-        anchorX: centers.reduce((sum, value) => sum + value, 0) / centers.length,
-        anchorY: metrics[0]!.y,
+      const anchorX = centers.reduce((sum, value) => sum + value, 0) / centers.length
+      if (!bestCenter || centerSpread < bestCenter.spread) {
+        bestCenter = { spread: centerSpread, anchorX }
+      }
+    }
+    if (rightSpread <= tol && leftSpread > tol) {
+      const anchorX = Math.max(...rights)
+      if (!bestEnd || rightSpread < bestEnd.spread) {
+        bestEnd = { spread: rightSpread, anchorX }
       }
     }
   }
 
+  // При конфликте middle vs end берём меньший разброс якоря.
+  if (bestCenter && bestEnd) {
+    if (bestCenter.spread <= bestEnd.spread) {
+      return { anchor: 'middle', anchorX: bestCenter.anchorX, anchorY: metrics[0]!.y }
+    }
+    return { anchor: 'end', anchorX: bestEnd.anchorX, anchorY: metrics[0]!.y }
+  }
+  if (bestCenter) {
+    return { anchor: 'middle', anchorX: bestCenter.anchorX, anchorY: metrics[0]!.y }
+  }
+  if (bestEnd) {
+    return { anchor: 'end', anchorX: bestEnd.anchorX, anchorY: metrics[0]!.y }
+  }
+
   const rights = metrics.map((m) => m.right)
   const rightSpread = Math.max(...rights) - Math.min(...rights)
-  if (rightSpread <= tol && leftSpread > tol) {
-    return { anchor: 'end', anchorX: Math.max(...rights), anchorY: metrics[0]!.y }
-  }
   if (leftSpread <= tol && rightSpread > tol) {
     return { anchor: 'start', anchorX: Math.min(...lefts), anchorY: metrics[0]!.y }
   }
@@ -1608,17 +1675,46 @@ function mergeStackedTextItems(items: SvgText[]): SvgText {
   if (source.length === 1) return source[0]!
   const sorted = [...source].sort((a, b) => a.y - b.y || a.x - b.x)
   const text = sorted.map((item) => item.text).join('\n')
-  const textAnchor = pickStrongestTextAnchor(sorted)
+  let textAnchor = pickStrongestTextAnchor(sorted)
+  let sceneX = pickAnchorSceneX(sorted, textAnchor)
+  let mmX = pickAnchorMmX(sorted, textAnchor)
+
+  // Corel часто пишет выровненные строки отдельными <text> без text-anchor/text-align.
+  if (textAnchor === 'start' && sorted.length >= 2) {
+    const lineMetrics = sorted.map((item) => {
+      const w = estimateLineWidthSvg(item.text.trim() || item.text, item.scene.fontSize)
+      return { left: item.scene.x, right: item.scene.x + w, y: item.scene.y }
+    })
+    const tolFont = Math.max(...sorted.map((item) => item.scene.fontSize))
+    const inferred = inferAlignedTextAnchor(lineMetrics, tolFont)
+    if (inferred && inferred.anchor !== 'start') {
+      textAnchor = inferred.anchor
+      sceneX = inferred.anchorX
+      const pxPerMm = sorted
+        .map((item) => (item.x !== 0 ? item.scene.x / item.x : null))
+        .find((v): v is number => v != null && Number.isFinite(v) && Math.abs(v) > 1e-6)
+      mmX = pxPerMm ? sceneX / pxPerMm : pickAnchorMmX(sorted, textAnchor)
+    }
+  }
+
   const base = sorted[0]!
-  const sceneX = pickAnchorSceneX(sorted, textAnchor)
-  const mmX = pickAnchorMmX(sorted, textAnchor)
   const fontSizeScene = base.scene.fontSize
   const lines = text.split('\n')
   const metrics = sorted.map((item, index) => {
     const line = lines[index] ?? item.text
-    const w = estimateLineWidthSvg(line, fontSizeScene)
-    const left = textAnchor === 'middle' ? item.scene.x - w / 2 : textAnchor === 'end' ? item.scene.x - w : item.scene.x
-    return { left, right: left + w, y: item.scene.y }
+    const w = estimateLineWidthSvg(line.trim() || line, item.scene.fontSize)
+    // Исходные Corel-<text> почти всегда start: scene.x = левый край.
+    // Если у фрагмента уже был middle/end — scene.x = якорь.
+    const anchorWas = item.textAnchor
+    if (textAnchor === 'middle') {
+      const leftEdge = anchorWas === 'middle' ? item.scene.x - w / 2 : item.scene.x
+      return { left: leftEdge, right: leftEdge + w, y: item.scene.y }
+    }
+    if (textAnchor === 'end') {
+      const leftEdge = anchorWas === 'end' ? item.scene.x - w : item.scene.x
+      return { left: leftEdge, right: leftEdge + w, y: item.scene.y }
+    }
+    return { left: item.scene.x, right: item.scene.x + w, y: item.scene.y }
   })
   return {
     ...base,
@@ -2787,13 +2883,32 @@ export function parseImportedSvgLayers(
           )
           : tspans
         const lineMetrics = resolveTspanLineMetrics(effectiveTspans, attrs, transformedFontSize, textTransform)
-        const inferred = textAnchor === 'start'
-          ? inferAlignedTextAnchor(lineMetrics, transformedFontSize)
-          : undefined
-        if (inferred) textAnchor = inferred.anchor
-        const point = inferred
-          ? { x: inferred.anchorX, y: inferred.anchorY }
-          : applyTransform(textTransform, xv, yv)
+        const inferred = inferAlignedTextAnchor(lineMetrics, transformedFontSize)
+        let point = applyTransform(textTransform, xv, yv)
+        // Геометрия: только если в SVG не было явного align (остался start).
+        if (textAnchor === 'start' && inferred) {
+          textAnchor = inferred.anchor
+          point = { x: inferred.anchorX, y: inferred.anchorY }
+        }
+        // Суффикс имени (text_*_center) — явный хинт оператора, выше attrs/геометрии.
+        const alignFromName = splitTextLayerAlignHint(ef).anchor
+        if (alignFromName) {
+          textAnchor = alignFromName
+          if (inferred && inferred.anchor === alignFromName) {
+            point = { x: inferred.anchorX, y: inferred.anchorY }
+          } else if (alignFromName === 'middle' && lineMetrics.length > 0) {
+            const centers = lineMetrics.map((m) => (m.left + m.right) / 2)
+            point = {
+              x: centers.reduce((sum, value) => sum + value, 0) / centers.length,
+              y: lineMetrics[0]!.y,
+            }
+          } else if (alignFromName === 'end' && lineMetrics.length > 0) {
+            point = {
+              x: Math.max(...lineMetrics.map((m) => m.right)),
+              y: lineMetrics[0]!.y,
+            }
+          }
+        }
         const mmPoint = geometry.svgPointToMm(point)
         const scenePoint = geometry.mmPointToScene(mmPoint)
         const fontFamily =
@@ -2919,12 +3034,19 @@ export function parseImportedSvgLayers(
   const mergedTextBySourceName = new Map<string, SvgText>()
   const mergedTextItems = mergedBySourceName.map((item) => {
     const sourceName = item.name
+    const rawName = item.layerName ?? sourceName
+    const { baseName, anchor: alignFromName } = splitTextLayerAlignHint(rawName)
     const { fabricId, layerName } = allocateEditableFabricId(
       'text',
-      item.layerName ?? sourceName,
+      baseName,
       editableIds,
     )
-    const next: SvgText = { ...item, name: fabricId, layerName }
+    const next: SvgText = {
+      ...item,
+      name: fabricId,
+      layerName,
+      ...(alignFromName ? { textAnchor: alignFromName } : {}),
+    }
     mergedTextBySourceName.set(sourceName, next)
     parsedTextLayerNames.add(fabricId)
     return next
