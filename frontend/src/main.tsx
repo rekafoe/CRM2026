@@ -33,9 +33,6 @@ const LazyEarningsPage = React.lazy(() =>
 const LazyCustomersPage = React.lazy(() =>
   import('./pages/admin/CustomersAdminPage').then((m) => ({ default: m.default }))
 );
-const LazyPhotoBatchEditorPage = React.lazy(() =>
-  import('./pages/admin/PhotoBatchEditorPage').then((m) => ({ default: m.PhotoBatchEditorPage }))
-);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(APP_CONFIG.storage.token) : null;
@@ -161,13 +158,7 @@ root.render(
           />
           <Route
             path="/photo-batch-editor"
-            element={
-              <RequireAuth>
-                <React.Suspense fallback={<LoadingFallback />}>
-                  <LazyPhotoBatchEditorPage />
-                </React.Suspense>
-              </RequireAuth>
-            }
+            element={<Navigate to="/adminpanel/design-templates" replace />}
           />
           </Routes>
         </BrowserRouter>

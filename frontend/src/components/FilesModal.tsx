@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { OrderFile, Item } from '../types';
 import {
   listOrderFiles,
@@ -10,7 +9,6 @@ import {
   getCurrentUser,
   getOrderFileAccessLogs,
   getPreflightReport,
-  createPublicEditorPreviewDraftFromOrderItem,
   getOrderItemEditorProductionManifest,
   type OrderFileAccessLog,
   type PreflightReport,
@@ -65,8 +63,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   orderNumber,
   items = []
 }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -115,24 +111,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       console.error('Ошибка загрузки файлов:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleRestoreEditorDraft = async (item: Item) => {
-    if (!item.params?.designState || item.params.designTemplateId == null) return;
-    setEditorActionLoading(true);
-    setEditorActionError(null);
-    try {
-      const res = await createPublicEditorPreviewDraftFromOrderItem({ orderId, orderItemId: item.id });
-      const token = res.data?.token;
-      if (!token) throw new Error('Сервер не вернул draft token');
-      const mode = item.params.editorDraftMode === 'multipage' ? 'multipage' : 'single';
-      onClose();
-      navigate(`/adminpanel/public-design-editor-preview/${item.params.designTemplateId}?mode=${mode}&draft=${encodeURIComponent(token)}`);
-    } catch (error) {
-      setEditorActionError(error instanceof Error ? error.message : 'Не удалось открыть макет на правку');
-    } finally {
-      setEditorActionLoading(false);
     }
   };
 
@@ -474,30 +452,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               <>Загрузить файл</>
             )}
           </label>
-          <button
-            type="button"
-            className="btn-create-design btn-photo-batch"
-            disabled={!selectedOrderItem}
-            onClick={() => {
-              if (!selectedOrderItem) return;
-              onClose();
-              const q = new URLSearchParams({
-                orderId: String(orderId),
-                orderItemId: String(selectedOrderItem.id),
-              });
-              if (selectedOrderItem.params?.productId != null) {
-                q.set('productId', String(selectedOrderItem.params.productId));
-              }
-              const typeId = (selectedOrderItem.params as { typeId?: number | string }).typeId;
-              if (typeId != null) q.set('typeId', String(typeId));
-              navigate(`/photo-batch-editor?${q.toString()}`, {
-                state: { backTo: location.pathname + location.search },
-              });
-            }}
-            title={selectedOrderItem ? 'Открыть пакетную фотопечать для позиции' : 'Сначала выберите позицию заказа'}
-          >
-            <AppIcon name="camera" size="xs" /> Пакетная фотопечать
-          </button>
           {selectedPhotoBatchSummary && (
             <span className="files-photo-batch-summary">{selectedPhotoBatchSummary}</span>
           )}
@@ -516,16 +470,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                   onClick={() => setPreviewItem(selectedOrderItem)}
                 >
                   Открыть preview
-                </button>
-              )}
-              {selectedOrderItem.params.designState && selectedOrderItem.params.designTemplateId != null && (
-                <button
-                  type="button"
-                  className="files-editor-summary__preview"
-                  onClick={() => void handleRestoreEditorDraft(selectedOrderItem)}
-                  disabled={editorActionLoading}
-                >
-                  Редактировать копию
                 </button>
               )}
               {(selectedOrderItem.params.designState || selectedOrderItem.params.photoBatch) && (

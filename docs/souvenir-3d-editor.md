@@ -36,7 +36,7 @@
 
 - Сайт читает `GET /products/:id/schema` → `template.simplified.design_editor_mode` и `printAreas` (в т.ч. compact).
 - `ClientEditorRouter` при `souvenir_3d` монтирует `Souvenir3dEditor` (Fabric + R3F), иначе плоский редактор.
-- **Пустой макет по умолчанию:** при сохранении шаблона продукта с `souvenir_3d` создаётся (если ещё нет) пустой `design_templates` размера первой `printArea` (`fabricJSON: {}`, `editorKind: souvenir_3d`) и привязывается к размеру. В сайдбаре — кнопка «Открыть пустой редактор».
+- **Пустой макет по умолчанию:** при сохранении шаблона продукта с `souvenir_3d` создаётся (если ещё нет) пустой `design_templates` размера первой `printArea` (`fabricJSON: {}`, `editorKind: souvenir_3d`) и привязывается к размеру. В сайдбаре — кнопка «Открыть на сайте» (актуальный UI printcore.by, не CRM PrintCore Studio).
 
 ## Как шаблон указывает kind
 
@@ -78,7 +78,10 @@
 
 ## Preview в CRM
 
-`/adminpanel/public-design-editor-preview/:templateId?mode=souvenir_3d`
+Sandbox каталога / кнопка в сайдбаре открывают **сайт**:
+`https://printcore.by/services/poligrafy/{route_key}/{typeKey}/order/editor?templateId=…&mode=souvenir_3d`
+
+Нужны привязка шаблона к продукту и `route_key`. Роут CRM `/adminpanel/public-design-editor-preview/…` редиректит в каталог (UI редактора в CRM скрыт).
 
 ## Граница сайт / CRM
 

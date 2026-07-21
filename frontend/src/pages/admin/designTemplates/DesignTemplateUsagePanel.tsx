@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { MoneyAmount } from '../../../components/ui';
 import {
@@ -8,6 +7,7 @@ import {
   type DesignTemplateUsageRow,
 } from '../../../api';
 import { API_BASE_URL } from '../../../config/constants';
+import { openSiteSandboxForDesignTemplate } from '../../../features/designTemplates/openSiteSandboxForDesignTemplate';
 import { resolveTemplatePreviewUrl } from './designTemplateCatalogUtils';
 
 type PeriodKey = '30' | '90' | '365' | 'all';
@@ -84,12 +84,19 @@ const UsageRow: React.FC<UsageRowProps> = ({ row, rank, maxLines, onOpen }) => {
 };
 
 export const DesignTemplateUsagePanel: React.FC = () => {
-  const navigate = useNavigate();
   const [period, setPeriod] = useState<PeriodKey>('90');
   const [data, setData] = useState<DesignTemplateUsageAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUnused, setShowUnused] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  const openOnSite = useCallback((id: number) => {
+    setOpenError(null);
+    void openSiteSandboxForDesignTemplate(id).catch((err) => {
+      setOpenError(err instanceof Error ? err.message : 'Не удалось открыть редактор на сайте');
+    });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -138,6 +145,7 @@ export const DesignTemplateUsagePanel: React.FC = () => {
       </p>
 
       {error && <p className="design-usage-panel__error">{error}</p>}
+      {openError && <p className="design-usage-panel__error">{openError}</p>}
 
       {loading && !data && (
         <div className="design-templates-loading">Загрузка аналитики…</div>
@@ -178,7 +186,7 @@ export const DesignTemplateUsagePanel: React.FC = () => {
                     row={row}
                     rank={index + 1}
                     maxLines={maxLines}
-                    onOpen={(id) => navigate(`/adminpanel/design-editor/${id}`)}
+                    onOpen={openOnSite}
                   />
                 ))}
               </ol>
@@ -218,7 +226,7 @@ export const DesignTemplateUsagePanel: React.FC = () => {
                       <button
                         type="button"
                         className="design-usage-unused-item__name"
-                        onClick={() => navigate(`/adminpanel/design-editor/${t.id}`)}
+                        onClick={() => openOnSite(t.id)}
                       >
                         #{t.id} {t.name}
                       </button>

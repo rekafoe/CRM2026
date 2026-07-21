@@ -14,10 +14,11 @@
 1. **Импорт шаблона** — SVG или ZIP со страницами по конвенции слоёв (`photo_*`, `text_*`, `trim`/`bleed`/`safe`).
 2. Опционально **исходник** (AI/CDR/PDF) — сохраняется в `spec.import`, в карточке без SVG шаблон будет **draft** (неактивен).
 3. Указать **продукт / подтип / размер** при импорте или в карточке (выпадающие списки из конфига продукта) — для `GET /api/design-templates/public` и строки в `product_subtype_designs`.
-4. **Шаблон** — админский редактор master (`/adminpanel/design-editor/:id`).
-5. **Клиент** — sandbox публичного редактора (`/adminpanel/public-design-editor-preview/:id`).
+4. **Клиент** — проверка макета только на сайте (`printcore.by/.../order/editor?templateId=`). Кнопка «На сайте» в каталоге. Нужны привязка к продукту и `route_key`.
 
-Ручное «Добавить шаблон» без импорта — только для простых фонов (PNG/JPG) и последующей сборки в редакторе.
+CRM **не хостит** UI master/client редактора (роуты `/adminpanel/design-editor` и `/public-design-editor-preview` редиректят в каталог). Исходники `publicDesignEditor` / `designEditor` остаются в репо как source of truth для `printcore-website/vendor/crm-design-editor`.
+
+Ручное «Добавить шаблон» без импорта — для простых фонов (PNG/JPG); поля макета — через **Импорт SVG**.
 
 ## Статусы в каталоге
 

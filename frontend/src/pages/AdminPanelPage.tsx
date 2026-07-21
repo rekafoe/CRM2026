@@ -12,8 +12,6 @@ import { AppIcon } from '../components/ui/AppIcon';
 import '../styles/admin-panel.css';
 import '../components/notifications/NotificationsManager.css';
 import './NotificationsPage.css';
-import { PublicDesignEditorPreviewPage as PublicDesignEditorPreviewPageEager } from '../features/publicDesignEditor/PublicDesignEditorPreviewPage';
-
 const LoadingFallback: React.FC = () => (
   <div className="loading-overlay">Загрузка...</div>
 );
@@ -73,19 +71,9 @@ const DesignTemplatesPage = lazy(() =>
 const DesignFontsPage = lazy(() =>
   import('./admin/DesignFontsPage').then((m) => ({ default: m.DesignFontsPage }))
 );
-const DesignEditorPage = lazy(() =>
-  import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
-);
-const PublicDesignEditorPreviewPageLazy = lazy(() =>
-  import('../features/publicDesignEditor/PublicDesignEditorPreviewPage').then((m) => ({
-    default: m.PublicDesignEditorPreviewPage,
-  }))
-);
 
-/** В dev lazy-чанк на Windows часто залипает — на проде остаётся code-split. */
-const PublicDesignEditorPreviewPage = import.meta.env.DEV
-  ? PublicDesignEditorPreviewPageEager
-  : PublicDesignEditorPreviewPageLazy;
+/** CRM UI редакторов скрыт: клиентский UX на сайте; исходники страниц остаются для vendor sync. */
+const DESIGN_TEMPLATES_CATALOG = '/adminpanel/design-templates';
 
 // Компонент страницы уведомлений (исправлен - убраны инлайн стили)
 const NotificationsPage: React.FC = () => {
@@ -408,8 +396,11 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/inbox-plan" element={<InboxFunnelPlanPage />} />
           <Route path="/design-templates" element={<DesignTemplatesPage />} />
           <Route path="/design-fonts" element={<DesignFontsPage />} />
-          <Route path="/design-editor/:templateId" element={<DesignEditorPage />} />
-          <Route path="/public-design-editor-preview/:templateId" element={<PublicDesignEditorPreviewPage />} />
+          <Route path="/design-editor/:templateId" element={<Navigate to={DESIGN_TEMPLATES_CATALOG} replace />} />
+          <Route
+            path="/public-design-editor-preview/:templateId"
+            element={<Navigate to={DESIGN_TEMPLATES_CATALOG} replace />}
+          />
           <Route path="/clients/:id" element={<CustomerDetailPage />} />
           <Route path="/clients" element={<CustomersAdminPage />} />
           <Route path="/document-templates" element={<DocumentTemplatesPage />} />

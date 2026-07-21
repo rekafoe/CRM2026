@@ -167,14 +167,21 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
                   При сохранении шаблона создаётся пустой макет размера print area. Без готового дизайна клиент рисует сам.
                 </small>
                 {typeof value.souvenirBlankTemplateId === 'number' && value.souvenirBlankTemplateId > 0 && (
-                  <a
+                  <button
+                    type="button"
                     className="btn btn-secondary"
-                    href={`/adminpanel/public-design-editor-preview/${value.souvenirBlankTemplateId}?mode=souvenir_3d`}
-                    target="_blank"
-                    rel="noreferrer"
+                    onClick={() => {
+                      void import('../../../features/designTemplates/openSiteSandboxForDesignTemplate')
+                        .then(({ openSiteSandboxForDesignTemplate }) =>
+                          openSiteSandboxForDesignTemplate(value.souvenirBlankTemplateId!),
+                        )
+                        .catch((err) => {
+                          window.alert(err instanceof Error ? err.message : 'Не удалось открыть редактор на сайте');
+                        });
+                    }}
                   >
-                    Открыть пустой редактор (#{value.souvenirBlankTemplateId})
-                  </a>
+                    Открыть на сайте (пустой #{value.souvenirBlankTemplateId})
+                  </button>
                 )}
                 {(value.printAreas?.length ? value.printAreas : [{
                   id: 'front',

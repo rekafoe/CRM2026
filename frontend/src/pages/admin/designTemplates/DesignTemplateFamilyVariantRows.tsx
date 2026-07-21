@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { addSubtypeDesign, updateDesignTemplate, type DesignTemplate } from '../../../api';
 import { DesignTemplateProductBindField } from './DesignTemplateProductBindField';
@@ -10,6 +9,7 @@ import {
   parseTemplateSpec,
   type DesignTemplateFamily,
 } from './designTemplateCatalogUtils';
+import { openSiteSandboxForDesignTemplate } from '../../../features/designTemplates/openSiteSandboxForDesignTemplate';
 import './DesignTemplateFamilyVariantRows.css';
 
 function mergeProductBindIntoSpec(
@@ -42,7 +42,6 @@ const STATUS_LABELS = {
 
 type Props = {
   family: DesignTemplateFamily;
-  editorPathPrefix: string;
   formatBinding: (parsed: ReturnType<typeof parseTemplateSpec>) => string | null;
   onBound: () => Promise<void>;
   onDelete: (id: number, label?: string) => void | Promise<void>;
@@ -59,18 +58,15 @@ function bindValueFromTemplate(t: DesignTemplate): ProductBindValue {
 
 function VariantRow({
   variant,
-  editorPathPrefix,
   formatBinding,
   onBound,
   onDelete,
 }: {
   variant: DesignTemplate;
-  editorPathPrefix: string;
   formatBinding: Props['formatBinding'];
   onBound: Props['onBound'];
   onDelete: Props['onDelete'];
 }) {
-  const navigate = useNavigate();
   const parsed = useMemo(() => parseTemplateSpec(variant), [variant]);
   const sizeStr = formatTemplateSize(parsed) ?? 'без размера в SVG';
   const status = getTemplateCatalogStatus(variant);
@@ -81,6 +77,19 @@ function VariantRow({
   const [saving, setSaving] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
   const [rowOk, setRowOk] = useState<string | null>(null);
+  const [sandboxBusy, setSandboxBusy] = useState(false);
+
+  const openClientSandbox = useCallback(async () => {
+    try {
+      setSandboxBusy(true);
+      setRowError(null);
+      await openSiteSandboxForDesignTemplate(variant);
+    } catch (err) {
+      setRowError(err instanceof Error ? err.message : 'Не удалось открыть сайтовый редактор');
+    } finally {
+      setSandboxBusy(false);
+    }
+  }, [variant]);
 
   // Sync when template data reloads from parent
   const specKey = `${parsed.productId ?? ''}:${parsed.typeId ?? ''}:${parsed.sizeId ?? ''}:${variant.subtype_link_count ?? 0}`;
@@ -148,22 +157,15 @@ function VariantRow({
           <button
             type="button"
             className="lg-btn lg-btn--sm"
-            onClick={() => navigate(`${editorPathPrefix}/${variant.id}`)}
-            title="Master-редактор"
+            onClick={() => void openClientSandbox()}
+            disabled={sandboxBusy}
+            title={
+              parsed.editorKind === 'souvenir_3d'
+                ? 'Клиентский редактор на сайте (3D / souvenir)'
+                : 'Клиентский редактор на сайте (printcore.by)'
+            }
           >
-            <AppIcon name="edit" size="xs" /> Шаблон
-          </button>
-          <button
-            type="button"
-            className="lg-btn lg-btn--sm lg-btn--icon"
-            onClick={() => {
-              const mode = parsed.editorKind === 'souvenir_3d' ? 'souvenir_3d' : 'single';
-              navigate(`/adminpanel/public-design-editor-preview/${variant.id}?mode=${mode}`);
-            }}
-            title={parsed.editorKind === 'souvenir_3d' ? 'Клиентский sandbox (3D)' : 'Клиентский sandbox'}
-            aria-label="Клиент"
-          >
-            <AppIcon name="image" size="xs" />
+            <AppIcon name="image" size="xs" /> {sandboxBusy ? '…' : 'На сайте'}
           </button>
           <button
             type="button"
@@ -213,7 +215,6 @@ function VariantRow({
 
 export const DesignTemplateFamilyVariantRows: React.FC<Props> = ({
   family,
-  editorPathPrefix,
   formatBinding,
   onBound,
   onDelete,
@@ -223,7 +224,6 @@ export const DesignTemplateFamilyVariantRows: React.FC<Props> = ({
       <VariantRow
         key={variant.id}
         variant={variant}
-        editorPathPrefix={editorPathPrefix}
         formatBinding={formatBinding}
         onBound={onBound}
         onDelete={onDelete}

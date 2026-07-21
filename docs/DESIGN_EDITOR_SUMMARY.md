@@ -23,10 +23,9 @@
 
 Редакторы разделены по ответственности:
 
-- админский редактор шаблона — `/adminpanel/design-editor/:templateId`, сохраняет master в `design_templates.spec.designState`;
-- клиентский редактор экземпляра — продуктовый слой `frontend/src/features/clientEditor/`, который выбирает сценарий и сохраняет пользовательскую копию в draft;
-- Fabric-документ внутри клиентского сценария находится в `frontend/src/features/publicDesignEditor/`;
-- sandbox для проверки клиентского редактора в CRM — `/adminpanel/public-design-editor-preview/:templateId`.
+- исходники админского master-редактора — `frontend/src/pages/admin/DesignEditorPage.tsx` (+ `designEditor/`); **UI-роут в CRM скрыт** (редирект в каталог), код остаётся для vendor sync;
+- клиентский редактор экземпляра — продуктовый слой `frontend/src/features/clientEditor/` + `publicDesignEditor/` (вендорится на сайт);
+- проверка клиента — только на сайте (`printcore.by/.../order/editor`), не через CRM sandbox.
 
 Переключателя `advanced/basic` в UI админского редактора больше нет. Ограничения заполнения остаются низкоуровневой возможностью canvas для клиентского слоя.
 

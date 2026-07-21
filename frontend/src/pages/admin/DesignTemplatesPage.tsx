@@ -22,6 +22,7 @@ import type { UserRef } from '../../types';
 import { API_BASE_URL } from '../../config/constants';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
+import { openSiteSandboxForDesignTemplate } from '../../features/designTemplates/openSiteSandboxForDesignTemplate';
 import {
   familyCatalogStatus,
   formatAuthorRoyaltyLine,
@@ -130,7 +131,6 @@ export const DesignTemplatesPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useCurrentUser();
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
-  const editorPathPrefix = '/adminpanel/design-editor';
   const tabParam = searchParams.get('tab');
   const pageTab: PageTab =
     tabParam === 'bindings' ? 'bindings' : tabParam === 'analytics' ? 'analytics' : 'catalog';
@@ -815,7 +815,6 @@ export const DesignTemplatesPage: React.FC = () => {
 
         <DesignTemplateFamilyVariantRows
           family={family}
-          editorPathPrefix={editorPathPrefix}
           formatBinding={formatBinding}
           onBound={loadTemplates}
           onDelete={handleDelete}
@@ -823,7 +822,6 @@ export const DesignTemplatesPage: React.FC = () => {
       </div>
     );
   }, [
-    editorPathPrefix,
     formatBinding,
     handleDelete,
     handleDeleteFamily,
@@ -890,10 +888,10 @@ export const DesignTemplatesPage: React.FC = () => {
           </button>
           {helpOpen && (
             <p className="design-templates-help__body">
-              Master-шаблоны для сайта и редактора. Карточка = семья с кодом <code>000001</code>;
+              Master-шаблоны для сайта. Карточка = семья с кодом <code>000001</code>;
               размеры (мм) — варианты внутри. Основной вход — <strong>Импорт SVG</strong> (
               <code>docs/design-template-importer.md</code>). В ZIP папки вида <code>204x204/</code> создают
-              варианты одной семьи. Плата автора (Y) и % (Z) задаются один раз на семью.
+              варианты одной семьи. Клиентский редактор — на сайте (кнопка «На сайте»). Плата автора (Y) и % (Z) задаются один раз на семью.
             </p>
           )}
         </div>
@@ -1229,7 +1227,7 @@ export const DesignTemplatesPage: React.FC = () => {
               </div>
               <div className="design-template-manual-hint">
                 Поля <code>photo_*</code> / <code>text_*</code> из SVG не создаются автоматически — для парсинга макета используйте <strong>Импорт SVG</strong>.
-                Здесь можно задать размеры и фон-превью, затем собрать поля в master-редакторе («Шаблон»).
+                Здесь можно задать размеры и фон-превью. Клиентский редактор — на сайте (кнопка «На сайте» у варианта).
               </div>
             </section>
           </div>
@@ -1447,7 +1445,17 @@ export const DesignTemplatesPage: React.FC = () => {
                   Привязки к продукту
                 </button>
               )}
-              <button type="button" className="lg-btn lg-btn--primary" onClick={() => navigate(`${editorPathPrefix}/${infoTemplate.id}`)}>Открыть редактор</button>
+              <button
+                type="button"
+                className="lg-btn lg-btn--primary"
+                onClick={() => {
+                  void openSiteSandboxForDesignTemplate(infoTemplate).catch((err) => {
+                    window.alert(err instanceof Error ? err.message : 'Не удалось открыть редактор на сайте');
+                  });
+                }}
+              >
+                Открыть на сайте
+              </button>
             </div>
           </div>
         )}
