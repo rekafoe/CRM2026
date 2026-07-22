@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  PublicDesignEditor,
-  type PublicDesignReadyForCartPayload,
-} from '../publicDesignEditor/PublicDesignEditor';
+import { PublicDesignEditor } from '../publicDesignEditor/PublicDesignEditor';
 import type { PublicDesignEditorAdapter } from '../publicDesignEditor/publicDesignEditorAdapter';
 import type { PublicDesignPageCountLimits } from '../publicDesignEditor/usePublicDesignPageActions';
 import { Souvenir3dPreview } from './Souvenir3dPreview';
@@ -21,13 +18,12 @@ export type Souvenir3dEditorProps = {
   onDraftTokenChange?: (token: string) => void;
   adapter?: PublicDesignEditorAdapter;
   showFinalizeButton?: boolean;
-  onReadyForCart?: (draftToken: string, payload?: PublicDesignReadyForCartPayload) => void | Promise<void>;
+  onReadyForCart?: (draftToken: string) => void | Promise<void>;
   showClientActionBar?: boolean;
   orderButtonLabel?: string;
   selectedParams?: Record<string, unknown>;
   pageCountLimits?: PublicDesignPageCountLimits;
   onPageCountChange?: (pageCount: number) => void;
-  minimumPageCountFromOrder?: number;
   /** Зоны из продукта (simplified.printAreas). */
   printAreas?: PrintAreaConfig[] | unknown;
   /** Периодический снимок Fabric canvas для texture (data URL). */
@@ -66,7 +62,6 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
   selectedParams,
   pageCountLimits,
   onPageCountChange,
-  minimumPageCountFromOrder,
   printAreas: printAreasProp,
   textureDataUrl: textureFromParent,
   onRequestTextureRefresh,
@@ -187,7 +182,6 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
             selectedParams={selectedParams}
             pageCountLimits={pageCountLimits}
             onPageCountChange={onPageCountChange}
-            minimumPageCountFromOrder={minimumPageCountFromOrder}
           />
         </div>
         <aside className="souvenir3d-editor__preview-pane" aria-label="3D-превью">
