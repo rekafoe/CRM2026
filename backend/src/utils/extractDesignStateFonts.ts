@@ -125,16 +125,10 @@ export function hasMissingRequiredFonts(entries: RequiredFontEntry[]): boolean {
 
 type LibraryFontRef = { family_name: string; name_aliases?: string[] }
 
-function isFontKnownInLibrary(family: string, libraryFonts: LibraryFontRef[]): boolean {
-  const current = normalizeFontFamilyName(family)
-  if (!current || isGenericFontFamily(current)) return false
-  for (const font of libraryFonts) {
-    const names = [font.family_name, ...(font.name_aliases ?? [])]
-    if (names.some((name) => fontFamilyNamesMatch(name, current))) return true
-  }
-  return false
-}
-
+/**
+ * Точное сопоставление text_<hint> с family_name / aliases.
+ * Без substring includes — иначе text_time ложно матчит Happy Time.
+ */
 function matchLibraryFontToTextLayer(
   textId: string,
   libraryFonts: LibraryFontRef[],
@@ -148,13 +142,12 @@ function matchLibraryFontToTextLayer(
     if (!canonical) continue
     const names = [canonical, ...(font.name_aliases ?? [])]
     for (const name of names) {
+      if (fontFamilyNamesMatch(name, suffixRaw)) return canonical
       const familyKey = fontFamilyCompactKey(name)
       const familyBase = fontFamilyBaseCompactKey(name)
-      if (!familyKey && !familyBase) continue
       if (
-        (suffixKey && familyKey && (familyKey === suffixKey || familyKey.includes(suffixKey) || suffixKey.includes(familyKey)))
-        || (suffixBase && familyBase && (familyBase === suffixBase || familyBase.includes(suffixBase) || suffixBase.includes(familyBase)))
-        || fontFamilyNamesMatch(name, suffixRaw)
+        (suffixKey && familyKey && familyKey === suffixKey)
+        || (suffixBase && familyBase && familyBase === suffixBase)
       ) {
         return canonical
       }
@@ -164,8 +157,9 @@ function matchLibraryFontToTextLayer(
 }
 
 /**
- * Для text_* без font-family в SVG (Arial в fabricJSON) подставляет шрифт из библиотеки CRM
- * по имени слоя: text_voguella → Voguella.
+ * Для text_* без реального font-family в SVG (пустой / Arial / sans-serif)
+ * подставляет шрифт из библиотеки CRM по имени слоя: text_voguella → Voguella.
+ * Неизвестный не-generic family не перезаписываем — оставляем missing.
  */
 export function applyLibraryFontFallbacksToDesignState(
   designState: unknown,
@@ -183,26 +177,17 @@ export function applyLibraryFontFallbacksToDesignState(
       const matched = matchLibraryFontToTextLayer(id, libraryFonts)
       if (!matched) return
       const currentFamily = String(obj.fontFamily ?? '')
-      const shouldReplace =
-        isGenericFontFamily(currentFamily)
-        || !isFontKnownInLibrary(currentFamily, libraryFonts)
-      if (!shouldReplace) return
+      if (!isGenericFontFamily(currentFamily)) return
       obj.fontFamily = matched
       walkFabricTextStyles(obj, (style) => {
         const segFamily = String(style.fontFamily ?? '')
-        if (
-          isGenericFontFamily(segFamily)
-          || !isFontKnownInLibrary(segFamily, libraryFonts)
-        ) {
+        if (isGenericFontFamily(segFamily)) {
           style.fontFamily = matched
         }
       })
       walkFabricTextStyleRuns(obj, (run) => {
         const segFamily = String(run.fontFamily ?? '')
-        if (
-          isGenericFontFamily(segFamily)
-          || !isFontKnownInLibrary(segFamily, libraryFonts)
-        ) {
+        if (isGenericFontFamily(segFamily)) {
           run.fontFamily = matched
         }
       })

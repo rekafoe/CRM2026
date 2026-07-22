@@ -18,6 +18,68 @@ export const SOUVENIR_PRODUCTION_DPI = 300;
  */
 export const TSHIRT_FRONT_PANEL_WIDTH_MM = 500;
 
+/** Внешний обхват типовой кружки (калибровка GLB → мм). */
+export const MUG_OUTER_CIRCUMFERENCE_MM = 260;
+
+/** Высота кружки (тулово + ободок в GLB) ≈ 11 см. */
+export const MUG_BODY_HEIGHT_MM = 110;
+
+/**
+ * Сдвиг зоны против часовой от симметричного шва (мм обхвата, вид сверху).
+ * Край поля ближе к ручке с одной стороны.
+ */
+export const MUG_WRAP_CCW_NUDGE_MM = 16;
+
+/**
+ * Обхват кружки: s=0 в центре ручки, дальше против часовой (вид сверху).
+ * Начало/конец поля печати — мм вдоль окружности от ручки.
+ *
+ * По умолчанию зазор у ручки + небольшой доворот CCW («дотягивает» до ручки).
+ */
+export function mugWrapArcFromHandle(options: {
+  widthMm: number;
+  circumferenceMm?: number;
+  /** мм от центра ручки до левого края зоны (CCW сверху). */
+  startMmFromHandle?: number;
+}): {
+  circumferenceMm: number;
+  startMm: number;
+  endMm: number;
+  thetaStart: number;
+  thetaLength: number;
+} {
+  const circumferenceMm = Math.max(1, options.circumferenceMm ?? MUG_OUTER_CIRCUMFERENCE_MM);
+  const widthMm = Math.min(Math.max(1, options.widthMm), circumferenceMm * 0.95);
+  const gapMm = Math.max(0, circumferenceMm - widthMm);
+  const rawStart =
+    options.startMmFromHandle != null && Number.isFinite(options.startMmFromHandle)
+      ? Number(options.startMmFromHandle)
+      : gapMm / 2 + MUG_WRAP_CCW_NUDGE_MM;
+  // Нормализуем в [0, circ)
+  let startMm = rawStart % circumferenceMm;
+  if (startMm < 0) startMm += circumferenceMm;
+  const endMm = startMm + widthMm;
+  const thetaStart = (startMm / circumferenceMm) * Math.PI * 2;
+  const thetaLength = (widthMm / circumferenceMm) * Math.PI * 2;
+  return { circumferenceMm, startMm, endMm, thetaStart, thetaLength };
+}
+
+/**
+ * Высота печатного пояса: мм зоны / 110 мм высоты кружки.
+ */
+export function mugPrintHeightScene(
+  heightMm: number,
+  bodyHeightScene: number,
+  bodyHeightMm = MUG_BODY_HEIGHT_MM,
+): number {
+  const safeBodyH = Math.max(bodyHeightScene, 0.001);
+  const mm = Math.max(1, bodyHeightMm);
+  const rawH = (Math.max(1, heightMm) / mm) * safeBodyH;
+  // Почти на всю высоту тулова, небольшие поля сверху/снизу.
+  const maxH = safeBodyH * 0.92;
+  return Math.min(rawH, maxH);
+}
+
 /** Размер зоны печати в единицах сцены по физическим мм и ширине панели mesh. */
 export function printAreaSceneSize(
   widthMm: number,

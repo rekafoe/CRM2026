@@ -26,14 +26,14 @@ describe('applyLibraryFontFallbacksToDesignState', () => {
     expect(obj.fontFamily).toBe('Voguella')
   })
 
-  it('заменяет неизвестный шрифт из SVG на библиотечный по id слоя text_voguella', () => {
+  it('подставляет шрифт при пустом fontFamily по id слоя text_voguella', () => {
     const designState = {
       pages: [{
         fabricJSON: {
           objects: [{
             type: 'textbox',
             id: 'text_voguella',
-            fontFamily: 'Aubrey Pro',
+            fontFamily: '',
             text: 'Имя',
           }],
         },
@@ -44,6 +44,46 @@ describe('applyLibraryFontFallbacksToDesignState', () => {
     }]) as typeof designState
     const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
     expect(obj.fontFamily).toBe('Voguella')
+  })
+
+  it('не перезаписывает неизвестный не-generic шрифт из SVG по id слоя', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            id: 'text_voguella',
+            fontFamily: 'Ceremonious One',
+            text: 'Имя',
+          }],
+        },
+      }],
+    }
+    const next = applyLibraryFontFallbacksToDesignState(designState, [{
+      family_name: 'Voguella',
+    }]) as typeof designState
+    const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
+    expect(obj.fontFamily).toBe('Ceremonious One')
+  })
+
+  it('text_time не матчит Happy Time Two через substring', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            id: 'text_time',
+            fontFamily: 'Arial',
+            text: '10:00',
+          }],
+        },
+      }],
+    }
+    const next = applyLibraryFontFallbacksToDesignState(designState, [{
+      family_name: 'Happy Time Two',
+    }]) as typeof designState
+    const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
+    expect(obj.fontFamily).toBe('Arial')
   })
 
   it('не трогает слой, если font-family уже есть в библиотеке CRM', () => {

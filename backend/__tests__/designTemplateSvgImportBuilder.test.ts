@@ -40,6 +40,18 @@ describe('fabricTextFromSvgText', () => {
     expect(cer?.end).toBe(item!.text.length)
   })
 
+  it('не подставляет Arial, если font-family в SVG отсутствует', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <text id="text_voguella" x="80" y="220" font-size="48">Имя</text>
+</svg>`
+    const item = parseImportedSvgLayers(svg).textItems[0]
+    expect(item).toBeDefined()
+    const fabric = fabricTextFromSvgText(item!) as Record<string, unknown>
+    expect(fabric.fontFamily).toBe('')
+    expect(fabric.fontFamily).not.toBe('Arial')
+  })
+
   it('даёт достаточную ширину однострочному text_* без принудительного переноса', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">

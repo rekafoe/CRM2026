@@ -8,6 +8,11 @@ export {
 export {
   SOUVENIR_PREVIEW_DPI,
   SOUVENIR_PRODUCTION_DPI,
+  MUG_BODY_HEIGHT_MM,
+  MUG_OUTER_CIRCUMFERENCE_MM,
+  MUG_WRAP_CCW_NUDGE_MM,
+  mugPrintHeightScene,
+  mugWrapArcFromHandle,
   printAreaAspect,
   printAreaFabricPx,
   printAreaPreviewTexturePx,

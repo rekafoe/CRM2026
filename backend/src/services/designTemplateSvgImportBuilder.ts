@@ -197,9 +197,10 @@ function toFabricText(item: SvgText) {
   const textStyleRuns = item.textStyles?.length
     ? toTextStyleRuns(item.textStyles, fontSizePx)
     : undefined
+  // Без молчаливого Arial: пустой family → generic → library/ZIP fallback по text_*.
   const baseFontFamily = item.textStyles?.[0]?.fontFamily?.trim()
     || item.fontFamily?.trim()
-    || 'Arial'
+    || ''
   const baseFill = item.fill?.trim()
     || item.textStyles?.[0]?.fill?.trim()
     || '#111827'
