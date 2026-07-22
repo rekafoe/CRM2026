@@ -1,5 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { PublicDesignEditor } from '../publicDesignEditor/PublicDesignEditor';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  PublicDesignEditor,
+  type PublicDesignReadyForCartPayload,
+} from '../publicDesignEditor/PublicDesignEditor';
 import type { PublicDesignEditorAdapter } from '../publicDesignEditor/publicDesignEditorAdapter';
 import type { PublicDesignPageCountLimits } from '../publicDesignEditor/usePublicDesignPageActions';
 import { Souvenir3dPreview } from './Souvenir3dPreview';
@@ -18,12 +21,13 @@ export type Souvenir3dEditorProps = {
   onDraftTokenChange?: (token: string) => void;
   adapter?: PublicDesignEditorAdapter;
   showFinalizeButton?: boolean;
-  onReadyForCart?: (draftToken: string) => void;
+  onReadyForCart?: (draftToken: string, payload?: PublicDesignReadyForCartPayload) => void | Promise<void>;
   showClientActionBar?: boolean;
   orderButtonLabel?: string;
   selectedParams?: Record<string, unknown>;
   pageCountLimits?: PublicDesignPageCountLimits;
   onPageCountChange?: (pageCount: number) => void;
+  minimumPageCountFromOrder?: number;
   /** Зоны из продукта (simplified.printAreas). */
   printAreas?: PrintAreaConfig[] | unknown;
   /** Периодический снимок Fabric canvas для texture (data URL). */
@@ -39,6 +43,11 @@ function normalizeAreas(raw: PrintAreaConfig[] | unknown | undefined): PrintArea
   const parsed = parsePrintAreas(raw);
   if (parsed.length > 0) return parsed;
   return [DEFAULT_PRINT_AREA_TSHIRT];
+}
+
+function findFabricLowerCanvas(host: HTMLElement | null): HTMLCanvasElement | null {
+  if (!host) return null;
+  return host.querySelector('canvas.lower-canvas') as HTMLCanvasElement | null;
 }
 
 /**
@@ -57,6 +66,7 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
   selectedParams,
   pageCountLimits,
   onPageCountChange,
+  minimumPageCountFromOrder,
   printAreas: printAreasProp,
   textureDataUrl: textureFromParent,
   onRequestTextureRefresh,
@@ -64,6 +74,9 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
   const areas = useMemo(() => normalizeAreas(printAreasProp), [printAreasProp]);
   const [activeId, setActiveId] = useState<string>(() => areas[0]?.id ?? 'front');
   const [localTexture, setLocalTexture] = useState<string | null>(null);
+  const [textureRevision, setTextureRevision] = useState(0);
+  const fabricHostRef = useRef<HTMLDivElement | null>(null);
+  const lastCaptureSigRef = useRef<string>('');
 
   const active = resolveActivePrintArea(areas, activeId) ?? areas[0] ?? DEFAULT_PRINT_AREA_TSHIRT;
 
@@ -76,6 +89,7 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
   useEffect(() => {
     if (textureFromParent != null) {
       setLocalTexture(textureFromParent);
+      setTextureRevision((n) => n + 1);
     }
   }, [textureFromParent]);
 
@@ -85,7 +99,29 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
     return () => window.clearInterval(id);
   }, [onRequestTextureRefresh]);
 
-  const textureSource = textureFromParent ?? localTexture;
+  const captureFabricTexture = useCallback(() => {
+    if (textureFromParent != null) return;
+    const lower = findFabricLowerCanvas(fabricHostRef.current);
+    if (!lower || lower.width < 2 || lower.height < 2) return;
+    try {
+      const url = lower.toDataURL('image/jpeg', 0.82);
+      // Дешёвый fingerprint: длина + куски data URL (полный === слишком дорогой).
+      const contentSig = `${lower.width}x${lower.height}:${url.length}:${url.slice(22, 54)}:${url.slice(-32)}`;
+      if (contentSig === lastCaptureSigRef.current) return;
+      lastCaptureSigRef.current = contentSig;
+      setLocalTexture(url);
+      setTextureRevision((n) => n + 1);
+    } catch {
+      /* canvas may be tainted briefly during image load */
+    }
+  }, [textureFromParent]);
+
+  useEffect(() => {
+    if (textureFromParent != null) return;
+    captureFabricTexture();
+    const id = window.setInterval(captureFabricTexture, 400);
+    return () => window.clearInterval(id);
+  }, [captureFabricTexture, textureFromParent, activeId]);
 
   const setPlaceholderTexture = useCallback(() => {
     const canvas = document.createElement('canvas');
@@ -103,19 +139,18 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
     ctx.textAlign = 'center';
     ctx.fillText('Макет зоны печати', canvas.width / 2, canvas.height / 2);
     setLocalTexture(canvas.toDataURL('image/png'));
+    setTextureRevision((n) => n + 1);
   }, [active.heightMm, active.widthMm]);
 
   useEffect(() => {
-    if (!textureSource) setPlaceholderTexture();
-  }, [textureSource, setPlaceholderTexture]);
+    if (!localTexture && textureFromParent == null) setPlaceholderTexture();
+  }, [localTexture, textureFromParent, setPlaceholderTexture]);
 
+  const textureSource = textureFromParent ?? localTexture;
   const mugDefault = active.procedural === 'mug' || active.id === 'wrap';
 
   return (
     <div className="souvenir3d-editor">
-      <p className="souvenir3d-editor__hint">
-        Слева — печатный макет (мм). Справа — 3D-превью изделия. В производство уходит только плоский PDF.
-      </p>
       {areas.length > 1 && (
         <div className="souvenir3d-editor__areas" role="tablist" aria-label="Зоны печати">
           {areas.map((area) => (
@@ -133,7 +168,7 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
         </div>
       )}
       <div className="souvenir3d-editor__layout">
-        <div className="souvenir3d-editor__fabric">
+        <div className="souvenir3d-editor__fabric" ref={fabricHostRef}>
           <PublicDesignEditor
             templateId={templateId}
             initialDraftToken={initialDraftToken}
@@ -152,6 +187,7 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
             selectedParams={selectedParams}
             pageCountLimits={pageCountLimits}
             onPageCountChange={onPageCountChange}
+            minimumPageCountFromOrder={minimumPageCountFromOrder}
           />
         </div>
         <aside className="souvenir3d-editor__preview-pane" aria-label="3D-превью">
@@ -162,6 +198,7 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
                 : { ...active, procedural: mugDefault ? 'mug' : 'tshirt' }
             }
             textureSource={textureSource}
+            textureRevision={textureRevision}
           />
         </aside>
       </div>

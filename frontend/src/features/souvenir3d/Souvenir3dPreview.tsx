@@ -11,6 +11,8 @@ export type Souvenir3dPreviewProps = {
   printArea: PrintAreaConfig;
   /** Data URL или HTMLCanvasElement с макетом (aspect = printArea мм). */
   textureSource: string | HTMLCanvasElement | null;
+  /** Инкремент при каждом новом кадре с Fabric (для live-обновления текстуры). */
+  textureRevision?: number;
   className?: string;
   /** Подпись для оператора / клиента. */
   caption?: string;
@@ -21,14 +23,22 @@ function textureFromSource(source: string | HTMLCanvasElement | null): THREE.Can
   if (typeof source !== 'string') {
     const tex = new THREE.CanvasTexture(source);
     tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
     tex.flipY = true;
     tex.needsUpdate = true;
     return tex;
   }
-  const loader = new THREE.TextureLoader();
-  const tex = loader.load(source);
+  // Data URL: синхроннее через Image, иначе TextureLoader иногда «молчит» до следующего кадра.
+  const img = new Image();
+  const tex = new THREE.Texture(img);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
   tex.flipY = true;
+  img.onload = () => {
+    tex.needsUpdate = true;
+  };
+  img.src = source;
+  if (img.complete) tex.needsUpdate = true;
   return tex;
 }
 
@@ -37,12 +47,23 @@ const SceneBody: React.FC<{
   printTexture: THREE.Texture | null;
 }> = ({ printArea, printTexture }) => {
   const hasGltf = Boolean(printArea.modelUrl);
+  const isMug = printArea.procedural === 'mug' || printArea.id === 'wrap';
   return (
     <>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[3, 5, 2]} intensity={1.1} castShadow />
+      <color attach="background" args={['#e8eef5']} />
+      <fog attach="fog" args={['#e8eef5', 8, 18]} />
+      <ambientLight intensity={0.35} />
+      <hemisphereLight args={['#ffffff', '#94a3b8', 0.45]} />
+      <directionalLight
+        position={[3.2, 5.5, 2.8]}
+        intensity={1.35}
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+      />
+      <directionalLight position={[-2.5, 2.2, -1.5]} intensity={0.28} />
+      <spotLight position={[0, 4.5, 3]} angle={0.45} penumbra={0.55} intensity={0.55} castShadow />
       <Suspense fallback={null}>
-        <Environment preset="city" />
+        <Environment preset="studio" />
       </Suspense>
       {hasGltf && printArea.modelUrl ? (
         <Suspense fallback={null}>
@@ -53,15 +74,28 @@ const SceneBody: React.FC<{
           />
         </Suspense>
       ) : (
-        <ProceduralProduct printArea={printArea} printTexture={printTexture} />
+        <group position={[0, isMug ? 0.05 : 0.02, 0]}>
+          <ProceduralProduct printArea={printArea} printTexture={printTexture} />
+        </group>
       )}
-      <ContactShadows position={[0, -0.95, 0]} opacity={0.35} scale={8} blur={2.5} far={2} />
+      <ContactShadows
+        position={[0, isMug ? -0.72 : -1.08, 0]}
+        opacity={0.45}
+        scale={isMug ? 4.5 : 6.5}
+        blur={2.4}
+        far={2.5}
+      />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, isMug ? -0.725 : -1.085, 0]} receiveShadow>
+        <circleGeometry args={[isMug ? 1.4 : 2.1, 48]} />
+        <meshStandardMaterial color="#d8e0ea" roughness={0.95} metalness={0} />
+      </mesh>
       <OrbitControls
         enablePan={false}
-        minPolarAngle={Math.PI / 4}
-        maxPolarAngle={Math.PI / 1.55}
-        minDistance={2.2}
-        maxDistance={6}
+        minPolarAngle={Math.PI / 6}
+        maxPolarAngle={Math.PI / 1.7}
+        minDistance={isMug ? 1.7 : 2.3}
+        maxDistance={isMug ? 4.8 : 6.2}
+        target={[0, isMug ? 0.05 : 0.08, 0]}
       />
     </>
   );
@@ -73,6 +107,7 @@ const SceneBody: React.FC<{
 export const Souvenir3dPreview: React.FC<Souvenir3dPreviewProps> = ({
   printArea,
   textureSource,
+  textureRevision = 0,
   className,
   caption,
 }) => {
@@ -84,13 +119,13 @@ export const Souvenir3dPreview: React.FC<Souvenir3dPreviewProps> = ({
     return () => {
       tex?.dispose();
     };
-  }, [textureSource]);
+  }, [textureSource, textureRevision]);
 
   const rootClass = ['souvenir3d-preview', className].filter(Boolean).join(' ');
   const label = caption ?? `${printArea.label} · ${printArea.widthMm}×${printArea.heightMm} мм`;
 
   const cameraPos = useMemo<[number, number, number]>(
-    () => (printArea.procedural === 'mug' || printArea.id === 'wrap' ? [2.2, 1.2, 2.4] : [0, 0.4, 3.4]),
+    () => (printArea.procedural === 'mug' || printArea.id === 'wrap' ? [2.15, 1.15, 2.35] : [0.15, 0.55, 3.55]),
     [printArea.id, printArea.procedural],
   );
 
@@ -98,12 +133,17 @@ export const Souvenir3dPreview: React.FC<Souvenir3dPreviewProps> = ({
     <div className={rootClass}>
       <div className="souvenir3d-preview__viewport" aria-label="3D-превью изделия">
         <Canvas
+          key={`${printArea.id}-${cameraPos.join(',')}`}
           shadows
-          dpr={[1, 1.75]}
-          camera={{ position: cameraPos, fov: 40 }}
-          gl={{ antialias: true, alpha: true }}
+          dpr={[1, 2]}
+          camera={{ position: cameraPos, fov: 38 }}
+          gl={{
+            antialias: true,
+            alpha: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.05,
+          }}
         >
-          <color attach="background" args={['#f1f5f9']} />
           <SceneBody printArea={printArea} printTexture={printTexture} />
         </Canvas>
       </div>

@@ -378,9 +378,12 @@ export default function useProductTemplatePage(productId: number | undefined): U
           if (blank) {
             simplified = blank.simplified
             dispatch({ type: 'setSimplified', value: simplified })
-            blankNote = blank.created
-              ? `\nПустой макет зоны печати создан: шаблон #${blank.templateId}.`
-              : `\nПустой макет уже есть: шаблон #${blank.templateId}.`
+            // Автосейв без сообщения — не спамим alert при каждом debounce.
+            if (message) {
+              blankNote = blank.created
+                ? `\nПустой макет зоны печати создан: шаблон #${blank.templateId}.`
+                : `\nПустой макет уже есть: шаблон #${blank.templateId}.`
+            }
           }
         }
 

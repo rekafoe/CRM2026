@@ -12,6 +12,32 @@ export const SOUVENIR_PREVIEW_DPI = 150;
 /** Production raster DPI (как editor production). */
 export const SOUVENIR_PRODUCTION_DPI = 300;
 
+/**
+ * Калибровка 3D-превью майки: ширина передней панели Body_Front ≈ взрослый M/L.
+ * По ней mm зоны печати переводятся в единицы сцены (модель сама без реального масштаба).
+ */
+export const TSHIRT_FRONT_PANEL_WIDTH_MM = 500;
+
+/** Размер зоны печати в единицах сцены по физическим мм и ширине панели mesh. */
+export function printAreaSceneSize(
+  widthMm: number,
+  heightMm: number,
+  panelWidthScene: number,
+  panelHeightScene: number,
+  panelWidthMm = TSHIRT_FRONT_PANEL_WIDTH_MM,
+): { width: number; height: number; mmPerScene: number } {
+  const safePanelW = Math.max(panelWidthScene, 0.001);
+  const mmPerScene = panelWidthMm / safePanelW;
+  let width = Math.max(1, widthMm) / mmPerScene;
+  let height = Math.max(1, heightMm) / mmPerScene;
+  const maxW = safePanelW * 0.92;
+  const maxH = Math.max(panelHeightScene, 0.001) * 0.82;
+  const fit = Math.min(1, maxW / width, maxH / height);
+  width *= fit;
+  height *= fit;
+  return { width, height, mmPerScene };
+}
+
 export function printAreaAspect(widthMm: number, heightMm: number): number {
   if (!(heightMm > 0)) return 1;
   return widthMm / heightMm;

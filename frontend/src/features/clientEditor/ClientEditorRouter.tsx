@@ -71,7 +71,7 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
   printAreas,
 }) => {
   const scenario = SCENARIO_COPY[mode];
-  const showIntro = mode === 'photo_batch' || mode === 'souvenir_3d';
+  const showIntro = mode === 'photo_batch';
 
   return (
     <div className={`client-editor client-editor--${mode}`}>

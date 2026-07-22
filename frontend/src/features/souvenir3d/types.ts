@@ -89,6 +89,11 @@ export function parsePrintAreas(raw: unknown): PrintAreaConfig[] {
   return areas;
 }
 
+export function isTshirtBackPrintArea(area: Pick<PrintAreaConfig, 'id' | 'meshName' | 'label'>): boolean {
+  const key = `${area.id} ${area.meshName} ${area.label}`.toLowerCase();
+  return /(?:^|[^a-z])back(?:[^a-z]|$)|rear|print_back|спин|задн/.test(key);
+}
+
 export function resolveActivePrintArea(
   areas: PrintAreaConfig[],
   preferredId?: string | null,

@@ -1,6 +1,7 @@
 import {
   addSubtypeDesign,
   createDesignTemplate,
+  getDesignTemplate,
   getSubtypeDesigns,
 } from '../../api';
 import { buildEmptyDesignState } from '../../pages/admin/designEditor/designEditorState';
@@ -16,6 +17,9 @@ export type EnsureSouvenirBlankResult = {
   simplified: SimplifiedConfig;
   sizeAdded: boolean;
 };
+
+/** Стабильный id автосозданного подтипа «Основной» (не Date.now — иначе каждый save плодит typeId). */
+const STABLE_DEFAULT_TYPE_ID = 1;
 
 function resolvePrintArea(simplified: SimplifiedConfig): ProductPrintAreaConfig {
   const fromConfig = Array.isArray(simplified.printAreas) ? simplified.printAreas : [];
@@ -69,6 +73,11 @@ function resolveTypeId(simplified: SimplifiedConfig): number | null {
     const id = Number(def?.id);
     if (Number.isFinite(id) && id > 0) return id;
   }
+  const configKeys = Object.keys(simplified.typeConfigs ?? {});
+  for (const key of configKeys) {
+    const id = Number(key);
+    if (Number.isFinite(id) && id > 0) return id;
+  }
   return null;
 }
 
@@ -82,7 +91,7 @@ function ensureDefaultType(
     return { simplified, typeId: existingId, typeAdded: false };
   }
 
-  const typeId = Date.now();
+  const typeId = STABLE_DEFAULT_TYPE_ID;
   const size = buildSizeFromArea(area);
   const sizes = Array.isArray(simplified.sizes) && simplified.sizes.length > 0
     ? simplified.sizes
@@ -106,9 +115,63 @@ function ensureDefaultType(
   };
 }
 
+function listFromAxios<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === 'object' && Array.isArray((response as { data?: unknown }).data)) {
+    return (response as { data: T[] }).data;
+  }
+  return [];
+}
+
+async function tryReadTemplateId(templateId: number): Promise<number | null> {
+  if (!(templateId > 0)) return null;
+  try {
+    const res = await getDesignTemplate(templateId);
+    const row = (res as { data?: { id?: number } }).data ?? (res as { id?: number });
+    const id = Number(row?.id);
+    return Number.isFinite(id) && id > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+async function findExistingBlankTemplateId(
+  productId: number,
+  typeId: number,
+): Promise<number | null> {
+  try {
+    // Без sizeId: любой уже привязанный макет подтипа — не плодим второй.
+    const existing = await getSubtypeDesigns(productId, typeId);
+    const linked = listFromAxios<{ design_template_id?: number }>(existing);
+    for (const row of linked) {
+      const id = Number(row.design_template_id);
+      if (Number.isFinite(id) && id > 0) return id;
+    }
+  } catch {
+    // ignore — ниже попробуем создать только если совсем ничего нет
+  }
+  return null;
+}
+
+async function ensureSubtypeLink(
+  productId: number,
+  typeId: number,
+  templateId: number,
+  sizeId: string,
+): Promise<void> {
+  try {
+    await addSubtypeDesign(productId, typeId, templateId, sizeId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Уже привязан к этому размеру / unique — ок.
+    if (msg.includes('409') || msg.includes('UNIQUE') || msg.includes('уже привязан')) return;
+    throw err;
+  }
+}
+
 /**
  * Гарантирует size под printArea и пустой design_template, привязанный к продукту.
- * Вызывать при design_editor_mode === souvenir_3d.
+ * Идемпотентно: повторные save/autosave не создают новый шаблон.
  */
 export async function ensureSouvenirBlankDesignTemplate(input: {
   productId: number;
@@ -141,10 +204,10 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
 
   let size =
     sizes.find((s) => sizeMatchesArea(s, area))
-    ?? typeSizes.find((s) => sizeMatchesArea(s, area))
-    ?? typeSizes[0]
-    ?? sizes[0];
+    ?? typeSizes.find((s) => sizeMatchesArea(s, area));
 
+  // Размер калькулятора ≠ зона печати (часто A4 vs 297×420) — добавляем size под printArea,
+  // а не клеим макет к чужому sizeId.
   if (!size) {
     size = buildSizeFromArea(area);
     sizes = [...sizes, size];
@@ -164,18 +227,34 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
 
   const sizeId = String(size.id);
 
-  const existing = await getSubtypeDesigns(productId, typeId, sizeId);
-  const linked = existing.data ?? [];
-  if (linked.length > 0) {
-    const templateId = Number(linked[0].design_template_id);
+  const rememberedId = Number(simplified.souvenirBlankTemplateId);
+  const rememberedOk = await tryReadTemplateId(rememberedId);
+  if (rememberedOk != null) {
+    await ensureSubtypeLink(productId, typeId, rememberedOk, sizeId);
     return {
-      templateId,
+      templateId: rememberedOk,
       created: false,
       sizeId,
       typeId,
       simplified: {
         ...simplified,
-        souvenirBlankTemplateId: templateId,
+        souvenirBlankTemplateId: rememberedOk,
+      },
+      sizeAdded,
+    };
+  }
+
+  const existingId = await findExistingBlankTemplateId(productId, typeId);
+  if (existingId != null) {
+    await ensureSubtypeLink(productId, typeId, existingId, sizeId);
+    return {
+      templateId: existingId,
+      created: false,
+      sizeId,
+      typeId,
+      simplified: {
+        ...simplified,
+        souvenirBlankTemplateId: existingId,
       },
       sizeAdded,
     };
@@ -188,7 +267,7 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
   });
 
   const nameBase = (productName || 'Сувенир').trim() || 'Сувенир';
-  const { data: created } = await createDesignTemplate({
+  const createdRes = await createDesignTemplate({
     name: `${nameBase} — пустой (${area.widthMm}×${area.heightMm})`,
     description: 'Автосозданный пустой макет под зону печати сувенира',
     is_active: true,
@@ -206,9 +285,13 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
       },
     },
   });
-
-  const templateId = Number(created.id);
-  await addSubtypeDesign(productId, typeId, templateId, sizeId);
+  const created = (createdRes as { data?: { id?: number } }).data
+    ?? (createdRes as { id?: number });
+  const templateId = Number(created?.id);
+  if (!Number.isFinite(templateId) || templateId <= 0) {
+    throw new Error('Не удалось создать пустой макет сувенира');
+  }
+  await ensureSubtypeLink(productId, typeId, templateId, sizeId);
 
   return {
     templateId,

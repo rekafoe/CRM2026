@@ -260,7 +260,8 @@ function parseLegacyTypeId(id: unknown, fallbackIndex: number): ProductTypeId {
     const numeric = Number(id);
     if (Number.isFinite(numeric)) return Math.trunc(numeric);
   }
-  return Date.now() + fallbackIndex;
+  // Стабильный fallback (не Date.now) — иначе каждый setSimplified плодит новый typeId.
+  return fallbackIndex;
 }
 
 /** Копия allowed_price_types на каждый подтип — иначе один массив в памяти у всех typeConfigs ломает переключение чипов. */

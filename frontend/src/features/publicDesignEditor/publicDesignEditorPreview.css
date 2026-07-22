@@ -188,6 +188,7 @@ body:has(.design-editor-fullbleed) {
 .public-editor-preview-editor .client-editor,
 .public-editor-preview-editor .client-editor--single,
 .public-editor-preview-editor .client-editor--multipage,
+.public-editor-preview-editor .client-editor--souvenir_3d,
 .public-editor-preview-editor .public-design-editor {
   flex: 1 1 auto;
   height: 100%;

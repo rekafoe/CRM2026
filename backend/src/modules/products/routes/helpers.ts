@@ -416,6 +416,8 @@ export function compactSimplifiedForSite(simplified: any) {
         )
       : undefined;
 
+  const blankId = Number(simplifiedOrdered.souvenirBlankTemplateId);
+
   return {
     use_layout: simplifiedOrdered.use_layout,
     cutting: simplifiedOrdered.cutting,
@@ -425,6 +427,7 @@ export function compactSimplifiedForSite(simplified: any) {
     prepress: simplifiedOrdered.prepress || null,
     printAreas: Array.isArray(simplifiedOrdered.printAreas) ? simplifiedOrdered.printAreas : null,
     sizes: Array.isArray(simplifiedOrdered.sizes) ? simplifiedOrdered.sizes.map(compactSize) : [],
+    ...(Number.isFinite(blankId) && blankId > 0 ? { souvenirBlankTemplateId: blankId } : {}),
     ...(compactTypes ? { types: compactTypes } : {}),
     ...(compactTypeConfigs ? { typeConfigs: compactTypeConfigs } : {}),
   };

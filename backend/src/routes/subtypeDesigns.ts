@@ -10,17 +10,23 @@ import {
 const router = Router({ mergeParams: true })
 router.use(authenticate)
 
-/** GET /api/products/:productId/subtype-designs?typeId=X */
+/** GET /api/products/:productId/subtype-designs?typeId=X&sizeId=Y */
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
     const productId = parseInt(req.params.productId, 10)
-    const typeId = parseInt((req.query.typeId as string) ?? '', 10)
+    const typeId = Number(req.query.typeId)
+    const sizeIdRaw = req.query.sizeId != null ? String(req.query.sizeId).trim() : ''
     if (!Number.isFinite(productId) || productId <= 0 || !Number.isFinite(typeId) || typeId <= 0) {
       res.status(400).json({ error: 'productId и typeId обязательны' })
       return
     }
-    const designs = await getSubtypeDesigns(productId, typeId)
+    // Без sizeId — все макеты подтипа (для идемпотентного ensure пустого сувенирного шаблона).
+    const designs = await getSubtypeDesigns(
+      productId,
+      typeId,
+      sizeIdRaw ? sizeIdRaw : undefined,
+    )
     res.json(designs)
   }),
 )
