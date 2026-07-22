@@ -367,7 +367,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
       try {
         setSaving(true)
         let simplified = state.simplified
-        let blankNote = ''
+        let blankCreatedNote = ''
 
         if (simplified.design_editor_mode === 'souvenir_3d') {
           const blank = await ensureSouvenirBlankDesignTemplate({
@@ -376,13 +376,23 @@ export default function useProductTemplatePage(productId: number | undefined): U
             simplified,
           })
           if (blank) {
+            const prevBlankId = Number(simplified.souvenirBlankTemplateId) || 0
+            const nextBlankId = blank.templateId
+            const shouldPatchState =
+              blank.created
+              || blank.sizeAdded
+              || prevBlankId !== nextBlankId
+              || JSON.stringify(simplified.types) !== JSON.stringify(blank.simplified.types)
+              || JSON.stringify(simplified.sizes) !== JSON.stringify(blank.simplified.sizes)
+              || JSON.stringify(simplified.printAreas) !== JSON.stringify(blank.simplified.printAreas)
             simplified = blank.simplified
-            dispatch({ type: 'setSimplified', value: simplified })
-            // Автосейв без сообщения — не спамим alert при каждом debounce.
-            if (message) {
-              blankNote = blank.created
-                ? `\nПустой макет зоны печати создан: шаблон #${blank.templateId}.`
-                : `\nПустой макет уже есть: шаблон #${blank.templateId}.`
+            // Без лишнего setState — иначе autosave зацикливается и спамит alert.
+            if (shouldPatchState) {
+              dispatch({ type: 'setSimplified', value: simplified })
+            }
+            // Alert только при первом создании и только на ручном save.
+            if (message && blank.created) {
+              blankCreatedNote = `\nПустой макет зоны печати создан: шаблон #${blank.templateId}.`
             }
           }
         }
@@ -405,7 +415,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
           setTemplateConfigId(created.id)
         }
 
-        const finalMessage = [message, blankNote].filter(Boolean).join('')
+        const finalMessage = [message, blankCreatedNote].filter(Boolean).join('')
         if (finalMessage) alert(finalMessage)
       } catch (error) {
         console.error('Failed to persist template config', error)

@@ -188,6 +188,29 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
 
   if (simplified.design_editor_mode !== 'souvenir_3d') return null;
 
+  // Уже есть пустой макет в конфиге — не трогаем (autosave не должен ничего менять).
+  const rememberedUpfront = Number(simplified.souvenirBlankTemplateId);
+  if (Number.isFinite(rememberedUpfront) && rememberedUpfront > 0) {
+    const ok = await tryReadTemplateId(rememberedUpfront);
+    if (ok != null) {
+      const typeId = resolveTypeId(simplified);
+      const area = resolvePrintArea(simplified);
+      const size =
+        (Array.isArray(simplified.sizes) ? simplified.sizes : []).find((s) => sizeMatchesArea(s, area))
+        ?? (typeId != null
+          ? (simplified.typeConfigs?.[String(typeId)]?.sizes ?? []).find((s) => sizeMatchesArea(s, area))
+          : undefined);
+      return {
+        templateId: ok,
+        created: false,
+        sizeId: String(size?.id ?? area.id ?? 'wrap'),
+        typeId: typeId ?? STABLE_DEFAULT_TYPE_ID,
+        simplified,
+        sizeAdded: false,
+      };
+    }
+  }
+
   const area = resolvePrintArea(simplified);
   if (!simplified.printAreas?.length) {
     simplified = { ...simplified, printAreas: [area] };
