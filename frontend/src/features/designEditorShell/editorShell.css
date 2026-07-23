@@ -319,8 +319,9 @@
   padding: 10px 18px 0;
 }
 
-/* Legacy admin / не-client: canvas слева, панель справа */
-.public-design-editor__workspace:not(.public-design-editor__workspace--desktop):not([data-pde-layout='client-desktop']) {
+/* Legacy sandbox / preview без --admin и без client-desktop: canvas слева, панель справа.
+ * Master admin (--workspace--admin) — flex в DesignEditorAdminShell.css, не трогать. */
+.public-design-editor__workspace:not(.public-design-editor__workspace--desktop):not(.public-design-editor__workspace--admin):not([data-pde-layout='client-desktop']) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 352px;
   gap: 10px;
