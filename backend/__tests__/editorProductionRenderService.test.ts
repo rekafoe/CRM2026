@@ -200,28 +200,28 @@ describe('editorProductionRenderService internals', () => {
     expect(placement.topMm).toBe(0)
   })
 
-  it('places trim PNG in bleed inset 1:1 (200×90 + bleed 2 → 204×94)', () => {
-    const placement = __editorProductionRenderInternals.computeTrimInsetPlacementMm(200, 90, 2)
-    expect(placement.leftMm).toBe(2)
-    expect(placement.topMm).toBe(2)
-    expect(placement.widthMm).toBe(200)
-    expect(placement.heightMm).toBe(90)
+  it('places design PNG full-bleed on sheet (дозаливка уже в pageSize)', () => {
+    const placement = __editorProductionRenderInternals.computeTrimInsetPlacementMm(204, 94, 2)
+    expect(placement.leftMm).toBe(0)
+    expect(placement.topMm).toBe(0)
+    expect(placement.widthMm).toBe(204)
+    expect(placement.heightMm).toBe(94)
   })
 
-  it('builds client raster HTML with bleed inset, not cover', () => {
+  it('builds client raster HTML full-page without white bleed inset', () => {
     const html = __editorProductionRenderInternals.buildClientRenderedRasterPageHtml(
       Buffer.from('abc'),
       204,
       94,
-      200,
-      90,
+      204,
+      94,
       2,
     )
-    expect(html).toContain('left:2mm')
-    expect(html).toContain('top:2mm')
-    expect(html).toContain('width:200mm')
-    expect(html).toContain('height:90mm')
-    expect(html).not.toContain('object-fit:cover')
+    expect(html).toContain('width:204mm')
+    expect(html).toContain('height:94mm')
+    expect(html).not.toContain('left:2mm')
+    expect(html).not.toContain('top:2mm')
+    expect(html).toContain('object-fit:fill')
   })
 
   it('embeds fonts as data URLs for Puppeteer production render', () => {
@@ -257,8 +257,8 @@ describe('editorProductionRenderService internals', () => {
     }, new Map(), 30, 20, 2, '', [], 0)
 
     expect(rendered.png.length).toBeGreaterThan(100)
-    expect(rendered.widthMm).toBe(34)
-    expect(rendered.heightMm).toBe(24)
+    expect(rendered.widthMm).toBe(30)
+    expect(rendered.heightMm).toBe(20)
     expect(rendered.pixelStats.uniqueColorSamples).toBeGreaterThan(1)
   }, 30000)
 
@@ -271,10 +271,10 @@ describe('editorProductionRenderService internals', () => {
     }, new Map(), 30, 20, 2, '', [], 0, 3)
 
     const pngSize = readPngSize(rendered.png)
-    expect(rendered.widthMm).toBe(34)
-    expect(rendered.heightMm).toBe(24)
-    expect(pngSize.width).toBe(mmToPxAt300(34))
-    expect(pngSize.height).toBe(mmToPxAt300(24))
+    expect(rendered.widthMm).toBe(30)
+    expect(rendered.heightMm).toBe(20)
+    expect(pngSize.width).toBe(mmToPxAt300(30))
+    expect(pngSize.height).toBe(mmToPxAt300(20))
     expect(rendered.pixelStats.nonWhiteRatio).toBeGreaterThan(0.001)
   }, 30000)
 

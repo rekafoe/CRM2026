@@ -58,16 +58,19 @@ function computeCoverPlacementMm(
   }
 }
 
-/** Trim PNG 1:1 в trim-бокс; вокруг — белый bleed (без scale/crop). */
+/**
+ * Placement PNG на лист PDF.
+ * Дозаливка уже заложена в pageWidth/pageHeight макета (204×204 при trim 200×200) —
+ * белую рамку bleedMm больше не добавляем.
+ */
 function computeTrimInsetPlacementMm(
   pageWidthMm: number,
   pageHeightMm: number,
-  bleedMm: number,
+  _bleedMm: number,
 ): { leftMm: number; topMm: number; widthMm: number; heightMm: number } {
-  const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
   return {
-    leftMm: bleed,
-    topMm: bleed,
+    leftMm: 0,
+    topMm: 0,
     widthMm: pageWidthMm,
     heightMm: pageHeightMm,
   }
@@ -593,12 +596,12 @@ function buildPageHtml(
   bleedMm: number,
   fontFaceCss = '',
 ): { html: string; widthMm: number; heightMm: number } {
-  const bleed = Math.max(0, bleedMm)
-  const widthMm = pageWidthMm + bleed * 2
-  const heightMm = pageHeightMm + bleed * 2
+  // pageSize уже с дозаливкой; bleedMm только справочно (гиды), лист = page.
+  void bleedMm
+  const widthMm = pageWidthMm
+  const heightMm = pageHeightMm
   const canvasW = Math.round(pageWidthMm * PX_PER_MM_AT_96)
   const canvasH = Math.round(pageHeightMm * PX_PER_MM_AT_96)
-  const bleedPx = Math.round(bleed * PX_PER_MM_AT_96)
 
   let bg = '#ffffff'
   const root = parseJsonObject(fabricJSON)
@@ -616,7 +619,9 @@ function buildPageHtml(
     *{box-sizing:border-box;margin:0;padding:0}
     body{margin:0;background:#fff}
     .sheet{position:relative;width:${widthMm}mm;height:${heightMm}mm;overflow:hidden;background:${bg}}
-    .trim{position:absolute;left:${bleedPx}px;top:${bleedPx}px;width:${canvasW}px;height:${canvasH}px}
+    .trim{position:absolute;left:0;top:0;width:${canvasW}px;height:${canvasH}px}
+    .obj{position:absolute;transform-origin:center center}
+    img.obj{object-fit:fill}
   </style></head><body><div class="sheet"><div class="trim">${parts.join('')}</div></div></body></html>`
 
   return { html, widthMm, heightMm }
@@ -737,12 +742,15 @@ function buildClientRenderedRasterPageHtml(
   pageHeightMm: number,
   bleedMm: number,
 ): string {
+  // Дозаливка уже в pageSize; PNG на весь лист.
+  void bleedMm
+  void pageWidthMm
+  void pageHeightMm
   const dataUrl = `data:image/png;base64,${png.toString('base64')}`
-  const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{width:${sheetWidthMm}mm;height:${sheetHeightMm}mm;margin:0;background:#fff;overflow:hidden}
-    img{position:absolute;left:${bleed}mm;top:${bleed}mm;width:${pageWidthMm}mm;height:${pageHeightMm}mm;object-fit:fill}
+    img{display:block;width:${sheetWidthMm}mm;height:${sheetHeightMm}mm;object-fit:fill}
   </style></head><body><img src="${dataUrl}" alt=""/></body></html>`
 }
 
@@ -766,8 +774,9 @@ export async function renderClientRenderedPagesProductionPdf(
   const pageWidthMm = manifest.pageWidthMm
   const pageHeightMm = manifest.pageHeightMm
   const bleedMm = Math.max(0, Number(manifest.bleedMm) || 0)
-  const sheetWidthMm = pageWidthMm + bleedMm * 2
-  const sheetHeightMm = pageHeightMm + bleedMm * 2
+  // pageSize уже включает дозаливку — не раздуваем лист белой рамкой.
+  const sheetWidthMm = pageWidthMm
+  const sheetHeightMm = pageHeightMm
   const trimPlacement = computeTrimInsetPlacementMm(pageWidthMm, pageHeightMm, bleedMm)
 
   for (let pageIndex = 1; pageIndex <= manifest.pageCount; pageIndex += 1) {
@@ -862,14 +871,16 @@ async function renderFabricPageToPng(
     inlineLocalFabricImageSources(fileMappedFabricJSON),
   )
   const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
+  // Дозаливка уже в pageWidth/pageHeight макета — sheet = page, без белой рамки.
+  void bleed
   const normalizedSceneScale = Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1
-  const widthMm = pageWidthMm + bleed * 2
-  const heightMm = pageHeightMm + bleed * 2
+  const widthMm = pageWidthMm
+  const heightMm = pageHeightMm
   const renderPayload = {
     fabricJSON: normalizedFabricJSON,
     pageWidthPx: Math.max(1, Math.round(pageWidthMm * PX_PER_MM_AT_96 * normalizedSceneScale)),
     pageHeightPx: Math.max(1, Math.round(pageHeightMm * PX_PER_MM_AT_96 * normalizedSceneScale)),
-    bleedPx: Math.round(bleed * EXPORT_PX_PER_MM),
+    bleedPx: 0,
     sheetWidthPx: Math.max(1, Math.round(widthMm * EXPORT_PX_PER_MM)),
     sheetHeightPx: Math.max(1, Math.round(heightMm * EXPORT_PX_PER_MM)),
     multiplier: Math.max(0.01, FABRIC_EXPORT_MULTIPLIER / normalizedSceneScale),
@@ -1117,11 +1128,8 @@ async function renderFabricPageToPng(
         ctx.imageSmoothingQuality = 'high'
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, sheet.width, sheet.height)
-        const trimW = trimImage.naturalWidth || Math.round(payload.pageWidthPx * payload.multiplier)
-        const trimH = trimImage.naturalHeight || Math.round(payload.pageHeightPx * payload.multiplier)
-        const bleedPx = Math.max(0, Math.round(Number(payload.bleedPx) || 0))
-        // 1:1 trim в inset bleed — без coverScale (иначе crop краёв на sheet+bleed).
-        ctx.drawImage(trimImage, bleedPx, bleedPx, trimW, trimH)
+        // Макет уже с дозаливкой: trim PNG = весь sheet (без белой рамки bleed).
+        ctx.drawImage(trimImage, 0, 0, sheet.width, sheet.height)
 
         const sampleCanvas = document.createElement('canvas')
         sampleCanvas.width = Math.min(180, sheet.width)
