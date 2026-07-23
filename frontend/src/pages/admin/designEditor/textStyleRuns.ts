@@ -1,4 +1,5 @@
 import type { Canvas, FabricObject } from 'fabric';
+import { util } from 'fabric';
 import { isFabricTextObjectType } from './patchFabricTextObjects';
 import { PUBLIC_EDITOR_DEV, isTextPositionDebugEnabled, isTextWidthDebugEnabled } from '../../../features/publicDesignEditor/publicEditorPerf';
 import {
@@ -18,6 +19,31 @@ export type TextStyleRun = {
 };
 
 type FabricStyles = Record<number, Record<number, Record<string, unknown>>>;
+type FabricStylesArray = Array<{ start: number; end: number; style: Record<string, unknown> }>;
+
+/**
+ * Fabric 7 в toObject() пишет styles как массив range'ей.
+ * Наш код и soft-load ждут map line→char — иначе repairStylesRecord удаляет styles целиком
+ * и кегль «соскакивает» к base fontSize при flip/snapshot.
+ */
+function coerceFabricStylesMap(
+  styles: unknown,
+  text: string,
+): FabricStyles | undefined {
+  if (!styles) return undefined;
+  if (Array.isArray(styles)) {
+    if (styles.length === 0) return undefined;
+    try {
+      const mapped = util.stylesFromArray(styles as FabricStylesArray, text);
+      if (!mapped || typeof mapped !== 'object' || Array.isArray(mapped)) return undefined;
+      return mapped as FabricStyles;
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof styles === 'object') return styles as FabricStyles;
+  return undefined;
+}
 
 export type TextLikeObject = FabricObject & {
   text?: string;
@@ -123,8 +149,10 @@ export function buildFabricStylesFromRuns(
 
 export function extractRunsFromFabricStyles(
   text: string,
-  styles: FabricStyles,
+  styles: FabricStyles | FabricStylesArray | unknown,
 ): TextStyleRun[] {
+  const map = coerceFabricStylesMap(styles, text);
+  if (!map) return [];
   const lines = text.split('\n');
   const lineStartOffsets: number[] = [];
   let offset = 0;
@@ -133,7 +161,7 @@ export function extractRunsFromFabricStyles(
     offset += line.length + 1;
   }
   const markers: Array<{ absIndex: number; patch: Record<string, unknown> }> = [];
-  for (const [lineKey, lineStyles] of Object.entries(styles)) {
+  for (const [lineKey, lineStyles] of Object.entries(map)) {
     const lineIndex = Number(lineKey);
     if (!Number.isFinite(lineIndex) || !lineStyles) continue;
     const lineStart = lineStartOffsets[lineIndex] ?? 0;
@@ -348,16 +376,20 @@ export function clampTextStyleRuns(
 /** Убирает style-индексы, не соответствующие строкам/символам текста (Fabric removeStyleFromTo). */
 function repairStylesRecord(
   text: string,
-  styles: FabricStyles | undefined,
+  styles: FabricStyles | FabricStylesArray | unknown,
 ): { styles: FabricStyles | undefined; runs: TextStyleRun[] | undefined } {
   const lines = text.split('\n');
-  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) {
+  const normalized = coerceFabricStylesMap(styles, text);
+  if (!normalized) {
     return { styles: undefined, runs: undefined };
   }
 
   const repaired: FabricStyles = {};
   let changed = false;
-  for (const [lineKey, lineStyles] of Object.entries(styles)) {
+  // Если пришли из Fabric array — всегда считаем changed, чтобы записать map обратно в JSON.
+  if (Array.isArray(styles)) changed = true;
+
+  for (const [lineKey, lineStyles] of Object.entries(normalized)) {
     const lineIndex = Number(lineKey);
     if (!Number.isFinite(lineIndex) || lineIndex < 0 || lineIndex >= lines.length) {
       changed = true;
@@ -385,10 +417,10 @@ function repairStylesRecord(
   }
 
   const nextStyles = Object.keys(repaired).length > 0 ? repaired : undefined;
-  if (changed || nextStyles !== styles) {
+  if (changed || nextStyles !== normalized) {
     return { styles: nextStyles, runs: undefined };
   }
-  return { styles, runs: undefined };
+  return { styles: normalized, runs: undefined };
 }
 
 export function repairTextObjectStyles(obj: TextLikeObject): void {
@@ -452,6 +484,29 @@ function resolvePersistedDesignedTextboxWidth(
 function prepareDesignedTextObjectJson(o: Record<string, unknown>): void {
   if (!isDesignedTemplateText(o)) return;
   repairTextObjectInFabricJson(o);
+  // Подтянуть base fontSize из styles (Corel часто держит кегль только в styles).
+  const text = String(o.text ?? '');
+  const map = coerceFabricStylesMap(o.styles, text);
+  if (map) {
+    let styleFs: number | undefined;
+    for (const line of Object.values(map)) {
+      if (!line || typeof line !== 'object') continue;
+      for (const char of Object.values(line)) {
+        const fs = Number((char as { fontSize?: unknown })?.fontSize);
+        if (Number.isFinite(fs) && fs > 0) {
+          styleFs = fs;
+          break;
+        }
+      }
+      if (styleFs != null) break;
+    }
+    if (styleFs != null) {
+      const base = Number(o.fontSize);
+      if (!Number.isFinite(base) || Math.abs(base - styleFs) > 0.5) {
+        o.fontSize = Math.max(6, Math.round(styleFs));
+      }
+    }
+  }
   if (o.originX == null) o.originX = 'left';
   if (o.originY == null) o.originY = 'top';
   if (o.angle == null) o.angle = 0;
@@ -1741,10 +1796,9 @@ function formatPatchAffectsTextboxWidth(patch: Record<string, unknown>): boolean
 }
 
 const MIN_TEXT_FONT_SIZE = 6;
-const MAX_TEXT_FONT_SIZE = 200;
 
 function clampTextFontSize(value: number): number {
-  return Math.max(MIN_TEXT_FONT_SIZE, Math.min(MAX_TEXT_FONT_SIZE, Math.round(value)));
+  return Math.max(MIN_TEXT_FONT_SIZE, Math.round(value));
 }
 
 function formatPatchAffectsFabricStyles(patch: Record<string, unknown>): boolean {
@@ -1772,14 +1826,19 @@ function applyFormatPatchToFabricStyles(
       const charIndex = Number(charKey);
       if (!Number.isFinite(charIndex) || !charStyle || typeof charStyle !== 'object') continue;
       const charNext: Record<string, unknown> = { ...(charStyle as Record<string, unknown>) };
-      if (typeof patch.fontSize === 'number') charNext.fontSize = patch.fontSize;
+      if (typeof patch.fontSize === 'number') {
+        // Единый кегль — только base; per-char fontSize иначе переживает serialize/load.
+        delete charNext.fontSize;
+      }
       if (typeof patch.fill === 'string') charNext.fill = patch.fill;
       if (typeof patch.fontWeight === 'string') charNext.fontWeight = patch.fontWeight;
       if (typeof patch.fontStyle === 'string') charNext.fontStyle = patch.fontStyle;
       if (typeof patch.underline === 'boolean') charNext.underline = patch.underline;
-      lineNext[charIndex] = charNext;
+      if (Object.keys(charNext).length > 0) {
+        lineNext[charIndex] = charNext;
+      }
     }
-    next[lineIndex] = lineNext;
+    if (Object.keys(lineNext).length > 0) next[lineIndex] = lineNext;
   }
   return Object.keys(next).length > 0 ? next : undefined;
 }
@@ -1869,7 +1928,10 @@ export function applyFormatToTextField(
       if (typeof effectivePatch.fill === 'string') merged.fill = effectivePatch.fill;
       if (typeof effectivePatch.fontWeight === 'string') merged.fontWeight = effectivePatch.fontWeight;
       if (typeof effectivePatch.fontStyle === 'string') merged.fontStyle = effectivePatch.fontStyle;
-      if (typeof effectivePatch.fontSize === 'number') merged.fontSize = effectivePatch.fontSize;
+      if (typeof effectivePatch.fontSize === 'number') {
+        // Кегль только в base — иначе buildFabricStylesFromRuns снова пропишет override.
+        delete merged.fontSize;
+      }
       if (typeof effectivePatch.underline === 'boolean') {
         (merged as TextStyleRun & { underline?: boolean }).underline = effectivePatch.underline;
       }
@@ -1878,17 +1940,32 @@ export function applyFormatToTextField(
     obj.textStyleRuns = updated;
     // Designed text_* часто хранит кегль в styles; hydrate для них early-return и не пересобирает map.
     if (formatPatchAffectsFabricStyles(effectivePatch) && obj.styles) {
-      const patchedStyles = applyFormatPatchToFabricStyles(obj.styles, effectivePatch);
-      if (patchedStyles) obj.set('styles', patchedStyles);
+      const patchedStyles = applyFormatPatchToFabricStyles(
+        coerceFabricStylesMap(obj.styles, String(obj.text ?? '')),
+        effectivePatch,
+      );
+      obj.set('styles', (patchedStyles ?? undefined) as unknown as FabricStyles);
     } else {
       hydrateTextObjectStyles(obj);
     }
   } else if (typeof patch.fontFamily !== 'string') {
     if (formatPatchAffectsFabricStyles(effectivePatch) && obj.styles) {
-      const patchedStyles = applyFormatPatchToFabricStyles(obj.styles, effectivePatch);
-      if (patchedStyles) obj.set('styles', patchedStyles);
+      const patchedStyles = applyFormatPatchToFabricStyles(
+        coerceFabricStylesMap(obj.styles, String(obj.text ?? '')),
+        effectivePatch,
+      );
+      obj.set('styles', (patchedStyles ?? undefined) as unknown as FabricStyles);
     }
     obj.setCoords?.();
+  }
+
+  if (typeof effectivePatch.fontSize === 'number') {
+    try {
+      (obj as TextLikeObject & { initDimensions?: () => void }).initDimensions?.();
+    } catch {
+      /* noop */
+    }
+    obj.dirty = true;
   }
 
   if (obj.type === 'textbox' && formatPatchAffectsTextboxWidth(effectivePatch)) {
@@ -2067,9 +2144,13 @@ export function dehydrateTextObjectsInFabricJSON(fabricJSON: Record<string, unkn
   walkFabricJsonObjects(objects, (o) => {
     if (!isFabricTextObjectType(o.type)) return;
     const text = String(o.text ?? '');
+    const stylesMap = coerceFabricStylesMap(o.styles, text);
+    if (stylesMap) o.styles = stylesMap;
+    else if (Array.isArray(o.styles)) delete o.styles;
+
     if ((!o.textStyleRuns || !Array.isArray(o.textStyleRuns) || !(o.textStyleRuns as unknown[]).length)
-      && o.styles) {
-      const runs = extractRunsFromFabricStyles(text, o.styles as FabricStyles);
+      && stylesMap) {
+      const runs = extractRunsFromFabricStyles(text, stylesMap);
       if (runs.length > 0) o.textStyleRuns = runs;
     }
     // For designed template texts keep the original detailed `styles` (if present) so that

@@ -80,7 +80,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
     alignOptions ??
     (variant === 'panel' ? (['left', 'center', 'right', 'justify'] as const) : (['left', 'center', 'right'] as const));
 
-  const clampSize = (value: number) => Math.min(200, Math.max(6, Math.round(value)));
+  const clampSize = (value: number) => Math.max(6, Math.round(value));
   const bumpSize = (d: number) => {
     onFontSizeChange(clampSize(size + d));
   };
@@ -142,7 +142,6 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
           type="number"
           className="text-floating-toolbar__size-input"
           min={6}
-          max={200}
           value={size}
           onChange={(e) => onFontSizeChange(clampSize(parseInt(e.target.value, 10) || size))}
           title="Размер шрифта"
@@ -306,7 +305,6 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
             type="number"
             className="text-panel-format__size-input"
             min={6}
-            max={200}
             value={size}
             onChange={(e) => onFontSizeChange(clampSize(parseInt(e.target.value, 10) || size))}
           />

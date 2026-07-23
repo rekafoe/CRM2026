@@ -132,13 +132,40 @@ export function getObjProps(obj: unknown): SelectedObjProps {
   else if (typeName === 'triangle') type = 'triangle';
 
   const id = String(o.id ?? '').trim();
+  let fontSize = o.fontSize as number | undefined;
+  if (type === 'IText') {
+    // Визуальный кегль: per-char styles перекрывают base (Corel SVG).
+    const styles = o.styles;
+    if (styles && typeof styles === 'object' && !Array.isArray(styles)) {
+      outer: for (const line of Object.values(styles as Record<string, unknown>)) {
+        if (!line || typeof line !== 'object') continue;
+        for (const char of Object.values(line as Record<string, unknown>)) {
+          const fs = Number((char as { fontSize?: unknown })?.fontSize);
+          if (Number.isFinite(fs) && fs > 0) {
+            fontSize = fs;
+            break outer;
+          }
+        }
+      }
+    } else if (Array.isArray(styles) && styles.length > 0) {
+      const first = styles[0] as { style?: { fontSize?: unknown } };
+      const fs = Number(first?.style?.fontSize);
+      if (Number.isFinite(fs) && fs > 0) fontSize = fs;
+    }
+    const sx = Math.abs(Number(o.scaleX ?? 1)) || 1;
+    const sy = Math.abs(Number(o.scaleY ?? 1)) || 1;
+    const scale = Math.max(sx, sy);
+    if (scale > 1.004 && typeof fontSize === 'number') {
+      fontSize = Math.round(fontSize * scale);
+    }
+  }
   return {
     type,
     id: id || undefined,
     photoFieldFilled: type === 'photoField' ? o.photoFieldFilled === true : undefined,
     text: type === 'IText' ? (o.text as string) : undefined,
     fontFamily: o.fontFamily as string | undefined,
-    fontSize: o.fontSize as number | undefined,
+    fontSize,
     fontWeight: (o.fontWeight as string) ?? 'normal',
     fontStyle: (o.fontStyle as string) ?? 'normal',
     underline: !!(o.underline),

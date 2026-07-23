@@ -313,7 +313,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
 
         canvas.on('object:scaling', (opt) => {
           const target = opt.target;
-          if (target && modeRef.current === 'basic' && isTextLikeObject(target)) {
+          if (target && isTextLikeObject(target)) {
             textResizeDraftRef.current = captureTextScaleDraft(target);
             return;
           }
@@ -350,7 +350,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
               : undefined;
 
           const textTarget =
-            target && modeRef.current === 'basic' && isTextLikeObject(target)
+            target && isTextLikeObject(target)
               ? target
               : undefined;
           const textDraft = textResizeDraftRef.current;

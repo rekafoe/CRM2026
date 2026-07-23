@@ -559,7 +559,8 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, { [key]: value });
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
-        d.saveSnapshot({ debounce: true });
+        // Кегль/формат — без debounce, иначе flip страницы до таймера теряет правку.
+        d.saveSnapshot(key === 'fontSize' ? undefined : { debounce: true });
       },
       setTextStyle: (props: { fontWeight?: string; fontStyle?: string }) => {
         const canvas = d.fabricRef.current;

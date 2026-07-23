@@ -148,9 +148,8 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
             type="number"
             className="design-editor-font-size"
             min={6}
-            max={200}
             value={selectedObj.fontSize ?? 24}
-            onChange={(e) => onFontSizeChange(parseInt(e.target.value, 10) || 24)}
+            onChange={(e) => onFontSizeChange(Math.max(6, parseInt(e.target.value, 10) || 24))}
             title="Размер шрифта"
           />
           <input

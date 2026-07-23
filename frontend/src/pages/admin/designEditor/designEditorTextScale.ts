@@ -27,7 +27,7 @@ export function captureTextScaleDraft(obj: FabricObject): TextScaleBakeDraft | n
   const sy = normScale(obj.scaleY);
   const baseFs = Math.max(6, Math.round(Number(ax(obj).fontSize) || 24));
   const scaleFactor = Math.max(sx, sy);
-  const fontSize = Math.max(6, Math.min(200, Math.round(baseFs * scaleFactor)));
+  const fontSize = Math.max(6, Math.round(baseFs * scaleFactor));
   const draft: TextScaleBakeDraft = {
     fieldId: String(ax(obj).id ?? '').trim(),
     fontSize,
@@ -55,7 +55,7 @@ export function bakeTextObjectScaleInPlace(
   const baseFs = Math.max(6, Math.round(Number(ax(text).fontSize) || 24));
   const scaleFactor = Math.max(sx, sy);
   const nextFontSize = draft?.fontSize
-    ?? Math.max(6, Math.min(200, Math.round(baseFs * scaleFactor)));
+    ?? Math.max(6, Math.round(baseFs * scaleFactor));
 
   const patch: Record<string, unknown> = {
     fontSize: nextFontSize,
