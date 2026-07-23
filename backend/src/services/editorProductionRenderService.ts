@@ -57,6 +57,21 @@ function computeCoverPlacementMm(
     heightMm,
   }
 }
+
+/** Trim PNG 1:1 в trim-бокс; вокруг — белый bleed (без scale/crop). */
+function computeTrimInsetPlacementMm(
+  pageWidthMm: number,
+  pageHeightMm: number,
+  bleedMm: number,
+): { leftMm: number; topMm: number; widthMm: number; heightMm: number } {
+  const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
+  return {
+    leftMm: bleed,
+    topMm: bleed,
+    widthMm: pageWidthMm,
+    heightMm: pageHeightMm,
+  }
+}
 const EXPORT_DPI = 300
 const PX_PER_MM_AT_96 = MM_TO_PX
 const EXPORT_PX_PER_MM = EXPORT_DPI / 25.4
@@ -723,10 +738,11 @@ function buildClientRenderedRasterPageHtml(
   bleedMm: number,
 ): string {
   const dataUrl = `data:image/png;base64,${png.toString('base64')}`
+  const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{width:${sheetWidthMm}mm;height:${sheetHeightMm}mm;margin:0;background:#fff;overflow:hidden}
-    img{position:absolute;left:0;top:0;width:${sheetWidthMm}mm;height:${sheetHeightMm}mm;object-fit:cover}
+    img{position:absolute;left:${bleed}mm;top:${bleed}mm;width:${pageWidthMm}mm;height:${pageHeightMm}mm;object-fit:fill}
   </style></head><body><img src="${dataUrl}" alt=""/></body></html>`
 }
 
@@ -752,6 +768,7 @@ export async function renderClientRenderedPagesProductionPdf(
   const bleedMm = Math.max(0, Number(manifest.bleedMm) || 0)
   const sheetWidthMm = pageWidthMm + bleedMm * 2
   const sheetHeightMm = pageHeightMm + bleedMm * 2
+  const trimPlacement = computeTrimInsetPlacementMm(pageWidthMm, pageHeightMm, bleedMm)
 
   for (let pageIndex = 1; pageIndex <= manifest.pageCount; pageIndex += 1) {
     const row = pagesByPart.get(pageIndex)
@@ -760,9 +777,7 @@ export async function renderClientRenderedPagesProductionPdf(
     if (!filePath) throw new Error(`PNG-страница ${pageIndex} не найдена на диске`)
     const png = fs.readFileSync(filePath)
     if (png.length <= 0) throw new Error(`PNG-страница ${pageIndex} пустая`)
-    await addPngRasterPageToDocument(doc, png, sheetWidthMm, sheetHeightMm, undefined, {
-      fit: 'cover',
-    })
+    await addPngRasterPageToDocument(doc, png, sheetWidthMm, sheetHeightMm, trimPlacement)
   }
 
   const bytes = await doc.save()
@@ -1104,12 +1119,9 @@ async function renderFabricPageToPng(
         ctx.fillRect(0, 0, sheet.width, sheet.height)
         const trimW = trimImage.naturalWidth || Math.round(payload.pageWidthPx * payload.multiplier)
         const trimH = trimImage.naturalHeight || Math.round(payload.pageHeightPx * payload.multiplier)
-        const coverScale = Math.max(sheet.width / trimW, sheet.height / trimH)
-        const drawW = trimW * coverScale
-        const drawH = trimH * coverScale
-        const drawX = (sheet.width - drawW) / 2
-        const drawY = (sheet.height - drawH) / 2
-        ctx.drawImage(trimImage, drawX, drawY, drawW, drawH)
+        const bleedPx = Math.max(0, Math.round(Number(payload.bleedPx) || 0))
+        // 1:1 trim в inset bleed — без coverScale (иначе crop краёв на sheet+bleed).
+        ctx.drawImage(trimImage, bleedPx, bleedPx, trimW, trimH)
 
         const sampleCanvas = document.createElement('canvas')
         sampleCanvas.width = Math.min(180, sheet.width)
@@ -1395,11 +1407,13 @@ export const __editorProductionRenderInternals = {
   assertHealthyPixelStats,
   buildPageHtml,
   buildRasterPageHtml,
+  buildClientRenderedRasterPageHtml,
   buildFontFaceCss,
   buildImageSrcLookupKeys,
   closeProductionRenderBrowser,
   collectProductionPageDiagnostics,
   computeCoverPlacementMm,
+  computeTrimInsetPlacementMm,
   isBlankEditorPage,
   remapFabricImageSources,
   renderFabricPageToPng,

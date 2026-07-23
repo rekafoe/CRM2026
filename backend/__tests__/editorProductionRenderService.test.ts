@@ -200,6 +200,30 @@ describe('editorProductionRenderService internals', () => {
     expect(placement.topMm).toBe(0)
   })
 
+  it('places trim PNG in bleed inset 1:1 (200×90 + bleed 2 → 204×94)', () => {
+    const placement = __editorProductionRenderInternals.computeTrimInsetPlacementMm(200, 90, 2)
+    expect(placement.leftMm).toBe(2)
+    expect(placement.topMm).toBe(2)
+    expect(placement.widthMm).toBe(200)
+    expect(placement.heightMm).toBe(90)
+  })
+
+  it('builds client raster HTML with bleed inset, not cover', () => {
+    const html = __editorProductionRenderInternals.buildClientRenderedRasterPageHtml(
+      Buffer.from('abc'),
+      204,
+      94,
+      200,
+      90,
+      2,
+    )
+    expect(html).toContain('left:2mm')
+    expect(html).toContain('top:2mm')
+    expect(html).toContain('width:200mm')
+    expect(html).toContain('height:90mm')
+    expect(html).not.toContain('object-fit:cover')
+  })
+
   it('embeds fonts as data URLs for Puppeteer production render', () => {
     const filePath = path.join(orderFilesDir, `font-face-test-${Date.now()}.woff2`)
     fs.writeFileSync(filePath, Buffer.from('fake-font-bytes'))
