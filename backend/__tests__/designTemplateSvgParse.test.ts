@@ -522,6 +522,41 @@ describe('parseImportedSvgLayers', () => {
     expect(text?.textAnchor).toBe('end')
     expect(text?.text).toContain('\n')
     expect(text?.frameWidthScene).toBeGreaterThan(100)
+    // x в SVG = левый край; после promote якорь должен уйти вправо (не остаться на 400).
+    expect(text?.svg.x).toBeGreaterThan(400)
+  })
+
+  it('start+text-align:right сдвигает scene.x к правому краю (цифры 2/4 не наезжают на текст)', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="210mm" viewBox="0 0 1000 1000">
+  <text id="text_num2" text-anchor="start" style="text-align:right;font-size:120px;font-family:Georgia">
+    <tspan x="820" y="420">2</tspan>
+  </text>
+  <text id="text_wisdom" text-anchor="start" style="text-align:right;font-size:28px">
+    <tspan x="700" y="380">Мудрость</tspan>
+    <tspan x="700" y="420">Ты знаешь как направить</tspan>
+    <tspan x="700" y="450">и поддержать</tspan>
+  </text>
+</svg>`
+    const items = parseImportedSvgLayers(svg).textItems
+    const num = items.find((t) => t.name === 'text_num2')
+    const wisdom = items.find((t) => t.name === 'text_wisdom')
+    expect(num?.textAnchor).toBe('end')
+    expect(wisdom?.textAnchor).toBe('end')
+    expect(num?.svg.x).toBeGreaterThan(820)
+    expect(wisdom?.svg.x).toBeGreaterThan(700)
+  })
+
+  it('явный text-anchor:end не сдвигает x повторно', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <text id="text_phone" text-anchor="end" font-size="24">
+    <tspan x="800" y="100">+375 29 000-00-00</tspan>
+  </text>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.textAnchor).toBe('end')
+    expect(text?.svg.x).toBeCloseTo(800, 0)
   })
 
   it('читает жирный/курсив из CSS-класса Corel', () => {

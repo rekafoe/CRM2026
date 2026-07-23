@@ -944,6 +944,55 @@ function estimateLineWidthSvg(text: string, fontSizeSvg: number): number {
 
 type TspanLineMetric = { left: number; right: number; y: number }
 
+/** Явный SVG text-anchor end/middle (атрибут или style), не CSS text-align. */
+function hasExplicitNonStartTextAnchor(
+  ...sources: Array<Record<string, string> | undefined>
+): boolean {
+  for (const source of sources) {
+    if (!source) continue
+    const anchor = (source['text-anchor'] ?? source.textAnchor)?.trim()
+    if (!anchor) continue
+    if (normalizeTextAnchor(anchor) !== 'start') return true
+  }
+  return false
+}
+
+/**
+ * Corel: text-anchor:start + text-align:right → якорь end, но x остаётся левым краем.
+ * Сдвигаем point к правому краю / центру по метрикам строк.
+ */
+function shiftPointForCssPromotedAnchor(
+  textAnchor: SvgText['textAnchor'],
+  lineMetrics: TspanLineMetric[],
+  fallback: { x: number; y: number },
+  textLines: string[],
+  fontSizeSvg: number,
+): { x: number; y: number } {
+  if (textAnchor !== 'end' && textAnchor !== 'middle') return fallback
+
+  if (lineMetrics.length > 0) {
+    if (textAnchor === 'end') {
+      return {
+        x: Math.max(...lineMetrics.map((m) => m.right)),
+        y: lineMetrics[0]!.y,
+      }
+    }
+    const centers = lineMetrics.map((m) => (m.left + m.right) / 2)
+    return {
+      x: centers.reduce((sum, value) => sum + value, 0) / centers.length,
+      y: lineMetrics[0]!.y,
+    }
+  }
+
+  const lines = textLines.length > 0 ? textLines : ['']
+  const widths = lines.map((line) => estimateLineWidthSvg(line.trim() || line, fontSizeSvg))
+  const maxW = Math.max(...widths, 1)
+  if (textAnchor === 'end') {
+    return { x: fallback.x + maxW, y: fallback.y }
+  }
+  return { x: fallback.x + maxW / 2, y: fallback.y }
+}
+
 function resolveTspanLineMetrics(
   tspans: ParsedTspan[],
   attrs: Record<string, string>,
@@ -1690,6 +1739,26 @@ function mergeStackedTextItems(items: SvgText[]): SvgText {
     if (inferred && inferred.anchor !== 'start') {
       textAnchor = inferred.anchor
       sceneX = inferred.anchorX
+      const pxPerMm = sorted
+        .map((item) => (item.x !== 0 ? item.scene.x / item.x : null))
+        .find((v): v is number => v != null && Number.isFinite(v) && Math.abs(v) > 1e-6)
+      mmX = pxPerMm ? sceneX / pxPerMm : pickAnchorMmX(sorted, textAnchor)
+    }
+  } else if (textAnchor === 'end' && sorted.length >= 1) {
+    // CSS-promote: все фрагменты с одним left x, но якорь уже end — сдвинуть к max(right).
+    const tol = Math.max(...sorted.map((item) => item.scene.fontSize)) * 0.45
+    const lefts = sorted.map((item) => (
+      item.textAnchor === 'end'
+        ? item.scene.x - estimateLineWidthSvg(item.text.trim() || item.text, item.scene.fontSize)
+        : item.scene.x
+    ))
+    const leftSpread = Math.max(...lefts) - Math.min(...lefts)
+    if (leftSpread <= tol) {
+      const rights = sorted.map((item, index) => {
+        const w = estimateLineWidthSvg(item.text.trim() || item.text, item.scene.fontSize)
+        return item.textAnchor === 'end' ? item.scene.x : lefts[index]! + w
+      })
+      sceneX = Math.max(...rights)
       const pxPerMm = sorted
         .map((item) => (item.x !== 0 ? item.scene.x / item.x : null))
         .find((v): v is number => v != null && Number.isFinite(v) && Math.abs(v) > 1e-6)
@@ -2818,6 +2887,10 @@ export function parseImportedSvgLayers(
           parseFontSizeFromStyle(textStyle) ??
           18
         let textAnchor = resolveTextAnchor(tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
+        // Promote только из text-align, не трогаем явный text-anchor:end/middle (в т.ч. из style).
+        const cssPromotedAnchor =
+          (textAnchor === 'end' || textAnchor === 'middle')
+          && !hasExplicitNonStartTextAnchor(tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
         const textTransform = multiplyTransform(
           multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform, unsupportedFeatures)),
           parseSvgTransform(tspanAttrs.transform, unsupportedFeatures),
@@ -2889,6 +2962,15 @@ export function parseImportedSvgLayers(
         if (textAnchor === 'start' && inferred) {
           textAnchor = inferred.anchor
           point = { x: inferred.anchorX, y: inferred.anchorY }
+        } else if (cssPromotedAnchor) {
+          // start + text-align:right/center: x — левый край, Fabric originX = right/center.
+          point = shiftPointForCssPromotedAnchor(
+            textAnchor,
+            lineMetrics,
+            point,
+            textContent.split('\n'),
+            transformedFontSize,
+          )
         }
         // Суффикс имени (text_*_center) — явный хинт оператора, выше attrs/геометрии.
         const alignFromName = splitTextLayerAlignHint(ef).anchor
