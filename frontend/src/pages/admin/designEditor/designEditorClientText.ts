@@ -75,6 +75,9 @@ export function createClientTextbox(opts: CreateClientTextboxOpts): FabricObject
     textAlign: 'center',
     splitByGrapheme: false,
     objectCaching: false,
+    cursorColor: '#dc2626',
+    cursorWidth: 3,
+    selectionColor: 'rgba(37, 99, 235, 0.28)',
   });
   ax(box).textFieldClientAdded = true;
   return box;

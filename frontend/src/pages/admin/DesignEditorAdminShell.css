@@ -32,18 +32,37 @@
 }
 
 .public-design-editor--admin .design-editor-main {
+  order: 3;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   gap: 10px;
   padding: 10px;
 }
 
+/* Холст занимает только место НАД page-strip, не под ним */
 .public-design-editor--admin .design-editor-main > .public-design-editor__stage {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   border-radius: 18px;
 }
 
 .public-design-editor--admin .design-editor-main > .public-design-editor__page-strip {
   flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+  max-height: min(42vh, 280px);
+  overflow: hidden;
+}
+
+.public-design-editor--admin .design-editor-main > .public-design-editor__scroll,
+.public-design-editor--admin .design-editor-main .design-editor-scroll-area {
+  min-height: 0;
 }
 
 .public-design-editor--admin .public-design-editor__stage-toolbar {
@@ -110,10 +129,10 @@
 }
 
 .public-design-editor--admin .design-editor-panel {
-  order: 3;
+  order: 2;
   width: 330px;
   min-width: 330px;
-  margin: 10px 10px 10px 0;
+  margin: 10px 8px;
   max-height: calc(100% - 20px);
   color: #0b1220;
   background: rgba(255, 255, 255, 0.94);
@@ -121,10 +140,6 @@
   border-radius: 20px;
   box-shadow: 0 22px 56px rgba(15, 23, 42, 0.1);
   overflow: hidden auto;
-}
-
-.public-design-editor--admin .design-editor-main {
-  order: 2;
 }
 
 .public-design-editor--admin .design-editor-panel-header,

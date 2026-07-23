@@ -1165,7 +1165,10 @@ export const DesignEditorPage: React.FC = () => {
               onGuidesChange: setGuides,
               onUndo: () => activeCanvas()?.undo(),
               onRedo: () => activeCanvas()?.redo(),
-              onSelectionChange: setSelectedObj,
+              onSelectionChange: (obj) => {
+                setSelectedObj(obj);
+                if (!obj || obj.type !== 'IText') setTextFloatingAnchor(null);
+              },
               onHistoryChange: (u, r) => {
                 setCanUndo(u);
                 setCanRedo(r);
@@ -1177,6 +1180,7 @@ export const DesignEditorPage: React.FC = () => {
               onDropRemoteImageUrl: handleImageUrlSubmit,
               onSidebarPhotoDropped: removeSidebarPhoto,
               onSnapLinesChange: setSnapLines,
+              onTextFloatingAnchor: setTextFloatingAnchor,
             }}
           />
 

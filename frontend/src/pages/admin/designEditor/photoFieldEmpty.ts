@@ -21,11 +21,13 @@ function ax(obj: unknown): AnyObj {
   return obj as AnyObj;
 }
 
-const EMPTY_PHOTO_FIELD_FILL = '#f1f5f9';
-const EMPTY_PHOTO_FIELD_STROKE = '#2563eb';
-const EMPTY_PHOTO_BADGE_FILL = '#dbeafe';
-const EMPTY_PHOTO_ICON_FILL = '#1d4ed8';
-const EMPTY_PHOTO_LABEL_FILL = '#1e40af';
+const EMPTY_PHOTO_FIELD_FILL = '#bfdbfe';
+const EMPTY_PHOTO_FIELD_STROKE = '#1e3a8a';
+const EMPTY_PHOTO_BADGE_FILL = '#93c5fd';
+const EMPTY_PHOTO_ICON_FILL = '#1e3a8a';
+const EMPTY_PHOTO_LABEL_FILL = '#172554';
+const EMPTY_PHOTO_FIELD_STROKE_WIDTH = 2.5;
+const EMPTY_PHOTO_FIELD_DASH = [8, 4] as const;
 
 function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObject[] {
   const ox = -frameW / 2;
@@ -39,8 +41,8 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     height: frameH,
     fill: EMPTY_PHOTO_FIELD_FILL,
     stroke: EMPTY_PHOTO_FIELD_STROKE,
-    strokeWidth: 1,
-    strokeDashArray: [6, 4],
+    strokeWidth: EMPTY_PHOTO_FIELD_STROKE_WIDTH,
+    strokeDashArray: [...EMPTY_PHOTO_FIELD_DASH],
     strokeUniform: true,
     rx: 6,
     ry: 6,
@@ -403,10 +405,10 @@ export function dehydrateEmptyPhotoFieldJsonObject(
     top: Number.isFinite(top) ? top : 0,
     width: fw,
     height: fh,
-    fill: '#eef2f7',
-    stroke: '#2563eb',
-    strokeWidth: 1,
-    strokeDashArray: [6, 4],
+    fill: '#bfdbfe',
+    stroke: '#1e3a8a',
+    strokeWidth: 2.5,
+    strokeDashArray: [8, 4],
     rx: 6,
     ry: 6,
     scaleX: 1,

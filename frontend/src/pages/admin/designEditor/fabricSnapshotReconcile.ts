@@ -19,6 +19,21 @@ function hasPhotoFieldObject(value: unknown): boolean {
   return getFabricJsonObjects(obj).some(hasPhotoFieldObject);
 }
 
+function isDecorElementRecord(obj: FabricJsonObject): boolean {
+  if (obj.isDecorElement === true) return true;
+  const id = readFabricObjectId(obj);
+  if (!id) return false;
+  const base = id.toLowerCase();
+  return base.startsWith('decor_');
+}
+
+function hasDecorElementObject(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const obj = value as FabricJsonObject;
+  if (isDecorElementRecord(obj)) return true;
+  return getFabricJsonObjects(obj).some(hasDecorElementObject);
+}
+
 function isTextLikeFabricJsonObject(value: unknown): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const type = String((value as FabricJsonObject).type ?? '').toLowerCase();
@@ -178,6 +193,7 @@ function shouldPreserveMissingPreviousObject(obj: FabricJsonObject): boolean {
   if (hasPhotoFieldObject(obj)) return true;
   if (isDesignedTemplateTextRecord(obj)) return true;
   if (isClientAddedFabricObject(obj)) return true;
+  if (isDecorElementRecord(obj)) return true;
   return false;
 }
 
@@ -323,7 +339,8 @@ export function reconcilePhotoFieldSnapshotLoss(
   if (
     !hasPhotoFieldObject(saved)
     && !hasTextLikeObject(saved)
-    && (hasPhotoFieldObject(previous) || hasTextLikeObject(previous))
+    && !hasDecorElementObject(saved)
+    && (hasPhotoFieldObject(previous) || hasTextLikeObject(previous) || hasDecorElementObject(previous))
   ) {
     if (siblingObjects && siblingObjects.length > 0) {
       const siblingById = collectObjectsById(siblingObjects);
@@ -336,7 +353,9 @@ export function reconcilePhotoFieldSnapshotLoss(
     }
     return cloneFabricJson(previous);
   }
-  if (!hasPhotoFieldObject(saved) && !hasTextLikeObject(saved)) return saved;
+  if (!hasPhotoFieldObject(saved) && !hasTextLikeObject(saved) && !hasDecorElementObject(saved)) {
+    return saved;
+  }
 
   const replacements = collectObjectsById(savedObjects);
   if (replacements.size === 0) return saved;

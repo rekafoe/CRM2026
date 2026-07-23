@@ -10,6 +10,7 @@ import { isLikelyImageFile, looksLikeHttpUrl } from '../../../../utils/imageFile
 import {
   applyPhotoFieldSelectionChrome,
   applyTextSelectionChrome,
+  DESIGN_EDITOR_TEXT_CHROME,
 } from '../designEditorTextChrome';
 import { bakeTextObjectScaleInPlace, captureTextScaleDraft, type TextScaleBakeDraft } from '../designEditorTextScale';
 import { findPhotoFieldAtScene } from '../photoFieldHitTest';
@@ -244,7 +245,13 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           resetCanvasWrapScroll();
           const active = canvas.getActiveObject();
           if (active && isTextLikeObject(active)) {
-            pinFabricHiddenTextarea(canvas, active as IText);
+            const text = active as IText;
+            text.set({
+              cursorColor: DESIGN_EDITOR_TEXT_CHROME.cursorColor,
+              cursorWidth: DESIGN_EDITOR_TEXT_CHROME.cursorWidth,
+              selectionColor: DESIGN_EDITOR_TEXT_CHROME.selectionColor,
+            });
+            pinFabricHiddenTextarea(canvas, text);
           }
         });
         canvas.on('text:editing:exited', (opt) => {

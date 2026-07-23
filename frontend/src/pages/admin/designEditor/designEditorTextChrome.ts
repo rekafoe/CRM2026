@@ -3,31 +3,35 @@ import { measureFilledPhotoFieldFrameSize } from './photoFieldGeometry';
 
 /** Визуальное выделение текстовых блоков на холсте (рамка + угловые маркеры). */
 export const DESIGN_EDITOR_TEXT_CHROME = {
-  borderColor: '#2563eb',
-  cornerColor: '#2563eb',
+  borderColor: '#1d4ed8',
+  cornerColor: '#1d4ed8',
   cornerStrokeColor: '#ffffff',
-  cornerSize: 11,
+  cornerSize: 18,
   cornerStyle: 'circle' as const,
   transparentCorners: false,
-  borderScaleFactor: 2.5,
+  borderScaleFactor: 3,
   padding: 10,
   hasBorders: true,
   hasControls: true,
-  touchCornerSize: 20,
+  touchCornerSize: 32,
+  /** Каретка при inline-edit: не наследует fill текста (иначе почти не видна). */
+  cursorColor: '#dc2626',
+  cursorWidth: 3,
+  selectionColor: 'rgba(37, 99, 235, 0.28)',
 };
 
 /** Базовые размеры рамки/маркеров в клиентском basic-режиме (до компенсации CSS fit-zoom). */
 const CLIENT_BASIC_TEXT_CHROME_BASE = {
-  cornerSize: 16,
-  touchCornerSize: 36,
-  borderScaleFactor: 3.25,
+  cornerSize: 22,
+  touchCornerSize: 44,
+  borderScaleFactor: 3.5,
   padding: 12,
 };
 
 /** Целевой размер маркеров на экране (px), до CSS fit-zoom и zoom холста Fabric. */
-const SCREEN_CORNER_PX = 16;
-const SCREEN_TOUCH_CORNER_PX = 36;
-const SCREEN_BORDER_STROKE_PX = 2.75;
+const SCREEN_CORNER_PX = 22;
+const SCREEN_TOUCH_CORNER_PX = 44;
+const SCREEN_BORDER_STROKE_PX = 3;
 const SCREEN_PHOTO_BORDER_STROKE_PX = SCREEN_BORDER_STROKE_PX * 0.85;
 
 function compensateControlSize(

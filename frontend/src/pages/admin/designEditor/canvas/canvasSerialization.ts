@@ -18,6 +18,78 @@ function isPhotoFieldObject(obj: FabricObject): boolean {
   return (obj as { isPhotoField?: unknown }).isPhotoField === true;
 }
 
+function isDecorFabricObject(obj: FabricObject): boolean {
+  const meta = obj as { isDecorElement?: unknown; id?: unknown };
+  if (meta.isDecorElement === true) return true;
+  const id = String(meta.id ?? '').trim().toLowerCase();
+  return id.startsWith('decor_');
+}
+
+function attachCustomPropsFromLive(
+  live: FabricObject,
+  serialized: Record<string, unknown>,
+): Record<string, unknown> {
+  const source = live as unknown as Record<string, unknown>;
+  for (const key of CUSTOM_PROPS) {
+    if (source[key] !== undefined && serialized[key] === undefined) {
+      serialized[key] = source[key];
+    }
+  }
+  if (isDecorFabricObject(live)) {
+    serialized.isDecorElement = true;
+  }
+  return serialized;
+}
+
+function serializeDecorFallback(obj: FabricObject): Record<string, unknown> | null {
+  try {
+    return attachCustomPropsFromLive(obj, obj.toObject() as Record<string, unknown>);
+  } catch {
+    const meta = obj as {
+      id?: unknown;
+      type?: unknown;
+      left?: number;
+      top?: number;
+      width?: number;
+      height?: number;
+      fill?: unknown;
+      stroke?: unknown;
+      strokeWidth?: unknown;
+      opacity?: unknown;
+      scaleX?: number;
+      scaleY?: number;
+      angle?: number;
+      importStackIndex?: unknown;
+      decorLayerName?: unknown;
+    };
+    const id = String(meta.id ?? '').trim();
+    if (!id) return null;
+    return {
+      type: meta.type ?? 'rect',
+      version: '6.0.0',
+      originX: 'left',
+      originY: 'top',
+      left: meta.left ?? 0,
+      top: meta.top ?? 0,
+      width: meta.width ?? 1,
+      height: meta.height ?? 1,
+      scaleX: meta.scaleX ?? 1,
+      scaleY: meta.scaleY ?? 1,
+      angle: meta.angle ?? 0,
+      fill: meta.fill ?? 'transparent',
+      ...(meta.stroke != null ? { stroke: meta.stroke } : {}),
+      ...(meta.strokeWidth != null ? { strokeWidth: meta.strokeWidth } : {}),
+      ...(meta.opacity != null ? { opacity: meta.opacity } : {}),
+      id,
+      isDecorElement: true,
+      selectable: false,
+      evented: false,
+      ...(meta.importStackIndex != null ? { importStackIndex: meta.importStackIndex } : {}),
+      ...(meta.decorLayerName != null ? { decorLayerName: meta.decorLayerName } : {}),
+    };
+  }
+}
+
 function serializePhotoFieldFallback(obj: FabricObject): Record<string, unknown> {
   const meta = obj as {
     id?: unknown;
@@ -50,7 +122,10 @@ function serializePhotoFieldFallback(obj: FabricObject): Record<string, unknown>
 
 function safeSerializeObject(obj: FabricObject): Record<string, unknown> | null {
   try {
-    return obj.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+    return attachCustomPropsFromLive(
+      obj,
+      obj.toObject(CUSTOM_PROPS) as Record<string, unknown>,
+    );
   } catch {
     if (isPhotoFieldObject(obj)) {
       try {
@@ -59,9 +134,15 @@ function safeSerializeObject(obj: FabricObject): Record<string, unknown> | null 
         return null;
       }
     }
+    if (isDecorFabricObject(obj)) {
+      return serializeDecorFallback(obj);
+    }
     if (isTextLikeObject(obj)) {
       try {
-        return obj.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+        return attachCustomPropsFromLive(
+          obj,
+          obj.toObject(CUSTOM_PROPS) as Record<string, unknown>,
+        );
       } catch {
         const fallback = obj as { text?: string; fontSize?: number; fontFamily?: string; id?: unknown };
         return {
@@ -220,6 +301,41 @@ function serializeCanvasObjectsIndividually(canvas: Canvas): Record<string, unkn
     .filter((obj) => !isSyntheticTemplatePreviewBackground(obj));
 }
 
+function readObjectId(value: Record<string, unknown>): string {
+  return String(value.id ?? '').trim();
+}
+
+/** Подтягивает кастомные props и missing decor_* с живого холста в snapshot. */
+function reconcileSerializedObjectsWithLiveCanvas(
+  canvas: Canvas,
+  objects: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const liveById = new Map<string, FabricObject>();
+  for (const live of canvas.getObjects() as FabricObject[]) {
+    const id = String((live as { id?: unknown }).id ?? '').trim();
+    if (id) liveById.set(id, live);
+  }
+
+  const byId = new Map<string, Record<string, unknown>>();
+  const next = objects.map((obj) => {
+    const id = readObjectId(obj);
+    if (!id) return obj;
+    byId.set(id, obj);
+    const live = liveById.get(id);
+    return live ? attachCustomPropsFromLive(live, { ...obj }) : obj;
+  });
+
+  for (const [id, live] of liveById) {
+    if (!isDecorFabricObject(live) || byId.has(id)) continue;
+    const serialized = safeSerializeObject(live);
+    if (!serialized || isSyntheticTemplatePreviewBackground(serialized)) continue;
+    next.push(serialized);
+    byId.set(id, serialized);
+  }
+
+  return next;
+}
+
 export function canvasToJSON(canvas: Canvas): Record<string, unknown> {
   let json: Record<string, unknown>;
   try {
@@ -240,13 +356,15 @@ export function canvasToJSON(canvas: Canvas): Record<string, unknown> {
     json = { ...json, objects: liveObjects };
   }
   if (Array.isArray(json.objects)) {
+    const reconciled = reconcileSerializedObjectsWithLiveCanvas(
+      canvas,
+      json.objects.filter(
+        (obj): obj is Record<string, unknown> => !!obj && typeof obj === 'object' && !Array.isArray(obj),
+      ),
+    );
     json = {
       ...json,
-      objects: deduplicateFabricJsonObjectsById(
-        json.objects.filter(
-          (obj): obj is Record<string, unknown> => !!obj && typeof obj === 'object' && !Array.isArray(obj),
-        ),
-      ),
+      objects: deduplicateFabricJsonObjectsById(reconciled),
     };
   }
   syncDesignedTextLayoutFromLiveCanvas(canvas, json);
