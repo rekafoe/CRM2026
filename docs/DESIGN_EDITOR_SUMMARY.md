@@ -23,11 +23,11 @@
 
 Редакторы разделены по ответственности:
 
-- исходники админского master-редактора — `frontend/src/pages/admin/DesignEditorPage.tsx` (+ `designEditor/`); **UI-роут в CRM скрыт** (редирект в каталог), код остаётся для vendor sync;
-- клиентский редактор экземпляра — продуктовый слой `frontend/src/features/clientEditor/` + `publicDesignEditor/` (вендорится на сайт);
-- проверка клиента — только на сайте (`printcore.by/.../order/editor`), не через CRM sandbox.
+- **Master-редактор** — `frontend/src/pages/admin/DesignEditorPage.tsx` (+ `designEditor/`). Роут: `/adminpanel/design-editor/:templateId` (кнопка «Макет» в каталоге). Полный canvas как у клиента; Save **абсолютно** перезаписывает `design_templates.spec.designState`. Клиенты на сайте получают уже эту версию.
+- **Клиентский редактор** — `features/clientEditor/` + `publicDesignEditor/` (вендор на сайт). Пишет только `editor_drafts` / заказ, **не** master.
+- Проверка клиентского UX — на сайте (`printcore.by/.../order/editor`).
 
-Переключателя `advanced/basic` в UI админского редактора больше нет. Ограничения заполнения остаются низкоуровневой возможностью canvas для клиентского слоя.
+Sync ядра CRM → сайт: `node tools/sync-design-editor.mjs` (см. скрипт).
 
 ## Импорт шаблонов
 

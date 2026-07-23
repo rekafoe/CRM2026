@@ -53,6 +53,7 @@
 - **Corel DRAW:** последовательности `_x0020_` (пробел), `_x002c_` (запятая) и т.п. в тексте и именах слоёв декодируются автоматически.
 - **Поворот текста:** `transform="rotate(…)"` и матрицы поворота на `<g>` / `<text>` переносятся в Fabric как `angle` (вертикальные подписи дат и т.п.).
 - **Выравнивание:** `text-anchor` и CSS `text-align` на `<text>`, `<tspan>` и родительской `<g>` → `originX` / `textAlign` в Fabric (`start` / `center` / `end`).
+- **Обогащение Corel:** атрибуты `data-crm-font`, `data-crm-align`, `data-crm-frame-w-mm`, `data-crm-x-mm` / `data-crm-y-mm`, `data-crm-ascent` на `text_*` имеют приоритет над эвристиками; ширина/baseline при наличии TTF из design-fonts считаются по метрикам (см. [design-template-designer-guide.md](./design-template-designer-guide.md) §12).
 - **Цвет текста:** SVG-атрибут `fill`, CSS `fill` / `color` (в т.ч. классы Corel `.fil0 { fill: #FFFFFF }`) → `fill` в Fabric; без цвета в SVG — тёмно-серый `#111827`.
 - **Фото-поля `photo_*`:** при открытии в редакторе пустые ячейки показывают серый фон, синюю пунктирную рамку и иконку камеры по центру (импорт из SVG даёт rect, редактор дорисовывает chrome).
 - **Диагностические коды warning-ов:** parser добавляет префиксы вида `[CODE]` (например `TXT_NO_VALID_NODE`, `PHOTO_NO_VALID_RECT`, `TRANSFORM_UNSUPPORTED`) для детерминированной диагностики проблемных слоёв.

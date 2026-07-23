@@ -2,10 +2,15 @@ import type { Canvas, FabricObject } from 'fabric';
 import {
   collectFontFamiliesFromTextField,
   collectFontLoadSpecsFromTextField,
+  captureSacredTemplateTextGeometry,
   hydrateTextObjectStyles,
   isDesignedTemplateText,
   kickTextObjectFontRerender,
+  lockSacredTextPositions,
+  markCanvasTextMetricsTrusted,
   remeasureTextObjectsAfterFontLoad,
+  stabilizeDesignedTextboxWidthFromContent,
+  tightenDraftTextboxWidthOnLoad,
   type TextLikeObject,
 } from '../pages/admin/designEditor/textStyleRuns';
 import { ensureDesignFontLoaded } from './loadDesignFonts';
@@ -22,15 +27,23 @@ function collectTextObjectFontLoads(obj: FabricObject, out: Set<string>): void {
   }
 }
 
-function refreshTextObjectFont(obj: FabricObject): void {
+function refreshTextObjectFont(obj: FabricObject, options?: { allowTighten?: boolean }): void {
   if (!isTextObject(obj)) return;
   const textObj = obj as TextLikeObject;
+  // Designed text_* тоже: материализует textStyleRuns → styles, если styles ещё пустой.
+  hydrateTextObjectStyles(textObj);
   if (isDesignedTemplateText(textObj)) {
     kickTextObjectFontRerender(textObj);
+    if (textObj.type === 'textbox' && textObj.textFieldUserEdited === true) {
+      if (options?.allowTighten) {
+        tightenDraftTextboxWidthOnLoad(textObj);
+      }
+      stabilizeDesignedTextboxWidthFromContent(textObj);
+      captureSacredTemplateTextGeometry(textObj, { overwrite: true });
+    }
     textObj.setCoords?.();
     return;
   }
-  hydrateTextObjectStyles(textObj);
   kickTextObjectFontRerender(textObj);
 }
 
@@ -62,7 +75,10 @@ async function waitForPaintFrames(frames = 2): Promise<void> {
 }
 
 /** После FontFace / document.fonts — пересчитать метрики текста Fabric (иначе остаётся fallback). */
-export async function reloadFabricCanvasFonts(canvas: Canvas): Promise<void> {
+export async function reloadFabricCanvasFonts(
+  canvas: Canvas,
+  options?: { preserveLayout?: boolean },
+): Promise<void> {
   const families = collectCanvasFontFamilies(canvas);
   await Promise.all(
     families.map(async (family) => {
@@ -89,15 +105,64 @@ export async function reloadFabricCanvasFonts(canvas: Canvas): Promise<void> {
   );
   await document.fonts.ready;
 
-  walkObjects(canvas.getObjects(), refreshTextObjectFont);
+  // Order/export PNG: только подгрузить глифы, без stabilize/sacred overwrite (иначе текст «скачет»).
+  if (options?.preserveLayout) {
+    walkObjects(canvas.getObjects(), (obj) => {
+      if (!isTextObject(obj)) return;
+      const textObj = obj as TextLikeObject;
+      hydrateTextObjectStyles(textObj);
+      kickTextObjectFontRerender(textObj);
+      textObj.setCoords?.();
+    });
+    canvas.requestRenderAll();
+    return;
+  }
+
+  // Первый проход: сброс кэша Fabric, без tighten (метрики ещё могут быть fallback).
+  walkObjects(canvas.getObjects(), (obj) => refreshTextObjectFont(obj, { allowTighten: false }));
   remeasureTextObjectsAfterFontLoad(canvas.getObjects());
+  lockSacredTextPositions(canvas);
 
   await waitForPaintFrames();
   walkObjects(canvas.getObjects(), (obj) => {
     if (!isTextObject(obj)) return;
-    kickTextObjectFontRerender(obj as TextLikeObject);
+    const textObj = obj as TextLikeObject;
+    if (!isDesignedTemplateText(textObj)) return;
+    kickTextObjectFontRerender(textObj);
+    if (textObj.type === 'textbox' && textObj.textFieldUserEdited === true) {
+      stabilizeDesignedTextboxWidthFromContent(textObj);
+    }
   });
   remeasureTextObjectsAfterFontLoad(canvas.getObjects());
+  lockSacredTextPositions(canvas);
 
+  // После paint метрики скрипта обычно уже реальные — разрешаем tighten/expand + sacred overwrite.
+  await waitForPaintFrames(3);
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 120);
+  });
+  markCanvasTextMetricsTrusted(canvas.getObjects());
+  walkObjects(canvas.getObjects(), (obj) => refreshTextObjectFont(obj, { allowTighten: true }));
+  remeasureTextObjectsAfterFontLoad(canvas.getObjects());
+  lockSacredTextPositions(canvas);
+  canvas.requestRenderAll();
+
+  // iOS cold cache: повторный expand только для user-edited text_* (authored soft-load не трогаем).
+  await waitForPaintFrames(2);
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 280);
+  });
+  walkObjects(canvas.getObjects(), (obj) => {
+    if (!isTextObject(obj)) return;
+    const textObj = obj as TextLikeObject;
+    if (!isDesignedTemplateText(textObj) || textObj.type !== 'textbox') return;
+    kickTextObjectFontRerender(textObj);
+    if (textObj.textFieldUserEdited === true) {
+      stabilizeDesignedTextboxWidthFromContent(textObj);
+      captureSacredTemplateTextGeometry(textObj, { overwrite: true });
+    }
+    textObj.setCoords?.();
+  });
+  lockSacredTextPositions(canvas);
   canvas.requestRenderAll();
 }

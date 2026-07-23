@@ -1,7 +1,7 @@
 // frontend/src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { getCurrentUser } from './api';
 import LoginPage from './pages/LoginPage';
 import { QueryProvider } from './providers/QueryProvider';
@@ -16,6 +16,12 @@ import { ErrorBoundary } from './components/optimized/ErrorBoundary';
 const LoadingFallback: React.FC = () => (
   <div className="loading-overlay">Загрузка...</div>
 );
+
+/** Старый URL → master-редактор в adminpanel. */
+const DesignEditorLegacyRedirect: React.FC = () => {
+  const { templateId } = useParams<{ templateId: string }>();
+  return <Navigate to={`/adminpanel/design-editor/${templateId ?? ''}`} replace />;
+};
 
 const LazyApp = React.lazy(() => import('./app'));
 const LazyDailyReportPage = React.lazy(() =>
@@ -154,7 +160,7 @@ root.render(
           />
           <Route
             path="/design-editor/:templateId"
-            element={<Navigate to="/adminpanel/design-templates" replace />}
+            element={<DesignEditorLegacyRedirect />}
           />
           <Route
             path="/photo-batch-editor"

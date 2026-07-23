@@ -10,6 +10,7 @@ import {
   type DesignTemplateFamily,
 } from './designTemplateCatalogUtils';
 import { openSiteSandboxForDesignTemplate } from '../../../features/designTemplates/openSiteSandboxForDesignTemplate';
+import { useNavigate } from 'react-router-dom';
 import './DesignTemplateFamilyVariantRows.css';
 
 function mergeProductBindIntoSpec(
@@ -67,6 +68,7 @@ function VariantRow({
   onBound: Props['onBound'];
   onDelete: Props['onDelete'];
 }) {
+  const navigate = useNavigate();
   const parsed = useMemo(() => parseTemplateSpec(variant), [variant]);
   const sizeStr = formatTemplateSize(parsed) ?? 'без размера в SVG';
   const status = getTemplateCatalogStatus(variant);
@@ -78,6 +80,10 @@ function VariantRow({
   const [rowError, setRowError] = useState<string | null>(null);
   const [rowOk, setRowOk] = useState<string | null>(null);
   const [sandboxBusy, setSandboxBusy] = useState(false);
+
+  const openMasterEditor = useCallback(() => {
+    navigate(`/adminpanel/design-editor/${variant.id}`);
+  }, [navigate, variant.id]);
 
   const openClientSandbox = useCallback(async () => {
     try {
@@ -154,6 +160,14 @@ function VariantRow({
           </span>
         </div>
         <div className="design-family-variant-row__maket-actions">
+          <button
+            type="button"
+            className="lg-btn lg-btn--sm lg-btn--primary"
+            onClick={openMasterEditor}
+            title="Master-редактор CRM: абсолютная правка шаблона (текст, фотополя, надписи)"
+          >
+            <AppIcon name="edit" size="xs" /> Макет
+          </button>
           <button
             type="button"
             className="lg-btn lg-btn--sm"

@@ -77,10 +77,15 @@ const GENERIC_FONT_KEYS = new Set([
   'courier', 'couriernew', 'symbol', 'default',
 ])
 
-/** Arial / sans-serif / пустое — шрифт не задан в SVG. */
+/** Arial / Helvetica / системные generic — как в Corel «заглушка», не кастомный шрифт. */
 export function isGenericFontFamily(family: string | undefined | null): boolean {
   if (!family?.trim()) return true
   return GENERIC_FONT_KEYS.has(fontFamilyCompactKey(family))
+}
+
+/** Family не задан вовсе (пустая строка) — можно ставить Arial или fallback по text_*. */
+export function isUnsetFontFamily(family: string | undefined | null): boolean {
+  return !normalizeFontFamilyName(family)
 }
 
 function titleCaseFontWords(value: string): string {

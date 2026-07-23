@@ -224,9 +224,62 @@ declare global {
   }
 }
 
+export function isTextPositionDebugEnabled(): boolean {
+  if (PUBLIC_EDITOR_DEV) return true;
+  if (typeof window === 'undefined') return false;
+  const w = window as any;
+  if (w.__TEXT_POS_DEBUG === true || w.__PUBLIC_EDITOR_DEV === true) return true;
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('__TEXT_POS_DEBUG') === '1') return true;
+  } catch {}
+  try {
+    const s = location.search || '';
+    if (s.includes('textpos') || s.includes('debug=text') || s.includes('debug=editor')) return true;
+  } catch {}
+  return false;
+}
+
+export function isTextWidthDebugEnabled(): boolean {
+  if (isTextPositionDebugEnabled()) return true;
+  if (typeof window === 'undefined') return false;
+  const w = window as any;
+  if (w.__TEXT_WIDTH_DEBUG === true) return true;
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('__TEXT_WIDTH_DEBUG') === '1') return true;
+  } catch {}
+  try {
+    const s = location.search || '';
+    if (s.includes('textwidth') || s.includes('debug=textwidth')) return true;
+  } catch {}
+  return false;
+}
+
 if (typeof window !== 'undefined') {
+  const w = window as any;
   window.__PUBLIC_EDITOR_PERF__ = {
     snapshot: getPublicEditorPerfSnapshot,
     reset: resetPublicEditorPerfMetrics,
   };
+  // Easy runtime toggles for [TEXT-POS] debugging (works in prod builds too)
+  w.__enableTextPosLogs = () => {
+    w.__TEXT_POS_DEBUG = true;
+    try { localStorage.setItem('__TEXT_POS_DEBUG', '1'); } catch {}
+    console.log('[TEXT-POS] debug enabled via __enableTextPosLogs() — reload page and flip pages to see logs');
+  };
+  w.__disableTextPosLogs = () => {
+    w.__TEXT_POS_DEBUG = false;
+    try { localStorage.removeItem('__TEXT_POS_DEBUG'); } catch {}
+    console.log('[TEXT-POS] debug disabled');
+  };
+  w.__enableTextWidthLogs = () => {
+    w.__TEXT_WIDTH_DEBUG = true;
+    try { localStorage.setItem('__TEXT_WIDTH_DEBUG', '1'); } catch {}
+    console.log('[TEXT-WIDTH] отладка включена. Кликните текстовое поле, введите текст, выйдите — в консоли будут строки [TEXT-WIDTH]. Скопируйте их и отправьте разработчику.');
+  };
+  w.__disableTextWidthLogs = () => {
+    w.__TEXT_WIDTH_DEBUG = false;
+    try { localStorage.removeItem('__TEXT_WIDTH_DEBUG'); } catch {}
+    console.log('[TEXT-WIDTH] отладка выключена');
+  };
+  // Also allow setting directly: window.__TEXT_POS_DEBUG = true
 }

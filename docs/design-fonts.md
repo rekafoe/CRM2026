@@ -2,13 +2,15 @@
 
 CRM хранит файлы шрифтов для корректного импорта SVG, production PDF и отдачи сайту через public API.
 
-См. также: [design-template-importer.md](./design-template-importer.md), [client-editor-site-integration.md](./client-editor-site-integration.md).
+См. также: [design-template-importer.md](./design-template-importer.md), [design-template-designer-guide.md](./design-template-designer-guide.md) (§4 — экспорт из Corel), [client-editor-site-integration.md](./client-editor-site-integration.md).
 
 ## Библиотека CRM
 
 Админка: `/adminpanel/design-fonts`
 
-Сдела- Загрузите один файл, несколько файлов или **целую папку** (до 100 за раз)
+Сделано:
+
+- Загрузите один файл, несколько файлов или **целую папку** (до 100 за раз)
 - Форматы: `.woff2` (предпочтительно), `.woff`, `.ttf`, `.otf`
 - Для **TTF/OTF** `family_name` и **алиасы** (`name_aliases`) читаются из name table файла; если Corel/SVG пишет `CeremoniousOne`, а в библиотеке `Ceremonious One` — сопоставление идёт автоматически
 - Без метаданных в файле — имя из названия файла (`ceremoniousone.ttf` → `Ceremonious One`)
@@ -27,6 +29,23 @@ API пакетной загрузки: `POST /api/design-fonts/batch` (поле 
 
 Таблица: `design_fonts`. Файлы: `uploads/design-fonts/`.
 
+## Контракт: SVG → fabricJSON (приоритет)
+
+| Приоритет | Источник | Действие |
+|---|---|---|
+| 1 | `font-family` в SVG (не пустой) | Оставляем как есть. **Arial из Corel не перезаписывается** именем слоя |
+| 2 | Имя слоя `text_<шрифт>` при **пустом** family | Точный матч с `family_name` / aliases библиотеки CRM (или файл из ZIP `fonts/`) |
+| 3 | Иначе | **Arial** по умолчанию |
+
+Примеры:
+
+- SVG `font-family:'Voguella'` → в редакторе Voguella (нужен файл в библиотеке).
+- SVG `font-family:'Arial'`, слой `text_voguella` → остаётся **Arial** (Corel-заглушка важнее имени).
+- SVG без family, слой `text_voguella` → Voguella из библиотеки.
+- SVG без family, слой `text_1` → Arial.
+
+Сопоставление по имени слоя — **точное** (compact key), без substring: `text_time` не матчит Happy Time.
+
 ## Шрифты в ZIP-импорте
 
 При импорте ZIP со страницами SVG можно приложить папку `fonts/`:
@@ -38,13 +57,16 @@ template.zip
   fonts/CeremoniousOne.woff2
 ```
 
-Имена файлов сопоставляются с family по эвристике (`HappyTime.woff2` → `Happy Time`). **Папка fonts/ не подставляет шрифт сама** — в `fabricJSON` попадает `font-family` из SVG (на `<text>`, `<tspan>` или родительской `<g>`). Если в SVG только Arial или font-family нет — будет предупреждение при импорте.
+Имена файлов сопоставляются с family по эвристике (`HappyTime.woff2` → `Happy Time`).
 
-Дополнительно: слой `text_happytime` может сопоставиться с файлом `HappyTime.otf` из ZIP; при одном шрифте в архиве он применится ко всем `text_*` без font-family.
+В `fabricJSON` в первую очередь попадает **`font-family` из SVG**. Папка `fonts/` и библиотека CRM:
 
-Приоритет: **глобальная библиотека** → **bundled из ZIP**.
+- подключают файлы для превью/PDF;
+- при **пустом** family могут подставить шрифт по имени слоя `text_*` (см. контракт выше).
 
-## Importer v7
+Приоритет файлов: **глобальная библиотека** → **bundled из ZIP**.
+
+## Importer v7+
 
 - Порядок слоёв в SVG = порядок объектов в `fabricJSON` (photo/text вперемешку, не «все фото, потом весь текст»)
 - Парсинг `font-family` из SVG в текстовые поля `text_*`
@@ -68,7 +90,7 @@ template.zip
 
 ## Production PDF
 
-CRM при генерации `production_pdf` подставляет `@font-face` из библиотеки и bundled-шрифтов шаблона (Puppeteer + `document.fonts.ready`).
+CRM при генерации `production_pdf` подставляет `@font-face` из библиотеки и bundled-шрифтов шаблона (Puppeteer + `document.fonts.ready`). Для `client_png` шрифты уже растрированы на сайте.
 
 ## Лицензии
 

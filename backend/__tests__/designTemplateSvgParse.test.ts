@@ -35,6 +35,25 @@ describe('allocateEditableFabricId', () => {
 })
 
 describe('parseImportedSvgLayers', () => {
+  it('принимает data-crm-* text metadata выше SVG-эвристик', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <text id="text_title_center" x="10" y="10" font-size="10" font-family="Arial"
+    data-crm-font="Voguella" data-crm-align="right" data-crm-frame-w-mm="42"
+    data-crm-frame-h-mm="8" data-crm-x-mm="25" data-crm-y-mm="12">Имя</text>
+</svg>`
+    const parsed = parseImportedSvgLayers(svg, { sceneScale: 3 })
+    const text = parsed.textItems[0]!
+    expect(text.fontFamily).toBe('Voguella')
+    expect(text.textAnchor).toBe('end')
+    expect(text.x).toBe(25)
+    expect(text.y).toBe(12)
+    const scenePxPerMm = 96 / 25.4 * 3
+    expect(text.scene.x).toBeCloseTo(25 * scenePxPerMm, 3)
+    expect(text.frameWidthScene).toBeCloseTo(42 * scenePxPerMm, 3)
+    expect(text.frameHeightScene).toBeCloseTo(8 * scenePxPerMm, 3)
+  })
+
   it('наследует photo_* с <g> если у rect нет id', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">

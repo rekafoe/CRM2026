@@ -2,7 +2,7 @@ import {
   fontFamilyBaseCompactKey,
   fontFamilyCompactKey,
   fontFamilyNamesMatch,
-  isGenericFontFamily,
+  isUnsetFontFamily,
   normalizeFontFamilyName,
 } from './fontFamilyNormalize'
 import { collectFontFamiliesFromTextField, type TextStyleRun } from './textStyleRuns'
@@ -157,15 +157,14 @@ function matchLibraryFontToTextLayer(
 }
 
 /**
- * Для text_* без реального font-family в SVG (пустой / Arial / sans-serif)
- * подставляет шрифт из библиотеки CRM по имени слоя: text_voguella → Voguella.
- * Неизвестный не-generic family не перезаписываем — оставляем missing.
+ * Для text_* без font-family в SVG (пустая строка) подставляет шрифт из библиотеки
+ * по имени слоя: text_voguella → Voguella.
+ * Arial из Corel не трогаем — это явная заглушка экспорта, не «пусто».
  */
 export function applyLibraryFontFallbacksToDesignState(
   designState: unknown,
   libraryFonts: LibraryFontRef[],
 ): unknown {
-  if (!libraryFonts.length) return designState
   if (!designState || typeof designState !== 'object' || Array.isArray(designState)) return designState
   const pages = (designState as Record<string, unknown>).pages
   if (!Array.isArray(pages)) return designState
@@ -174,21 +173,29 @@ export function applyLibraryFontFallbacksToDesignState(
     walkFabric(value, (obj) => {
       const id = String(obj.id ?? '')
       if (!id.toLowerCase().startsWith('text_')) return
-      const matched = matchLibraryFontToTextLayer(id, libraryFonts)
-      if (!matched) return
+      const matched = libraryFonts.length > 0
+        ? matchLibraryFontToTextLayer(id, libraryFonts)
+        : undefined
       const currentFamily = String(obj.fontFamily ?? '')
-      if (!isGenericFontFamily(currentFamily)) return
-      obj.fontFamily = matched
+      if (matched && isUnsetFontFamily(currentFamily)) {
+        obj.fontFamily = matched
+      } else if (isUnsetFontFamily(String(obj.fontFamily ?? ''))) {
+        obj.fontFamily = 'Arial'
+      }
       walkFabricTextStyles(obj, (style) => {
         const segFamily = String(style.fontFamily ?? '')
-        if (isGenericFontFamily(segFamily)) {
+        if (matched && isUnsetFontFamily(segFamily)) {
           style.fontFamily = matched
+        } else if (isUnsetFontFamily(segFamily)) {
+          style.fontFamily = 'Arial'
         }
       })
       walkFabricTextStyleRuns(obj, (run) => {
         const segFamily = String(run.fontFamily ?? '')
-        if (isGenericFontFamily(segFamily)) {
+        if (matched && isUnsetFontFamily(segFamily)) {
           run.fontFamily = matched
+        } else if (isUnsetFontFamily(segFamily)) {
+          run.fontFamily = 'Arial'
         }
       })
     })

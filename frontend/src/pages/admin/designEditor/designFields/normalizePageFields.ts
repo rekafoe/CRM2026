@@ -1,44 +1,10 @@
 import type { Canvas, FabricObject } from 'fabric';
 import { normalizeFilledPhotoFieldsOnCanvas } from '../photoFieldFit';
+import { upgradeOrphanLibraryImagesOnCanvas } from '../canvas/canvasCommands';
 import { prepareTextObjectsOnCanvas } from '../textStyleRuns';
 import { isTemplatePhotoField } from './fieldMeta';
 import { syncImportedPhotoFieldsOnCanvas, upgradeEmptyPhotoFieldsOnCanvas } from './photoField';
 import { applyImportStackOrder } from './importStackOrder';
-
-// Re-assert positions of template text fields after all normalizations.
-// This is the final seat-belt so that no combination of hydrate/width/coords
-// can drift the original placement coming from the SVG import when flipping pages.
-function lockAllTemplateTextPositions(canvas: Canvas): void {
-  for (const obj of canvas.getObjects()) {
-    const anyObj = obj as unknown as { id?: string; textFieldClientAdded?: boolean; left?: number; top?: number; set?: (p: any) => void; setCoords?: () => void; type?: string };
-    const id = String(anyObj.id ?? '');
-    if (anyObj.type !== 'textbox') continue;
-    if (!id.toLowerCase().startsWith('text_')) continue;
-    if (anyObj.textFieldClientAdded === true) continue;
-    const l = Number(anyObj.left);
-    const t = Number(anyObj.top);
-    const patch: Record<string, number> = {};
-    if (Number.isFinite(l)) patch.left = l;
-    if (Number.isFinite(t)) patch.top = t;
-    if (anyObj.set && Object.keys(patch).length) anyObj.set(patch);
-    anyObj.setCoords?.();
-    // Also recurse groups if any
-    const group = obj as { getObjects?: () => FabricObject[] };
-    if (typeof group.getObjects === 'function') {
-      for (const child of group.getObjects()) {
-        const c = child as unknown as { id?: string; textFieldClientAdded?: boolean; left?: number; top?: number; set?: (p: any) => void; setCoords?: () => void; type?: string };
-        const cid = String(c.id ?? '');
-        if (c.type !== 'textbox' || !cid.toLowerCase().startsWith('text_') || c.textFieldClientAdded === true) continue;
-        const cl = Number(c.left); const ct = Number(c.top);
-        const cp: Record<string, number> = {};
-        if (Number.isFinite(cl)) cp.left = cl;
-        if (Number.isFinite(ct)) cp.top = ct;
-        if (c.set && Object.keys(cp).length) c.set(cp);
-        c.setCoords?.();
-      }
-    }
-  }
-}
 
 type AnyObj = Record<string, unknown>;
 
@@ -83,12 +49,15 @@ export async function normalizeDesignFieldsOnCanvas(
   canvas: Canvas,
   _pageW: number,
   _pageH: number,
+  options?: { preserveTextLayout?: boolean },
 ): Promise<void> {
-  prepareTextObjectsOnCanvas(canvas.getObjects());
+  prepareTextObjectsOnCanvas(canvas.getObjects(), {
+    preserveLayout: options?.preserveTextLayout === true,
+  });
   syncImportedPhotoFieldsOnCanvas(canvas);
   upgradeEmptyPhotoFieldsOnCanvas(canvas);
+  await upgradeOrphanLibraryImagesOnCanvas(canvas);
   normalizeTemplateEmptyPhotoFieldStack(canvas);
   await normalizeFilledPhotoFieldsOnCanvas(canvas);
   applyImportStackOrder(canvas);
-  lockAllTemplateTextPositions(canvas);
 }

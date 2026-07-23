@@ -8,10 +8,14 @@
  * photo_cover — уникальный id выдаёт парсер (photo_1, locked_bg_1, …).
  * Выравнивание текста: суффикс имени text_*_center|_right|_left → textAlign в Fabric;
  * Fabric id остаётся без суффикса (text_title_center → text_title / text_1).
+ * Будущий ZIP sidecar может задавать те же поля как
+ * `{ "texts": { "text_title": { "font": "...", "align": "center", "frameWmm": 42 } } }`;
+ * пока источником метаданных служат только data-crm-* атрибуты SVG.
  */
 
 import { performance } from 'perf_hooks'
 import { normalizeFontFamilyName } from '../utils/fontFamilyNormalize'
+import { measureDesignFontText } from '../utils/designFontMetrics'
 import {
   parseSvgGradientDefs,
   resolveSvgPaint,
@@ -68,6 +72,12 @@ export type SvgText = {
   textStyles?: SvgTextStyleSegment[]
   /** Ширина блочного textbox в px сцены (для text-align ≠ left). */
   frameWidthScene?: number
+  /** Высота явно заданного textbox в px сцены. */
+  frameHeightScene?: number
+  /** Смещение от baseline к верхнему краю текста в px сцены. */
+  ascentScene?: number
+  /** Выравнивание задано data-crm-align и не должно заменяться суффиксом имени. */
+  crmAlignExplicit?: boolean
   /** Цвет заливки текста (SVG fill / CSS color). */
   fill?: string
   /** Угол поворота в градусах (Fabric, по часовой), из SVG transform. */
@@ -938,8 +948,11 @@ export function resolveTextAnchor(...sources: Array<Record<string, string> | und
   return anchorFromAttr ?? 'start'
 }
 
-function estimateLineWidthSvg(text: string, fontSizeSvg: number): number {
-  return Math.max(1, text.length) * fontSizeSvg * 0.55
+function estimateLineWidthSvg(text: string, fontSizeSvg: number, fontFamily?: string): number {
+  const measured = measureDesignFontText(text, fontSizeSvg, fontFamily)
+  if (measured?.width && Number.isFinite(measured.width)) return Math.max(1, measured.width)
+  const looksScript = /script|ceremon|cursive|handwrit|calligraph|italic/i.test(fontFamily ?? '')
+  return Math.max(1, text.length) * fontSizeSvg * (looksScript ? 0.85 : 0.55)
 }
 
 type TspanLineMetric = { left: number; right: number; y: number }
@@ -967,6 +980,7 @@ function shiftPointForCssPromotedAnchor(
   fallback: { x: number; y: number },
   textLines: string[],
   fontSizeSvg: number,
+  fontFamily?: string,
 ): { x: number; y: number } {
   if (textAnchor !== 'end' && textAnchor !== 'middle') return fallback
 
@@ -985,7 +999,7 @@ function shiftPointForCssPromotedAnchor(
   }
 
   const lines = textLines.length > 0 ? textLines : ['']
-  const widths = lines.map((line) => estimateLineWidthSvg(line.trim() || line, fontSizeSvg))
+  const widths = lines.map((line) => estimateLineWidthSvg(line.trim() || line, fontSizeSvg, fontFamily))
   const maxW = Math.max(...widths, 1)
   if (textAnchor === 'end') {
     return { x: fallback.x + maxW, y: fallback.y }
@@ -998,12 +1012,13 @@ function resolveTspanLineMetrics(
   attrs: Record<string, string>,
   fontSizeSvg: number,
   transform: SvgTransform,
+  fontFamily?: string,
 ): TspanLineMetric[] {
   return tspans.map((tspan) => {
     const x = parseNumber(pickAttr(tspan.attrs, attrs, 'x')) ?? 0
     const y = parseNumber(pickAttr(tspan.attrs, attrs, 'y')) ?? 0
     const pt = applyTransform(transform, x, y)
-    const w = estimateLineWidthSvg(tspan.text, fontSizeSvg)
+    const w = estimateLineWidthSvg(tspan.text, fontSizeSvg, fontFamily)
     return { left: pt.x, right: pt.x + w, y: pt.y }
   })
 }
@@ -1083,10 +1098,11 @@ function computeTextFrameWidthScene(
   metrics: TspanLineMetric[],
   fontSizeScene: number,
   textAnchor: SvgText['textAnchor'],
+  fontFamily?: string,
   /** Если metrics в SVG user units — перевести горизонтальный span в scene px. */
   svgSpanToScene?: (spanSvg: number) => number,
 ): number | undefined {
-  const widths = lines.map((line) => estimateLineWidthSvg(line, fontSizeScene))
+  const widths = lines.map((line) => estimateLineWidthSvg(line, fontSizeScene, fontFamily))
   const maxW = Math.max(...widths, 1)
   const rawSpan = metrics.length > 1
     ? Math.max(...metrics.map((m) => m.right)) - Math.min(...metrics.map((m) => m.left))
@@ -2886,7 +2902,17 @@ export function parseImportedSvgLayers(
           parseNumber(attrs['font-size']) ??
           parseFontSizeFromStyle(textStyle) ??
           18
+        const crmFont = attrs['data-crm-font']?.trim()
+        const crmAlign = attrs['data-crm-align']?.trim().toLowerCase()
+        const crmAnchor = crmAlign === 'left' ? 'start' : crmAlign === 'center' ? 'middle' : crmAlign === 'right' ? 'end' : undefined
+        const metricFontFamily =
+          crmFont
+          ?? parseFontFamilyFromStyle(tspanStyle)
+          ?? parseFontFamilyFromStyle(textStyle)
+          ?? (tspanAttrs['font-family'] ? normalizeFontFamilyToken(tspanAttrs['font-family']) : undefined)
+          ?? (attrs['font-family'] ? normalizeFontFamilyToken(attrs['font-family']) : undefined)
         let textAnchor = resolveTextAnchor(tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
+        if (crmAnchor) textAnchor = crmAnchor
         // Promote только из text-align, не трогаем явный text-anchor:end/middle (в т.ч. из style).
         const cssPromotedAnchor =
           (textAnchor === 'end' || textAnchor === 'middle')
@@ -2955,11 +2981,11 @@ export function parseImportedSvgLayers(
             transformedFontSize,
           )
           : tspans
-        const lineMetrics = resolveTspanLineMetrics(effectiveTspans, attrs, transformedFontSize, textTransform)
+        const lineMetrics = resolveTspanLineMetrics(effectiveTspans, attrs, transformedFontSize, textTransform, metricFontFamily)
         const inferred = inferAlignedTextAnchor(lineMetrics, transformedFontSize)
         let point = applyTransform(textTransform, xv, yv)
         // Геометрия: только если в SVG не было явного align (остался start).
-        if (textAnchor === 'start' && inferred) {
+        if (!crmAnchor && textAnchor === 'start' && inferred) {
           textAnchor = inferred.anchor
           point = { x: inferred.anchorX, y: inferred.anchorY }
         } else if (cssPromotedAnchor) {
@@ -2970,11 +2996,12 @@ export function parseImportedSvgLayers(
             point,
             textContent.split('\n'),
             transformedFontSize,
+            metricFontFamily,
           )
         }
         // Суффикс имени (text_*_center) — явный хинт оператора, выше attrs/геометрии.
         const alignFromName = splitTextLayerAlignHint(ef).anchor
-        if (alignFromName) {
+        if (!crmAnchor && alignFromName) {
           textAnchor = alignFromName
           if (inferred && inferred.anchor === alignFromName) {
             point = { x: inferred.anchorX, y: inferred.anchorY }
@@ -2991,14 +3018,23 @@ export function parseImportedSvgLayers(
             }
           }
         }
-        const mmPoint = geometry.svgPointToMm(point)
-        const scenePoint = geometry.mmPointToScene(mmPoint)
-        const fontFamily =
+        let mmPoint = geometry.svgPointToMm(point)
+        let scenePoint = geometry.mmPointToScene(mmPoint)
+        const parsedFontFamily =
           textStyles?.[0]?.fontFamily
           ?? parseFontFamilyFromStyle(tspanStyle)
           ?? parseFontFamilyFromStyle(textStyle)
           ?? (tspanAttrs['font-family'] ? normalizeFontFamilyToken(tspanAttrs['font-family']) : undefined)
           ?? (attrs['font-family'] ? normalizeFontFamilyToken(attrs['font-family']) : undefined)
+        const fontFamily = crmFont && (!parsedFontFamily || /^arial$/i.test(parsedFontFamily))
+          ? normalizeFontFamilyToken(crmFont)
+          : parsedFontFamily
+        const crmXmm = parseNumber(attrs['data-crm-x-mm'])
+        const crmYmm = parseNumber(attrs['data-crm-y-mm'])
+        if (crmXmm != null || crmYmm != null) {
+          mmPoint = { x: crmXmm ?? mmPoint.x, y: crmYmm ?? mmPoint.y }
+          scenePoint = geometry.mmPointToScene(mmPoint)
+        }
         const fontWeight =
           parseFontWeightFromStyle(tspanStyle)
           ?? parseFontWeightFromStyle(textStyle)
@@ -3012,13 +3048,22 @@ export function parseImportedSvgLayers(
           const b = geometry.svgPointToMm({ x: spanSvg, y: 0 })
           return Math.abs(geometry.mmToPx(b.x - a.x))
         }
-        const frameWidthScene = computeTextFrameWidthScene(
-          textContent.split('\n'),
-          lineMetrics,
-          fontSizeScene,
-          textAnchor,
-          svgSpanToScene,
-        )
+        const declaredFrameWidthMm = parseNumber(attrs['data-crm-frame-w-mm'])
+        const declaredFrameHeightMm = parseNumber(attrs['data-crm-frame-h-mm'])
+        const frameWidthScene = declaredFrameWidthMm != null && declaredFrameWidthMm > 0
+          ? geometry.mmToPx(declaredFrameWidthMm)
+          : computeTextFrameWidthScene(
+            textContent.split('\n'),
+            lineMetrics,
+            fontSizeScene,
+            textAnchor,
+            fontFamily,
+            svgSpanToScene,
+          )
+        const rawCrmAscent = parseNumber(attrs['data-crm-ascent'])
+        const ascentScene = rawCrmAscent != null && rawCrmAscent > 0
+          ? (rawCrmAscent <= 2 ? rawCrmAscent * fontSizeScene : geometry.mmToPx(rawCrmAscent))
+          : measureDesignFontText('M', fontSizeScene, fontFamily)?.ascent
         const angle = transformAngleDeg(textTransform)
         const textEntry: SvgText = {
           name: ef,
@@ -3032,8 +3077,13 @@ export function parseImportedSvgLayers(
           fontStyle,
           text: textContent,
           textAnchor,
+          crmAlignExplicit: Boolean(crmAnchor),
           textStyles,
           frameWidthScene,
+          frameHeightScene: declaredFrameHeightMm != null && declaredFrameHeightMm > 0
+            ? geometry.mmToPx(declaredFrameHeightMm)
+            : undefined,
+          ascentScene,
           fill,
           angle: Math.abs(angle) > 0.01 ? angle : undefined,
           svg: { ...point, fontSize: transformedFontSize },
@@ -3127,7 +3177,7 @@ export function parseImportedSvgLayers(
       ...item,
       name: fabricId,
       layerName,
-      ...(alignFromName ? { textAnchor: alignFromName } : {}),
+      ...(!item.crmAlignExplicit && alignFromName ? { textAnchor: alignFromName } : {}),
     }
     mergedTextBySourceName.set(sourceName, next)
     parsedTextLayerNames.add(fabricId)

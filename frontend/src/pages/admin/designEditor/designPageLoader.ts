@@ -4,25 +4,36 @@ import type { DesignPage } from './types';
 import { FABRIC_CUSTOM_PROPS } from './constants';
 import { normalizeDesignFieldsOnCanvas } from './designFields';
 import { reloadFabricCanvasFonts } from '../../../utils/fabricFontReload';
-import { prepareTextObjectsOnCanvas } from './textStyleRuns';
+import { prepareTextObjectsOnCanvas, finalizeCanvasTextEditingBeforeSave, captureSacredTemplateTextGeometry, extractDesignedTextLayoutsFromFabricJson, applyDesignedTextLayoutSnapshot, normalizeDesignedTextInFabricJSON, type DesignedTextLayoutSnapshot } from './textStyleRuns';
+import type { TextLikeObject } from './textStyleRuns';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from '../../../features/publicDesignEditor/publicEditorFeatureFlags';
 import {
   PUBLIC_EDITOR_DEV,
+  isTextPositionDebugEnabled,
   recordPublicEditorPerfMetric,
 } from '../../../features/publicDesignEditor/publicEditorPerf';
+import { deduplicateFabricJsonObjectsById } from './fabricSnapshotReconcile';
+import { deduplicateCanvasObjectsByStableId } from './canvas/canvasUtils';
+import { isTemplateTextLayerId, prefixSpreadPageFabricObjectIds, stripSpreadPageIdPrefix } from './spreadPageObjectIds';
 import {
   getIosSafariCanvasOptions,
   hardenCanvasObjectsForIosSafari,
   hardenFabricObjectForIosSafari,
   isIosSafariCanvasSafeMode,
 } from './canvas/iosSafariCanvasSafeMode';
-import { prefixSpreadPageFabricObjectIds } from './spreadPageObjectIds';
+import { setFabricCanvasSceneSize } from './canvas/mobileEditorPixelBudget';
+import { rewriteEphemeralPhotoFieldBlobSources } from './canvas/canvasSerialization';
+import {
+  resolveCrmEditorAssetUrl,
+  rewriteFabricJsonAssetUrls,
+} from '../../../utils/crmEditorAssetUrl';
 
 type AnyObj = Record<string, unknown>;
 
 const svgDataUrlCache = new Map<string, string>();
 
 type DeferredBackground = Record<string, unknown>;
+export type ResolveEditorImageSrc = (src: string) => Promise<string | null>;
 
 type PreparedFabricJson = {
   json: Record<string, unknown>;
@@ -44,37 +55,34 @@ function asAny(value: unknown): AnyObj {
   return value as AnyObj;
 }
 
-function summarizeSource(src: string): Record<string, unknown> {
-  return {
-    kind: src.startsWith('data:') ? 'data-url' : 'url',
-    isSvg: isSvgImageSource(src),
-    length: src.length,
-    preview: src.startsWith('data:') ? src.slice(0, 72) : src,
-  };
-}
-
-function summarizeCanvasObjects(canvas: Canvas): Array<Record<string, unknown>> {
-  return canvas.getObjects().map((obj, index) => {
-    const meta = asAny(obj);
-    return {
-      index,
-      type: obj.type,
-      id: typeof meta.id === 'string' ? meta.id : null,
-      isBackground: meta.isBackground === true,
-      isPhotoField: meta.isPhotoField === true,
-      photoFieldFilled: meta.photoFieldFilled === true,
-      fill: typeof meta.fill === 'string' ? meta.fill : undefined,
-      src: typeof meta.src === 'string' ? summarizeSource(meta.src) : undefined,
-      left: Math.round(Number(obj.left ?? 0)),
-      top: Math.round(Number(obj.top ?? 0)),
-      width: Math.round(Number(obj.width ?? 0)),
-      height: Math.round(Number(obj.height ?? 0)),
-      scaleX: Number(obj.scaleX ?? 1),
-      scaleY: Number(obj.scaleY ?? 1),
-      visible: obj.visible !== false,
-      opacity: obj.opacity,
-    };
-  });
+function captureSacredTemplateTextsOnCanvas(
+  canvas: Canvas,
+  pageKeyForLog: string,
+  layoutSnapshots?: Map<string, DesignedTextLayoutSnapshot>,
+): void {
+  try {
+    canvas.getObjects().forEach((o) => {
+      const meta = asAny(o);
+      const id = String(meta.id ?? '');
+      if (isTemplateTextLayerId(id) && meta.textFieldClientAdded !== true) {
+        const snap = layoutSnapshots?.get(id);
+        if (snap) applyDesignedTextLayoutSnapshot(o as TextLikeObject, snap);
+        captureSacredTemplateTextGeometry(o as TextLikeObject, { overwrite: true, jsonSnapshot: snap });
+      }
+    });
+    if (isTextPositionDebugEnabled()) {
+      const captured = canvas.getObjects().filter((o) => isTemplateTextLayerId(asAny(o).id));
+      if (captured.length) {
+        console.log(`[TEXT-POS] sacred-captured ${pageKeyForLog}`);
+        captured.forEach((o) => {
+          const t = o as TextLikeObject;
+          console.log(`[TEXT-POS]   SACRED id=${t.id} left=${t.left} top=${t.top} w=${t.width} angle=${t.angle ?? 0} originX=${t.originX}`);
+        });
+      }
+    }
+  } catch {
+    /* non-fatal */
+  }
 }
 
 function normalizeFabricJsonRoot(value: unknown): Record<string, unknown> | null {
@@ -127,23 +135,17 @@ function shouldLoadSvgBackgroundAsVector(): boolean {
 async function resolveSvgImageDataUrl(src: string): Promise<string | null> {
   if (!isSvgImageUrl(src) || src.startsWith('data:')) return null;
   const cached = svgDataUrlCache.get(src);
-  if (cached) {
-return cached;
-  }
+  if (cached) return cached;
   try {
-const response = await fetch(src, { credentials: 'same-origin' });
-    if (!response.ok) {
-return null;
-    }
+    const response = await fetch(src, { credentials: 'same-origin' });
+    if (!response.ok) return null;
     const svgText = await response.text();
-    if (!/<svg[\s>]/i.test(svgText)) {
-return null;
-    }
+    if (!/<svg[\s>]/i.test(svgText)) return null;
     const dataUrl = svgTextToDataUrl(svgText);
     svgDataUrlCache.set(src, dataUrl);
-return dataUrl;
-  } catch (error) {
-return null;
+    return dataUrl;
+  } catch {
+    return null;
   }
 }
 
@@ -163,8 +165,6 @@ async function inlineSvgImageSources(value: unknown): Promise<void> {
   }
   await Promise.all(Object.values(record).map((nested) => inlineSvgImageSources(nested)));
 }
-
-export type ResolveEditorImageSrc = (src: string) => Promise<string | null>;
 
 async function remapFabricJsonImageSources(
   value: unknown,
@@ -210,7 +210,8 @@ async function prepareFabricJsonForLoad(
   fabricJson: Record<string, unknown>,
   resolveImageSrc?: ResolveEditorImageSrc,
 ): Promise<PreparedFabricJson> {
-  const prepared = deepCloneFabricJson(fabricJson);
+  const prepared = rewriteFabricJsonAssetUrls(deepCloneFabricJson(fabricJson));
+  rewriteEphemeralPhotoFieldBlobSources(prepared);
   const deferredBackgrounds: DeferredBackground[] = [];
   collectDeferredSvgBackgrounds(prepared.objects, deferredBackgrounds);
   await inlineSvgImageSources(prepared);
@@ -224,15 +225,11 @@ async function prepareFabricJsonForLoad(
 
 async function loadSvgBackgroundAsVector(src: string): Promise<FabricObject | null> {
   const svgText = decodeSvgDataUrl(src);
-  if (!svgText || !/<svg[\s>]/i.test(svgText)) {
-return null;
-  }
+  if (!svgText || !/<svg[\s>]/i.test(svgText)) return null;
   const parsed = await loadSVGFromString(svgText);
   const objects = parsed.objects.filter((obj): obj is FabricObject => obj != null);
-  if (!objects.length) {
-return null;
-  }
-objects.forEach(hardenFabricObjectForIosSafari);
+  if (!objects.length) return null;
+  objects.forEach(hardenFabricObjectForIosSafari);
   const group = util.groupSVGElements(objects, parsed.options);
   hardenFabricObjectForIosSafari(group);
   return group;
@@ -243,15 +240,11 @@ async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackg
     const src = typeof background.src === 'string' ? background.src : '';
     if (!src) continue;
     try {
-const props = { ...background };
+      const props = { ...background };
       delete props.src;
       delete props.type;
       delete props.version;
-      const backgroundObject = shouldLoadSvgBackgroundAsVector()
-        ? await loadSvgBackgroundAsVector(src)
-        : null;
-      const obj = backgroundObject
-        ?? await FabricImage.fromURL(src, src.startsWith('data:') ? {} : { crossOrigin: 'anonymous' });
+      const obj = await loadBackgroundObject(src);
       obj.set(props);
       for (const key of FABRIC_CUSTOM_PROPS) {
         if (Object.prototype.hasOwnProperty.call(background, key)) {
@@ -263,10 +256,24 @@ const props = { ...background };
       hardenFabricObjectForIosSafari(obj);
       canvas.add(obj);
       canvas.sendObjectToBack(obj);
-} catch (error) {
-// SVG backgrounds are decorative; never block the rest of the page.
+    } catch {
+      // SVG backgrounds are decorative; never block the rest of the page.
     }
   }
+}
+
+async function loadBackgroundObject(src: string): Promise<FabricObject> {
+  if (shouldLoadSvgBackgroundAsVector() && isSvgImageSource(src)) {
+    const vectorSrc = src.startsWith('data:')
+      ? src
+      : await resolveSvgImageDataUrl(src);
+    if (vectorSrc) {
+      const vectorObject = await loadSvgBackgroundAsVector(vectorSrc);
+      if (vectorObject) return vectorObject;
+    }
+  }
+
+  return FabricImage.fromURL(src, src.startsWith('data:') ? {} : { crossOrigin: 'anonymous' });
 }
 
 function getFabricJsonObjects(value: Record<string, unknown> | null): Record<string, unknown>[] {
@@ -307,7 +314,39 @@ function normalizeSerializedBackgroundObject(obj: Record<string, unknown>, pageW
   obj.scaleY = pageH / height;
 }
 
-function buildSpreadMergedFabricJson(input: {
+/**
+ * Убирает text_* с правой страницы, если на левой уже есть тот же слой с тем же текстом
+ * (остаток старого spine-mirror). Разный текст при том же id — норма для соседних страниц альбома.
+ */
+function scrubMirroredDesignedTextFromSpreadMerge(
+  leftObjects: Record<string, unknown>[],
+  rightObjects: Record<string, unknown>[],
+): { rightObjects: Record<string, unknown>[]; removed: number } {
+  const leftTextByBaseId = new Map<string, string>();
+  for (const obj of leftObjects) {
+    const id = typeof obj.id === 'string' ? obj.id.trim() : '';
+    if (!id) continue;
+    const baseId = stripSpreadPageIdPrefix(id);
+    if (!isTemplateTextLayerId(baseId) || obj.textFieldClientAdded === true) continue;
+    leftTextByBaseId.set(baseId, String(obj.text ?? '').replace(/\u200b/g, '').trim());
+  }
+  let removed = 0;
+  const nextRight = rightObjects.filter((obj) => {
+    const id = typeof obj.id === 'string' ? obj.id.trim() : '';
+    if (!id) return true;
+    const baseId = stripSpreadPageIdPrefix(id);
+    if (!isTemplateTextLayerId(baseId) || obj.textFieldClientAdded === true) return true;
+    const leftText = leftTextByBaseId.get(baseId);
+    if (leftText == null) return true;
+    const rightText = String(obj.text ?? '').replace(/\u200b/g, '').trim();
+    if (leftText !== rightText) return true;
+    removed += 1;
+    return false;
+  });
+  return { rightObjects: nextRight, removed };
+}
+
+export function buildSpreadMergedFabricJson(input: {
   leftPage: DesignPage | undefined;
   rightPage: DesignPage | undefined;
   leftPageIndex: number;
@@ -331,7 +370,7 @@ function buildSpreadMergedFabricJson(input: {
     return next;
   });
   let dedupedMirrorCount = 0;
-  const rightObjects = getFabricJsonObjects(rightRoot).flatMap((obj) => {
+  const rightObjectsRaw = getFabricJsonObjects(rightRoot).flatMap((obj) => {
     const next = deepCloneFabricJson(obj);
     const mirror = readSpreadMirrorMeta(next);
     const isMirroredDuplicate = enableMirrorReconciliation
@@ -347,30 +386,38 @@ function buildSpreadMergedFabricJson(input: {
     prefixSpreadPageFabricObjectIds(next, input.rightPageIndex);
     return [next];
   });
+  const scrubbed = scrubMirroredDesignedTextFromSpreadMerge(leftObjects, rightObjectsRaw);
+  const rightObjects = scrubbed.rightObjects;
+  dedupedMirrorCount += scrubbed.removed;
   recordPublicEditorPerfMetric('spread.merge.dedupedMirrors', dedupedMirrorCount, {
     leftObjects: leftObjects.length,
     rightObjects: rightObjects.length,
+    scrubbedSameText: scrubbed.removed,
   });
   if (PUBLIC_EDITOR_DEV && dedupedMirrorCount > 0) {
-    console.info('[DesignEditorCanvas] spread merge reconciled mirrored duplicates', {
+    console.info('[DesignEditorCanvas] spread merge reconciled duplicates', {
       dedupedMirrorCount,
       leftObjects: leftObjects.length,
       rightObjects: rightObjects.length,
+      scrubbedSameText: scrubbed.removed,
     });
   }
   if (leftObjects.length === 0 && rightObjects.length === 0) return null;
   return {
     ...(leftRoot ?? rightRoot ?? {}),
-    objects: [...leftObjects, ...rightObjects],
+    objects: deduplicateFabricJsonObjectsById([...leftObjects, ...rightObjects]),
     backgroundColor: 'white',
   };
 }
 
 function resolvePreviewUrl(template: DesignTemplate | null, apiBaseUrl: string): string | null {
   if (!template?.preview_url) return null;
+  const resolved = resolveCrmEditorAssetUrl(template.preview_url);
+  if (resolved) return resolved;
   if (template.preview_url.startsWith('http')) return template.preview_url;
   const base = apiBaseUrl.replace(/\/api\/?$/, '');
-  return `${base}${template.preview_url.startsWith('/') ? '' : '/'}${template.preview_url}`;
+  const joined = `${base}${template.preview_url.startsWith('/') ? '' : '/'}${template.preview_url}`;
+  return resolveCrmEditorAssetUrl(joined) ?? joined;
 }
 
 function hasBackgroundObject(canvas: Canvas): boolean {
@@ -412,7 +459,7 @@ export async function addTemplatePreviewBackground(
   const previewUrl = resolvePreviewUrl(template, apiBaseUrl);
   if (!previewUrl) return;
   try {
-    const img = await FabricImage.fromURL(previewUrl, { crossOrigin: 'anonymous' });
+    const img = await loadBackgroundObject(previewUrl);
     img.set({
       left: 0,
       top: 0,
@@ -438,32 +485,85 @@ export async function loadDesignPageScene(input: {
   pageW: number;
   pageH: number;
   apiBaseUrl: string;
+  /** Order/export PNG: не пересчитывать ширину/позицию text_* после load. */
+  preserveTextLayout?: boolean;
+  /** CRM-specific resolver for image sources retained for existing callers. */
   resolveImageSrc?: ResolveEditorImageSrc;
 }): Promise<void> {
-  const { canvas, pageData, pageIndex, template, pageW, pageH, apiBaseUrl, resolveImageSrc } = input;
+  const {
+    canvas, pageData, pageIndex, template, pageW, pageH, apiBaseUrl, preserveTextLayout, resolveImageSrc,
+  } = input;
+  const textLayoutOpts = preserveTextLayout ? { preserveTextLayout: true } as const : undefined;
+  const fontReloadOpts = preserveTextLayout ? { preserveLayout: true } : undefined;
   const useTemplatePreviewBackground = pageIndex == null || pageIndex === 0;
   const fabricJson = normalizeFabricJsonRoot(pageData?.fabricJSON);
   const hasJson = !!fabricJson
     && Object.keys(fabricJson).length > 0;
-if (hasJson) {
+  const pageKeyForLog = `single-${pageIndex ?? '?'}`;
+  if (hasJson) {
+    // DEBUG: positions coming from stored fabricJSON (before any mutation on load)
+    try {
+      const objs = Array.isArray(fabricJson.objects) ? fabricJson.objects : [];
+      const textObjs = objs.filter((o: any) => isTemplateTextLayerId(o?.id));
+      if (textObjs.length && isTextPositionDebugEnabled()) {
+        console.log(`[TEXT-POS] incoming-json ${pageKeyForLog} count=${textObjs.length}`);
+        textObjs.forEach((o: any) => {
+          const t = String(o.text ?? '').slice(0, 40).replace(/\n/g, ' ');
+          console.log(`[TEXT-POS]   [IN] id=${o.id} left=${o.left} top=${o.top} w=${o.width} angle=${o.angle ?? 0} originX=${o.originX} "${t}"`);
+        });
+      }
+    } catch {}
+
     canvas.clear();
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
+      const normalizedFabricJson = normalizeDesignedTextInFabricJSON(fabricJson);
+      const layoutSnapshots = extractDesignedTextLayoutsFromFabricJson(normalizedFabricJson);
       // Не даём Fabric мутировать snapshot страницы в React state при переходах.
-      const prepared = await prepareFabricJsonForLoad(fabricJson, resolveImageSrc);
+      const prepared = await prepareFabricJsonForLoad(normalizedFabricJson, resolveImageSrc);
       await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
       hardenCanvasObjectsForIosSafari(canvas);
-} catch (error) {
-canvas.clear();
+      deduplicateCanvasObjectsByStableId(canvas);
+
+      // Apply layout width/position from JSON — Fabric loadFromJSON may shrink textbox width.
+      captureSacredTemplateTextsOnCanvas(canvas, pageKeyForLog, layoutSnapshots);
+
+      // DEBUG: positions right after loadFromJSON
+      try {
+        const loadedTexts = canvas.getObjects().filter((o: any) => isTemplateTextLayerId(o.id));
+      if (loadedTexts.length && isTextPositionDebugEnabled()) {
+        console.log(`[TEXT-POS] after-loadFromJSON ${pageKeyForLog} count=${loadedTexts.length}`);
+        loadedTexts.forEach((o: any) => {
+          const t = String(o.text ?? '').slice(0, 40).replace(/\n/g, ' ');
+          console.log(`[TEXT-POS]   [LOADED] id=${o.id} left=${o.left} top=${o.top} w=${o.width} angle=${o.angle ?? 0} originX=${o.originX} "${t}"`);
+        });
+      }
+      } catch {}
+    } catch {
+      canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
     }
     // Для пустых страниц без backgroundColor в JSON сохраняем непрозрачный белый фон.
     ensureWhiteCanvasBackground(canvas);
-    await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
+    await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH, textLayoutOpts);
     normalizeBackgroundObjects(canvas, pageW, pageH);
-    await reloadFabricCanvasFonts(canvas);
+    await reloadFabricCanvasFonts(canvas, fontReloadOpts);
     hardenCanvasObjectsForIosSafari(canvas);
+    finalizeCanvasTextEditingBeforeSave(canvas, fontReloadOpts);
+
+    // DEBUG: final positions after all normalization/hydrate/width-fit on this page load
+    try {
+      const finalTexts = canvas.getObjects().filter((o: any) => isTemplateTextLayerId(o.id));
+      if (finalTexts.length && isTextPositionDebugEnabled()) {
+        console.log(`[TEXT-POS] after-normalize ${pageKeyForLog} count=${finalTexts.length}`);
+        finalTexts.forEach((o: any) => {
+          const t = String(o.text ?? '').slice(0, 40).replace(/\n/g, ' ');
+          console.log(`[TEXT-POS]   [FINAL] id=${o.id} left=${o.left} top=${o.top} w=${o.width} angle=${o.angle ?? 0} originX=${o.originX} "${t}"`);
+        });
+      }
+    } catch {}
+
     if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
       await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
     }
@@ -476,7 +576,9 @@ canvas.clear();
   }
   ensureWhiteCanvasBackground(canvas);
   hardenCanvasObjectsForIosSafari(canvas);
-canvas.requestRenderAll();
+  // Final stabilize + lock before render (в т.ч. после подгрузки шрифтов на мобилке).
+  try { finalizeCanvasTextEditingBeforeSave(canvas, fontReloadOpts); } catch {}
+  canvas.requestRenderAll();
 }
 
 export async function loadSpreadMergedScene(input: {
@@ -501,22 +603,31 @@ export async function loadSpreadMergedScene(input: {
   });
 if (mergedJson) {
     canvas.clear();
-    canvas.setDimensions({ width: pageW * 2, height: pageH });
+    setFabricCanvasSceneSize(canvas, pageW * 2, pageH);
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
-      const prepared = await prepareFabricJsonForLoad(mergedJson);
+      const normalizedMergedJson = normalizeDesignedTextInFabricJSON(mergedJson);
+      const spreadLayoutSnapshots = extractDesignedTextLayoutsFromFabricJson(normalizedMergedJson);
+      const prepared = await prepareFabricJsonForLoad(normalizedMergedJson);
       await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
       ensureWhiteCanvasBackground(canvas);
+      deduplicateCanvasObjectsByStableId(canvas);
+      captureSacredTemplateTextsOnCanvas(
+        canvas,
+        `spread-${leftPageIndex ?? '?'}-${rightPageIndex ?? '?'}`,
+        spreadLayoutSnapshots,
+      );
       await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
-      await reloadFabricCanvasFonts(canvas);
       hardenCanvasObjectsForIosSafari(canvas);
+      await reloadFabricCanvasFonts(canvas);
+      finalizeCanvasTextEditingBeforeSave(canvas);
       canvas.renderAll();
       canvas.requestRenderAll();
 return;
     } catch (error) {
 canvas.clear();
-      canvas.setDimensions({ width: pageW * 2, height: pageH });
+      setFabricCanvasSceneSize(canvas, pageW * 2, pageH);
       (canvas as unknown as AnyObj).backgroundColor = 'white';
     }
   }
@@ -545,15 +656,27 @@ canvas.clear();
     ]);
 
     canvas.clear();
-    canvas.setDimensions({ width: pageW * 2, height: pageH });
+    setFabricCanvasSceneSize(canvas, pageW * 2, pageH);
     (canvas as unknown as AnyObj).backgroundColor = 'white';
 
     for (const obj of [...leftTemp.getObjects()]) {
       try {
         const clone = await obj.clone();
+        const beforeL = clone.left;
         clone.set({ left: clone.left ?? 0 });
+        // Explicitly carry rotation for rotated template texts (clone may not transfer our _sacred*).
+        if (isTemplateTextLayerId((obj as any).id)) {
+          const srcAngle = (obj as any).angle ?? 0;
+          clone.set({ angle: srcAngle } as any);
+          if (typeof (obj as any)._sacredAngle === 'number') {
+            (clone as any)._sacredAngle = (obj as any)._sacredAngle;
+          }
+        }
         hardenFabricObjectForIosSafari(clone);
         canvas.add(clone);
+        if (isTemplateTextLayerId((obj as any).id) && isTextPositionDebugEnabled()) {
+          console.log(`[TEXT-POS] spread-clone left id=${(obj as any).id} before=${beforeL} after=${clone.left} angle=${clone.angle ?? 0}`);
+        }
       } catch (error) {
         if (PUBLIC_EDITOR_DEV) console.warn('[DesignEditorCanvas] skipped left spread object clone', error);
       }
@@ -562,13 +685,28 @@ canvas.clear();
     for (const obj of [...rightTemp.getObjects()]) {
       try {
         const clone = await obj.clone();
+        const beforeL = clone.left;
         clone.set({ left: (clone.left ?? 0) + pageW });
+        // Explicitly carry rotation for rotated template texts.
+        if (isTemplateTextLayerId((obj as any).id)) {
+          const srcAngle = (obj as any).angle ?? 0;
+          clone.set({ angle: srcAngle } as any);
+          if (typeof (obj as any)._sacredAngle === 'number') {
+            (clone as any)._sacredAngle = (obj as any)._sacredAngle;
+          }
+        }
         hardenFabricObjectForIosSafari(clone);
         canvas.add(clone);
+        if (isTemplateTextLayerId((obj as any).id) && isTextPositionDebugEnabled()) {
+          console.log(`[TEXT-POS] spread-clone right id=${(obj as any).id} before=${beforeL} after=${clone.left} angle=${clone.angle ?? 0}`);
+        }
       } catch (error) {
         if (PUBLIC_EDITOR_DEV) console.warn('[DesignEditorCanvas] skipped right spread object clone', error);
       }
     }
+
+    // Capture sacred geometry for text objects on spread fallback path.
+    captureSacredTemplateTextsOnCanvas(canvas, `spread-fallback-${leftPageIndex ?? '?'}-${rightPageIndex ?? '?'}`);
   } finally {
     leftTemp.dispose();
     rightTemp.dispose();
@@ -577,6 +715,7 @@ canvas.clear();
   ensureWhiteCanvasBackground(canvas);
   hardenCanvasObjectsForIosSafari(canvas);
   await reloadFabricCanvasFonts(canvas);
+  finalizeCanvasTextEditingBeforeSave(canvas);
   canvas.renderAll();
   canvas.requestRenderAll();
 }

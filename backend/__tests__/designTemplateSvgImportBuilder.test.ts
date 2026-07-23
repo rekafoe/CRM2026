@@ -14,6 +14,16 @@ describe('resolveImportedTemplateSceneScale', () => {
 })
 
 describe('fabricTextFromSvgText', () => {
+  it('использует data-crm-ascent для top вместо magic 0.8', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <text id="text_title" x="10" y="20" font-size="10" data-crm-ascent="0.6">Title</text>
+</svg>`
+    const item = parseImportedSvgLayers(svg, { sceneScale: 3 }).textItems[0]!
+    const fabric = fabricTextFromSvgText(item) as unknown as Record<string, number>
+    expect(fabric.top).toBeCloseTo(item.scene.y - item.scene.fontSize * 0.6, 5)
+  })
+
   it('экспортирует textbox с textStyleRuns без styles', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
@@ -40,7 +50,7 @@ describe('fabricTextFromSvgText', () => {
     expect(cer?.end).toBe(item!.text.length)
   })
 
-  it('не подставляет Arial, если font-family в SVG отсутствует', () => {
+  it('подставляет Arial, если font-family в SVG отсутствует', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
   <text id="text_voguella" x="80" y="220" font-size="48">Имя</text>
@@ -48,8 +58,7 @@ describe('fabricTextFromSvgText', () => {
     const item = parseImportedSvgLayers(svg).textItems[0]
     expect(item).toBeDefined()
     const fabric = fabricTextFromSvgText(item!) as Record<string, unknown>
-    expect(fabric.fontFamily).toBe('')
-    expect(fabric.fontFamily).not.toBe('Arial')
+    expect(fabric.fontFamily).toBe('Arial')
   })
 
   it('даёт достаточную ширину однострочному text_* без принудительного переноса', () => {

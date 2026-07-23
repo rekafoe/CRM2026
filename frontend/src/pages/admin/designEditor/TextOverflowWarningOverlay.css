@@ -1,0 +1,27 @@
+.design-editor-text-overflow-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 22;
+  overflow: visible;
+}
+
+.design-editor-text-overflow-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.45);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.design-editor-text-overflow-badge__icon {
+  color: #ffffff;
+}

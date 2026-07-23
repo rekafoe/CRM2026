@@ -6,7 +6,7 @@ import {
 } from '../src/utils/extractDesignStateFonts'
 
 describe('applyLibraryFontFallbacksToDesignState', () => {
-  it('подставляет шрифт из библиотеки по id слоя text_voguella', () => {
+  it('не подменяет Corel Arial шрифтом из библиотеки по id слоя', () => {
     const designState = {
       pages: [{
         fabricJSON: {
@@ -23,7 +23,7 @@ describe('applyLibraryFontFallbacksToDesignState', () => {
       family_name: 'Voguella',
     }]) as typeof designState
     const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
-    expect(obj.fontFamily).toBe('Voguella')
+    expect(obj.fontFamily).toBe('Arial')
   })
 
   it('подставляет шрифт при пустом fontFamily по id слоя text_voguella', () => {
@@ -44,6 +44,26 @@ describe('applyLibraryFontFallbacksToDesignState', () => {
     }]) as typeof designState
     const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
     expect(obj.fontFamily).toBe('Voguella')
+  })
+
+  it('пустой fontFamily без совпадения в библиотеке → Arial', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            id: 'text_1',
+            fontFamily: '',
+            text: 'Имя',
+          }],
+        },
+      }],
+    }
+    const next = applyLibraryFontFallbacksToDesignState(designState, [{
+      family_name: 'Voguella',
+    }]) as typeof designState
+    const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
+    expect(obj.fontFamily).toBe('Arial')
   })
 
   it('не перезаписывает неизвестный не-generic шрифт из SVG по id слоя', () => {

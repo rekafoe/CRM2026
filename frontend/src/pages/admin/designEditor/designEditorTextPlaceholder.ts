@@ -26,9 +26,15 @@ export function isPlaceholderTemplateText(text: string | undefined): boolean {
  * Сообщение после выхода из правки, если текст пустой или остался шаблонным.
  * null — напоминание не нужно.
  */
+export interface TextFillHintOptions {
+  /** Клиентский текст (+текст) — не ругаем за неизменённый placeholder сразу после добавления. */
+  isClientAdded?: boolean;
+}
+
 export function resolveTextFillHintAfterEdit(
   textBefore: string | undefined,
   textAfter: string | undefined,
+  options?: TextFillHintOptions,
 ): string | null {
   const before = normalizeTextForPlaceholderCheck(textBefore);
   const after = normalizeTextForPlaceholderCheck(textAfter);
@@ -38,6 +44,10 @@ export function resolveTextFillHintAfterEdit(
   }
 
   if (!isPlaceholderTemplateText(after)) {
+    return null;
+  }
+
+  if (options?.isClientAdded && after === before) {
     return null;
   }
 

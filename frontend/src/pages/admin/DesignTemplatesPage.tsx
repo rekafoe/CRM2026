@@ -1444,6 +1444,17 @@ export const DesignTemplatesPage: React.FC = () => {
               <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); setReimportTemplate(infoTemplate); }}>
                 Обновить из SVG
               </button>
+              <button
+                type="button"
+                className="lg-btn lg-btn--primary"
+                onClick={() => {
+                  const id = infoTemplate.id;
+                  setInfoTemplate(null);
+                  navigate(`/adminpanel/design-editor/${id}`);
+                }}
+              >
+                Редактировать макет
+              </button>
               <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); openEdit(infoTemplate); }}>Редактировать карточку</button>
               {(infoParsed.productId != null || infoParsed.typeId != null) && (
                 <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); openBindingsForTemplate(infoTemplate); }}>
@@ -1452,7 +1463,7 @@ export const DesignTemplatesPage: React.FC = () => {
               )}
               <button
                 type="button"
-                className="lg-btn lg-btn--primary"
+                className="lg-btn"
                 onClick={() => {
                   void openSiteSandboxForDesignTemplate(infoTemplate).catch((err) => {
                     window.alert(err instanceof Error ? err.message : 'Не удалось открыть редактор на сайте');

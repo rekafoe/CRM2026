@@ -5,7 +5,9 @@ import {
   fontFamilyCompactKey,
   guessFontFamilyFromFilename,
   isGenericFontFamily,
+  isUnsetFontFamily,
 } from '../utils/fontFamilyNormalize'
+import { measureDesignFontText } from '../utils/designFontMetrics'
 import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
 import {
   parseImportedSvgLayers,
@@ -192,15 +194,14 @@ function toFabricText(item: SvgText) {
   const textAlign = item.textAnchor === 'end' ? 'right' : item.textAnchor === 'middle' ? 'center' : 'left'
   const top = Math.abs(angle) > 0.5
     ? item.scene.y
-    : item.scene.y - fontSizePx * 0.8
-  const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
+    : item.scene.y - (item.ascentScene ?? measureDesignFontText('M', fontSizePx, item.fontFamily)?.ascent ?? fontSizePx * 0.8)
   const textStyleRuns = item.textStyles?.length
     ? toTextStyleRuns(item.textStyles, fontSizePx)
     : undefined
-  // Без молчаливого Arial: пустой family → generic → library/ZIP fallback по text_*.
+  // Как в Corel: нет family → Arial. Arial из SVG не перезаписываем library/ZIP fallback.
   const baseFontFamily = item.textStyles?.[0]?.fontFamily?.trim()
     || item.fontFamily?.trim()
-    || ''
+    || 'Arial'
   const baseFill = item.fill?.trim()
     || item.textStyles?.[0]?.fill?.trim()
     || '#111827'
@@ -213,7 +214,9 @@ function toFabricText(item: SvgText) {
    */
   const looksScript = /script|ceremon|cursive|handwrit|calligraph|italic/i.test(baseFontFamily)
   const widthCoeff = looksScript ? 0.85 : 0.55
-  const estimatedLineWidth = maxLineLen * fontSizePx * widthCoeff
+  const estimatedLineWidth = Math.max(...item.text.split('\n').map((line) => (
+    measureDesignFontText(line, fontSizePx, baseFontFamily)?.width ?? Math.max(1, line.length) * fontSizePx * widthCoeff
+  )))
   const defaultWidth = Math.max(120, estimatedLineWidth + fontSizePx * 0.9)
   const frameW = item.frameWidthScene
   const width = typeof frameW === 'number' && Number.isFinite(frameW) && frameW > 0
@@ -828,24 +831,25 @@ function applyBundledFontFallbacks(
     if (layer.kind !== 'text') continue
     const text = layer.data
     const matched = matchBundledFontToTextLayer(text.name, bundledFonts)
-    if (matched && isGenericFontFamily(text.fontFamily)) {
+    // Только пустой family; Arial из Corel оставляем как есть.
+    if (matched && isUnsetFontFamily(text.fontFamily)) {
       text.fontFamily = matched.family
     }
     if (matched && text.textStyles?.length) {
       for (const seg of text.textStyles) {
-        if (isGenericFontFamily(seg.fontFamily)) {
+        if (isUnsetFontFamily(seg.fontFamily)) {
           seg.fontFamily = matched.family
         }
       }
     }
   }
 
-  const unresolved = parsed.textItems.filter((item) => isGenericFontFamily(item.fontFamily))
+  const unresolved = parsed.textItems.filter((item) => isUnsetFontFamily(item.fontFamily))
   if (unresolved.length > 0) {
     warnings.push(
-      `Страница ${pageIndex + 1}: для ${unresolved.map((t) => t.name).join(', ')} не найден font-family в SVG. `
-      + `В ZIP: ${bundledFonts.map((f) => f.family).join(', ')}. `
-      + 'Проверьте экспорт (font-family на слое) или имя text_<шрифт>.',
+      `Страница ${pageIndex + 1}: для ${unresolved.map((t) => t.name).join(', ')} не найден font-family в SVG `
+      + `(будет Arial). В ZIP: ${bundledFonts.map((f) => f.family).join(', ')}. `
+      + 'Проверьте экспорт или имя text_<шрифт>.',
     )
   }
 }
