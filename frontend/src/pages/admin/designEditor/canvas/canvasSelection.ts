@@ -4,11 +4,12 @@ import type { SelectedObjProps } from '../types';
 import { isClientAddedPhotoField } from '../designFields';
 import { isCoarsePointerEnvironment } from './canvasPointer';
 import { asAny, isTextLikeObject } from './canvasUtils';
+import { isEligiblePhotoFieldLike } from '../decorElementGuards';
 
 export function resolvePhotoFieldTarget(target: FabricObject | undefined): FabricObject | undefined {
   let field = target;
   if (field?.group && asAny(field.group).isPhotoField) field = field.group as FabricObject;
-  if (!field || !asAny(field).isPhotoField) return undefined;
+  if (!field || !isEligiblePhotoFieldLike(asAny(field))) return undefined;
   return field;
 }
 
@@ -82,7 +83,7 @@ export function findPhotoFieldByIdDeep(
   const walk = (list: FabricObject[]) => {
     for (const o of list) {
       const id = String(asAny(o).id ?? '');
-      if (asAny(o).isPhotoField && photoFieldIdsMatch(id, fieldId)) {
+      if (isEligiblePhotoFieldLike(asAny(o)) && photoFieldIdsMatch(id, fieldId)) {
         matches.push(o);
       }
       if (typeof (o as Group).getObjects === 'function') {

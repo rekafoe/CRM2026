@@ -92,6 +92,11 @@ export function analyzePublicDesignPage(
   walkFabricObjects(page?.fabricJSON, (obj) => {
     objectCount += 1;
     if (obj.isPhotoField === true) {
+      // decor_* / isDecorElement — лого и орнамент, не фото-поля для авторасстановки
+      if (obj.isDecorElement === true) return;
+      const rawId = String(obj.id ?? '').trim().toLowerCase();
+      const baseId = rawId.replace(/^p\d+:/, '');
+      if (baseId.startsWith('decor_')) return;
       const id = String(obj.id ?? `photo-${pageIndex + 1}-${photoFields.length + 1}`);
       const filled = obj.photoFieldFilled === true;
       const fieldWidth = Number(obj.photoFieldFw ?? obj.width ?? 0);

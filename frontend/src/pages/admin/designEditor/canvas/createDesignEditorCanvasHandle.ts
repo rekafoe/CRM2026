@@ -55,6 +55,7 @@ import {
   isTextLikeObject,
 } from './canvasUtils';
 import { isCoarsePointerEnvironment } from './canvasPointer';
+import { isDecorElementLike, isEligiblePhotoFieldLike } from '../decorElementGuards';
 
 export interface DesignEditorCanvasHandleDeps {
   fabricRef: MutableRefObject<Canvas | null>;
@@ -385,10 +386,11 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
           (o) =>
             o.type === 'image' &&
             !asAny(o).isBackground &&
-            !asAny(o).isPhotoField,
+            !asAny(o).isPhotoField &&
+            !isDecorElementLike(asAny(o)),
         ) as FabricImage[];
         const targets = objects.filter((o) => {
-          if (!asAny(o).isPhotoField) return false;
+          if (!isEligiblePhotoFieldLike(asAny(o))) return false;
           /* Пустая рамка (rect/group) или старый макет: одно image с флагом */
           return o.type === 'rect' || o.type === 'group' || o.type === 'image';
         }) as FabricObject[];
