@@ -217,18 +217,40 @@ function parseSpecMm(spec: string | null | undefined): { width_mm: number; heigh
   return null
 }
 
-/** Одна карточка на design_code (первый встретившийся вариант после сортировки). */
+function rowHasPublicPreview(row: DesignTemplateRow): boolean {
+  const site = String(row.site_preview_url ?? '').trim()
+  const preview = String(row.preview_url ?? '').trim()
+  return Boolean(site || preview)
+}
+
+/**
+ * Одна карточка на design_code.
+ * Превью общее для семьи: берём site_preview_url / preview_url с любого варианта.
+ */
 function dedupePublicByDesignCode(rows: DesignTemplateRow[]): DesignTemplateRow[] {
-  const seen = new Set<string>()
-  const out: DesignTemplateRow[] = []
+  const groups = new Map<string, DesignTemplateRow[]>()
+  const order: string[] = []
   for (const row of rows) {
     const code = String((row as { design_code?: string }).design_code ?? '').trim()
     const key = code || `id:${row.id}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(row)
+    if (!groups.has(key)) {
+      order.push(key)
+      groups.set(key, [])
+    }
+    groups.get(key)!.push(row)
   }
-  return out
+
+  return order.map((key) => {
+    const group = groups.get(key) ?? []
+    const preferred = group.find(rowHasPublicPreview) ?? group[0]!
+    const siteDonor = group.find((r) => String(r.site_preview_url ?? '').trim())
+    const previewDonor = group.find((r) => String(r.preview_url ?? '').trim())
+    return {
+      ...preferred,
+      site_preview_url: preferred.site_preview_url || siteDonor?.site_preview_url || null,
+      preview_url: preferred.preview_url || previewDonor?.preview_url || null,
+    }
+  })
 }
 
 export async function getDesignTemplatesByIds(ids: number[]): Promise<Map<number, DesignTemplateRow>> {
@@ -284,6 +306,65 @@ async function syncFamilyRoyaltyFields(
         author_user_id = ?, usage_fee = ?, author_percent = ?, updated_at = datetime('now')
        WHERE design_code = ?`,
       [fields.author_user_id, fields.usage_fee, fields.author_percent, designCode],
+    )
+  }
+}
+
+/** Превью для сайта — общее на всю семью design_code. */
+async function syncFamilySitePreviewUrl(
+  designCode: string,
+  sitePreviewUrl: string | null,
+  exceptId?: number,
+): Promise<void> {
+  if (!isValidDesignCode(designCode)) return
+  const db = await getDb()
+  if (exceptId != null) {
+    await db.run(
+      `UPDATE design_templates SET
+        site_preview_url = ?, updated_at = datetime('now')
+       WHERE design_code = ? AND id != ?`,
+      [sitePreviewUrl, designCode, exceptId],
+    )
+  } else {
+    await db.run(
+      `UPDATE design_templates SET
+        site_preview_url = ?, updated_at = datetime('now')
+       WHERE design_code = ?`,
+      [sitePreviewUrl, designCode],
+    )
+  }
+}
+
+/**
+ * Размазать site_preview_url по семьям, где оно есть хотя бы у одного варианта.
+ * Нужно для уже существующих данных до введения общей превью.
+ */
+let familySitePreviewBackfillDone = false
+async function ensureFamilySitePreviewBackfill(): Promise<void> {
+  if (familySitePreviewBackfillDone) return
+  familySitePreviewBackfillDone = true
+  const db = await getDb()
+  const donors = await db.all(
+    `SELECT design_code, site_preview_url
+     FROM design_templates
+     WHERE design_code IS NOT NULL
+       AND TRIM(design_code) != ''
+       AND site_preview_url IS NOT NULL
+       AND TRIM(site_preview_url) != ''
+     GROUP BY design_code
+     HAVING COUNT(*) >= 1`,
+  ) as Array<{ design_code: string; site_preview_url: string }>
+
+  for (const donor of donors) {
+    const code = String(donor.design_code ?? '').trim()
+    const url = String(donor.site_preview_url ?? '').trim()
+    if (!isValidDesignCode(code) || !url) continue
+    await db.run(
+      `UPDATE design_templates SET
+        site_preview_url = ?, updated_at = datetime('now')
+       WHERE design_code = ?
+         AND (site_preview_url IS NULL OR TRIM(site_preview_url) = '')`,
+      [url, code],
     )
   }
 }
@@ -362,6 +443,7 @@ export async function getPublicDesignTemplates(params: {
   typeId?: number
   sizeId?: string
 }): Promise<DesignTemplateRow[]> {
+  await ensureFamilySitePreviewBackfill()
   const db = await getDb()
   let rows: DesignTemplateRow[]
   if (params.productId && params.typeId) {
@@ -558,6 +640,14 @@ export async function createDesignTemplate(input: DesignTemplateInput): Promise<
     })
   }
 
+  // Превью для сайта — общее на семью.
+  const siblingSitePreview = siblings.find((s) => s.id !== id && String(s.site_preview_url ?? '').trim())
+  if (input.site_preview_url !== undefined) {
+    await syncFamilySitePreviewUrl(designCode, input.site_preview_url ?? null)
+  } else if (siblingSitePreview?.site_preview_url) {
+    await syncFamilySitePreviewUrl(designCode, siblingSitePreview.site_preview_url)
+  }
+
   const created = await getDesignTemplate(id)
   if (!created) throw new Error('Failed to fetch created template')
   return created
@@ -637,6 +727,10 @@ export async function updateDesignTemplate(
       usage_fee,
       author_percent,
     })
+  }
+
+  if (input.site_preview_url !== undefined) {
+    await syncFamilySitePreviewUrl(design_code, site_preview_url ?? null)
   }
 
   return getDesignTemplate(id)

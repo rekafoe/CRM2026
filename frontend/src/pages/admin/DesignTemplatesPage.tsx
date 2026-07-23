@@ -34,6 +34,7 @@ import {
   parseDesignTemplateImportError,
   parseTemplateSpec,
   resolveDesignCode,
+  resolveFamilyPreviewUrl,
   resolveTemplatePreviewUrl,
   type DesignTemplateFamily,
   type TemplateCatalogStatus,
@@ -470,6 +471,10 @@ export const DesignTemplatesPage: React.FC = () => {
     } catch {
       spec = {};
     }
+    const code = resolveDesignCode(t);
+    const familySitePreview = code
+      ? templates.find((v) => resolveDesignCode(v) === code && String(v.site_preview_url ?? '').trim())?.site_preview_url
+      : null;
     setExistingSpec(spec);
     setEditingId(t.id);
     setForm({
@@ -477,7 +482,7 @@ export const DesignTemplatesPage: React.FC = () => {
       description: t.description ?? '',
       category_id: t.category_id ?? null,
       preview_url: t.preview_url ?? '',
-      site_preview_url: t.site_preview_url ?? '',
+      site_preview_url: (t.site_preview_url || familySitePreview) ?? '',
       width_mm: parsed.width_mm != null ? String(parsed.width_mm) : '',
       height_mm: parsed.height_mm != null ? String(parsed.height_mm) : '',
       page_count: parsed.page_count != null ? String(parsed.page_count) : '',
@@ -704,7 +709,7 @@ export const DesignTemplatesPage: React.FC = () => {
     const t = family.primary;
     const status = familyCatalogStatus(family);
     const codeLabel = family.design_code ?? formatDesignCodeLabel(t);
-    const previewSrc = resolveTemplatePreviewUrl(t.site_preview_url || t.preview_url, API_BASE_URL);
+    const previewSrc = resolveTemplatePreviewUrl(resolveFamilyPreviewUrl(family), API_BASE_URL);
     const warningCount = family.variants.reduce(
       (n, v) => n + parseTemplateSpec(v).importWarnings.length,
       0,

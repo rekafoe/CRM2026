@@ -266,6 +266,14 @@ export function groupTemplatesIntoFamilies(templates: DesignTemplate[]): DesignT
   return families;
 }
 
+/** Превью семьи: site_preview с любого варианта, иначе preview_url. */
+export function resolveFamilyPreviewUrl(family: DesignTemplateFamily): string | null {
+  const site = family.variants.find((t) => String(t.site_preview_url ?? '').trim())?.site_preview_url
+  if (site?.trim()) return site.trim()
+  const preview = family.variants.find((t) => String(t.preview_url ?? '').trim())?.preview_url
+  return preview?.trim() || null
+}
+
 export function familyCatalogStatus(family: DesignTemplateFamily): TemplateCatalogStatus {
   if (family.variants.some((t) => getTemplateCatalogStatus(t) === 'active')) return 'active';
   if (family.variants.every((t) => getTemplateCatalogStatus(t) === 'draft')) return 'draft';
