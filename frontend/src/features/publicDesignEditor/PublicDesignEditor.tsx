@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, ConfirmDialog, Modal } from '../../components/common';
+import { Alert, ConfirmDialog } from '../../components/common';
 import { AppIcon } from '../../components/ui/AppIcon';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { GuideLine } from '../../pages/admin/designEditor/CanvasRulers';
@@ -210,7 +210,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [mobilePanel, setMobilePanel] = useState<PublicDesignMobilePanel>('canvas');
   const isMobile = useMediaQuery('(max-width: 760px)');
   const [pendingDeletePage, setPendingDeletePage] = useState<number | null>(null);
-  const [pageCountNotice, setPageCountNotice] = useState<string | null>(null);
+  const [pendingPageAddConfirm, setPendingPageAddConfirm] = useState<PublicDesignPageCountAdjustment | null>(null);
+  const pageAddConfirmResolverRef = useRef<((ok: boolean) => void) | null>(null);
   const [customerForm, setCustomerForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -702,10 +703,22 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setTextFillHint(message);
   }, []);
 
-  const handlePageCountAdjusted = useCallback((adjustment: PublicDesignPageCountAdjustment) => {
-    setPageCountNotice(
-      `Было добавлено ${formatPageCountRu(adjustment.addedPages)}, потому что количество страниц для данного типа переплёта должно быть кратно ${adjustment.step}.`,
-    );
+  const handleConfirmPageCountAdjustment = useCallback((adjustment: PublicDesignPageCountAdjustment) => {
+    return new Promise<boolean>((resolve) => {
+      if (pageAddConfirmResolverRef.current) {
+        pageAddConfirmResolverRef.current(false);
+        pageAddConfirmResolverRef.current = null;
+      }
+      pageAddConfirmResolverRef.current = resolve;
+      setPendingPageAddConfirm(adjustment);
+    });
+  }, []);
+
+  const closePageAddConfirm = useCallback((ok: boolean) => {
+    const resolve = pageAddConfirmResolverRef.current;
+    pageAddConfirmResolverRef.current = null;
+    setPendingPageAddConfirm(null);
+    resolve?.(ok);
   }, []);
 
   useEffect(() => {
@@ -740,7 +753,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     markDirty,
     pageCountLimits,
     onPageCountRejected: setError,
-    onPageCountAdjusted: handlePageCountAdjusted,
+    onConfirmPageCountAdjustment: handleConfirmPageCountAdjustment,
   });
 
   commitCanvasToPagesRef.current = () => {
@@ -1334,6 +1347,20 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         onIssueFocus={handleCheckoutIssueFocus}
       />
       <ConfirmDialog
+        isOpen={pendingPageAddConfirm != null}
+        onClose={() => closePageAddConfirm(false)}
+        title="Добавить страницы?"
+        message={
+          pendingPageAddConfirm
+            ? `Для выбранного типа переплёта страницы добавляются кратно ${pendingPageAddConfirm.step}. Будет добавлено ${formatPageCountRu(pendingPageAddConfirm.addedPages)}. Стоимость заказа изменится.`
+            : ''
+        }
+        confirmText="Добавить"
+        cancelText="Отмена"
+        variant="info"
+        onConfirm={() => closePageAddConfirm(true)}
+      />
+      <ConfirmDialog
         isOpen={pendingDeletePage != null}
         onClose={() => setPendingDeletePage(null)}
         title="Удалить страницу?"
@@ -1346,33 +1373,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           void handleDeleteClientPage(pendingDeletePage);
         }}
       />
-      <Modal
-        isOpen={pageCountNotice != null}
-        onClose={() => setPageCountNotice(null)}
-        title="Количество страниц скорректировано"
-        size="sm"
-        className="public-design-editor__page-count-notice-modal"
-        bodyClassName="public-design-editor__page-count-notice-body"
-      >
-        <div className="public-design-editor__page-count-notice">
-          <div className="public-design-editor__page-count-notice-icon" aria-hidden="true">
-            <AppIcon name="info" size="sm" />
-          </div>
-          <p className="public-design-editor__page-count-notice-message">{pageCountNotice}</p>
-          <p className="public-design-editor__page-count-notice-hint">
-            Новые страницы уже добавлены в макет. Можно продолжать редактирование.
-          </p>
-          <div className="public-design-editor__page-count-notice-actions">
-            <Button
-              type="button"
-              onClick={() => setPageCountNotice(null)}
-              className="public-design-editor__page-count-notice-button"
-            >
-              Понятно
-            </Button>
-          </div>
-        </div>
-      </Modal>
       <PublicDesignDraftConflictDialog
         isOpen={draftConflictOpen}
         onClose={handleDismissDraftConflict}
