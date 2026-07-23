@@ -7,15 +7,58 @@ import {
   prepareTextObjectsInFabricJSON,
   readDesignedTextboxPersistedWidth,
 } from '../textStyleRuns';
+import { dehydrateEmptyPhotoFieldJsonObject, dehydrateEmptyPhotoFieldsInFabricJSON } from '../photoFieldEmpty';
+import { resolvePhotoFieldFrameSize, resolvePhotoFieldFrameSceneTL } from '../photoFieldGeometry';
 import { deduplicateFabricJsonObjectsById } from '../fabricSnapshotReconcile';
 import { isTextLikeObject } from './canvasUtils';
 
 const CUSTOM_PROPS = FABRIC_CUSTOM_PROPS;
 
+function isPhotoFieldObject(obj: FabricObject): boolean {
+  return (obj as { isPhotoField?: unknown }).isPhotoField === true;
+}
+
+function serializePhotoFieldFallback(obj: FabricObject): Record<string, unknown> {
+  const meta = obj as {
+    id?: unknown;
+    photoFieldFilled?: unknown;
+    photoFieldClientAdded?: unknown;
+    importStackIndex?: unknown;
+    angle?: number;
+  };
+  if (meta.photoFieldFilled === true) {
+    throw new Error('filled photo field serialize fallback unavailable');
+  }
+  const { fw, fh } = resolvePhotoFieldFrameSize(obj);
+  const tl = resolvePhotoFieldFrameSceneTL(obj);
+  return dehydrateEmptyPhotoFieldJsonObject({
+    type: 'rect',
+    id: meta.id,
+    left: tl.x,
+    top: tl.y,
+    width: fw,
+    height: fh,
+    photoFieldFw: fw,
+    photoFieldFh: fh,
+    angle: meta.angle ?? 0,
+    isPhotoField: true,
+    photoFieldFilled: false,
+    photoFieldClientAdded: meta.photoFieldClientAdded === true,
+    importStackIndex: meta.importStackIndex,
+  });
+}
+
 function safeSerializeObject(obj: FabricObject): Record<string, unknown> | null {
   try {
     return obj.toObject(CUSTOM_PROPS) as Record<string, unknown>;
   } catch {
+    if (isPhotoFieldObject(obj)) {
+      try {
+        return serializePhotoFieldFallback(obj);
+      } catch {
+        return null;
+      }
+    }
     if (isTextLikeObject(obj)) {
       try {
         return obj.toObject(CUSTOM_PROPS) as Record<string, unknown>;
@@ -210,6 +253,7 @@ export function canvasToJSON(canvas: Canvas): Record<string, unknown> {
   prepareTextObjectsInFabricJSON(json);
   dehydrateTextObjectsInFabricJSON(json);
   rewriteEphemeralPhotoFieldBlobSources(json);
+  dehydrateEmptyPhotoFieldsInFabricJSON(json);
   return json;
 }
 

@@ -358,3 +358,79 @@ export function bakeEmptyPhotoFieldRectScale(
   return true;
 }
 
+function readPositiveSize(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function resolveEmptyPhotoFieldFrameFromJson(obj: Record<string, unknown>): { fw: number; fh: number } {
+  const sx = Math.abs(readPositiveSize(obj.scaleX, 1)) || 1;
+  const sy = Math.abs(readPositiveSize(obj.scaleY, 1)) || 1;
+  const baseW = readPositiveSize(obj.photoFieldFw, readPositiveSize(obj.width));
+  const baseH = readPositiveSize(obj.photoFieldFh, readPositiveSize(obj.height));
+  return {
+    fw: Math.max(32, Math.round(baseW * sx)),
+    fh: Math.max(32, Math.round(baseH * sy)),
+  };
+}
+
+/**
+ * Master/template contract: пустые photo_* в designState — простые rect (как SVG-импорт).
+ * Chrome-группы с кастомным layoutManager после Save ломают load на сайте.
+ */
+export function dehydrateEmptyPhotoFieldJsonObject(
+  obj: Record<string, unknown>,
+): Record<string, unknown> {
+  if (obj.isPhotoField !== true || obj.photoFieldFilled === true) {
+    if (obj.isPhotoField === true && String(obj.type ?? '').toLowerCase() === 'group') {
+      const next = { ...obj };
+      delete next.layoutManager;
+      return next;
+    }
+    return obj;
+  }
+
+  const { fw, fh } = resolveEmptyPhotoFieldFrameFromJson(obj);
+  const left = Number(obj.left);
+  const top = Number(obj.top);
+  const angle = Number(obj.angle);
+  const rect: Record<string, unknown> = {
+    type: 'rect',
+    version: obj.version ?? '6.0.0',
+    originX: 'left',
+    originY: 'top',
+    left: Number.isFinite(left) ? left : 0,
+    top: Number.isFinite(top) ? top : 0,
+    width: fw,
+    height: fh,
+    fill: '#eef2f7',
+    stroke: '#2563eb',
+    strokeWidth: 1,
+    strokeDashArray: [6, 4],
+    rx: 6,
+    ry: 6,
+    scaleX: 1,
+    scaleY: 1,
+    angle: Number.isFinite(angle) ? angle : 0,
+    id: obj.id,
+    isPhotoField: true,
+    photoFieldFilled: false,
+    photoFieldFw: fw,
+    photoFieldFh: fh,
+  };
+  if (obj.importStackIndex != null) rect.importStackIndex = obj.importStackIndex;
+  if (obj.isDecorElement != null) rect.isDecorElement = obj.isDecorElement;
+  if (obj.decorLayerName != null) rect.decorLayerName = obj.decorLayerName;
+  if (obj.photoFieldClientAdded === true) rect.photoFieldClientAdded = true;
+  return rect;
+}
+
+/** Перед записью page snapshot / design_templates: empty photo Groups → rect. */
+export function dehydrateEmptyPhotoFieldsInFabricJSON(fabricJSON: Record<string, unknown>): void {
+  if (!Array.isArray(fabricJSON.objects)) return;
+  fabricJSON.objects = fabricJSON.objects.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    return dehydrateEmptyPhotoFieldJsonObject(item as Record<string, unknown>);
+  });
+}
+

@@ -28,6 +28,7 @@ import {
   readDesignTemplateSpec,
   resolveDesignSceneScale,
 } from './designEditor/designEditorState';
+import { reconcileSavedSnapshotLoss } from './designEditor/fabricSnapshotReconcile';
 import {
   extractUsedFontFamiliesFromPages,
   isFabricTextObjectType,
@@ -816,10 +817,15 @@ export const DesignEditorPage: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!canvasHandleRef.current) return;
 
-    const saved = await canvasHandleRef.current.saveCurrentPage();
+    const rawSaved = await canvasHandleRef.current.saveCurrentPage();
+    const saved = reconcileSavedSnapshotLoss(
+      pages,
+      rawSaved as PageSaveSnapshot,
+      { currentPage, leftPageIdx, rightPageIdx },
+    );
     const updatedPages = mergeSavedEditorPages(
       pages,
-      saved as PageSaveSnapshot,
+      saved,
       currentPage,
       leftPageIdx,
       rightPageIdx,

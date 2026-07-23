@@ -100,6 +100,16 @@ export function useDesignEditorViewport(input: {
     };
 
     const resolveBestContainer = (): HTMLElement | null => {
+      const minWidth = input.compactPadding === true ? 120 : 220;
+      const minHeight = input.compactPadding === true ? 140 : 220;
+      // С линейками viewport меньше scroll-area: нельзя брать «самый большой» parent —
+      // иначе fitZoom/origin считаются по зоне с ruler gutters и холст уезжает под линейки.
+      if (viewportEl) {
+        const viewportSize = readElementSize(viewportEl);
+        if (viewportSize.width >= minWidth && viewportSize.height >= minHeight) {
+          return viewportEl;
+        }
+      }
       const candidates = resolveViewportCandidates();
       if (candidates.length === 0) return null;
       return candidates.reduce((best, current) => {

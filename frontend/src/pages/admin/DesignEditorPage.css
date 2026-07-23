@@ -88,6 +88,7 @@
 
 /* Область с холстом — grid: линейки + viewport */
 .design-editor-scroll-area {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -137,7 +138,8 @@
 /* ── Направляющие (guide lines) ── */
 .guides-overlay {
   grid-area: 2 / 2;
-  position: relative;
+  position: absolute;
+  inset: 0;
   pointer-events: none;
   overflow: hidden;
   z-index: 10;
@@ -277,6 +279,9 @@
   font-family: inherit;
   user-select: none;
 }
+.ps-root.is-collapsed .ps-strip-row {
+  display: none;
+}
 .ps-root.is-collapsed .ps-strip {
   display: none;
 }
@@ -398,7 +403,7 @@
   overflow-x: hidden;
   overflow-y: visible;
   padding: 0 8px;
-  background: #1e1e1e;
+  background: transparent;
 }
 
 .ps-strip {
