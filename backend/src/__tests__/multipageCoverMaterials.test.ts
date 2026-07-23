@@ -3,6 +3,7 @@ import {
   isSeparateCoverMode,
   resolveCoverMaterialIdForPricing,
 } from '../utils/multipageCoverMaterials';
+import { collectMaterialIdsFromSimplified } from '../modules/products/routes/helpers';
 
 describe('multipageCoverMaterials', () => {
   it('isSeparateCoverMode', () => {
@@ -42,5 +43,29 @@ describe('multipageCoverMaterials', () => {
         { cover_material_id: 99, material_id: 1 }
       )
     ).toBe(10);
+  });
+
+  it('collectMaterialIdsFromSimplified includes cover.allowed_material_ids', () => {
+    const ids = collectMaterialIdsFromSimplified({
+      sizes: [{ allowed_material_ids: [1] }],
+      multiPageStructure: {
+        cover: {
+          mode: 'separate',
+          allowed_material_ids: [9, 10],
+          material_id: 9,
+        },
+      },
+    });
+    expect(ids.sort((a, b) => a - b)).toEqual([1, 9, 10]);
+  });
+
+  it('collectMaterialIdsFromSimplified skips cover ids when mode is not separate', () => {
+    const ids = collectMaterialIdsFromSimplified({
+      sizes: [{ allowed_material_ids: [1] }],
+      multiPageStructure: {
+        cover: { mode: 'none', allowed_material_ids: [9, 10] },
+      },
+    });
+    expect(ids).toEqual([1]);
   });
 });

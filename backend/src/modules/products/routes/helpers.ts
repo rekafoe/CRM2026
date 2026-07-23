@@ -1,5 +1,6 @@
 import { getDb } from '../../../db';
 import { ProductServiceLinkDTO } from '../dtos/serviceLink.dto';
+import { getCoverAllowedMaterialIds } from '../../../utils/multipageCoverMaterials';
 
 export type TemplateConfigRow = {
   id: number;
@@ -440,36 +441,41 @@ function getEffectiveAllowedMaterialIdsForSize(typeConfig: any, size: any): numb
   return (common != null && common.length > 0) ? common : (size?.allowed_material_ids ?? []);
 }
 
-/** Собирает уникальные ID материалов из simplified (allowed_material_ids, common_allowed_material_ids, allowed_base_material_ids). */
+/** Собирает уникальные ID материалов из simplified (sizes, typeConfigs, cover.allowed_material_ids). */
 export function collectMaterialIdsFromSimplified(simplified: any): number[] {
   if (!simplified || typeof simplified !== 'object') return [];
   const ids = new Set<number>();
 
+  const addId = (id: unknown) => {
+    const n = Number(id);
+    if (Number.isFinite(n) && n > 0) ids.add(n);
+  };
+
+  const addCoverIds = (cover: unknown) => {
+    for (const id of getCoverAllowedMaterialIds(cover as any)) addId(id);
+  };
+
   const addFromSize = (size: any, typeConfig?: any) => {
     const materialIds = typeConfig ? getEffectiveAllowedMaterialIdsForSize(typeConfig, size) : (size?.allowed_material_ids ?? []);
     if (Array.isArray(materialIds)) {
-      materialIds.forEach((id: number) => {
-        if (Number.isFinite(Number(id))) ids.add(Number(id));
-      });
+      materialIds.forEach((id: number) => addId(id));
     }
     if (Array.isArray(size?.allowed_base_material_ids)) {
-      size.allowed_base_material_ids.forEach((id: number) => {
-        if (Number.isFinite(Number(id))) ids.add(Number(id));
-      });
+      size.allowed_base_material_ids.forEach((id: number) => addId(id));
     }
   };
 
   if (Array.isArray(simplified.sizes)) {
     simplified.sizes.forEach((s: any) => addFromSize(s));
   }
+  addCoverIds(simplified?.multiPageStructure?.cover);
   if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
     for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
       if (Array.isArray(cfg?.common_allowed_material_ids)) {
-        cfg.common_allowed_material_ids.forEach((id: number) => {
-          if (Number.isFinite(Number(id))) ids.add(Number(id));
-        });
+        cfg.common_allowed_material_ids.forEach((id: number) => addId(id));
       }
       if (Array.isArray(cfg?.sizes)) cfg.sizes.forEach((s: any) => addFromSize(s, cfg));
+      addCoverIds(cfg?.multiPageStructure?.cover);
     }
   }
 
