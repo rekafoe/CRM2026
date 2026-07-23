@@ -15,6 +15,7 @@ import type { CollageLayout, DesignTemplate } from '../../../../api';
 import { reloadFabricCanvasFonts } from '../../../../utils/fabricFontReload';
 import { finalizeEmptyPhotoFieldPlacement } from '../photoFieldEmpty';
 import { createEmptyPhotoField, createClientTextbox } from '../designFields';
+import { applyImportStackOrder } from '../designFields/importStackOrder';
 import { resolvePhotoFieldSizeForPage } from '../photoFieldClientSizing';
 import { clearPhotoFieldDropHighlight, createPhotoFieldDropHighlightState } from '../photoFieldDropHighlight';
 import { loadDesignPageScene, loadSpreadMergedScene } from '../designPageLoader';
@@ -207,6 +208,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
               fill: '#000000',
             });
         canvas.add(text);
+        applyImportStackOrder(canvas);
         canvas.setActiveObject(text);
         if (d.modeRef.current === 'basic') applyBasicModeConstraints(canvas, d.selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
@@ -240,6 +242,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
               fill: '#111827',
             });
         canvas.add(text);
+        applyImportStackOrder(canvas);
         canvas.setActiveObject(text);
         if (d.modeRef.current === 'basic') applyBasicModeConstraints(canvas, d.selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
@@ -322,6 +325,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         d.photoFieldSkipBakeOnceRef.current = fieldId;
         canvas.add(field);
         finalizeEmptyPhotoFieldPlacement(field as Group, { x: fieldLeft, y: fieldTop });
+        applyImportStackOrder(canvas);
         canvas.setActiveObject(field);
         if (d.modeRef.current === 'basic') applyBasicModeConstraints(canvas, d.selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
@@ -367,6 +371,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         for (const entry of fields) {
           finalizeEmptyPhotoFieldPlacement(entry.field as Group, entry.anchor);
         }
+        applyImportStackOrder(canvas);
         canvas.discardActiveObject();
         canvas.setActiveObject(fields[0]!.field);
         canvas.requestRenderAll();
@@ -439,6 +444,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
             return;
         }
         canvas.add(obj);
+        applyImportStackOrder(canvas);
         canvas.setActiveObject(obj);
         if (d.modeRef.current === 'basic') applyBasicModeConstraints(canvas, d.selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
@@ -629,33 +635,45 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
       bringForward: () => {
         const canvas = d.fabricRef.current;
         if (!canvas) return;
-        canvas.getActiveObjects().forEach((o) => canvas.bringObjectForward(o));
+        const active = [...canvas.getActiveObjects()];
+        active.forEach((o) => canvas.bringObjectForward(o));
+        applyImportStackOrder(canvas);
+        if (active[0]) canvas.setActiveObject(active[0]);
         canvas.requestRenderAll();
         d.saveSnapshot();
       },
       sendBackward: () => {
         const canvas = d.fabricRef.current;
         if (!canvas) return;
-        canvas.getActiveObjects().forEach((o) => canvas.sendObjectBackwards(o));
+        const active = [...canvas.getActiveObjects()];
+        active.forEach((o) => canvas.sendObjectBackwards(o));
+        applyImportStackOrder(canvas);
+        if (active[0]) canvas.setActiveObject(active[0]);
         canvas.requestRenderAll();
         d.saveSnapshot();
       },
       bringToFront: () => {
         const canvas = d.fabricRef.current;
         if (!canvas) return;
-        canvas.getActiveObjects().forEach((o) => canvas.bringObjectToFront(o));
+        const active = [...canvas.getActiveObjects()];
+        active.forEach((o) => canvas.bringObjectToFront(o));
+        applyImportStackOrder(canvas);
+        if (active[0]) canvas.setActiveObject(active[0]);
         canvas.requestRenderAll();
         d.saveSnapshot();
       },
       sendToBack: () => {
         const canvas = d.fabricRef.current;
         if (!canvas) return;
-        canvas.getActiveObjects().forEach((o) => {
+        const active = [...canvas.getActiveObjects()];
+        active.forEach((o) => {
           if (!asAny(o).isBackground) canvas.sendObjectToBack(o);
         });
         // Убеждаемся, что фон остаётся сзади
         const bg = canvas.getObjects().find((o) => asAny(o).isBackground);
         if (bg) canvas.sendObjectToBack(bg);
+        applyImportStackOrder(canvas);
+        if (active[0]) canvas.setActiveObject(active[0]);
         canvas.requestRenderAll();
         d.saveSnapshot();
       },

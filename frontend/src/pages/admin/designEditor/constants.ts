@@ -87,6 +87,10 @@ export const FABRIC_CUSTOM_PROPS = [
   'spreadFallbackProxy',
   /** Диапазоны шрифтов в текстовом поле (источник правды; Fabric styles — runtime). */
   'textStyleRuns',
+  /** Пользователь правил текст/формат — иначе после flip soft-load откатывает оформление. */
+  'textFieldUserEdited',
+  'textFieldLayoutWidth',
+  'textFieldUserLayoutWidth',
   /** Порядок слоя при SVG-импорте (z-order). */
   'importStackIndex',
   'isDecorElement',

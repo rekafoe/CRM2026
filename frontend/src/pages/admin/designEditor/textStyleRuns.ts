@@ -1097,6 +1097,7 @@ export function hydrateTextObjectStyles(obj: TextLikeObject): void {
   // prefer to keep the detailed incoming styles verbatim. Re-building from our TextStyleRun model
   // can lose per-char оформление (fontStyle, specific families for script, sizes etc) on page flips.
   // If styles map is empty but runs exist (typical SVG import) — materialize styles from runs.
+  // Кегль/формат после правок синхронизирует applyFormatToTextField → styles map напрямую.
   const isDesigned = isDesignedTemplateText(obj);
   if (isDesigned && !obj.textFieldUserEdited) {
     if (!hadIncomingStyles) {
@@ -1739,6 +1740,50 @@ function formatPatchAffectsTextboxWidth(patch: Record<string, unknown>): boolean
     || typeof patch.letterSpacing === 'number';
 }
 
+const MIN_TEXT_FONT_SIZE = 6;
+const MAX_TEXT_FONT_SIZE = 200;
+
+function clampTextFontSize(value: number): number {
+  return Math.max(MIN_TEXT_FONT_SIZE, Math.min(MAX_TEXT_FONT_SIZE, Math.round(value)));
+}
+
+function formatPatchAffectsFabricStyles(patch: Record<string, unknown>): boolean {
+  return typeof patch.fontSize === 'number'
+    || typeof patch.fill === 'string'
+    || typeof patch.fontWeight === 'string'
+    || typeof patch.fontStyle === 'string'
+    || typeof patch.underline === 'boolean';
+}
+
+/** Синхронизирует per-char Fabric styles с toolbar-патчем (иначе кегль откатывается после flip). */
+function applyFormatPatchToFabricStyles(
+  styles: FabricStyles | undefined,
+  patch: Record<string, unknown>,
+): FabricStyles | undefined {
+  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return styles;
+  if (!formatPatchAffectsFabricStyles(patch)) return styles;
+
+  const next: FabricStyles = {};
+  for (const [lineKey, lineStyles] of Object.entries(styles)) {
+    const lineIndex = Number(lineKey);
+    if (!Number.isFinite(lineIndex) || !lineStyles || typeof lineStyles !== 'object') continue;
+    const lineNext: Record<number, Record<string, unknown>> = {};
+    for (const [charKey, charStyle] of Object.entries(lineStyles)) {
+      const charIndex = Number(charKey);
+      if (!Number.isFinite(charIndex) || !charStyle || typeof charStyle !== 'object') continue;
+      const charNext: Record<string, unknown> = { ...(charStyle as Record<string, unknown>) };
+      if (typeof patch.fontSize === 'number') charNext.fontSize = patch.fontSize;
+      if (typeof patch.fill === 'string') charNext.fill = patch.fill;
+      if (typeof patch.fontWeight === 'string') charNext.fontWeight = patch.fontWeight;
+      if (typeof patch.fontStyle === 'string') charNext.fontStyle = patch.fontStyle;
+      if (typeof patch.underline === 'boolean') charNext.underline = patch.underline;
+      lineNext[charIndex] = charNext;
+    }
+    next[lineIndex] = lineNext;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
 /** После смены кегля/шрифта поджимает или расширяет textbox под новый контент. */
 function syncDesignedTextboxWidthAfterFormatChange(obj: TextLikeObject): void {
   if (obj.type !== 'textbox' || !isDesignedTemplateText(obj)) return;
@@ -1789,6 +1834,9 @@ export function applyFormatToTextField(
 ): void {
   markTextFieldUserEdited(obj);
   const next: Record<string, unknown> = { ...patch };
+  if (typeof next.fontSize === 'number') {
+    next.fontSize = clampTextFontSize(next.fontSize);
+  }
   if (next.shadow != null && typeof next.shadow === 'object') {
     // Shadow handled by caller (Fabric Shadow instance).
   }
@@ -1800,7 +1848,7 @@ export function applyFormatToTextField(
     delete next.fontFamily;
   }
 
-  if (typeof patch.fontSize === 'number') {
+  if (typeof next.fontSize === 'number') {
     next.scaleX = 1;
     next.scaleY = 1;
   }
@@ -1809,26 +1857,41 @@ export function applyFormatToTextField(
     obj.set(next as Parameters<typeof obj.set>[0]);
   }
 
+  const effectivePatch: Record<string, unknown> = {
+    ...patch,
+    ...(typeof next.fontSize === 'number' ? { fontSize: next.fontSize } : {}),
+  };
+
   const runs = obj.textStyleRuns;
   if (runs?.length) {
     const updated = runs.map((run) => {
       const merged = { ...run };
-      if (typeof patch.fill === 'string') merged.fill = patch.fill;
-      if (typeof patch.fontWeight === 'string') merged.fontWeight = patch.fontWeight;
-      if (typeof patch.fontStyle === 'string') merged.fontStyle = patch.fontStyle;
-      if (typeof patch.fontSize === 'number') merged.fontSize = patch.fontSize;
-      if (typeof patch.underline === 'boolean') {
-        (merged as TextStyleRun & { underline?: boolean }).underline = patch.underline;
+      if (typeof effectivePatch.fill === 'string') merged.fill = effectivePatch.fill;
+      if (typeof effectivePatch.fontWeight === 'string') merged.fontWeight = effectivePatch.fontWeight;
+      if (typeof effectivePatch.fontStyle === 'string') merged.fontStyle = effectivePatch.fontStyle;
+      if (typeof effectivePatch.fontSize === 'number') merged.fontSize = effectivePatch.fontSize;
+      if (typeof effectivePatch.underline === 'boolean') {
+        (merged as TextStyleRun & { underline?: boolean }).underline = effectivePatch.underline;
       }
       return merged;
     });
     obj.textStyleRuns = updated;
-    hydrateTextObjectStyles(obj);
+    // Designed text_* часто хранит кегль в styles; hydrate для них early-return и не пересобирает map.
+    if (formatPatchAffectsFabricStyles(effectivePatch) && obj.styles) {
+      const patchedStyles = applyFormatPatchToFabricStyles(obj.styles, effectivePatch);
+      if (patchedStyles) obj.set('styles', patchedStyles);
+    } else {
+      hydrateTextObjectStyles(obj);
+    }
   } else if (typeof patch.fontFamily !== 'string') {
+    if (formatPatchAffectsFabricStyles(effectivePatch) && obj.styles) {
+      const patchedStyles = applyFormatPatchToFabricStyles(obj.styles, effectivePatch);
+      if (patchedStyles) obj.set('styles', patchedStyles);
+    }
     obj.setCoords?.();
   }
 
-  if (obj.type === 'textbox' && formatPatchAffectsTextboxWidth(patch)) {
+  if (obj.type === 'textbox' && formatPatchAffectsTextboxWidth(effectivePatch)) {
     if (isDesignedTemplateText(obj)) {
       syncDesignedTextboxWidthAfterFormatChange(obj);
     } else if (obj.textFieldClientAdded === true) {
