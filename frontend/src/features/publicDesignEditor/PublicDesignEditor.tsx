@@ -1356,7 +1356,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         confirmText="Добавить"
         cancelText="Отмена"
         variant="info"
-        onConfirm={() => closePageAddConfirm(true)}
+        onConfirm={() => {
+          closePageAddConfirm(true);
+        }}
       />
       <ConfirmDialog
         isOpen={pendingDeletePage != null}
@@ -1368,7 +1370,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         variant="danger"
         onConfirm={() => {
           if (pendingDeletePage == null) return;
-          void handleDeleteClientPage(pendingDeletePage);
+          const page = pendingDeletePage;
+          setPendingDeletePage(null);
+          void handleDeleteClientPage(page);
         }}
       />
       <PublicDesignDraftConflictDialog
