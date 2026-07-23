@@ -1,0 +1,82 @@
+.paper-type-densities-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.paper-type-densities-editor__summary {
+  font-size: 13px;
+  color: var(--text-secondary, #4b5563);
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.paper-type-densities-editor__summary-label {
+  font-weight: 600;
+  margin-right: 6px;
+  color: var(--text-primary, #111827);
+}
+
+.paper-type-densities-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.paper-type-densities-editor__type {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 4px;
+  padding: 10px 12px;
+  background: var(--bg-primary, #fff);
+}
+
+.paper-type-densities-editor__type--active {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+
+.paper-type-densities-editor__type-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary, #111827);
+}
+
+.paper-type-densities-editor__densities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.paper-type-densities-editor__density {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: transparent;
+  font-size: 13px;
+}
+
+.paper-type-densities-editor__density--checked {
+  background: #f0f9ff;
+  border-color: #3b82f6;
+}
+
+.paper-type-densities-editor__density input {
+  cursor: pointer;
+}
+
+.paper-type-densities-editor__price {
+  color: var(--text-muted, #6b7280);
+  margin-left: 2px;
+}
+
+.paper-type-densities-editor__empty {
+  font-size: 13px;
+  color: var(--text-muted, #6b7280);
+}

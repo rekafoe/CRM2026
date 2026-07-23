@@ -367,6 +367,56 @@
   padding: 16px;
 }
 
+.materials-card__own-toggle {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 10px 12px;
+  background-color: #fafafa;
+  margin-bottom: 12px;
+}
+
+.materials-card__own-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.materials-card__own-toggle-label input {
+  cursor: pointer;
+}
+
+.materials-card__base {
+  border-top: 1px solid #e5e7eb;
+}
+
+.materials-card__base-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.materials-card__base-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+}
+
+.materials-card__base-item--checked {
+  background: #f0fdf4;
+  border-color: #22c55e;
+}
+
+.materials-card__base-item input {
+  cursor: pointer;
+}
+
 /* Сворачиваемые карточки (по умолчанию свёрнуты) */
 .simplified-card--collapsible .simplified-card__header {
   cursor: pointer;

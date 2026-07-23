@@ -271,7 +271,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [showCopySizes, setShowCopySizes] = useState(false)
   const [copyFromTypeId, setCopyFromTypeId] = useState<ProductTypeId | null>(null)
   const [copySelectedSizeIds, setCopySelectedSizeIds] = useState<(number | string)[]>([])
-  const [selectedPaperTypeId, setSelectedPaperTypeId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [editorTab, setEditorTab] = useState<SimplifiedEditorTab>(() =>
     showPagesConfig ? 'pages' : 'print',
@@ -349,31 +348,12 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       setPaperTypes(pt || [])
       setPrintTechs((techResp || []).filter((t: any) => t && t.code))
 
-      const typeConfig = hasTypes && selectedTypeId ? value.typeConfigs?.[String(selectedTypeId)] : undefined
-      const effectiveIds = typeConfig && selected ? getEffectiveAllowedMaterialIds(typeConfig, selected) : (selected?.allowed_material_ids ?? [])
-      if (selected && effectiveIds.length > 0 && pt && pt.length > 0 && !selectedPaperTypeId) {
-        for (const paperType of pt) {
-          const materialIds = new Set(
-            paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
-          )
-          const hasMatchingMaterial = effectiveIds.some(id => materialIds.has(id))
-          if (hasMatchingMaterial && materialIds.size > 0) {
-            setSelectedPaperTypeId(paperType.id)
-            hasUserInteractedWithMaterialsRef.current = true
-            break
-          }
-        }
-      }
-
-      if (pt && pt.length > 0 && !selectedPaperTypeId) {
-        setSelectedPaperTypeId(pt[0].id)
-      }
     } catch (error) {
       console.error('Ошибка загрузки списков:', error)
     } finally {
       setLoadingLists(false)
     }
-  }, [selectedPaperTypeId, selected, hasTypes, selectedTypeId, value.typeConfigs])
+  }, [])
 
   useEffect(() => {
     if (!loadingLists && (paperTypes.length === 0 || printTechs.length === 0)) {
@@ -573,48 +553,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     updateSize(sizeId, { print_prices: updatedPrintPrices })
   }, [sizes, updateSize])
 
-  // Материалы выбранного типа бумаги (или всех типов, если selectedPaperTypeId не выбран)
-  // Поддерживаем выбор нескольких типов бумаги - показываем материалы из выбранного типа
-  const materialsForSelectedPaperType = useMemo(() => {
-    if (!paperTypes.length) return []
-    
-    // Если тип бумаги не выбран, возвращаем пустой массив (пользователь должен выбрать тип)
-    if (!selectedPaperTypeId) return []
-    
-    const paperType = paperTypes.find(pt => pt.id === selectedPaperTypeId)
-    if (!paperType) return []
-    
-    // Получаем все material_id из плотностей этого типа бумаги
-    const materialIds = new Set(
-      paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
-    )
-    
-    // Если есть материалы в allMaterials, используем их
-    if (allMaterials && allMaterials.length > 0) {
-      return allMaterials.filter(m => materialIds.has(Number(m.id)))
-        .sort((a, b) => {
-          // Сортируем по плотности, если она есть
-          const aDensity = paperType.densities?.find(d => d.material_id === Number(a.id))?.value || 0
-          const bDensity = paperType.densities?.find(d => d.material_id === Number(b.id))?.value || 0
-          return aDensity - bDensity || String(a.name).localeCompare(String(b.name))
-        })
-    }
-    
-    // Если материалов нет в allMaterials, создаём на основе плотностей из типа бумаги
-    return paperType.densities
-      ?.filter(d => d.material_id && d.material_id > 0)
-      .map(d => ({
-        id: d.material_id,
-        name: `${paperType.display_name || paperType.name} ${d.value} г/м²`,
-        price: d.price || 0,
-        unit: 'лист',
-        quantity: d.available_quantity || 0,
-        is_active: d.is_available ? 1 : 0,
-        category_name: paperType.display_name || paperType.name,
-      } as any as CalculatorMaterial))
-      .sort((a, b) => String(a.name).localeCompare(String(b.name))) || []
-  }, [selectedPaperTypeId, paperTypes, allMaterials])
-  
   // Все материалы из всех типов бумаги (для отображения в таблице)
   const allMaterialsFromAllPaperTypes = useMemo(() => {
     if (!paperTypes.length) return []
@@ -655,23 +593,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
 
   // Отслеживание взаимодействия пользователя с материалами
   const hasUserInteractedWithMaterialsRef = useRef(false)
-  
-  // Автоматическое добавление материалов при выборе типа бумаги только при первой загрузке
-  useEffect(() => {
-    if (!selected || !selectedPaperTypeId || materialsForSelectedPaperType.length === 0) return
-    if (hasUserInteractedWithMaterialsRef.current) return
-    if (effectiveAllowedMaterialIds.length > 0) {
-      hasUserInteractedWithMaterialsRef.current = true
-      return
-    }
-
-    const materialsToAdd = materialsForSelectedPaperType.filter(m =>
-      !effectiveAllowedMaterialIds.includes(Number(m.id))
-    )
-    if (materialsToAdd.length > 0) {
-      updateEffectiveMaterials([...effectiveAllowedMaterialIds, ...materialsToAdd.map(m => Number(m.id))])
-    }
-  }, [selectedPaperTypeId, materialsForSelectedPaperType, selected, effectiveAllowedMaterialIds, updateEffectiveMaterials])
 
   // Отслеживание взаимодействия пользователя с услугами для каждого размера отдельно
   // Ключ - ID размера, значение - был ли пользователь взаимодействовал с услугами
@@ -1118,10 +1039,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   <MaterialsCard
                     selected={selected}
                     loadingLists={loadingLists}
-                    selectedPaperTypeId={selectedPaperTypeId}
-                    setSelectedPaperTypeId={setSelectedPaperTypeId}
                     paperTypes={paperTypes}
-                    materialsForSelectedPaperType={materialsForSelectedPaperType}
                     allMaterialsFromAllPaperTypes={allMaterialsFromAllPaperTypes}
                     allMaterials={allMaterials}
                     hasUserInteractedWithMaterialsRef={hasUserInteractedWithMaterialsRef}
