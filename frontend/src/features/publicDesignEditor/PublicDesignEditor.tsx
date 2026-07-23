@@ -732,7 +732,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     commitCanvasToPages,
     handleGoToPage,
     handleAddClientPage,
-    handleInsertClientPage,
     handleAddClientSpread,
     handleDeleteClientLast,
     handleDeleteClientPage,
@@ -990,7 +989,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       }}
       onGoTo={(pageIndex) => void handleGoToPage(pageIndex)}
       onAddPage={() => void handleAddClientPage()}
-      onInsertPage={(pageIndex) => void handleInsertClientPage(pageIndex)}
       onDeletePage={setPendingDeletePage}
       onAddSpread={() => void handleAddClientSpread()}
       onDeleteLast={() => void handleDeleteClientLast()}
