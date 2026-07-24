@@ -53,7 +53,8 @@ export function getPoolPaymentInfo(order: {
       isAwaitingOnlinePayment: false,
     };
   }
-  if (isOnline && (status === 'pending' || !isPaid)) {
+  // Только явный pending — не любой unpaid online (у колонки DEFAULT 'online').
+  if (isOnline && status === 'pending') {
     return {
       badge: 'BePaid · В процессе',
       tone: 'pending',

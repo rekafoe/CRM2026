@@ -362,6 +362,9 @@ export class OrderService {
       insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', paymentMethodHint === 'online' ? 'online' : 'offline'])
     } else if (paymentMethodHint === 'online') {
       insertFields.push(['prepaymentStatus', 'pending'], ['paymentMethod', 'online'])
+    } else if (paymentMethodHint === 'offline') {
+      // Явно NULL: колонка orders.paymentMethod имеет DEFAULT 'online'
+      insertFields.push(['paymentMethod', null])
     }
     if (hasPrepaymentUpdatedAt) {
       insertFields.push([

@@ -141,10 +141,13 @@ export class OrderController {
       const body = req.body || {}
       const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = body
       const paymentMethodRaw = body.paymentMethod ?? body.payment_method
+      // online → BePaid pending; cash-on-delivery/offline → явно не online (иначе DEFAULT 'online' в SQLite)
       const paymentMethodHint =
-        paymentMethodRaw === 'online' || paymentMethodRaw === 'cash-on-delivery'
-          ? (paymentMethodRaw === 'online' ? 'online' as const : null)
-          : (paymentMethodRaw === 'offline' ? 'offline' as const : null)
+        paymentMethodRaw === 'online'
+          ? ('online' as const)
+          : paymentMethodRaw === 'cash-on-delivery' || paymentMethodRaw === 'offline'
+            ? ('offline' as const)
+            : null
       const { delivery, error: deliveryError } = readWebsiteDeliveryFromBody(body)
       if (deliveryError) {
         res.status(400).json({ error: deliveryError, message: deliveryError })
