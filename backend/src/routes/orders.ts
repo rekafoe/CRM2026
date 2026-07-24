@@ -12,7 +12,14 @@ import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
 import { OrderService } from '../modules/orders/services/orderService'
 import { sendOrderSmsManual } from '../services/orderStatusSmsService'
+import { enqueueMail } from '../services/mailOutboxService'
+import {
+  createBePaidCheckout,
+  resolveBePaidReturnUrls,
+  splitCustomerName,
+} from '../services/bepaidCheckoutService'
 import { EarningsService } from '../services/earningsService'
+import { isValidEmailAddress } from '../utils/isValidEmail'
 import { registerExternalOrderFiles, updateExternalOrderFile } from '../services/externalOrderFilesService'
 import { buildEditorProductionManifest } from '../services/editorProductionExportService'
 import {
@@ -1252,10 +1259,42 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const paymentMethod = (req.body as any)?.paymentMethod ?? 'offline'
   if (!amount || amount <= 0) { res.status(400).json({ message: 'Сумма предоплаты не задана' }); return }
 
-  // BePaid integration stub: normally create payment via API and get redirect url
-  const paymentId = `BEP-${Date.now()}-${id}`
-  const paymentUrl = paymentMethod === 'online' ? `https://checkout.bepaid.by/redirect/${paymentId}` : null
+  let paymentId: string | null = null
+  let paymentUrl: string | null = null
   const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
+
+  if (paymentMethod === 'online') {
+    const email = String(order.customerEmail || '').trim()
+    if (!isValidEmailAddress(email)) {
+      res.status(400).json({ message: 'Для онлайн-оплаты BePaid нужен валидный email клиента' })
+      return
+    }
+    const trackingId = String(order.number || `ord-${id}`).trim()
+    const { firstName, lastName } = splitCustomerName(order.customerName)
+    const urls = resolveBePaidReturnUrls(id)
+    try {
+      const checkout = await createBePaidCheckout({
+        amountByn: amount,
+        orderTrackingId: trackingId,
+        description: `Оплата заказа ${trackingId}`,
+        customer: {
+          email,
+          firstName,
+          lastName,
+          phone: order.customerPhone || undefined,
+        },
+        successUrl: urls.successUrl,
+        failUrl: urls.failUrl,
+        notificationUrl: urls.notificationUrl,
+      })
+      paymentUrl = checkout.redirectUrl
+      paymentId = checkout.token
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Не удалось создать ссылку BePaid'
+      res.status(502).json({ message })
+      return
+    }
+  }
 
   const assignToMe = (req.body as any)?.assignToMe === true || (req.body as any)?.assignToMe === 'true'
   const authUser = (req as any).user as { id: number } | undefined
@@ -1274,6 +1313,153 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   res.json(orderForApi(updated))
+}))
+
+/**
+ * Создать (при необходимости) ссылку BePaid и отправить клиенту SMS и/или email.
+ * Body: { amount?: number, channel: 'sms' | 'email' | 'both' | 'none', recreate?: boolean }
+ */
+router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  const db = await getDb()
+  const order = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
+  if (!order) {
+    res.status(404).json({ message: 'Заказ не найден' })
+    return
+  }
+
+  const body = (req.body || {}) as {
+    amount?: number
+    channel?: 'sms' | 'email' | 'both' | 'none'
+    recreate?: boolean
+  }
+  const channel = body.channel ?? 'none'
+  const total = Number(order.totalAmount ?? 0)
+  const existingPrepay = Number(order.prepaymentAmount ?? 0)
+  const statusLower = String(order.prepaymentStatus ?? '').toLowerCase()
+  const isPaid = statusLower === 'paid' || statusLower === 'successful'
+  const paidAmount = isPaid ? existingPrepay : 0
+  const defaultAmount = Math.max(0, total - paidAmount)
+
+  const amount = Number(body.amount ?? defaultAmount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    res.status(400).json({ message: 'Сумма оплаты должна быть больше нуля' })
+    return
+  }
+
+  const email = String(order.customerEmail || '').trim()
+  let paymentUrl = String(order.paymentUrl || '').trim() || null
+  let paymentId = String(order.paymentId || '').trim() || null
+  const amountChanged = Math.abs(Number(order.prepaymentAmount ?? 0) - amount) > 0.009
+  const needsNewCheckout =
+    body.recreate === true ||
+    !paymentUrl ||
+    amountChanged ||
+    String(order.paymentMethod).toLowerCase() !== 'online' ||
+    String(order.prepaymentStatus).toLowerCase() === 'paid' ||
+    String(order.prepaymentStatus).toLowerCase() === 'successful'
+
+  if (needsNewCheckout) {
+    if (!isValidEmailAddress(email)) {
+      res.status(400).json({ message: 'Для ссылки BePaid нужен валидный email клиента' })
+      return
+    }
+    const trackingId = String(order.number || `ord-${id}`).trim()
+    const { firstName, lastName } = splitCustomerName(order.customerName)
+    const urls = resolveBePaidReturnUrls(id)
+    try {
+      const checkout = await createBePaidCheckout({
+        amountByn: amount,
+        orderTrackingId: trackingId,
+        description: `Оплата заказа ${trackingId}`,
+        customer: {
+          email,
+          firstName,
+          lastName,
+          phone: order.customerPhone || undefined,
+        },
+        successUrl: urls.successUrl,
+        failUrl: urls.failUrl,
+        notificationUrl: urls.notificationUrl,
+      })
+      paymentUrl = checkout.redirectUrl
+      paymentId = checkout.token
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Не удалось создать ссылку BePaid'
+      res.status(502).json({ message })
+      return
+    }
+
+    let hasPrepaymentUpdatedAt = false
+    try {
+      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+    } catch {
+      hasPrepaymentUpdatedAt = false
+    }
+    const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
+    const todayLocal = (todayRow?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+    const prepaymentMoment = `${todayLocal} 12:00:00`
+    const updateSql = hasPrepaymentUpdatedAt
+      ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
+    if (hasPrepaymentUpdatedAt) {
+      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', prepaymentMoment, id)
+    } else {
+      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', id)
+    }
+  }
+
+  if (!paymentUrl) {
+    res.status(500).json({ message: 'Не удалось получить ссылку на оплату' })
+    return
+  }
+
+  const orderNumber = String(order.number || `ord-${id}`).trim()
+  const smsText = `PrintCore: оплата заказа ${orderNumber}: ${paymentUrl}`
+  let sentSms = false
+  let sentEmail = false
+  let smsError: string | undefined
+  let emailError: string | undefined
+
+  if (channel === 'sms' || channel === 'both') {
+    const r = await sendOrderSmsManual({ orderId: id, body: smsText })
+    if (r.ok === true) {
+      sentSms = true
+    } else {
+      smsError = r.error
+    }
+  }
+
+  if (channel === 'email' || channel === 'both') {
+    if (!isValidEmailAddress(email)) {
+      emailError = 'Нет валидного email клиента'
+    } else {
+      try {
+        await enqueueMail({
+          to: email,
+          subject: `Ссылка на оплату заказа ${orderNumber}`,
+          text: `Здравствуйте!\n\nОплатите заказ ${orderNumber} по ссылке:\n${paymentUrl}\n\nСумма: ${amount.toFixed(2)} BYN\n\nPrintCore`,
+          html: `<p>Здравствуйте!</p><p>Оплатите заказ <strong>${orderNumber}</strong> по ссылке:</p><p><a href="${paymentUrl}">${paymentUrl}</a></p><p>Сумма: <strong>${amount.toFixed(2)} BYN</strong></p><p>PrintCore</p>`,
+          jobType: 'transactional',
+          contextOrderId: id,
+          idempotencyKey: `payment-link:${id}:${paymentId}:${Date.now()}`,
+        })
+        sentEmail = true
+      } catch (e) {
+        emailError = e instanceof Error ? e.message : 'Ошибка постановки email в очередь'
+      }
+    }
+  }
+
+  const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
+  res.json({
+    ...orderForApi(updated),
+    paymentUrl,
+    sentSms,
+    sentEmail,
+    smsError,
+    emailError,
+  })
 }))
 
 /** Admin: ручная отправка SMS клиенту (8:30–20:00 Minsk, SMS_ENABLED) */

@@ -287,7 +287,19 @@ export class OrderService {
     return OrderService.attachItemsToOrders(orders)
   }
 
-  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm' | 'mini_app', customerId?: number, paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal') {
+  static async createOrder(
+    customerName?: string,
+    customerPhone?: string,
+    customerEmail?: string,
+    prepaymentAmount?: number,
+    userId?: number,
+    date?: string,
+    source?: 'website' | 'telegram' | 'crm' | 'mini_app',
+    customerId?: number,
+    paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal',
+    /** Сайт: online (BePaid) → pending при нулевой предоплате */
+    paymentMethodHint?: 'online' | 'offline' | null,
+  ) {
     const dateOnly = date ? String(date).trim().slice(0, 10) : null
     const isToday = dateOnly && dateOnly === getTodayString()
     const createdAt = dateOnly && !isToday ? `${dateOnly}T12:00:00.000Z` : getCurrentTimestamp()
@@ -347,10 +359,15 @@ export class OrderService {
       ['prepaymentAmount', initialPrepay],
     ]
     if (initialPrepay > 0) {
-      insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', 'offline'])
+      insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', paymentMethodHint === 'online' ? 'online' : 'offline'])
+    } else if (paymentMethodHint === 'online') {
+      insertFields.push(['prepaymentStatus', 'pending'], ['paymentMethod', 'online'])
     }
     if (hasPrepaymentUpdatedAt) {
-      insertFields.push(['prepaymentUpdatedAt', initialPrepay > 0 ? createdAt : null])
+      insertFields.push([
+        'prepaymentUpdatedAt',
+        initialPrepay > 0 || paymentMethodHint === 'online' ? createdAt : null,
+      ])
     }
     insertFields.push(
       ['userId', creatorId],
@@ -622,6 +639,7 @@ export class OrderService {
       miniappCheckoutState?: MiniappCheckoutState;
       miniappDesignHelpRequested?: boolean;
       delivery?: WebsiteOrderDelivery | null;
+      paymentMethod?: 'online' | 'offline' | null;
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -640,7 +658,9 @@ export class OrderService {
       orderData.userId,
       undefined,
       source,
-      orderData.customer_id
+      orderData.customer_id,
+      undefined,
+      orderData.paymentMethod ?? null,
     );
     await this.applyMiniappOrderMetadata(db, {
       orderId: createdOrder.id,
@@ -688,6 +708,7 @@ export class OrderService {
       miniappCheckoutState?: MiniappCheckoutState;
       miniappDesignHelpRequested?: boolean;
       delivery?: WebsiteOrderDelivery | null;
+      paymentMethod?: 'online' | 'offline' | null;
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -757,6 +778,7 @@ export class OrderService {
       /** Для фильтра заказов Mini App (Telegram user id = chat_id в личке) */
       telegramChatId?: string;
       delivery?: WebsiteOrderDelivery | null;
+      paymentMethod?: 'online' | 'offline' | null;
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;

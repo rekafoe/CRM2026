@@ -37,9 +37,9 @@
 }
 
 .order-pool-sidebar {
-  flex: 0 0 clamp(440px, 40%, 640px);
-  width: clamp(440px, 40%, 640px);
-  min-width: 260px;
+  flex: 0 0 clamp(520px, 46%, 720px);
+  width: clamp(520px, 46%, 720px);
+  min-width: 280px;
   background: var(--op-glass-bg);
   border: 1px solid var(--op-glass-border);
   border-radius: 24px;
@@ -402,8 +402,7 @@
   font-size: 13px;
   vertical-align: middle;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
 }
 
 .order-list-table td:last-child {
@@ -420,6 +419,8 @@
 .order-list-table td.numeric {
   text-align: center;
   white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .order-list-table tr:nth-child(even) {
@@ -429,11 +430,74 @@
 .order-debt--due {
   color: #b91c1c;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .order-debt--paid {
   color: #15803d;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.order-pool-status-idle {
+  color: #666;
+}
+
+.order-payment-cell {
+  min-width: 118px;
+}
+
+.order-payment-combined {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-payment-badge {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.order-payment-combined--paid .order-payment-badge,
+.order-payment-prepay--paid {
+  color: #15803d;
+}
+
+.order-payment-combined--pending .order-payment-badge,
+.order-payment-prepay--pending {
+  color: #b45309;
+}
+
+.order-payment-combined--failed .order-payment-badge,
+.order-payment-prepay--failed {
+  color: #b91c1c;
+}
+
+.order-payment-combined--debt .order-payment-badge {
+  color: #64748b;
+}
+
+.order-payment-prepay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.order-payment-prepay small {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.order-payment-prepay--none {
+  color: #94a3b8;
+  font-weight: 500;
 }
 
 .prepayment-amount.paid {
@@ -615,6 +679,18 @@
   box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
 }
 
+.order-detail-actions .btn-send-payment-link {
+  background: #1d4ed8;
+  color: white;
+  border: 2px solid #1d4ed8;
+}
+
+.order-detail-actions .btn-send-payment-link:hover {
+  background: #1e40af;
+  border-color: #1e40af;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.25);
+}
+
 .order-detail-actions .btn-remove-prepayment {
   background: #dc2626;
   color: white;
@@ -624,6 +700,104 @@
 .order-detail-actions .btn-remove-prepayment:hover {
   background: #b91c1c;
   border-color: #b91c1c;
+}
+
+.order-detail-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.order-detail-payment__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.order-detail-payment__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.order-detail-payment__badge {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.order-detail-payment__badge--paid {
+  color: #15803d;
+}
+
+.order-detail-payment__badge--pending {
+  color: #b45309;
+}
+
+.order-detail-payment__badge--failed {
+  color: #b91c1c;
+}
+
+.order-detail-payment__badge--debt,
+.order-detail-payment__badge--none {
+  color: #475569;
+}
+
+.order-detail-payment__value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.order-detail-payment__value small {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.order-detail-payment__debt.is-due {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.order-detail-payment__debt.is-paid {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.order-detail-payment__url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.order-detail-payment__url a {
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.order-detail-payment__copy {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+  background: white !important;
+  color: #1e293b !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 /* Таймлайн статусов */
@@ -795,7 +969,7 @@
 .order-detail-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   margin: 16px 0;
   padding: 16px 0;
   border-top: 2px solid #f1f5f9;
@@ -804,48 +978,27 @@
 
 .order-detail-actions button {
   flex: 0 1 auto;
-  padding: 10px 18px;
+  padding: 10px 16px;
   border: 2px solid transparent;
   border-radius: 12px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: 100%;
   transition: box-shadow 0.2s ease;
 }
 
-.order-detail-actions button:first-child {
+.order-detail-actions > button:first-of-type {
   background: #15803d;
   color: white;
   border-color: #15803d;
 }
 
-.order-detail-actions button:first-child:hover {
+.order-detail-actions > button:first-of-type:hover {
   background: #166534;
   border-color: #166534;
   box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
-}
-
-.order-detail-actions button:nth-child(2) {
-  background: var(--accent-primary, #667eea);
-  color: white;
-  border-color: var(--accent-primary, #667eea);
-}
-
-.order-detail-actions button:nth-child(2):hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
-}
-
-.order-detail-actions button:nth-child(3) {
-  background: #dc2626;
-  color: white;
-  border-color: #dc2626;
-}
-
-.order-detail-actions button:nth-child(3):hover {
-  background: #b91c1c;
-  border-color: #b91c1c;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
 }
 
 .order-detail-readiness {

@@ -687,6 +687,22 @@ export const createPrepaymentLink = (
 ) =>
   api.post<Order>(`/orders/${orderId}/prepay`, { amount, paymentMethod, assignToMe });
 
+export type SendPaymentLinkChannel = 'sms' | 'email' | 'both' | 'none';
+
+export const sendOrderPaymentLink = (
+  orderId: number,
+  payload: { amount?: number; channel: SendPaymentLinkChannel; recreate?: boolean }
+) =>
+  api.post<
+    Order & {
+      paymentUrl: string;
+      sentSms: boolean;
+      sentEmail: boolean;
+      smsError?: string;
+      emailError?: string;
+    }
+  >(`/orders/${orderId}/send-payment-link`, payload);
+
 // Генерация PDF бланка заказа
 export const generateOrderBlankPdf = (orderId: number, companyPhones?: string[]) => {
   const params = companyPhones && companyPhones.length > 0 

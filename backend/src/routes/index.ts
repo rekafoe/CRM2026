@@ -36,10 +36,12 @@ import smsRoutes from './sms'
 import miniappRoutes from './miniapp'
 import campaignsRoutes from './campaigns'
 import publicEditorRoutes from './publicEditor'
+import webhooksRoutes from './webhooks'
 
 const router = Router()
 
 // API routes
+router.use('/webhooks', webhooksRoutes)
 router.use('/auth', authRoutes)
 router.use('/users', usersRoutes)
 router.use('/orders', ordersRoutes)

@@ -140,6 +140,11 @@ export class OrderController {
     try {
       const body = req.body || {}
       const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = body
+      const paymentMethodRaw = body.paymentMethod ?? body.payment_method
+      const paymentMethodHint =
+        paymentMethodRaw === 'online' || paymentMethodRaw === 'cash-on-delivery'
+          ? (paymentMethodRaw === 'online' ? 'online' as const : null)
+          : (paymentMethodRaw === 'offline' ? 'offline' as const : null)
       const { delivery, error: deliveryError } = readWebsiteDeliveryFromBody(body)
       if (deliveryError) {
         res.status(400).json({ error: deliveryError, message: deliveryError })
@@ -155,6 +160,7 @@ export class OrderController {
         customerPhone: customerPhone ?? null,
         customerEmail: customerEmail ?? null,
         prepaymentAmount: prepaymentAmount ?? null,
+        paymentMethod: paymentMethodHint,
         customer_id: customer_id ?? null,
         itemsCount: Array.isArray(items) ? items.length : 0,
         items: Array.isArray(items)
@@ -206,6 +212,7 @@ export class OrderController {
           customer_id: resolvedCustomerId ?? undefined,
           source: 'website',
           delivery,
+          paymentMethod: paymentMethodHint,
           items: editorDraftPrepared.items
         })
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
@@ -233,7 +240,9 @@ export class OrderController {
         undefined,
         undefined,
         'website',
-        customer_id
+        customer_id,
+        undefined,
+        paymentMethodHint,
       )
       if (delivery) {
         await OrderService.persistOrderDelivery(order.id, delivery)
@@ -344,10 +353,6 @@ export class OrderController {
 
     if (!row) {
       res.status(404).json({ error: 'Заказ не найден' })
-      return
-    }
-    if (row.source !== 'website') {
-      res.status(403).json({ error: 'Доступно только для заказов с сайта' })
       return
     }
 

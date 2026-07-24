@@ -14,6 +14,7 @@ function getEffectiveResponsibleUserId(order: Order): number | null {
   return Number.isFinite(n) ? n : null;
 }
 import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
+import { getPoolPaymentInfo, isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
@@ -23,6 +24,7 @@ import { OrderTotal } from '../components/order/OrderTotal';
 import { FilesModal } from '../components/FilesModal';
 import { PrepaymentModal } from '../components/PrepaymentModal';
 import { PrepaymentDetailsModal } from '../components/PrepaymentDetailsModal';
+import { SendPaymentLinkModal } from '../components/SendPaymentLinkModal';
 import { MoneyAmount } from '../components/ui';
 import { useToastNotifications } from '../components/Toast';
 import { useLogger } from '../utils/logger';
@@ -43,7 +45,7 @@ type FilterState = {
   assigned: 'all' | 'assigned' | 'not_assigned';
   searchInput: string;
   searchTerm: string;
-  quickFilter: 'debt' | 'prepay' | null;
+  quickFilter: 'debt' | 'prepay' | 'awaiting_payment' | null;
   sortBy: 'created_at' | 'number' | 'totalAmount';
   sortDirection: 'asc' | 'desc';
   visibleCount: number;
@@ -82,14 +84,6 @@ function getSourceLabel(source?: string): string {
     case 'mini_app': return 'Mini App';
     default: return 'Неизвестно';
   }
-}
-
-function getPaymentMethodLabel(method?: string | null): string {
-  if (!method) return '—';
-  if (method === 'online') return 'Онлайн';
-  if (method === 'offline') return 'Оффлайн';
-  if (method === 'telegram') return 'Telegram';
-  return method;
 }
 
 function filtersReducer(state: FilterState, action: FilterAction): FilterState {
@@ -135,7 +129,6 @@ const OrderRow = React.memo<{
   onSelect: (order: Order) => void;
   getSourceLabel: (source?: string) => string;
   getAssigneeLabel: (order: Order) => string;
-  getPaymentMethodLabel: (method?: string | null) => string;
   getOrderPrepayment: (order: Order) => number;
   getOrderDebt: (order: Order) => number;
   getOrderTotal: (order: Order) => number;
@@ -146,76 +139,77 @@ const OrderRow = React.memo<{
     onSelect,
     getSourceLabel,
     getAssigneeLabel,
-    getPaymentMethodLabel,
     getOrderPrepayment,
     getOrderDebt,
     getOrderTotal,
-  }) => (
-    <tr
-      className={`${isSelected ? 'selected' : ''} ${getEffectiveResponsibleUserId(order) ? 'assigned' : ''}`}
-      onClick={() => onSelect(order)}
-    >
-      <td className="sticky-col">
-        <div className="order-number">{order.number}</div>
-      </td>
-      <td>
-        <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
-      </td>
-      <td>
-        <div className="order-customer" title={order.customerName || 'Не указан'}>
-          {order.customerName || 'Не указан'}
-        </div>
-      </td>
-      <td>
-        <div className="order-phone" title={order.customerPhone || 'Не указан'}>
-          {order.customerPhone || '—'}
-        </div>
-      </td>
-      <td>
-        <div className="order-badges">
-          {order.source && <StatusBadge status={getSourceLabel(order.source)} color="info" size="sm" />}
-        </div>
-      </td>
-      <td>
-        <div className="order-assignee">{getAssigneeLabel(order)}</div>
-      </td>
-      <td className="order-status">
-        {getEffectiveResponsibleUserId(order) ? (
-          <span className="assigned-badge">✓ Назначен</span>
-        ) : order.is_cancelled === 1 ? (
-          <StatusBadge status="Отменён" color="error" size="sm" />
-        ) : (
-          <span style={{ color: '#666' }}>В пуле</span>
-        )}
-      </td>
-      <td>
-        <div className="order-payment-method">{getPaymentMethodLabel(order.paymentMethod)}</div>
-      </td>
-      <td className="numeric">
-        <div className="order-prepayment">
-          {getOrderPrepayment(order) > 0 ? (
-            <span className={`prepayment-amount ${isPaidPrepaymentStatus(order.prepaymentStatus) ? 'paid' : 'pending'}`}>
-              <MoneyAmount value={getOrderPrepayment(order)} />
-              <br />
-              <small className={`prepayment-status ${isPaidPrepaymentStatus(order.prepaymentStatus) ? 'paid' : 'pending'}`}>
-                {isPaidPrepaymentStatus(order.prepaymentStatus) ? 'Оплачено' : 'Ожидает'}
-              </small>
-            </span>
+  }) => {
+    const payment = getPoolPaymentInfo(order);
+    const prepay = getOrderPrepayment(order);
+    const debt = getOrderDebt(order);
+    return (
+      <tr
+        className={`${isSelected ? 'selected' : ''} ${getEffectiveResponsibleUserId(order) ? 'assigned' : ''}`}
+        onClick={() => onSelect(order)}
+      >
+        <td className="sticky-col">
+          <div className="order-number">{order.number}</div>
+        </td>
+        <td>
+          <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
+        </td>
+        <td>
+          <div className="order-customer" title={order.customerName || 'Не указан'}>
+            {order.customerName || 'Не указан'}
+          </div>
+        </td>
+        <td>
+          <div className="order-phone" title={order.customerPhone || 'Не указан'}>
+            {order.customerPhone || '—'}
+          </div>
+        </td>
+        <td>
+          <div className="order-badges">
+            {order.source && <StatusBadge status={getSourceLabel(order.source)} color="info" size="sm" />}
+          </div>
+        </td>
+        <td>
+          <div className="order-assignee">{getAssigneeLabel(order)}</div>
+        </td>
+        <td className="order-status">
+          {getEffectiveResponsibleUserId(order) ? (
+            <span className="assigned-badge">✓ Назначен</span>
+          ) : order.is_cancelled === 1 ? (
+            <StatusBadge status="Отменён" color="error" size="sm" />
           ) : (
-            <span style={{ color: '#999' }}>—</span>
+            <span className="order-pool-status-idle">В пуле</span>
           )}
-        </div>
-      </td>
-      <td className="numeric">
-        <div className={`order-debt ${getOrderDebt(order) > 0 ? 'order-debt--due' : 'order-debt--paid'}`}>
-          <MoneyAmount value={getOrderDebt(order)} />
-        </div>
-      </td>
-      <td className="numeric">
-        <div className="order-total"><MoneyAmount value={getOrderTotal(order)} /></div>
-      </td>
-    </tr>
-  )
+        </td>
+        <td className="order-payment-cell">
+          <div className={`order-payment-combined order-payment-combined--${payment.tone}`}>
+            <span className="order-payment-badge">{payment.badge}</span>
+            {payment.showPrepayAmount || prepay > 0 ? (
+              <span className={`order-payment-prepay order-payment-prepay--${payment.tone}`}>
+                <MoneyAmount value={prepay} />
+                <small>{payment.prepayLabel}</small>
+              </span>
+            ) : (
+              <span className="order-payment-prepay order-payment-prepay--none">
+                <small>{payment.prepayLabel}</small>
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="numeric">
+          <div className={`order-debt ${debt > 0 ? 'order-debt--due' : 'order-debt--paid'}`}>
+            <MoneyAmount value={debt} />
+          </div>
+        </td>
+        <td className="numeric">
+          <div className="order-total"><MoneyAmount value={getOrderTotal(order)} /></div>
+        </td>
+      </tr>
+    );
+  }
 );
 
 export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, currentUserName, isAdmin }) => {
@@ -234,6 +228,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [showPrepaymentDetailsModal, setShowPrepaymentDetailsModal] = useState(false);
+  const [showSendPaymentLinkModal, setShowSendPaymentLinkModal] = useState(false);
   const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
@@ -265,9 +260,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   }, []);
 
   const getOrderDebt = useCallback((order: Order) => {
-    return typeof order.debt === 'number' && Number.isFinite(order.debt)
-      ? order.debt
-      : Math.max(0, getOrderTotal(order) - getOrderPrepayment(order));
+    const total = getOrderTotal(order);
+    const prepay = getOrderPrepayment(order);
+    // Неоплаченная (pending/failed) предоплата не уменьшает долг — только paid/successful.
+    const paidPortion = isPaidPrepaymentStatus(order.prepaymentStatus) ? prepay : 0;
+    return Math.max(0, total - paidPortion);
   }, [getOrderTotal, getOrderPrepayment]);
 
   const getAssigneeLabel = useCallback(
@@ -499,6 +496,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         filtered = filtered.filter((o) => getOrderDebt(o) > 0);
       } else if (filters.quickFilter === 'prepay') {
         filtered = filtered.filter((o) => getOrderPrepayment(o) > 0);
+      } else if (filters.quickFilter === 'awaiting_payment') {
+        filtered = filtered.filter((o) => isAwaitingOnlinePayment(o));
       }
     }
 
@@ -805,17 +804,39 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </button>
             <button
               className={`quick-btn ${filters.quickFilter === 'debt' ? 'active' : ''}`}
-              onClick={() => dispatchFilters({ type: 'setQuickFilter', value: 'debt' })}
+              onClick={() =>
+                dispatchFilters({
+                  type: 'setQuickFilter',
+                  value: filters.quickFilter === 'debt' ? null : 'debt',
+                })
+              }
               title="Только с долгом"
             >
               С долгом
             </button>
             <button
               className={`quick-btn ${filters.quickFilter === 'prepay' ? 'active' : ''}`}
-              onClick={() => dispatchFilters({ type: 'setQuickFilter', value: 'prepay' })}
+              onClick={() =>
+                dispatchFilters({
+                  type: 'setQuickFilter',
+                  value: filters.quickFilter === 'prepay' ? null : 'prepay',
+                })
+              }
               title="Только с предоплатой"
             >
               С предоплатой
+            </button>
+            <button
+              className={`quick-btn ${filters.quickFilter === 'awaiting_payment' ? 'active' : ''}`}
+              onClick={() =>
+                dispatchFilters({
+                  type: 'setQuickFilter',
+                  value: filters.quickFilter === 'awaiting_payment' ? null : 'awaiting_payment',
+                })
+              }
+              title="Онлайн BePaid — ожидает оплату"
+            >
+              Ожидает оплату
             </button>
             <button
               className="quick-btn"
@@ -892,7 +913,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   <th>Ответственный</th>
                   <th>Статус</th>
                   <th>Оплата</th>
-                  <th className="numeric">Предоплата</th>
                   <th className="numeric">Долг</th>
                   <th className="numeric">Сумма</th>
                 </tr>
@@ -906,7 +926,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                     onSelect={setSelectedOrder}
                     getSourceLabel={getSourceLabel}
                     getAssigneeLabel={getAssigneeLabel}
-                    getPaymentMethodLabel={getPaymentMethodLabel}
                     getOrderPrepayment={getOrderPrepayment}
                     getOrderDebt={getOrderDebt}
                     getOrderTotal={getOrderTotal}
@@ -976,7 +995,17 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               )}
             </div>
             <div className="order-detail-actions">
-              <button onClick={() => setShowPrepaymentModal(true)}>💳 Внести предоплату</button>
+              <button type="button" onClick={() => setShowPrepaymentModal(true)}>
+                Внести предоплату
+              </button>
+              <button
+                type="button"
+                className="btn-send-payment-link"
+                onClick={() => setShowSendPaymentLinkModal(true)}
+                title="Создать ссылку BePaid и отправить клиенту"
+              >
+                Ссылка на оплату
+              </button>
               {getOrderPrepayment(selectedOrder) > 0 && (
                 <button
                   type="button"
@@ -984,16 +1013,17 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   onClick={() => handleRemovePrepayment(selectedOrder.id)}
                   title="Удалить предоплату по заказу"
                 >
-                  🗑️ Удалить предоплату
+                  Удалить предоплату
                 </button>
               )}
               {(getOrderDebt(selectedOrder) > 0 || (getOrderPrepayment(selectedOrder) >= getOrderTotal(selectedOrder) && getOrderTotal(selectedOrder) > 0)) && Number(selectedOrder.status) !== 7 && (
                 <button
+                  type="button"
                   className="btn-close-debt"
                   onClick={() => handleIssueOrder(selectedOrder.id)}
                   disabled={issuingOrderId === selectedOrder.id}
                 >
-                  {issuingOrderId === selectedOrder.id ? '⏳ Выдача...' : '✅ Выдать заказ'}
+                  {issuingOrderId === selectedOrder.id ? 'Выдача...' : 'Выдать заказ'}
                 </button>
               )}
               {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
@@ -1012,6 +1042,53 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 </button>
               )}
             </div>
+            {(() => {
+              const payment = getPoolPaymentInfo(selectedOrder);
+              const debt = getOrderDebt(selectedOrder);
+              const prepay = getOrderPrepayment(selectedOrder);
+              return (
+                <div className="order-detail-payment">
+                  <div className="order-detail-payment__row">
+                    <span className="order-detail-payment__label">Оплата</span>
+                    <span className={`order-detail-payment__badge order-detail-payment__badge--${payment.tone}`}>
+                      {payment.badge}
+                    </span>
+                  </div>
+                  <div className="order-detail-payment__row">
+                    <span className="order-detail-payment__label">Предоплата</span>
+                    <span className="order-detail-payment__value">
+                      <MoneyAmount value={prepay} />
+                      <small>{payment.prepayLabel}</small>
+                    </span>
+                  </div>
+                  <div className="order-detail-payment__row">
+                    <span className="order-detail-payment__label">Долг</span>
+                    <span className={`order-detail-payment__debt ${debt > 0 ? 'is-due' : 'is-paid'}`}>
+                      <MoneyAmount value={debt} />
+                    </span>
+                  </div>
+                  {selectedOrder.paymentUrl && (
+                    <div className="order-detail-payment__url">
+                      <a href={selectedOrder.paymentUrl} target="_blank" rel="noreferrer">
+                        Открыть ссылку BePaid
+                      </a>
+                      <button
+                        type="button"
+                        className="order-detail-payment__copy"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(selectedOrder.paymentUrl || '').then(
+                            () => toast.success('Ссылка скопирована'),
+                            () => toast.error('Не удалось скопировать')
+                          );
+                        }}
+                      >
+                        Скопировать
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {(() => {
               const created = selectedOrder.created_at ?? (selectedOrder as any).createdAt;
               const firstItem = (selectedOrder.items ?? [])[0];
@@ -1153,6 +1230,22 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           order={selectedOrder}
           onPrepaymentUpdate={loadOrders}
           onOpenPrepaymentModal={() => setShowPrepaymentModal(true)}
+        />
+      )}
+      {showSendPaymentLinkModal && selectedOrder && (
+        <SendPaymentLinkModal
+          isOpen={showSendPaymentLinkModal}
+          onClose={() => setShowSendPaymentLinkModal(false)}
+          order={selectedOrder}
+          debtAmount={getOrderDebt(selectedOrder)}
+          onUpdated={(updated) => {
+            updateOrderInList(updated.id, updated);
+            void loadOrders({ soft: true });
+          }}
+          onToast={(type, title, message) => {
+            if (type === 'success') toast.success(title, message);
+            else toast.error(title, message);
+          }}
         />
       )}
       {ReasonPromptModalElement}
