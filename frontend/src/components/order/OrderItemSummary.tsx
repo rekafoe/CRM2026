@@ -2,7 +2,7 @@ import React from 'react';
 import type { Item } from '../../types';
 import { usePriceTypeLabels } from '../../hooks/pricing/usePriceTypeLabels';
 import { BynSymbol } from '../ui/BynSymbol';
-import { itemParamsHasNoLayout } from './orderItemUtils';
+import { filterOperatorVisibleParameters, itemParamsHasNoLayout } from './orderItemUtils';
 
 interface ParameterSummaryItem {
   label: string;
@@ -217,37 +217,18 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
         </>
       )}
 
-      {/* Дополнительные параметры из parameterSummary */}
+      {/* Доп. параметры — без техдампа сайта и дублей с разбивкой */}
       {!compact &&
-      (() => {
-        // Параметры, которые нужно показать в основной строке
-        const importantParams = parameterSummary.filter((param) => {
-          const label = param.label.toLowerCase();
-          // Исключаем уже показанные параметры
-          return !(
-            label === 'материал' ||
-            label === 'тип материала' ||
-            label === 'плотность бумаги' ||
-            label === 'плотность' ||
-            label === 'тип продукта' ||
-            label === 'тираж' ||
-            label === 'стороны печати' ||
-            label === 'срок изготовления'
-          );
-        });
-
-        // Показываем первые 3-4 важных параметра
-        const paramsToShow = importantParams.slice(0, 4);
-        
-        return paramsToShow.map((param) => (
-          <React.Fragment key={`${param.label}-${param.value}`}>
-            <span className="separator">|</span>
-            <span className="detail-item">
-              {param.label}: {param.value}
-            </span>
-          </React.Fragment>
-        ));
-      })()}
+        filterOperatorVisibleParameters(parameterSummary)
+          .slice(0, 3)
+          .map((param) => (
+            <React.Fragment key={`${param.label}-${param.value}`}>
+              <span className="separator">|</span>
+              <span className="detail-item">
+                {param.label}: {param.value}
+              </span>
+            </React.Fragment>
+          ))}
     </div>
   );
 };

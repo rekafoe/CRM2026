@@ -14,16 +14,114 @@ export const itemParamsHasNoLayout = (params: Item['params'] | Record<string, un
   return false;
 };
 
+/** Внутренние / служебные ключи опций сайта — не для UI оператора. */
+const HIDDEN_OPERATOR_PARAM_KEYS = new Set([
+  'productionrendersource',
+  'poligraffyslug',
+  'poligrafyslug',
+  'poligrafytypeidparam',
+  'typeid',
+  'pricetype',
+  'ordermode',
+  'productid',
+  'crmproductid',
+  'crmsizeid',
+  'crmmaterialid',
+  'crmprintcolormode',
+  'crmsides',
+  'crmpaperdensity',
+  'crmfinishing',
+  'crmpricetype',
+  'designtemplateid',
+  'designtemplatecode',
+  'designusagefee',
+  'designeditormode',
+  'editordrafttoken',
+  'designstate',
+  'photobatch',
+  'clientrenderedpages',
+  'layouthumanlabel',
+  'crmnolayoutdeclared',
+]);
+
+/** Дубли и шум, которые уже есть в разбивке / строке цены. */
+const HIDDEN_OPERATOR_PARAM_LABELS = new Set([
+  'тип печати',
+  'тип бумаги',
+  'тип бумаги обложки',
+  'плотность обложки',
+  'плотность бумаги',
+  'плотность',
+  'обработка',
+  'дополнительная отделка',
+  'формат',
+  'формат печати',
+  'размер',
+  'тип материала',
+  'материал',
+  'тип продукта',
+  'тираж',
+  'стороны печати',
+  'срок изготовления',
+  'количество страниц',
+  'layouthumanlabel',
+]);
+
+const stripTechKvFromDescription = (desc: string): string => {
+  let text = desc;
+  for (const key of HIDDEN_OPERATOR_PARAM_KEYS) {
+    text = text.replace(new RegExp(`;?\\s*${key}\\s*:\\s*[^;•]+`, 'gi'), '');
+  }
+  return text
+    .replace(/;?\s*Тип печати\s*:\s*[^;•]+/gi, '')
+    .replace(/;?\s*Тип бумаги(?:\s+обложки)?\s*:\s*[^;•]+/gi, '')
+    .replace(/;?\s*Плотность обложки\s*:\s*[^;•]+/gi, '')
+    .replace(/;?\s*Обработка\s*:\s*[^;•]+/gi, '');
+};
+
 /** Убирает артефакты website checkout из описания позиции. */
 export const sanitizeWebsiteOrderItemDescription = (desc: string): string => {
   if (!desc) return desc;
-  return desc
+  return stripTechKvFromDescription(desc)
     .replace(/;?\s*layoutHumanLabel:\s*[^;]+/gi, '')
     .replace(/;?\s*Дополнительная отделка:\s*\[object Object\]/gi, '')
     .replace(/\s{2,}/g, ' ')
     .replace(/;\s*;/g, ';')
     .replace(/\s*;\s*$/g, '')
     .trim();
+};
+
+/** Параметр для правой колонки / чипов — только полезное оператору. */
+export const isOperatorVisibleParameter = (param: {
+  label?: string;
+  key?: string;
+  value?: unknown;
+}): boolean => {
+  const label = String(param.label ?? '').trim();
+  const key = String(param.key ?? '').trim();
+  const value = param.value == null ? '' : String(param.value).trim();
+  if (!label || !value || value === '[object Object]') return false;
+
+  const labelNorm = label.toLowerCase();
+  const keyNorm = key.toLowerCase();
+  if (HIDDEN_OPERATOR_PARAM_KEYS.has(labelNorm) || HIDDEN_OPERATOR_PARAM_KEYS.has(keyNorm)) {
+    return false;
+  }
+  if (HIDDEN_OPERATOR_PARAM_LABELS.has(labelNorm)) return false;
+
+  // Сырые ключи латиницей (camelCase / snake_case) — служебные
+  if (/^[a-z][a-zA-Z0-9_]*$/.test(label) || /^[a-z][a-z0-9_]*$/.test(labelNorm)) {
+    return false;
+  }
+
+  return true;
+};
+
+export const filterOperatorVisibleParameters = <T extends { label?: string; key?: string; value?: unknown }>(
+  params: T[] | null | undefined
+): T[] => {
+  if (!Array.isArray(params)) return [];
+  return params.filter(isOperatorVisibleParameter);
 };
 
 // Определяем, что описание сгенерировано автоматически калькулятором
@@ -36,7 +134,12 @@ export const isAutoDescription = (desc: string | undefined | null): boolean => {
     d.includes('тираж:') ||
     d.includes('стороны печати:') ||
     d.includes('тип материала:') ||
-    d.includes('материал:')
+    d.includes('материал:') ||
+    d.includes('тип печати:') ||
+    d.includes('тип бумаги:') ||
+    d.includes('productionrendersource:') ||
+    d.includes('poligrafyslug:') ||
+    d.includes('ordermode:')
   );
 };
 

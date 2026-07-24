@@ -6,6 +6,7 @@ import { getPaperTypesFromWarehouse } from '../services/calculatorMaterialServic
 import { ConfirmDialog } from './common/ConfirmDialog';
 import { useToast } from './Toast';
 import {
+  filterOperatorVisibleParameters,
   generateItemDescription,
   isAutoDescription,
   sanitizeOrderItemDescription,
@@ -303,35 +304,10 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     ((Array.isArray(item.params.materials) && item.params.materials.length > 0) ||
       (Array.isArray(item.params.services) && item.params.services.length > 0));
 
-  /** Чипы параметров справа — без дублей с таблицей разбивки и строкой итого */
+  /** Правая колонка — только параметры, полезные оператору (без техдампа сайта). */
   const filteredParameterChips = useMemo(() => {
-    return parameterSummary.filter((param) => {
-      const label = param.label.toLowerCase();
-      if (label === 'layouthumanlabel' || param.value === '[object Object]') {
-        return false;
-      }
-      if (
-        showPositionBreakdown &&
-        (label === 'формат печати' || label === 'формат' || label === 'размер')
-      ) {
-        return false;
-      }
-      return !(
-        label === 'формат' ||
-        label === 'размер' ||
-        label === 'тип материала' ||
-        label === 'материал' ||
-        label === 'плотность бумаги' ||
-        label === 'плотность' ||
-        label === 'тип продукта' ||
-        label === 'тираж' ||
-        label === 'стороны печати' ||
-        label === 'срок изготовления' ||
-        label === 'количество страниц' ||
-        label === 'формат печати'
-      );
-    });
-  }, [parameterSummary, showPositionBreakdown]);
+    return filterOperatorVisibleParameters(parameterSummary);
+  }, [parameterSummary]);
 
   /** Формат / тираж для строки без таблицы и для шапки таблицы разбивки */
   const titleParts = useMemo(() => {
@@ -592,15 +568,16 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
       </div>
       {filteredParameterChips.length > 0 ? (
         <aside className="order-item-sidebar" aria-label="Доп. параметры позиции">
-          <div className="order-item-sidebar__row order-item-sidebar__row--chips">
-            <div className="order-parameter-summary order-parameter-summary--sidebar">
+          <div className="order-item-sidebar-card">
+            <div className="order-item-sidebar-card__title">Параметры</div>
+            <dl className="order-item-sidebar-specs">
               {filteredParameterChips.map((param) => (
-                <span className="parameter-chip" key={`${param.label}-${param.value}`}>
-                  <span className="parameter-label">{param.label}:</span>
-                  <span className="parameter-value">{param.value}</span>
-                </span>
+                <div className="order-item-sidebar-specs__row" key={`${param.label}-${param.value}`}>
+                  <dt>{param.label}</dt>
+                  <dd>{param.value}</dd>
+                </div>
               ))}
-            </div>
+            </dl>
           </div>
         </aside>
       ) : null}

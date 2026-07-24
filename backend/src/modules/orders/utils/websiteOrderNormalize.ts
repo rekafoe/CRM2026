@@ -10,6 +10,17 @@ const INTERNAL_PARAM_KEYS = new Set([
   'designEditorMode',
 ]);
 
+const HIDDEN_SUMMARY_LABELS = new Set([
+  'productionrendersource',
+  'poligrafyslug',
+  'poligrafytypeidparam',
+  'typeid',
+  'pricetype',
+  'ordermode',
+  'productid',
+  'layouthumanlabel',
+]);
+
 function isNoLayoutDeclared(params: Record<string, unknown>): boolean {
   if (params.no_layout === true || params.layout_missing === true) return true;
   if (params.crmNoLayoutDeclared === true) return true;
@@ -47,6 +58,10 @@ function sanitizeParameterSummary(
       if (!label || value == null) return null;
       if (label === 'layoutHumanLabel') return null;
       if (label === 'Дополнительная отделка' && value === '[object Object]') return null;
+      const labelNorm = label.toLowerCase();
+      if (HIDDEN_SUMMARY_LABELS.has(labelNorm)) return null;
+      // Служебные ключи латиницей (camelCase) не показываем оператору
+      if (/^[a-z][a-zA-Z0-9_]*$/.test(label)) return null;
       return { label, value };
     })
     .filter((row): row is { label: string; value: string } => row != null);

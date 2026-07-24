@@ -141,10 +141,57 @@
 .order-item-sidebar {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  flex-shrink: 0;
-  max-width: 100%;
+  align-items: stretch;
+  gap: 8px;
+  flex: 0 1 220px;
+  min-width: 160px;
+  max-width: 260px;
+}
+
+.order-item-sidebar-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.order-item-sidebar-card__title {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+}
+
+.order-item-sidebar-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.order-item-sidebar-specs__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: baseline;
+}
+
+.order-item-sidebar-specs__row dt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+  overflow-wrap: anywhere;
+}
+
+.order-item-sidebar-specs__row dd {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .order-item-sidebar__row {
@@ -218,9 +265,36 @@
   max-width: min(420px, 100%);
 }
 
+.order-parameter-summary .parameter-chip,
+.order-item-sidebar .parameter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  color: var(--text-primary, #0f172a);
+  white-space: normal;
+}
+
+.order-parameter-summary .parameter-label,
+.order-item-sidebar .parameter-label {
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+}
+
+.order-parameter-summary .parameter-value,
+.order-item-sidebar .parameter-value {
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
 @media (max-width: 900px) {
   .order-item-sidebar {
-    align-items: stretch;
+    flex: 1 1 100%;
+    max-width: none;
     width: 100%;
   }
 
