@@ -80,5 +80,8 @@ export function createClientTextbox(opts: CreateClientTextboxOpts): FabricObject
     selectionColor: 'rgba(37, 99, 235, 0.28)',
   });
   ax(box).textFieldClientAdded = true;
+  // Центр бокса = якорь: смена width не двигает глифы (сувенирка).
+  const centerX = left + width / 2;
+  box.set({ originX: 'center', left: centerX });
   return box;
 }

@@ -1013,6 +1013,7 @@ export function restoreTextLayoutsFromSnapshots(
     const snap = snapshots.get(id) ?? snapshots.get(stripSpreadPageIdPrefix(id));
     if (!snap) continue;
     applyDesignedTextLayoutSnapshot(obj, snap);
+    normalizeClientCenteredTextboxOrigin(obj);
   }
 }
 
@@ -1248,14 +1249,13 @@ function computeMinTextboxWidth(obj: TextLikeObject, text: string): number {
 function widenTextboxPreservingDesignedOrigin(obj: TextLikeObject, nextWidth: number): void {
   const id = String(obj.id ?? '');
   const beforeLeft = obj.left;
-  const originX = (obj as { originX?: string }).originX ?? 'left';
-  const originY = (obj as { originY?: string }).originY ?? 'top';
   const currentW = Number(obj.width ?? 0);
   const floor = resolveEffectiveDesignedTextboxLayoutFloor(obj);
   let targetW = Math.max(nextWidth, Number.isFinite(currentW) ? currentW : 0, floor);
   const absoluteMax = resolveDesignedTextboxAbsoluteMaxWidth(obj);
   if (absoluteMax != null) targetW = Math.min(targetW, absoluteMax);
-  obj.set({ width: targetW, originX, originY, textFieldLayoutWidth: targetW } as Parameters<typeof obj.set>[0]);
+  setTextboxWidthPreservingOrigin(obj, targetW);
+  (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = targetW;
   if (isDesignedTemplateText(obj)) {
     const anyObj = obj as { _sacredWidth?: number; _editLayoutWidthFloor?: number };
     anyObj._sacredWidth = targetW;
@@ -1264,7 +1264,7 @@ function widenTextboxPreservingDesignedOrigin(obj: TextLikeObject, nextWidth: nu
     }
   }
   if (isTemplateTextLayerId(id) && isTextPositionDebugEnabled()) {
-    console.log(`[TEXT-POS] width-expand id=${id} beforeLeft=${beforeLeft} afterLeft=${obj.left} targetW=${nextWidth} originX=${originX}`);
+    console.log(`[TEXT-POS] width-expand id=${id} beforeLeft=${beforeLeft} afterLeft=${obj.left} targetW=${nextWidth} originX=${(obj as { originX?: string }).originX}`);
   }
 }
 
@@ -1406,8 +1406,8 @@ function setTextboxWidthPreservingOrigin(obj: TextLikeObject, nextWidth: number)
   const textAlign = String((obj as { textAlign?: string }).textAlign ?? 'left').toLowerCase();
   const patch: Record<string, unknown> = { width: nextWidth, originX, originY };
 
-  // textAlign:center + originX:left: глифы рисуются в центре бокса.
-  // Сужение width при том же left сдвигает визуал сильно влево (сувенирка).
+  // textAlign:center/right + originX:left: глифы якорятся к ширине бокса.
+  // Сужение width при том же left сдвигает визуал (особенно сувенирка 200×90).
   if (
     Number.isFinite(oldWidth)
     && oldWidth > 0
@@ -1426,6 +1426,29 @@ function setTextboxWidthPreservingOrigin(obj: TextLikeObject, nextWidth: number)
   }
 
   obj.set(patch as Parameters<typeof obj.set>[0]);
+  obj.setCoords?.();
+}
+
+/**
+ * Клиентский текст: textAlign center при originX left → originX center.
+ * Тогда смена width не двигает визуальный центр (типичный баг сувенирки).
+ */
+export function normalizeClientCenteredTextboxOrigin(obj: TextLikeObject): void {
+  if (obj.textFieldClientAdded !== true || obj.type !== 'textbox') return;
+  const textAlign = String((obj as { textAlign?: string }).textAlign ?? 'left').toLowerCase();
+  if (textAlign !== 'center') return;
+  const originX = String((obj as { originX?: string }).originX ?? 'left');
+  if (originX === 'center') return;
+
+  const w = Number(obj.width ?? 0);
+  const left = Number(obj.left ?? 0);
+  if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(left)) return;
+
+  let centerX = left;
+  if (originX === 'left') centerX = left + w / 2;
+  else if (originX === 'right' || originX === 'end') centerX = left - w / 2;
+
+  obj.set({ originX: 'center', left: centerX } as Parameters<typeof obj.set>[0]);
   obj.setCoords?.();
 }
 
@@ -1494,17 +1517,11 @@ function finalizeDesignedSingleLineTextboxWidth(obj: TextLikeObject): void {
 }
 
 function setDesignedTextboxWidthPreservingOrigin(obj: TextLikeObject, nextWidth: number): void {
-  const originX = (obj as { originX?: string }).originX ?? 'left';
-  const originY = (obj as { originY?: string }).originY ?? 'top';
   let targetW = Math.max(TIGHT_TEXTBOX_MIN_WIDTH_PX, nextWidth);
   const absoluteMax = resolveDesignedTextboxAbsoluteMaxWidth(obj);
   if (absoluteMax != null) targetW = Math.min(targetW, absoluteMax);
-  obj.set({
-    width: targetW,
-    originX,
-    originY,
-    textFieldLayoutWidth: targetW,
-  } as Parameters<typeof obj.set>[0]);
+  setTextboxWidthPreservingOrigin(obj, targetW);
+  (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = targetW;
   if (isDesignedTemplateText(obj)) {
     const anyObj = obj as { _sacredWidth?: number; _editLayoutWidthFloor?: number };
     anyObj._sacredWidth = targetW;
@@ -1512,7 +1529,6 @@ function setDesignedTextboxWidthPreservingOrigin(obj: TextLikeObject, nextWidth:
       anyObj._editLayoutWidthFloor = targetW;
     }
   }
-  obj.setCoords?.();
 }
 
 export function hasUserLockedClientTextboxLayout(obj: TextLikeObject): boolean {
@@ -2384,6 +2400,7 @@ export function migrateAndHydrateTextObject(
   // client_png / order export: не трогаем left/top/width — только материализуем styles для глифов.
   if (options?.preserveLayout) {
     hydrateTextObjectStyles(textObj);
+    normalizeClientCenteredTextboxOrigin(textObj);
     textObj.setCoords?.();
     if (isTemplateText && isTextPositionDebugEnabled()) {
       console.log(`[TEXT-POS] migrate end (preserve) id=${id} left=${textObj.left} top=${textObj.top} w=${textObj.width}`);
@@ -2423,6 +2440,7 @@ export function migrateAndHydrateTextObject(
 
   captureSacredPositionIfNeeded(textObj);
   hydrateTextObjectStyles(textObj);
+  normalizeClientCenteredTextboxOrigin(textObj);
   tightenDraftTextboxWidthOnLoad(textObj);
   normalizeImportedSingleLineTextboxWidth(textObj);
   restoreSacredPosition(textObj);
