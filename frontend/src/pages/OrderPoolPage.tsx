@@ -1,23 +1,26 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderActivityEvent } from '../types';
-import { api, getOrders, getOrderPoolSync, reassignOrderByNumber, unassignOrderByNumber, cancelOnlineOrder, deleteOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
+import {
+  api,
+  getOrders,
+  getOrderPoolSync,
+  reassignOrderByNumber,
+  unassignOrderByNumber,
+  cancelOnlineOrder,
+  deleteOrder,
+  getUsers,
+  createPrepaymentLink,
+  issueOrder,
+  getOperatorsToday,
+  updateOrderItem,
+  getOrderActivity,
+  updateOrderNotes,
+} from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
-
-const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
-
-/** Ответственный в пуле: приоритет responsible_user_id, иначе legacy userId */
-function getEffectiveResponsibleUserId(order: Order): number | null {
-  const raw = order.responsible_user_id ?? order.userId;
-  if (raw == null) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
-}
 import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
-import { getPoolPaymentInfo, isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
+import { isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
-import { StatusBadge } from '../components/common/StatusBadge';
-import { OrderHeader } from '../components/optimized/OrderHeader';
 import { OrderContent } from '../components/optimized/OrderContent';
 import { OrderStatusTimeline } from '../components/order/OrderStatusTimeline';
 import { OrderTotal } from '../components/order/OrderTotal';
@@ -25,12 +28,23 @@ import { FilesModal } from '../components/FilesModal';
 import { PrepaymentModal } from '../components/PrepaymentModal';
 import { PrepaymentDetailsModal } from '../components/PrepaymentDetailsModal';
 import { SendPaymentLinkModal } from '../components/SendPaymentLinkModal';
-import { MoneyAmount } from '../components/ui';
+import { Button } from '../components/common/Button';
 import { useToastNotifications } from '../components/Toast';
 import { useLogger } from '../utils/logger';
 import { useReasonPrompt } from '../components/common/useReasonPrompt';
 import { useReasonPresets } from '../components/common/useReasonPresets';
+import {
+  OrderPoolFilters,
+  OrderPoolList,
+  OrderPoolDetailHeader,
+  OrderPoolPaymentSummary,
+  getEffectiveResponsibleUserId,
+  initialOrderPoolFilters,
+  orderPoolFiltersReducer,
+} from '../components/orderPool';
 import '../styles/order-pool.css';
+
+const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
 
 interface OrderPoolPageProps {
   currentUserId: number;
@@ -38,179 +52,6 @@ interface OrderPoolPageProps {
   /** Физическое удаление отменённого заказа из БД */
   isAdmin: boolean;
 }
-
-type FilterState = {
-  source: 'all' | 'crm' | 'website' | 'telegram' | 'mini_app';
-  cancelled: 'all' | 'cancelled' | 'not_cancelled';
-  assigned: 'all' | 'assigned' | 'not_assigned';
-  searchInput: string;
-  searchTerm: string;
-  quickFilter: 'debt' | 'prepay' | 'awaiting_payment' | null;
-  sortBy: 'created_at' | 'number' | 'totalAmount';
-  sortDirection: 'asc' | 'desc';
-  visibleCount: number;
-};
-
-type FilterAction =
-  | { type: 'setSource'; value: FilterState['source'] }
-  | { type: 'setCancelled'; value: FilterState['cancelled'] }
-  | { type: 'setAssigned'; value: FilterState['assigned'] }
-  | { type: 'setSearchInput'; value: string }
-  | { type: 'setSearchTerm'; value: string }
-  | { type: 'setQuickFilter'; value: FilterState['quickFilter'] }
-  | { type: 'setSortBy'; value: FilterState['sortBy'] }
-  | { type: 'toggleSortDirection' }
-  | { type: 'resetFilters' }
-  | { type: 'resetVisible' }
-  | { type: 'increaseVisible'; step?: number };
-
-const initialFilters: FilterState = {
-  source: 'website',
-  cancelled: 'not_cancelled',
-  assigned: 'not_assigned',
-  searchInput: '',
-  searchTerm: '',
-  quickFilter: null,
-  sortBy: 'created_at',
-  sortDirection: 'desc',
-  visibleCount: 100,
-};
-
-function getSourceLabel(source?: string): string {
-  switch (source) {
-    case 'website': return 'Онлайн';
-    case 'telegram': return 'Telegram';
-    case 'crm': return 'CRM';
-    case 'mini_app': return 'Mini App';
-    default: return 'Неизвестно';
-  }
-}
-
-function filtersReducer(state: FilterState, action: FilterAction): FilterState {
-  switch (action.type) {
-    case 'setSource':
-      return { ...state, source: action.value };
-    case 'setCancelled':
-      return { ...state, cancelled: action.value };
-    case 'setAssigned':
-      return { ...state, assigned: action.value };
-    case 'setSearchInput':
-      return { ...state, searchInput: action.value };
-    case 'setSearchTerm':
-      return { ...state, searchTerm: action.value };
-    case 'setQuickFilter':
-      return { ...state, quickFilter: action.value };
-    case 'setSortBy':
-      return { ...state, sortBy: action.value };
-    case 'toggleSortDirection':
-      return { ...state, sortDirection: state.sortDirection === 'asc' ? 'desc' : 'asc' };
-    case 'resetFilters':
-      return {
-        ...state,
-        source: initialFilters.source,
-        cancelled: initialFilters.cancelled,
-        assigned: initialFilters.assigned,
-        searchInput: '',
-        searchTerm: '',
-        quickFilter: null,
-      };
-    case 'resetVisible':
-      return { ...state, visibleCount: 100 };
-    case 'increaseVisible':
-      return { ...state, visibleCount: state.visibleCount + (action.step ?? 100) };
-    default:
-      return state;
-  }
-}
-
-const OrderRow = React.memo<{
-  order: Order;
-  isSelected: boolean;
-  onSelect: (order: Order) => void;
-  getSourceLabel: (source?: string) => string;
-  getAssigneeLabel: (order: Order) => string;
-  getOrderPrepayment: (order: Order) => number;
-  getOrderDebt: (order: Order) => number;
-  getOrderTotal: (order: Order) => number;
-}>(
-  ({
-    order,
-    isSelected,
-    onSelect,
-    getSourceLabel,
-    getAssigneeLabel,
-    getOrderPrepayment,
-    getOrderDebt,
-    getOrderTotal,
-  }) => {
-    const payment = getPoolPaymentInfo(order);
-    const prepay = getOrderPrepayment(order);
-    const debt = getOrderDebt(order);
-    return (
-      <tr
-        className={`${isSelected ? 'selected' : ''} ${getEffectiveResponsibleUserId(order) ? 'assigned' : ''}`}
-        onClick={() => onSelect(order)}
-      >
-        <td className="sticky-col">
-          <div className="order-number">{order.number}</div>
-        </td>
-        <td>
-          <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
-        </td>
-        <td>
-          <div className="order-customer" title={order.customerName || 'Не указан'}>
-            {order.customerName || 'Не указан'}
-          </div>
-        </td>
-        <td>
-          <div className="order-phone" title={order.customerPhone || 'Не указан'}>
-            {order.customerPhone || '—'}
-          </div>
-        </td>
-        <td>
-          <div className="order-badges">
-            {order.source && <StatusBadge status={getSourceLabel(order.source)} color="info" size="sm" />}
-          </div>
-        </td>
-        <td>
-          <div className="order-assignee">{getAssigneeLabel(order)}</div>
-        </td>
-        <td className="order-status">
-          {getEffectiveResponsibleUserId(order) ? (
-            <span className="assigned-badge">✓ Назначен</span>
-          ) : order.is_cancelled === 1 ? (
-            <StatusBadge status="Отменён" color="error" size="sm" />
-          ) : (
-            <span className="order-pool-status-idle">В пуле</span>
-          )}
-        </td>
-        <td className="order-payment-cell">
-          <div className={`order-payment-combined order-payment-combined--${payment.tone}`}>
-            <span className="order-payment-badge">{payment.badge}</span>
-            {payment.showPrepayAmount || prepay > 0 ? (
-              <span className={`order-payment-prepay order-payment-prepay--${payment.tone}`}>
-                <MoneyAmount value={prepay} />
-                <small>{payment.prepayLabel}</small>
-              </span>
-            ) : (
-              <span className="order-payment-prepay order-payment-prepay--none">
-                <small>{payment.prepayLabel}</small>
-              </span>
-            )}
-          </div>
-        </td>
-        <td className="numeric">
-          <div className={`order-debt ${debt > 0 ? 'order-debt--due' : 'order-debt--paid'}`}>
-            <MoneyAmount value={debt} />
-          </div>
-        </td>
-        <td className="numeric">
-          <div className="order-total"><MoneyAmount value={getOrderTotal(order)} /></div>
-        </td>
-      </tr>
-    );
-  }
-);
 
 export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, currentUserName, isAdmin }) => {
   const navigate = useNavigate();
@@ -237,17 +78,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [notesSaving, setNotesSaving] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const { statuses: orderStatuses } = useOrderStatuses();
-  const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
+  const [filters, dispatchFilters] = useReducer(orderPoolFiltersReducer, initialOrderPoolFilters);
   const orderIdsRef = useRef<Set<number>>(new Set());
   const searchRequestSeqRef = useRef(0);
   const activityRequestSeqRef = useRef(0);
   const activityOrderIdRef = useRef<number | null>(null);
-  const selectedItems = selectedOrder?.items ?? [];
-  const userNameById = useMemo(() => {
-    const map = new Map<number, string>();
-    allUsers.forEach((u) => map.set(Number(u.id), u.name));
-    return map;
-  }, [allUsers]);
 
   const getOrderTotal = useCallback((order: Order) => {
     return typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
@@ -259,76 +94,69 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     return parseNumberFlexible(order.prepaymentAmount ?? 0);
   }, []);
 
-  const getOrderDebt = useCallback((order: Order) => {
-    const total = getOrderTotal(order);
-    const prepay = getOrderPrepayment(order);
-    // Неоплаченная (pending/failed) предоплата не уменьшает долг — только paid/successful.
-    const paidPortion = isPaidPrepaymentStatus(order.prepaymentStatus) ? prepay : 0;
-    return Math.max(0, total - paidPortion);
-  }, [getOrderTotal, getOrderPrepayment]);
-
-  const getAssigneeLabel = useCallback(
+  const getOrderDebt = useCallback(
     (order: Order) => {
-      const userId = getEffectiveResponsibleUserId(order);
-      if (!userId) return '—';
-      return userNameById.get(userId) || `ID ${userId}`;
+      const total = getOrderTotal(order);
+      const prepay = getOrderPrepayment(order);
+      const paidPortion = isPaidPrepaymentStatus(order.prepaymentStatus) ? prepay : 0;
+      return Math.max(0, total - paidPortion);
     },
-    [userNameById]
+    [getOrderTotal, getOrderPrepayment],
   );
 
   const updateOrderInList = useCallback((orderId: number, patch: Partial<Order>) => {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...patch } : o)));
-    setSelectedOrder((prev) =>
-      prev?.id === orderId ? (prev ? { ...prev, ...patch } : null) : prev
-    );
+    setSelectedOrder((prev) => (prev?.id === orderId ? (prev ? { ...prev, ...patch } : null) : prev));
   }, []);
 
-  const loadOrders = useCallback(async (options: { activeOnly?: boolean; query?: string; soft?: boolean } = {}) => {
-    const requestSeq = ++searchRequestSeqRef.current;
-    const query = options.query?.trim();
-    const isSearch = Boolean(query);
-    const useSoftLoading = isSearch || options.soft === true;
-    const canSearch = query && (/^(#|ORD-|site-ord-|tg-ord-)?\d+$/i.test(query) || query.length >= 3);
-    if (query && !canSearch) {
-      setOrders([]);
-      setError(null);
-      setSearchLoading(false);
-      return;
-    }
-    try {
-      if (useSoftLoading) {
-        setSearchLoading(true);
-      } else {
-        setLoading(true);
-      }
-      const res = canSearch
-        ? await api.get<Order[]>('/orders/search', { params: { all: '1', light: '1', query, limit: '100' } })
-        : await getOrders({ all: true, poolActiveOnly: options.activeOnly ?? true });
-      if (requestSeq !== searchRequestSeqRef.current) return;
-      const list = res.data as Order[];
-      orderIdsRef.current = new Set(list.map((o) => o.id));
-      setOrders(list);
-      setError(null);
-      setSelectedOrder((prev) => {
-        if (!prev) return prev;
-        const next = list.find((o) => o.id === prev!.id);
-        return next ?? prev;
-      });
-    } catch (err) {
-      if (requestSeq !== searchRequestSeqRef.current) return;
-      logger.error('Failed to load orders for pool', err);
-      setError('Не удалось загрузить заказы.');
-    } finally {
-      if (requestSeq !== searchRequestSeqRef.current) return;
-      if (useSoftLoading) {
+  const loadOrders = useCallback(
+    async (options: { activeOnly?: boolean; query?: string; soft?: boolean } = {}) => {
+      const requestSeq = ++searchRequestSeqRef.current;
+      const query = options.query?.trim();
+      const isSearch = Boolean(query);
+      const useSoftLoading = isSearch || options.soft === true;
+      const canSearch = query && (/^(#|ORD-|site-ord-|tg-ord-)?\d+$/i.test(query) || query.length >= 3);
+      if (query && !canSearch) {
+        setOrders([]);
+        setError(null);
         setSearchLoading(false);
-      } else {
-        setLoading(false);
+        return;
       }
-    }
-  }, [logger]);
+      try {
+        if (useSoftLoading) {
+          setSearchLoading(true);
+        } else {
+          setLoading(true);
+        }
+        const res = canSearch
+          ? await api.get<Order[]>('/orders/search', { params: { all: '1', light: '1', query, limit: '100' } })
+          : await getOrders({ all: true, poolActiveOnly: options.activeOnly ?? true });
+        if (requestSeq !== searchRequestSeqRef.current) return;
+        const list = res.data as Order[];
+        orderIdsRef.current = new Set(list.map((o) => o.id));
+        setOrders(list);
+        setError(null);
+        setSelectedOrder((prev) => {
+          if (!prev) return prev;
+          const next = list.find((o) => o.id === prev!.id);
+          return next ?? prev;
+        });
+      } catch (err) {
+        if (requestSeq !== searchRequestSeqRef.current) return;
+        logger.error('Failed to load orders for pool', err);
+        setError('Не удалось загрузить заказы.');
+      } finally {
+        if (requestSeq !== searchRequestSeqRef.current) return;
+        if (useSoftLoading) {
+          setSearchLoading(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    [logger],
+  );
 
-  /** Фоновое обновление списка (без индикатора загрузки) — вызывается при изменении маркера «заказ с сайта» */
   const refreshOrdersInBackground = useCallback(async () => {
     try {
       const res = await getOrders({ all: true, poolActiveOnly: true });
@@ -353,16 +181,20 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   useEffect(() => {
     if (isInitialized) return;
     loadOrders().then(() => setIsInitialized(true));
-    getUsers().then(res => setAllUsers(res.data)).catch(err => logger.error('Failed to load users', err));
-    // статусы загружаются через useOrderStatuses (кэшируются на сессию)
+    getUsers()
+      .then((res) => setAllUsers(res.data))
+      .catch((err) => logger.error('Failed to load users', err));
   }, [isInitialized, loadOrders, logger]);
 
   const today = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, []);
+
   useEffect(() => {
-    getOperatorsToday(today).then(res => setOperatorsToday(res.data ?? [])).catch(() => setOperatorsToday([]));
+    getOperatorsToday(today)
+      .then((res) => setOperatorsToday(res.data ?? []))
+      .catch(() => setOperatorsToday([]));
   }, [today]);
 
   const handleExecutorChange = useCallback(
@@ -370,33 +202,37 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       try {
         await updateOrderItem(orderId, itemId, { executor_user_id });
         loadOrders();
-      } catch (err: any) {
-        toast.error('Ошибка', err?.message ?? 'Не удалось обновить исполнителя');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Не удалось обновить исполнителя';
+        toast.error('Ошибка', message);
       }
     },
-    [loadOrders, toast]
+    [loadOrders, toast],
   );
 
-  const loadSelectedOrderActivity = useCallback(async (orderId: number, fallbackNotes = '') => {
-    const requestSeq = ++activityRequestSeqRef.current;
-    activityOrderIdRef.current = orderId;
-    try {
-      setActivityLoading(true);
-      const res = await getOrderActivity(orderId);
-      if (requestSeq !== activityRequestSeqRef.current) return;
-      setOrderActivity(Array.isArray(res.data?.events) ? res.data.events : []);
-      setNotesDraft(typeof res.data?.notes === 'string' ? res.data.notes : '');
-    } catch (err) {
-      if (requestSeq !== activityRequestSeqRef.current) return;
-      logger.error('Failed to load order activity', err);
-      setOrderActivity([]);
-      setNotesDraft(fallbackNotes);
-    } finally {
-      if (requestSeq === activityRequestSeqRef.current) {
-        setActivityLoading(false);
+  const loadSelectedOrderActivity = useCallback(
+    async (orderId: number, fallbackNotes = '') => {
+      const requestSeq = ++activityRequestSeqRef.current;
+      activityOrderIdRef.current = orderId;
+      try {
+        setActivityLoading(true);
+        const res = await getOrderActivity(orderId);
+        if (requestSeq !== activityRequestSeqRef.current) return;
+        setOrderActivity(Array.isArray(res.data?.events) ? res.data.events : []);
+        setNotesDraft(typeof res.data?.notes === 'string' ? res.data.notes : '');
+      } catch (err) {
+        if (requestSeq !== activityRequestSeqRef.current) return;
+        logger.error('Failed to load order activity', err);
+        setOrderActivity([]);
+        setNotesDraft(fallbackNotes);
+      } finally {
+        if (requestSeq === activityRequestSeqRef.current) {
+          setActivityLoading(false);
+        }
       }
-    }
-  }, [logger]);
+    },
+    [logger],
+  );
 
   useEffect(() => {
     if (!selectedOrder?.id) {
@@ -412,20 +248,19 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     void loadSelectedOrderActivity(orderId, fallbackNotes);
   }, [selectedOrder?.id]);
 
-
-  /** При открытии страницы пула — помечаем как просмотренное (убираем бейдж "new" на главной) */
   useEffect(() => {
     getOrderPoolSync()
       .then(({ data }) => {
         const at = data?.lastWebsiteOrderAt ?? Date.now();
         try {
           localStorage.setItem(ORDER_POOL_LAST_SEEN_KEY, String(at));
-        } catch {}
+        } catch {
+          /* ignore */
+        }
       })
       .catch(() => {});
   }, []);
 
-  /** Опрос маркера «заказ с сайта»: при обращении к orderpool API с printcore.by бэкенд обновляет lastWebsiteOrderAt — принудительно обновляем список */
   const poolSyncRef = useRef<number>(0);
   useEffect(() => {
     if (!isInitialized) return;
@@ -444,7 +279,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           refreshOrdersInBackground();
         }
       } catch {
-        // игнорируем ошибки опроса
+        /* ignore poll errors */
       }
     }, pollMs);
     return () => clearInterval(tid);
@@ -463,47 +298,51 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
 
   useEffect(() => {
     dispatchFilters({ type: 'resetVisible' });
-  }, [filters.source, filters.cancelled, filters.assigned, filters.searchTerm, filters.quickFilter, filters.sortBy, filters.sortDirection]);
+  }, [
+    filters.source,
+    filters.cancelled,
+    filters.assigned,
+    filters.searchTerm,
+    filters.quickFilter,
+    filters.sortBy,
+    filters.sortDirection,
+  ]);
 
   const filteredOrders = useMemo(() => {
     const hasSearch = Boolean(filters.searchTerm?.trim());
-    // Без поиска: только ожидающие (0) и оформленные с долгом (1). С поиском — по всем заказам, только поиск.
-    let filtered: Order[];
     if (hasSearch) {
-      // В режиме поиска backend уже вернул ограниченный релевантный результат.
-      // Не фильтруем и не сортируем его повторно на клиенте.
       return orders;
-    } else {
-      filtered = orders.filter((o) => {
-        const s = Number(o.status);
-        // Показываем ожидающие (0), первый статус / оформленные (1) — в т.ч. неназначенные онлайн-заказы
-        if (s === 0) return true;
-        if (s === 1) return true;
-        return false;
-      });
-      if (filters.source !== 'all') {
-        filtered = filtered.filter((o) => o.source === filters.source);
-      }
-      if (filters.cancelled !== 'all') {
-        filtered = filtered.filter((o) => (o.is_cancelled === 1) === (filters.cancelled === 'cancelled'));
-      }
-      if (filters.assigned !== 'all') {
-        filtered = filtered.filter(
-          (o) => (getEffectiveResponsibleUserId(o) != null) === (filters.assigned === 'assigned'),
-        );
-      }
-      if (filters.quickFilter === 'debt') {
-        filtered = filtered.filter((o) => getOrderDebt(o) > 0);
-      } else if (filters.quickFilter === 'prepay') {
-        filtered = filtered.filter((o) => getOrderPrepayment(o) > 0);
-      } else if (filters.quickFilter === 'awaiting_payment') {
-        filtered = filtered.filter((o) => isAwaitingOnlinePayment(o));
-      }
+    }
+
+    let filtered = orders.filter((o) => {
+      const s = Number(o.status);
+      if (s === 0) return true;
+      if (s === 1) return true;
+      return false;
+    });
+
+    if (filters.source !== 'all') {
+      filtered = filtered.filter((o) => o.source === filters.source);
+    }
+    if (filters.cancelled !== 'all') {
+      filtered = filtered.filter((o) => (o.is_cancelled === 1) === (filters.cancelled === 'cancelled'));
+    }
+    if (filters.assigned !== 'all') {
+      filtered = filtered.filter(
+        (o) => (getEffectiveResponsibleUserId(o) != null) === (filters.assigned === 'assigned'),
+      );
+    }
+    if (filters.quickFilter === 'debt') {
+      filtered = filtered.filter((o) => getOrderDebt(o) > 0);
+    } else if (filters.quickFilter === 'prepay') {
+      filtered = filtered.filter((o) => getOrderPrepayment(o) > 0);
+    } else if (filters.quickFilter === 'awaiting_payment') {
+      filtered = filtered.filter((o) => isAwaitingOnlinePayment(o));
     }
 
     filtered.sort((a, b) => {
-      let valA: any;
-      let valB: any;
+      let valA: string | number;
+      let valB: string | number;
 
       if (filters.sortBy === 'created_at') {
         valA = new Date(a.created_at).getTime();
@@ -511,7 +350,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       } else if (filters.sortBy === 'number') {
         valA = a.number || '';
         valB = b.number || '';
-      } else if (filters.sortBy === 'totalAmount') {
+      } else {
         valA = getOrderTotal(a);
         valB = getOrderTotal(b);
       }
@@ -538,9 +377,46 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
 
   const visibleOrders = useMemo(
     () => filteredOrders.slice(0, filters.visibleCount),
-    [filteredOrders, filters.visibleCount]
+    [filteredOrders, filters.visibleCount],
   );
   const hasMoreOrders = visibleOrders.length < filteredOrders.length;
+
+  const filterCounts = useMemo(() => {
+    let base = orders.filter((o) => {
+      const s = Number(o.status);
+      return s === 0 || s === 1;
+    });
+    if (filters.source !== 'all') {
+      base = base.filter((o) => o.source === filters.source);
+    }
+    if (filters.searchTerm.trim()) {
+      const q = filters.searchTerm.trim().toLowerCase();
+      base = base.filter(
+        (o) =>
+          (o.number || '').toLowerCase().includes(q) ||
+          (o.customerName || '').toLowerCase().includes(q) ||
+          (o.customerPhone || '').toLowerCase().includes(q),
+      );
+    }
+    return {
+      notAssigned: base.filter((o) => getEffectiveResponsibleUserId(o) == null && o.is_cancelled !== 1).length,
+      assigned: base.filter((o) => getEffectiveResponsibleUserId(o) != null && o.is_cancelled !== 1).length,
+      cancelled: base.filter((o) => o.is_cancelled === 1).length,
+      debt: base.filter((o) => getOrderDebt(o) > 0 && o.is_cancelled !== 1).length,
+      prepay: base.filter((o) => getOrderPrepayment(o) > 0 && o.is_cancelled !== 1).length,
+      awaitingPayment: base.filter((o) => isAwaitingOnlinePayment(o) && o.is_cancelled !== 1).length,
+    };
+  }, [orders, filters.source, filters.searchTerm, getOrderDebt, getOrderPrepayment]);
+
+  const handleCopyPhone = useCallback(
+    (phone: string) => {
+      void navigator.clipboard.writeText(phone).then(
+        () => toast.success('Телефон скопирован', phone),
+        () => toast.error('Не удалось скопировать'),
+      );
+    },
+    [toast],
+  );
 
   const handleAssignToMe = useCallback(
     async (orderNumber: string) => {
@@ -556,9 +432,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           const o = prev.find((x) => x.number === orderNumber);
           if (!o) return prev;
           return prev.map((x) =>
-            x.id === o.id
-              ? { ...x, userId: currentUserId, responsible_user_id: currentUserId }
-              : x,
+            x.id === o.id ? { ...x, userId: currentUserId, responsible_user_id: currentUserId } : x,
           );
         });
         setSelectedOrder((prev) => {
@@ -570,7 +444,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.error('Ошибка назначения', (err as Error).message);
       }
     },
-    [currentUserId, orders, toast, logger]
+    [currentUserId, orders, toast, logger],
   );
 
   const handleReassignTo = useCallback(
@@ -591,7 +465,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.error('Ошибка переназначения', (err as Error).message);
       }
     },
-    [allUsers, orders, toast, logger, updateOrderInList]
+    [allUsers, orders, toast, logger, updateOrderInList],
   );
 
   const handleReturnToPool = useCallback(
@@ -607,8 +481,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         const o = orders.find((x) => x.number === orderNumber);
         if (o) {
           updateOrderInList(o.id, {
-            userId: null as any,
-            responsible_user_id: null as any,
+            userId: null as unknown as number,
+            responsible_user_id: null as unknown as number,
             is_cancelled: 0,
           });
         }
@@ -617,9 +491,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.error('Ошибка возврата в пул', (err as Error).message);
       }
     },
-    [orders, toast, logger, updateOrderInList]
+    [orders, toast, logger, updateOrderInList],
   );
-
 
   const issuingRef = useRef(false);
   const handleIssueOrder = useCallback(
@@ -629,26 +502,27 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       setIssuingOrderId(orderId);
       try {
         const d = new Date();
-        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        await issueOrder(orderId, today);
+        const issueDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        await issueOrder(orderId, issueDate);
         toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
         const order = orders.find((o) => o.id === orderId);
         const total = order ? getOrderAmounts(order).total : 0;
         updateOrderInList(orderId, {
-          status: 7 as any,
+          status: 7 as Order['status'],
           prepaymentAmount: total,
           prepaymentStatus: 'paid',
           paymentMethod: 'offline',
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error('Issue order failed', err);
-        toast.error('Ошибка', err?.message ?? 'Не удалось выдать заказ');
+        const message = err instanceof Error ? err.message : 'Не удалось выдать заказ';
+        toast.error('Ошибка', message);
       } finally {
         issuingRef.current = false;
         setIssuingOrderId(null);
       }
     },
-    [orders, toast, logger, updateOrderInList]
+    [orders, toast, logger, updateOrderInList],
   );
 
   const handleCancelOnline = useCallback(
@@ -666,16 +540,16 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.success('Заказ отменён', 'Заказ переведён в статус «Отменён».');
         updateOrderInList(orderId, {
           is_cancelled: 1,
-          status: Number(data?.status ?? 0) as any,
-          userId: null as any,
-          responsible_user_id: null as any,
+          status: Number(data?.status ?? 0) as Order['status'],
+          userId: null as unknown as number,
+          responsible_user_id: null as unknown as number,
         });
       } catch (err) {
         logger.error('Failed to cancel online order', err);
         toast.error('Ошибка отмены', (err as Error).message);
       }
     },
-    [toast, logger, updateOrderInList, requestReason, getPresets]
+    [toast, logger, updateOrderInList, requestReason, getPresets],
   );
 
   const handlePermanentDelete = useCallback(
@@ -700,11 +574,16 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.error('Ошибка', msg);
       }
     },
-    [toast, logger, requestReason, getPresets]
+    [toast, logger, requestReason, getPresets],
   );
 
   const handlePrepaymentCreated = useCallback(
-    async (amount: number, _email: string, paymentMethod: 'online' | 'offline' | 'telegram', assignToMe?: boolean) => {
+    async (
+      amount: number,
+      _email: string,
+      paymentMethod: 'online' | 'offline' | 'telegram',
+      assignToMe?: boolean,
+    ) => {
       if (!selectedOrder) return;
       try {
         const method = paymentMethod === 'telegram' ? 'online' : paymentMethod;
@@ -721,13 +600,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           patch.responsible_user_id = currentUserId;
         }
         updateOrderInList(selectedOrder.id, patch);
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error('Prepayment failed', err);
-        toast.error('Ошибка', err?.message ?? 'Не удалось обновить предоплату');
+        const message = err instanceof Error ? err.message : 'Не удалось обновить предоплату';
+        toast.error('Ошибка', message);
         throw err;
       }
     },
-    [selectedOrder, currentUserId, toast, logger, updateOrderInList]
+    [selectedOrder, currentUserId, toast, logger, updateOrderInList],
   );
 
   const handleRemovePrepayment = useCallback(
@@ -741,12 +621,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           prepaymentStatus: undefined,
           paymentMethod: undefined,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error('Remove prepayment failed', err);
-        toast.error('Ошибка', err?.message ?? 'Не удалось удалить предоплату');
+        const message = err instanceof Error ? err.message : 'Не удалось удалить предоплату';
+        toast.error('Ошибка', message);
       }
     },
-    [toast, logger, updateOrderInList]
+    [toast, logger, updateOrderInList],
   );
 
   const handleSaveNotes = useCallback(async () => {
@@ -757,9 +638,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       updateOrderInList(selectedOrder.id, { notes: notesDraft.trim() ? notesDraft : '' });
       await loadSelectedOrderActivity(selectedOrder.id, notesDraft.trim() ? notesDraft : '');
       toast.success('Сохранено', 'Примечания обновлены');
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('Failed to save notes', err);
-      toast.error('Ошибка', err?.message ?? 'Не удалось сохранить примечания');
+      const message = err instanceof Error ? err.message : 'Не удалось сохранить примечания';
+      toast.error('Ошибка', message);
     } finally {
       setNotesSaving(false);
     }
@@ -775,174 +657,53 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   if (loading) return <div className="loading-overlay">Загрузка...</div>;
   if (error) return <div className="error-message">{error}</div>;
 
+  const selectedDebt = selectedOrder ? getOrderDebt(selectedOrder) : 0;
+  const selectedPrepay = selectedOrder ? getOrderPrepayment(selectedOrder) : 0;
+  const selectedTotal = selectedOrder ? getOrderTotal(selectedOrder) : 0;
+
   return (
     <div className="order-pool-page">
       <div className="order-pool-sidebar">
-        <button onClick={() => navigate('/')} className="back-button">← Назад</button>
-        <h2>Пул заказов ({filteredOrders.length})</h2>
+        <button type="button" onClick={() => navigate('/')} className="back-button">
+          ← Назад
+        </button>
+        <h2>
+          Пул заказов
+          <span className="order-pool-sidebar__count">{filteredOrders.length}</span>
+        </h2>
 
-        <div className="filters">
-          <div className="filters-quick">
-            <button
-              className={`quick-btn ${filters.assigned === 'not_assigned' ? 'active' : ''}`}
-              onClick={() => dispatchFilters({ type: 'setAssigned', value: 'not_assigned' })}
-              title="Без ответственного"
-            >
-              Неназначенные
-            </button>
-            <button
-              className={`quick-btn ${filters.assigned === 'assigned' ? 'active' : ''}`}
-              onClick={() => dispatchFilters({ type: 'setAssigned', value: 'assigned' })}
-            >
-              Назначенные
-            </button>
-            <button
-              className={`quick-btn ${filters.cancelled === 'cancelled' ? 'active' : ''}`}
-              onClick={() => dispatchFilters({ type: 'setCancelled', value: 'cancelled' })}
-            >
-              Отменённые
-            </button>
-            <button
-              className={`quick-btn ${filters.quickFilter === 'debt' ? 'active' : ''}`}
-              onClick={() =>
-                dispatchFilters({
-                  type: 'setQuickFilter',
-                  value: filters.quickFilter === 'debt' ? null : 'debt',
-                })
-              }
-              title="Только с долгом"
-            >
-              С долгом
-            </button>
-            <button
-              className={`quick-btn ${filters.quickFilter === 'prepay' ? 'active' : ''}`}
-              onClick={() =>
-                dispatchFilters({
-                  type: 'setQuickFilter',
-                  value: filters.quickFilter === 'prepay' ? null : 'prepay',
-                })
-              }
-              title="Только с предоплатой"
-            >
-              С предоплатой
-            </button>
-            <button
-              className={`quick-btn ${filters.quickFilter === 'awaiting_payment' ? 'active' : ''}`}
-              onClick={() =>
-                dispatchFilters({
-                  type: 'setQuickFilter',
-                  value: filters.quickFilter === 'awaiting_payment' ? null : 'awaiting_payment',
-                })
-              }
-              title="Онлайн BePaid — ожидает оплату"
-            >
-              Ожидает оплату
-            </button>
-            <button
-              className="quick-btn"
-              onClick={() => {
-                dispatchFilters({ type: 'resetFilters' });
-              }}
-            >
-              Сбросить
-            </button>
-          </div>
-          <div className="filters-row">
-            <div className={`order-pool-search ${searchLoading ? 'order-pool-search--loading' : ''}`}>
-              <span className="order-pool-search__icon" aria-hidden="true">⌕</span>
-              <input
-                type="text"
-                placeholder="Поиск по номеру, клиенту, телефону..."
-                value={filters.searchInput}
-                onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
-              />
-              {searchLoading && (
-                <span className="order-pool-search__loader" aria-label="Идёт поиск">
-                  <span />
-                  <span />
-                  <span />
-                </span>
-              )}
-            </div>
-            <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as FilterState['source'] })} aria-label="Источник заказа">
-              <option value="website">Онлайн (сайт)</option>
-              <option value="all">Все источники</option>
-              <option value="crm">CRM</option>
-              <option value="telegram">Telegram</option>
-              <option value="mini_app">Mini App</option>
-            </select>
-            <select value={filters.cancelled} onChange={(e) => dispatchFilters({ type: 'setCancelled', value: e.target.value as any })}>
-              <option value="all">Все</option>
-              <option value="cancelled">Отменённые</option>
-              <option value="not_cancelled">Не отменённые</option>
-            </select>
-            <select value={filters.assigned} onChange={(e) => dispatchFilters({ type: 'setAssigned', value: e.target.value as any })}>
-              <option value="all">Все</option>
-              <option value="assigned">Назначенные</option>
-              <option value="not_assigned">Неназначенные</option>
-            </select>
-            <select value={filters.sortBy} onChange={(e) => dispatchFilters({ type: 'setSortBy', value: e.target.value as any })}>
-              <option value="created_at">По дате</option>
-              <option value="number">По номеру</option>
-              <option value="totalAmount">По сумме</option>
-            </select>
-            <button onClick={() => dispatchFilters({ type: 'toggleSortDirection' })} title="Направление сортировки">
-              {filters.sortDirection === 'asc' ? '↑' : '↓'}
-            </button>
-          </div>
-        </div>
+        <OrderPoolFilters
+          filters={filters}
+          dispatchFilters={dispatchFilters}
+          searchLoading={searchLoading}
+          counts={filterCounts}
+        />
 
-        <div className={`order-list ${searchLoading ? 'order-list--searching' : ''}`}>
-          {searchLoading && (
-            <div className="order-pool-search-hint" role="status">
-              <span className="order-pool-search-hint__pulse" />
-              Обновляем результаты поиска
-            </div>
-          )}
-          {filteredOrders.length === 0 ? (
-            <p>Нет заказов в пуле, соответствующих фильтрам.</p>
-          ) : (
-            <table className="order-list-table order-list-table--compact">
-              <thead>
-                <tr>
-                  <th>Номер</th>
-                  <th>Дата</th>
-                  <th>Клиент</th>
-                  <th>Телефон</th>
-                  <th>Источник</th>
-                  <th>Ответственный</th>
-                  <th>Статус</th>
-                  <th>Оплата</th>
-                  <th className="numeric">Долг</th>
-                  <th className="numeric">Сумма</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleOrders.map(order => (
-                  <OrderRow
-                    key={order.id}
-                    order={order}
-                    isSelected={selectedOrder?.id === order.id}
-                    onSelect={setSelectedOrder}
-                    getSourceLabel={getSourceLabel}
-                    getAssigneeLabel={getAssigneeLabel}
-                    getOrderPrepayment={getOrderPrepayment}
-                    getOrderDebt={getOrderDebt}
-                    getOrderTotal={getOrderTotal}
-                  />
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <OrderPoolList
+          orders={visibleOrders}
+          selectedOrderId={selectedOrder?.id}
+          currentUserId={currentUserId}
+          onSelect={setSelectedOrder}
+          onTakeOrder={(order) => {
+            if (order.number) void handleAssignToMe(order.number);
+          }}
+          onCopyPhone={handleCopyPhone}
+          searchLoading={searchLoading}
+          getOrderPrepayment={getOrderPrepayment}
+          getOrderDebt={getOrderDebt}
+          getOrderTotal={getOrderTotal}
+        />
+
         {hasMoreOrders && (
           <div className="order-list-load-more">
-            <button
+            <Button
+              type="button"
+              variant="secondary"
               className="load-more-btn"
               onClick={() => dispatchFilters({ type: 'increaseVisible', step: 100 })}
             >
               Показать ещё
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -950,178 +711,65 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       <div className="order-pool-detail">
         {selectedOrder ? (
           <>
-            <OrderHeader
+            <OrderPoolDetailHeader
               order={selectedOrder}
-              onShowFilesModal={() => setShowFilesModal(true)}
-              onShowPrepaymentModal={() => setShowPrepaymentModal(true)}
+              currentUserId={currentUserId}
+              allUsers={allUsers}
+              onResponsibleChange={(userId) => {
+                if (userId == null) {
+                  handleReturnToPool(selectedOrder.number!);
+                } else {
+                  handleReassignTo(selectedOrder.number!, userId);
+                }
+              }}
+              onAssignToMe={() => handleAssignToMe(selectedOrder.number!)}
+              onShowFiles={() => setShowFilesModal(true)}
+              onShowPrepayment={() => setShowPrepaymentModal(true)}
+              onSendPaymentLink={() => setShowSendPaymentLinkModal(true)}
+              onRemovePrepayment={() => handleRemovePrepayment(selectedOrder.id)}
+              onIssueOrder={() => handleIssueOrder(selectedOrder.id)}
+              onCancelOrder={() => handleCancelOnline(selectedOrder.id)}
+              onPermanentDelete={() => handlePermanentDelete(selectedOrder.id)}
+              onCopyPhone={handleCopyPhone}
+              showRemovePrepayment={selectedPrepay > 0}
+              showIssueOrder={
+                (selectedDebt > 0 ||
+                  (selectedPrepay >= selectedTotal && selectedTotal > 0)) &&
+                Number(selectedOrder.status) !== 7
+              }
+              showCancelOrder={
+                (Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
+                selectedOrder.is_cancelled !== 1
+              }
+              showPermanentDelete={isAdmin && selectedOrder.is_cancelled === 1}
+              issuing={issuingOrderId === selectedOrder.id}
             />
-            <div className="order-detail-responsible">
-              <label>
-                Ответственный:
-                <select
-                  value={getEffectiveResponsibleUserId(selectedOrder) ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    const current = getEffectiveResponsibleUserId(selectedOrder);
-                    if (v === '') {
-                      if (current != null) {
-                        handleReturnToPool(selectedOrder.number!);
-                      }
-                      return;
-                    }
-                    const uid = Number(v);
-                    if (uid === current) return;
-                    handleReassignTo(selectedOrder.number!, uid);
-                  }}
-                  disabled={Number(selectedOrder.status) !== 0 && Number(selectedOrder.status) !== 1}
-                  title={(Number(selectedOrder.status) !== 0 && Number(selectedOrder.status) !== 1) ? 'Переназначить можно только при статусе «Ожидает» (0 или 1)' : undefined}
-                >
-                  <option value="">— Не назначен</option>
-                  {allUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-              </label>
-              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
-                getEffectiveResponsibleUserId(selectedOrder) !== currentUserId && (
-                <button
-                  type="button"
-                  className="btn-assign-responsible"
-                  onClick={() => handleAssignToMe(selectedOrder.number!)}
-                  title="Назначить себя ответственным по заказу"
-                >
-                  Назначить ответственного
-                </button>
-              )}
-            </div>
-            <div className="order-detail-actions">
-              <button type="button" onClick={() => setShowPrepaymentModal(true)}>
-                Внести предоплату
-              </button>
-              <button
-                type="button"
-                className="btn-send-payment-link"
-                onClick={() => setShowSendPaymentLinkModal(true)}
-                title="Создать ссылку BePaid и отправить клиенту"
-              >
-                Ссылка на оплату
-              </button>
-              {getOrderPrepayment(selectedOrder) > 0 && (
-                <button
-                  type="button"
-                  className="btn-remove-prepayment"
-                  onClick={() => handleRemovePrepayment(selectedOrder.id)}
-                  title="Удалить предоплату по заказу"
-                >
-                  Удалить предоплату
-                </button>
-              )}
-              {(getOrderDebt(selectedOrder) > 0 || (getOrderPrepayment(selectedOrder) >= getOrderTotal(selectedOrder) && getOrderTotal(selectedOrder) > 0)) && Number(selectedOrder.status) !== 7 && (
-                <button
-                  type="button"
-                  className="btn-close-debt"
-                  onClick={() => handleIssueOrder(selectedOrder.id)}
-                  disabled={issuingOrderId === selectedOrder.id}
-                >
-                  {issuingOrderId === selectedOrder.id ? 'Выдача...' : 'Выдать заказ'}
-                </button>
-              )}
-              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
-                selectedOrder.is_cancelled !== 1 && (
-                <button type="button" onClick={() => handleCancelOnline(selectedOrder.id)}>
-                  Отменить заказ
-                </button>
-              )}
-              {isAdmin && selectedOrder.is_cancelled === 1 && (
-                <button
-                  type="button"
-                  className="btn-order-permanent-delete"
-                  onClick={() => handlePermanentDelete(selectedOrder.id)}
-                >
-                  Удалить из базы
-                </button>
-              )}
-            </div>
-            {(() => {
-              const payment = getPoolPaymentInfo(selectedOrder);
-              const debt = getOrderDebt(selectedOrder);
-              const prepay = getOrderPrepayment(selectedOrder);
-              return (
-                <div className="order-detail-payment">
-                  <div className="order-detail-payment__row">
-                    <span className="order-detail-payment__label">Оплата</span>
-                    <span className={`order-detail-payment__badge order-detail-payment__badge--${payment.tone}`}>
-                      {payment.badge}
-                    </span>
-                  </div>
-                  <div className="order-detail-payment__row">
-                    <span className="order-detail-payment__label">Предоплата</span>
-                    <span className="order-detail-payment__value">
-                      <MoneyAmount value={prepay} />
-                      <small>{payment.prepayLabel}</small>
-                    </span>
-                  </div>
-                  <div className="order-detail-payment__row">
-                    <span className="order-detail-payment__label">Долг</span>
-                    <span className={`order-detail-payment__debt ${debt > 0 ? 'is-due' : 'is-paid'}`}>
-                      <MoneyAmount value={debt} />
-                    </span>
-                  </div>
-                  {selectedOrder.paymentUrl && (
-                    <div className="order-detail-payment__url">
-                      <a href={selectedOrder.paymentUrl} target="_blank" rel="noreferrer">
-                        Открыть ссылку BePaid
-                      </a>
-                      <button
-                        type="button"
-                        className="order-detail-payment__copy"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(selectedOrder.paymentUrl || '').then(
-                            () => toast.success('Ссылка скопирована'),
-                            () => toast.error('Не удалось скопировать')
-                          );
-                        }}
-                      >
-                        Скопировать
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-            {(() => {
-              const created = selectedOrder.created_at ?? (selectedOrder as any).createdAt;
-              const firstItem = (selectedOrder.items ?? [])[0];
-              const priceType = (firstItem?.params as any)?.priceType ?? (firstItem?.params as any)?.price_type ?? 'standard';
-              const readyLabels: Record<string, string> = {
-                urgent: 'В течение 3 часов',
-                promo: '48 часов',
-                special: '4–5 дней',
-                standard: '24 часа',
-              };
-              const readyLabel = readyLabels[String(priceType).toLowerCase()] ?? readyLabels.standard;
-              // TODO: реализовать систему уведомлений клиенту (email/SMS о готовности заказа) — см. docs/customer-notifications-setup.md
-              return (
-                <div className="order-detail-readiness">
-                  <span className="order-detail-readiness-label">Срок готовности:</span>
-                  <span className="order-detail-readiness-value">{readyLabel}</span>
-                  {created && priceType !== 'standard' && (
-                    <span className="order-detail-readiness-hint">
-                      с момента оформления {new Date(created).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
+
+            <OrderPoolPaymentSummary
+              order={selectedOrder}
+              prepay={selectedPrepay}
+              debt={selectedDebt}
+              onCopyPaymentUrl={() => {
+                void navigator.clipboard.writeText(selectedOrder.paymentUrl || '').then(
+                  () => toast.success('Ссылка скопирована'),
+                  () => toast.error('Не удалось скопировать'),
+                );
+              }}
+            />
+
             {orderStatuses.length > 0 && (
-              <OrderStatusTimeline
-                statuses={orderStatuses}
-                currentStatusId={Number(selectedOrder.status)}
-                createdAt={selectedOrder.created_at ?? (selectedOrder as any).createdAt}
-                readyAt={(selectedOrder as any).readyAt ?? null}
-                hasItems={(selectedOrder.items?.length ?? 0) > 0}
-              />
+              <details className="order-pool-collapsible">
+                <summary className="order-pool-collapsible__summary">Статусы</summary>
+                <OrderStatusTimeline
+                  statuses={orderStatuses}
+                  currentStatusId={Number(selectedOrder.status)}
+                  createdAt={selectedOrder.created_at ?? (selectedOrder as { createdAt?: string }).createdAt}
+                  readyAt={(selectedOrder as { readyAt?: string | null }).readyAt ?? null}
+                  hasItems={(selectedOrder.items?.length ?? 0) > 0}
+                />
+              </details>
             )}
+
             <OrderContent
               order={selectedOrder}
               onLoadOrders={loadOrders}
@@ -1129,6 +777,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
               onExecutorChange={handleExecutorChange}
             />
+
             <OrderTotal
               {...(() => {
                 const a = getOrderAmounts(selectedOrder);
@@ -1143,18 +792,22 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               prepaymentAmount={selectedOrder.prepaymentAmount}
               prepaymentStatus={selectedOrder.prepaymentStatus}
               paymentMethod={selectedOrder.paymentMethod}
+              showPaymentBreakdown={false}
             />
+
             <div className="order-activity-panel">
               <div className="order-activity-panel__header">
-                <h3>Примечания и история</h3>
-                <button
+                <h3>Примечания</h3>
+                <Button
                   type="button"
-                  className="order-activity-panel__save-btn"
+                  variant="success"
+                  size="sm"
                   onClick={() => void handleSaveNotes()}
                   disabled={notesSaving}
+                  loading={notesSaving}
                 >
-                  {notesSaving ? 'Сохранение...' : 'Сохранить примечания'}
-                </button>
+                  {notesSaving ? 'Сохранение...' : 'Сохранить'}
+                </Button>
               </div>
               <textarea
                 className="order-activity-panel__notes"
@@ -1164,39 +817,45 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 rows={3}
               />
 
-              <div className="order-activity-panel__timeline">
-                {activityLoading ? (
-                  <div className="order-activity-panel__empty">Загрузка истории...</div>
-                ) : orderActivity.length === 0 ? (
-                  <div className="order-activity-panel__empty">История пока пустая</div>
-                ) : (
-                  orderActivity.map((event) => (
-                    <div key={event.id} className="order-activity-event">
-                      <div className="order-activity-event__top">
-                        <span className="order-activity-event__title">{event.message}</span>
-                        <span className="order-activity-event__date">{formatActivityDate(event.created_at)}</span>
-                      </div>
-                      <div className="order-activity-event__meta">
-                        {event.user_name || 'Система'}
-                      </div>
-                      {event.comment && (
-                        <div className="order-activity-event__comment">{event.comment}</div>
-                      )}
-                      {event.old_value != null && event.new_value != null && (
-                        <div className="order-activity-event__change">
-                          <span>{event.old_value}</span>
-                          <span className="arrow">→</span>
-                          <span>{event.new_value}</span>
+              <details className="order-pool-collapsible order-pool-collapsible--nested">
+                <summary className="order-pool-collapsible__summary">История изменений</summary>
+                <div className="order-activity-panel__timeline">
+                  {activityLoading ? (
+                    <div className="order-activity-panel__empty">Загрузка истории...</div>
+                  ) : orderActivity.length === 0 ? (
+                    <div className="order-activity-panel__empty">История пока пустая</div>
+                  ) : (
+                    orderActivity.map((event) => (
+                      <div key={event.id} className="order-activity-event">
+                        <div className="order-activity-event__top">
+                          <span className="order-activity-event__title">{event.message}</span>
+                          <span className="order-activity-event__date">{formatActivityDate(event.created_at)}</span>
                         </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
+                        <div className="order-activity-event__meta">{event.user_name || 'Система'}</div>
+                        {event.comment && (
+                          <div className="order-activity-event__comment">{event.comment}</div>
+                        )}
+                        {event.old_value != null && event.new_value != null && (
+                          <div className="order-activity-event__change">
+                            <span>{event.old_value}</span>
+                            <span className="arrow">→</span>
+                            <span>{event.new_value}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </details>
             </div>
           </>
         ) : (
-          <p className="text-center text-gray-500">Выберите заказ из списка для просмотра деталей.</p>
+          <div className="order-pool-detail-empty">
+            <p className="order-pool-detail-empty__title">Выберите заказ</p>
+            <p className="order-pool-detail-empty__hint">
+              Слева список — откройте заказ, чтобы взять в работу, проверить оплату и позиции.
+            </p>
+          </div>
         )}
       </div>
 
@@ -1252,5 +911,3 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     </div>
   );
 };
-
-

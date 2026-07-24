@@ -583,7 +583,30 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         if (next.shadow != null && typeof next.shadow === 'object' && !(next.shadow instanceof Shadow)) {
           next.shadow = new Shadow(next.shadow as object);
         }
+        const prevOriginX = String((active as { originX?: string }).originX ?? 'left');
+        const prevOriginY = String((active as { originY?: string }).originY ?? 'top');
+        const nextOriginX = next.originX != null ? String(next.originX) : null;
+        const withOrigin =
+          active as unknown as {
+            getPointByOrigin?: (ox: string, oy: string) => { x: number; y: number };
+            setPositionByOrigin?: (p: { x: number; y: number }, ox: string, oy: string) => void;
+            setCoords?: () => void;
+          };
+        const anchor =
+          nextOriginX
+          && nextOriginX !== prevOriginX
+          && typeof withOrigin.getPointByOrigin === 'function'
+            ? withOrigin.getPointByOrigin(prevOriginX, prevOriginY)
+            : null;
         applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, next);
+        if (
+          anchor
+          && nextOriginX
+          && typeof withOrigin.setPositionByOrigin === 'function'
+        ) {
+          withOrigin.setPositionByOrigin(anchor, nextOriginX, prevOriginY);
+          active.setCoords?.();
+        }
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
         d.saveSnapshot({ debounce: true });

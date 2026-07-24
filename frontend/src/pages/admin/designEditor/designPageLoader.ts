@@ -4,7 +4,7 @@ import type { DesignPage } from './types';
 import { FABRIC_CUSTOM_PROPS } from './constants';
 import { normalizeDesignFieldsOnCanvas } from './designFields';
 import { reloadFabricCanvasFonts } from '../../../utils/fabricFontReload';
-import { prepareTextObjectsOnCanvas, finalizeCanvasTextEditingBeforeSave, captureSacredTemplateTextGeometry, extractDesignedTextLayoutsFromFabricJson, applyDesignedTextLayoutSnapshot, normalizeDesignedTextInFabricJSON, type DesignedTextLayoutSnapshot } from './textStyleRuns';
+import { prepareTextObjectsOnCanvas, finalizeCanvasTextEditingBeforeSave, captureSacredTemplateTextGeometry, extractDesignedTextLayoutsFromFabricJson, applyDesignedTextLayoutSnapshot, normalizeDesignedTextInFabricJSON, restoreTextLayoutsFromSnapshots, type DesignedTextLayoutSnapshot } from './textStyleRuns';
 import type { TextLikeObject } from './textStyleRuns';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from '../../../features/publicDesignEditor/publicEditorFeatureFlags';
 import {
@@ -516,9 +516,10 @@ export async function loadDesignPageScene(input: {
 
     canvas.clear();
     (canvas as unknown as AnyObj).backgroundColor = 'white';
+    let layoutSnapshots = new Map<string, DesignedTextLayoutSnapshot>();
     try {
       const normalizedFabricJson = normalizeDesignedTextInFabricJSON(fabricJson);
-      const layoutSnapshots = extractDesignedTextLayoutsFromFabricJson(normalizedFabricJson);
+      layoutSnapshots = extractDesignedTextLayoutsFromFabricJson(normalizedFabricJson);
       // Не даём Fabric мутировать snapshot страницы в React state при переходах.
       const prepared = await prepareFabricJsonForLoad(normalizedFabricJson, resolveImageSrc);
       await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
@@ -543,6 +544,7 @@ export async function loadDesignPageScene(input: {
     } catch {
       canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
+      layoutSnapshots = new Map();
     }
     // Для пустых страниц без backgroundColor в JSON сохраняем непрозрачный белый фон.
     ensureWhiteCanvasBackground(canvas);
@@ -551,6 +553,9 @@ export async function loadDesignPageScene(input: {
     await reloadFabricCanvasFonts(canvas, fontReloadOpts);
     hardenCanvasObjectsForIosSafari(canvas);
     finalizeCanvasTextEditingBeforeSave(canvas, fontReloadOpts);
+    if (preserveTextLayout && layoutSnapshots.size > 0) {
+      restoreTextLayoutsFromSnapshots(canvas, layoutSnapshots);
+    }
 
     // DEBUG: final positions after all normalization/hydrate/width-fit on this page load
     try {
@@ -578,6 +583,17 @@ export async function loadDesignPageScene(input: {
   hardenCanvasObjectsForIosSafari(canvas);
   // Final stabilize + lock before render (в т.ч. после подгрузки шрифтов на мобилке).
   try { finalizeCanvasTextEditingBeforeSave(canvas, fontReloadOpts); } catch {}
+  if (preserveTextLayout && hasJson) {
+    try {
+      const fabricJsonAgain = normalizeFabricJsonRoot(pageData?.fabricJSON);
+      if (fabricJsonAgain) {
+        const snaps = extractDesignedTextLayoutsFromFabricJson(
+          normalizeDesignedTextInFabricJSON(fabricJsonAgain),
+        );
+        restoreTextLayoutsFromSnapshots(canvas, snaps);
+      }
+    } catch { /* non-fatal */ }
+  }
   canvas.requestRenderAll();
 }
 

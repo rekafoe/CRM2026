@@ -6,7 +6,7 @@ import {
   resolveDesignedTextboxAbsoluteMaxWidth,
 } from './designEditorTextPageClamp';
 import { isPlaceholderTemplateText, normalizeTextForPlaceholderCheck } from './designEditorTextPlaceholder';
-import { isTemplateTextLayerId } from './spreadPageObjectIds';
+import { isTemplateTextLayerId, stripSpreadPageIdPrefix } from './spreadPageObjectIds';
 
 export type TextStyleRun = {
   start: number;
@@ -627,6 +627,7 @@ export type DesignedTextLayoutSnapshot = {
   originX: string;
   originY: string;
   textFieldLayoutWidth?: number;
+  textAlign?: string;
 };
 
 function resolveDesignedTextboxWidth(
@@ -942,10 +943,18 @@ export function extractDesignedTextLayoutsFromFabricJson(
   const objects = fabricJSON.objects;
   if (!Array.isArray(objects)) return out;
   walkFabricJsonObjects(objects, (o) => {
-    if (!isFabricTextObjectType(o.type) || !isDesignedTemplateText(o)) return;
+    if (!isFabricTextObjectType(o.type)) return;
     const id = String(o.id ?? '');
     if (!id) return;
-    let width = readDesignedTextboxPersistedWidth(o);
+    // Template text_* — как раньше; client-added тоже (для preserveTextLayout / export PNG).
+    const isDesigned = isDesignedTemplateText(o);
+    const isClientText = o.textFieldClientAdded === true || /^text[-_]/i.test(id);
+    if (!isDesigned && !isClientText) return;
+    let width = isDesigned
+      ? readDesignedTextboxPersistedWidth(o)
+      : (Number.isFinite(Number(o.textFieldLayoutWidth)) && Number(o.textFieldLayoutWidth) > 0
+        ? Number(o.textFieldLayoutWidth)
+        : (Number.isFinite(Number(o.width)) && Number(o.width) > 0 ? Number(o.width) : null));
     if (width == null) return;
     out.set(id, {
       left: Number(o.left ?? 0),
@@ -956,6 +965,7 @@ export function extractDesignedTextLayoutsFromFabricJson(
       originX: String(o.originX ?? 'left'),
       originY: String(o.originY ?? 'top'),
       textFieldLayoutWidth: width,
+      textAlign: o.textAlign != null ? String(o.textAlign) : undefined,
     });
   });
   return out;
@@ -965,11 +975,13 @@ export function applyDesignedTextLayoutSnapshot(
   obj: TextLikeObject,
   snapshot: DesignedTextLayoutSnapshot,
 ): void {
-  if (!isDesignedTemplateText(obj)) return;
-  const layoutW = resolvePersistedDesignedTextboxWidth(
-    Number(snapshot.width),
-    Number(snapshot.textFieldLayoutWidth ?? snapshot.width),
-  ) ?? snapshot.width;
+  const layoutW = isDesignedTemplateText(obj)
+    ? (resolvePersistedDesignedTextboxWidth(
+        Number(snapshot.width),
+        Number(snapshot.textFieldLayoutWidth ?? snapshot.width),
+      ) ?? snapshot.width)
+    : Number(snapshot.textFieldLayoutWidth ?? snapshot.width);
+  if (!Number.isFinite(layoutW) || layoutW <= 0) return;
   const patch: Record<string, unknown> = {
     left: snapshot.left,
     top: snapshot.top,
@@ -979,11 +991,29 @@ export function applyDesignedTextLayoutSnapshot(
     originY: snapshot.originY,
     textFieldLayoutWidth: layoutW,
   };
+  if (snapshot.textAlign) patch.textAlign = snapshot.textAlign;
   if (snapshot.height != null && Number.isFinite(snapshot.height)) {
     patch.height = snapshot.height;
   }
   obj.set(patch as Parameters<typeof obj.set>[0]);
   (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = layoutW;
+  obj.setCoords?.();
+}
+
+/** После load/normalize: вернуть геометрию из JSON (в т.ч. client text) — для export PNG. */
+export function restoreTextLayoutsFromSnapshots(
+  canvas: { getObjects: () => unknown[] },
+  snapshots: Map<string, DesignedTextLayoutSnapshot>,
+): void {
+  if (!snapshots.size) return;
+  for (const raw of canvas.getObjects()) {
+    const obj = raw as TextLikeObject;
+    const id = String(obj.id ?? '');
+    if (!id) continue;
+    const snap = snapshots.get(id) ?? snapshots.get(stripSpreadPageIdPrefix(id));
+    if (!snap) continue;
+    applyDesignedTextLayoutSnapshot(obj, snap);
+  }
 }
 
 /** Захват геометрии из loadFromJSON до любых force-origin / hydrate мутаций. */
@@ -1372,7 +1402,30 @@ export function measureTightTextboxContentWidth(obj: TextLikeObject): number {
 function setTextboxWidthPreservingOrigin(obj: TextLikeObject, nextWidth: number): void {
   const originX = (obj as { originX?: string }).originX ?? 'left';
   const originY = (obj as { originY?: string }).originY ?? 'top';
-  obj.set({ width: nextWidth, originX, originY } as Parameters<typeof obj.set>[0]);
+  const oldWidth = Number(obj.width ?? 0);
+  const textAlign = String((obj as { textAlign?: string }).textAlign ?? 'left').toLowerCase();
+  const patch: Record<string, unknown> = { width: nextWidth, originX, originY };
+
+  // textAlign:center + originX:left: глифы рисуются в центре бокса.
+  // Сужение width при том же left сдвигает визуал сильно влево (сувенирка).
+  if (
+    Number.isFinite(oldWidth)
+    && oldWidth > 0
+    && Number.isFinite(nextWidth)
+    && Math.abs(oldWidth - nextWidth) > 0.5
+    && originX === 'left'
+  ) {
+    const left = Number(obj.left ?? 0);
+    if (Number.isFinite(left)) {
+      if (textAlign === 'center') {
+        patch.left = left + (oldWidth - nextWidth) / 2;
+      } else if (textAlign === 'right') {
+        patch.left = left + (oldWidth - nextWidth);
+      }
+    }
+  }
+
+  obj.set(patch as Parameters<typeof obj.set>[0]);
   obj.setCoords?.();
 }
 

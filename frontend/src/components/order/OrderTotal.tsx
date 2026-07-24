@@ -13,6 +13,8 @@ export interface OrderAmountsDisplayProps {
   taxRate?: number;
   /** С API; если не задан — total − prepayment */
   debt?: number;
+  /** Скрыть блок предоплаты/долга (если показывается отдельно, напр. в пуле заказов) */
+  showPaymentBreakdown?: boolean;
 }
 
 const bynAmount = (n: number) =>
@@ -33,6 +35,7 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
   paymentMethod,
   taxRate = 0,
   debt: debtFromApi,
+  showPaymentBreakdown = true,
 }) => {
   const disc = discountAmount;
   const rate = Number(taxRate) || 0;
@@ -76,7 +79,7 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
         </span>
       </div>
 
-      {prepayment > 0 && (
+      {showPaymentBreakdown && prepayment > 0 && (
         <>
           <hr />
           <div className="order-total__line prepayment">
