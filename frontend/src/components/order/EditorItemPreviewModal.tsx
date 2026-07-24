@@ -96,6 +96,8 @@ async function renderDesignPageToDataUrl(
       pageH: geometry.pageHeightPx,
       apiBaseUrl: API_BASE_URL,
       resolveImageSrc,
+      // Иначе text_* при рендере preview «прыгает» относительно редактора.
+      preserveTextLayout: true,
     });
     return canvas.toDataURL({ format: 'png', multiplier });
   } finally {
@@ -292,6 +294,17 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
     });
   };
 
+  const latestJob = productionJobs[0] ?? null;
+  const latestProductionFile = productionFiles[0] ?? null;
+  const productionStatus = latestJob?.status ?? (latestProductionFile ? 'done' : null);
+  const showPlacement = summary.kind === 'souvenir3d' && Boolean(designState);
+  const previewNote =
+    previewSource === 'client_png'
+      ? 'client PNG с сайта'
+      : previewSource === 'fabric'
+        ? 'рендер из designState'
+        : null;
+
   return (
     <div className="editor-preview-modal__overlay" onClick={onClose}>
       <div className="editor-preview-modal" onClick={(event) => event.stopPropagation()}>
@@ -300,153 +313,164 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
             <h3>{summary.label}</h3>
             <p>{summary.detail}</p>
           </div>
-          <button type="button" className="editor-preview-modal__close" onClick={onClose}>Закрыть</button>
+          <button type="button" className="editor-preview-modal__close" onClick={onClose}>
+            Закрыть
+          </button>
         </header>
 
-        <div className="editor-preview-modal__meta">
-          {item.params.editorDraftToken && <span>Draft: {item.params.editorDraftToken}</span>}
-          {item.params.designTemplateId != null && <span>Template ID: {item.params.designTemplateId}</span>}
-          {item.params.editorDraftMode && <span>Mode: {item.params.editorDraftMode}</span>}
-        </div>
+        <div className="editor-preview-modal__toolbar">
+          {designState && (
+            <button
+              type="button"
+              className="editor-preview-modal__primary"
+              onClick={() => void handleExportPdf()}
+              disabled={exporting || loading}
+            >
+              {exporting ? 'Экспорт…' : 'Скачать PDF'}
+            </button>
+          )}
 
-        {error && <div className="editor-preview-modal__error">{error}</div>}
-
-        {orderId && designState && (
-          <section className="editor-preview-modal__production" aria-labelledby="editor-production-heading">
-            <div className="editor-preview-modal__production-header">
-              <h4 id="editor-production-heading">Production PDF (CRM)</h4>
+          {orderId && designState && (
+            <>
+              <div className="editor-preview-modal__status">
+                <span>Production PDF</span>
+                {productionLoading ? (
+                  <span className="editor-preview-modal__status-badge">…</span>
+                ) : productionStatus ? (
+                  <span
+                    className={`editor-preview-modal__status-badge editor-preview-modal__status-badge--${productionStatus}`}
+                  >
+                    {JOB_STATUS_LABEL[productionStatus] ?? productionStatus}
+                  </span>
+                ) : (
+                  <span className="editor-preview-modal__status-badge">нет файла</span>
+                )}
+                {latestProductionFile && (
+                  <button
+                    type="button"
+                    className="editor-preview-modal__link-btn"
+                    onClick={() => handleDownloadProductionFile(latestProductionFile)}
+                  >
+                    Скачать
+                  </button>
+                )}
+              </div>
+              {latestJob?.status === 'failed' && latestJob.lastError && (
+                <p className="editor-preview-modal__production-error" title={latestJob.lastError}>
+                  {latestJob.lastError}
+                </p>
+              )}
               <button
                 type="button"
-                className="editor-preview-modal__primary"
+                className="editor-preview-modal__secondary"
                 onClick={() => void handleRegenerateProduction()}
                 disabled={productionRegenerating || productionLoading}
               >
                 {productionRegenerating ? 'В очереди…' : 'Перегенерировать'}
               </button>
-            </div>
-            {productionLoading ? (
-              <p className="editor-preview-modal__production-hint">Загрузка статуса…</p>
-            ) : (
-              <>
-                {productionJobs.length > 0 && (
-                  <ul className="editor-preview-modal__production-jobs">
-                    {productionJobs.slice(0, 5).map((job) => (
-                      <li key={job.id}>
-                        {job.jobType}: {JOB_STATUS_LABEL[job.status] ?? job.status}
-                        {job.lastError ? ` — ${job.lastError}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {productionFiles.length > 0 ? (
-                  <ul className="editor-preview-modal__production-files">
-                    {productionFiles.map((file) => (
-                      <li key={file.id}>
-                        <button
-                          type="button"
-                          className="editor-preview-modal__production-file-link"
-                          onClick={() => handleDownloadProductionFile(file)}
-                        >
-                          {file.originalName || file.filename}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="editor-preview-modal__production-hint">
-                    Файл ещё не сгенерирован. Воркер создаёт PDF после заказа с сайта (нужен Puppeteer на сервере).
-                  </p>
-                )}
-              </>
-            )}
-          </section>
-        )}
+            </>
+          )}
+
+          <span className="editor-preview-modal__toolbar-spacer" />
+          {previewNote && (
+            <span className="editor-preview-modal__previews-note">{previewNote}</span>
+          )}
+        </div>
+
+        {error && <div className="editor-preview-modal__error">{error}</div>}
 
         {summary.layoutIncomplete && summary.layoutIssues && summary.layoutIssues.length > 0 && (
           <div className="editor-preview-modal__layout-issues" role="alert">
             <strong>Макет неполный</strong>
             <ul>
               {summary.layoutIssues.map((issue) => (
-                <li key={issue.id} className={`editor-preview-modal__issue editor-preview-modal__issue--${issue.level}`}>
+                <li
+                  key={issue.id}
+                  className={`editor-preview-modal__issue editor-preview-modal__issue--${issue.level}`}
+                >
                   {issue.message}
                 </li>
               ))}
             </ul>
-            {summary.layoutReviewPath && (
-              <p className="editor-preview-modal__review-path">Путь: {summary.layoutReviewPath}</p>
-            )}
           </div>
         )}
 
-        {summary.kind === 'souvenir3d' && designState && (
-          <section className="editor-preview-modal__placement" aria-labelledby="editor-placement-heading">
-            <h4 id="editor-placement-heading">Куда наносить принт (для оператора)</h4>
-            <p className="editor-preview-modal__production-hint">
-              3D в печать не идёт — только схема размещения. Production PDF ниже остаётся плоским макетом зоны.
-            </p>
-            <SouvenirPlacementPreview
-              printArea={
-                parsePrintAreas(item.params.printAreas)[0]
-                ?? {
-                  ...DEFAULT_PRINT_AREA_TSHIRT,
-                  widthMm: Number(designState.pageWidth) || DEFAULT_PRINT_AREA_TSHIRT.widthMm,
-                  heightMm: Number(designState.pageHeight) || DEFAULT_PRINT_AREA_TSHIRT.heightMm,
-                  label: summary.printAreaLabel || DEFAULT_PRINT_AREA_TSHIRT.label,
+        <div
+          className={`editor-preview-modal__body${showPlacement ? ' editor-preview-modal__body--with-placement' : ''}`}
+        >
+          {showPlacement && designState && (
+            <aside className="editor-preview-modal__placement" aria-labelledby="editor-placement-heading">
+              <h4 id="editor-placement-heading" className="editor-preview-modal__placement-title">
+                Куда наносить
+              </h4>
+              <p className="editor-preview-modal__placement-hint">
+                Схема для оператора. В печать идёт плоский макет справа.
+              </p>
+              <SouvenirPlacementPreview
+                compact
+                printArea={
+                  parsePrintAreas(item.params.printAreas)[0]
+                  ?? {
+                    ...DEFAULT_PRINT_AREA_TSHIRT,
+                    widthMm: Number(designState.pageWidth) || DEFAULT_PRINT_AREA_TSHIRT.widthMm,
+                    heightMm: Number(designState.pageHeight) || DEFAULT_PRINT_AREA_TSHIRT.heightMm,
+                    label: summary.printAreaLabel || DEFAULT_PRINT_AREA_TSHIRT.label,
+                  }
                 }
-              }
-              printImageUrl={pagePreviews[0]?.url ?? null}
-            />
-          </section>
-        )}
+                printImageUrl={pagePreviews[0]?.url ?? null}
+              />
+            </aside>
+          )}
 
-        {designState && (
-          <>
-            <div className="editor-preview-modal__actions">
-              <button type="button" className="editor-preview-modal__primary" onClick={handleExportPdf} disabled={exporting || loading}>
-                {exporting ? 'Экспортируем PDF...' : 'Скачать постраничный PDF'}
-              </button>
-              <span>
-                Страницы экспортируются в порядке 1-{designPages.length}.
-                {previewSource === 'client_png' ? ' Preview: client PNG с сайта.' : previewSource === 'fabric' ? ' Preview: рендер из designState.' : ''}
-              </span>
-            </div>
-            {loading ? (
-              <div className="editor-preview-modal__loading">Строим preview страниц...</div>
-            ) : pagePreviews.length > 0 ? (
-              <div className="editor-preview-modal__pages">
-                {pagePreviews.map((preview) => (
-                  <figure key={preview.page} className="editor-preview-modal__page">
-                    <img src={preview.url} alt={`Страница ${preview.page}`} />
-                    <figcaption>
-                      Страница {preview.page}
-                      {preview.source === 'client_png' ? ' · client PNG' : ''}
-                    </figcaption>
-                  </figure>
+          <div className="editor-preview-modal__previews">
+            {designState && (
+              <div className="editor-preview-modal__previews-head">
+                <h4 className="editor-preview-modal__previews-title">
+                  Макет{pagePreviews.length > 1 ? ` · ${pagePreviews.length} стр.` : ''}
+                </h4>
+              </div>
+            )}
+
+            {designState ? (
+              loading ? (
+                <div className="editor-preview-modal__loading">Строим preview…</div>
+              ) : pagePreviews.length > 0 ? (
+                <div
+                  className={`editor-preview-modal__pages${pagePreviews.length === 1 ? ' editor-preview-modal__pages--single' : ''}`}
+                >
+                  {pagePreviews.map((preview) => (
+                    <figure key={preview.page} className="editor-preview-modal__page">
+                      <img src={preview.url} alt={`Страница ${preview.page}`} />
+                      <figcaption>Страница {preview.page}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              ) : (
+                <div className="editor-preview-modal__loading">Нет данных для preview.</div>
+              )
+            ) : null}
+
+            {photoBatch && (
+              <div className="editor-preview-modal__photo-batch">
+                {photoBatch.groups?.map((group) => (
+                  <section key={group.groupSizeId} className="editor-preview-modal__group">
+                    <h4>{group.groupLabel}</h4>
+                    <p>
+                      {group.quantity} отпечатков · {group.targetSizeMm.width}×{group.targetSizeMm.height} мм
+                    </p>
+                    <ul>
+                      {group.items?.map((photo) => (
+                        <li key={`${group.groupSizeId}-${photo.fileId}`}>
+                          {photo.originalName} · {photo.quantity} шт. · {photo.fitMode} · поворот {photo.rotation}°
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
                 ))}
               </div>
-            ) : (
-              <div className="editor-preview-modal__loading">Нет данных для preview страниц.</div>
             )}
-          </>
-        )}
-
-        {photoBatch && (
-          <div className="editor-preview-modal__photo-batch">
-            {photoBatch.groups?.map((group) => (
-              <section key={group.groupSizeId} className="editor-preview-modal__group">
-                <h4>{group.groupLabel}</h4>
-                <p>{group.quantity} отпечатков · {group.targetSizeMm.width}×{group.targetSizeMm.height} мм</p>
-                <ul>
-                  {group.items?.map((photo) => (
-                    <li key={`${group.groupSizeId}-${photo.fileId}`}>
-                      {photo.originalName} · {photo.quantity} шт. · {photo.fitMode} · поворот {photo.rotation}°
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

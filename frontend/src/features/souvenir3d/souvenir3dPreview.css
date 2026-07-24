@@ -110,7 +110,7 @@
 .souvenir3d-placement {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .souvenir3d-placement__blank {
@@ -125,46 +125,57 @@
   overflow: hidden;
 }
 
+.souvenir3d-placement--compact .souvenir3d-placement__blank {
+  max-width: none;
+  aspect-ratio: 3 / 4;
+}
+
 .souvenir3d-placement__blank--mug {
   aspect-ratio: 1 / 1;
 }
 
 .souvenir3d-placement__silhouette {
   position: absolute;
-  inset: 12%;
+  inset: 10%;
   border: 2px dashed #94a3b8;
   border-radius: 8px;
   background: #e2e8f0;
 }
 
 .souvenir3d-placement__blank--mug .souvenir3d-placement__silhouette {
-  inset: 18% 22%;
+  inset: 16% 20%;
   border-radius: 40% / 12%;
 }
 
 .souvenir3d-placement__print {
   position: absolute;
-  left: 28%;
-  top: 28%;
-  width: 44%;
-  height: 40%;
+  left: 26%;
+  top: 26%;
+  width: 48%;
+  height: 42%;
   object-fit: contain;
   background: #fff;
   border: 1px solid #64748b;
-  box-shadow: 0 4px 16px rgb(15 23 42 / 12%);
+  box-shadow: 0 2px 10px rgb(15 23 42 / 12%);
 }
 
 .souvenir3d-placement__blank--mug .souvenir3d-placement__print {
-  left: 24%;
-  top: 32%;
-  width: 52%;
-  height: 36%;
+  left: 22%;
+  top: 30%;
+  width: 56%;
+  height: 38%;
 }
 
 .souvenir3d-placement__meta {
-  font-size: 0.875rem;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
   color: var(--text-secondary, #64748b);
   text-align: center;
+}
+
+.souvenir3d-placement--compact .souvenir3d-placement__meta {
+  font-size: 0.6875rem;
 }
 
 @media (max-width: 960px) {

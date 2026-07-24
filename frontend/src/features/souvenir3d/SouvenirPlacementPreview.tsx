@@ -7,6 +7,10 @@ export type SouvenirPlacementPreviewProps = {
   /** Растр плоского макета (data URL / http). */
   printImageUrl: string | null;
   className?: string;
+  /** Компактная схема в модалке оператора (без гигантских отступов). */
+  compact?: boolean;
+  /** Показывать имя mesh — обычно не нужно оператору. */
+  showMeshName?: boolean;
 };
 
 /**
@@ -17,10 +21,13 @@ export const SouvenirPlacementPreview: React.FC<SouvenirPlacementPreviewProps> =
   printArea,
   printImageUrl,
   className,
+  compact = false,
+  showMeshName = false,
 }) => {
   const isMug = printArea.procedural === 'mug' || printArea.id === 'wrap';
   const root = [
     'souvenir3d-placement',
+    compact ? 'souvenir3d-placement--compact' : '',
     className,
   ]
     .filter(Boolean)
@@ -45,7 +52,7 @@ export const SouvenirPlacementPreview: React.FC<SouvenirPlacementPreviewProps> =
       </div>
       <p className="souvenir3d-placement__meta">
         {printArea.label} · {printArea.widthMm}×{printArea.heightMm} мм
-        {printArea.meshName ? ` · mesh ${printArea.meshName}` : ''}
+        {showMeshName && printArea.meshName ? ` · ${printArea.meshName}` : ''}
       </p>
     </div>
   );
