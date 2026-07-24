@@ -11,6 +11,7 @@ import {
   prepareWebsiteItemsWithEditorDrafts,
 } from '../../../services/editorDraftWebsitePrepare'
 import { completeEditorOrderIntake } from '../../../services/editorOrderIntakeService'
+import { ensureWebsiteCustomer } from '../../../services/editorDraftOwnerService'
 import { mapCrmStatusToWebsiteStatus } from '../../../services/websiteOrderStatusSyncService'
 import { parseWebsiteOrderDelivery } from '../../../types/websiteOrderDelivery'
 import { hasColumn } from '../../../utils/tableSchemaCache'
@@ -180,13 +181,29 @@ export class OrderController {
       if (items != null && Array.isArray(items) && items.length > 0) {
         const normalizedItems = normalizeWebsiteItems(items)
         const editorDraftPrepared = await prepareWebsiteItemsWithEditorDrafts(normalizedItems)
+        let resolvedCustomerId =
+          customer_id != null && Number.isFinite(Number(customer_id)) ? Number(customer_id) : null
+        if (!resolvedCustomerId && (customerPhone || customerEmail)) {
+          try {
+            const ensured = await ensureWebsiteCustomer({
+              phone: customerPhone,
+              email: customerEmail,
+              name: customerName,
+            })
+            resolvedCustomerId = ensured.id
+          } catch (err: unknown) {
+            logger.warn('createOrderFromWebsite: не удалось ensure customer', {
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
+        }
         const result = await OrderService.createOrderWithAutoDeduction({
           customerName: customerName || undefined,
           customerPhone: customerPhone || undefined,
           customerEmail: customerEmail || undefined,
           prepaymentAmount,
           userId: undefined,
-          customer_id,
+          customer_id: resolvedCustomerId ?? undefined,
           source: 'website',
           delivery,
           items: editorDraftPrepared.items
@@ -194,7 +211,7 @@ export class OrderController {
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
         await completeEditorOrderIntake({
           orderId: result.order.id,
-          customerId: customer_id,
+          customerId: resolvedCustomerId,
           itemIds: result.itemIds ?? [],
           editorDraftItems: editorDraftPrepared.editorDraftItems,
         })

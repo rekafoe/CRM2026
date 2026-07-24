@@ -20,6 +20,7 @@ import { AutoOrderService } from './services/autoOrderService'
 import { UserNotificationService } from './services/userNotificationService'
 import { EarningsService } from './services/earningsService'
 import { startOrderFilesCleanup } from './services/orderFilesCleanupService'
+import { startEditorDraftsCleanup } from './services/editorDraftOwnerService'
 import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
 import { startMailOutboxWorker } from './services/mailOutboxWorker'
@@ -268,6 +269,12 @@ async function startServer() {
       intervalMs: parseInt(process.env.ORDER_FILES_CLEANUP_INTERVAL_HOURS || '24', 10) * 60 * 60 * 1000,
     }
     startOrderFilesCleanup(orderFilesCleanupConfig)
+
+    const editorDraftsCleanupConfig = {
+      enabled: process.env.EDITOR_DRAFTS_CLEANUP_ENABLED !== 'false',
+      intervalMs: parseInt(process.env.EDITOR_DRAFTS_CLEANUP_INTERVAL_HOURS || '24', 10) * 60 * 60 * 1000,
+    }
+    startEditorDraftsCleanup(editorDraftsCleanupConfig)
 
     const storageMonitorConfig = {
       enabled: process.env.STORAGE_MONITOR_ENABLED !== 'false',

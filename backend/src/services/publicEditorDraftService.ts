@@ -30,9 +30,32 @@ export interface EditorDraftRow {
   version?: number
   status: string
   order_id: number | null
+  customer_id?: number | null
+  guest_token?: string | null
+  expires_at?: string | null
   created_at: string
   updated_at: string
 }
+
+/** Список незавершённых без полного payload (для UI). */
+export type EditorDraftListItem = {
+  token: string
+  product_id: number | null
+  type_id: number | null
+  size_id: string | null
+  design_template_id: number | null
+  mode: string
+  status: string
+  updated_at: string
+  created_at: string
+  expires_at: string | null
+  customer_id: number | null
+  guest_token: string | null
+  title: string
+}
+
+export const EDITOR_DRAFT_TTL_GUEST_DAYS = 14
+export const EDITOR_DRAFT_TTL_CUSTOMER_DAYS = 90
 
 function parseByteLimit(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback
@@ -118,6 +141,87 @@ async function ensureEditorDraftVersionColumn(): Promise<void> {
   invalidateTableSchemaCache('editor_drafts')
 }
 
+async function ensureEditorDraftOwnerColumns(): Promise<void> {
+  const db = await getDb()
+  if (!(await hasColumn('editor_drafts', 'customer_id').catch(() => false))) {
+    await db.exec('ALTER TABLE editor_drafts ADD COLUMN customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL')
+  }
+  if (!(await hasColumn('editor_drafts', 'guest_token').catch(() => false))) {
+    await db.exec('ALTER TABLE editor_drafts ADD COLUMN guest_token TEXT')
+  }
+  if (!(await hasColumn('editor_drafts', 'expires_at').catch(() => false))) {
+    await db.exec('ALTER TABLE editor_drafts ADD COLUMN expires_at TEXT')
+  }
+  invalidateTableSchemaCache('editor_drafts')
+}
+
+function daysFromNowIso(days: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString()
+}
+
+export function resolveEditorDraftExpiresAt(input: {
+  customerId?: number | null
+  guestToken?: string | null
+}): string {
+  if (input.customerId != null && Number.isFinite(Number(input.customerId))) {
+    return daysFromNowIso(EDITOR_DRAFT_TTL_CUSTOMER_DAYS)
+  }
+  return daysFromNowIso(EDITOR_DRAFT_TTL_GUEST_DAYS)
+}
+
+function normalizeGuestToken(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.length > 128) return null
+  return trimmed
+}
+
+function normalizeCustomerId(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+function draftListTitle(row: EditorDraftRow): string {
+  const payload = parsePayloadRaw(row.payload)
+  const selected = isRecord(payload.selectedParams) ? payload.selectedParams : null
+  const fromPayload =
+    (typeof payload.title === 'string' && payload.title.trim())
+    || (selected && typeof selected.productName === 'string' && selected.productName.trim())
+    || (typeof payload.productName === 'string' && payload.productName.trim())
+  if (fromPayload) return fromPayload
+  if (row.design_template_id) return `Макет #${row.design_template_id}`
+  if (row.product_id) return `Продукт #${row.product_id}`
+  return 'Незавершённый макет'
+}
+
+function isDraftExpired(row: Pick<EditorDraftRow, 'expires_at'>): boolean {
+  if (!row.expires_at) return false
+  const expiresMs = Date.parse(row.expires_at)
+  if (!Number.isFinite(expiresMs)) return false
+  return expiresMs < Date.now()
+}
+
+function toDraftListItem(row: EditorDraftRow): EditorDraftListItem {
+  return {
+    token: row.token,
+    product_id: row.product_id,
+    type_id: row.type_id,
+    size_id: row.size_id,
+    design_template_id: row.design_template_id,
+    mode: row.mode,
+    status: row.status,
+    updated_at: row.updated_at,
+    created_at: row.created_at,
+    expires_at: row.expires_at ?? null,
+    customer_id: row.customer_id ?? null,
+    guest_token: row.guest_token ?? null,
+    title: draftListTitle(row),
+  }
+}
+
 function parsePayload(row: EditorDraftRow): Record<string, unknown> {
   try {
     return row.payload ? JSON.parse(row.payload) as Record<string, unknown> : {}
@@ -154,7 +258,15 @@ function readExpectedVersion(patch: Record<string, unknown>): number | null {
 }
 
 function stripDraftControlKeys(patch: Record<string, unknown>): Record<string, unknown> {
-  const { expectedVersion: _expectedVersion, __expectedVersion: _legacyExpectedVersion, ...payloadPatch } = patch
+  const {
+    expectedVersion: _expectedVersion,
+    __expectedVersion: _legacyExpectedVersion,
+    customerId: _customerId,
+    customer_id: _customer_id,
+    guestToken: _guestToken,
+    guest_token: _guest_token,
+    ...payloadPatch
+  } = patch
   return payloadPatch
 }
 
@@ -165,12 +277,20 @@ export async function createEditorDraft(input: {
   sizeId?: string
   mode?: string
   payload?: Record<string, unknown>
+  customerId?: number | null
+  guestToken?: string | null
 }): Promise<EditorDraftRow & { payloadParsed: Record<string, unknown> }> {
+  await ensureEditorDraftOwnerColumns()
   const db = await getDb()
   const token = createToken()
+  const customerId = normalizeCustomerId(input.customerId)
+  const guestToken = customerId ? null : normalizeGuestToken(input.guestToken)
+  const expiresAt = resolveEditorDraftExpiresAt({ customerId, guestToken })
   const result = await db.run(
-    `INSERT INTO editor_drafts (token, design_template_id, product_id, type_id, size_id, mode, payload)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO editor_drafts (
+      token, design_template_id, product_id, type_id, size_id, mode, payload,
+      customer_id, guest_token, expires_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       token,
       input.designTemplateId ?? null,
@@ -179,6 +299,9 @@ export async function createEditorDraft(input: {
       input.sizeId ?? null,
       input.mode ?? 'single',
       stringifyDraftPayload(input.payload ?? {}),
+      customerId,
+      guestToken,
+      expiresAt,
     ],
   )
   const row = await db.get<EditorDraftRow>('SELECT * FROM editor_drafts WHERE id = ?', result.lastID)
@@ -187,9 +310,91 @@ export async function createEditorDraft(input: {
 }
 
 export async function getEditorDraft(token: string): Promise<(EditorDraftRow & { payloadParsed: Record<string, unknown> }) | null> {
+  await ensureEditorDraftOwnerColumns()
   const db = await getDb()
   const row = await db.get<EditorDraftRow>('SELECT * FROM editor_drafts WHERE token = ?', token)
-  return row ? { ...row, payloadParsed: parsePayload(row) } : null
+  if (!row) return null
+  if (row.status === 'draft' && isDraftExpired(row)) {
+    return null
+  }
+  return { ...row, payloadParsed: parsePayload(row) }
+}
+
+export async function listEditorDraftsForOwner(input: {
+  customerId?: number | null
+  guestToken?: string | null
+}): Promise<EditorDraftListItem[]> {
+  await ensureEditorDraftOwnerColumns()
+  const customerId = normalizeCustomerId(input.customerId)
+  const guestToken = normalizeGuestToken(input.guestToken)
+  if (!customerId && !guestToken) return []
+
+  const db = await getDb()
+  const rows = customerId
+    ? ((await db.all(
+      `SELECT * FROM editor_drafts
+       WHERE status = 'draft'
+         AND customer_id = ?
+         AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))
+       ORDER BY datetime(updated_at) DESC, id DESC
+       LIMIT 50`,
+      [customerId],
+    )) as EditorDraftRow[])
+    : ((await db.all(
+      `SELECT * FROM editor_drafts
+       WHERE status = 'draft'
+         AND guest_token = ?
+         AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))
+       ORDER BY datetime(updated_at) DESC, id DESC
+       LIMIT 50`,
+      [guestToken],
+    )) as EditorDraftRow[])
+
+  return (rows ?? []).map(toDraftListItem)
+}
+
+export async function claimEditorDraftsForCustomer(input: {
+  guestToken: string
+  customerId: number
+}): Promise<{ claimed: number }> {
+  await ensureEditorDraftOwnerColumns()
+  const guestToken = normalizeGuestToken(input.guestToken)
+  const customerId = normalizeCustomerId(input.customerId)
+  if (!guestToken || !customerId) {
+    throw new Error('Нужны guestToken и customerId')
+  }
+  const db = await getDb()
+  const expiresAt = resolveEditorDraftExpiresAt({ customerId })
+  const result = await db.run(
+    `UPDATE editor_drafts
+     SET customer_id = ?, guest_token = NULL, expires_at = ?, updated_at = datetime('now')
+     WHERE status = 'draft'
+       AND guest_token = ?
+       AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))`,
+    [customerId, expiresAt, guestToken],
+  )
+  return { claimed: result.changes ?? 0 }
+}
+
+export async function cleanupExpiredEditorDrafts(): Promise<{ deleted: number }> {
+  await ensureEditorDraftOwnerColumns()
+  const db = await getDb()
+  const expired = (await db.all(
+    `SELECT id FROM editor_drafts
+     WHERE status = 'draft'
+       AND expires_at IS NOT NULL
+       AND datetime(expires_at) <= datetime('now')
+     LIMIT 500`,
+  )) as Array<{ id: number }>
+  if (!expired?.length) return { deleted: 0 }
+
+  let deleted = 0
+  for (const row of expired) {
+    await db.run('DELETE FROM editor_draft_files WHERE draft_id = ?', [row.id])
+    const result = await db.run('DELETE FROM editor_drafts WHERE id = ? AND status = ?', [row.id, 'draft'])
+    deleted += result.changes ?? 0
+  }
+  return { deleted }
 }
 
 export async function updateEditorDraftPayload(
@@ -197,26 +402,53 @@ export async function updateEditorDraftPayload(
   patch: Record<string, unknown>,
 ): Promise<EditorDraftRow & { payloadParsed: Record<string, unknown> }> {
   await ensureEditorDraftVersionColumn()
+  await ensureEditorDraftOwnerColumns()
   cleanupEditorDraftRateState()
   enforceEditorDraftRateLimit(token)
   const db = await getDb()
   const existing = await db.get<EditorDraftRow>('SELECT * FROM editor_drafts WHERE token = ?', token)
   if (!existing) throw new Error('Draft не найден')
   if (existing.status !== 'draft') throw new Error('Draft уже финализирован')
+  if (isDraftExpired(existing)) throw new Error('Срок хранения макета истёк')
 
+  const ownerCustomerId = normalizeCustomerId(patch.customerId ?? patch.customer_id)
+  const ownerGuestToken = normalizeGuestToken(patch.guestToken ?? patch.guest_token)
+  const payloadPatch = stripDraftControlKeys({
+    ...patch,
+    customerId: undefined,
+    customer_id: undefined,
+    guestToken: undefined,
+    guest_token: undefined,
+  })
   const expectedVersion = readExpectedVersion(patch)
-  const payloadPatch = stripDraftControlKeys(patch)
   const currentPayload = parsePayloadRaw(existing.payload)
   const payload = { ...currentPayload, ...payloadPatch }
   const serializedPayload = stringifyDraftPayload(payload)
   const currentSerialized = existing.payload ?? '{}'
   const versionNow = Number(existing.version ?? 1) || 1
+
+  const nextCustomerId = ownerCustomerId ?? existing.customer_id ?? null
+  const nextGuestToken = nextCustomerId
+    ? null
+    : (ownerGuestToken ?? existing.guest_token ?? null)
+  const nextExpiresAt = resolveEditorDraftExpiresAt({
+    customerId: nextCustomerId,
+    guestToken: nextGuestToken,
+  })
+
   if (serializedPayload === currentSerialized) {
     if (expectedVersion && versionNow !== expectedVersion) {
       throw new Error('Draft изменился в другой вкладке. Обновите страницу и повторите сохранение.')
     }
+    await db.run(
+      `UPDATE editor_drafts
+       SET customer_id = ?, guest_token = ?, expires_at = ?, updated_at = datetime('now')
+       WHERE token = ? AND status = 'draft'`,
+      [nextCustomerId, nextGuestToken, nextExpiresAt, token],
+    )
+    const refreshed = await db.get<EditorDraftRow>('SELECT * FROM editor_drafts WHERE token = ?', token)
     return {
-      ...existing,
+      ...(refreshed ?? existing),
       payloadParsed: payload,
       version: versionNow,
     }
@@ -224,15 +456,17 @@ export async function updateEditorDraftPayload(
   const result = expectedVersion
     ? await db.run(
       `UPDATE editor_drafts
-       SET payload = ?, version = COALESCE(version, 1) + 1, updated_at = datetime('now')
+       SET payload = ?, version = COALESCE(version, 1) + 1, updated_at = datetime('now'),
+           customer_id = ?, guest_token = ?, expires_at = ?
        WHERE token = ? AND status = 'draft' AND COALESCE(version, 1) = ?`,
-      [serializedPayload, token, expectedVersion],
+      [serializedPayload, nextCustomerId, nextGuestToken, nextExpiresAt, token, expectedVersion],
     )
     : await db.run(
       `UPDATE editor_drafts
-       SET payload = ?, version = COALESCE(version, 1) + 1, updated_at = datetime('now')
+       SET payload = ?, version = COALESCE(version, 1) + 1, updated_at = datetime('now'),
+           customer_id = ?, guest_token = ?, expires_at = ?
        WHERE token = ? AND status = 'draft'`,
-      [serializedPayload, token],
+      [serializedPayload, nextCustomerId, nextGuestToken, nextExpiresAt, token],
     )
   if ((result.changes ?? 0) === 0) {
     throw new Error('Draft изменился в другой вкладке. Обновите страницу и повторите сохранение.')

@@ -6,15 +6,18 @@ import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 import {
   addEditorDraftFile,
   EditorDraftRateLimitError,
+  claimEditorDraftsForCustomer,
   createEditorDraft,
   createEditorDraftFromOrderItem,
   finalizeEditorDraft,
   getEditorDraft,
   getEditorDraftFile,
   listEditorDraftFiles,
+  listEditorDraftsForOwner,
   updateEditorDraftPayload,
 } from '../services/publicEditorDraftService'
-import { cloneCustomerProjectToDraft } from '../services/customerProjectService'
+import { cloneCustomerProjectToDraft, listCustomerProjects } from '../services/customerProjectService'
+import { ensureWebsiteCustomer } from '../services/editorDraftOwnerService'
 
 const router = Router()
 
@@ -58,6 +61,10 @@ function createDraftInput(body: Record<string, unknown>) {
     sizeId: body.sizeId != null ? String(body.sizeId) : undefined,
     mode: body.mode != null ? String(body.mode) : undefined,
     payload: body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {},
+    customerId: body.customerId != null ? Number(body.customerId) : (body.customer_id != null ? Number(body.customer_id) : null),
+    guestToken: typeof body.guestToken === 'string'
+      ? body.guestToken
+      : (typeof body.guest_token === 'string' ? body.guest_token : null),
   }
 }
 
@@ -267,6 +274,77 @@ router.post('/drafts', asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(draft)
 }))
 
+/** GET /api/public-editor/drafts?guestToken=&customerId= — список незавершённых */
+router.get('/drafts', asyncHandler(async (req: Request, res: Response) => {
+  const customerId = req.query.customerId != null ? Number(req.query.customerId) : null
+  const guestToken = typeof req.query.guestToken === 'string' ? req.query.guestToken : null
+  if ((!customerId || !Number.isFinite(customerId)) && !guestToken) {
+    res.status(400).json({ message: 'Нужен customerId или guestToken' })
+    return
+  }
+  const drafts = await listEditorDraftsForOwner({
+    customerId: customerId && Number.isFinite(customerId) ? customerId : null,
+    guestToken,
+  })
+  res.json({ drafts })
+}))
+
+/** POST /api/public-editor/drafts/claim — привязать guest drafts к customer */
+router.post('/drafts/claim', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {}
+    const result = await claimEditorDraftsForCustomer({
+      guestToken: String(body.guestToken ?? body.guest_token ?? ''),
+      customerId: Number(body.customerId ?? body.customer_id),
+    })
+    res.json(result)
+  } catch (err: unknown) {
+    res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось привязать drafts' })
+  }
+}))
+
+/** POST /api/public-editor/customers/ensure — найти/создать CRM customer для сайта */
+router.post('/customers/ensure', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {}
+    const customer = await ensureWebsiteCustomer({
+      phone: typeof body.phone === 'string' ? body.phone : null,
+      email: typeof body.email === 'string' ? body.email : null,
+      name: typeof body.name === 'string' ? body.name : null,
+    })
+    res.json(customer)
+  } catch (err: unknown) {
+    res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось определить клиента' })
+  }
+}))
+
+/** GET /api/public-editor/projects?customerId= — проекты клиента (оформленные макеты) */
+router.get('/projects', asyncHandler(async (req: Request, res: Response) => {
+  const customerId = Number(req.query.customerId)
+  if (!Number.isFinite(customerId) || customerId <= 0) {
+    res.status(400).json({ message: 'Нужен customerId' })
+    return
+  }
+  const projects = await listCustomerProjects(customerId)
+  res.json({
+    projects: projects.map((project) => ({
+      id: project.id,
+      title: project.title,
+      created_at: project.created_at,
+      updated_at: project.updated_at,
+      expires_at: project.expires_at,
+      source_order_id: project.source_order_id,
+      design_template_id: project.design_template_id,
+      editor_mode: project.editor_mode,
+      editable: Number(project.editable) === 1,
+      product_id: project.product_id ?? null,
+      type_id: project.type_id ?? null,
+      size_id: project.size_id ?? null,
+      resume: project.resume,
+    })),
+  })
+}))
+
 /**
  * @swagger
  * /api/public-editor/drafts/{token}:
@@ -451,7 +529,15 @@ router.post('/projects/:id/clone-draft', asyncHandler(async (req: Request, res: 
       res.status(400).json({ message: 'Некорректный id проекта' })
       return
     }
-    const result = await cloneCustomerProjectToDraft(projectId)
+    const body = req.body ?? {}
+    const customerId = body.customerId != null
+      ? Number(body.customerId)
+      : (body.customer_id != null ? Number(body.customer_id) : null)
+    if (!customerId || !Number.isFinite(customerId)) {
+      res.status(400).json({ message: 'Нужен customerId для проверки владельца' })
+      return
+    }
+    const result = await cloneCustomerProjectToDraft(projectId, { customerId })
     res.status(201).json(result)
   } catch (err: unknown) {
     res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось создать draft из проекта' })
