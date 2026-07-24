@@ -28,27 +28,62 @@ const READY_LABELS: Record<string, string> = {
   promo: '48 часов',
   special: '4–5 дней',
   standard: '24 часа',
+  online: '24 часа',
 };
+
+/** Смещение от оформления до готовности, если в позициях нет readyDate. */
+const READY_OFFSET_MS: Record<string, number> = {
+  urgent: 3 * 60 * 60 * 1000,
+  promo: 48 * 60 * 60 * 1000,
+  special: 5 * 24 * 60 * 60 * 1000,
+  standard: 24 * 60 * 60 * 1000,
+  online: 24 * 60 * 60 * 1000,
+};
+
+function getOrderPriceType(order: Order): string {
+  const firstItem = (order.items ?? [])[0];
+  const params = firstItem?.params as { priceType?: string; price_type?: string } | undefined;
+  return String(params?.priceType ?? params?.price_type ?? 'standard').toLowerCase();
+}
+
+function getOrderCreatedAt(order: Order): string | undefined {
+  return order.created_at ?? (order as { createdAt?: string }).createdAt;
+}
+
+/** Макс. readyDate из позиций или расчёт от даты оформления. */
+export function resolveOrderReadyAt(order: Order): Date | null {
+  const fromItems = (order.items ?? [])
+    .map((item) => {
+      const raw = (item.params as { readyDate?: string } | undefined)?.readyDate;
+      if (!raw) return NaN;
+      return new Date(raw).getTime();
+    })
+    .filter((t) => Number.isFinite(t));
+
+  if (fromItems.length > 0) {
+    return new Date(Math.max(...fromItems));
+  }
+
+  const created = getOrderCreatedAt(order);
+  if (!created) return null;
+  const base = new Date(created);
+  if (Number.isNaN(base.getTime())) return null;
+  const priceType = getOrderPriceType(order);
+  const offset = READY_OFFSET_MS[priceType] ?? READY_OFFSET_MS.standard;
+  return new Date(base.getTime() + offset);
+}
 
 export function getOrderReadyLabel(order: Order): {
   label: string;
   hint?: string;
+  readyAt: Date | null;
+  readyAtLabel: string;
 } {
-  const created = order.created_at ?? (order as { createdAt?: string }).createdAt;
-  const firstItem = (order.items ?? [])[0];
-  const params = firstItem?.params as { priceType?: string; price_type?: string } | undefined;
-  const priceType = String(params?.priceType ?? params?.price_type ?? 'standard').toLowerCase();
+  const priceType = getOrderPriceType(order);
   const label = READY_LABELS[priceType] ?? READY_LABELS.standard;
-  if (created && priceType !== 'standard') {
-    return {
-      label,
-      hint: `с момента оформления ${new Date(created).toLocaleString('ru-RU', {
-        dateStyle: 'short',
-        timeStyle: 'short',
-      })}`,
-    };
-  }
-  return { label };
+  const readyAt = resolveOrderReadyAt(order);
+  const readyAtLabel = formatPoolDateTimeFull(readyAt?.toISOString());
+  return { label, readyAt, readyAtLabel };
 }
 
 export function formatShortDate(value?: string): string {
@@ -58,7 +93,21 @@ export function formatShortDate(value?: string): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
 }
 
-/** Дата для оператора: сегодня/вчера + время, иначе дд.мм. */
+/** Полная дата с часами: дд.мм.гггг, чч:мм */
+export function formatPoolDateTimeFull(value?: string | null): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** Компактно для списка: сегодня/вчера + время, иначе дд.мм.гггг, чч:мм */
 export function formatPoolDateTime(value?: string): string {
   if (!value) return '—';
   const d = new Date(value);
@@ -70,10 +119,7 @@ export function formatPoolDateTime(value?: string): string {
   const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   if (dayDiff === 0) return `сегодня ${time}`;
   if (dayDiff === 1) return `вчера ${time}`;
-  if (dayDiff > 1 && dayDiff < 7) {
-    return `${d.toLocaleDateString('ru-RU', { weekday: 'short' })} ${time}`;
-  }
-  return `${d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} ${time}`;
+  return formatPoolDateTimeFull(value);
 }
 
 export type OrderPoolFilterCounts = {

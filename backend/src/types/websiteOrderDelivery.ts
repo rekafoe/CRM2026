@@ -89,7 +89,18 @@ export function formatWebsiteDeliverySummary(delivery: WebsiteOrderDelivery): st
     delivery.cost != null && Number.isFinite(delivery.cost)
       ? `${delivery.cost.toFixed(2)} BYN`
       : delivery.costLabel ?? null
-  const parts = [kindLabel, delivery.label]
+  const address = typeof delivery.address === 'string' ? delivery.address.trim() : ''
+  const location =
+    address ||
+    (delivery.kind === 'pickup' && delivery.label?.trim() ? delivery.label.trim() : '')
+  const parts = [kindLabel]
+  if (location && location !== delivery.label) {
+    parts.push(delivery.label, location)
+  } else if (location) {
+    parts.push(location)
+  } else if (delivery.label) {
+    parts.push(delivery.label)
+  }
   if (costPart) parts.push(costPart)
   return parts.filter(Boolean).join(' · ')
 }

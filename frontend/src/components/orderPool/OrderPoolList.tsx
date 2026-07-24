@@ -4,7 +4,9 @@ import { MoneyAmount } from '../ui';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 import {
   formatPoolDateTime,
+  formatPoolDateTimeFull,
   getEffectiveResponsibleUserId,
+  getOrderReadyLabel,
   getSourceLabel,
 } from './orderPoolUtils';
 
@@ -40,6 +42,8 @@ const OrderCard = React.memo<{
     !isCancelled
     && (Number(order.status) === 0 || Number(order.status) === 1)
     && responsibleId !== currentUserId;
+  const readiness = getOrderReadyLabel(order);
+  const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
 
   return (
     <article
@@ -78,9 +82,14 @@ const OrderCard = React.memo<{
             ) : null}
             {isMine ? <span className="order-pool-card__tag is-mine">Мой</span> : null}
           </div>
-          <time className="order-pool-card__date" dateTime={order.created_at}>
-            {formatPoolDateTime(order.created_at)}
-          </time>
+          <div className="order-pool-card__dates">
+            <time className="order-pool-card__date" dateTime={createdAt} title="Дата оформления">
+              {formatPoolDateTime(createdAt)}
+            </time>
+            <span className="order-pool-card__ready" title={`Готовность: ${formatPoolDateTimeFull(readiness.readyAt?.toISOString())}`}>
+              до {readiness.readyAtLabel}
+            </span>
+          </div>
         </div>
 
         <div className="order-pool-card__client">

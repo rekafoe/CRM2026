@@ -10,10 +10,25 @@ describe('websiteOrderDelivery', () => {
       kind: 'pickup',
       providerId: 'pickup-dzerzhinsky-3b',
       label: 'Проспект Дзержинского 3б',
+      address: 'г. Минск, пр. Дзержинского 3б',
       cost: 0,
     })
     expect(d?.providerId).toBe('pickup-dzerzhinsky-3b')
     expect(formatWebsiteDeliverySummary(d!)).toContain('Самовывоз')
+    expect(formatWebsiteDeliverySummary(d!)).toContain('пр. Дзержинского 3б')
+  })
+
+  it('includes courier destination in summary', () => {
+    const d = parseWebsiteOrderDelivery({
+      kind: 'courier_minsk',
+      providerId: 'courier-minsk',
+      label: 'Доставка в пределах Минска',
+      address: 'ул. Независимости 10',
+      costLabel: 'от 10р',
+    })
+    const summary = formatWebsiteDeliverySummary(d!)
+    expect(summary).toContain('Курьер по Минску')
+    expect(summary).toContain('ул. Независимости 10')
   })
 
   it('rejects incomplete delivery', () => {

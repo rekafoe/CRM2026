@@ -42,6 +42,7 @@ import {
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
 } from '../components/orderPool';
+import { OrderDeliveryBlock } from '../components/orders/OrderDeliveryBlock';
 import '../styles/order-pool.css';
 
 const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
@@ -756,6 +757,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 );
               }}
             />
+
+            {selectedOrder.delivery ? (
+              <OrderDeliveryBlock delivery={selectedOrder.delivery} />
+            ) : null}
 
             {orderStatuses.length > 0 && (
               <details className="order-pool-collapsible">

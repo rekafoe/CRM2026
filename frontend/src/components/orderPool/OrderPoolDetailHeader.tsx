@@ -3,6 +3,7 @@ import { Order } from '../../types';
 import { StatusBadge } from '../common/StatusBadge';
 import { Button } from '../common/Button';
 import {
+  formatPoolDateTimeFull,
   getEffectiveResponsibleUserId,
   getOrderReadyLabel,
   getSourceLabel,
@@ -54,6 +55,8 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const showCancelled = order.is_cancelled === 1;
   const readiness = getOrderReadyLabel(order);
   const needsAssign = canReassign && responsibleId !== currentUserId;
+  const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
+  const createdLabel = formatPoolDateTimeFull(createdAt);
 
   return (
     <div className="order-pool-detail-header">
@@ -83,10 +86,15 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
               <span className="order-pool-detail-header__phone">—</span>
             )}
           </div>
-          <p className="order-pool-detail-header__readiness">
-            Срок готовности: <strong>{readiness.label}</strong>
-            {readiness.hint ? <span> · {readiness.hint}</span> : null}
-          </p>
+          <div className="order-pool-detail-header__dates">
+            <p className="order-pool-detail-header__date-row">
+              Оформлен: <strong>{createdLabel}</strong>
+            </p>
+            <p className="order-pool-detail-header__date-row order-pool-detail-header__readiness">
+              Готовность: <strong>{readiness.readyAtLabel}</strong>
+              {readiness.label ? <span className="order-pool-detail-header__ready-hint"> · {readiness.label}</span> : null}
+            </p>
+          </div>
         </div>
 
         {needsAssign && (

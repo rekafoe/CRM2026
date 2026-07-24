@@ -17,6 +17,7 @@ import { AppIcon } from './ui/AppIcon';
 import { OrderFileAccessLogsModal } from './OrderFileAccessLogsModal';
 import { PreflightReportModal } from './PreflightReportModal';
 import { getEditorItemSummary } from './order/editorItemSummary';
+import { sanitizeOrderItemDescription } from './order/orderItemUtils';
 import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 import './FilesModal.css';
 
@@ -32,8 +33,11 @@ interface FilesModalProps {
 }
 
 function getItemLabel(item: Item, index: number): string {
-  const desc = item.params?.description || item.type || '';
-  return desc ? `Позиция ${index + 1}: ${desc}` : `Позиция ${index + 1}`;
+  const raw = item.params?.description || item.type || '';
+  const cleaned = sanitizeOrderItemDescription(String(raw), item.type).trim();
+  const name = cleaned || item.type || `Позиция ${index + 1}`;
+  const short = name.length > 64 ? `${name.slice(0, 61)}…` : name;
+  return `${index + 1}. ${short}`;
 }
 
 function isExternalFile(file: OrderFile): boolean {
@@ -61,20 +65,17 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   onClose,
   orderId,
   orderNumber,
-  items = []
+  items = [],
 }) => {
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
-  /** К какой позиции привязать следующий загружаемый файл (null = общие) */
   const [selectedOrderItemId, setSelectedOrderItemId] = useState<number | null>(null);
-  /** Префлайт */
   const [preflightFile, setPreflightFile] = useState<{ id: number; name: string } | null>(null);
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightError, setPreflightError] = useState<string | null>(null);
-  /** Кэш результатов префлайта по fileId — для отображения статуса в списке */
   const [preflightCache, setPreflightCache] = useState<Record<number, PreflightReport>>({});
   const [isAdmin, setIsAdmin] = useState(false);
   const [accessLogFile, setAccessLogFile] = useState<{ id: number; name: string } | null>(null);
@@ -85,10 +86,9 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [editorActionLoading, setEditorActionLoading] = useState(false);
   const [editorActionError, setEditorActionError] = useState<string | null>(null);
 
-  // Загружаем файлы при открытии модального окна
   React.useEffect(() => {
     if (isOpen) {
-      loadFiles();
+      void loadFiles();
       void loadCurrentUserRole();
     }
   }, [isOpen, orderId]);
@@ -143,14 +143,13 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       const { data: newFile } = await uploadOrderFile(orderId, file, selectedOrderItemId ?? undefined);
       await loadFiles();
       if (input) input.value = '';
-      // Авто-префлайт для поддерживаемых типов (PDF, JPG, PNG, TIFF)
       const mime = (newFile?.mime ?? file.type ?? '').toLowerCase();
       if (newFile?.id && PREFLIGHT_MIME_TYPES.includes(mime)) {
         try {
           const res = await getPreflightReport(orderId, newFile.id);
           setPreflightCache((prev) => ({ ...prev, [newFile.id]: res.data }));
         } catch {
-          // Результат не кэшируем при ошибке — пользователь может запустить проверку вручную
+          /* manual preflight still available */
         }
       }
     } catch (error) {
@@ -163,7 +162,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
 
   const handleDownloadAll = async () => {
     if (isDownloadingAll) return;
-
     setIsDownloadingAll(true);
     try {
       await Promise.all(
@@ -173,8 +171,8 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               window.setTimeout(() => {
                 void handleDownloadFile(file).finally(resolve);
               }, index * 200);
-            })
-        )
+            }),
+        ),
       );
     } finally {
       setIsDownloadingAll(false);
@@ -193,25 +191,26 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       });
       return;
     }
-    await downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() => alert('Не удалось скачать файл'));
+    await downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() =>
+      alert('Не удалось скачать файл'),
+    );
   };
 
   const handleApproveFile = async (fileId: number) => {
     try {
       await approveOrderFile(orderId, fileId);
       await loadFiles();
-    } catch (error) {
+    } catch {
       alert('Не удалось утвердить файл');
     }
   };
 
   const handleDeleteFile = async (fileId: number) => {
     if (!confirm('Вы уверены, что хотите удалить этот файл?')) return;
-    
     try {
       await deleteOrderFile(orderId, fileId);
       await loadFiles();
-    } catch (error) {
+    } catch {
       alert('Не удалось удалить файл');
     }
   };
@@ -253,7 +252,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     setAccessLogsError(null);
   };
 
-  /** Статус префлайта для отображения в списке */
   const getPreflightStatus = (report: PreflightReport): 'ok' | 'warning' | 'error' => {
     const hasError = report.issues?.some((i) => i.severity === 'error') ?? false;
     const hasWarning = report.issues?.some((i) => i.severity === 'warning') ?? false;
@@ -274,18 +272,19 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     return PREFLIGHT_MIME_TYPES.includes(m);
   };
 
-  const approvedCount = files.filter(f => f.approved).length;
-  const totalCount = files.length;
-  const selectedOrderItem = selectedOrderItemId != null
-    ? items.find((item) => item.id === selectedOrderItemId)
-    : null;
+  const approvedCount = files.filter((f) => f.approved).length;
+  const pendingCount = files.length - approvedCount;
+  const selectedOrderItem =
+    selectedOrderItemId != null ? items.find((item) => item.id === selectedOrderItemId) : null;
   const selectedPhotoBatch = selectedOrderItem?.params?.photoBatch;
   const selectedPhotoBatchSummary = selectedPhotoBatch
     ? `${selectedPhotoBatch.totalFiles ?? 0} файлов · ${selectedPhotoBatch.totalQuantity ?? 0} отпечатков`
     : null;
   const selectedEditorSummary = selectedOrderItem ? getEditorItemSummary(selectedOrderItem) : null;
+  const canOpenEditorPreview = Boolean(
+    selectedOrderItem?.params.designState || selectedOrderItem?.params.photoBatch,
+  );
 
-  /** Группировка файлов по позиции заказа для отображения */
   const filesByItem = useMemo(() => {
     const map = new Map<number | null, OrderFile[]>();
     for (const f of files) {
@@ -296,244 +295,266 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     return map;
   }, [files]);
 
-  const renderFileList = (list: OrderFile[]) => (
-    list.map(file => {
+  const renderFileList = (list: OrderFile[]) =>
+    list.map((file) => {
       const cached = canPreflight(file) ? preflightCache[file.id] : null;
       const status = cached ? getPreflightStatus(cached) : null;
       const external = isExternalFile(file);
       const canDownload = !external || !file.externalStatus || file.externalStatus === 'ready';
       return (
-      <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'} ${external ? `file-item--external file-item--external-${file.externalStatus || 'unknown'}` : ''}`}>
-        <div className="file-info">
-          <div className="file-name">
-            <button type="button" className="file-name-link" onClick={() => handleDownloadFile(file)} title="Скачать">
+        <div
+          key={file.id}
+          className={`fm-file${file.approved ? ' fm-file--approved' : ''}${external ? ' fm-file--external' : ''}`}
+        >
+          <div className="fm-file__main">
+            <button
+              type="button"
+              className="fm-file__name"
+              onClick={() => void handleDownloadFile(file)}
+              title="Скачать"
+            >
               {file.originalName || file.filename}
             </button>
-            {external && (
-              <span className="file-storage-badge" title="Внешнее хранилище">
-                {file.externalProvider || file.storage}
-              </span>
-            )}
-            {file.artifactType && <span className="file-artifact-badge">{file.artifactType}</span>}
+            <div className="fm-file__meta">
+              <span>{formatFileSize(file.size)}</span>
+              {file.uploadedAt && (
+                <span>{new Date(file.uploadedAt).toLocaleDateString('ru-RU')}</span>
+              )}
+              {file.partNumber != null && <span>часть {file.partNumber}</span>}
+              {file.artifactType && <span className="fm-chip">{file.artifactType}</span>}
+              {external && (
+                <span className="fm-chip fm-chip--muted">
+                  {file.externalProvider || file.storage}
+                  {file.externalStatus ? ` · ${getExternalStatusLabel(file.externalStatus)}` : ''}
+                </span>
+              )}
+              {canPreflight(file) && (
+                <span
+                  className={`fm-chip fm-chip--preflight fm-chip--preflight-${status ?? 'none'}`}
+                  title={
+                    status === 'ok'
+                      ? 'Префлайт: ок'
+                      : status === 'warning'
+                        ? 'Префлайт: предупреждения'
+                        : status === 'error'
+                          ? 'Префлайт: ошибки'
+                          : 'Не проверен'
+                  }
+                >
+                  {status === 'ok' && 'Префлайт OK'}
+                  {status === 'warning' && 'Префлайт !'}
+                  {status === 'error' && 'Префлайт ✕'}
+                  {status === null && 'Префлайт'}
+                </span>
+              )}
+              {file.approved && <span className="fm-chip fm-chip--ok">Утверждён</span>}
+            </div>
+          </div>
+          <div className="fm-file__actions">
             {canPreflight(file) && (
-              <span
-                className={`file-preflight-status file-preflight-status--${status ?? 'none'}`}
-                title={
-                  status === 'ok'
-                    ? 'Префлайт: ок'
-                    : status === 'warning'
-                      ? 'Префлайт: есть предупреждения'
-                      : status === 'error'
-                        ? 'Префлайт: есть ошибки'
-                        : 'Нажмите щит для проверки'
-                }
+              <button
+                type="button"
+                className="fm-icon-btn"
+                onClick={() => void handlePreflight(file)}
+                title={cached ? 'Отчёт префлайта' : 'Проверить макет'}
               >
-                {status === 'ok' && <AppIcon name="check" size="xs" />}
-                {status === 'warning' && <span className="preflight-warning-icon" aria-label="предупреждение">!</span>}
-                {status === 'error' && <AppIcon name="ban" size="xs" />}
-                {status === null && <AppIcon name="shield" size="xs" />}
-              </span>
+                <AppIcon name="shield" size="xs" />
+              </button>
             )}
-          </div>
-          <div className="file-details">
-            <span className="file-size">{formatFileSize(file.size)}</span>
-            <span className="file-date">{file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString('ru-RU') : ''}</span>
-            {file.partNumber != null && <span>часть {file.partNumber}</span>}
-            {external && file.externalStatus && <span>{getExternalStatusLabel(file.externalStatus)}</span>}
+            <button
+              type="button"
+              className="fm-icon-btn"
+              onClick={() => void handleDownloadFile(file)}
+              title={canDownload ? 'Скачать' : 'Файл ещё не готов'}
+              disabled={!canDownload}
+            >
+              <AppIcon name="download" size="xs" />
+            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className="fm-icon-btn"
+                onClick={() => void handleAccessLogs(file)}
+                title="Журнал скачиваний"
+              >
+                <AppIcon name="folder" size="xs" />
+              </button>
+            )}
+            {!file.approved && (
+              <button
+                type="button"
+                className="fm-icon-btn fm-icon-btn--ok"
+                onClick={() => void handleApproveFile(file.id)}
+                title="Утвердить"
+              >
+                <AppIcon name="check" size="xs" />
+              </button>
+            )}
+            <button
+              type="button"
+              className="fm-icon-btn fm-icon-btn--danger"
+              onClick={() => void handleDeleteFile(file.id)}
+              title="Удалить"
+            >
+              <AppIcon name="x" size="xs" />
+            </button>
           </div>
         </div>
-        <div className="file-actions">
-          {canPreflight(file) && (
-            <button className="btn-preflight" onClick={() => handlePreflight(file)} title={cached ? 'Открыть отчёт префлайта' : 'Проверить макет (префлайт)'}>
-              <AppIcon name="shield" size="xs" />
-            </button>
-          )}
-          <button className="btn-download" onClick={() => handleDownloadFile(file)} title={canDownload ? 'Скачать файл' : 'Файл ещё не готов'} disabled={!canDownload}>
-            <AppIcon name="download" size="xs" />
-          </button>
-          {isAdmin && (
-            <button className="btn-access-log" onClick={() => handleAccessLogs(file)} title="Журнал скачиваний">
-              <AppIcon name="shield" size="xs" />
-            </button>
-          )}
-          {file.approved ? (
-            <span className="status-approved" title="Файл утвержден"><AppIcon name="check" size="sm" /></span>
-          ) : (
-            <button className="btn-approve" onClick={() => handleApproveFile(file.id)} title="Утвердить файл">
-              <AppIcon name="check" size="xs" />
-            </button>
-          )}
-          <button className="btn-delete" onClick={() => handleDeleteFile(file.id)} title="Удалить файл">
-            <AppIcon name="x" size="xs" />
-          </button>
-        </div>
-      </div>
       );
-    })
-  );
+    });
 
   if (!isOpen) return null;
 
   return (
     <div className="files-modal-overlay" onClick={onClose}>
       <div className="files-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Заголовок */}
-        <div className="files-modal-header">
-          <h3>
-            <AppIcon name="folder" size="sm" className="fm-title-icon" />
-            Файлы макетов — Заказ #{orderNumber}
-          </h3>
+        <header className="fm-header">
+          <div>
+            <h3>Файлы макетов</h3>
+            <p>Заказ #{orderNumber}</p>
+          </div>
           <button type="button" className="fm-btn-close" onClick={onClose} aria-label="Закрыть">
             <AppIcon name="x" size="sm" />
           </button>
-        </div>
+        </header>
 
-        {/* Статистика */}
-        <div className="files-stats">
-          <div className="stat-item">
-            <span className="stat-label">Всего файлов:</span>
-            <span className="stat-value">{totalCount}</span>
+        <div className="fm-toolbar">
+          <div className="fm-status">
+            <span className="fm-status-badge">{files.length} файлов</span>
+            {approvedCount > 0 && (
+              <span className="fm-status-badge fm-status-badge--ok">{approvedCount} утв.</span>
+            )}
+            {pendingCount > 0 && (
+              <span className="fm-status-badge fm-status-badge--pending">{pendingCount} ждут</span>
+            )}
           </div>
-          <div className="stat-item">
-            <span className="stat-label">Утверждено:</span>
-            <span className="stat-value approved">{approvedCount}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Ожидает:</span>
-            <span className="stat-value pending">{totalCount - approvedCount}</span>
-          </div>
-        </div>
 
-        {/* Действия */}
-        <div className="files-actions">
+          <span className="fm-toolbar-spacer" />
+
           {items.length > 0 && (
             <select
-              className="files-position-select"
+              className="fm-select"
               value={selectedOrderItemId ?? ''}
-              onChange={(e) => setSelectedOrderItemId(e.target.value === '' ? null : Number(e.target.value))}
-              title="К какой позиции заказа привязать загружаемый файл"
+              onChange={(e) =>
+                setSelectedOrderItemId(e.target.value === '' ? null : Number(e.target.value))
+              }
+              title="К какой позиции привязать загрузку"
             >
               <option value="">Общие (без привязки)</option>
               {items.map((it, i) => (
-                <option key={it.id} value={it.id}>{getItemLabel(it, i)}</option>
+                <option key={it.id} value={it.id}>
+                  {getItemLabel(it, i)}
+                </option>
               ))}
             </select>
           )}
+
           {files.length > 0 && (
-          <button
-            className={`btn-download-all ${isDownloadingAll ? 'is-downloading' : ''}`}
-            onClick={() => void handleDownloadAll()}
-            disabled={isDownloadingAll}
-            aria-busy={isDownloadingAll}
-          >
-            {isDownloadingAll ? (
-              <>
-                <span className="fm-download-all-spinner" aria-hidden="true" />
-                Скачиваются...
-              </>
-            ) : (
-              <>
-                <AppIcon name="download" size="xs" />
-                Скачать все файлы
-              </>
-            )}
-          </button>
+            <button
+              type="button"
+              className="fm-btn fm-btn--secondary"
+              onClick={() => void handleDownloadAll()}
+              disabled={isDownloadingAll}
+              aria-busy={isDownloadingAll}
+            >
+              {isDownloadingAll ? (
+                <>
+                  <span className="fm-spinner" aria-hidden />
+                  Скачиваем…
+                </>
+              ) : (
+                <>
+                  <AppIcon name="download" size="xs" />
+                  Скачать все
+                </>
+              )}
+            </button>
           )}
-          <label className={`btn-upload ${isUploading ? 'is-uploading' : ''}`}>
-            <input 
-              type="file" 
-              onChange={handleFileUpload}
+
+          <label className={`fm-btn fm-btn--primary${isUploading ? ' is-busy' : ''}`}>
+            <input
+              type="file"
+              onChange={(e) => void handleFileUpload(e)}
               disabled={isUploading}
-              style={{ display: 'none' }}
+              className="fm-file-input"
             />
             {isUploading ? (
-              <><AppIcon name="refresh" size="xs" /> Загрузка...</>
+              <>
+                <AppIcon name="refresh" size="xs" /> Загрузка…
+              </>
             ) : (
-              <>Загрузить файл</>
+              <>Загрузить</>
             )}
           </label>
-          {selectedPhotoBatchSummary && (
-            <span className="files-photo-batch-summary">{selectedPhotoBatchSummary}</span>
-          )}
         </div>
+
         {selectedOrderItem && selectedEditorSummary && (
-          <div className={`files-editor-summary files-editor-summary--${selectedEditorSummary.kind}`}>
-            <div className="files-editor-summary__main">
+          <div className={`fm-editor-bar fm-editor-bar--${selectedEditorSummary.kind}`}>
+            <div className="fm-editor-bar__text">
               <strong>{selectedEditorSummary.label}</strong>
               <span>{selectedEditorSummary.detail}</span>
+              {selectedPhotoBatchSummary && <span>· {selectedPhotoBatchSummary}</span>}
             </div>
-            <div className="files-editor-summary__meta">
-              {(selectedOrderItem.params.designState || selectedOrderItem.params.photoBatch) && (
+            <div className="fm-editor-bar__actions">
+              {canOpenEditorPreview && (
                 <button
                   type="button"
-                  className="files-editor-summary__preview"
+                  className="fm-btn fm-btn--ghost"
                   onClick={() => setPreviewItem(selectedOrderItem)}
                 >
-                  Открыть preview
+                  Preview
                 </button>
               )}
-              {(selectedOrderItem.params.designState || selectedOrderItem.params.photoBatch) && (
+              {canOpenEditorPreview && (
                 <button
                   type="button"
-                  className="files-editor-summary__preview"
+                  className="fm-btn fm-btn--ghost"
                   onClick={() => void handleDownloadProductionManifest(selectedOrderItem)}
                   disabled={editorActionLoading}
                 >
-                  Production manifest
+                  Manifest
                 </button>
               )}
-              {selectedOrderItem.params.editorDraftToken && (
-                <span title={selectedOrderItem.params.editorDraftToken}>
-                  Draft: {selectedOrderItem.params.editorDraftToken.slice(0, 12)}…
-                </span>
-              )}
-              {selectedOrderItem.params.designTemplateId != null && (
-                <span>Template ID: {selectedOrderItem.params.designTemplateId}</span>
-              )}
-              {selectedOrderItem.params.editorDraftMode && (
-                <span>Mode: {selectedOrderItem.params.editorDraftMode}</span>
-              )}
             </div>
-          </div>
-        )}
-        {editorActionError && (
-          <div className="files-editor-action-error">
-            {editorActionError}
           </div>
         )}
 
-        {/* Список файлов */}
-        <div className="files-content">
+        {editorActionError && <div className="fm-error">{editorActionError}</div>}
+
+        <div className="fm-body">
           {isLoading ? (
-            <div className="loading">Загрузка файлов...</div>
+            <div className="fm-empty">Загрузка файлов…</div>
           ) : files.length === 0 ? (
-            <div className="no-files">
-              <div className="no-files-icon">
-                <AppIcon name="document" size="xl" />
-              </div>
-              <div className="no-files-text">Файлы не загружены</div>
-              <div className="no-files-hint">Загрузите макеты для этого заказа</div>
+            <div className="fm-empty">
+              <AppIcon name="document" size="xl" />
+              <strong>Файлов пока нет</strong>
+              <span>Загрузите макет или дождитесь файлов с сайта</span>
             </div>
           ) : (
-            <div className="files-list">
+            <div className="fm-list">
               {filesByItem.has(null) && (
-                <div className="files-group">
-                  <div className="files-group-title">Общие (без привязки к позиции)</div>
+                <section className="fm-group">
+                  <h4 className="fm-group__title">Общие</h4>
                   {renderFileList(filesByItem.get(null)!)}
-                </div>
+                </section>
               )}
-              {items.map((it, i) => filesByItem.has(it.id) && (
-                <div key={it.id} className="files-group">
-                  <div className="files-group-title">{getItemLabel(it, i)}</div>
-                  {renderFileList(filesByItem.get(it.id)!)}
-                </div>
-              ))}
-              {Array.from(filesByItem.entries()).filter(([k]) => k !== null && !items.some(i => i.id === k)).map(([itemId, list]) => (
-                <div key={`item-${itemId}`} className="files-group">
-                  <div className="files-group-title">Позиция (ID {itemId})</div>
-                  {renderFileList(list)}
-                </div>
-              ))}
+              {items.map(
+                (it, i) =>
+                  filesByItem.has(it.id) && (
+                    <section key={it.id} className="fm-group">
+                      <h4 className="fm-group__title">{getItemLabel(it, i)}</h4>
+                      {renderFileList(filesByItem.get(it.id)!)}
+                    </section>
+                  ),
+              )}
+              {Array.from(filesByItem.entries())
+                .filter(([k]) => k !== null && !items.some((i) => i.id === k))
+                .map(([itemId, list]) => (
+                  <section key={`item-${itemId}`} className="fm-group">
+                    <h4 className="fm-group__title">Позиция #{itemId}</h4>
+                    {renderFileList(list)}
+                  </section>
+                ))}
             </div>
           )}
         </div>

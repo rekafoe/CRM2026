@@ -21,14 +21,37 @@ function formatCost(delivery: WebsiteOrderDelivery): string | null {
   return delivery.costLabel ?? null;
 }
 
+function addressLabel(kind: string): string {
+  if (kind === 'pickup') return 'Точка самовывоза';
+  if (kind === 'pickup_point') return 'Пункт выдачи';
+  if (kind === 'courier_minsk' || kind === 'courier_country') return 'Куда доставить';
+  return 'Адрес';
+}
+
+/** Для самовывоза адрес часто лежит в label; для доставки — в address. */
+function resolveLocation(delivery: WebsiteOrderDelivery): string | null {
+  const address = typeof delivery.address === 'string' ? delivery.address.trim() : '';
+  if (address) return address;
+  if (delivery.kind === 'pickup' && delivery.label?.trim()) {
+    return delivery.label.trim();
+  }
+  return null;
+}
+
 export function OrderDeliveryBlock({ delivery, compact }: Props) {
   const kindLabel = KIND_LABELS[delivery.kind] ?? delivery.kind;
   const cost = formatCost(delivery);
+  const location = resolveLocation(delivery);
+  const showVariant =
+    delivery.kind !== 'pickup'
+    && Boolean(delivery.label?.trim())
+    && delivery.label.trim() !== location;
 
   if (compact) {
     return (
       <span className="order-delivery-block order-delivery-block--compact">
-        {kindLabel}: {delivery.label}
+        {kindLabel}
+        {location ? `: ${location}` : delivery.label ? `: ${delivery.label}` : ''}
         {cost ? ` (${cost})` : ''}
       </span>
     );
@@ -36,26 +59,28 @@ export function OrderDeliveryBlock({ delivery, compact }: Props) {
 
   return (
     <div className="order-delivery-block">
-      <div className="order-delivery-block__title">Способ получения</div>
+      <div className="order-delivery-block__title">Получение</div>
       <dl className="order-delivery-block__list">
         <div className="order-delivery-block__row">
-          <dt>Тип</dt>
+          <dt>Способ</dt>
           <dd>{kindLabel}</dd>
         </div>
-        <div className="order-delivery-block__row">
-          <dt>Вариант</dt>
-          <dd>{delivery.label}</dd>
-        </div>
-        {delivery.description ? (
+        {showVariant ? (
           <div className="order-delivery-block__row">
-            <dt>Описание</dt>
-            <dd>{delivery.description}</dd>
+            <dt>Вариант</dt>
+            <dd>{delivery.label}</dd>
           </div>
         ) : null}
-        {delivery.address ? (
+        {location ? (
+          <div className="order-delivery-block__row order-delivery-block__row--emphasis">
+            <dt>{addressLabel(delivery.kind)}</dt>
+            <dd>{location}</dd>
+          </div>
+        ) : null}
+        {delivery.description ? (
           <div className="order-delivery-block__row">
-            <dt>Адрес</dt>
-            <dd>{delivery.address}</dd>
+            <dt>Комментарий</dt>
+            <dd>{delivery.description}</dd>
           </div>
         ) : null}
         {cost ? (
@@ -64,12 +89,6 @@ export function OrderDeliveryBlock({ delivery, compact }: Props) {
             <dd>{cost}</dd>
           </div>
         ) : null}
-        <div className="order-delivery-block__row order-delivery-block__row--muted">
-          <dt>ID на сайте</dt>
-          <dd>
-            <code>{delivery.providerId}</code>
-          </dd>
-        </div>
       </dl>
     </div>
   );

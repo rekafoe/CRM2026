@@ -446,11 +446,26 @@
   color: #991b1b;
 }
 
-.order-pool-card__date {
+.order-pool-card__dates {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   flex-shrink: 0;
+  text-align: right;
+}
+
+.order-pool-card__date {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted, #6c757d);
+  white-space: nowrap;
+}
+
+.order-pool-card__ready {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary, #495057);
   white-space: nowrap;
 }
 
@@ -945,14 +960,31 @@
   text-decoration: underline;
 }
 
-.order-pool-detail-header__readiness {
+.order-pool-detail-header__dates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.order-pool-detail-header__date-row {
   margin: 0;
   font-size: 13px;
   color: var(--text-secondary, #495057);
 }
 
-.order-pool-detail-header__readiness strong {
+.order-pool-detail-header__date-row strong {
   color: var(--text-primary, #212529);
+  font-weight: 700;
+}
+
+.order-pool-detail-header__readiness {
+  margin: 0;
+}
+
+.order-pool-detail-header__ready-hint {
+  font-weight: 500;
+  color: var(--text-muted, #6c757d);
 }
 
 .order-pool-detail-header__take-primary {
@@ -964,35 +996,58 @@
 }
 
 .order-detail-payment {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0 0 16px;
-  padding: 14px 16px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  max-width: 100%;
+  width: fit-content;
+  margin: 0 0 14px;
+  padding: 8px 10px;
   background: var(--bg-secondary, #f8f9fa);
   border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
-.order-detail-payment__row {
-  display: flex;
+.order-detail-payment__chips {
+  display: inline-flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 16px;
+  align-items: stretch;
+  gap: 0;
+}
+
+.order-detail-payment__chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 12px;
+  border-right: 1px solid var(--border-light, #e9ecef);
+}
+
+.order-detail-payment__chip:first-child {
+  padding-left: 2px;
+}
+
+.order-detail-payment__chip:last-child {
+  border-right: 0;
+  padding-right: 2px;
 }
 
 .order-detail-payment__label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--text-muted, #6c757d);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  line-height: 1.2;
 }
 
 .order-detail-payment__badge {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .order-detail-payment__badge--paid {
@@ -1013,17 +1068,25 @@
 }
 
 .order-detail-payment__value {
-  display: flex;
+  display: inline-flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 6px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary, #212529);
+  line-height: 1.25;
 }
 
 .order-detail-payment__value small {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted, #6c757d);
+}
+
+.order-detail-payment__debt {
+  font-size: 13px;
+  line-height: 1.25;
 }
 
 .order-detail-payment__debt.is-due {
@@ -1037,24 +1100,44 @@
 }
 
 .order-detail-payment__url {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-color, #dee2e6);
+  gap: 6px 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-light, #e9ecef);
 }
 
 .order-detail-payment__url a {
   color: var(--accent-primary, #6c8eb8);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  word-break: break-all;
+  white-space: nowrap;
 }
 
 .order-detail-payment__copy {
   flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .order-detail-payment {
+    width: 100%;
+  }
+
+  .order-detail-payment__chips {
+    width: 100%;
+  }
+
+  .order-detail-payment__chip {
+    flex: 1 1 auto;
+  }
+
+  .order-detail-payment__url {
+    width: 100%;
+    padding: 6px 2px 0;
+    border-left: 0;
+    border-top: 1px solid var(--border-light, #e9ecef);
+  }
 }
 
 .order-pool-collapsible {
