@@ -10,12 +10,14 @@ import {
   cancelOnlineOrder,
   deleteOrder,
   getUsers,
+  getDepartments,
   createPrepaymentLink,
   issueOrder,
   getOperatorsToday,
   updateOrderItem,
   getOrderActivity,
   updateOrderNotes,
+  type Department,
 } from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
@@ -74,6 +76,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [poolDepartmentId, setPoolDepartmentId] = useState<number | ''>('');
   const [orderActivity, setOrderActivity] = useState<OrderActivityEvent[]>([]);
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -129,9 +133,17 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         } else {
           setLoading(true);
         }
+        const deptParam =
+          poolDepartmentId === '' ? undefined : { department_id: poolDepartmentId };
         const res = canSearch
-          ? await api.get<Order[]>('/orders/search', { params: { all: '1', light: '1', query, limit: '100' } })
-          : await getOrders({ all: true, poolActiveOnly: options.activeOnly ?? true });
+          ? await api.get<Order[]>('/orders/search', {
+              params: { all: '1', light: '1', query, limit: '100', ...deptParam },
+            })
+          : await getOrders({
+              all: true,
+              poolActiveOnly: options.activeOnly ?? true,
+              ...deptParam,
+            });
         if (requestSeq !== searchRequestSeqRef.current) return;
         const list = res.data as Order[];
         orderIdsRef.current = new Set(list.map((o) => o.id));
@@ -155,12 +167,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         }
       }
     },
-    [logger],
+    [logger, poolDepartmentId],
   );
 
   const refreshOrdersInBackground = useCallback(async () => {
     try {
-      const res = await getOrders({ all: true, poolActiveOnly: true });
+      const deptParam =
+        poolDepartmentId === '' ? undefined : { department_id: poolDepartmentId };
+      const res = await getOrders({ all: true, poolActiveOnly: true, ...deptParam });
       const list = res.data as Order[];
       const prevIds = orderIdsRef.current;
       const newCount = list.filter((o) => !prevIds.has(o.id)).length;
@@ -177,7 +191,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     } catch (err) {
       logger.error('Background refresh orders failed', err);
     }
-  }, [logger, toast]);
+  }, [logger, toast, poolDepartmentId]);
 
   useEffect(() => {
     if (isInitialized) return;
@@ -185,7 +199,15 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     getUsers()
       .then((res) => setAllUsers(res.data))
       .catch((err) => logger.error('Failed to load users', err));
+    getDepartments()
+      .then((res) => setDepartments(res.data ?? []))
+      .catch(() => setDepartments([]));
   }, [isInitialized, loadOrders, logger]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    void loadOrders({ activeOnly: true, soft: true });
+  }, [poolDepartmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const today = useMemo(() => {
     const d = new Date();
@@ -680,6 +702,26 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           counts={filterCounts}
         />
 
+        {departments.length > 0 ? (
+          <label className="order-pool-department-filter">
+            Точка
+            <select
+              value={poolDepartmentId === '' ? '' : String(poolDepartmentId)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPoolDepartmentId(v === '' ? '' : Number(v));
+              }}
+            >
+              <option value="">Все точки</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <OrderPoolList
           orders={visibleOrders}
           selectedOrderId={selectedOrder?.id}
@@ -758,8 +800,20 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               }}
             />
 
-            {selectedOrder.delivery ? (
-              <OrderDeliveryBlock delivery={selectedOrder.delivery} />
+            {selectedOrder.fulfillment_department_name || selectedOrder.delivery ? (
+              <div className="order-pool-fulfillment">
+                {selectedOrder.fulfillment_department_name ? (
+                  <div className="order-pool-fulfillment__point">
+                    Точка: <strong>{selectedOrder.fulfillment_department_name}</strong>
+                    {selectedOrder.fulfillment_department_code
+                      ? ` (${selectedOrder.fulfillment_department_code})`
+                      : ''}
+                  </div>
+                ) : null}
+                {selectedOrder.delivery ? (
+                  <OrderDeliveryBlock delivery={selectedOrder.delivery} />
+                ) : null}
+              </div>
             ) : null}
 
             {orderStatuses.length > 0 && (

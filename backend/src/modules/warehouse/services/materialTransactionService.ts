@@ -70,26 +70,60 @@ export class MaterialTransactionService {
       materialId
     );
 
+    const { getDefaultWarehouseId } = await import('./warehouseStock')
+    const warehouseId = await getDefaultWarehouseId()
+    if (warehouseId != null) {
+      await db.run(
+        `INSERT INTO material_stock (material_id, warehouse_id, quantity)
+         VALUES (?, ?, ?)
+         ON CONFLICT(material_id, warehouse_id) DO UPDATE SET quantity = excluded.quantity`,
+        [materialId, warehouseId, newQuantity]
+      ).catch(() => {})
+    }
+
     // Запись движения
     const delta = -roundedQty;
-    await db.run(
-      `INSERT INTO material_moves (
-        material_id,
-        type,
-        quantity,
+    let hasWarehouseCol = false
+    try {
+      const { hasColumn } = await import('../../../utils/tableSchemaCache')
+      hasWarehouseCol = await hasColumn('material_moves', 'warehouse_id')
+    } catch {
+      hasWarehouseCol = false
+    }
+    if (hasWarehouseCol && warehouseId != null) {
+      await db.run(
+        `INSERT INTO material_moves (
+          material_id, type, quantity, delta, reason, order_id, user_id, warehouse_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        materialId,
+        'spend',
+        roundedQty,
         delta,
         reason,
-        order_id,
-        user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      materialId,
-      'spend',
-      roundedQty,
-      delta,
-      reason,
-      orderId ?? null,
-      userId ?? null
-    );
+        orderId ?? null,
+        userId ?? null,
+        warehouseId
+      )
+    } else {
+      await db.run(
+        `INSERT INTO material_moves (
+          material_id,
+          type,
+          quantity,
+          delta,
+          reason,
+          order_id,
+          user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        materialId,
+        'spend',
+        roundedQty,
+        delta,
+        reason,
+        orderId ?? null,
+        userId ?? null
+      )
+    }
 
     logger.info('Материал списан', {
       materialId,

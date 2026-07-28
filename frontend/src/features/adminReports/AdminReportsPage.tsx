@@ -7,6 +7,8 @@ import { OrderStatusAnalytics } from './components/OrderStatusAnalytics';
 import { ManagerAnalytics } from './components/ManagerAnalytics';
 import { MaterialsAnalytics } from './components/MaterialsAnalytics';
 import { TimeAnalytics } from './components/TimeAnalytics';
+import { LocationRevenueAnalytics } from './components/LocationRevenueAnalytics';
+import { PnLAnalytics } from './components/PnLAnalytics';
 import { AnalyticsTab } from './types';
 import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getYearlyRevenue, getDepartments, updateReasonPresetsSettings, type Department } from '../../api';
 import { Button } from '../../components/common';
@@ -52,6 +54,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     managerData,
     materialsData,
     timeData,
+    locationRevenueData,
+    pnlData,
     isLoading,
     period,
     dateFrom,
@@ -59,11 +63,15 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     periodParams,
     activeTab,
     departmentId,
+    includePayroll,
+    includeCogs,
     loadAnalytics,
     setActiveTab,
     setPeriod,
     setDateRange,
     setDepartmentId,
+    setIncludePayroll,
+    setIncludeCogs,
     refreshAnalytics,
     hasData,
     totalStats
@@ -237,32 +245,40 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
 
   const handleTabChange = (tab: AnalyticsTab) => {
     setActiveTab(tab);
-    loadAnalytics(tab, periodParams, departmentId);
+    loadAnalytics(tab, periodParams, departmentId, { includePayroll, includeCogs });
   };
 
   const handlePeriodChange = (newPeriod: number) => {
     setPeriod(newPeriod);
     setDateRange(undefined, undefined);
-    loadAnalytics(activeTab, { period: newPeriod }, departmentId);
+    loadAnalytics(activeTab, { period: newPeriod }, departmentId, { includePayroll, includeCogs });
   };
 
   const handleDepartmentChange = (newDeptId: number | '') => {
     const id = newDeptId === '' ? undefined : newDeptId;
     setDepartmentId(id);
-    loadAnalytics(activeTab, periodParams, id);
+    loadAnalytics(activeTab, periodParams, id, { includePayroll, includeCogs });
     void loadDashboardSettings(id);
   };
 
   const handleDateRangeChange = (from: string, to: string) => {
     setDateRange(from || undefined, to || undefined);
     if (from && to) {
-      loadAnalytics(activeTab, { period, dateFrom: from, dateTo: to }, departmentId);
+      loadAnalytics(activeTab, { period, dateFrom: from, dateTo: to }, departmentId, { includePayroll, includeCogs });
     }
   };
 
   const clearDateRange = () => {
     setDateRange(undefined, undefined);
-    loadAnalytics(activeTab, { period }, departmentId);
+    loadAnalytics(activeTab, { period }, departmentId, { includePayroll, includeCogs });
+  };
+
+  const handlePnLToggle = (next: { includePayroll?: boolean; includeCogs?: boolean }) => {
+    const payroll = next.includePayroll ?? includePayroll;
+    const cogs = next.includeCogs ?? includeCogs;
+    if (next.includePayroll !== undefined) setIncludePayroll(next.includePayroll);
+    if (next.includeCogs !== undefined) setIncludeCogs(next.includeCogs);
+    loadAnalytics('pnl', periodParams, departmentId, { includePayroll: payroll, includeCogs: cogs });
   };
 
   const handleExportJSON = () => {
@@ -412,7 +428,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   const handleAlertNavigate = (tab?: AnalyticsTab) => {
     if (!tab) return;
     setActiveTab(tab);
-    loadAnalytics(tab, periodParams, departmentId);
+    loadAnalytics(tab, periodParams, departmentId, { includePayroll, includeCogs });
   };
 
   useEffect(() => {
@@ -1161,18 +1177,41 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             </div>
           </div>
           <div className="reports-filter-group">
-            <label className="reports-filter-label">Департамент</label>
+            <label className="reports-filter-label">Департамент / точка</label>
             <select
               value={departmentId ?? ''}
               onChange={(e) => handleDepartmentChange(e.target.value === '' ? '' : Number(e.target.value))}
               className="reports-filter-input"
             >
-              <option value="">Все департаменты</option>
+              <option value="">Все точки</option>
               {departments.map(d => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
           </div>
+          {activeTab === 'pnl' && (
+            <div className="reports-filter-group">
+              <label className="reports-filter-label">P&L опции</label>
+              <div className="reports-auto-refresh">
+                <label className="reports-auto-refresh__toggle">
+                  <input
+                    type="checkbox"
+                    checked={includePayroll}
+                    onChange={(e) => handlePnLToggle({ includePayroll: e.target.checked })}
+                  />
+                  ФОТ
+                </label>
+                <label className="reports-auto-refresh__toggle">
+                  <input
+                    type="checkbox"
+                    checked={includeCogs}
+                    onChange={(e) => handlePnLToggle({ includeCogs: e.target.checked })}
+                  />
+                  Себестоимость
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1180,6 +1219,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
       <div className="reports-tabs">
         {[
           { key: 'overview', label: 'Обзор', iconName: 'chart' as const },
+          { key: 'locations', label: 'По точкам', iconName: 'building' as const },
+          { key: 'pnl', label: 'P&L', iconName: 'chart-bar' as const },
           { key: 'managers', label: 'Менеджеры', iconName: 'users' as const },
           { key: 'materials', label: 'Материалы', iconName: 'package' as const },
           { key: 'time', label: 'Время', iconName: 'clock' as const }
@@ -1223,6 +1264,24 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             )
           )}
           {activeTab === 'time' && timeData && <TimeAnalytics data={timeData} />}
+          {activeTab === 'locations' && (
+            locationRevenueData ? (
+              <LocationRevenueAnalytics data={locationRevenueData} />
+            ) : (
+              <div className="reports-empty">
+                {isLoading ? 'Загрузка выручки по точкам...' : 'Нет данных по точкам'}
+              </div>
+            )
+          )}
+          {activeTab === 'pnl' && (
+            pnlData ? (
+              <PnLAnalytics data={pnlData} includePayroll={includePayroll} includeCogs={includeCogs} />
+            ) : (
+              <div className="reports-empty">
+                {isLoading ? 'Загрузка P&L...' : 'Нет данных P&L'}
+              </div>
+            )
+          )}
         </div>
       ) : (
         <div className="reports-empty">

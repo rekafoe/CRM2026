@@ -244,7 +244,47 @@ export interface TimeAnalyticsData {
 }
 
 // === ОБЩИЕ ТИПЫ ===
-export type AnalyticsTab = 'overview' | 'managers' | 'materials' | 'time';
+export type AnalyticsTab = 'overview' | 'managers' | 'materials' | 'time' | 'locations' | 'pnl';
+
+export interface LocationRevenueItem {
+  department_id: number;
+  name: string;
+  orders?: number;
+  revenue: number;
+}
+
+export interface LocationRevenueData {
+  period: { startDate: string; endDate?: string };
+  locations: LocationRevenueItem[];
+  unassigned: number;
+  company_total: number;
+  by_month?: Array<{ month: string; orders: number; revenue: number }>;
+}
+
+export interface PnLLocationItem {
+  department_id: number;
+  name: string;
+  revenue: number;
+  expenses: number;
+  payroll?: number;
+  cogs?: number;
+  result: number;
+}
+
+export interface PnLData {
+  period: { startDate: string; endDate?: string };
+  department_id: number | null;
+  locations: PnLLocationItem[];
+  company_wide: { expenses: number; payroll?: number; cogs?: number };
+  unassigned_revenue: number;
+  totals: {
+    revenue: number;
+    expenses: number;
+    payroll?: number;
+    cogs?: number;
+    result: number;
+  };
+}
 
 export interface AnalyticsState {
   productData: ProductAnalyticsData | null;
@@ -253,10 +293,14 @@ export interface AnalyticsState {
   managerData: ManagerAnalyticsData | null;
   materialsData: MaterialsAnalyticsData | null;
   timeData: TimeAnalyticsData | null;
+  locationRevenueData: LocationRevenueData | null;
+  pnlData: PnLData | null;
   isLoading: boolean;
   period: number;
   dateFrom?: string;
   dateTo?: string;
   activeTab: AnalyticsTab;
   departmentId?: number;
+  includePayroll: boolean;
+  includeCogs: boolean;
 }

@@ -74,6 +74,9 @@ const DesignFontsPage = lazy(() =>
 const DesignEditorPage = lazy(() =>
   import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
 );
+const ExpensesPage = lazy(() =>
+  import('../features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage }))
+);
 
 const DESIGN_TEMPLATES_CATALOG = '/adminpanel/design-templates';
 
@@ -157,6 +160,9 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/reports')} className="nav-btn">
             <AppIcon name="chart" size="xs" /> Отчеты
           </button>
+          <button onClick={() => navigate('/adminpanel/expenses')} className="nav-btn">
+            <AppIcon name="receipt" size="xs" /> Расходы
+          </button>
           <button onClick={() => navigate('/adminpanel/products')} className="nav-btn">
             <AppIcon name="puzzle" size="xs" /> Продукты калькулятора
           </button>
@@ -237,6 +243,15 @@ const AdminPanelHome: React.FC = () => {
               <span className="link-icon"><AppIcon name="chart" size="md" circle /></span>
               <span className="link-title">Отчеты</span>
               <span className="link-desc">Аналитика и отчеты</span>
+            </button>
+
+            <button
+              className="admin-link-card"
+              onClick={() => navigate('/adminpanel/expenses')}
+            >
+              <span className="link-icon"><AppIcon name="receipt" size="md" circle /></span>
+              <span className="link-title">Расходы</span>
+              <span className="link-desc">Операционные расходы по департаментам</span>
             </button>
             
             <button 
@@ -369,6 +384,7 @@ export const AdminPanelPage: React.FC = () => {
           
           {/* Оригинальные админ страницы */}
           <Route path="/reports" element={<AdminReportsPage />} />
+          <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/daily-reports" element={<AdminReportsPage />} />
           <Route path="/analytics" element={<ReportsPage />} />
           

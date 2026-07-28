@@ -55,6 +55,12 @@ export class OrderController {
       const issuedOn = (req as any).query?.issued_on as string | undefined
       const all = (req as any).query?.all === '1' || (req as any).query?.all === true
       const poolActiveOnly = (req as any).query?.poolActiveOnly === '1' || (req as any).query?.poolActiveOnly === true
+      const departmentIdRaw = (req as any).query?.department_id
+      const departmentId =
+        departmentIdRaw != null && departmentIdRaw !== ''
+          ? parseInt(String(departmentIdRaw), 10)
+          : undefined
+      const scopedDepartmentId = Number.isFinite(departmentId) ? departmentId : undefined
       if (issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(issuedOn.slice(0, 10))) {
         const orders = all
           ? await OrderService.getOrdersIssuedOnAll(issuedOn)
@@ -64,7 +70,10 @@ export class OrderController {
       }
       // all=1: страница Order Pool — все пользователи (не только админ) видят заказы всех
       const orders = all
-        ? await OrderService.getAllOrdersForPool({ activeOnly: poolActiveOnly })
+        ? await OrderService.getAllOrdersForPool({
+            activeOnly: poolActiveOnly,
+            departmentId: scopedDepartmentId,
+          })
         : await OrderService.getAllOrders(authUser.id)
       res.json(orders)
     } catch (error: any) {
@@ -111,7 +120,7 @@ export class OrderController {
   static async createOrder(req: Request, res: Response) {
     try {
       const authUser = (req as any).user as { id: number } | undefined
-      const { customerName, customerPhone, customerEmail, prepaymentAmount, date, customer_id, payment_channel } = req.body || {}
+      const { customerName, customerPhone, customerEmail, prepaymentAmount, date, customer_id, payment_channel, fulfillment_department_id } = req.body || {}
       
       const order = await OrderService.createOrder(
         customerName,
@@ -124,6 +133,10 @@ export class OrderController {
         customer_id,
         payment_channel
       )
+      if (fulfillment_department_id != null && Number.isFinite(Number(fulfillment_department_id))) {
+        await OrderService.setFulfillmentDepartmentId(order.id, Number(fulfillment_department_id))
+        ;(order as any).fulfillment_department_id = Number(fulfillment_department_id)
+      }
       
       res.status(201).json(order)
     } catch (error: any) {

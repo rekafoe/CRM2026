@@ -9,13 +9,17 @@ import { SQL_ITEMS_SUBTOTAL_BY_ORDER } from '../utils/orderAmountsSql'
 
 function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(order: T): T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> } {
   const delivery = parseWebsiteOrderDeliveryJson(order.delivery_json ?? null)
-  if (!delivery) return order
+  if (!delivery) {
+    const { delivery_json: _dj, ...rest } = order as T & { delivery_json?: string | null }
+    return rest as T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> }
+  }
   const { delivery_json: _dj, ...rest } = order
   return { ...rest, delivery } as T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> }
 }
 
 type ListAllOrdersOptions = {
   statuses?: number[]
+  departmentId?: number
 }
 
 /** Имя колонки принтера в items (на проде может быть printer_id). Кэш на время жизни процесса. */
@@ -384,6 +388,7 @@ export const OrderRepository = {
     let hasContactUserId = false
     let hasResponsibleUserId = false
     let hasDeliveryJson = false
+    let hasFulfillmentDept = false
     try {
       hasIsCancelled = await hasColumn('orders', 'is_cancelled')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
@@ -392,6 +397,7 @@ export const OrderRepository = {
       hasContactUserId = await hasColumn('orders', 'contact_user_id')
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
       hasDeliveryJson = await hasColumn('orders', 'delivery_json')
+      hasFulfillmentDept = await hasColumn('orders', 'fulfillment_department_id')
     } catch { /* ignore */ }
     const isCancelledSel = hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'
     const paymentChannelSel = hasPaymentChannel
@@ -401,12 +407,22 @@ export const OrderRepository = {
     const deliverySel = hasDeliveryJson ? 'o.delivery_json' : 'NULL as delivery_json'
     const contactUserIdSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
     const responsibleUserIdSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
+    const fulfillmentSel = hasFulfillmentDept
+      ? `o.fulfillment_department_id, d.name as fulfillment_department_name, d.code as fulfillment_department_code`
+      : `NULL as fulfillment_department_id, NULL as fulfillment_department_name, NULL as fulfillment_department_code`
+    const deptJoin = hasFulfillmentDept ? 'LEFT JOIN departments d ON d.id = o.fulfillment_department_id' : ''
     const whereParts: string[] = []
     const queryParams: number[] = []
     if (options.statuses?.length) {
       const placeholders = options.statuses.map(() => '?').join(',')
       whereParts.push(`CAST(o.status AS INTEGER) IN (${placeholders})`)
       queryParams.push(...options.statuses)
+    }
+    if (options.departmentId != null && Number.isFinite(options.departmentId) && hasFulfillmentDept) {
+      whereParts.push(
+        `(o.fulfillment_department_id = ? OR (o.fulfillment_department_id IS NULL AND o.userId IN (SELECT id FROM users WHERE department_id = ?)))`
+      )
+      queryParams.push(options.departmentId, options.departmentId)
     }
     const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
     const orders = await db.all<any>(
@@ -421,6 +437,7 @@ export const OrderRepository = {
         ${paymentChannelSel},
         ${notesSel},
         ${deliverySel},
+        ${fulfillmentSel},
         ${isCancelledSel},
         c.id as customer__id,
         c.first_name as customer__first_name,
@@ -433,6 +450,7 @@ export const OrderRepository = {
         c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
+      ${deptJoin}
       ${whereClause}
       ORDER BY o.id DESC`,
       ...queryParams
@@ -484,6 +502,15 @@ export const OrderRepository = {
 
   async listAssignedOrdersForUser(userId: number): Promise<any[]> {
     const db = await getDb()
+    let hasDeliveryJson = false
+    try {
+      hasDeliveryJson = await hasColumn('orders', 'delivery_json')
+    } catch {
+      hasDeliveryJson = false
+    }
+    const deliverySel = hasDeliveryJson
+      ? `CASE WHEN uopo.order_type = 'website' THEN o.delivery_json ELSE NULL END as delivery_json`
+      : `NULL as delivery_json`
     try {
       const assignedOrders = await db.all(
         `SELECT 
@@ -546,6 +573,7 @@ export const OrderRepository = {
             WHEN uopo.order_type = 'website' THEN o.paymentMethod
             ELSE 'telegram'
           END as paymentMethod,
+          ${deliverySel},
           uop.user_id as userId
         FROM user_order_page_orders uopo
         JOIN user_order_pages uop ON uop.id = uopo.page_id
@@ -555,7 +583,8 @@ export const OrderRepository = {
         ORDER BY uopo.assigned_at DESC`,
         [userId]
       )
-      return assignedOrders
+      const rows = Array.isArray(assignedOrders) ? assignedOrders : []
+      return rows.map((row: any) => attachDeliveryFromRow(row))
     } catch (e: any) {
       console.warn('[OrderRepository] listAssignedOrdersForUser failed:', e?.message || e)
       return []
@@ -636,8 +665,10 @@ export const OrderRepository = {
     }
 
     if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {
-      whereConditions.push('o.userId IN (SELECT id FROM users WHERE department_id = ?)')
-      params.push(searchParams.department_id)
+      whereConditions.push(
+        `(o.fulfillment_department_id = ? OR (o.fulfillment_department_id IS NULL AND o.userId IN (SELECT id FROM users WHERE department_id = ?)))`
+      )
+      params.push(searchParams.department_id, searchParams.department_id)
     }
 
     const rawQuery = String(searchParams.query || '').trim()
@@ -782,7 +813,9 @@ export const OrderRepository = {
     }
 
     const orders = await db.all<any>(query, ...params)
-    return OrderRepository.mapPaymentChannelForInternal(orders) as unknown as Order[]
+    return OrderRepository.mapPaymentChannelForInternal(orders).map((row) =>
+      attachDeliveryFromRow(row)
+    ) as unknown as Order[]
   },
 
   /** payment_channel='internal' когда is_internal=1 (для API) */

@@ -73,11 +73,17 @@ export function setAuthToken(token?: string) {
   }
 }
 
-export const getOrders = (params?: { all?: boolean; issued_on?: string; poolActiveOnly?: boolean }) => {
+export const getOrders = (params?: {
+  all?: boolean;
+  issued_on?: string;
+  poolActiveOnly?: boolean;
+  department_id?: number;
+}) => {
   const p: Record<string, string> = {};
   if (params?.all) p.all = '1';
   if (params?.issued_on) p.issued_on = params.issued_on.slice(0, 10);
   if (params?.poolActiveOnly) p.poolActiveOnly = '1';
+  if (params?.department_id != null) p.department_id = String(params.department_id);
   return api.get<Order[]>('/orders', { params: Object.keys(p).length ? p : undefined });
 };
 
@@ -207,14 +213,137 @@ export interface Department {
   description?: string | null;
   sort_order?: number;
   created_at?: string;
+  code?: string | null;
+  address?: string | null;
+  is_pickup_point?: number | boolean;
+  is_active?: number | boolean;
 }
 
 export const getDepartments = () => api.get<Department[]>('/departments');
-export const createDepartment = (data: { name: string; description?: string; sort_order?: number }) =>
-  api.post<Department>('/departments', data);
-export const updateDepartment = (id: number, data: { name?: string; description?: string; sort_order?: number }) =>
-  api.put<Department>(`/departments/${id}`, data);
+export const createDepartment = (data: {
+  name: string;
+  description?: string;
+  sort_order?: number;
+  code?: string | null;
+  address?: string | null;
+  is_pickup_point?: boolean;
+  is_active?: boolean;
+}) => api.post<Department>('/departments', data);
+export const updateDepartment = (
+  id: number,
+  data: {
+    name?: string;
+    description?: string;
+    sort_order?: number;
+    code?: string | null;
+    address?: string | null;
+    is_pickup_point?: boolean;
+    is_active?: boolean;
+  }
+) => api.put<Department>(`/departments/${id}`, data);
 export const deleteDepartment = (id: number) => api.delete(`/departments/${id}`);
+
+// === РАСХОДЫ ===
+export type ExpenseCategoryKind = 'opex' | 'cogs' | 'other';
+
+export interface ExpenseCategory {
+  id: number;
+  name: string;
+  kind: ExpenseCategoryKind;
+  sort_order: number;
+  is_active: number | boolean;
+  created_at?: string;
+}
+
+export interface Expense {
+  id: number;
+  department_id: number | null;
+  category_id: number;
+  amount: number;
+  currency: string;
+  expense_date: string;
+  title: string | null;
+  notes: string | null;
+  created_by: number | null;
+  created_at?: string;
+  updated_at?: string;
+  category_name?: string;
+  department_name?: string | null;
+  created_by_name?: string | null;
+}
+
+export interface ExpenseSummary {
+  by_department: Array<{
+    department_id: number | null;
+    department_name: string;
+    total: number;
+  }>;
+  company_wide: number;
+  total: number;
+}
+
+export const getExpenseCategories = (activeOnly = true) =>
+  api.get<{ categories: ExpenseCategory[] }>('/expenses/categories', {
+    params: { active: activeOnly ? '1' : '0' },
+  });
+
+export const createExpenseCategory = (data: {
+  name: string;
+  kind?: ExpenseCategoryKind;
+  sort_order?: number;
+  is_active?: boolean;
+}) => api.post<ExpenseCategory>('/expenses/categories', data);
+
+export const updateExpenseCategory = (
+  id: number,
+  data: Partial<{ name: string; kind: ExpenseCategoryKind; sort_order: number; is_active: boolean }>
+) => api.put<ExpenseCategory>(`/expenses/categories/${id}`, data);
+
+export const getExpenses = (params?: {
+  date_from?: string;
+  date_to?: string;
+  department_id?: number | 'company' | null;
+  category_id?: number;
+}) => {
+  const query: Record<string, string | number> = {};
+  if (params?.date_from) query.date_from = params.date_from;
+  if (params?.date_to) query.date_to = params.date_to;
+  if (params?.category_id) query.category_id = params.category_id;
+  if (params?.department_id === null || params?.department_id === 'company') {
+    query.department_id = 'company';
+  } else if (params?.department_id) {
+    query.department_id = params.department_id;
+  }
+  return api.get<{ expenses: Expense[] }>('/expenses', { params: query });
+};
+
+export const createExpense = (data: {
+  department_id?: number | null;
+  category_id: number;
+  amount: number;
+  currency?: string;
+  expense_date: string;
+  title?: string | null;
+  notes?: string | null;
+}) => api.post<Expense>('/expenses', data);
+
+export const updateExpense = (
+  id: number,
+  data: Partial<{
+    department_id: number | null;
+    category_id: number;
+    amount: number;
+    currency: string;
+    expense_date: string;
+    title: string | null;
+    notes: string | null;
+  }>
+) => api.put<Expense>(`/expenses/${id}`, data);
+
+export const deleteExpense = (id: number) => api.delete(`/expenses/${id}`);
+
+export const getExpenseSummary = (params?: { date_from?: string; date_to?: string }) =>
+  api.get<ExpenseSummary>('/expenses/summary', { params });
 
 // === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ===
 export interface User {
@@ -248,9 +377,10 @@ export const saveFullDailyReport = (report: DailyReport) =>
 
 // Параметры периода аналитики: либо period (дни), либо date_from + date_to (YYYY-MM-DD)
 export type AnalyticsPeriodParams = { period?: string; date_from?: string; date_to?: string };
+export type AnalyticsQueryParams = AnalyticsPeriodParams & { department_id?: number };
 
 // === АНАЛИТИКА ПРОДУКТОВ ===
-export const getProductPopularityAnalytics = (params?: AnalyticsPeriodParams & { limit?: string }) =>
+export const getProductPopularityAnalytics = (params?: AnalyticsQueryParams & { limit?: string }) =>
   api.get<{
     period: { days: number; startDate: string };
     productPopularity: Array<{
@@ -281,7 +411,7 @@ export const getProductPopularityAnalytics = (params?: AnalyticsPeriodParams & {
   }>('/reports/analytics/products/popularity', { params });
 
 // === ФИНАНСОВАЯ АНАЛИТИКА ===
-export const getFinancialProfitabilityAnalytics = (params?: AnalyticsPeriodParams) =>
+export const getFinancialProfitabilityAnalytics = (params?: AnalyticsQueryParams) =>
   api.get<{
     period: { days: number; startDate: string };
     productProfitability: Array<{
@@ -323,7 +453,7 @@ export const getFinancialProfitabilityAnalytics = (params?: AnalyticsPeriodParam
   }>('/reports/analytics/financial/profitability', { params });
 
 // === АНАЛИТИКА СТАТУСОВ ЗАКАЗОВ ===
-export const getOrderStatusFunnelAnalytics = (params?: AnalyticsPeriodParams) =>
+export const getOrderStatusFunnelAnalytics = (params?: AnalyticsQueryParams) =>
   api.get<{
     period: { days: number; startDate: string };
     statusFunnel: Array<{
@@ -357,9 +487,54 @@ export const getYearlyRevenue = (params?: { department_id?: number }) =>
     total_revenue: number;
     total_orders: number;
     by_month: Array<{ month: string; orders: number; revenue: number }>;
-  }>('/reports/analytics/revenue/yearly', { params })
+  }>('/reports/analytics/revenue/yearly', { params });
 
-export const getAnalyticsOrdersList = (params?: AnalyticsPeriodParams & { status?: string; reason_filter?: string; department_id?: number; limit?: number; offset?: number }) =>
+export const getRevenueByLocation = (params?: AnalyticsPeriodParams & { by_month?: boolean }) =>
+  api.get<{
+    period: { startDate: string; endDate?: string };
+    locations: Array<{ department_id: number; name: string; orders?: number; revenue: number }>;
+    unassigned: number;
+    company_total: number;
+    by_month?: Array<{ month: string; orders: number; revenue: number }>;
+  }>('/reports/analytics/revenue/by-location', {
+    params: params?.by_month ? { ...params, by_month: '1' } : params,
+  });
+
+export const getPnL = (params?: AnalyticsPeriodParams & {
+  department_id?: number;
+  include_payroll?: boolean;
+  include_cogs?: boolean;
+}) =>
+  api.get<{
+    period: { startDate: string; endDate?: string };
+    department_id: number | null;
+    locations: Array<{
+      department_id: number;
+      name: string;
+      revenue: number;
+      expenses: number;
+      payroll?: number;
+      cogs?: number;
+      result: number;
+    }>;
+    company_wide: { expenses: number; payroll?: number; cogs?: number };
+    unassigned_revenue: number;
+    totals: {
+      revenue: number;
+      expenses: number;
+      payroll?: number;
+      cogs?: number;
+      result: number;
+    };
+  }>('/reports/analytics/pnl', {
+    params: {
+      ...params,
+      include_payroll: params?.include_payroll ? '1' : '0',
+      include_cogs: params?.include_cogs ? '1' : '0',
+    },
+  });
+
+export const getAnalyticsOrdersList = (params?: AnalyticsQueryParams & { status?: string; reason_filter?: string; limit?: number; offset?: number }) =>
   api.get<{
     period: { startDate: string; endDate?: string };
     filters: { status: string; reason_filter?: string | null; department_id: number | null; limit: number; offset: number };
@@ -379,7 +554,7 @@ export const getAnalyticsOrdersList = (params?: AnalyticsPeriodParams & { status
     }>;
   }>('/reports/analytics/orders/list', { params });
 
-export const getAnalyticsOrderReasons = (params?: AnalyticsPeriodParams & { department_id?: number }) =>
+export const getAnalyticsOrderReasons = (params?: AnalyticsQueryParams) =>
   api.get<{
     period: { startDate: string; endDate?: string };
     department_id: number | null;
@@ -405,7 +580,7 @@ export const updateReasonPresetsSettings = (payload: {
   api.put('/reports/analytics/reason-presets', payload);
 
 // === АНАЛИТИКА ЭФФЕКТИВНОСТИ МЕНЕДЖЕРОВ ===
-export const getManagerEfficiencyAnalytics = (params?: AnalyticsPeriodParams & { department_id?: number }) =>
+export const getManagerEfficiencyAnalytics = (params?: AnalyticsQueryParams) =>
   api.get<{
     period: { days: number; startDate: string };
     managerEfficiency: Array<{
@@ -438,7 +613,7 @@ export const getManagerEfficiencyAnalytics = (params?: AnalyticsPeriodParams & {
   }>('/reports/analytics/managers/efficiency', { params });
 
 // === ABC-АНАЛИЗ МАТЕРИАЛОВ ===
-export const getMaterialsABCAnalytics = (params?: AnalyticsPeriodParams) =>
+export const getMaterialsABCAnalytics = (params?: AnalyticsQueryParams) =>
   api.get<{
     period: { days: number; startDate: string };
     abcAnalysis: Array<{
@@ -472,7 +647,7 @@ export const getMaterialsABCAnalytics = (params?: AnalyticsPeriodParams) =>
   }>('/reports/analytics/materials/abc-analysis', { params });
 
 // === ВРЕМЕННАЯ АНАЛИТИКА ===
-export const getTimePeakHoursAnalytics = (params?: AnalyticsPeriodParams) =>
+export const getTimePeakHoursAnalytics = (params?: AnalyticsQueryParams) =>
   api.get<{
     period: { days: number; startDate: string };
     hourlyAnalysis: Array<{
@@ -738,7 +913,8 @@ export const getPrintTechnologies = () => api.get('/printing-technologies');
 export const submitPrinterCounter = (printerId: number, data: { counter_date: string; value: number }) => api.post(`/printers/${printerId}/counters`, data);
 export const getPrinterCountersByDate = (date: string) => api.get(`/printers/counters`, { params: { date } });
 export const getPrinterCountersByMonth = (month: string) => api.get(`/printers/counters`, { params: { month } });
-export const getDailyCashByMonth = (month: string) => api.get(`/reports/daily-cash-by-month`, { params: { month } });
+export const getDailyCashByMonth = (month: string, params?: { department_id?: number }) =>
+  api.get(`/reports/daily-cash-by-month`, { params: { month, ...params } });
 export const getDailySummary = (date: string) => api.get(`/reports/daily/${date}/summary`);
 
 export type CashRegisterDayPayload = {
@@ -761,11 +937,11 @@ export type CashRegisterDayPayload = {
   backfill_updated?: number;
 };
 
-export const getCashRegisterDay = (date: string) =>
-  api.get<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register`);
+export const getCashRegisterDay = (date: string, params?: { department_id?: number }) =>
+  api.get<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register`, { params });
 
-export const recalculateCashRegisterDay = (date: string) =>
-  api.post<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register/recalculate`);
+export const recalculateCashRegisterDay = (date: string, params?: { department_id?: number }) =>
+  api.post<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register/recalculate`, undefined, { params });
 
 // Calculators (MVP)
 export const getFlyersSchema = () => api.get('/calculators/flyers-color');

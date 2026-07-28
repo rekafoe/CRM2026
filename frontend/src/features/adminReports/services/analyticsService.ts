@@ -6,7 +6,9 @@ import {
   getOrderStatusFunnelAnalytics,
   getManagerEfficiencyAnalytics,
   getMaterialsABCAnalytics,
-  getTimePeakHoursAnalytics
+  getTimePeakHoursAnalytics,
+  getRevenueByLocation,
+  getPnL,
 } from '../../../api';
 
 import {
@@ -16,55 +18,87 @@ import {
   ManagerAnalyticsData,
   MaterialsAnalyticsData,
   TimeAnalyticsData,
+  LocationRevenueData,
+  PnLData,
   AnalyticsTab
 } from '../types';
 
 export type PeriodParams = { period: number; dateFrom?: string; dateTo?: string };
 
-function buildParams({ period, dateFrom, dateTo }: PeriodParams): { period?: string; date_from?: string; date_to?: string } {
-  if (dateFrom && dateTo) return { date_from: dateFrom, date_to: dateTo };
-  return { period: period.toString() };
+function buildParams(
+  { period, dateFrom, dateTo }: PeriodParams,
+  departmentId?: number,
+): { period?: string; date_from?: string; date_to?: string; department_id?: number } {
+  const base = dateFrom && dateTo
+    ? { date_from: dateFrom, date_to: dateTo }
+    : { period: period.toString() };
+  if (departmentId != null) return { ...base, department_id: departmentId };
+  return base;
 }
 
 export class AnalyticsService {
-  static async getProductAnalytics(params: PeriodParams): Promise<ProductAnalyticsData> {
-    const response = await getProductPopularityAnalytics(buildParams(params));
+  static async getProductAnalytics(params: PeriodParams, departmentId?: number): Promise<ProductAnalyticsData> {
+    const response = await getProductPopularityAnalytics(buildParams(params, departmentId));
     return response.data;
   }
 
-  static async getFinancialAnalytics(params: PeriodParams): Promise<FinancialAnalyticsData> {
-    const response = await getFinancialProfitabilityAnalytics(buildParams(params));
+  static async getFinancialAnalytics(params: PeriodParams, departmentId?: number): Promise<FinancialAnalyticsData> {
+    const response = await getFinancialProfitabilityAnalytics(buildParams(params, departmentId));
     return response.data;
   }
 
-  static async getOrderStatusAnalytics(params: PeriodParams): Promise<OrderStatusAnalyticsData> {
-    const response = await getOrderStatusFunnelAnalytics(buildParams(params));
+  static async getOrderStatusAnalytics(params: PeriodParams, departmentId?: number): Promise<OrderStatusAnalyticsData> {
+    const response = await getOrderStatusFunnelAnalytics(buildParams(params, departmentId));
     return response.data;
   }
 
   static async getManagerAnalytics(params: PeriodParams, departmentId?: number): Promise<ManagerAnalyticsData> {
-    const apiParams = { ...buildParams(params), department_id: departmentId };
-    const response = await getManagerEfficiencyAnalytics(apiParams);
+    const response = await getManagerEfficiencyAnalytics(buildParams(params, departmentId));
     return response.data;
   }
 
-  static async getMaterialsAnalytics(params: PeriodParams): Promise<MaterialsAnalyticsData> {
+  static async getMaterialsAnalytics(params: PeriodParams, departmentId?: number): Promise<MaterialsAnalyticsData> {
     const p = params.dateFrom && params.dateTo
       ? params
       : { period: params.period * 3, dateFrom: params.dateFrom, dateTo: params.dateTo };
-    const response = await getMaterialsABCAnalytics(buildParams(p));
+    const response = await getMaterialsABCAnalytics(buildParams(p, departmentId));
     return response.data;
   }
 
-  static async getTimeAnalytics(params: PeriodParams): Promise<TimeAnalyticsData> {
-    const response = await getTimePeakHoursAnalytics(buildParams(params));
+  static async getTimeAnalytics(params: PeriodParams, departmentId?: number): Promise<TimeAnalyticsData> {
+    const response = await getTimePeakHoursAnalytics(buildParams(params, departmentId));
+    return response.data;
+  }
+
+  static async getLocationRevenueAnalytics(
+    params: PeriodParams,
+    departmentId?: number,
+    withByMonth = true,
+  ): Promise<LocationRevenueData> {
+    const response = await getRevenueByLocation({
+      ...buildParams(params, departmentId),
+      by_month: withByMonth,
+    });
+    return response.data;
+  }
+
+  static async getPnLAnalytics(
+    params: PeriodParams,
+    options?: { departmentId?: number; includePayroll?: boolean; includeCogs?: boolean },
+  ): Promise<PnLData> {
+    const response = await getPnL({
+      ...buildParams(params, options?.departmentId),
+      include_payroll: options?.includePayroll,
+      include_cogs: options?.includeCogs,
+    });
     return response.data;
   }
 
   static async loadAnalyticsForTab(
     tab: AnalyticsTab,
     params: PeriodParams,
-    departmentId?: number
+    departmentId?: number,
+    pnlOptions?: { includePayroll?: boolean; includeCogs?: boolean },
   ): Promise<{
     productData?: ProductAnalyticsData;
     financialData?: FinancialAnalyticsData;
@@ -72,12 +106,29 @@ export class AnalyticsService {
     managerData?: ManagerAnalyticsData;
     materialsData?: MaterialsAnalyticsData;
     timeData?: TimeAnalyticsData;
+    locationRevenueData?: LocationRevenueData;
+    pnlData?: PnLData;
   }> {
-    const results: any = {};
+    const results: Record<string, unknown> = {};
+
+    if (tab === 'locations') {
+      results.locationRevenueData = await this.getLocationRevenueAnalytics(params, departmentId);
+      return results;
+    }
+
+    if (tab === 'pnl') {
+      results.pnlData = await this.getPnLAnalytics(params, {
+        departmentId,
+        includePayroll: pnlOptions?.includePayroll,
+        includeCogs: pnlOptions?.includeCogs,
+      });
+      return results;
+    }
+
     const [productResult, financialResult, orderStatusResult] = await Promise.allSettled([
-      this.getProductAnalytics(params),
-      this.getFinancialAnalytics(params),
-      this.getOrderStatusAnalytics(params)
+      this.getProductAnalytics(params, departmentId),
+      this.getFinancialAnalytics(params, departmentId),
+      this.getOrderStatusAnalytics(params, departmentId),
     ]);
     if (productResult.status === 'fulfilled') results.productData = productResult.value;
     else console.error('Product analytics failed:', productResult.reason);
@@ -95,14 +146,14 @@ export class AnalyticsService {
     }
     if (tab === 'materials' || tab === 'overview') {
       try {
-        results.materialsData = await this.getMaterialsAnalytics(params);
+        results.materialsData = await this.getMaterialsAnalytics(params, departmentId);
       } catch (e) {
         console.error('Materials analytics load failed:', e);
       }
     }
     if (tab === 'time' || tab === 'overview') {
       try {
-        results.timeData = await this.getTimeAnalytics(params);
+        results.timeData = await this.getTimeAnalytics(params, departmentId);
       } catch (e) {
         console.error('Time analytics load failed:', e);
       }

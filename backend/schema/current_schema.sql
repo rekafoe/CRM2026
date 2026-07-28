@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS departments (
   name TEXT NOT NULL UNIQUE,
   description TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  code TEXT,
+  address TEXT,
+  is_pickup_point INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -70,6 +74,7 @@ CREATE TABLE IF NOT EXISTS orders (
   paymentId TEXT,
   paymentMethod TEXT DEFAULT 'online',
   source TEXT,
+  fulfillment_department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
   FOREIGN KEY(userId) REFERENCES users(id)
 );
 
@@ -589,3 +594,58 @@ CREATE TABLE IF NOT EXISTS user_order_pages (
 
 CREATE INDEX IF NOT EXISTS idx_user_order_pages_user_date ON user_order_pages (user_id, date);
 
+-- ============================================
+-- –†–ê–°–•–û–î–´ (OPEX / COGS)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS expense_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL CHECK(kind IN ('opex','cogs','other')) DEFAULT 'opex',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+  category_id INTEGER NOT NULL,
+  amount REAL NOT NULL CHECK(amount > 0),
+  currency TEXT NOT NULL DEFAULT 'BYN',
+  expense_date TEXT NOT NULL,
+  title TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_expense_date ON expenses (expense_date);
+CREATE INDEX IF NOT EXISTS idx_expenses_department_id ON expenses (department_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_category_id ON expenses (category_id);
+
+
+-- ============================================
+-- — À¿ƒ€ œŒ “Œ◊ ¿Ã
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS warehouses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(department_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS material_stock (
+  material_id INTEGER NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+  warehouse_id INTEGER NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
+  quantity REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (material_id, warehouse_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_warehouses_department ON warehouses (department_id);
+CREATE INDEX IF NOT EXISTS idx_material_stock_warehouse ON material_stock (warehouse_id);

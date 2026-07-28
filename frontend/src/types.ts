@@ -174,6 +174,10 @@ export interface Order {
   notes?: string;
   /** Способ получения / доставка (заказ с сайта) */
   delivery?: WebsiteOrderDelivery;
+  /** Точка исполнения */
+  fulfillment_department_id?: number | null;
+  fulfillment_department_name?: string | null;
+  fulfillment_department_code?: string | null;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   estimatedCompletion?: string;
   actualCompletion?: string;

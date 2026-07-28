@@ -5,12 +5,6 @@ import { AnalyticsService, type PeriodParams } from '../services/analyticsServic
 import {
   AnalyticsState,
   AnalyticsTab,
-  ProductAnalyticsData,
-  FinancialAnalyticsData,
-  OrderStatusAnalyticsData,
-  ManagerAnalyticsData,
-  MaterialsAnalyticsData,
-  TimeAnalyticsData
 } from '../types';
 
 /** Первый и последний день текущего календарного месяца в формате YYYY-MM-DD */
@@ -33,12 +27,16 @@ const initialState: AnalyticsState = {
   managerData: null,
   materialsData: null,
   timeData: null,
+  locationRevenueData: null,
+  pnlData: null,
   isLoading: false,
   period: 30,
   dateFrom: defaultMonth.from,
   dateTo: defaultMonth.to,
   activeTab: 'overview',
-  departmentId: undefined
+  departmentId: undefined,
+  includePayroll: false,
+  includeCogs: false,
 };
 
 export const useAnalytics = () => {
@@ -55,29 +53,36 @@ export const useAnalytics = () => {
   const loadAnalytics = useCallback(async (
     tab?: AnalyticsTab,
     params?: PeriodParams,
-    departmentId?: number
+    departmentId?: number,
+    pnlOptions?: { includePayroll?: boolean; includeCogs?: boolean },
   ) => {
     const s = stateRef.current;
     const t = tab ?? s.activeTab;
     const p = params ?? { period: s.period, dateFrom: s.dateFrom, dateTo: s.dateTo };
     const d = departmentId ?? s.departmentId;
+    const payroll = pnlOptions?.includePayroll ?? s.includePayroll;
+    const cogs = pnlOptions?.includeCogs ?? s.includeCogs;
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      const data = await AnalyticsService.loadAnalyticsForTab(t, p, d);
+      const data = await AnalyticsService.loadAnalyticsForTab(t, p, d, { includePayroll: payroll, includeCogs: cogs });
       setState(prev => ({
         ...prev,
-        productData: data.productData || prev.productData,
-        financialData: data.financialData || prev.financialData,
-        orderStatusData: data.orderStatusData || prev.orderStatusData,
-        managerData: data.managerData || prev.managerData,
-        materialsData: data.materialsData || prev.materialsData,
-        timeData: data.timeData || prev.timeData,
+        productData: data.productData ?? prev.productData,
+        financialData: data.financialData ?? prev.financialData,
+        orderStatusData: data.orderStatusData ?? prev.orderStatusData,
+        managerData: data.managerData ?? prev.managerData,
+        materialsData: data.materialsData ?? prev.materialsData,
+        timeData: data.timeData ?? prev.timeData,
+        locationRevenueData: data.locationRevenueData ?? prev.locationRevenueData,
+        pnlData: data.pnlData ?? prev.pnlData,
         isLoading: false,
         activeTab: t,
         period: p.period,
         dateFrom: p.dateFrom,
         dateTo: p.dateTo,
-        departmentId: d
+        departmentId: d,
+        includePayroll: payroll,
+        includeCogs: cogs,
       }));
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -102,9 +107,22 @@ export const useAnalytics = () => {
     setState(prev => ({ ...prev, departmentId }));
   }, []);
 
+  const setIncludePayroll = useCallback((includePayroll: boolean) => {
+    setState(prev => ({ ...prev, includePayroll }));
+  }, []);
+
+  const setIncludeCogs = useCallback((includeCogs: boolean) => {
+    setState(prev => ({ ...prev, includeCogs }));
+  }, []);
+
   const refreshAnalytics = useCallback(() => {
     const s = stateRef.current;
-    return loadAnalytics(s.activeTab, { period: s.period, dateFrom: s.dateFrom, dateTo: s.dateTo }, s.departmentId);
+    return loadAnalytics(
+      s.activeTab,
+      { period: s.period, dateFrom: s.dateFrom, dateTo: s.dateTo },
+      s.departmentId,
+      { includePayroll: s.includePayroll, includeCogs: s.includeCogs },
+    );
   }, [loadAnalytics]);
 
   return {
@@ -115,19 +133,21 @@ export const useAnalytics = () => {
     setPeriod,
     setDateRange,
     setDepartmentId,
+    setIncludePayroll,
+    setIncludeCogs,
     refreshAnalytics,
 
-    // Геттеры для удобства
     hasData: !!(
       state.productData ||
       state.financialData ||
       state.orderStatusData ||
       state.managerData ||
       state.materialsData ||
-      state.timeData
+      state.timeData ||
+      state.locationRevenueData ||
+      state.pnlData
     ),
 
-    // Вычисляемые свойства
     totalStats: {
       totalOrders: state.productData?.productPopularity.reduce((sum, p) => sum + p.order_count, 0) || 0,
       totalRevenue: state.productData?.total_revenue ?? state.productData?.productPopularity.reduce((sum, p) => sum + p.total_revenue, 0) ?? 0,

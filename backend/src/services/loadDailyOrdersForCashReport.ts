@@ -1,5 +1,6 @@
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { hasFulfillmentDepartmentColumn, scopeByFulfillmentDepartment } from '../utils/orderFulfillmentScope'
 import { OrderRepository } from '../repositories/orderRepository'
 import { computeCashForReportDate, sqlDailyOrderDayFilter } from '../utils/reportOrderCash'
 
@@ -36,9 +37,14 @@ export type LoadDailyOrdersResult = {
   issued_by_operators: IssuedByOperatorRow[]
 }
 
-export async function loadDailyOrdersForCashReport(reportDate: string): Promise<LoadDailyOrdersResult> {
+export async function loadDailyOrdersForCashReport(
+  reportDate: string,
+  departmentId?: number,
+): Promise<LoadDailyOrdersResult> {
   const d = String(reportDate || '').slice(0, 10)
   const db = await getDb()
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })
 
   let hasPrepaymentUpdatedAt = false
   try {
@@ -88,8 +94,10 @@ export async function loadDailyOrdersForCashReport(reportDate: string): Promise<
             ${notesSelect}
        FROM orders o
       WHERE ${dayFilter.whereSql}
+        ${fulfillmentScope.clause}
       ORDER BY o.id DESC`,
     ...dayFilter.params,
+    ...fulfillmentScope.params,
   )) as DailyOrderForCashReport[]
 
   const orderIds = orders.map((o) => o.id)

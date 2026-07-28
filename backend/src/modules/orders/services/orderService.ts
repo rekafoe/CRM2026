@@ -266,15 +266,20 @@ export class OrderService {
   }
 
   /** Все заказы без фильтра по пользователю (для пула заказов). Batch loading — устранение N+1. */
-  static async getAllOrdersForPool(options: { activeOnly?: boolean } = {}) {
-    const fromOrders = (await OrderRepository.listAllOrders(
-      options.activeOnly ? { statuses: [0, 1] } : undefined
-    )) as Order[]
+  static async getAllOrdersForPool(options: { activeOnly?: boolean; departmentId?: number } = {}) {
+    const fromOrders = (await OrderRepository.listAllOrders({
+      ...(options.activeOnly ? { statuses: [0, 1] } : {}),
+      ...(options.departmentId != null ? { departmentId: options.departmentId } : {}),
+    })) as Order[]
     const orderIds = new Set(fromOrders.map((o) => o.id))
     const photoRows = await OrderRepository.listPhotoOrdersForPool()
     const fromPhoto: Order[] = []
     for (const row of photoRows) {
       if (orderIds.has(row.id)) {
+        continue
+      }
+      // Фото-заказы без fulfillment — в пул только без фильтра по точке
+      if (options.departmentId != null) {
         continue
       }
       fromPhoto.push(photoOrderRowToPoolOrder(row))
@@ -609,18 +614,46 @@ export class OrderService {
   static async persistOrderDelivery(orderId: number, delivery: WebsiteOrderDelivery | null): Promise<void> {
     const db = await getDb()
     let hasCol = false
+    let hasFulfillment = false
     try {
       hasCol = await hasColumn('orders', 'delivery_json')
+      hasFulfillment = await hasColumn('orders', 'fulfillment_department_id')
     } catch {
       hasCol = false
+      hasFulfillment = false
     }
     if (!hasCol) {
       throw new Error('Колонка delivery_json ещё не добавлена. Примените миграции.')
     }
     const serialized = delivery ? serializeWebsiteOrderDelivery(delivery) : null
+    if (hasFulfillment) {
+      const { resolveFulfillmentDepartmentId } = await import('./fulfillmentDepartment')
+      const fulfillmentId = await resolveFulfillmentDepartmentId(delivery)
+      await db.run(
+        'UPDATE orders SET delivery_json = ?, fulfillment_department_id = ?, updated_at = datetime("now") WHERE id = ?',
+        [serialized, fulfillmentId, orderId],
+      )
+      return
+    }
     await db.run(
       'UPDATE orders SET delivery_json = ?, updated_at = datetime("now") WHERE id = ?',
       [serialized, orderId],
+    )
+  }
+
+  /** Явно задать точку исполнения (CRM / ручной выбор). */
+  static async setFulfillmentDepartmentId(orderId: number, departmentId: number | null): Promise<void> {
+    const db = await getDb()
+    let hasFulfillment = false
+    try {
+      hasFulfillment = await hasColumn('orders', 'fulfillment_department_id')
+    } catch {
+      hasFulfillment = false
+    }
+    if (!hasFulfillment) return
+    await db.run(
+      'UPDATE orders SET fulfillment_department_id = ?, updated_at = datetime("now") WHERE id = ?',
+      [departmentId, orderId],
     )
   }
 
@@ -1893,7 +1926,7 @@ export class OrderService {
     for (const order of orders as Order[]) {
       order.items = itemsByOrderId.get(order.id) ?? []
     }
-    return orders
+    return (orders as Order[]).map((o) => OrderService.orderForApi(o as any) as Order)
   }
 
   static async getOrdersStats(userId: number, dateFrom?: string, dateTo?: string) {

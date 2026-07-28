@@ -35,6 +35,7 @@ import mailRoutes from './mail'
 import smsRoutes from './sms'
 import miniappRoutes from './miniapp'
 import campaignsRoutes from './campaigns'
+import expensesRoutes from './expenses'
 import publicEditorRoutes from './publicEditor'
 import webhooksRoutes from './webhooks'
 
@@ -75,6 +76,7 @@ router.use('/mail', mailRoutes)
 router.use('/sms', smsRoutes)
 router.use('/miniapp', miniappRoutes)
 router.use('/campaigns', campaignsRoutes)
+router.use('/expenses', expensesRoutes)
 router.use('/public-editor', publicEditorRoutes)
 router.use('/products/:productId/subtype-designs', subtypeDesignsRoutes)
 

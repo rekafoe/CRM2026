@@ -10,6 +10,7 @@ import {
   type DailyOrderForCashReport,
 } from './loadDailyOrdersForCashReport'
 import { logger } from '../utils/logger'
+import { hasFulfillmentDepartmentColumn, scopeByFulfillmentDepartment } from '../utils/orderFulfillmentScope'
 
 export type CashRegisterContribution = {
   user_id: number
@@ -127,25 +128,29 @@ function aggregateCashFromOrders(
   }
 }
 
-async function loadOrderVolumeWorkDay(reportDate: string): Promise<number> {
+async function loadOrderVolumeWorkDay(reportDate: string, departmentId?: number): Promise<number> {
   const d = reportDate.slice(0, 10)
   const db = await getDb()
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })
   const totalExpr = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)')
   const row = await db.get<{ s: number }>(
     `SELECT COALESCE(SUM(${totalExpr}), 0) as s
        FROM orders o
       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-        AND o.status != 0`,
+        AND o.status != 0
+        ${fulfillmentScope.clause}`,
     d,
+    ...fulfillmentScope.params,
   )
   return Math.round(Number(row?.s ?? 0) * 100) / 100
 }
 
-export async function getCashRegisterDay(reportDate: string): Promise<CashRegisterDayPayload> {
+export async function getCashRegisterDay(reportDate: string, departmentId?: number): Promise<CashRegisterDayPayload> {
   await backfillPaymentMetadataForCashDay(reportDate)
-  const loaded = await loadDailyOrdersForCashReport(reportDate)
+  const loaded = await loadDailyOrdersForCashReport(reportDate, departmentId)
   const agg = aggregateCashFromOrders(loaded.orders, loaded.date)
-  const order_volume_work_day = await loadOrderVolumeWorkDay(loaded.date)
+  const order_volume_work_day = await loadOrderVolumeWorkDay(loaded.date, departmentId)
 
   return {
     date: loaded.date,
@@ -280,8 +285,11 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
   return updated
 }
 
-export async function recalculateCashRegisterDay(reportDate: string): Promise<CashRegisterDayPayload & { backfill_updated: number }> {
+export async function recalculateCashRegisterDay(
+  reportDate: string,
+  departmentId?: number,
+): Promise<CashRegisterDayPayload & { backfill_updated: number }> {
   const backfill_updated = await backfillPaymentMetadataForCashDay(reportDate)
-  const payload = await getCashRegisterDay(reportDate)
+  const payload = await getCashRegisterDay(reportDate, departmentId)
   return { ...payload, backfill_updated }
 }

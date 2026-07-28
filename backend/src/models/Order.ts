@@ -22,6 +22,10 @@ export interface Order {
   miniapp_checkout_state?: MiniappCheckoutState;
   miniapp_design_help_requested?: number;
   delivery?: WebsiteOrderDelivery;
+  /** Точка исполнения (departments.id) */
+  fulfillment_department_id?: number | null;
+  fulfillment_department_name?: string | null;
+  fulfillment_department_code?: string | null;
   /** Скидка на заказ, % */
   discount_percent?: number;
   /** Суммы с attachAmountsToOrder / computeOrderAmounts */

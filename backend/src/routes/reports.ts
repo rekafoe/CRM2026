@@ -14,6 +14,13 @@ import {
   recalculateCashRegisterDay,
 } from '../services/cashRegisterDayService'
 import { computeCashForReportDate } from '../utils/reportOrderCash'
+import {
+  hasFulfillmentDepartmentColumn,
+  parseFulfillmentDepartmentId,
+  revenueOrdersCondition,
+  scopeByFulfillmentDepartment,
+  type FulfillmentDepartmentScope,
+} from '../utils/orderFulfillmentScope'
 
 const router = Router()
 
@@ -97,6 +104,60 @@ function getAnalyticsDateRange(query: Record<string, unknown>): {
       const p = createdExpr(alias)
       return `${p} >= ?`
     }
+  }
+}
+
+async function fulfillmentScopeFromQuery(
+  query: Record<string, unknown>,
+  alias = 'o',
+): Promise<{
+  departmentId: FulfillmentDepartmentScope
+  columnExists: boolean
+  clause: string
+  params: number[]
+}> {
+  const departmentId = parseFulfillmentDepartmentId(query.department_id)
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const scope = scopeByFulfillmentDepartment(alias, departmentId, { columnExists })
+  return { departmentId, columnExists, ...scope }
+}
+
+function parseDepartmentIdFromQuery(query: Record<string, unknown>): number | undefined {
+  const parsed = parseFulfillmentDepartmentId(query.department_id)
+  return typeof parsed === 'number' ? parsed : undefined
+}
+
+async function loadExpensesByDepartment(
+  db: Awaited<ReturnType<typeof getDb>>,
+  dateFrom: string,
+  dateTo: string,
+): Promise<{ byDepartment: Map<number | null, number>; companyWide: number }> {
+  const empty = { byDepartment: new Map<number | null, number>(), companyWide: 0 }
+  try {
+    const table = await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='expenses'")
+    if (!table) return empty
+    const hasDeptCol = await hasColumn('expenses', 'department_id')
+    const deptSelect = hasDeptCol ? 'department_id' : 'NULL as department_id'
+    const rows = await db.all<Array<{ department_id: number | null; total: number }>>(
+      `SELECT ${deptSelect}, COALESCE(SUM(amount), 0) as total
+         FROM expenses
+        WHERE substr(COALESCE(expense_date, created_at), 1, 10) >= ?
+          AND substr(COALESCE(expense_date, created_at), 1, 10) <= ?
+        GROUP BY ${hasDeptCol ? 'department_id' : '1'}`,
+      dateFrom,
+      dateTo,
+    )
+    const byDepartment = new Map<number | null, number>()
+    let companyWide = 0
+    for (const row of rows) {
+      const deptId = row.department_id == null ? null : Number(row.department_id)
+      const amt = Number(row.total || 0)
+      byDepartment.set(deptId, (byDepartment.get(deptId) || 0) + amt)
+      if (deptId == null) companyWide += amt
+    }
+    return { byDepartment, companyWide }
+  } catch {
+    return empty
   }
 }
 
@@ -200,16 +261,18 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
 router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   const d = String(req.params.date || '').slice(0, 10)
   if (!d) { res.status(400).json({ message: 'date required' }); return }
+  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
 
-  const { orders, issued_orders_total, issued_by_operators } = await loadDailyOrdersForCashReport(d)
-  res.json({ date: d, orders, issued_orders_total, issued_by_operators })
+  const { orders, issued_orders_total, issued_by_operators } = await loadDailyOrdersForCashReport(d, departmentId)
+  res.json({ date: d, department_id: departmentId ?? null, orders, issued_orders_total, issued_by_operators })
 }))
 
 // GET /api/reports/daily/:date/cash-register — итог кассы за день (источник истины для счётчиков)
 router.get('/daily/:date/cash-register', asyncHandler(async (req, res) => {
   const d = String(req.params.date || '').slice(0, 10)
   if (!d) { res.status(400).json({ message: 'date required' }); return }
-  const payload = await getCashRegisterDay(d)
+  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
+  const payload = await getCashRegisterDay(d, departmentId)
   res.json(payload)
 }))
 
@@ -217,7 +280,8 @@ router.get('/daily/:date/cash-register', asyncHandler(async (req, res) => {
 router.post('/daily/:date/cash-register/recalculate', asyncHandler(async (req, res) => {
   const d = String(req.params.date || '').slice(0, 10)
   if (!d) { res.status(400).json({ message: 'date required' }); return }
-  const payload = await recalculateCashRegisterDay(d)
+  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
+  const payload = await recalculateCashRegisterDay(d, departmentId)
   res.json(payload)
 }))
 
@@ -228,7 +292,10 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
     res.status(400).json({ message: 'month=YYYY-MM required' })
     return
   }
+  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
   const db = await getDb()
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })
   let hasPrepaymentUpdatedAt = false
   try {
     hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -261,8 +328,10 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
        FROM orders o
       WHERE (${monthParts.join(' OR ')})
         AND COALESCE(o.prepaymentAmount, 0) > 0
-        AND (o.status IS NULL OR o.status != 0)`,
+        AND (o.status IS NULL OR o.status != 0)
+        ${fulfillmentScope.clause}`,
     ...monthParams,
+    ...fulfillmentScope.params,
   )
   const issueByOrderDay = new Map<string, number>()
   if (hasDebtClosedCash) {
@@ -308,7 +377,7 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
       addCash(day, uid, cash)
     }
   }
-  res.json({ month, byDate })
+  res.json({ month, department_id: departmentId ?? null, byDate })
 }))
 
 // GET /api/reports/analytics/products/popularity — популярность продуктов
@@ -316,6 +385,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   const { limit = '10' } = req.query
   const limitNum = parseInt(limit as string) || 10
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
   const days = endDate
     ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000)
     : parseInt(String(req.query.period || '30'), 10) || 30
@@ -327,6 +397,8 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   const notCancelledCond = hasIsCancelledPop
     ? '(o.status != 0 AND COALESCE(o.is_cancelled, 0) = 0)'
     : 'o.status != 0'
+  const orderScopeCond = `${dateFilter('o')} AND ${notCancelledCond}${fulfillment.clause}`
+  const orderScopeParams = [...dateParams, ...fulfillment.params]
 
   const itemG = orderItemProductGroupKeyExpr()
   const itemL = orderItemProductLabelExpr()
@@ -337,10 +409,10 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
      FROM items i
      JOIN orders o ON o.id = i.orderId
      ${ORDER_ITEM_PRODUCT_JOIN}
-     WHERE ${dateFilter('o')} AND ${notCancelledCond}
+     WHERE ${orderScopeCond}
      GROUP BY (${itemG})
      ORDER BY total_revenue DESC LIMIT ?`,
-    [...dateParams, limitNum]
+    [...orderScopeParams, limitNum]
   )
 
   const categoryStats = await db.all<any>(
@@ -350,9 +422,9 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
         WHEN LOWER(i.type) LIKE '%плакат%' OR LOWER(i.type) LIKE '%poster%' THEN 'Плакаты'
         WHEN LOWER(i.type) LIKE '%календар%' THEN 'Календари' ELSE 'Другое' END as category,
       COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity, SUM(i.price * i.quantity) as total_revenue
-     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelledCond}
+     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${orderScopeCond}
      GROUP BY category ORDER BY total_revenue DESC`,
-    dateParams
+    orderScopeParams
   )
 
   const productTrends = await db.all<any>(
@@ -361,10 +433,10 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
      FROM items i
      JOIN orders o ON o.id = i.orderId
      ${ORDER_ITEM_PRODUCT_JOIN}
-     WHERE ${dateFilter('o')} AND ${notCancelledCond}
+     WHERE ${orderScopeCond}
      GROUP BY DATE(COALESCE(o.createdAt, o.created_at)), (${itemG})
      ORDER BY date DESC, daily_revenue DESC`,
-    dateParams
+    orderScopeParams
   )
 
   const averageOrderValue = await db.all<any>(
@@ -372,15 +444,14 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
      FROM items i
      JOIN orders o ON o.id = i.orderId
      ${ORDER_ITEM_PRODUCT_JOIN}
-     WHERE ${dateFilter('o')} AND ${notCancelledCond}
+     WHERE ${orderScopeCond}
      GROUP BY (${itemG})
      HAVING COUNT(DISTINCT o.id) >= 3
      ORDER BY avg_order_value DESC`,
-    dateParams
+    orderScopeParams
   )
 
-  // Общая выручка = заказы оплаченные или завершённые (деньги в кассе).
-  // Исключаем: «Ожидает» (status=1), мягко-отменённые (status=0 / is_cancelled=1).
+  const revenueCond = revenueOrdersCondition('o')
   const periodRevenueRow = await db.get<{ total_revenue: number }>(`
     SELECT COALESCE(SUM(
       (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(i_totals.raw_total, 0)
@@ -397,14 +468,15 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
       ), 0) as raw_total FROM items GROUP BY orderId
     ) i_totals ON i_totals.orderId = o.id
     WHERE ${dateFilter('o')}
-      AND o.status != 0
+      AND ${revenueCond}
       AND ${notCancelledCond}
-      AND (o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))
-  `, dateParams)
+      ${fulfillment.clause}
+  `, [...dateParams, ...fulfillment.params])
   const total_revenue = Number(periodRevenueRow?.total_revenue ?? 0)
 
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    department_id: typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : null,
     total_revenue,
     productPopularity,
     categoryStats,
@@ -416,6 +488,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
 // GET /api/reports/analytics/financial/profitability — финансовая аналитика
 router.get('/analytics/financial/profitability', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
   const hasIsCancelledFin = await hasColumn('orders', 'is_cancelled')
@@ -425,6 +498,11 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
   const notCancelledNoAlias = hasIsCancelledFin
     ? '(status != 0 AND COALESCE(is_cancelled, 0) = 0)'
     : 'status != 0'
+  const orderScopeCond = `${dateFilter('o')} AND ${notCancelled}${fulfillment.clause}`
+  const orderScopeParams = [...dateParams, ...fulfillment.params]
+  const fulfillmentNoAlias = fulfillment.clause.replace(/\bo\./g, '')
+  const orderScopeNoAlias = `${dateFilter('')} AND ${notCancelledNoAlias}${fulfillmentNoAlias}`
+  const orderScopeNoAliasParams = [...dateParams, ...fulfillment.params]
 
   const gkF = orderItemProductGroupKeyExpr()
   const labF = orderItemProductLabelExpr()
@@ -435,10 +513,10 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
     FROM items i
     JOIN orders o ON o.id = i.orderId
     ${ORDER_ITEM_PRODUCT_JOIN}
-    WHERE ${dateFilter('o')} AND ${notCancelled}
+    WHERE ${orderScopeCond}
     GROUP BY (${gkF})
     ORDER BY total_revenue DESC
-  `, dateParams)
+  `, orderScopeParams)
 
   const paymentAnalysis = await db.get<any>(`
     SELECT COUNT(CASE WHEN paymentMethod = 'online' THEN 1 END) as online_orders,
@@ -448,8 +526,8 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
       SUM(CASE WHEN paymentMethod = 'offline' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as offline_revenue,
       SUM(CASE WHEN paymentMethod = 'telegram' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as telegram_revenue,
       AVG(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount END) as avg_payment_amount
-    FROM orders WHERE ${dateFilter('')} AND ${notCancelledNoAlias}
-  `, dateParams)
+    FROM orders WHERE ${orderScopeNoAlias}
+  `, orderScopeNoAliasParams)
 
   const prepaymentAnalysis = await db.get<any>(`
     SELECT COUNT(CASE WHEN prepaymentStatus IN ('paid','successful') THEN 1 END) as paid_prepayments,
@@ -457,14 +535,16 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
       SUM(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as total_paid_prepayment,
       SUM(CASE WHEN prepaymentStatus NOT IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as total_pending_prepayment,
       AVG(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount END) as avg_paid_prepayment
-    FROM orders WHERE ${dateFilter('')} AND prepaymentAmount > 0 AND ${notCancelledNoAlias}
-  `, dateParams)
+    FROM orders WHERE ${orderScopeNoAlias} AND prepaymentAmount > 0
+  `, orderScopeNoAliasParams)
 
   const createdExpr = 'COALESCE(o.createdAt, o.created_at)'
   const currentRangeCondition = endDate
-    ? `${createdExpr} >= ? AND ${createdExpr} <= ? AND ${notCancelled}`
-    : `${createdExpr} >= ? AND ${notCancelled}`
-  const currentRangeParams = endDate ? [startDate.toISOString(), endDate.toISOString()] : [startDate.toISOString()]
+    ? `${createdExpr} >= ? AND ${createdExpr} <= ? AND ${notCancelled}${fulfillment.clause}`
+    : `${createdExpr} >= ? AND ${notCancelled}${fulfillment.clause}`
+  const currentRangeParams = endDate
+    ? [startDate.toISOString(), endDate.toISOString(), ...fulfillment.params]
+    : [startDate.toISOString(), ...fulfillment.params]
 
   const avgCheckTrend = await db.all<any>(`
     WITH order_totals AS (
@@ -526,6 +606,7 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
 
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    department_id: typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : null,
     productProfitability,
     paymentAnalysis,
     prepaymentAnalysis,
@@ -543,9 +624,15 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
 // GET /api/reports/analytics/orders/status-funnel — анализ статусов заказов
 router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
   const hasFunnelIsCancelled = await hasColumn('orders', 'is_cancelled')
+  const orderScopeCond = `${dateFilter('o')}${fulfillment.clause}`
+  const orderScopeParams = [...dateParams, ...fulfillment.params]
+  const fulfillmentNoAlias = fulfillment.clause.replace(/\bo\./g, '')
+  const orderScopeNoAlias = `${dateFilter('')}${fulfillmentNoAlias}`
+  const orderScopeNoAliasParams = [...dateParams, ...fulfillment.params]
 
   const statusFunnel = await db.all<any>(`
     SELECT COALESCE(os.name, CASE WHEN o.status = 0 THEN 'Отменён (пул)' ELSE CAST(o.status AS TEXT) END) as status_name,
@@ -554,9 +641,9 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
       AVG(COALESCE(o.prepaymentAmount, 0)) as avg_amount
     FROM orders o
     LEFT JOIN order_statuses os ON os.id = o.status
-    WHERE ${dateFilter('o')}
+    WHERE ${orderScopeCond}
     GROUP BY o.status, status_name ORDER BY o.status
-  `, dateParams)
+  `, orderScopeParams)
 
   const totalActiveCond = hasFunnelIsCancelled
     ? 'status != 0 AND COALESCE(is_cancelled, 0) = 0'
@@ -569,14 +656,14 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
       COUNT(CASE WHEN status >= 4 THEN 1 END) as ready_orders,
       COUNT(CASE WHEN status = 7 THEN 1 END) as completed_orders,
       COUNT(CASE WHEN ${totalActiveCond} THEN 1 END) as total_active
-    FROM orders WHERE ${dateFilter('')}
+    FROM orders WHERE ${orderScopeNoAlias}
     GROUP BY DATE(COALESCE(createdAt, created_at)) ORDER BY date DESC
-  `, dateParams)
+  `, orderScopeNoAliasParams)
 
   const avgProcessingTime = await db.all<any>(`
     SELECT AVG(JULIANDAY(COALESCE(updatedAt, updated_at)) - JULIANDAY(COALESCE(createdAt, created_at))) * 24 as avg_hours_to_complete, COUNT(*) as completed_orders
-    FROM orders WHERE status = 7 AND ${dateFilter('')} AND COALESCE(updatedAt, updated_at) > COALESCE(createdAt, created_at)
-  `, dateParams)
+    FROM orders WHERE status = 7 AND ${orderScopeNoAlias} AND COALESCE(updatedAt, updated_at) > COALESCE(createdAt, created_at)
+  `, orderScopeNoAliasParams)
 
   const cancelledCond = hasFunnelIsCancelled
     ? `(status = 0 OR COALESCE(is_cancelled, 0) = 1)`
@@ -584,11 +671,12 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 
   const cancellationReasons = await db.all<any>(`
     SELECT COUNT(*) as cancelled_count, SUM(COALESCE(prepaymentAmount, 0)) as cancelled_amount
-    FROM orders WHERE ${cancelledCond} AND ${dateFilter('')}
-  `, dateParams)
+    FROM orders WHERE ${cancelledCond} AND ${orderScopeNoAlias}
+  `, orderScopeNoAliasParams)
 
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    department_id: typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : null,
     statusFunnel,
     statusConversion,
     avgProcessingTime: avgProcessingTime[0],
@@ -599,11 +687,8 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 // GET /api/reports/analytics/revenue/yearly — выручка за последние 12 месяцев, по месяцам
 router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
   const db = await getDb()
-  const departmentIdParam = req.query.department_id ? Number(req.query.department_id) : undefined
-  const departmentId = Number.isFinite(departmentIdParam) ? Number(departmentIdParam) : undefined
-
-  const deptJoin = departmentId !== undefined ? 'LEFT JOIN users u ON u.id = o.userId' : ''
-  const deptWhere = departmentId !== undefined ? `AND u.department_id = ${departmentId}` : ''
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
+  const revenueCond = revenueOrdersCondition('o')
 
   const rows = await db.all<Array<{ month: string; orders: number; revenue: number }>>(`
     SELECT
@@ -611,7 +696,6 @@ router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
       COUNT(*) AS orders,
       SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) AS revenue
     FROM orders o
-    ${deptJoin}
     LEFT JOIN (
       SELECT i.orderId AS order_id, SUM(i.price * i.quantity) AS raw_total
       FROM items i
@@ -619,18 +703,17 @@ router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
     ) i_totals ON i_totals.order_id = o.id
     WHERE
       COALESCE(o.createdAt, o.created_at) >= date('now', '-12 months')
-      AND o.status != 0
-      AND (o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))
-      ${deptWhere}
+      AND ${revenueCond}
+      ${fulfillment.clause}
     GROUP BY month
     ORDER BY month
-  `)
+  `, fulfillment.params)
 
   const total_revenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0)
   const total_orders = rows.reduce((s, r) => s + Number(r.orders || 0), 0)
 
   res.json({
-    department_id: departmentId ?? null,
+    department_id: typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : null,
     total_revenue,
     total_orders,
     by_month: rows.map(r => ({
@@ -641,6 +724,222 @@ router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/reports/analytics/revenue/by-location — выручка по точкам исполнения
+router.get('/analytics/revenue/by-location', asyncHandler(async (req, res) => {
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const includeByMonth = req.query.by_month === '1' || req.query.by_month === 'true'
+  const db = await getDb()
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const revenueCond = revenueOrdersCondition('o')
+  const dateCond = dateFilter('o')
+
+  const departments = await db.all<Array<{ id: number; name: string; code: string | null }>>(
+    `SELECT id, name, code FROM departments WHERE COALESCE(is_active, 1) = 1 ORDER BY sort_order ASC, name ASC`,
+  )
+
+  const groupExpr = columnExists ? 'o.fulfillment_department_id' : 'NULL'
+  const deptJoin = columnExists ? 'LEFT JOIN departments d ON d.id = o.fulfillment_department_id' : ''
+
+  const locationRows = await db.all<Array<{ department_id: number | null; name: string | null; orders: number; revenue: number }>>(`
+    SELECT ${groupExpr} as department_id,
+           MAX(d.name) as name,
+           COUNT(*) as orders,
+           SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) as revenue
+    FROM orders o
+    ${deptJoin}
+    LEFT JOIN (
+      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+      FROM items i GROUP BY i.orderId
+    ) i_totals ON i_totals.order_id = o.id
+    WHERE ${dateCond} AND ${revenueCond}
+    GROUP BY ${groupExpr}
+  `, dateParams)
+
+  const revenueByDept = new Map<number | null, { orders: number; revenue: number; name: string | null }>()
+  for (const row of locationRows) {
+    const deptId = row.department_id == null ? null : Number(row.department_id)
+    revenueByDept.set(deptId, {
+      orders: Number(row.orders || 0),
+      revenue: Number(row.revenue || 0),
+      name: row.name,
+    })
+  }
+
+  const unassignedRow = revenueByDept.get(null)
+  const unassigned = Number(unassignedRow?.revenue || 0)
+  revenueByDept.delete(null)
+
+  const locations = departments.map((dept) => {
+    const stats = revenueByDept.get(dept.id)
+    revenueByDept.delete(dept.id)
+    return {
+      department_id: dept.id,
+      name: dept.name,
+      code: dept.code,
+      orders: stats?.orders ?? 0,
+      revenue: stats?.revenue ?? 0,
+    }
+  })
+
+  for (const [deptId, stats] of revenueByDept.entries()) {
+    if (deptId == null) continue
+    locations.push({
+      department_id: deptId,
+      name: stats.name || `Точка #${deptId}`,
+      code: null,
+      orders: stats.orders,
+      revenue: stats.revenue,
+    })
+  }
+
+  const company_total = locations.reduce((s, l) => s + l.revenue, 0) + unassigned
+
+  let by_month: Array<{ month: string; revenue: number; orders: number }> | undefined
+  if (includeByMonth) {
+    const monthRows = await db.all<Array<{ month: string; orders: number; revenue: number }>>(`
+      SELECT strftime('%Y-%m', COALESCE(o.createdAt, o.created_at)) as month,
+             COUNT(*) as orders,
+             SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) as revenue
+      FROM orders o
+      LEFT JOIN (
+        SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+        FROM items i GROUP BY i.orderId
+      ) i_totals ON i_totals.order_id = o.id
+      WHERE ${dateCond} AND ${revenueCond}
+      GROUP BY month
+      ORDER BY month
+    `, dateParams)
+    by_month = monthRows.map((r) => ({
+      month: r.month,
+      orders: Number(r.orders || 0),
+      revenue: Number(r.revenue || 0),
+    }))
+  }
+
+  res.json({
+    period: {
+      startDate: startDate.toISOString(),
+      endDate: endDate?.toISOString() ?? undefined,
+    },
+    locations: locations.map(({ department_id, name, revenue, orders }) => ({
+      department_id,
+      name,
+      orders,
+      revenue,
+    })),
+    unassigned,
+    company_total,
+    ...(by_month ? { by_month } : {}),
+  })
+}))
+
+// GET /api/reports/analytics/pnl — P&L по точкам исполнения
+router.get('/analytics/pnl', asyncHandler(async (req, res) => {
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
+  const includePayroll = req.query.include_payroll === '1' || req.query.include_payroll === 'true'
+  const includeCogs = req.query.include_cogs === '1' || req.query.include_cogs === 'true'
+  const db = await getDb()
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const revenueCond = revenueOrdersCondition('o')
+  const dateCond = `${dateFilter('o')}${fulfillment.clause}`
+  const revenueParams = [...dateParams, ...fulfillment.params]
+
+  const dateFromStr = startDate.toISOString().slice(0, 10)
+  const dateToStr = (endDate ?? new Date()).toISOString().slice(0, 10)
+
+  const departments = await db.all<Array<{ id: number; name: string }>>(
+    `SELECT id, name FROM departments WHERE COALESCE(is_active, 1) = 1 ORDER BY sort_order ASC, name ASC`,
+  )
+
+  const groupExpr = columnExists ? 'o.fulfillment_department_id' : 'NULL'
+  const deptJoin = columnExists ? 'LEFT JOIN departments d ON d.id = o.fulfillment_department_id' : ''
+
+  const revenueRows = await db.all<Array<{ department_id: number | null; name: string | null; revenue: number }>>(`
+    SELECT ${groupExpr} as department_id,
+           MAX(d.name) as name,
+           SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) as revenue
+    FROM orders o
+    ${deptJoin}
+    LEFT JOIN (
+      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+      FROM items i GROUP BY i.orderId
+    ) i_totals ON i_totals.order_id = o.id
+    WHERE ${dateCond} AND ${revenueCond}
+    GROUP BY ${groupExpr}
+  `, revenueParams)
+
+  const revenueByDept = new Map<number | null, number>()
+  for (const row of revenueRows) {
+    const deptId = row.department_id == null ? null : Number(row.department_id)
+    revenueByDept.set(deptId, Number(row.revenue || 0))
+  }
+  const unassigned_revenue = Number(revenueByDept.get(null) || 0)
+  revenueByDept.delete(null)
+
+  const expensesSummary = await loadExpensesByDepartment(db, dateFromStr, dateToStr)
+
+  const buildLocation = (departmentId: number, name: string) => {
+    const revenue = Number(revenueByDept.get(departmentId) || 0)
+    const expenses = Number(expensesSummary.byDepartment.get(departmentId) || 0)
+    const payroll = includePayroll ? 0 : undefined
+    const cogs = includeCogs ? 0 : undefined
+    const result = revenue - expenses - (payroll ?? 0) - (cogs ?? 0)
+    return {
+      department_id: departmentId,
+      name,
+      revenue,
+      expenses,
+      ...(includePayroll ? { payroll } : {}),
+      ...(includeCogs ? { cogs } : {}),
+      result,
+    }
+  }
+
+  const locations = departments.map((d) => buildLocation(d.id, d.name))
+  for (const [deptId] of revenueByDept.entries()) {
+    if (!locations.some((l) => l.department_id === deptId)) {
+      locations.push(buildLocation(deptId, `Точка #${deptId}`))
+    }
+  }
+
+  const company_wide: { expenses: number; payroll?: number; cogs?: number } = {
+    expenses: expensesSummary.companyWide,
+  }
+  if (includePayroll) company_wide.payroll = 0
+  if (includeCogs) company_wide.cogs = 0
+
+  const totalRevenue = locations.reduce((s, l) => s + l.revenue, 0) + unassigned_revenue
+  const totalExpenses = expensesSummary.companyWide
+  const totals: {
+    revenue: number
+    expenses: number
+    payroll?: number
+    cogs?: number
+    result: number
+  } = {
+    revenue: totalRevenue,
+    expenses: totalExpenses,
+    result: totalRevenue - totalExpenses,
+  }
+  if (includePayroll) totals.payroll = 0
+  if (includeCogs) totals.cogs = 0
+  if (includePayroll) totals.result -= totals.payroll ?? 0
+  if (includeCogs) totals.result -= totals.cogs ?? 0
+
+  res.json({
+    period: {
+      startDate: startDate.toISOString(),
+      endDate: endDate?.toISOString() ?? undefined,
+    },
+    department_id: typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : null,
+    locations,
+    company_wide,
+    unassigned_revenue,
+    totals,
+  })
+}))
+
 // GET /api/reports/analytics/orders/list — первичка заказов для drill-down из KPI
 router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
@@ -648,8 +947,8 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
 
   const statusFilter = req.query.status ? String(req.query.status) : 'all'
   const reasonFilter = req.query.reason_filter ? String(req.query.reason_filter) : ''
-  const departmentIdParam = req.query.department_id ? Number(req.query.department_id) : undefined
-  const departmentId = Number.isFinite(departmentIdParam) ? Number(departmentIdParam) : undefined
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
+  const departmentId = typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : undefined
   const limitRaw = Number(req.query.limit ?? 100)
   const limit = Math.min(500, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 100))
   const offsetRaw = Number(req.query.offset ?? 0)
@@ -661,9 +960,9 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   const where: string[] = [dateFilter('o')]
   const params: any[] = [...dateParams]
 
-  if (departmentId !== undefined) {
-    where.push('u.department_id = ?')
-    params.push(departmentId)
+  if (fulfillment.clause) {
+    where.push(fulfillment.clause.trim().replace(/^AND\s+/i, ''))
+    params.push(...fulfillment.params)
   }
 
   if (statusFilter && statusFilter !== 'all') {
@@ -786,14 +1085,14 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
 router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
   const db = await getDb()
-  const departmentIdParam = req.query.department_id ? Number(req.query.department_id) : undefined
-  const departmentId = Number.isFinite(departmentIdParam) ? Number(departmentIdParam) : undefined
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
+  const departmentId = typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : undefined
 
   const baseWhere: string[] = [dateFilter('o')]
   const baseParams: any[] = [...dateParams]
-  if (departmentId !== undefined) {
-    baseWhere.push('u.department_id = ?')
-    baseParams.push(departmentId)
+  if (fulfillment.clause) {
+    baseWhere.push(fulfillment.clause.trim().replace(/^AND\s+/i, ''))
+    baseParams.push(...fulfillment.params)
   }
 
   const hasCancellationEvents = !!(await db.get(
@@ -811,9 +1110,9 @@ router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
       eventWhere.push("e.created_at >= ?")
       eventParams.push(startDate.toISOString())
     }
-    if (departmentId !== undefined) {
-      eventWhere.push('u.department_id = ?')
-      eventParams.push(departmentId)
+    if (fulfillment.clause) {
+      eventWhere.push(fulfillment.clause.trim().replace(/^AND\s+/i, '').replace(/\bo\./g, 'ord.'))
+      eventParams.push(...fulfillment.params)
     }
     cancellationRows = await db.all<any>(`
       SELECT
@@ -821,7 +1120,7 @@ router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
         COALESCE(e.reason_code, 'unspecified') as reason_code,
         COUNT(*) as count
       FROM order_cancellation_events e
-      LEFT JOIN users u ON u.id = e.user_id
+      LEFT JOIN orders ord ON ord.id = e.order_id
       WHERE ${eventWhere.join(' AND ')}
       GROUP BY reason, reason_code
       ORDER BY count DESC
@@ -844,7 +1143,6 @@ router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
         END as reason_code,
         COUNT(*) as count
       FROM orders o
-      LEFT JOIN users u ON u.id = o.userId
       WHERE ${baseWhere.join(' AND ')} AND o.status = 0
       GROUP BY reason, reason_code
       ORDER BY count DESC
@@ -868,7 +1166,6 @@ router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
       END as reason_code,
       COUNT(*) as count
     FROM orders o
-    LEFT JOIN users u ON u.id = o.userId
     WHERE ${baseWhere.join(' AND ')}
       AND o.status IN (1,2,3,4)
       AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24
@@ -965,8 +1262,8 @@ router.put('/analytics/reason-presets', asyncHandler(async (req, res) => {
 // GET /api/reports/analytics/managers/efficiency — эффективность менеджеров
 // Отмена = status=0 (мягко удалённые) или is_cancelled=1. Status 5 = «Передан в ПВЗ», не отмена.
 router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
-  const { department_id: deptIdParam } = req.query
-  const departmentId = deptIdParam != null ? parseInt(String(deptIdParam), 10) : undefined
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
+  const departmentId = typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : undefined
   const { startDate, endDate } = getAnalyticsDateRange(req.query)
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
 
@@ -978,8 +1275,10 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const managerDateParams = endStr ? [startStr, endStr] : [startStr]
 
   const db = await getDb()
-  const deptCondition = Number.isFinite(departmentId) ? ' AND u.department_id = ? ' : ''
-  const deptParam = Number.isFinite(departmentId) ? [departmentId] : []
+  const orderFulfillmentJoin = fulfillment.clause
+    ? fulfillment.clause.trim().replace(/^AND\s+/i, '')
+    : ''
+  const orderFulfillmentParams = fulfillment.params
   const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
   const cancelledCondition = hasIsCancelled
     ? '(o.status = 0 OR COALESCE(o.is_cancelled, 0) = 1)'
@@ -995,10 +1294,10 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
       AVG(CASE WHEN ${oUpdated} > ${oCreated} THEN JULIANDAY(${oUpdated}) - JULIANDAY(${oCreated}) ELSE NULL END) * 24 as avg_processing_hours,
       COUNT(DISTINCT ${oDate}) as active_days, MAX(${oCreated}) as last_order_date
     FROM users u
-    LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
-    WHERE u.role IN ('admin', 'manager', 'user') ${deptCondition}
+    LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}${orderFulfillmentJoin ? ` AND ${orderFulfillmentJoin}` : ''}
+    WHERE u.role IN ('admin', 'manager', 'user')
     GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY total_revenue DESC`,
-    [...managerDateParams, ...deptParam]
+    [...managerDateParams, ...orderFulfillmentParams]
   )
 
   const topManagerIds = managerEfficiency.slice(0, 3).map(m => m.user_id)
@@ -1007,26 +1306,25 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
     SELECT o.userId as user_id, ${oDate} as date, COUNT(o.id) as daily_orders,
       SUM(COALESCE(o.prepaymentAmount, 0)) as daily_revenue,
       COUNT(o.id) as daily_completed
-    FROM orders o WHERE ${oCreatedRange} AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
+    FROM orders o WHERE ${oCreatedRange}${orderFulfillmentJoin ? ` AND ${orderFulfillmentJoin}` : ''} AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
     GROUP BY o.userId, ${oDate} ORDER BY date DESC
-  `, [...managerDateParams, ...topManagerIds])
+  `, [...managerDateParams, ...orderFulfillmentParams, ...topManagerIds])
     : []
 
-  // Без ограничений по статусам: подтверждённые и выполненные = все заказы
   const managerConversion = await db.all<any>(
     `SELECT u.id as user_id, u.name as user_name,
       COUNT(o.id) as confirmed_orders,
       COUNT(o.id) as completed_orders, COUNT(o.id) as total_orders,
       100.0 as conversion_rate
-    FROM users u LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
-    WHERE u.role IN ('admin', 'manager', 'user') ${deptCondition}
+    FROM users u LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}${orderFulfillmentJoin ? ` AND ${orderFulfillmentJoin}` : ''}
+    WHERE u.role IN ('admin', 'manager', 'user')
     GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY total_orders DESC`,
-    [...managerDateParams, ...deptParam]
+    [...managerDateParams, ...orderFulfillmentParams]
   )
 
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
-    department_id: Number.isFinite(departmentId) ? departmentId : null,
+    department_id: departmentId ?? null,
     managerEfficiency,
     managerDailyStats,
     managerConversion
@@ -1108,6 +1406,7 @@ const emptyMaterialsResponse = (period: { days: number; startDate: string; endDa
 // material_moves.created_at может быть в формате SQLite (YYYY-MM-DD HH:MM:SS), сравниваем по дате через substr
 router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) => {
   const { startDate, endDate } = getAnalyticsDateRange(req.query)
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'ord')
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '90'), 10) || 90
   const period = { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined }
   const startStr = startDate.toISOString().slice(0, 10)
@@ -1118,6 +1417,10 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
   const matDateParams = endStr ? [startStr, endStr] : [startStr]
 
   const db = await getDb()
+  const orderJoin = fulfillment.clause
+    ? `LEFT JOIN orders ord ON ord.id = mm.order_id AND ${fulfillment.clause.trim().replace(/^AND\s+/i, '')}`
+    : ''
+  const orderJoinParams = fulfillment.params
 
   let materialsConsumption: any[]
   try {
@@ -1130,9 +1433,10 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
     FROM materials m
     LEFT JOIN material_categories mc ON mc.id = m.category_id
     LEFT JOIN material_moves mm ON mm.material_id = m.id AND ${matDateRange}
-    WHERE ${matDateRange}
+    ${orderJoin}
+    WHERE ${matDateRange}${fulfillment.clause ? ` AND (mm.order_id IS NULL OR ord.id IS NOT NULL)` : ''}
     GROUP BY m.id, m.name, mc.name HAVING total_consumed > 0 ORDER BY total_cost DESC
-  `, [...matDateParams, ...matDateParams])
+  `, [...matDateParams, ...orderJoinParams, ...matDateParams])
   } catch (err) {
     console.error('Materials ABC query failed:', err)
     res.json(emptyMaterialsResponse(period))
@@ -1200,12 +1504,14 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
     FROM material_categories mc
     LEFT JOIN materials m ON m.category_id = mc.id
     LEFT JOIN material_moves mm ON mm.material_id = m.id AND ${matDateRange}
-    WHERE ${matDateRange}
+    ${orderJoin}
+    WHERE ${matDateRange}${fulfillment.clause ? ` AND (mm.order_id IS NULL OR ord.id IS NOT NULL)` : ''}
     GROUP BY mc.id, mc.name HAVING total_consumed > 0 ORDER BY total_cost DESC
-  `, [...matDateParams, ...matDateParams])
+  `, [...matDateParams, ...orderJoinParams, ...matDateParams])
 
   res.json({
     period,
+    department_id: typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : null,
     abcAnalysis,
     abcSummary,
     categoryAnalysis,
@@ -1226,9 +1532,11 @@ function workHoursCondition(alias: string): string {
 // GET /api/reports/analytics/time/peak-hours — временная аналитика только по рабочим часам 9–20
 router.get('/analytics/time/peak-hours', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const fulfillment = await fulfillmentScopeFromQuery(req.query as Record<string, unknown>, 'o')
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
-  const dateAndWorkHours = `${dateFilter('o')} AND ${workHoursCondition('o')}`
+  const dateAndWorkHours = `${dateFilter('o')} AND ${workHoursCondition('o')}${fulfillment.clause}`
+  const timeParams = [...dateParams, ...fulfillment.params]
 
   const hourlyRaw = await db.all<any>(`
     SELECT CAST(SUBSTR(COALESCE(o.createdAt, o.created_at), 12, 2) AS INTEGER) as hour, COUNT(o.id) as orders_count,
@@ -1237,7 +1545,7 @@ router.get('/analytics/time/peak-hours', asyncHandler(async (req, res) => {
       COUNT(DISTINCT substr(COALESCE(o.createdAt, o.created_at), 1, 10)) as active_days
     FROM orders o WHERE ${dateAndWorkHours}
     GROUP BY hour ORDER BY hour
-  `, dateParams)
+  `, timeParams)
 
   // Градация по часам 9–20: заполняем все часы, отсутствующие = 0
   const hourMap = new Map<number, { hour: string; orders_count: number; total_revenue: number; avg_order_value: number | null; active_days: number }>()
@@ -1265,7 +1573,7 @@ router.get('/analytics/time/peak-hours', asyncHandler(async (req, res) => {
       CAST(SUBSTR(COALESCE(o.createdAt, o.created_at), 12, 2) AS INTEGER) as hour, COUNT(o.id) as orders_count, SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
     FROM orders o WHERE ${dateAndWorkHours}
     GROUP BY strftime('%w', ${oDateExpr}), hour, weekday ORDER BY strftime('%w', ${oDateExpr}), hour
-  `, dateParams)
+  `, timeParams)
   const weekdayHourlyAnalysis = weekdayHourlyRaw.filter((r: any) => r.hour >= WORK_HOUR_START && r.hour <= WORK_HOUR_END)
 
   const peakAmongWorkHours = hourlyAnalysis.length ? hourlyAnalysis.reduce((max, h) => h.orders_count > max.orders_count ? h : max, hourlyAnalysis[0]) : { hour: '09', orders_count: 0 }
@@ -1277,7 +1585,7 @@ router.get('/analytics/time/peak-hours', asyncHandler(async (req, res) => {
         COUNT(o.id) as orders_count, SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
       FROM orders o WHERE ${dateAndWorkHours}
       GROUP BY strftime('%w', ${oDateExpr}), weekday ORDER BY orders_count DESC LIMIT 1
-    `, dateParams) || { weekday: '—', orders_count: 0, total_revenue: 0 },
+    `, timeParams) || { weekday: '—', orders_count: 0, total_revenue: 0 },
     busiestTimeSlot: hourlyAnalysis.length ? peakAmongWorkHours : { hour: '09', orders_count: 0 }
   }
 
@@ -1291,6 +1599,7 @@ router.get('/analytics/time/peak-hours', asyncHandler(async (req, res) => {
 
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    department_id: typeof fulfillment.departmentId === 'number' ? fulfillment.departmentId : null,
     workHours: { start: WORK_HOUR_START, end: WORK_HOUR_END },
     hourlyAnalysis,
     weekdayHourlyAnalysis,

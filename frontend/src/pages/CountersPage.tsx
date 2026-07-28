@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getCurrentUser, getUsers, getCashRegisterDay, recalculateCashRegisterDay } from '../api';
+import { api, getCurrentUser, getUsers, getCashRegisterDay, recalculateCashRegisterDay, getDepartments, type Department } from '../api';
 import { addCalendarDaysLocal, calendarDateLocal, todayCalendarLocal } from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
@@ -72,6 +72,8 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<'cash' | 'printers'>('cash');
   const previousDateLabel = React.useMemo(
     () => addCalendarDaysLocal(selectedDate, -1),
@@ -86,12 +88,15 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
     if (user) {
       loadCounters();
     }
-  }, [user, selectedDate]);
+  }, [user, selectedDate, selectedDepartmentId]);
 
   useEffect(() => {
     getUsers()
       .then((res) => setAllUsers(Array.isArray(res.data) ? res.data : []))
       .catch(() => setAllUsers([]));
+    getDepartments()
+      .then((res) => setDepartments(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setDepartments([]));
   }, []);
 
   const loadUser = async () => {
@@ -172,7 +177,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       const previousDateKey = addCalendarDaysLocal(selectedDate, -1);
       const previousActualCash = await getCashActualForDate(previousDateKey);
 
-      const cashRegisterRes = await getCashRegisterDay(selectedDate);
+      const cashRegisterRes = await getCashRegisterDay(selectedDate, {
+        department_id: selectedDepartmentId,
+      });
       const reg = cashRegisterRes.data;
       const dailyRevenue = Number(reg.cash_in_today ?? 0);
       const issuedOrdersTotal = Number(reg.issued_today ?? 0);
@@ -187,7 +194,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       setCashContributions(contributionsToShow);
       setCashContributionsTotal(total);
 
-      const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`);
+      const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`, {
+        params: selectedDepartmentId != null ? { department_id: selectedDepartmentId } : undefined,
+      });
       const ordersForDate = Array.isArray(ordersResponse.data?.orders)
         ? ordersResponse.data.orders
         : [];
@@ -246,7 +255,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
     try {
       setRecalculatingCash(true);
       setError(null);
-      await recalculateCashRegisterDay(selectedDate);
+      await recalculateCashRegisterDay(selectedDate, {
+        department_id: selectedDepartmentId,
+      });
       await loadCashData();
     } catch (err: unknown) {
       console.error('Recalculate cash register failed', err);
@@ -446,6 +457,20 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             onChange={(e) => handleDateChange(e.target.value)}
             className="date-input"
           />
+        </div>
+        <div className="date-selector">
+          <label htmlFor="dept-input"><AppIcon name="building" size="xs" /> Точка:</label>
+          <select
+            id="dept-input"
+            className="date-input"
+            value={selectedDepartmentId ?? ''}
+            onChange={(e) => setSelectedDepartmentId(e.target.value === '' ? undefined : Number(e.target.value))}
+          >
+            <option value="">Все точки</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
