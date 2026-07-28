@@ -1,4 +1,4 @@
-import { getDb } from '../../config/database'
+import { getDb } from '../../../config/database'
 
 /** Склад по умолчанию для точки (или глобальный default). */
 export async function getDefaultWarehouseId(departmentId?: number | null): Promise<number | null> {

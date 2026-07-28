@@ -1,5 +1,5 @@
-import { getDb } from '../../config/database'
-import type { WebsiteOrderDelivery } from '../../types/websiteOrderDelivery'
+import { getDb } from '../../../config/database'
+import type { WebsiteOrderDelivery } from '../../../types/websiteOrderDelivery'
 
 /** Резолв точки исполнения по delivery с сайта (kind=pickup + providerId = departments.code). */
 export async function resolveFulfillmentDepartmentId(
