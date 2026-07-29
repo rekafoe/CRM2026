@@ -29,6 +29,7 @@ import {
   requestManualProductionRegeneration,
 } from '../services/editorProductionJobService'
 import { logger } from '../utils/logger'
+import { Readable } from 'stream'
 
 const router = Router()
 
@@ -910,8 +911,35 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
   }
   if (row.storage && row.storage !== 'local') {
     if (row.externalUrl) {
-      await logOrderFileAccess(db, req, { orderId, fileId, action: 'external_link', storage: row.storage })
-      res.redirect(302, String(row.externalUrl))
+      let externalResponse: Response
+      try {
+        externalResponse = await fetch(String(row.externalUrl), {
+          cache: 'no-store',
+          redirect: 'follow',
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Не удалось подключиться к внешнему хранилищу'
+        res.status(502).json({ message })
+        return
+      }
+      if (!externalResponse.ok || !externalResponse.body) {
+        const message = await externalResponse.text().catch(() => '')
+        res.status(externalResponse.status || 502).json({
+          message: message || `Ошибка внешнего хранилища: ${externalResponse.status} ${externalResponse.statusText}`,
+        })
+        return
+      }
+      const displayName = (row.originalName || row.filename).trim() || row.filename
+      const contentDisposition =
+        externalResponse.headers.get('content-disposition') ||
+        `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`
+      const contentType = externalResponse.headers.get('content-type') || row.mime || 'application/octet-stream'
+      const contentLength = externalResponse.headers.get('content-length')
+      res.setHeader('Content-Disposition', contentDisposition)
+      res.setHeader('Content-Type', contentType)
+      if (contentLength) res.setHeader('Content-Length', contentLength)
+      await logOrderFileAccess(db, req, { orderId, fileId, action: 'download', storage: row.storage })
+      Readable.fromWeb(externalResponse.body as any).pipe(res)
       return
     }
     res.status(409).json({
