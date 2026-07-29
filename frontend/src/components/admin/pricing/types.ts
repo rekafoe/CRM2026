@@ -22,6 +22,8 @@ export interface PrinterRow {
   max_width_mm?: number | null;
   color_mode?: 'bw' | 'color' | 'both';
   printer_class?: 'office' | 'pro';
+  department_id?: number | null;
+  department_name?: string | null;
   price_single?: number | null;
   price_duplex?: number | null;
   price_per_meter?: number | null;

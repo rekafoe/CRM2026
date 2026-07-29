@@ -131,17 +131,44 @@ export const OrderRepository = {
     let hasIsInternal = false
     let hasNotes = false
     let hasDeliveryJson = false
+    let hasExecutorUserId = false
+    let hasContactUserId = false
+    let hasResponsibleUserId = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
       hasIsInternal = await hasColumn('orders', 'is_internal')
       hasNotes = await hasColumn('orders', 'notes')
       hasDeliveryJson = await hasColumn('orders', 'delivery_json')
+      hasExecutorUserId = await hasColumn('items', 'executor_user_id')
+      hasContactUserId = await hasColumn('orders', 'contact_user_id')
+      hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
     } catch { /* ignore */ }
     const paymentChannelSel = hasPaymentChannel
       ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
       : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const deliverySel = hasDeliveryJson ? 'o.delivery_json' : 'NULL as delivery_json'
+    const contactSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
+    const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
+    const assignedAsExecutorSel = hasExecutorUserId
+      ? `CASE
+           WHEN o.userId = ? THEN 0
+           WHEN EXISTS (
+             SELECT 1 FROM items i
+             WHERE i.orderId = o.id AND i.executor_user_id = ?
+           ) THEN 1
+           ELSE 0
+         END as assigned_as_executor`
+      : '0 as assigned_as_executor'
+    const accessWhere = hasExecutorUserId
+      ? `(o.userId = ? OR EXISTS (
+           SELECT 1 FROM items i
+           WHERE i.orderId = o.id AND i.executor_user_id = ?
+         ))`
+      : 'o.userId = ?'
+    const selectParams: number[] = hasExecutorUserId ? [userId, userId] : []
+    const whereParams: number[] = hasExecutorUserId ? [userId, userId] : [userId]
+
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -151,10 +178,13 @@ export const OrderRepository = {
         END as number,
         o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
+        ${contactSel},
+        ${responsibleSel},
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
         ${notesSel},
         ${deliverySel},
+        ${assignedAsExecutorSel},
         c.id as customer__id,
         c.first_name as customer__first_name,
         c.last_name as customer__last_name,
@@ -166,9 +196,10 @@ export const OrderRepository = {
         c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.userId = ?
+      WHERE ${accessWhere}
       ORDER BY o.id DESC`,
-      userId
+      ...selectParams,
+      ...whereParams
     )
     // Преобразуем плоские поля customer__ в объект customer
     return orders.map((row: any) => {
@@ -658,10 +689,30 @@ export const OrderRepository = {
     const params: any[] = []
 
     if (!searchParams.all) {
-      whereConditions.push(
-        '(o.userId = ? OR EXISTS (SELECT 1 FROM user_order_page_orders uopo JOIN user_order_pages uop ON uopo.page_id = uop.id WHERE uopo.order_id = o.id AND uopo.order_type = \'website\' AND uop.user_id = ?))'
-      )
-      params.push(userId, userId)
+      let hasExecutorUserId = false
+      try {
+        hasExecutorUserId = await hasColumn('items', 'executor_user_id')
+      } catch { /* ignore */ }
+      if (hasExecutorUserId) {
+        whereConditions.push(
+          `(o.userId = ?
+            OR EXISTS (
+              SELECT 1 FROM user_order_page_orders uopo
+              JOIN user_order_pages uop ON uopo.page_id = uop.id
+              WHERE uopo.order_id = o.id AND uopo.order_type = 'website' AND uop.user_id = ?
+            )
+            OR EXISTS (
+              SELECT 1 FROM items i
+              WHERE i.orderId = o.id AND i.executor_user_id = ?
+            ))`
+        )
+        params.push(userId, userId, userId)
+      } else {
+        whereConditions.push(
+          '(o.userId = ? OR EXISTS (SELECT 1 FROM user_order_page_orders uopo JOIN user_order_pages uop ON uopo.page_id = uop.id WHERE uopo.order_id = o.id AND uopo.order_type = \'website\' AND uop.user_id = ?))'
+        )
+        params.push(userId, userId)
+      }
     }
 
     if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {

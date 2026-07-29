@@ -12,6 +12,7 @@ import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
+import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 
 export class OrderItemController {
   static async addItem(req: Request, res: Response) {
@@ -635,6 +636,14 @@ export class OrderItemController {
       } catch (_) {}
       logger.info('🖨️ [updateItem] Колонка принтера в items', { printerIdCol })
 
+      let hasExecutorUserIdEarly = false
+      try {
+        hasExecutorUserIdEarly = await hasColumn('items', 'executor_user_id')
+      } catch { /* ignore */ }
+      const hasExecutorColForSelect = hasExecutorUserIdEarly
+        ? 'executor_user_id'
+        : 'NULL as executor_user_id'
+
       type ExistingRow = {
         id: number
         orderId: number
@@ -647,11 +656,19 @@ export class OrderItemController {
         waste: number
       }
       const existing = await db.get<ExistingRow & Record<string, unknown>>(
-        `SELECT id, orderId, type, params, price, quantity, ${printerIdCol}, sides, sheets, waste FROM items WHERE id = ? AND orderId = ?`,
+        `SELECT id, orderId, type, params, price, quantity, ${printerIdCol}, sides, sheets, waste,
+                ${hasExecutorColForSelect} FROM items WHERE id = ? AND orderId = ?`,
         itemId,
         orderId
       )
       if (!existing) { res.status(404).json({ message: 'Позиция не найдена' }); return }
+
+      let previousExecutorUserId: number | null = null
+      if (hasExecutorUserIdEarly) {
+        const rawPrev = (existing as any).executor_user_id
+        previousExecutorUserId =
+          rawPrev != null && Number.isFinite(Number(rawPrev)) ? Number(rawPrev) : null
+      }
 
       const newQuantity = body.quantity != null ? Math.max(1, Number(body.quantity) || 1) : existing.quantity
       if (totalCostFromClient != null) {
@@ -883,6 +900,35 @@ export class OrderItemController {
         printerIdVal = (parsedParams as any).printerId
       }
       logger.info('🖨️ [updateItem] После UPDATE', { itemId, orderId, printerIdVal, printerIdKey: printerIdKey ?? 'none', fromParams: (parsedParams as any).printerId })
+
+      if (hasExecutorUserIdEarly && body.executor_user_id !== undefined) {
+        try {
+          const orderMeta = await db.get<{ number?: string | null }>(
+            `SELECT CASE
+               WHEN source = 'website' THEN 'site-ord-' || id
+               ELSE number
+             END as number
+             FROM orders WHERE id = ?`,
+            orderId
+          )
+          await UserInboxNotificationService.notifyExecutorAssigned({
+            executorUserId: body.executor_user_id,
+            previousExecutorUserId,
+            actorUserId: (req as AuthenticatedRequest).user?.id ?? null,
+            orderId,
+            orderNumber: orderMeta?.number ?? null,
+            itemId,
+            itemType: updated?.type ?? existing.type,
+          })
+        } catch (notifyErr: any) {
+          logger.warn('⚠️ [updateItem] Не удалось отправить уведомление исполнителю', {
+            orderId,
+            itemId,
+            message: notifyErr?.message || String(notifyErr),
+          })
+        }
+      }
+
       res.json({
         id: updated.id,
         orderId: updated.orderId,

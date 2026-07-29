@@ -114,6 +114,35 @@ export const updateOrderAssignees = (orderId: number, data: { contact_user_id?: 
 export const getOperatorsToday = (date?: string) =>
   api.get<Array<{ id: number; name: string }>>('/users/operators-today', { params: date ? { date } : {} });
 
+export type InboxNotification = {
+  id: number;
+  userId: number;
+  type: string;
+  title: string;
+  message: string;
+  payload: Record<string, unknown> | null;
+  actorUserId: number | null;
+  isRead: boolean;
+  createdAt: string;
+  readAt: string | null;
+};
+
+export const getInboxNotifications = (params?: { unread_only?: boolean; limit?: number }) =>
+  api.get<{ items: InboxNotification[]; unreadCount: number }>('/notifications/inbox', {
+    params: {
+      unread_only: params?.unread_only ? '1' : undefined,
+      limit: params?.limit,
+    },
+  });
+
+export const getInboxUnreadCount = () =>
+  api.get<{ unreadCount: number }>('/notifications/inbox/unread-count');
+
+export const markInboxNotificationsRead = (ids?: number[]) =>
+  api.post<{ changed: number; unreadCount: number }>('/notifications/inbox/mark-read', {
+    ids,
+  });
+
 // Order Pool helpers
 export const reassignOrderByNumber = (number: string, userId: number) =>
   api.post(`/orders/reassign/${encodeURIComponent(number)}`, { userId });
@@ -204,7 +233,8 @@ export const saveProductMaterials = (cfg: {
 export const getDailyReports = (params?: { user_id?: number | ''; from?: string; to?: string; current_user_id?: number; show_all?: boolean }) =>
   api.get<DailyReport[]>('/daily-reports', { params });
 
-export const getCurrentUser = () => api.get<{ id: number; name: string; role: string }>('/auth/me');
+export const getCurrentUser = () =>
+  api.get<{ id: number; name: string; role: string; department_id?: number | null }>('/auth/me');
 
 // === ДЕПАРТАМЕНТЫ ===
 export interface Department {
@@ -708,6 +738,38 @@ export const getMyEarnings = (params?: { month?: string }) =>
   api.get('/earnings/me', { params });
 export const getAdminEarnings = (params?: { month?: string; history_months?: number; department_id?: number }) =>
   api.get('/earnings/admin', { params });
+export type AdminEarningsOrderLine = {
+  itemId: number;
+  itemType: string;
+  itemName: string;
+  itemTotal: number;
+  percent: number;
+  amount: number;
+  earnedDate: string;
+};
+export type AdminEarningsOrderRow = {
+  orderId: number;
+  orderNumber: string;
+  statusId: number;
+  statusName: string;
+  source?: string | null;
+  linesCount: number;
+  amount: number;
+  itemsBase: number;
+  avgPercent: number;
+  firstEarnedDate?: string;
+  lastEarnedDate?: string;
+  lines: AdminEarningsOrderLine[];
+};
+export const getAdminEarningsOrders = (params: { user_id: number; month: string }) =>
+  api.get<{
+    userId: number;
+    userName: string;
+    month: string;
+    total: number;
+    ordersCount: number;
+    orders: AdminEarningsOrderRow[];
+  }>('/earnings/admin/orders', { params });
 export const getDailyEarnings = (date: string, userId?: number) =>
   api.get('/earnings/daily', { params: userId ? { date, user_id: userId } : { date } });
 
@@ -907,8 +969,11 @@ export const calculateProductPrice = (params: any) => unifiedCalculatePrice({
 });
 
 // Printers
-export const getPrinters = (params?: { technology_code?: string }) =>
-  api.get<Printer[]>('/printers', { params });
+export const getPrinters = (params?: {
+  technology_code?: string;
+  department_id?: number;
+  executor_user_id?: number;
+}) => api.get<Printer[]>('/printers', { params });
 export const getPrintTechnologies = () => api.get('/printing-technologies');
 export const submitPrinterCounter = (printerId: number, data: { counter_date: string; value: number }) => api.post(`/printers/${printerId}/counters`, data);
 export const getPrinterCountersByDate = (date: string) => api.get(`/printers/counters`, { params: { date } });

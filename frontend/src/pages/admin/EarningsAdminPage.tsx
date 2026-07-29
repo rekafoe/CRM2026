@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, FormField, Modal } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
-import { getAdminEarnings, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus } from '../../api';
+import { getAdminEarnings, getAdminEarningsOrders, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
 import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
 import type { AdminUserRow } from './earnings/earningsTypes';
 import './EarningsAdminPage.css';
@@ -27,6 +27,14 @@ export const EarningsAdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'summary' | 'analytics' | 'employee'>('summary');
   const [analyticsUserId, setAnalyticsUserId] = useState<number | null>(null);
   const [detailUser, setDetailUser] = useState<AdminUserRow | null>(null);
+  const [ordersDetail, setOrdersDetail] = useState<{
+    userName: string;
+    month: string;
+    total: number;
+    orders: AdminEarningsOrderRow[];
+  } | null>(null);
+  const [ordersDetailLoading, setOrdersDetailLoading] = useState(false);
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [shiftUser, setShiftUser] = useState<AdminUserRow | null>(null);
   const [shiftRows, setShiftRows] = useState<ShiftRow[]>([]);
   const [shiftLoading, setShiftLoading] = useState(false);
@@ -69,6 +77,35 @@ export const EarningsAdminPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const openMonthOrders = useCallback(async (user: AdminUserRow, monthKey: string) => {
+    setOrdersDetailLoading(true);
+    setExpandedOrderId(null);
+    setOrdersDetail({
+      userName: user.name,
+      month: monthKey,
+      total: 0,
+      orders: [],
+    });
+    try {
+      const res = await getAdminEarningsOrders({ user_id: user.userId, month: monthKey });
+      setOrdersDetail({
+        userName: res.data?.userName || user.name,
+        month: res.data?.month || monthKey,
+        total: Number(res.data?.total) || 0,
+        orders: Array.isArray(res.data?.orders) ? res.data.orders : [],
+      });
+    } catch {
+      setOrdersDetail({
+        userName: user.name,
+        month: monthKey,
+        total: 0,
+        orders: [],
+      });
+    } finally {
+      setOrdersDetailLoading(false);
+    }
+  }, []);
 
   const openShiftModal = useCallback(async (user: AdminUserRow) => {
     setShiftUser(user);
@@ -391,7 +428,16 @@ export const EarningsAdminPage: React.FC = () => {
                 {rows.map((row) => (
                   <tr key={row.userId}>
                     <td className="earn-cell-name">{row.name}</td>
-                    <td className="earn-cell-money"><MoneyAmount value={row.totalCurrentMonth} /></td>
+                    <td className="earn-cell-money">
+                      <button
+                        type="button"
+                        className="earn-month-link"
+                        title="Заказы, по которым начислены проценты"
+                        onClick={() => openMonthOrders(row, month)}
+                      >
+                        <MoneyAmount value={row.totalCurrentMonth} />
+                      </button>
+                    </td>
                     <td className="earn-cell-money earn-cell-money--bonus">
                       <MoneyAmount value={row.totalBonuses ?? 0} signed />
                     </td>
@@ -505,8 +551,24 @@ export const EarningsAdminPage: React.FC = () => {
                     <tbody>
                       {analyticsHistory.map((entry) => (
                         <tr key={entry.month}>
-                          <td>{entry.month}</td>
-                          <td className="earn-cell-money"><MoneyAmount value={entry.total} /></td>
+                          <td>
+                            <button
+                              type="button"
+                              className="earn-month-link"
+                              onClick={() => analyticsUser && openMonthOrders(analyticsUser, entry.month)}
+                            >
+                              {entry.month}
+                            </button>
+                          </td>
+                          <td className="earn-cell-money">
+                            <button
+                              type="button"
+                              className="earn-month-link"
+                              onClick={() => analyticsUser && openMonthOrders(analyticsUser, entry.month)}
+                            >
+                              <MoneyAmount value={entry.total} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -518,10 +580,11 @@ export const EarningsAdminPage: React.FC = () => {
         </div>
       )}
 
-      {/* Detail modal */}
+      {/* Detail modal — история месяцев */}
       <Modal isOpen={!!detailUser} onClose={() => setDetailUser(null)} title="Динамика начислений" size="md">
         {detailUser && (
           <div className="earn-table-wrapper">
+            <p className="earn-detail-hint">Нажмите на месяц, чтобы увидеть заказы и статусы</p>
             <table className="earn-table">
               <thead>
                 <tr><th>Месяц</th><th>Начислено</th></tr>
@@ -529,12 +592,134 @@ export const EarningsAdminPage: React.FC = () => {
               <tbody>
                 {detailUser.history.map((h) => (
                   <tr key={h.month}>
-                    <td>{h.month}</td>
-                    <td className="earn-cell-money"><MoneyAmount value={h.total} /></td>
+                    <td>
+                      <button
+                        type="button"
+                        className="earn-month-link"
+                        onClick={() => openMonthOrders(detailUser, h.month)}
+                      >
+                        {h.month}
+                      </button>
+                    </td>
+                    <td className="earn-cell-money">
+                      <button
+                        type="button"
+                        className="earn-month-link"
+                        onClick={() => openMonthOrders(detailUser, h.month)}
+                      >
+                        <MoneyAmount value={h.total} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </Modal>
+
+      {/* Orders by month modal */}
+      <Modal
+        isOpen={!!ordersDetail}
+        onClose={() => {
+          setOrdersDetail(null);
+          setExpandedOrderId(null);
+        }}
+        title={
+          ordersDetail
+            ? `Начисления: ${ordersDetail.userName} · ${ordersDetail.month}`
+            : 'Начисления по заказам'
+        }
+        size="lg"
+      >
+        {ordersDetail && (
+          <div className="earn-orders-detail">
+            <div className="earn-orders-detail__summary">
+              <span>Заказов: <strong>{ordersDetail.orders.length}</strong></span>
+              <span>
+                Сумма процентов:{' '}
+                <strong><MoneyAmount value={ordersDetail.total} /></strong>
+              </span>
+            </div>
+            {ordersDetailLoading ? (
+              <div className="earn-orders-detail__loading">Загрузка…</div>
+            ) : ordersDetail.orders.length === 0 ? (
+              <div className="earn-orders-detail__empty">Нет начислений за этот месяц</div>
+            ) : (
+              <div className="earn-table-wrapper">
+                <table className="earn-table">
+                  <thead>
+                    <tr>
+                      <th>Заказ</th>
+                      <th>Статус</th>
+                      <th>Дата %</th>
+                      <th>Позиции</th>
+                      <th>%</th>
+                      <th>Начислено</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ordersDetail.orders.map((order) => (
+                      <React.Fragment key={order.orderId}>
+                        <tr
+                          className="earn-order-row"
+                          onClick={() =>
+                            setExpandedOrderId((id) =>
+                              id === order.orderId ? null : order.orderId
+                            )
+                          }
+                        >
+                          <td className="earn-cell-name">{order.orderNumber}</td>
+                          <td>
+                            <span className="earn-status-pill">{order.statusName}</span>
+                          </td>
+                          <td>
+                            {order.lastEarnedDate
+                              ? String(order.lastEarnedDate).slice(0, 10)
+                              : '—'}
+                          </td>
+                          <td>{order.linesCount}</td>
+                          <td>{Number(order.avgPercent || 0).toFixed(1)}</td>
+                          <td className="earn-cell-money">
+                            <MoneyAmount value={order.amount} />
+                          </td>
+                        </tr>
+                        {expandedOrderId === order.orderId && order.lines.length > 0 && (
+                          <tr className="earn-order-lines-row">
+                            <td colSpan={6}>
+                              <table className="earn-table earn-table--nested">
+                                <thead>
+                                  <tr>
+                                    <th>Позиция</th>
+                                    <th>База</th>
+                                    <th>%</th>
+                                    <th>Сумма</th>
+                                    <th>Дата</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {order.lines.map((line) => (
+                                    <tr key={`${order.orderId}-${line.itemId}-${line.earnedDate}`}>
+                                      <td>{line.itemName}</td>
+                                      <td><MoneyAmount value={line.itemTotal} /></td>
+                                      <td>{Number(line.percent || 0).toFixed(1)}</td>
+                                      <td className="earn-cell-money">
+                                        <MoneyAmount value={line.amount} />
+                                      </td>
+                                      <td>{String(line.earnedDate || '').slice(0, 10)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </Modal>

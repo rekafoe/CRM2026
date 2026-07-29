@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Logo } from '../Logo.tsx';
 import { AppIcon } from '../ui/AppIcon';
 import type { Organization } from '../../api';
+import type { InboxNotification } from '../../api';
+import { InboxNotifications } from '../notifications/InboxNotifications';
 import './TopBar.css';
 
 interface TopBarProps {
@@ -16,6 +18,13 @@ interface TopBarProps {
   onLogout: () => void;
   /** Новый заказ с сайта/TG в пуле — показываем зелёный бейдж "new" */
   hasNewPoolOrder?: boolean;
+  inboxUnreadCount?: number;
+  inboxOpen?: boolean;
+  inboxItems?: InboxNotification[];
+  onInboxToggle?: () => void;
+  onInboxClose?: () => void;
+  onInboxMarkAllRead?: () => void;
+  onInboxOpenNotification?: (notification: InboxNotification) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -28,6 +37,13 @@ export const TopBar: React.FC<TopBarProps> = ({
   onShowCountersPage,
   onLogout,
   hasNewPoolOrder = false,
+  inboxUnreadCount = 0,
+  inboxOpen = false,
+  inboxItems = [],
+  onInboxToggle,
+  onInboxClose,
+  onInboxMarkAllRead,
+  onInboxOpenNotification,
 }) => {
   const navigate = useNavigate();
   const rawLogoUrl = organization?.logo_url;
@@ -70,6 +86,17 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
       <div className="topbar-actions">
+        {onInboxToggle && onInboxClose && onInboxMarkAllRead && onInboxOpenNotification && (
+          <InboxNotifications
+            unreadCount={inboxUnreadCount}
+            open={inboxOpen}
+            items={inboxItems}
+            onToggle={onInboxToggle}
+            onClose={onInboxClose}
+            onMarkAllRead={onInboxMarkAllRead}
+            onOpenNotification={onInboxOpenNotification}
+          />
+        )}
         <button 
           onClick={onShowOrderPool}
           title="Пул заказов" 

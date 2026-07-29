@@ -208,7 +208,22 @@ export class OrderService {
     } catch (e) {
       // user_order_page_orders / user_order_pages могут отсутствовать
     }
-    const allOrders = [...orders, ...assignedOrders] as Order[]
+    const byId = new Map<number, Order>()
+    for (const order of orders) {
+      byId.set(order.id, order)
+    }
+    for (const order of assignedOrders) {
+      const existing = byId.get(order.id)
+      if (!existing) {
+        byId.set(order.id, order)
+        continue
+      }
+      // Сохраняем пометку «исполнитель по позиции», если заказ уже пришёл из listUserOrders
+      if ((existing as any).assigned_as_executor && !(order as any).assigned_as_executor) {
+        byId.set(order.id, { ...order, ...existing, assigned_as_executor: (existing as any).assigned_as_executor })
+      }
+    }
+    const allOrders = Array.from(byId.values()) as Order[]
     return OrderService.attachItemsToOrders(allOrders)
   }
 
@@ -409,6 +424,26 @@ export class OrderService {
     const id = (insertRes as any).lastID!
     const number = buildOrderNumberFromSourceAndId(source || 'crm', id)
     await db.run('UPDATE orders SET number = ? WHERE id = ?', [number, id])
+
+    // CRM-заказ без явной точки → точка = департамент создателя
+    try {
+      const hasFulfillment = await hasColumn('orders', 'fulfillment_department_id')
+      if (hasFulfillment && creatorId != null) {
+        const creator = await db.get<{ department_id: number | null }>(
+          'SELECT department_id FROM users WHERE id = ?',
+          [creatorId]
+        )
+        if (creator?.department_id != null && Number.isFinite(Number(creator.department_id))) {
+          await db.run(
+            `UPDATE orders SET fulfillment_department_id = ?
+             WHERE id = ? AND fulfillment_department_id IS NULL`,
+            [Number(creator.department_id), id]
+          )
+        }
+      }
+    } catch {
+      /* колонка/юзер могут отсутствовать */
+    }
 
     const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
     const order: Order = { ...(raw as any), items: [] }

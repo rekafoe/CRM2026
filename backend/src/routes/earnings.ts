@@ -311,6 +311,125 @@ router.get('/admin', asyncHandler(async (req, res) => {
   res.json({ month, previousMonth: prevMonth, historyMonths, users: result })
 }))
 
+/**
+ * GET /api/earnings/admin/orders?user_id=&month=
+ * Детализация начислений по заказам за месяц (для клика по месяцу в админке %).
+ */
+router.get('/admin/orders', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser || authUser.role !== 'admin') {
+    res.status(403).json({ message: 'Forbidden' })
+    return
+  }
+  const userId = Number((req.query as any)?.user_id)
+  const month = getMonthKey((req.query as any)?.month)
+  if (!Number.isFinite(userId) || userId <= 0) {
+    res.status(400).json({ message: 'user_id обязателен' })
+    return
+  }
+
+  const db = await getDb()
+  const user = await db.get<{ id: number; name: string }>('SELECT id, name FROM users WHERE id = ?', [userId])
+  if (!user) {
+    res.status(404).json({ message: 'Пользователь не найден' })
+    return
+  }
+
+  const rows = await db.all<any>(
+    `
+    SELECT
+      e.order_id,
+      o.number as order_number,
+      o.status as status_id,
+      COALESCE(os.name, CAST(o.status AS TEXT)) as status_name,
+      o.source,
+      COUNT(*) as lines_count,
+      SUM(e.amount) as amount,
+      SUM(e.order_item_total) as items_base,
+      AVG(e.percent) as avg_percent,
+      MIN(e.earned_date) as first_earned_date,
+      MAX(e.earned_date) as last_earned_date
+    FROM order_item_earnings e
+    JOIN orders o ON o.id = e.order_id
+    LEFT JOIN order_statuses os ON os.id = o.status
+    WHERE e.user_id = ? AND substr(e.earned_date, 1, 7) = ?
+    GROUP BY e.order_id
+    ORDER BY MAX(e.earned_date) DESC, e.order_id DESC
+    `,
+    [userId, month]
+  )
+
+  const lineRows = await db.all<any>(
+    `
+    SELECT
+      e.order_id,
+      e.order_item_id,
+      e.order_item_total,
+      e.percent,
+      e.amount,
+      e.earned_date,
+      i.type,
+      i.params
+    FROM order_item_earnings e
+    JOIN items i ON i.id = e.order_item_id
+    WHERE e.user_id = ? AND substr(e.earned_date, 1, 7) = ?
+    ORDER BY e.earned_date DESC, e.order_item_id DESC
+    `,
+    [userId, month]
+  )
+
+  const linesByOrder = new Map<number, any[]>()
+  for (const row of lineRows || []) {
+    let params: any = {}
+    try {
+      params = typeof row.params === 'string' ? JSON.parse(row.params) : row.params
+    } catch {
+      params = {}
+    }
+    const orderId = Number(row.order_id)
+    const list = linesByOrder.get(orderId) || []
+    list.push({
+      itemId: Number(row.order_item_id),
+      itemType: row.type,
+      itemName: params?.productName || params?.description || params?.parameterSummary || row.type,
+      itemTotal: Number(row.order_item_total) || 0,
+      percent: Number(row.percent) || 0,
+      amount: Number(row.amount) || 0,
+      earnedDate: row.earned_date,
+    })
+    linesByOrder.set(orderId, list)
+  }
+
+  const orders = (rows || []).map((row: any) => {
+    const orderId = Number(row.order_id)
+    return {
+      orderId,
+      orderNumber: row.order_number || `ORD-${orderId}`,
+      statusId: Number(row.status_id),
+      statusName: row.status_name || String(row.status_id),
+      source: row.source || null,
+      linesCount: Number(row.lines_count) || 0,
+      amount: Number(row.amount) || 0,
+      itemsBase: Number(row.items_base) || 0,
+      avgPercent: Number(row.avg_percent) || 0,
+      firstEarnedDate: row.first_earned_date,
+      lastEarnedDate: row.last_earned_date,
+      lines: linesByOrder.get(orderId) || [],
+    }
+  })
+
+  const total = orders.reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0)
+
+  res.json({
+    userId: user.id,
+    userName: user.name,
+    month,
+    total,
+    ordersCount: orders.length,
+    orders,
+  })
+}))
+
 // ——— Штрафы (admin или свой user_id) ———
 
 /** GET /api/earnings/penalties?user_id=&month= — список штрафов по пользователю и месяцу */

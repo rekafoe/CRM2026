@@ -19,6 +19,7 @@ import {
   parseFulfillmentDepartmentId,
   revenueOrdersCondition,
   scopeByFulfillmentDepartment,
+  effectiveLocationDepartmentExpr,
   type FulfillmentDepartmentScope,
 } from '../utils/orderFulfillmentScope'
 
@@ -737,8 +738,8 @@ router.get('/analytics/revenue/by-location', asyncHandler(async (req, res) => {
     `SELECT id, name, code FROM departments WHERE COALESCE(is_active, 1) = 1 ORDER BY sort_order ASC, name ASC`,
   )
 
-  const groupExpr = columnExists ? 'o.fulfillment_department_id' : 'NULL'
-  const deptJoin = columnExists ? 'LEFT JOIN departments d ON d.id = o.fulfillment_department_id' : ''
+  const groupExpr = effectiveLocationDepartmentExpr('o', { columnExists })
+  const deptJoin = `LEFT JOIN departments d ON d.id = (${groupExpr})`
 
   const locationRows = await db.all<Array<{ department_id: number | null; name: string | null; orders: number; revenue: number }>>(`
     SELECT ${groupExpr} as department_id,
@@ -852,8 +853,8 @@ router.get('/analytics/pnl', asyncHandler(async (req, res) => {
     `SELECT id, name FROM departments WHERE COALESCE(is_active, 1) = 1 ORDER BY sort_order ASC, name ASC`,
   )
 
-  const groupExpr = columnExists ? 'o.fulfillment_department_id' : 'NULL'
-  const deptJoin = columnExists ? 'LEFT JOIN departments d ON d.id = o.fulfillment_department_id' : ''
+  const groupExpr = effectiveLocationDepartmentExpr('o', { columnExists })
+  const deptJoin = `LEFT JOIN departments d ON d.id = (${groupExpr})`
 
   const revenueRows = await db.all<Array<{ department_id: number | null; name: string | null; revenue: number }>>(`
     SELECT ${groupExpr} as department_id,

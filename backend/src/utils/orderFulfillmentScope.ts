@@ -21,7 +21,26 @@ export function parseFulfillmentDepartmentId(raw: unknown): FulfillmentDepartmen
   return Number.isFinite(n) ? n : undefined
 }
 
-/** SQL-фрагмент: AND (alias.fulfillment_department_id = ?) или IS NULL для unassigned */
+/**
+ * Эффективная точка заказа:
+ * 1) явный fulfillment_department_id (самовывоз с сайта / ручной выбор)
+ * 2) иначе департамент создателя (CRM-оператор на точке)
+ */
+export function effectiveLocationDepartmentExpr(
+  alias: string,
+  options?: { columnExists?: boolean },
+): string {
+  const p = alias ? `${alias}.` : ''
+  if (options?.columnExists === false) {
+    return `(SELECT u.department_id FROM users u WHERE u.id = ${p}userId)`
+  }
+  return `COALESCE(
+    ${p}fulfillment_department_id,
+    (SELECT u.department_id FROM users u WHERE u.id = ${p}userId)
+  )`
+}
+
+/** SQL-фрагмент фильтра по эффективной точке */
 export function scopeByFulfillmentDepartment(
   alias: string,
   departmentId: FulfillmentDepartmentScope,
@@ -30,14 +49,11 @@ export function scopeByFulfillmentDepartment(
   if (departmentId === undefined || departmentId === null) {
     return { clause: '', params: [] }
   }
-  if (options?.columnExists === false) {
-    return { clause: '', params: [] }
-  }
-  const col = `${alias}.fulfillment_department_id`
+  const expr = effectiveLocationDepartmentExpr(alias, options)
   if (departmentId === 'unassigned') {
-    return { clause: ` AND ${col} IS NULL`, params: [] }
+    return { clause: ` AND (${expr}) IS NULL`, params: [] }
   }
-  return { clause: ` AND ${col} = ?`, params: [departmentId] }
+  return { clause: ` AND (${expr}) = ?`, params: [departmentId] }
 }
 
 /** Условие «заказ в выручке» (оплачен или завершён, не отменён). */

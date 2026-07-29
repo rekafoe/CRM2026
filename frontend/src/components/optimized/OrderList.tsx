@@ -64,6 +64,9 @@ const OrderItem = memo<{
     onSelect(order.id);
   }, [order.id, onSelect]);
 
+  const isAssignedAsExecutor =
+    order.assigned_as_executor === true || order.assigned_as_executor === 1;
+
   // Возвращает имя клиента или null если не указан
   const customerLabel = useMemo(() => {
     if (order.customer) {
@@ -96,7 +99,7 @@ const OrderItem = memo<{
 
   return (
     <li
-      className={`order-item order-list__item ${isActive ? 'active' : ''}`}
+      className={`order-item order-list__item ${isActive ? 'active' : ''} ${isAssignedAsExecutor ? 'order-item--executor' : ''}`}
       onClick={handleClick}
     >
       <div className="order-item__header">
@@ -108,13 +111,18 @@ const OrderItem = memo<{
           {customerLabel}
         </div>
       )}
+      {isAssignedAsExecutor && (
+        <div className="order-item__executor-badge">
+          Исполнитель по позиции
+        </div>
+      )}
       {showDebt && debt != null && debt > 0 && (
-        <div className="order-item__debt" style={{ fontSize: 11, color: '#c62828', marginTop: 2 }}>
+        <div className="order-item__debt">
           Долг: <MoneyAmount value={debt} />
         </div>
       )}
       {showIssuedByMe && (issuedByMe === true || issuedByMe === 1) && (
-        <div className="order-item__issued-by-me" style={{ fontSize: 11, color: '#2e7d32', marginTop: 2 }}>
+        <div className="order-item__issued-by-me">
           Выдали вы
         </div>
       )}

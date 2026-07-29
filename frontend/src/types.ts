@@ -140,6 +140,11 @@ export interface Order {
   contact_user_id?: number | null;
   /** Ответственный — оператор, выполняющий заказ */
   responsible_user_id?: number | null;
+  /**
+   * Заказ попал в список текущего пользователя, потому что его назначили
+   * исполнителем хотя бы по одной позиции (не владелец заказа).
+   */
+  assigned_as_executor?: boolean | number;
   // Источник заказа
   source?: 'crm' | 'website' | 'telegram' | 'mini_app';
   // Customer information
@@ -350,6 +355,8 @@ export interface Printer {
   max_width_mm?: number | null;
   color_mode?: 'bw' | 'color' | 'both';
   printer_class?: 'office' | 'pro';
+  department_id?: number | null;
+  department_name?: string | null;
   price_single?: number | null;
   price_duplex?: number | null;
   price_per_meter?: number | null;

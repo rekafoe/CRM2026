@@ -45,6 +45,8 @@ import { useOrderHandlers } from './hooks/useOrderHandlers';
 import { OrderDetailSection } from './components/OrderDetailSection';
 import { useReasonPrompt } from '../common/useReasonPrompt';
 import { getOrderAmounts } from '../../utils/orderTotal';
+import { useInboxNotifications } from '../../hooks/useInboxNotifications';
+import type { InboxNotification } from '../../api';
 
 interface OptimizedAppProps {
   onClose?: () => void;
@@ -93,6 +95,29 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
       .then((res) => setOrganization(res.data ?? null))
       .catch(() => setOrganization(null));
   }, []);
+
+  const handleExecutorAssignedNotification = useCallback((notification: InboxNotification) => {
+    loadOrders(undefined, true);
+    const orderId = Number(notification.payload?.orderId);
+    if (Number.isFinite(orderId) && orderId > 0) {
+      setSelectedId(orderId);
+    }
+  }, [loadOrders]);
+
+  const inbox = useInboxNotifications({
+    enabled: Boolean(currentUser?.id),
+    onExecutorAssigned: handleExecutorAssignedNotification,
+  });
+
+  const handleInboxOpenNotification = useCallback((notification: InboxNotification) => {
+    inbox.markOneRead(notification.id);
+    inbox.setOpen(false);
+    const orderId = Number(notification.payload?.orderId);
+    if (Number.isFinite(orderId) && orderId > 0) {
+      loadOrders(undefined, true);
+      setSelectedId(orderId);
+    }
+  }, [inbox.markOneRead, inbox.setOpen, loadOrders]);
 
   // Хук для состояния модальных окон
   const modalState = useModalState();
@@ -331,6 +356,13 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             onShowCountersPage={topBarShowCountersPage}
             onLogout={handleLogout}
             hasNewPoolOrder={hasNewPoolOrder}
+            inboxUnreadCount={inbox.unreadCount}
+            inboxOpen={inbox.open}
+            inboxItems={inbox.items}
+            onInboxToggle={() => inbox.setOpen((v) => !v)}
+            onInboxClose={() => inbox.setOpen(false)}
+            onInboxMarkAllRead={inbox.markAllRead}
+            onInboxOpenNotification={handleInboxOpenNotification}
           />
 
           {showTopPicker && (

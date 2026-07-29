@@ -592,3 +592,71 @@
     flex-direction: column;
   }
 }
+
+.earn-month-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: #2563eb;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.earn-month-link:hover {
+  color: #1d4ed8;
+}
+
+.earn-detail-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.earn-orders-detail__summary {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.earn-orders-detail__loading,
+.earn-orders-detail__empty {
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.earn-order-row {
+  cursor: pointer;
+}
+
+.earn-order-row:hover {
+  background: #f8fafc;
+}
+
+.earn-status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.earn-table--nested {
+  margin: 8px 0 8px 12px;
+  width: calc(100% - 12px);
+  background: #f8fafc;
+}
+
+.earn-order-lines-row > td {
+  padding: 0 8px 12px !important;
+  background: #f8fafc;
+}

@@ -64,6 +64,9 @@ interface OrderItemProps {
     items?: Item[];
     /** Тип цены заказа (для отображения, если у позиции нет своего) */
     priceType?: string;
+    fulfillment_department_id?: number | null;
+    userId?: number;
+    responsible_user_id?: number | null;
   } | null;
   onUpdate: () => void;
   onEditParameters?: (orderId: number, item: Item) => void;
@@ -77,6 +80,21 @@ interface OrderItemProps {
 
 export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUpdate, onEditParameters, readOnly, operatorsToday = [], onExecutorChange }) => {
   const { addToast } = useToast();
+  const effectiveExecutorId = useMemo(() => {
+    const fromItem = item.executor_user_id;
+    if (fromItem != null && Number.isFinite(Number(fromItem)) && Number(fromItem) > 0) {
+      return Number(fromItem);
+    }
+    const fromResponsible = (order as any)?.responsible_user_id;
+    if (fromResponsible != null && Number.isFinite(Number(fromResponsible)) && Number(fromResponsible) > 0) {
+      return Number(fromResponsible);
+    }
+    const fromOwner = (order as any)?.userId;
+    if (fromOwner != null && Number.isFinite(Number(fromOwner)) && Number(fromOwner) > 0) {
+      return Number(fromOwner);
+    }
+    return null;
+  }, [item.executor_user_id, order]);
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState<NumberInputValue>(item.quantity ?? 1);
   const [price, setPrice] = useState<NumberInputValue>(item.price);
@@ -146,11 +164,17 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     specsAny?.printColorMode ||
     null;
 
-  // Загружаем принтеры: фильтр по технологии продукта; если технологии нет — все принтеры
+  // Принтеры департамента исполнителя этой позиции (+ технология / цветность)
   useEffect(() => {
     (async () => {
       try {
-        const resp = await getPrinters(printTech ? { technology_code: printTech } : undefined);
+        const params: {
+          technology_code?: string;
+          executor_user_id?: number;
+        } = {};
+        if (printTech) params.technology_code = printTech;
+        if (effectiveExecutorId != null) params.executor_user_id = effectiveExecutorId;
+        const resp = await getPrinters(Object.keys(params).length ? params : undefined);
         const list = Array.isArray(resp.data) ? resp.data : [];
         const filtered = printColorMode
           ? list.filter((p: any) => (p.color_mode || 'both') === 'both' || p.color_mode === printColorMode)
@@ -160,12 +184,18 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
         setPrinters([]);
       }
     })();
-  }, [printTech, printColorMode]);
+  }, [printTech, printColorMode, effectiveExecutorId]);
 
   const loadPrintersIfNeeded = async () => {
     if (printers.length > 0) return;
     try {
-      const resp = await getPrinters(printTech ? { technology_code: printTech } : undefined);
+      const params: {
+        technology_code?: string;
+        executor_user_id?: number;
+      } = {};
+      if (printTech) params.technology_code = printTech;
+      if (effectiveExecutorId != null) params.executor_user_id = effectiveExecutorId;
+      const resp = await getPrinters(Object.keys(params).length ? params : undefined);
       const list = Array.isArray(resp.data) ? resp.data : [];
       const filtered = printColorMode
         ? list.filter((p: any) => (p.color_mode || 'both') === 'both' || p.color_mode === printColorMode)

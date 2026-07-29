@@ -4,6 +4,8 @@ import { UserNotificationController } from '../modules/notifications/controllers
 import { TelegramUserController } from '../controllers/telegramUserController';
 import { TelegramWebhookController } from '../controllers/telegramWebhookController';
 import { TelegramSettingsController } from '../controllers/telegramSettingsController';
+import { asyncHandler, AuthenticatedRequest } from '../middleware';
+import { UserInboxNotificationService } from '../services/userInboxNotificationService';
 
 const router = Router();
 
@@ -47,6 +49,47 @@ router.post('/users/low-stock-alert', UserNotificationController.sendLowStockAle
 router.post('/users/new-order-alert', UserNotificationController.sendNewOrderAlert);
 router.post('/users/system-alert', UserNotificationController.sendSystemAlert);
 router.put('/users/:userId/telegram-chat-id', UserNotificationController.updateUserTelegramChatId);
+
+// In-app inbox (колокольчик в CRM)
+router.get('/inbox', asyncHandler(async (req, res) => {
+  const user = (req as AuthenticatedRequest).user
+  if (!user?.id) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+  const unreadOnly = String((req.query as any)?.unread_only || '') === '1'
+  const limit = Number((req.query as any)?.limit)
+  const [items, unreadCount] = await Promise.all([
+    UserInboxNotificationService.listForUser(user.id, {
+      unreadOnly,
+      limit: Number.isFinite(limit) ? limit : 30,
+    }),
+    UserInboxNotificationService.unreadCount(user.id),
+  ])
+  res.json({ items, unreadCount })
+}))
+
+router.get('/inbox/unread-count', asyncHandler(async (req, res) => {
+  const user = (req as AuthenticatedRequest).user
+  if (!user?.id) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+  const unreadCount = await UserInboxNotificationService.unreadCount(user.id)
+  res.json({ unreadCount })
+}))
+
+router.post('/inbox/mark-read', asyncHandler(async (req, res) => {
+  const user = (req as AuthenticatedRequest).user
+  if (!user?.id) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+  const ids = Array.isArray((req.body as any)?.ids) ? (req.body as any).ids : undefined
+  const changed = await UserInboxNotificationService.markRead(user.id, ids)
+  const unreadCount = await UserInboxNotificationService.unreadCount(user.id)
+  res.json({ changed, unreadCount })
+}))
 
 // Работа с пользователями бота
 router.get('/bot/users', UserNotificationController.getBotUsers);

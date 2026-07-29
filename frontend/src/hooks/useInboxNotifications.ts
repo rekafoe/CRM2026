@@ -1,0 +1,93 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  getInboxNotifications,
+  markInboxNotificationsRead,
+  type InboxNotification,
+} from '../api';
+import { useToastNotifications } from '../components/Toast';
+
+const POLL_MS = 15000;
+
+export function useInboxNotifications(opts?: {
+  enabled?: boolean;
+  onExecutorAssigned?: (notification: InboxNotification) => void;
+}) {
+  const enabled = opts?.enabled !== false;
+  const toast = useToastNotifications();
+  const toastInfoRef = useRef(toast.info);
+  toastInfoRef.current = toast.info;
+  const [items, setItems] = useState<InboxNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [open, setOpen] = useState(false);
+  const knownIdsRef = useRef<Set<number>>(new Set());
+  const bootstrappedRef = useRef(false);
+  const onExecutorAssignedRef = useRef(opts?.onExecutorAssigned);
+  onExecutorAssignedRef.current = opts?.onExecutorAssigned;
+
+  const refresh = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      const res = await getInboxNotifications({ limit: 30 });
+      const nextItems = Array.isArray(res.data?.items) ? res.data.items : [];
+      const nextUnread = Number(res.data?.unreadCount) || 0;
+
+      if (!bootstrappedRef.current) {
+        knownIdsRef.current = new Set(nextItems.map((n) => n.id));
+        bootstrappedRef.current = true;
+      } else {
+        for (const n of nextItems) {
+          if (knownIdsRef.current.has(n.id)) continue;
+          knownIdsRef.current.add(n.id);
+          if (!n.isRead) {
+            toastInfoRef.current(n.title, n.message);
+            if (n.type === 'executor_assigned') {
+              onExecutorAssignedRef.current?.(n);
+            }
+          }
+        }
+      }
+
+      setItems(nextItems);
+      setUnreadCount(nextUnread);
+    } catch {
+      // тихо: нет смысла спамить ошибками поллинга
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    refresh();
+    const timer = window.setInterval(refresh, POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [enabled, refresh]);
+
+  const markAllRead = useCallback(async () => {
+    try {
+      const res = await markInboxNotificationsRead();
+      setUnreadCount(Number(res.data?.unreadCount) || 0);
+      setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const markOneRead = useCallback(async (id: number) => {
+    try {
+      const res = await markInboxNotificationsRead([id]);
+      setUnreadCount(Number(res.data?.unreadCount) || 0);
+      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  return {
+    items,
+    unreadCount,
+    open,
+    setOpen,
+    refresh,
+    markAllRead,
+    markOneRead,
+  };
+}

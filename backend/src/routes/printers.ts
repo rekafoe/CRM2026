@@ -6,36 +6,101 @@ import { AuthenticatedRequest } from '../middleware'
 const router = Router()
 
 const PRINTERS_SELECT = [
-  'id',
-  'code',
-  'name',
-  'technology_code',
-  'counter_unit',
-  'max_width_mm',
-  'color_mode',
-  'printer_class',
-  'price_single',
-  'price_duplex',
-  'price_per_meter',
-  'price_bw_single',
-  'price_bw_duplex',
-  'price_color_single',
-  'price_color_duplex',
-  'price_bw_per_meter',
-  'price_color_per_meter',
-  'is_active',
+  'p.id',
+  'p.code',
+  'p.name',
+  'p.technology_code',
+  'p.counter_unit',
+  'p.max_width_mm',
+  'p.color_mode',
+  'p.printer_class',
+  'p.price_single',
+  'p.price_duplex',
+  'p.price_per_meter',
+  'p.price_bw_single',
+  'p.price_bw_duplex',
+  'p.price_color_single',
+  'p.price_color_duplex',
+  'p.price_bw_per_meter',
+  'p.price_color_per_meter',
+  'p.is_active',
+  'p.department_id',
+  'd.name as department_name',
 ].join(', ')
 
-// GET /api/printers — список принтеров (опционально фильтр по технологии)
+const PRINTERS_FROM = `
+  FROM printers p
+  LEFT JOIN departments d ON d.id = p.department_id
+`
+
+function parseOptionalDepartmentId(raw: unknown): number | null | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined
+  if (raw === 'null' || raw === 'none') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+async function resolvePrintersDepartmentFilter(
+  req: AuthenticatedRequest,
+  db: Awaited<ReturnType<typeof getDb>>
+): Promise<number | null | undefined> {
+  // Приоритет: департамент исполнителя позиции (для селекта принтера в заказе)
+  const executorUserId = Number((req.query as any)?.executor_user_id)
+  if (Number.isFinite(executorUserId) && executorUserId > 0) {
+    const executor = await db.get<{ department_id: number | null }>(
+      'SELECT department_id FROM users WHERE id = ?',
+      [executorUserId]
+    )
+    const dept = executor?.department_id != null ? Number(executor.department_id) : null
+    if (dept != null && Number.isFinite(dept) && dept > 0) return dept
+    // У исполнителя нет департамента — не ограничиваем список
+    return undefined
+  }
+
+  const queryDept = parseOptionalDepartmentId((req.query as any)?.department_id)
+  // Явный department_id (для админки / отчётов) — для любого авторизованного
+  if (queryDept !== undefined) return queryDept
+
+  const authUser = req.user
+  if (!authUser || authUser.role === 'admin') return undefined
+
+  const userRow = await db.get<{ department_id: number | null }>(
+    'SELECT department_id FROM users WHERE id = ?',
+    [authUser.id]
+  )
+  const userDept = userRow?.department_id != null ? Number(userRow.department_id) : null
+  if (userDept != null && Number.isFinite(userDept) && userDept > 0) {
+    return userDept
+  }
+  return undefined
+}
+
+// GET /api/printers — список принтеров (фильтр по технологии / департаменту)
+// Не-admin с department_id видит только принтеры своего департамента.
 router.get('/', asyncHandler(async (req, res) => {
   const technologyCode = (req.query as any)?.technology_code as string | undefined
   const db = await getDb()
+  const departmentId = await resolvePrintersDepartmentFilter(req as AuthenticatedRequest, db)
   const filterByTech = technologyCode && String(technologyCode).trim()
-  const where = filterByTech ? 'WHERE technology_code = ?' : ''
-  const params = filterByTech ? [filterByTech] : []
 
+  const where: string[] = []
+  const params: any[] = []
+  if (filterByTech) {
+    where.push('p.technology_code = ?')
+    params.push(filterByTech)
+  }
+  if (departmentId !== undefined) {
+    if (departmentId === null) {
+      where.push('p.department_id IS NULL')
+    } else {
+      where.push('p.department_id = ?')
+      params.push(departmentId)
+    }
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const rows = await db.all<any>(
-    `SELECT ${PRINTERS_SELECT} FROM printers ${where} ORDER BY name`,
+    `SELECT ${PRINTERS_SELECT} ${PRINTERS_FROM} ${whereSql} ORDER BY d.name IS NULL, d.name, p.name`,
     ...params
   )
   res.json(rows)
@@ -54,6 +119,7 @@ router.post('/', asyncHandler(async (req, res) => {
     max_width_mm = null,
     color_mode = 'both',
     printer_class = 'office',
+    department_id = null,
     price_single = null,
     price_duplex = null,
     price_per_meter = null,
@@ -72,6 +138,7 @@ router.post('/', asyncHandler(async (req, res) => {
     max_width_mm?: number | null
     color_mode?: 'bw' | 'color' | 'both'
     printer_class?: 'office' | 'pro'
+    department_id?: number | null
     price_single?: number | null
     price_duplex?: number | null
     price_per_meter?: number | null
@@ -89,19 +156,40 @@ router.post('/', asyncHandler(async (req, res) => {
     return
   }
 
+  const deptId =
+    department_id == null || department_id === ('' as any)
+      ? null
+      : Number(department_id)
+  if (deptId != null && (!Number.isFinite(deptId) || deptId <= 0)) {
+    res.status(400).json({ message: 'Некорректный department_id' })
+    return
+  }
+
   const db = await getDb()
+  if (deptId != null) {
+    const dept = await db.get<{ id: number }>('SELECT id FROM departments WHERE id = ?', [deptId])
+    if (!dept) {
+      res.status(400).json({ message: 'Департамент не найден' })
+      return
+    }
+  }
+
   await db.run(
     `INSERT INTO printers (code, name, technology_code, counter_unit, max_width_mm, color_mode, printer_class,
-      price_single, price_duplex, price_per_meter, price_bw_single, price_bw_duplex,
+      department_id, price_single, price_duplex, price_per_meter, price_bw_single, price_bw_duplex,
       price_color_single, price_color_duplex, price_bw_per_meter, price_color_per_meter, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     code, name, technology_code ?? null, counter_unit, max_width_mm ?? null, color_mode, printer_class,
+    deptId,
     price_single ?? null, price_duplex ?? null, price_per_meter ?? null,
     price_bw_single ?? null, price_bw_duplex ?? null, price_color_single ?? null, price_color_duplex ?? null,
     price_bw_per_meter ?? null, price_color_per_meter ?? null, is_active ? 1 : 0
   )
 
-  const row = await db.get<any>(`SELECT ${PRINTERS_SELECT} FROM printers WHERE code = ?`, code)
+  const row = await db.get<any>(
+    `SELECT ${PRINTERS_SELECT} ${PRINTERS_FROM} WHERE p.code = ?`,
+    code
+  )
 
   res.status(201).json(row)
 }))
@@ -112,7 +200,26 @@ router.put('/:id', asyncHandler(async (req, res) => {
   if (!user || user.role !== 'admin') { res.status(403).json({ message: 'Forbidden' }); return }
 
   const id = Number(req.params.id)
-  const { code, name, technology_code, counter_unit, max_width_mm, color_mode, printer_class, price_single, price_duplex, price_per_meter, price_bw_single, price_bw_duplex, price_color_single, price_color_duplex, price_bw_per_meter, price_color_per_meter, is_active } = req.body as {
+  const {
+    code,
+    name,
+    technology_code,
+    counter_unit,
+    max_width_mm,
+    color_mode,
+    printer_class,
+    department_id,
+    price_single,
+    price_duplex,
+    price_per_meter,
+    price_bw_single,
+    price_bw_duplex,
+    price_color_single,
+    price_color_duplex,
+    price_bw_per_meter,
+    price_color_per_meter,
+    is_active,
+  } = req.body as {
     code?: string
     name?: string
     technology_code?: string | null
@@ -120,6 +227,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     max_width_mm?: number | null
     color_mode?: 'bw' | 'color' | 'both'
     printer_class?: 'office' | 'pro'
+    department_id?: number | null
     price_single?: number | null
     price_duplex?: number | null
     price_per_meter?: number | null
@@ -136,6 +244,19 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const existing = await db.get<any>('SELECT * FROM printers WHERE id = ?', id)
   if (!existing) { res.status(404).json({ message: 'Printer not found' }); return }
 
+  if (department_id !== undefined && department_id != null) {
+    const deptId = Number(department_id)
+    if (!Number.isFinite(deptId) || deptId <= 0) {
+      res.status(400).json({ message: 'Некорректный department_id' })
+      return
+    }
+    const dept = await db.get<{ id: number }>('SELECT id FROM departments WHERE id = ?', [deptId])
+    if (!dept) {
+      res.status(400).json({ message: 'Департамент не найден' })
+      return
+    }
+  }
+
   const sets: string[] = []
   const values: any[] = []
   if (code !== undefined) { sets.push('code = ?'); values.push(code) }
@@ -145,6 +266,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
   if (max_width_mm !== undefined) { sets.push('max_width_mm = ?'); values.push(max_width_mm) }
   if (color_mode !== undefined) { sets.push('color_mode = ?'); values.push(color_mode) }
   if (printer_class !== undefined) { sets.push('printer_class = ?'); values.push(printer_class) }
+  if (department_id !== undefined) {
+    sets.push('department_id = ?')
+    values.push(department_id == null ? null : Number(department_id))
+  }
   if (price_single !== undefined) { sets.push('price_single = ?'); values.push(price_single) }
   if (price_duplex !== undefined) { sets.push('price_duplex = ?'); values.push(price_duplex) }
   if (price_per_meter !== undefined) { sets.push('price_per_meter = ?'); values.push(price_per_meter) }
@@ -165,7 +290,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
     )
   }
 
-  const row = await db.get<any>(`SELECT ${PRINTERS_SELECT} FROM printers WHERE id = ?`, id)
+  const row = await db.get<any>(
+    `SELECT ${PRINTERS_SELECT} ${PRINTERS_FROM} WHERE p.id = ?`,
+    id
+  )
 
   res.json(row)
 }))

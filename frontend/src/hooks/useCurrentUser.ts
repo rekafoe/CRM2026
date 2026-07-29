@@ -5,6 +5,7 @@ interface User {
   id: number;
   name: string;
   role: string;
+  department_id?: number | null;
 }
 
 export const useCurrentUser = (): User | null => {

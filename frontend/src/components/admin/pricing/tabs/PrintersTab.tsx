@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, FormField, StatusBadge } from '../../../common';
 import { MoneyAmount } from '../../../ui';
-import { api } from '../../../../api';
+import { api, getDepartments, type Department } from '../../../../api';
 import { numberInputFromString, numberInputToNullable, type NumberInputValue } from '../../../../utils/numberInput';
 import type { PrinterRow, PrintTechnology, PricingMode } from '../types';
 import { PRINTERS_PRINT_TAB_URL } from '../printPriceDisplay';
@@ -17,8 +17,9 @@ interface PrintersTabProps {
   getPricingModeForTech: (techCode?: string | null) => PricingMode | null;
 }
 
-type PrinterFormState = Omit<Partial<PrinterRow>, 'max_width_mm'> & {
+type PrinterFormState = Omit<Partial<PrinterRow>, 'max_width_mm' | 'department_id'> & {
   max_width_mm?: NumberInputValue | null;
+  department_id?: number | '' | null;
 };
 
 const PrintersTabComponent: React.FC<PrintersTabProps> = ({
@@ -30,19 +31,64 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
   onSuccess,
   getPricingModeForTech,
 }) => {
-  const [printerForm, setPrinterForm] = useState<PrinterFormState>({ counter_unit: 'sheets', is_active: 1 });
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [filterDepartmentId, setFilterDepartmentId] = useState<number | ''>('');
+  const [printerForm, setPrinterForm] = useState<PrinterFormState>({
+    counter_unit: 'sheets',
+    is_active: 1,
+    department_id: '',
+  });
   const [newPrinterForm, setNewPrinterForm] = useState<PrinterFormState>({
     counter_unit: 'sheets',
     is_active: 1,
     color_mode: 'both',
-    printer_class: 'office'
+    printer_class: 'office',
+    department_id: '',
   });
   const [editingPrinterId, setEditingPrinterId] = useState<number | null>(null);
+
+  useEffect(() => {
+    getDepartments()
+      .then((r) => setDepartments(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setDepartments([]));
+  }, []);
 
   const techOptions = useMemo(
     () => printTechnologies.filter((t) => t.is_active !== 0),
     [printTechnologies]
   );
+
+  const departmentName = useCallback(
+    (departmentId?: number | null) => {
+      if (departmentId == null) return 'Без департамента';
+      return departments.find((d) => d.id === departmentId)?.name || `Департамент #${departmentId}`;
+    },
+    [departments]
+  );
+
+  const filteredPrinters = useMemo(() => {
+    if (filterDepartmentId === '') return printers;
+    return printers.filter((p) => Number(p.department_id) === Number(filterDepartmentId));
+  }, [printers, filterDepartmentId]);
+
+  const printersByDepartment = useMemo(() => {
+    const groups = new Map<string, { key: string; title: string; items: PrinterRow[] }>();
+    for (const printer of filteredPrinters) {
+      const deptId = printer.department_id == null ? null : Number(printer.department_id);
+      const key = deptId == null ? 'none' : String(deptId);
+      const title =
+        printer.department_name ||
+        (deptId == null ? 'Без департамента' : departmentName(deptId));
+      const group = groups.get(key) || { key, title, items: [] };
+      group.items.push(printer);
+      groups.set(key, group);
+    }
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.key === 'none') return 1;
+      if (b.key === 'none') return -1;
+      return a.title.localeCompare(b.title, 'ru');
+    });
+  }, [filteredPrinters, departmentName]);
 
   const isUvPrinterTech = useCallback(
     (techCode?: string | null) => {
@@ -60,13 +106,17 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
       max_width_mm: printer.max_width_mm ?? null,
       color_mode: printer.color_mode || 'both',
       printer_class: printer.printer_class || 'office',
+      department_id: printer.department_id ?? '',
     });
   }, []);
 
   const cancelEditPrinter = useCallback(() => {
     setEditingPrinterId(null);
-    setPrinterForm({ counter_unit: 'sheets', is_active: 1 });
+    setPrinterForm({ counter_unit: 'sheets', is_active: 1, department_id: '' });
   }, []);
+
+  const toDepartmentPayload = (value: number | '' | null | undefined) =>
+    value === '' || value == null ? null : Number(value);
 
   const savePrinter = useCallback(async () => {
     if (!editingPrinterId) return;
@@ -79,6 +129,7 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
         max_width_mm: numberInputToNullable((printerForm.max_width_mm ?? '') as NumberInputValue),
         color_mode: printerForm.color_mode,
         printer_class: printerForm.printer_class,
+        department_id: toDepartmentPayload(printerForm.department_id),
         is_active: printerForm.is_active,
       });
       await onLoadData();
@@ -88,7 +139,7 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
       onError('Ошибка сохранения принтера');
       console.error('Error saving printer:', error);
     }
-  }, [editingPrinterId, printerForm, onLoadData, onError, onSuccess]);
+  }, [editingPrinterId, printerForm, onLoadData, onError, onSuccess, cancelEditPrinter]);
 
   const createPrinter = useCallback(async () => {
     if (!newPrinterForm.code || !newPrinterForm.name) {
@@ -104,9 +155,16 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
         max_width_mm: numberInputToNullable((newPrinterForm.max_width_mm ?? '') as NumberInputValue),
         color_mode: newPrinterForm.color_mode,
         printer_class: newPrinterForm.printer_class,
+        department_id: toDepartmentPayload(newPrinterForm.department_id),
         is_active: newPrinterForm.is_active,
       });
-      setNewPrinterForm({ counter_unit: 'sheets', is_active: 1, color_mode: 'both', printer_class: 'office' });
+      setNewPrinterForm({
+        counter_unit: 'sheets',
+        is_active: 1,
+        color_mode: 'both',
+        printer_class: 'office',
+        department_id: '',
+      });
       await onLoadData();
       onSuccess('Принтер добавлен');
     } catch (error) {
@@ -119,7 +177,10 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
     <div className="pricing-section">
       <div className="section-header">
         <h3>Принтеры</h3>
-        <p>Оборудование для аналитики и счётчиков. Цены печати задаются только во вкладке "Цены печати".</p>
+        <p>
+          Оборудование для аналитики и счётчиков. Привязка к департаменту ограничивает выбор принтера
+          у исполнителей этого департамента. Цены печати — во вкладке «Цены печати».
+        </p>
       </div>
 
       <div className="data-card">
@@ -151,6 +212,23 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
                 placeholder="Konica AccurioPress C83hc"
               />
             </FormField>
+            <FormField label="Департамент">
+              <select
+                className="form-control"
+                value={newPrinterForm.department_id === '' || newPrinterForm.department_id == null ? '' : String(newPrinterForm.department_id)}
+                onChange={(e) =>
+                  setNewPrinterForm({
+                    ...newPrinterForm,
+                    department_id: e.target.value === '' ? '' : Number(e.target.value),
+                  })
+                }
+              >
+                <option value="">Не выбран</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </FormField>
             <FormField label="Тип печати">
               <select
                 className="form-control"
@@ -163,7 +241,6 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
                 ))}
               </select>
             </FormField>
-            {/* Цены печати задаются в отдельной вкладке "Цены печати" (print_prices) */}
             <FormField label="Ед. счётчика">
               <select
                 className="form-control"
@@ -217,176 +294,225 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
         </div>
       </div>
 
-      <div className="data-grid">
-        {printers.map((printer) => (
-          <div key={printer.id} className="data-card">
-            <div className="card-header">
-              <div className="card-title">
-                <h4>{printer.name}</h4>
-                <StatusBadge status={printer.is_active ? 'active' : 'inactive'} />
-              </div>
-              {editingPrinterId === printer.id ? (
-                <div className="card-actions">
-                  <Button variant="success" size="sm" onClick={savePrinter} loading={loading}>
-                    Сохранить
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={cancelEditPrinter}>
-                    Отмена
-                  </Button>
-                </div>
-              ) : (
-                <Button variant="primary" size="sm" onClick={() => startEditPrinter(printer)}>
-                  Изменить
-                </Button>
-              )}
-            </div>
-            <div className="card-content">
-              {editingPrinterId === printer.id ? (
-                <div className="field-group">
-                  <FormField label="Код">
-                    <input
-                      className="form-control"
-                      value={printerForm.code || ''}
-                      onChange={(e) => setPrinterForm({ ...printerForm, code: e.target.value })}
-                    />
-                  </FormField>
-                  <FormField label="Название">
-                    <input
-                      className="form-control"
-                      value={printerForm.name || ''}
-                      onChange={(e) => setPrinterForm({ ...printerForm, name: e.target.value })}
-                    />
-                  </FormField>
-                  <FormField label="Тип печати">
-                    <select
-                      className="form-control"
-                      value={printerForm.technology_code || ''}
-                      onChange={(e) => setPrinterForm({ ...printerForm, technology_code: e.target.value || undefined })}
-                    >
-                      <option value="">Не выбран</option>
-                      {techOptions.map((t) => (
-                        <option key={t.code} value={t.code}>{t.name}</option>
-                      ))}
-                    </select>
-                  </FormField>
-                  {isUvPrinterTech(printerForm.technology_code) && (
-                    <div className="printer-uv-hint">
-                      Ставки УФ задаются в{' '}
-                      <Link to={PRINTERS_PRINT_TAB_URL}>Ценах печати (м²)</Link>. Цветность и единица счётчика для
-                      УФ-планшета не используются.
+      <div className="data-card printers-dept-filter">
+        <div className="card-content">
+          <FormField label="Фильтр по департаменту">
+            <select
+              className="form-control"
+              value={filterDepartmentId === '' ? '' : String(filterDepartmentId)}
+              onChange={(e) =>
+                setFilterDepartmentId(e.target.value === '' ? '' : Number(e.target.value))
+              }
+            >
+              <option value="">Все департаменты</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      </div>
+
+      {printersByDepartment.map((group) => (
+        <div key={group.key} className="printers-dept-group">
+          <h4 className="printers-dept-group__title">{group.title}</h4>
+          <div className="data-grid">
+            {group.items.map((printer) => (
+              <div key={printer.id} className="data-card">
+                <div className="card-header">
+                  <div className="card-title">
+                    <h4>{printer.name}</h4>
+                    <StatusBadge status={printer.is_active ? 'active' : 'inactive'} />
+                  </div>
+                  {editingPrinterId === printer.id ? (
+                    <div className="card-actions">
+                      <Button variant="success" size="sm" onClick={savePrinter} loading={loading}>
+                        Сохранить
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={cancelEditPrinter}>
+                        Отмена
+                      </Button>
                     </div>
+                  ) : (
+                    <Button variant="primary" size="sm" onClick={() => startEditPrinter(printer)}>
+                      Изменить
+                    </Button>
                   )}
-                  {!isUvPrinterTech(printerForm.technology_code) && (
-                    <>
-                      <FormField label="Ед. счётчика">
+                </div>
+                <div className="card-content">
+                  {editingPrinterId === printer.id ? (
+                    <div className="field-group">
+                      <FormField label="Код">
+                        <input
+                          className="form-control"
+                          value={printerForm.code || ''}
+                          onChange={(e) => setPrinterForm({ ...printerForm, code: e.target.value })}
+                        />
+                      </FormField>
+                      <FormField label="Название">
+                        <input
+                          className="form-control"
+                          value={printerForm.name || ''}
+                          onChange={(e) => setPrinterForm({ ...printerForm, name: e.target.value })}
+                        />
+                      </FormField>
+                      <FormField label="Департамент">
                         <select
                           className="form-control"
-                          value={printerForm.counter_unit || 'sheets'}
+                          value={
+                            printerForm.department_id === '' || printerForm.department_id == null
+                              ? ''
+                              : String(printerForm.department_id)
+                          }
                           onChange={(e) =>
-                            setPrinterForm({ ...printerForm, counter_unit: e.target.value as 'sheets' | 'meters' })
+                            setPrinterForm({
+                              ...printerForm,
+                              department_id: e.target.value === '' ? '' : Number(e.target.value),
+                            })
                           }
                         >
-                          <option value="sheets">Листы</option>
-                          <option value="meters">Погонные метры</option>
+                          <option value="">Не выбран</option>
+                          {departments.map((d) => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
                         </select>
                       </FormField>
-                      <FormField label="Цветность">
+                      <FormField label="Тип печати">
                         <select
                           className="form-control"
-                          value={printerForm.color_mode || 'both'}
-                          onChange={(e) => setPrinterForm({ ...printerForm, color_mode: e.target.value as any })}
+                          value={printerForm.technology_code || ''}
+                          onChange={(e) => setPrinterForm({ ...printerForm, technology_code: e.target.value || undefined })}
                         >
-                          <option value="both">Цвет+Ч/Б</option>
-                          <option value="color">Только цвет</option>
-                          <option value="bw">Только Ч/Б</option>
+                          <option value="">Не выбран</option>
+                          {techOptions.map((t) => (
+                            <option key={t.code} value={t.code}>{t.name}</option>
+                          ))}
                         </select>
                       </FormField>
-                    </>
-                  )}
-                  <FormField label="Класс">
-                    <select
-                      className="form-control"
-                      value={printerForm.printer_class || 'office'}
-                      onChange={(e) => setPrinterForm({ ...printerForm, printer_class: e.target.value as any })}
-                    >
-                      <option value="office">Офисный</option>
-                      <option value="pro">Профессиональный</option>
-                    </select>
-                  </FormField>
-                  <FormField label="Макс. ширина, мм">
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={(printerForm.max_width_mm ?? '') as any}
-                      onChange={(e) => setPrinterForm({ ...printerForm, max_width_mm: numberInputFromString(e.target.value) })}
-                    />
-                  </FormField>
-                  <FormField label="Активность">
-                    <select
-                      className="form-control"
-                      value={(printerForm.is_active ?? printer.is_active ?? 1) ? 1 : 0}
-                      onChange={(e) => setPrinterForm({ ...printerForm, is_active: Number(e.target.value) })}
-                    >
-                      <option value={1}>Активен</option>
-                      <option value={0}>Выключен</option>
-                    </select>
-                  </FormField>
-                </div>
-              ) : (
-                <div className="field-group">
-                  <FormField label="Тип печати">
-                    <span className="field-value">
-                      {printer.technology_code
-                        ? techOptions.find((t) => t.code === printer.technology_code)?.name || printer.technology_code
-                        : '—'}
-                    </span>
-                  </FormField>
-                  {isUvPrinterTech(printer.technology_code) ? (
-                    <FormField label="УФ-печать">
-                      <span className="field-value">Ставки в Ценах печати (м²)</span>
-                    </FormField>
+                      {isUvPrinterTech(printerForm.technology_code) && (
+                        <div className="printer-uv-hint">
+                          Ставки УФ задаются в{' '}
+                          <Link to={PRINTERS_PRINT_TAB_URL}>Ценах печати (м²)</Link>. Цветность и единица счётчика для
+                          УФ-планшета не используются.
+                        </div>
+                      )}
+                      {!isUvPrinterTech(printerForm.technology_code) && (
+                        <>
+                          <FormField label="Ед. счётчика">
+                            <select
+                              className="form-control"
+                              value={printerForm.counter_unit || 'sheets'}
+                              onChange={(e) =>
+                                setPrinterForm({ ...printerForm, counter_unit: e.target.value as 'sheets' | 'meters' })
+                              }
+                            >
+                              <option value="sheets">Листы</option>
+                              <option value="meters">Погонные метры</option>
+                            </select>
+                          </FormField>
+                          <FormField label="Цветность">
+                            <select
+                              className="form-control"
+                              value={printerForm.color_mode || 'both'}
+                              onChange={(e) => setPrinterForm({ ...printerForm, color_mode: e.target.value as any })}
+                            >
+                              <option value="both">Цвет+Ч/Б</option>
+                              <option value="color">Только цвет</option>
+                              <option value="bw">Только Ч/Б</option>
+                            </select>
+                          </FormField>
+                        </>
+                      )}
+                      <FormField label="Класс">
+                        <select
+                          className="form-control"
+                          value={printerForm.printer_class || 'office'}
+                          onChange={(e) => setPrinterForm({ ...printerForm, printer_class: e.target.value as any })}
+                        >
+                          <option value="office">Офисный</option>
+                          <option value="pro">Профессиональный</option>
+                        </select>
+                      </FormField>
+                      <FormField label="Макс. ширина, мм">
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={(printerForm.max_width_mm ?? '') as any}
+                          onChange={(e) => setPrinterForm({ ...printerForm, max_width_mm: numberInputFromString(e.target.value) })}
+                        />
+                      </FormField>
+                      <FormField label="Активность">
+                        <select
+                          className="form-control"
+                          value={(printerForm.is_active ?? printer.is_active ?? 1) ? 1 : 0}
+                          onChange={(e) => setPrinterForm({ ...printerForm, is_active: Number(e.target.value) })}
+                        >
+                          <option value={1}>Активен</option>
+                          <option value={0}>Выключен</option>
+                        </select>
+                      </FormField>
+                    </div>
                   ) : (
-                    <FormField label="Цветность">
-                      <span className="field-value">
-                        {printer.color_mode === 'bw' ? 'Ч/Б' : printer.color_mode === 'color' ? 'Цветной' : 'Цвет+Ч/Б'}
-                      </span>
-                    </FormField>
+                    <div className="field-group">
+                      <FormField label="Департамент">
+                        <span className="field-value">
+                          {printer.department_name || departmentName(printer.department_id)}
+                        </span>
+                      </FormField>
+                      <FormField label="Тип печати">
+                        <span className="field-value">
+                          {printer.technology_code
+                            ? techOptions.find((t) => t.code === printer.technology_code)?.name || printer.technology_code
+                            : '—'}
+                        </span>
+                      </FormField>
+                      {isUvPrinterTech(printer.technology_code) ? (
+                        <FormField label="УФ-печать">
+                          <span className="field-value">Ставки в Ценах печати (м²)</span>
+                        </FormField>
+                      ) : (
+                        <FormField label="Цветность">
+                          <span className="field-value">
+                            {printer.color_mode === 'bw' ? 'Ч/Б' : printer.color_mode === 'color' ? 'Цветной' : 'Цвет+Ч/Б'}
+                          </span>
+                        </FormField>
+                      )}
+                      <FormField label="Класс">
+                        <span className="field-value">
+                          {printer.printer_class === 'pro' ? 'Профессиональный' : 'Офисный'}
+                        </span>
+                      </FormField>
+                      <FormField label="Себестоимость печати">
+                        <span className="field-value">
+                          {techOptions.find((t) => t.code === printer.technology_code)?.pricing_mode === 'per_meter'
+                            ? (printer.price_per_meter == null ? '—' : <><MoneyAmount value={printer.price_per_meter} />/м</>)
+                            : (
+                              <>
+                                {printer.price_single == null ? '—' : <><MoneyAmount value={printer.price_single} />/лист</>}
+                                {printer.price_duplex == null ? '' : <>, 2 стор: <MoneyAmount value={printer.price_duplex} /></>}
+                              </>
+                            )}
+                        </span>
+                      </FormField>
+                      <FormField label="Ед. счётчика">
+                        <span className="field-value">
+                          {printer.counter_unit === 'meters' ? 'Погонные метры' : 'Листы'}
+                        </span>
+                      </FormField>
+                      <FormField label="Макс. ширина, мм">
+                        <span className="field-value">{printer.max_width_mm ?? '—'}</span>
+                      </FormField>
+                    </div>
                   )}
-                  <FormField label="Класс">
-                    <span className="field-value">
-                      {printer.printer_class === 'pro' ? 'Профессиональный' : 'Офисный'}
-                    </span>
-                  </FormField>
-                  <FormField label="Себестоимость печати">
-                    <span className="field-value">
-                      {techOptions.find((t) => t.code === printer.technology_code)?.pricing_mode === 'per_meter'
-                        ? (printer.price_per_meter == null ? '—' : <><MoneyAmount value={printer.price_per_meter} />/м</>)
-                        : (
-                          <>
-                            {printer.price_single == null ? '—' : <><MoneyAmount value={printer.price_single} />/лист</>}
-                            {printer.price_duplex == null ? '' : <>, 2 стор: <MoneyAmount value={printer.price_duplex} /></>}
-                          </>
-                        )}
-                    </span>
-                  </FormField>
-                  <FormField label="Ед. счётчика">
-                    <span className="field-value">
-                      {printer.counter_unit === 'meters' ? 'Погонные метры' : 'Листы'}
-                    </span>
-                  </FormField>
-                  <FormField label="Макс. ширина, мм">
-                    <span className="field-value">{printer.max_width_mm ?? '—'}</span>
-                  </FormField>
                 </div>
-              )}
-            </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 };
 
 export const PrintersTab = React.memo(PrintersTabComponent);
 PrintersTab.displayName = 'PrintersTab';
-

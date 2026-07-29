@@ -52,8 +52,8 @@ export class AuthService {
 
   static async getCurrentUser(token: string) {
     const db = await getDb()
-    const user = await db.get<{ id: number; name: string; role: string }>(
-      'SELECT id, name, role FROM users WHERE api_token = ?',
+    const user = await db.get<{ id: number; name: string; role: string; department_id: number | null }>(
+      'SELECT id, name, role, department_id FROM users WHERE api_token = ?',
       token
     )
     
