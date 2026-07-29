@@ -18,6 +18,14 @@ export interface Order {
   paymentId?: string;
   paymentMethod?: 'online' | 'offline' | 'telegram';
   userId?: number;
+  /** Контактёр / ответственный (если колонки есть) */
+  contact_user_id?: number | null;
+  responsible_user_id?: number | null;
+  /**
+   * Заказ попал в список пользователя как исполнителю по позиции
+   * (не владелец заказа).
+   */
+  assigned_as_executor?: boolean | number;
   payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal';
   miniapp_checkout_state?: MiniappCheckoutState;
   miniapp_design_help_requested?: number;

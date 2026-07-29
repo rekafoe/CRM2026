@@ -219,8 +219,8 @@ export class OrderService {
         continue
       }
       // Сохраняем пометку «исполнитель по позиции», если заказ уже пришёл из listUserOrders
-      if ((existing as any).assigned_as_executor && !(order as any).assigned_as_executor) {
-        byId.set(order.id, { ...order, ...existing, assigned_as_executor: (existing as any).assigned_as_executor })
+      if (existing.assigned_as_executor && !order.assigned_as_executor) {
+        byId.set(order.id, { ...order, ...existing, assigned_as_executor: existing.assigned_as_executor })
       }
     }
     const allOrders = Array.from(byId.values()) as Order[]
