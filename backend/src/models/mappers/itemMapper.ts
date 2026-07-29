@@ -16,7 +16,8 @@ export type ItemRow = {
   executor_user_id?: number | null
 }
 
-export const itemRowSelect = 'id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id'
+export const itemRowSelect =
+  'id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id'
 
 export function mapItemRowToItem(row: ItemRow): Item {
   let parsedParams: Item['params']

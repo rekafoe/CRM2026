@@ -24,18 +24,23 @@ type ListAllOrdersOptions = {
 
 /** Имя колонки принтера в items (на проде может быть printer_id). Кэш на время жизни процесса. */
 let itemPrinterColCache: string | null = null
+let itemHasExecutorColCache: boolean | null = null
+
 async function getItemSelectWithPrinterCol(db: Awaited<ReturnType<typeof getDb>>): Promise<string> {
-  if (itemPrinterColCache === null) {
+  if (itemPrinterColCache === null || itemHasExecutorColCache === null) {
     try {
       const raw = await db.all<{ name: string }>('PRAGMA table_info(items)')
       const cols: Array<{ name: string }> = Array.isArray(raw) ? raw : []
       const printerCol = cols.find((c) => c.name.toLowerCase().includes('printer'))
       itemPrinterColCache = printerCol?.name ?? 'printerId'
+      itemHasExecutorColCache = cols.some((c) => c.name === 'executor_user_id')
     } catch {
       itemPrinterColCache = 'printerId'
+      itemHasExecutorColCache = false
     }
   }
-  return `id, orderId, type, params, price, quantity, ${itemPrinterColCache}, sides, sheets, waste, clicks, executor_user_id`
+  const executorSel = itemHasExecutorColCache ? ', executor_user_id' : ', NULL as executor_user_id'
+  return `id, orderId, type, params, price, quantity, ${itemPrinterColCache}, sides, sheets, waste, clicks${executorSel}`
 }
 
 /** Если type — числовая строка (ID продукта с сайта), подставляем имя из products. */

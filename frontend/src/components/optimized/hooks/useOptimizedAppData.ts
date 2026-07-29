@@ -120,7 +120,7 @@ export const useOptimizedAppData = (
     
     fetchOrders.then((res) => {
       if (cancelled) return;
-      let list = res.data;
+      let list = Array.isArray(res.data) ? res.data : [];
       if (ordersListTab === 'orders') {
         list = list
           .filter(o => {
@@ -128,7 +128,14 @@ export const useOptimizedAppData = (
             if (!rawDate) return false;
             return extractDate(rawDate) === targetDate;
           })
-          .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
+          .filter(o => {
+            if (uid == null) return true;
+            // Свои как владелец / без владельца
+            if ((o as any).userId == null || (o as any).userId === uid) return true;
+            // Назначен исполнителем по позиции
+            const assigned = (o as any).assigned_as_executor;
+            return assigned === true || assigned === 1;
+          });
         // Выданные (status 7) не скрываем — заказ создателя не пропадает, если его выдал коллега.
       }
       const uniqueOrders = list.filter((order, index, self) => 
@@ -211,7 +218,7 @@ export const useOptimizedAppData = (
         : getOrders();
       
       fetchOrders.then((res) => {
-        let list = res.data;
+        let list = Array.isArray(res.data) ? res.data : [];
         if (ordersListTab === 'orders') {
           list = list
             .filter(o => {
@@ -219,7 +226,12 @@ export const useOptimizedAppData = (
               if (!rawDate) return false;
               return extractDate(rawDate) === targetDate;
             })
-            .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
+            .filter(o => {
+              if (uid == null) return true;
+              if ((o as any).userId == null || (o as any).userId === uid) return true;
+              const assigned = (o as any).assigned_as_executor;
+              return assigned === true || assigned === 1;
+            });
         }
         const uniqueOrders = list.filter((order, index, self) => 
           index === self.findIndex(o => o.id === order.id)

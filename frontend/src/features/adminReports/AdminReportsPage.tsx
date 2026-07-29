@@ -10,7 +10,7 @@ import { TimeAnalytics } from './components/TimeAnalytics';
 import { LocationRevenueAnalytics } from './components/LocationRevenueAnalytics';
 import { PnLAnalytics } from './components/PnLAnalytics';
 import { AnalyticsTab } from './types';
-import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getYearlyRevenue, getDepartments, updateReasonPresetsSettings, type Department } from '../../api';
+import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getYearlyRevenue, getDepartments, getExpenseSummary, updateReasonPresetsSettings, type Department } from '../../api';
 import { Button } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
 import { useReasonPresets } from '../../components/common/useReasonPresets';
@@ -93,6 +93,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     ordersPlan: 0,
     revenuePlan: 0,
   });
+  const [periodExpensesTotal, setPeriodExpensesTotal] = useState(0);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [dashboardSettingsByName, setDashboardSettingsByName] = useState<Record<string, MarkupSetting>>({});
@@ -349,6 +350,43 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     void loadOrderReasonStats();
   }, [period, dateFrom, dateTo, departmentId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadPeriodExpenses = async () => {
+      try {
+        let from = dateFrom;
+        let to = dateTo;
+        if (!from || !to) {
+          const end = new Date();
+          const start = new Date();
+          start.setDate(end.getDate() - Math.max(1, Number(period) || 30) + 1);
+          from = start.toISOString().slice(0, 10);
+          to = end.toISOString().slice(0, 10);
+        }
+        const res = await getExpenseSummary({ date_from: from, date_to: to });
+        const summary = res.data;
+        if (!summary) {
+          if (!cancelled) setPeriodExpensesTotal(0);
+          return;
+        }
+        let total = Number(summary.total) || 0;
+        if (departmentId != null) {
+          const row = (summary.by_department || []).find(
+            (d) => d.department_id != null && Number(d.department_id) === Number(departmentId)
+          );
+          total = Number(row?.total) || 0;
+        }
+        if (!cancelled) setPeriodExpensesTotal(total);
+      } catch {
+        if (!cancelled) setPeriodExpensesTotal(0);
+      }
+    };
+    void loadPeriodExpenses();
+    return () => {
+      cancelled = true;
+    };
+  }, [period, dateFrom, dateTo, departmentId]);
+
   const loadYearlyRevenue = async (deptId?: number) => {
     setYearlyRevenueLoading(true);
     try {
@@ -517,6 +555,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   const revenueFact = totalStats.totalRevenue;
   const revenuePlan = Math.max(0, Number(planTargets.revenuePlan) || 0);
   const revenuePlanPercent = revenuePlan > 0 ? (revenueFact / revenuePlan) * 100 : null;
+  const expensesFact = periodExpensesTotal;
+  const netAfterExpenses = revenueFact - expensesFact;
   const selectedDepartmentName = departmentId
     ? departments.find((d) => d.id === departmentId)?.name || `#${departmentId}`
     : null;
@@ -539,6 +579,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     const summaryRows = [
       { Показатель: 'Всего заказов', Значение: totalStats.totalOrders },
       { Показатель: 'Общая выручка', Значение: totalStats.totalRevenue },
+      { Показатель: 'Расходы', Значение: expensesFact },
+      { Показатель: 'Выручка минус расходы', Значение: netAfterExpenses },
       { Показатель: 'План заказов', Значение: ordersPlan },
       { Показатель: 'Факт/План заказов, %', Значение: ordersPlan > 0 ? Number(ordersPlanPercent?.toFixed(2) || 0) : '-' },
       { Показатель: 'План выручки', Значение: revenuePlan },
@@ -751,6 +793,16 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               <MoneyAmount value={totalStats.totalRevenue} decimals={0} />
             </div>
             <div className="reports-stat-label">Общая выручка</div>
+          </div>
+          <div className="reports-stat-card reports-stat-card--expenses">
+            <div className="reports-stat-value reports-stat-value--expenses">
+              <MoneyAmount value={expensesFact} decimals={0} />
+            </div>
+            <div className="reports-stat-label">Расходы</div>
+            <div className="reports-stat-sub">
+              Чистыми:{' '}
+              <MoneyAmount value={netAfterExpenses} decimals={0} />
+            </div>
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable reports-stat-card--yearly"

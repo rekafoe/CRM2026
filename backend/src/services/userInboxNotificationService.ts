@@ -72,52 +72,66 @@ export class UserInboxNotificationService {
   }
 
   static async listForUser(userId: number, opts?: { unreadOnly?: boolean; limit?: number }) {
-    const db = await getDb()
-    const limit = Math.min(100, Math.max(1, Number(opts?.limit) || 30))
-    const unreadOnly = Boolean(opts?.unreadOnly)
-    const rows = await db.all<any>(
-      `SELECT * FROM user_inbox_notifications
-        WHERE user_id = ?
-          ${unreadOnly ? 'AND is_read = 0' : ''}
-        ORDER BY id DESC
-        LIMIT ?`,
-      userId,
-      limit
-    )
-    return (rows || []).map(mapRow)
+    try {
+      const db = await getDb()
+      const limit = Math.min(100, Math.max(1, Number(opts?.limit) || 30))
+      const unreadOnly = Boolean(opts?.unreadOnly)
+      const rows = await db.all<any>(
+        `SELECT * FROM user_inbox_notifications
+          WHERE user_id = ?
+            ${unreadOnly ? 'AND is_read = 0' : ''}
+          ORDER BY id DESC
+          LIMIT ?`,
+        userId,
+        limit
+      )
+      return (rows || []).map(mapRow)
+    } catch (e: any) {
+      logger.warn('[UserInbox] listForUser failed (table may be missing)', { message: e?.message || String(e) })
+      return []
+    }
   }
 
   static async unreadCount(userId: number): Promise<number> {
-    const db = await getDb()
-    const row = await db.get<{ c: number }>(
-      'SELECT COUNT(*) as c FROM user_inbox_notifications WHERE user_id = ? AND is_read = 0',
-      userId
-    )
-    return Number(row?.c || 0)
+    try {
+      const db = await getDb()
+      const row = await db.get<{ c: number }>(
+        'SELECT COUNT(*) as c FROM user_inbox_notifications WHERE user_id = ? AND is_read = 0',
+        userId
+      )
+      return Number(row?.c || 0)
+    } catch {
+      return 0
+    }
   }
 
   static async markRead(userId: number, notificationIds?: number[]): Promise<number> {
-    const db = await getDb()
-    if (notificationIds && notificationIds.length > 0) {
-      const ids = notificationIds.map(Number).filter((id) => Number.isFinite(id) && id > 0)
-      if (ids.length === 0) return 0
-      const placeholders = ids.map(() => '?').join(',')
+    try {
+      const db = await getDb()
+      if (notificationIds && notificationIds.length > 0) {
+        const ids = notificationIds.map(Number).filter((id) => Number.isFinite(id) && id > 0)
+        if (ids.length === 0) return 0
+        const placeholders = ids.map(() => '?').join(',')
+        const result = await db.run(
+          `UPDATE user_inbox_notifications
+              SET is_read = 1, read_at = datetime('now','localtime')
+            WHERE user_id = ? AND is_read = 0 AND id IN (${placeholders})`,
+          userId,
+          ...ids
+        )
+        return Number((result as any).changes || 0)
+      }
       const result = await db.run(
         `UPDATE user_inbox_notifications
             SET is_read = 1, read_at = datetime('now','localtime')
-          WHERE user_id = ? AND is_read = 0 AND id IN (${placeholders})`,
-        userId,
-        ...ids
+          WHERE user_id = ? AND is_read = 0`,
+        userId
       )
       return Number((result as any).changes || 0)
+    } catch (e: any) {
+      logger.warn('[UserInbox] markRead failed', { message: e?.message || String(e) })
+      return 0
     }
-    const result = await db.run(
-      `UPDATE user_inbox_notifications
-          SET is_read = 1, read_at = datetime('now','localtime')
-        WHERE user_id = ? AND is_read = 0`,
-      userId
-    )
-    return Number((result as any).changes || 0)
   }
 
   /**

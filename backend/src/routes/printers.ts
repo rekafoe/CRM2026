@@ -2,10 +2,11 @@ import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
+import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
 
-const PRINTERS_SELECT = [
+const PRINTERS_BASE_SELECT = [
   'p.id',
   'p.code',
   'p.name',
@@ -24,14 +25,23 @@ const PRINTERS_SELECT = [
   'p.price_bw_per_meter',
   'p.price_color_per_meter',
   'p.is_active',
-  'p.department_id',
-  'd.name as department_name',
 ].join(', ')
 
-const PRINTERS_FROM = `
-  FROM printers p
-  LEFT JOIN departments d ON d.id = p.department_id
-`
+async function printersSelectSql(): Promise<{ select: string; from: string; hasDepartment: boolean }> {
+  const hasDepartment = await hasColumn('printers', 'department_id').catch(() => false)
+  if (!hasDepartment) {
+    return {
+      select: `${PRINTERS_BASE_SELECT}, NULL as department_id, NULL as department_name`,
+      from: 'FROM printers p',
+      hasDepartment: false,
+    }
+  }
+  return {
+    select: `${PRINTERS_BASE_SELECT}, p.department_id, d.name as department_name`,
+    from: `FROM printers p LEFT JOIN departments d ON d.id = p.department_id`,
+    hasDepartment: true,
+  }
+}
 
 function parseOptionalDepartmentId(raw: unknown): number | null | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined
@@ -42,45 +52,60 @@ function parseOptionalDepartmentId(raw: unknown): number | null | undefined {
 
 async function resolvePrintersDepartmentFilter(
   req: AuthenticatedRequest,
-  db: Awaited<ReturnType<typeof getDb>>
+  db: Awaited<ReturnType<typeof getDb>>,
+  hasPrinterDepartment: boolean
 ): Promise<number | null | undefined> {
-  // Приоритет: департамент исполнителя позиции (для селекта принтера в заказе)
+  if (!hasPrinterDepartment) return undefined
+
+  const hasUserDepartment = await hasColumn('users', 'department_id').catch(() => false)
+
   const executorUserId = Number((req.query as any)?.executor_user_id)
   if (Number.isFinite(executorUserId) && executorUserId > 0) {
-    const executor = await db.get<{ department_id: number | null }>(
-      'SELECT department_id FROM users WHERE id = ?',
-      [executorUserId]
-    )
-    const dept = executor?.department_id != null ? Number(executor.department_id) : null
-    if (dept != null && Number.isFinite(dept) && dept > 0) return dept
-    // У исполнителя нет департамента — не ограничиваем список
+    if (!hasUserDepartment) return undefined
+    try {
+      const executor = await db.get<{ department_id: number | null }>(
+        'SELECT department_id FROM users WHERE id = ?',
+        [executorUserId]
+      )
+      const dept = executor?.department_id != null ? Number(executor.department_id) : null
+      if (dept != null && Number.isFinite(dept) && dept > 0) return dept
+    } catch {
+      return undefined
+    }
     return undefined
   }
 
   const queryDept = parseOptionalDepartmentId((req.query as any)?.department_id)
-  // Явный department_id (для админки / отчётов) — для любого авторизованного
   if (queryDept !== undefined) return queryDept
 
   const authUser = req.user
-  if (!authUser || authUser.role === 'admin') return undefined
+  if (!authUser || authUser.role === 'admin' || !hasUserDepartment) return undefined
 
-  const userRow = await db.get<{ department_id: number | null }>(
-    'SELECT department_id FROM users WHERE id = ?',
-    [authUser.id]
-  )
-  const userDept = userRow?.department_id != null ? Number(userRow.department_id) : null
-  if (userDept != null && Number.isFinite(userDept) && userDept > 0) {
-    return userDept
+  try {
+    const userRow = await db.get<{ department_id: number | null }>(
+      'SELECT department_id FROM users WHERE id = ?',
+      [authUser.id]
+    )
+    const userDept = userRow?.department_id != null ? Number(userRow.department_id) : null
+    if (userDept != null && Number.isFinite(userDept) && userDept > 0) {
+      return userDept
+    }
+  } catch {
+    return undefined
   }
   return undefined
 }
 
 // GET /api/printers — список принтеров (фильтр по технологии / департаменту)
-// Не-admin с department_id видит только принтеры своего департамента.
 router.get('/', asyncHandler(async (req, res) => {
   const technologyCode = (req.query as any)?.technology_code as string | undefined
   const db = await getDb()
-  const departmentId = await resolvePrintersDepartmentFilter(req as AuthenticatedRequest, db)
+  const { select, from, hasDepartment } = await printersSelectSql()
+  const departmentId = await resolvePrintersDepartmentFilter(
+    req as AuthenticatedRequest,
+    db,
+    hasDepartment
+  )
   const filterByTech = technologyCode && String(technologyCode).trim()
 
   const where: string[] = []
@@ -89,7 +114,7 @@ router.get('/', asyncHandler(async (req, res) => {
     where.push('p.technology_code = ?')
     params.push(filterByTech)
   }
-  if (departmentId !== undefined) {
+  if (hasDepartment && departmentId !== undefined) {
     if (departmentId === null) {
       where.push('p.department_id IS NULL')
     } else {
@@ -99,8 +124,11 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const orderSql = hasDepartment
+    ? 'ORDER BY d.name IS NULL, d.name, p.name'
+    : 'ORDER BY p.name'
   const rows = await db.all<any>(
-    `SELECT ${PRINTERS_SELECT} ${PRINTERS_FROM} ${whereSql} ORDER BY d.name IS NULL, d.name, p.name`,
+    `SELECT ${select} ${from} ${whereSql} ${orderSql}`,
     ...params
   )
   res.json(rows)
@@ -166,7 +194,9 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 
   const db = await getDb()
-  if (deptId != null) {
+  const { select, from, hasDepartment } = await printersSelectSql()
+
+  if (hasDepartment && deptId != null) {
     const dept = await db.get<{ id: number }>('SELECT id FROM departments WHERE id = ?', [deptId])
     if (!dept) {
       res.status(400).json({ message: 'Департамент не найден' })
@@ -174,20 +204,33 @@ router.post('/', asyncHandler(async (req, res) => {
     }
   }
 
-  await db.run(
-    `INSERT INTO printers (code, name, technology_code, counter_unit, max_width_mm, color_mode, printer_class,
-      department_id, price_single, price_duplex, price_per_meter, price_bw_single, price_bw_duplex,
-      price_color_single, price_color_duplex, price_bw_per_meter, price_color_per_meter, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    code, name, technology_code ?? null, counter_unit, max_width_mm ?? null, color_mode, printer_class,
-    deptId,
-    price_single ?? null, price_duplex ?? null, price_per_meter ?? null,
-    price_bw_single ?? null, price_bw_duplex ?? null, price_color_single ?? null, price_color_duplex ?? null,
-    price_bw_per_meter ?? null, price_color_per_meter ?? null, is_active ? 1 : 0
-  )
+  if (hasDepartment) {
+    await db.run(
+      `INSERT INTO printers (code, name, technology_code, counter_unit, max_width_mm, color_mode, printer_class,
+        department_id, price_single, price_duplex, price_per_meter, price_bw_single, price_bw_duplex,
+        price_color_single, price_color_duplex, price_bw_per_meter, price_color_per_meter, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      code, name, technology_code ?? null, counter_unit, max_width_mm ?? null, color_mode, printer_class,
+      deptId,
+      price_single ?? null, price_duplex ?? null, price_per_meter ?? null,
+      price_bw_single ?? null, price_bw_duplex ?? null, price_color_single ?? null, price_color_duplex ?? null,
+      price_bw_per_meter ?? null, price_color_per_meter ?? null, is_active ? 1 : 0
+    )
+  } else {
+    await db.run(
+      `INSERT INTO printers (code, name, technology_code, counter_unit, max_width_mm, color_mode, printer_class,
+        price_single, price_duplex, price_per_meter, price_bw_single, price_bw_duplex,
+        price_color_single, price_color_duplex, price_bw_per_meter, price_color_per_meter, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      code, name, technology_code ?? null, counter_unit, max_width_mm ?? null, color_mode, printer_class,
+      price_single ?? null, price_duplex ?? null, price_per_meter ?? null,
+      price_bw_single ?? null, price_bw_duplex ?? null, price_color_single ?? null, price_color_duplex ?? null,
+      price_bw_per_meter ?? null, price_color_per_meter ?? null, is_active ? 1 : 0
+    )
+  }
 
   const row = await db.get<any>(
-    `SELECT ${PRINTERS_SELECT} ${PRINTERS_FROM} WHERE p.code = ?`,
+    `SELECT ${select} ${from} WHERE p.code = ?`,
     code
   )
 
@@ -241,10 +284,11 @@ router.put('/:id', asyncHandler(async (req, res) => {
   }
 
   const db = await getDb()
+  const { select, from, hasDepartment } = await printersSelectSql()
   const existing = await db.get<any>('SELECT * FROM printers WHERE id = ?', id)
   if (!existing) { res.status(404).json({ message: 'Printer not found' }); return }
 
-  if (department_id !== undefined && department_id != null) {
+  if (hasDepartment && department_id !== undefined && department_id != null) {
     const deptId = Number(department_id)
     if (!Number.isFinite(deptId) || deptId <= 0) {
       res.status(400).json({ message: 'Некорректный department_id' })
@@ -266,7 +310,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   if (max_width_mm !== undefined) { sets.push('max_width_mm = ?'); values.push(max_width_mm) }
   if (color_mode !== undefined) { sets.push('color_mode = ?'); values.push(color_mode) }
   if (printer_class !== undefined) { sets.push('printer_class = ?'); values.push(printer_class) }
-  if (department_id !== undefined) {
+  if (hasDepartment && department_id !== undefined) {
     sets.push('department_id = ?')
     values.push(department_id == null ? null : Number(department_id))
   }
@@ -291,7 +335,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   }
 
   const row = await db.get<any>(
-    `SELECT ${PRINTERS_SELECT} ${PRINTERS_FROM} WHERE p.id = ?`,
+    `SELECT ${select} ${from} WHERE p.id = ?`,
     id
   )
 

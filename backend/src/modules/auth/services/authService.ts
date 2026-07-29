@@ -40,15 +40,28 @@ export class AuthService {
 
   static async getCurrentUser(token: string) {
     const db = await getDb()
-    const user = await db.get<{ id: number; name: string; role: string; department_id: number | null }>(
-      'SELECT id, name, role, department_id FROM users WHERE api_token = ?',
-      token
-    )
+    let user: { id: number; name: string; role: string; department_id?: number | null } | undefined
+    try {
+      user = await db.get(
+        'SELECT id, name, role, department_id FROM users WHERE api_token = ?',
+        token
+      )
+    } catch {
+      user = await db.get(
+        'SELECT id, name, role FROM users WHERE api_token = ?',
+        token
+      )
+    }
     
     if (!user) {
       throw new Error('Неверный токен')
     }
     
-    return user
+    return {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      department_id: user.department_id ?? null,
+    }
   }
 }

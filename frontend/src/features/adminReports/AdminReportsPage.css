@@ -220,6 +220,21 @@
   margin-bottom: 4px;
 }
 
+.reports-stat-card--expenses::before {
+  background: #c2410c;
+  opacity: 1;
+}
+
+.reports-stat-value--expenses {
+  color: #c2410c;
+}
+
+.reports-stat-sub {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
 .reports-stat-card__header {
   display: flex;
   align-items: center;
