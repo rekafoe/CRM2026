@@ -423,10 +423,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const hasMoreOrders = visibleOrders.length < filteredOrders.length;
 
   const filterCounts = useMemo(() => {
-    let base = orders.filter((o) => {
-      const s = Number(o.status);
-      return s === 0 || s === 1;
-    });
+    let base = [...orders];
     if (filters.source !== 'all') {
       base = base.filter((o) => o.source === filters.source);
     }
