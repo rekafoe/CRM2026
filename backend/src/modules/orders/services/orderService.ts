@@ -116,18 +116,28 @@ export class OrderService {
     );
   }
 
-  private static buildDefaultReadyDate(baseDate?: string) {
+  /** Смещение готовности от оформления по типу цены (как в Order Pool). */
+  private static readonly READY_OFFSET_MS: Record<string, number> = {
+    urgent: 3 * 60 * 60 * 1000,
+    promo: 48 * 60 * 60 * 1000,
+    special: 5 * 24 * 60 * 60 * 1000,
+    standard: 24 * 60 * 60 * 1000,
+    online: 24 * 60 * 60 * 1000,
+  }
+
+  /**
+   * Дата готовности в ISO (UTC, с Z).
+   * Раньше писали «локальные» часы сервера без таймзоны (+1ч) — на Railway (UTC)
+   * в UI (UTC+3) готовность оказывалась раньше «Оформлен».
+   */
+  private static buildDefaultReadyDate(baseDate?: string, priceType?: string) {
     const date = baseDate ? new Date(baseDate) : new Date()
     if (isNaN(date.getTime())) {
       return null
     }
-    date.setHours(date.getHours() + 1)
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day}T${hours}:${minutes}`
+    const key = String(priceType || 'standard').toLowerCase().trim()
+    const offset = this.READY_OFFSET_MS[key] ?? this.READY_OFFSET_MS.standard
+    return new Date(date.getTime() + offset).toISOString()
   }
   private static async getAllStatuses(): Promise<Array<{ id: number; name: string }>> {
     return getCachedData<Array<{ id: number; name: string }>>(
@@ -530,7 +540,12 @@ export class OrderService {
           paramsObj = {}
         }
         if (!paramsObj.readyDate) {
-          const defaultReadyDate = this.buildDefaultReadyDate(orderCreatedAt)
+          const priceType =
+            paramsObj.priceType ?? paramsObj.price_type ?? (item as { priceType?: string }).priceType
+          const defaultReadyDate = this.buildDefaultReadyDate(
+            orderCreatedAt,
+            typeof priceType === 'string' ? priceType : undefined,
+          )
           if (defaultReadyDate) {
             paramsObj.readyDate = defaultReadyDate
           }
@@ -640,12 +655,6 @@ export class OrderService {
       } catch {
         paramsObj = {};
       }
-      if (!paramsObj.readyDate) {
-        const defaultReadyDate = this.buildDefaultReadyDate(payload.orderCreatedAt || undefined);
-        if (defaultReadyDate) {
-          paramsObj.readyDate = defaultReadyDate;
-        }
-      }
       if (Array.isArray(item.components) && item.components.length > 0) {
         paramsObj._miniappComponents = item.components.map((component) => ({
           materialId: Number(component.materialId),
@@ -670,6 +679,15 @@ export class OrderService {
       }
       if (priceType && typeof priceType === 'string') {
         paramsObj.priceType = priceType.toLowerCase().trim();
+      }
+      if (!paramsObj.readyDate) {
+        const defaultReadyDate = this.buildDefaultReadyDate(
+          payload.orderCreatedAt || undefined,
+          typeof priceType === 'string' ? priceType : paramsObj.priceType,
+        );
+        if (defaultReadyDate) {
+          paramsObj.readyDate = defaultReadyDate;
+        }
       }
       await db.run(
         'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',
@@ -1942,7 +1960,11 @@ export class OrderService {
       formatInfo
     }
     if (!params.readyDate) {
-      const defaultReadyDate = this.buildDefaultReadyDate(order.created_at || order.createdAt)
+      const priceType = params.priceType ?? params.price_type ?? urgency
+      const defaultReadyDate = this.buildDefaultReadyDate(
+        order.created_at || order.createdAt,
+        typeof priceType === 'string' ? priceType : undefined,
+      )
       if (defaultReadyDate) {
         params.readyDate = defaultReadyDate
       }

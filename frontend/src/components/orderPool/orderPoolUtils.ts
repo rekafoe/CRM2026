@@ -50,27 +50,55 @@ function getOrderCreatedAt(order: Order): string | undefined {
   return order.created_at ?? (order as { createdAt?: string }).createdAt;
 }
 
-/** Макс. readyDate из позиций или расчёт от даты оформления. */
+/**
+ * Парсит readyDate из params.
+ * Строки без таймзоны (YYYY-MM-DDTHH:mm) раньше писались в UTC сервера —
+ * интерпретируем их как UTC, иначе в UTC+3 готовность «уезжает» назад.
+ */
+function parseItemReadyDateMs(raw: string): number {
+  const s = String(raw).trim();
+  if (!s) return NaN;
+  // datetime-local / без Z: считаем UTC (как писал Railway)
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(s)) {
+    const utc = Date.parse(s.length === 16 ? `${s}:00Z` : `${s}Z`);
+    if (Number.isFinite(utc)) return utc;
+  }
+  const t = new Date(s).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+/** Макс. readyDate из позиций или расчёт от даты оформления по SLA. */
 export function resolveOrderReadyAt(order: Order): Date | null {
+  const created = getOrderCreatedAt(order);
+  const createdMs = created ? new Date(created).getTime() : NaN;
+  const priceType = getOrderPriceType(order);
+  const offset = READY_OFFSET_MS[priceType] ?? READY_OFFSET_MS.standard;
+  const fromSla =
+    Number.isFinite(createdMs) ? new Date(createdMs + offset) : null;
+
   const fromItems = (order.items ?? [])
     .map((item) => {
       const raw = (item.params as { readyDate?: string } | undefined)?.readyDate;
       if (!raw) return NaN;
-      return new Date(raw).getTime();
+      return parseItemReadyDateMs(raw);
     })
     .filter((t) => Number.isFinite(t));
 
   if (fromItems.length > 0) {
-    return new Date(Math.max(...fromItems));
+    const maxReadyMs = Math.max(...fromItems);
+    if (Number.isFinite(createdMs) && fromSla) {
+      // Готовность раньше оформления (частый баг TZ без Z)
+      if (maxReadyMs < createdMs) return fromSla;
+      // Старый бэкенд писал +1ч без таймзоны при подписи «24 часа»
+      const TWO_H = 2 * 60 * 60 * 1000;
+      if (offset >= 24 * 60 * 60 * 1000 && maxReadyMs - createdMs < TWO_H) {
+        return fromSla;
+      }
+    }
+    return new Date(maxReadyMs);
   }
 
-  const created = getOrderCreatedAt(order);
-  if (!created) return null;
-  const base = new Date(created);
-  if (Number.isNaN(base.getTime())) return null;
-  const priceType = getOrderPriceType(order);
-  const offset = READY_OFFSET_MS[priceType] ?? READY_OFFSET_MS.standard;
-  return new Date(base.getTime() + offset);
+  return fromSla;
 }
 
 export function getOrderReadyLabel(order: Order): {

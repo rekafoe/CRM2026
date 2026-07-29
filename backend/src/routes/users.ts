@@ -26,7 +26,11 @@ router.get('/', requireAdmin, asyncHandler(async (req, res) => {
 }))
 
 // GET /api/users/operators-today?date=YYYY-MM-DD — операторы, работающие в указанную дату (по user_shifts)
-router.get('/operators-today', requireAdmin, asyncHandler(async (req, res) => {
+router.get('/operators-today', asyncHandler(async (req: AuthenticatedRequest, res) => {
+  if (!req.user) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
   const date = String((req.query as any)?.date ?? '').trim().slice(0, 10)
   const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
@@ -42,6 +46,12 @@ router.get('/operators-today', requireAdmin, asyncHandler(async (req, res) => {
      ORDER BY u.name`,
     targetDate
   )
+  // Если смен нет — отдаём всех активных пользователей, чтобы можно было назначить исполнителя
+  if (!Array.isArray(rows) || rows.length === 0) {
+    const all = await db.all<any>('SELECT id, name FROM users ORDER BY name')
+    res.json(all)
+    return
+  }
   res.json(rows)
 }))
 

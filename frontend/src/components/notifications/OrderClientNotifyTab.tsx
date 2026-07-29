@@ -5,10 +5,14 @@ import {
   fetchMailDiagnostics,
   fetchMailStats,
   fetchOrderEmailRules,
+  fetchOrderEmailTemplates,
+  fetchOrderMailStatuses,
   postMailTest,
   patchOrderEmailRule,
+  patchOrderEmailTemplate,
+  createOrderEmailRule,
 } from '../../api/mailApi';
-import type { OrderEmailRuleRow } from '../../api/mailApi';
+import type { OrderEmailRuleRow, EmailTemplateRow } from '../../api/mailApi';
 import type { MailDiagnosticsResponse, MailDiagnosticStep } from '../../api/mailApi';
 import { fetchSmsConfig, fetchOrderSmsRules, patchOrderSmsRule } from '../../api/smsApi';
 import type { OrderSmsRuleRow } from '../../api/smsApi';
@@ -31,6 +35,16 @@ export const OrderClientNotifyTab: React.FC = () => {
     null
   );
   const [rules, setRules] = useState<OrderEmailRuleRow[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplateRow[]>([]);
+  const [statuses, setStatuses] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [draftName, setDraftName] = useState('');
+  const [draftSubject, setDraftSubject] = useState('');
+  const [draftHtml, setDraftHtml] = useState('');
+  const [draftText, setDraftText] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [newRuleStatusId, setNewRuleStatusId] = useState('');
+  const [newRuleTemplateId, setNewRuleTemplateId] = useState('');
   const [loading, setLoading] = useState(true);
   const [testTo, setTestTo] = useState('');
   const [testSending, setTestSending] = useState(false);
@@ -43,15 +57,33 @@ export const OrderClientNotifyTab: React.FC = () => {
   const [smsRules, setSmsRules] = useState<OrderSmsRuleRow[]>([]);
   const [smsTogglingId, setSmsTogglingId] = useState<number | null>(null);
 
+  const applyTemplateDraft = useCallback((t: EmailTemplateRow | null) => {
+    if (!t) {
+      setSelectedTemplateId(null);
+      setDraftName('');
+      setDraftSubject('');
+      setDraftHtml('');
+      setDraftText('');
+      return;
+    }
+    setSelectedTemplateId(t.id);
+    setDraftName(t.name || '');
+    setDraftSubject(t.subject_template || '');
+    setDraftHtml(t.body_html_template || '');
+    setDraftText(t.body_text_template || '');
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, s, r, sc, sr] = await Promise.all([
+      const [c, s, r, sc, sr, tpl, st] = await Promise.all([
         fetchMailConfig(),
         fetchMailStats(),
         fetchOrderEmailRules(),
         fetchSmsConfig().catch(() => ({ enabled: false, debounceSeconds: 0 })),
         fetchOrderSmsRules().catch(() => ({ rules: [] as OrderSmsRuleRow[] })),
+        fetchOrderEmailTemplates().catch(() => ({ templates: [] as EmailTemplateRow[] })),
+        fetchOrderMailStatuses().catch(() => ({ statuses: [] as Array<{ id: number; name: string }> })),
       ]);
       setConfig(c);
       setStats(s);
@@ -59,6 +91,12 @@ export const OrderClientNotifyTab: React.FC = () => {
       setSmsEnabled(sc.enabled);
       setSmsDebounce(sc.debounceSeconds);
       setSmsRules(sr.rules || []);
+      const list = tpl.templates || [];
+      setTemplates(list);
+      setStatuses(st.statuses || []);
+      setSelectedTemplateId((prev) =>
+        prev != null && list.some((x) => x.id === prev) ? prev : list[0]?.id ?? null
+      );
     } catch (e) {
       addToast({
         type: 'error',
@@ -74,6 +112,16 @@ export const OrderClientNotifyTab: React.FC = () => {
     void load();
   }, [load]);
 
+  const syncedTemplateIdRef = React.useRef<number | null>(null);
+  useEffect(() => {
+    if (selectedTemplateId == null) return;
+    if (syncedTemplateIdRef.current === selectedTemplateId) return;
+    const current = templates.find((x) => x.id === selectedTemplateId) || null;
+    if (!current) return;
+    syncedTemplateIdRef.current = selectedTemplateId;
+    applyTemplateDraft(current);
+  }, [templates, selectedTemplateId, applyTemplateDraft]);
+
   const handleToggle = async (rule: OrderEmailRuleRow) => {
     if (!config?.configured) {
       addToast({
@@ -86,7 +134,7 @@ export const OrderClientNotifyTab: React.FC = () => {
     setTogglingId(rule.id);
     try {
       const next = !rule.is_active;
-      await patchOrderEmailRule(rule.id, next);
+      await patchOrderEmailRule(rule.id, { is_active: next });
       setRules((prev) => prev.map((x) => (x.id === rule.id ? { ...x, is_active: next ? 1 : 0 } : x)));
       addToast({ type: 'success', title: 'Сохранено', message: next ? 'Правило включено' : 'Правило выключено' });
     } catch (e) {
@@ -97,6 +145,78 @@ export const OrderClientNotifyTab: React.FC = () => {
       });
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleRuleTemplateChange = async (rule: OrderEmailRuleRow, templateId: number) => {
+    setTogglingId(rule.id);
+    try {
+      await patchOrderEmailRule(rule.id, { email_template_id: templateId });
+      const slug = templates.find((t) => t.id === templateId)?.slug || null;
+      setRules((prev) =>
+        prev.map((x) =>
+          x.id === rule.id ? { ...x, email_template_id: templateId, template_slug: slug } : x
+        )
+      );
+      addToast({ type: 'success', title: 'Сохранено', message: 'Шаблон правила обновлён' });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Ошибка',
+        message: e instanceof Error ? e.message : 'Не удалось сменить шаблон',
+      });
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    if (selectedTemplateId == null) return;
+    setSavingTemplate(true);
+    try {
+      const updated = await patchOrderEmailTemplate(selectedTemplateId, {
+        name: draftName,
+        subject_template: draftSubject,
+        body_html_template: draftHtml,
+        body_text_template: draftText,
+      });
+      setTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      applyTemplateDraft(updated);
+      addToast({ type: 'success', title: 'Шаблон сохранён' });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Ошибка',
+        message: e instanceof Error ? e.message : 'Не удалось сохранить шаблон',
+      });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleCreateRule = async () => {
+    const statusId = Number(newRuleStatusId);
+    const templateId = Number(newRuleTemplateId || selectedTemplateId);
+    if (!Number.isFinite(statusId) || statusId <= 0 || !Number.isFinite(templateId) || templateId <= 0) {
+      addToast({ type: 'warning', title: 'Правило', message: 'Выберите статус и шаблон' });
+      return;
+    }
+    try {
+      await createOrderEmailRule({
+        to_status_id: statusId,
+        email_template_id: templateId,
+        is_active: true,
+      });
+      setNewRuleStatusId('');
+      setNewRuleTemplateId('');
+      await load();
+      addToast({ type: 'success', title: 'Правило создано' });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Ошибка',
+        message: e instanceof Error ? e.message : 'Не удалось создать правило',
+      });
     }
   };
 
@@ -358,7 +478,7 @@ export const OrderClientNotifyTab: React.FC = () => {
           <h4>Email при смене статуса</h4>
           <p className="client-notify-hint">
             Нужен email клиента, настроенный SMTP и <strong>включённое</strong> правило для нового статуса.
-            Дубли на один переход статуса блокируются idempotency-ключом.
+            Письма содержат позиции, сумму, доставку и срок (как у конкурентов).
           </p>
           <div className="client-notify-table-wrap">
             <table className="client-notify-table">
@@ -380,7 +500,20 @@ export const OrderClientNotifyTab: React.FC = () => {
                   rules.map((rule) => (
                     <tr key={rule.id}>
                       <td>{rule.status_name || `#${rule.to_status_id}`}</td>
-                      <td>{rule.template_slug || '—'}</td>
+                      <td>
+                        <select
+                          className="client-notify-input client-notify-select"
+                          value={rule.email_template_id}
+                          disabled={togglingId === rule.id}
+                          onChange={(e) => void handleRuleTemplateChange(rule, Number(e.target.value))}
+                        >
+                          {templates.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.slug})
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td>
                         <input
                           type="checkbox"
@@ -396,6 +529,110 @@ export const OrderClientNotifyTab: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          <div className="client-notify-new-rule">
+            <h5 className="client-notify-subtitle">Добавить правило</h5>
+            <div className="client-notify-test-row">
+              <select
+                className="client-notify-input client-notify-select"
+                value={newRuleStatusId}
+                onChange={(e) => setNewRuleStatusId(e.target.value)}
+              >
+                <option value="">Статус…</option>
+                {statuses.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="client-notify-input client-notify-select"
+                value={newRuleTemplateId || String(selectedTemplateId ?? '')}
+                onChange={(e) => setNewRuleTemplateId(e.target.value)}
+              >
+                <option value="">Шаблон…</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="btn btn-secondary" onClick={() => void handleCreateRule()}>
+                Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <h4>Редактор шаблона письма</h4>
+          <p className="client-notify-hint">
+            Плейсхолдеры: <code>{'{{customerName}}'}</code>, <code>{'{{orderNumber}}'}</code>,{' '}
+            <code>{'{{statusPhrase}}'}</code>, <code>{'{{itemsHtml}}'}</code>/<code>{'{{itemsText}}'}</code>,{' '}
+            <code>{'{{orderTotal}}'}</code>, <code>{'{{deliveryHtml}}'}</code>,{' '}
+            <code>{'{{productionTerm}}'}</code>, <code>{'{{readyAt}}'}</code>,{' '}
+            <code>{'{{companyName}}'}</code>, <code>{'{{companyEmail}}'}</code>,{' '}
+            <code>{'{{companyPhone}}'}</code>, <code>{'{{cabinetUrl}}'}</code>.
+          </p>
+          <label className="client-notify-field">
+            <span>Шаблон</span>
+            <select
+              className="client-notify-input"
+              value={selectedTemplateId ?? ''}
+              onChange={(e) => {
+                syncedTemplateIdRef.current = null;
+                setSelectedTemplateId(Number(e.target.value) || null);
+              }}
+            >
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.slug})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="client-notify-field">
+            <span>Название</span>
+            <input
+              className="client-notify-input"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+            />
+          </label>
+          <label className="client-notify-field">
+            <span>Тема</span>
+            <input
+              className="client-notify-input"
+              value={draftSubject}
+              onChange={(e) => setDraftSubject(e.target.value)}
+            />
+          </label>
+          <label className="client-notify-field">
+            <span>HTML</span>
+            <textarea
+              className="client-notify-textarea"
+              rows={14}
+              value={draftHtml}
+              onChange={(e) => setDraftHtml(e.target.value)}
+            />
+          </label>
+          <label className="client-notify-field">
+            <span>Текст (plain)</span>
+            <textarea
+              className="client-notify-textarea"
+              rows={10}
+              value={draftText}
+              onChange={(e) => setDraftText(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={savingTemplate || selectedTemplateId == null}
+            onClick={() => void handleSaveTemplate()}
+          >
+            {savingTemplate ? 'Сохранение…' : 'Сохранить шаблон'}
+          </button>
         </div>
       </div>
     </div>

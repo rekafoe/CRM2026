@@ -124,7 +124,9 @@ export const useOptimizedAppData = (
       if (ordersListTab === 'orders') {
         list = list
           .filter(o => {
-            // Бэкенд уже фильтрует по date; оставляем страховку по дате
+            const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
+            // Исполнитель по позиции: бэкенд может отдать заказ другого дня — не режем по created_at
+            if (assigned) return true;
             const rawDate = (o as any).created_at ?? (o as any).createdAt;
             if (!rawDate) return true;
             return extractDate(rawDate) === targetDate;
@@ -153,14 +155,21 @@ export const useOptimizedAppData = (
               (o.items?.length || 0) === (next.items?.length || 0) &&
               (o.items || []).every((it, j) => {
                 const nj = (next.items || [])[j];
-                return it && nj && it.id === nj.id && (it.printerId ?? null) === (nj.printerId ?? null);
+                return (
+                  it &&
+                  nj &&
+                  it.id === nj.id &&
+                  (it.printerId ?? null) === (nj.printerId ?? null) &&
+                  (it.executor_user_id ?? null) === (nj.executor_user_id ?? null)
+                );
               });
             return (
               o.id === next.id &&
               itemsMatch &&
               Number(o.prepaymentAmount || 0) === Number(next.prepaymentAmount || 0) &&
               (o.prepaymentStatus || '') === (next.prepaymentStatus || '') &&
-              (o.paymentMethod || '') === (next.paymentMethod || '')
+              (o.paymentMethod || '') === (next.paymentMethod || '') &&
+              Boolean(o.assigned_as_executor) === Boolean(next.assigned_as_executor)
             );
           })
         ) {
@@ -223,6 +232,8 @@ export const useOptimizedAppData = (
         if (ordersListTab === 'orders') {
           list = list
             .filter(o => {
+              const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
+              if (assigned) return true;
               const rawDate = (o as any).created_at ?? (o as any).createdAt;
               if (!rawDate) return true;
               return extractDate(rawDate) === targetDate;
@@ -248,14 +259,21 @@ export const useOptimizedAppData = (
                   (o.items?.length || 0) === (newOrder.items?.length || 0) &&
                   (o.items || []).every((it, j) => {
                     const nj = (newOrder.items || [])[j];
-                    return it && nj && it.id === nj.id && (it.printerId ?? null) === (nj.printerId ?? null);
+                    return (
+                      it &&
+                      nj &&
+                      it.id === nj.id &&
+                      (it.printerId ?? null) === (nj.printerId ?? null) &&
+                      (it.executor_user_id ?? null) === (nj.executor_user_id ?? null)
+                    );
                   });
                 return (
                   o.id === newOrder.id && 
                   itemsMatch &&
                   Number(o.prepaymentAmount || 0) === Number(newOrder.prepaymentAmount || 0) &&
                   (o.prepaymentStatus || '') === (newOrder.prepaymentStatus || '') &&
-                  (o.paymentMethod || '') === (newOrder.paymentMethod || '')
+                  (o.paymentMethod || '') === (newOrder.paymentMethod || '') &&
+                  Boolean(o.assigned_as_executor) === Boolean(newOrder.assigned_as_executor)
                 );
               })) {
             return prevOrders;

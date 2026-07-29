@@ -6,6 +6,7 @@ import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 import { parseWebsiteOrderDeliveryJson } from '../types/websiteOrderDelivery'
 import { SQL_ITEMS_SUBTOTAL_BY_ORDER } from '../utils/orderAmountsSql'
+import { getTodayString } from '../utils/date'
 
 function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(order: T): T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> } {
   const delivery = parseWebsiteOrderDeliveryJson(order.delivery_json ?? null)
@@ -173,20 +174,40 @@ export const OrderRepository = {
       } catch { /* ignore */ }
     }
 
-    const whereParts: string[] = ['o.userId = ?']
-    const whereParams: Array<string | number> = [userId]
-    if (executorOrderIds.size > 0) {
-      const ids = Array.from(executorOrderIds)
-      whereParts[0] = `(o.userId = ? OR o.id IN (${ids.map(() => '?').join(',')}))`
-      whereParams.push(...ids)
-    }
-
     const day = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date.slice(0, 10))
       ? options.date.slice(0, 10)
       : null
-    if (day) {
+    // На «сегодня» исполнителю показываем и заказы прошлых дней (пул/сайт),
+    // иначе назначение видно только в селекте позиции у ответственного.
+    const todayLocal = getTodayString()
+
+    const whereParts: string[] = []
+    const whereParams: Array<string | number> = []
+    const execIds = executorOrderIds.size > 0 ? Array.from(executorOrderIds) : []
+    const execInSql = execIds.length > 0 ? `o.id IN (${execIds.map(() => '?').join(',')})` : null
+
+    if (day && execInSql && day === todayLocal) {
+      // Свои за сегодня + все заказы, где юзер исполнитель по позиции (любая дата создания)
+      whereParts.push(
+        `((o.userId = ? AND date(COALESCE(o.created_at, o.createdAt)) = date(?)) OR (${execInSql}))`,
+      )
+      whereParams.push(userId, day, ...execIds)
+    } else if (day) {
+      if (execInSql) {
+        whereParts.push(`(o.userId = ? OR ${execInSql})`)
+        whereParams.push(userId, ...execIds)
+      } else {
+        whereParts.push('o.userId = ?')
+        whereParams.push(userId)
+      }
       whereParts.push(`date(COALESCE(o.created_at, o.createdAt)) = date(?)`)
       whereParams.push(day)
+    } else if (execInSql) {
+      whereParts.push(`(o.userId = ? OR ${execInSql})`)
+      whereParams.push(userId, ...execIds)
+    } else {
+      whereParts.push('o.userId = ?')
+      whereParams.push(userId)
     }
 
     const orders = await db.all<any>(

@@ -95,11 +95,41 @@ export async function fetchOrderEmailTemplates(): Promise<{ templates: EmailTemp
   return data;
 }
 
+export async function fetchOrderMailStatuses(): Promise<{ statuses: Array<{ id: number; name: string }> }> {
+  const { data } = await apiClient.get<{ statuses: Array<{ id: number; name: string }> }>('/mail/order-statuses');
+  return data;
+}
+
 export async function patchOrderEmailRule(
   id: number,
-  isActive: boolean
+  patch: { is_active?: boolean; email_template_id?: number }
 ): Promise<void> {
-  await apiClient.patch(`/mail/order-email-rules/${id}`, { is_active: isActive });
+  await apiClient.patch(`/mail/order-email-rules/${id}`, patch);
+}
+
+export async function createOrderEmailRule(payload: {
+  to_status_id: number;
+  email_template_id: number;
+  is_active?: boolean;
+}): Promise<void> {
+  await apiClient.post('/mail/order-email-rules', payload);
+}
+
+export async function patchOrderEmailTemplate(
+  id: number,
+  patch: {
+    name?: string;
+    subject_template?: string;
+    body_html_template?: string;
+    body_text_template?: string | null;
+    is_active?: boolean;
+  }
+): Promise<EmailTemplateRow> {
+  const { data } = await apiClient.patch<{ ok: boolean; template: EmailTemplateRow }>(
+    `/mail/order-templates/${id}`,
+    patch
+  );
+  return data.template;
 }
 
 export async function fetchMailJobsByOrder(

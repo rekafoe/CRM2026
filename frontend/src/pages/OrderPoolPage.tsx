@@ -225,11 +225,23 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const handleExecutorChange = useCallback(
     async (orderId: number, itemId: number, executor_user_id: number | null) => {
       try {
+        setOrders((prev) =>
+          prev.map((o) => {
+            if (o.id !== orderId || !Array.isArray(o.items)) return o;
+            return {
+              ...o,
+              items: o.items.map((it) =>
+                it.id === itemId ? { ...it, executor_user_id } : it,
+              ),
+            };
+          }),
+        );
         await updateOrderItem(orderId, itemId, { executor_user_id });
-        loadOrders();
+        void loadOrders({ soft: true });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Не удалось обновить исполнителя';
         toast.error('Ошибка', message);
+        void loadOrders({ soft: true });
       }
     },
     [loadOrders, toast],

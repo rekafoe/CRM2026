@@ -312,7 +312,7 @@ router.get(
 );
 
 /**
- * PATCH /api/mail/order-email-rules/:id — включить/выключить правило.
+ * PATCH /api/mail/order-email-rules/:id — включить/выключить правило и/или сменить шаблон.
  */
 router.patch(
   '/order-email-rules/:id',
@@ -323,18 +323,160 @@ router.patch(
       res.status(400).json({ error: 'Invalid id' });
       return;
     }
-    const isActive = (req.body as { is_active?: boolean })?.is_active;
-    if (typeof isActive !== 'boolean') {
-      res.status(400).json({ error: 'is_active (boolean) required' });
+    const body = (req.body || {}) as { is_active?: boolean; email_template_id?: number };
+    if (typeof body.is_active !== 'boolean' && body.email_template_id == null) {
+      res.status(400).json({ error: 'is_active and/or email_template_id required' });
       return;
     }
     const db = await getDb();
-    const r = await db.run('UPDATE order_email_rules SET is_active = ? WHERE id = ?', [isActive ? 1 : 0, id]);
-    if (!r.changes) {
+    if (body.email_template_id != null) {
+      const tid = Number(body.email_template_id);
+      if (!Number.isFinite(tid) || tid <= 0) {
+        res.status(400).json({ error: 'Invalid email_template_id' });
+        return;
+      }
+      const t = await db.get('SELECT id FROM email_templates WHERE id = ?', [tid]);
+      if (!t) {
+        res.status(400).json({ error: 'Template not found' });
+        return;
+      }
+      await db.run('UPDATE order_email_rules SET email_template_id = ? WHERE id = ?', [tid, id]);
+    }
+    if (typeof body.is_active === 'boolean') {
+      await db.run('UPDATE order_email_rules SET is_active = ? WHERE id = ?', [body.is_active ? 1 : 0, id]);
+    }
+    const row = await db.get(
+      `SELECT r.id, r.to_status_id, r.email_template_id, r.is_active, s.name as status_name, t.slug as template_slug
+       FROM order_email_rules r
+       LEFT JOIN order_statuses s ON s.id = r.to_status_id
+       LEFT JOIN email_templates t ON t.id = r.email_template_id
+       WHERE r.id = ?`,
+      [id]
+    );
+    if (!row) {
       res.status(404).json({ error: 'Rule not found' });
       return;
     }
-    res.json({ ok: true, id, is_active: isActive });
+    res.json({ ok: true, rule: row });
+  })
+);
+
+/**
+ * POST /api/mail/order-email-rules — создать правило статус → шаблон.
+ * body: { to_status_id, email_template_id, is_active? }
+ */
+router.post(
+  '/order-email-rules',
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const body = (req.body || {}) as {
+      to_status_id?: number;
+      email_template_id?: number;
+      is_active?: boolean;
+    };
+    const statusId = Number(body.to_status_id);
+    const templateId = Number(body.email_template_id);
+    if (!Number.isFinite(statusId) || statusId <= 0 || !Number.isFinite(templateId) || templateId <= 0) {
+      res.status(400).json({ error: 'to_status_id and email_template_id required' });
+      return;
+    }
+    const db = await getDb();
+    const status = await db.get('SELECT id FROM order_statuses WHERE id = ?', [statusId]);
+    const template = await db.get('SELECT id FROM email_templates WHERE id = ?', [templateId]);
+    if (!status || !template) {
+      res.status(400).json({ error: 'Status or template not found' });
+      return;
+    }
+    const existing = await db.get<{ id: number }>(
+      'SELECT id FROM order_email_rules WHERE to_status_id = ?',
+      [statusId]
+    );
+    if (existing?.id) {
+      await db.run(
+        'UPDATE order_email_rules SET email_template_id = ?, is_active = ? WHERE id = ?',
+        [templateId, body.is_active === false ? 0 : 1, existing.id]
+      );
+      res.json({ ok: true, id: existing.id, updated: true });
+      return;
+    }
+    const r = await db.run(
+      'INSERT INTO order_email_rules (to_status_id, email_template_id, is_active) VALUES (?, ?, ?)',
+      [statusId, templateId, body.is_active === false ? 0 : 1]
+    );
+    res.status(201).json({ ok: true, id: r.lastID, created: true });
+  })
+);
+
+/**
+ * PATCH /api/mail/order-templates/:id — редактировать шаблон письма.
+ */
+router.patch(
+  '/order-templates/:id',
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: 'Invalid id' });
+      return;
+    }
+    const body = (req.body || {}) as {
+      name?: string;
+      subject_template?: string;
+      body_html_template?: string;
+      body_text_template?: string | null;
+      is_active?: boolean;
+    };
+    const db = await getDb();
+    const existing = await db.get<{
+      id: number
+      name: string
+      subject_template: string
+      body_html_template: string
+      body_text_template: string | null
+      is_active: number
+    }>('SELECT * FROM email_templates WHERE id = ?', [id]);
+    if (!existing) {
+      res.status(404).json({ error: 'Template not found' });
+      return;
+    }
+    await db.run(
+      `UPDATE email_templates SET
+         name = ?,
+         subject_template = ?,
+         body_html_template = ?,
+         body_text_template = ?,
+         is_active = ?
+       WHERE id = ?`,
+      [
+        body.name != null ? String(body.name).trim() : existing.name,
+        body.subject_template != null ? String(body.subject_template) : existing.subject_template,
+        body.body_html_template != null ? String(body.body_html_template) : existing.body_html_template,
+        body.body_text_template !== undefined ? body.body_text_template : existing.body_text_template,
+        typeof body.is_active === 'boolean' ? (body.is_active ? 1 : 0) : existing.is_active,
+        id,
+      ]
+    );
+    const row = await db.get(
+      `SELECT id, slug, name, subject_template, body_html_template, body_text_template, is_active, created_at
+       FROM email_templates WHERE id = ?`,
+      [id]
+    );
+    res.json({ ok: true, template: row });
+  })
+);
+
+/**
+ * GET /api/mail/order-statuses — статусы для привязки правил (admin).
+ */
+router.get(
+  '/order-statuses',
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const db = await getDb();
+    const rows = await db.all(
+      `SELECT id, name FROM order_statuses ORDER BY sort_order, id`
+    );
+    res.json({ statuses: rows || [] });
   })
 );
 

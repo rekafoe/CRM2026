@@ -1,56 +1,57 @@
-import { getDb } from '../config/database';
-import { getSmtpConfig } from '../config/mail';
-import { renderEmailTemplate } from './emailTemplateService';
-import { enqueueMail } from './mailOutboxService';
-import { isValidEmailAddress } from '../utils/isValidEmail';
-import { logger } from '../utils/logger';
+import { getDb } from '../config/database'
+import { getSmtpConfig } from '../config/mail'
+import { renderEmailTemplate } from './emailTemplateService'
+import { enqueueMail } from './mailOutboxService'
+import { isValidEmailAddress } from '../utils/isValidEmail'
+import { logger } from '../utils/logger'
+import { buildOrderStatusEmailVars } from './orderStatusEmailVars'
 
-export type OrderEmailSource = 'crm' | 'website' | 'telegram' | 'mini_app';
+export type OrderEmailSource = 'crm' | 'website' | 'telegram' | 'mini_app'
 
 /**
  * Поставить в очередь письмо клиенту при смене статуса (если есть правило и email).
  * Idempotency: одно письмо на переход (old → new) для заказа.
  */
 export async function tryEnqueueOrderStatusEmail(params: {
-  orderId: number;
-  oldStatusId: number;
-  newStatusId: number;
-  source?: OrderEmailSource;
+  orderId: number
+  oldStatusId: number
+  newStatusId: number
+  source?: OrderEmailSource
 }): Promise<void> {
   if (params.source === 'telegram') {
-    return;
+    return
   }
   if (params.oldStatusId === params.newStatusId) {
-    return;
+    return
   }
   if (!getSmtpConfig().configured) {
-    return;
+    return
   }
 
   try {
-    const db = await getDb();
+    const db = await getDb()
     const rule = await db.get<{
-      subject_template: string;
-      body_html_template: string;
-      body_text_template: string | null;
+      subject_template: string
+      body_html_template: string
+      body_text_template: string | null
     }>(
       `SELECT t.subject_template, t.body_html_template, t.body_text_template
        FROM order_email_rules r
        INNER JOIN email_templates t ON t.id = r.email_template_id
        WHERE r.to_status_id = ? AND r.is_active = 1 AND t.is_active = 1`,
       [params.newStatusId]
-    );
+    )
     if (!rule) {
-      return;
+      return
     }
 
     const order = await db.get<{
-      id: number;
-      number: string | null;
-      customerName: string | null;
-      customerEmail: string | null;
-      customerEmailFromCard: string | null;
-      source: OrderEmailSource | null;
+      id: number
+      number: string | null
+      customerName: string | null
+      customerEmail: string | null
+      customerEmailFromCard: string | null
+      source: OrderEmailSource | null
     }>(
       `SELECT
          o.id,
@@ -63,46 +64,41 @@ export async function tryEnqueueOrderStatusEmail(params: {
        LEFT JOIN customers c ON c.id = o.customer_id
        WHERE o.id = ?`,
       [params.orderId]
-    );
+    )
     if (!order) {
-      return;
+      return
     }
     if ((params.source ?? order.source) === 'telegram') {
-      return;
+      return
     }
 
-    const to = (order.customerEmail || order.customerEmailFromCard || '').trim();
+    const to = (order.customerEmail || order.customerEmailFromCard || '').trim()
     if (!to) {
-      logger.debug('Order status email skipped: no customerEmail', { orderId: params.orderId });
-      return;
+      logger.debug('Order status email skipped: no customerEmail', { orderId: params.orderId })
+      return
     }
     if (!isValidEmailAddress(to)) {
-      logger.debug('Order status email skipped: invalid customerEmail', { orderId: params.orderId, to });
-      return;
+      logger.debug('Order status email skipped: invalid customerEmail', { orderId: params.orderId, to })
+      return
     }
 
     const st = await db.get<{ name: string }>(
       'SELECT name FROM order_statuses WHERE id = ?',
       params.newStatusId
-    );
-    const statusName = st?.name || String(params.newStatusId);
-    const customerName = (order.customerName || '').trim() || 'клиент';
-    const orderNumber = (order.number || `site-ord-${order.id}`).trim();
-
-    const vars: Record<string, string> = {
-      orderId: String(order.id),
-      orderNumber,
+    )
+    const statusName = st?.name || String(params.newStatusId)
+    const vars = await buildOrderStatusEmailVars({
+      orderId: params.orderId,
       statusName,
-      customerName,
-    };
+    })
 
-    const subject = renderEmailTemplate(rule.subject_template, vars);
-    const bodyHtml = renderEmailTemplate(rule.body_html_template, vars);
+    const subject = renderEmailTemplate(rule.subject_template, vars)
+    const bodyHtml = renderEmailTemplate(rule.body_html_template, vars)
     const bodyText = rule.body_text_template
       ? renderEmailTemplate(rule.body_text_template, vars)
-      : undefined;
+      : undefined
 
-    const idempotencyKey = `order-notify:${params.orderId}:${params.oldStatusId}:${params.newStatusId}`;
+    const idempotencyKey = `order-notify:${params.orderId}:${params.oldStatusId}:${params.newStatusId}`
 
     await enqueueMail({
       to,
@@ -118,13 +114,13 @@ export async function tryEnqueueOrderStatusEmail(params: {
         oldStatusId: params.oldStatusId,
         newStatusId: params.newStatusId,
       },
-    });
+    })
     logger.info('Order status email enqueued', {
       orderId: params.orderId,
       toStatusId: params.newStatusId,
       to,
-    });
+    })
   } catch (e) {
-    logger.warn('Order status email enqueue failed', { error: e, orderId: params.orderId });
+    logger.warn('Order status email enqueue failed', { error: e, orderId: params.orderId })
   }
 }

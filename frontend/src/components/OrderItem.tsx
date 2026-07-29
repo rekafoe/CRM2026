@@ -368,7 +368,11 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           <div className="order-item-meta-assign-select-wrap">
             <select
               className="order-item-meta-select order-item-meta-select--inline"
-              value={item.executor_user_id ?? (order as any)?.responsible_user_id ?? (order as any)?.userId ?? ''}
+              value={
+                item.executor_user_id != null && Number(item.executor_user_id) > 0
+                  ? String(item.executor_user_id)
+                  : ''
+              }
               onChange={(e) => {
                 const v = e.target.value;
                 if (!onExecutorChange) return;
@@ -376,6 +380,13 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
               }}
             >
               <option value="">—</option>
+              {item.executor_user_id != null &&
+                Number(item.executor_user_id) > 0 &&
+                !operatorsToday.some((u) => u.id === Number(item.executor_user_id)) && (
+                  <option value={String(item.executor_user_id)}>
+                    {`Пользователь #${item.executor_user_id}`}
+                  </option>
+                )}
               {operatorsToday.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}

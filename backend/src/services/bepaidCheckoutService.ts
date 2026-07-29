@@ -21,12 +21,26 @@ export type BePaidCheckoutResult = {
   redirectUrl: string
 }
 
+export class BePaidCheckoutError extends Error {
+  readonly code: 'config' | 'upstream' | 'validation'
+  readonly httpStatus: number
+
+  constructor(message: string, code: BePaidCheckoutError['code'], httpStatus = 502) {
+    super(message)
+    this.name = 'BePaidCheckoutError'
+    this.code = code
+    this.httpStatus = httpStatus
+  }
+}
+
 function getCredentials(): { shopId: string; secretKey: string } {
   const shopId = String(process.env.BEPAID_SHOP_ID || '').trim()
   const secretKey = String(process.env.BEPAID_SECRET_KEY || '').trim()
   if (!shopId || !secretKey) {
-    throw new Error(
-      'Не заданы BEPAID_SHOP_ID и BEPAID_SECRET_KEY. Укажите их в окружении CRM (как на сайте).',
+    throw new BePaidCheckoutError(
+      'Не заданы BEPAID_SHOP_ID и BEPAID_SECRET_KEY в Railway. Укажите те же ключи, что на сайте.',
+      'config',
+      503,
     )
   }
   return { shopId, secretKey }
@@ -44,14 +58,40 @@ function checkoutBaseUrl(): string {
   return (process.env.BEPAID_CHECKOUT_URL || 'https://checkout.bepaid.by').replace(/\/$/, '')
 }
 
+function sanitizePhone(phone?: string): string | undefined {
+  if (!phone) return undefined
+  const trimmed = String(phone).trim()
+  const digits = trimmed.replace(/\D/g, '')
+  if (digits.length < 9 || digits.length > 15) return undefined
+  return trimmed.slice(0, 32)
+}
+
 function extractErrorMessage(payload: unknown, httpStatus: number): string {
   if (payload && typeof payload === 'object') {
     const data = payload as Record<string, unknown>
-    const responseBlock = data.response as { message?: string } | undefined
-    if (responseBlock?.message) return responseBlock.message
+    const responseBlock = data.response as { message?: string; errors?: unknown } | undefined
+    if (responseBlock?.message) return String(responseBlock.message)
     if (typeof data.message === 'string' && data.message.trim()) return data.message
+    const errors = data.errors ?? responseBlock?.errors
+    if (errors && typeof errors === 'object') {
+      const parts: string[] = []
+      for (const [key, val] of Object.entries(errors as Record<string, unknown>)) {
+        if (Array.isArray(val)) parts.push(`${key}: ${val.join(', ')}`)
+        else if (val != null) parts.push(`${key}: ${String(val)}`)
+      }
+      if (parts.length) return parts.join('; ')
+    }
   }
   return `BePaid HTTP ${httpStatus}`
+}
+
+function makeTimeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(ms)
+  }
+  const controller = new AbortController()
+  setTimeout(() => controller.abort(), ms)
+  return controller.signal
 }
 
 /**
@@ -61,16 +101,18 @@ export async function createBePaidCheckout(input: BePaidCheckoutInput): Promise<
   const { shopId, secretKey } = getCredentials()
   const amountMinor = Math.round(Number(input.amountByn) * 100)
   if (!Number.isFinite(amountMinor) || amountMinor <= 0) {
-    throw new Error('Сумма оплаты должна быть больше нуля')
+    throw new BePaidCheckoutError('Сумма оплаты должна быть больше нуля', 'validation', 400)
   }
   if (!input.customer.email?.trim()) {
-    throw new Error('Для ссылки BePaid нужен email клиента')
+    throw new BePaidCheckoutError('Для ссылки BePaid нужен email клиента', 'validation', 400)
   }
 
+  const test = isTestMode(input.test)
   const authToken = Buffer.from(`${shopId}:${secretKey}`).toString('base64')
+  const phone = sanitizePhone(input.customer.phone)
   const requestBody = {
     checkout: {
-      test: isTestMode(input.test),
+      test,
       transaction_type: 'payment',
       attempts: 3,
       settings: {
@@ -78,7 +120,7 @@ export async function createBePaidCheckout(input: BePaidCheckoutInput): Promise<
         decline_url: input.failUrl,
         fail_url: input.failUrl,
         cancel_url: input.failUrl,
-        notification_url: input.notificationUrl,
+        ...(input.notificationUrl ? { notification_url: input.notificationUrl } : {}),
         language: 'ru',
         customer_fields: {
           visible: ['first_name', 'phone'],
@@ -98,7 +140,7 @@ export async function createBePaidCheckout(input: BePaidCheckoutInput): Promise<
         email: input.customer.email.trim(),
         first_name: input.customer.firstName || undefined,
         last_name: input.customer.lastName || undefined,
-        phone: input.customer.phone || undefined,
+        ...(phone ? { phone } : {}),
       },
     },
   }
@@ -113,30 +155,52 @@ export async function createBePaidCheckout(input: BePaidCheckoutInput): Promise<
         'X-API-Version': '2',
       },
       body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(30_000),
+      signal: makeTimeoutSignal(25_000),
     })
     const data = (await response.json().catch(() => null)) as
       | { checkout?: { token?: string; redirect_url?: string }; message?: string; response?: { message?: string } }
       | null
     if (!response.ok) {
       const message = extractErrorMessage(data, response.status)
+      logger.warn('BePaid checkout rejected', {
+        httpStatus: response.status,
+        message,
+        trackingId: input.orderTrackingId,
+        test,
+        shopIdPrefix: shopId.slice(0, 4),
+      })
       if (message.toLowerCase().includes('access denied')) {
-        throw new Error(
-          'BePaid: доступ запрещён. Проверьте BEPAID_SHOP_ID и BEPAID_SECRET_KEY в окружении CRM.',
+        throw new BePaidCheckoutError(
+          test
+            ? 'BePaid: доступ запрещён (test-режим). Проверьте BEPAID_SHOP_ID / BEPAID_SECRET_KEY или выставьте BEPAID_TEST_MODE=false для боевого магазина.'
+            : 'BePaid: доступ запрещён. Проверьте BEPAID_SHOP_ID и BEPAID_SECRET_KEY в Railway (и BEPAID_TEST_MODE, если ключи тестовые).',
+          'config',
+          503,
         )
       }
-      throw new Error(message)
+      throw new BePaidCheckoutError(`BePaid: ${message}`, 'upstream', 502)
     }
     const checkout = data?.checkout
     if (!checkout?.token || !checkout?.redirect_url) {
-      throw new Error('BePaid вернул неполный ответ (нет token или redirect_url)')
+      throw new BePaidCheckoutError(
+        'BePaid вернул неполный ответ (нет token или redirect_url)',
+        'upstream',
+        502,
+      )
     }
     return { token: String(checkout.token), redirectUrl: String(checkout.redirect_url) }
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('BePaid')) throw error
-    const message = error instanceof Error ? error.message : 'Ошибка при создании платежа BePaid'
-    logger.warn('BePaid checkout failed', { message, trackingId: input.orderTrackingId })
-    throw new Error(message)
+    if (error instanceof BePaidCheckoutError) throw error
+    const raw = error instanceof Error ? error.message : String(error)
+    const isTimeout =
+      raw.toLowerCase().includes('abort') ||
+      raw.toLowerCase().includes('timeout') ||
+      (error instanceof Error && error.name === 'TimeoutError')
+    const message = isTimeout
+      ? 'BePaid не ответил вовремя (таймаут). Повторите через минуту.'
+      : raw || 'Ошибка при создании платежа BePaid'
+    logger.warn('BePaid checkout failed', { message, trackingId: input.orderTrackingId, test })
+    throw new BePaidCheckoutError(message, isTimeout ? 'upstream' : 'upstream', 502)
   }
 }
 

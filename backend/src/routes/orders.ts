@@ -15,6 +15,7 @@ import { sendOrderSmsManual } from '../services/orderStatusSmsService'
 import { enqueueMail } from '../services/mailOutboxService'
 import {
   createBePaidCheckout,
+  BePaidCheckoutError,
   resolveBePaidReturnUrls,
   splitCustomerName,
 } from '../services/bepaidCheckoutService'
@@ -1291,7 +1292,9 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
       paymentId = checkout.token
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Не удалось создать ссылку BePaid'
-      res.status(502).json({ message })
+      const status = e instanceof BePaidCheckoutError ? e.httpStatus : 502
+      logger.warn('BePaid prepay checkout failed', { orderId: id, message, status })
+      res.status(status).json({ message })
       return
     }
   }
@@ -1347,7 +1350,22 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
     return
   }
 
-  const email = String(order.customerEmail || '').trim()
+  let email = String(order.customerEmail || '').trim()
+  if (!isValidEmailAddress(email) && order.customer_id) {
+    try {
+      const customer = await db.get<{ email?: string | null }>(
+        'SELECT email FROM customers WHERE id = ?',
+        [order.customer_id],
+      )
+      const fromCustomer = String(customer?.email || '').trim()
+      if (isValidEmailAddress(fromCustomer)) {
+        email = fromCustomer
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   let paymentUrl = String(order.paymentUrl || '').trim() || null
   let paymentId = String(order.paymentId || '').trim() || null
   const amountChanged = Math.abs(Number(order.prepaymentAmount ?? 0) - amount) > 0.009
@@ -1386,7 +1404,9 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
       paymentId = checkout.token
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Не удалось создать ссылку BePaid'
-      res.status(502).json({ message })
+      const status = e instanceof BePaidCheckoutError ? e.httpStatus : 502
+      logger.warn('BePaid send-payment-link failed', { orderId: id, message, status })
+      res.status(status).json({ message })
       return
     }
 

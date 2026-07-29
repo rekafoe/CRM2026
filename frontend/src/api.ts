@@ -949,7 +949,7 @@ export const sendOrderPaymentLink = (
       smsError?: string;
       emailError?: string;
     }
-  >(`/orders/${orderId}/send-payment-link`, payload);
+  >(`/orders/${orderId}/send-payment-link`, payload, { timeout: 45000 });
 
 // Генерация PDF бланка заказа
 export const generateOrderBlankPdf = (orderId: number, companyPhones?: string[]) => {

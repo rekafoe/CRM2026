@@ -90,10 +90,18 @@ export const SendPaymentLinkModal: React.FC<Props> = ({
         onToast('error', 'Не удалось отправить', parts.join('. '));
       }
     } catch (err: unknown) {
+      const ax = err as {
+        response?: { data?: { message?: string }; status?: number };
+        message?: string;
+        code?: string;
+      };
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        ax.response?.data?.message ||
+        (ax.code === 'ECONNABORTED'
+          ? 'Сервер не успел ответить (таймаут). Проверьте BePaid / Railway и повторите.'
+          : ax.message) ||
         (err instanceof Error ? err.message : 'Ошибка отправки');
-      onToast('error', 'Ошибка', msg);
+      onToast('error', 'Ошибка оплаты', msg);
     } finally {
       setSending(false);
     }

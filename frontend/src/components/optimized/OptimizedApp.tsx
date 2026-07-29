@@ -170,13 +170,26 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const handleExecutorChange = useCallback(
     async (orderId: number, itemId: number, executor_user_id: number | null) => {
       try {
+        // Сразу в UI — иначе loadOrders может вернуть prevOrders без executor_user_id
+        setOrders((prev) =>
+          prev.map((o) => {
+            if (o.id !== orderId || !Array.isArray(o.items)) return o;
+            return {
+              ...o,
+              items: o.items.map((it) =>
+                it.id === itemId ? { ...it, executor_user_id } : it,
+              ),
+            };
+          }),
+        );
         await updateOrderItem(orderId, itemId, { executor_user_id });
-        loadOrders();
+        loadOrders(undefined, true);
       } catch (err: any) {
         toast.error('Ошибка', err?.message ?? 'Не удалось обновить исполнителя');
+        loadOrders(undefined, true);
       }
     },
-    [loadOrders, toast]
+    [loadOrders, setOrders, toast]
   );
 
   // Деструктуризация modalState для удобства
