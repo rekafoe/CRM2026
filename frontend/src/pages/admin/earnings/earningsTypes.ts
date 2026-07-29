@@ -7,6 +7,8 @@ export type AdminUserRow = {
   totalPreviousMonth: number;
   totalPenalties?: number;
   totalBonuses?: number;
+  hourlyRate?: number;
+  hourlyPay?: number;
   totalNet?: number;
   hours: number;
   shifts: number;

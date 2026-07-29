@@ -245,10 +245,13 @@ export const EarningsAdminPage: React.FC = () => {
   const totalActive = useMemo(() => activeRows.length, [activeRows]);
   const averageSalary = useMemo(() => {
     if (activeRows.length === 0) return 0;
-    const total = activeRows.reduce((sum, row) => sum + Number(row.totalCurrentMonth || 0), 0);
+    const total = activeRows.reduce((sum, row) => sum + Number(row.totalNet ?? row.totalCurrentMonth ?? 0), 0);
     return total / activeRows.length;
   }, [activeRows]);
-  const totalSalary = useMemo(() => rows.reduce((s, r) => s + Number(r.totalCurrentMonth || 0), 0), [rows]);
+  const totalSalary = useMemo(
+    () => rows.reduce((s, r) => s + Number(r.totalNet ?? r.totalCurrentMonth ?? 0), 0),
+    [rows],
+  );
 
   const analyticsUser = useMemo(() => {
     if (rows.length === 0) return null;
@@ -407,7 +410,8 @@ export const EarningsAdminPage: React.FC = () => {
               <thead>
                 <tr>
                   <th>Сотрудник</th>
-                  <th>Текущий месяц</th>
+                  <th>Проценты</th>
+                  <th>Часы × ставка</th>
                   <th>Премии</th>
                   <th>Штрафы</th>
                   <th>К выплате</th>
@@ -420,7 +424,7 @@ export const EarningsAdminPage: React.FC = () => {
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
                       Нет данных за выбранный месяц
                     </td>
                   </tr>
@@ -437,6 +441,18 @@ export const EarningsAdminPage: React.FC = () => {
                       >
                         <MoneyAmount value={row.totalCurrentMonth} />
                       </button>
+                    </td>
+                    <td className="earn-cell-money" title={
+                      Number(row.hourlyRate) > 0
+                        ? `${Number(row.hours).toFixed(1)} ч × ${Number(row.hourlyRate).toFixed(2)} BYN`
+                        : 'Ставка не задана'
+                    }>
+                      <MoneyAmount value={row.hourlyPay ?? 0} />
+                      {Number(row.hourlyRate) > 0 ? (
+                        <div className="earn-cell-hint">
+                          {Number(row.hours).toFixed(1)}×{Number(row.hourlyRate).toFixed(2)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="earn-cell-money earn-cell-money--bonus">
                       <MoneyAmount value={row.totalBonuses ?? 0} signed />
@@ -808,7 +824,7 @@ export const EarningsAdminPage: React.FC = () => {
             <div className="earn-penalty-summary">
               Итого штрафов за {month}: <strong><MoneyAmount value={penaltyTotal} /></strong>
               {' · '}
-              К выплате: <strong><MoneyAmount value={Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal)} /></strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.hourlyPay ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal)} /></strong>
             </div>
             {penaltyLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
@@ -867,7 +883,7 @@ export const EarningsAdminPage: React.FC = () => {
             <div className="earn-bonus-summary">
               Итого премий за {month}: <strong><MoneyAmount value={bonusTotal} signed /></strong>
               {' · '}
-              К выплате: <strong><MoneyAmount value={Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0))} /></strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + (bonusUser.hourlyPay ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0))} /></strong>
             </div>
             {bonusLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>

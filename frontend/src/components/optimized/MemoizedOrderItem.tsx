@@ -18,10 +18,23 @@ interface MemoizedOrderItemProps {
   onEditParameters?: (orderId: number, item: any) => void;
   readOnly?: boolean;
   operatorsToday?: Array<{ id: number; name: string }>;
+  assignableOnShift?: Array<{ id: number; name: string; department_id?: number | null }>;
+  assignableAll?: Array<{ id: number; name: string; department_id?: number | null }>;
   onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
 }
 
-export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({ item, orderId, order, onUpdate, onEditParameters, readOnly, operatorsToday = [], onExecutorChange }) => {
+export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({
+  item,
+  orderId,
+  order,
+  onUpdate,
+  onEditParameters,
+  readOnly,
+  operatorsToday = [],
+  assignableOnShift,
+  assignableAll,
+  onExecutorChange,
+}) => {
   const handleUpdate = useCallback(() => {
     onUpdate();
   }, [onUpdate]);
@@ -36,6 +49,8 @@ export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({ item, orderId, 
       onEditParameters={onEditParameters}
       readOnly={readOnly}
       operatorsToday={operatorsToday}
+      assignableOnShift={assignableOnShift}
+      assignableAll={assignableAll}
       onExecutorChange={onExecutorChange}
     />
   );

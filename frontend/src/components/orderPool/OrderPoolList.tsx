@@ -7,6 +7,7 @@ import {
   formatPoolDateTimeFull,
   getEffectiveResponsibleUserId,
   getOrderReadyLabel,
+  getPoolFulfillmentChip,
   getSourceLabel,
 } from './orderPoolUtils';
 
@@ -44,6 +45,7 @@ const OrderCard = React.memo<{
     && responsibleId !== currentUserId;
   const readiness = getOrderReadyLabel(order);
   const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
+  const fulfillmentChip = getPoolFulfillmentChip(order);
 
   return (
     <article
@@ -75,6 +77,11 @@ const OrderCard = React.memo<{
             <span className="order-pool-card__number">{order.number}</span>
             {order.source ? (
               <span className="order-pool-card__source">{getSourceLabel(order.source)}</span>
+            ) : null}
+            {fulfillmentChip ? (
+              <span className="order-pool-card__fulfillment" title={fulfillmentChip.title}>
+                {fulfillmentChip.label}
+              </span>
             ) : null}
             {isCancelled ? <span className="order-pool-card__tag is-error">Отменён</span> : null}
             {!isAssigned && !isCancelled ? (

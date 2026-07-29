@@ -17,7 +17,10 @@ import {
   updateOrderItem,
   getOrderActivity,
   updateOrderNotes,
+  getAssignableUsers,
+  getCurrentUser,
   type Department,
+  type AssignableUser,
 } from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
@@ -76,8 +79,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
+  const [assignableOnShift, setAssignableOnShift] = useState<AssignableUser[]>([]);
+  const [assignableAll, setAssignableAll] = useState<AssignableUser[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [poolDepartmentId, setPoolDepartmentId] = useState<number | ''>('');
+  const [poolDeptDefaultApplied, setPoolDeptDefaultApplied] = useState(false);
   const [orderActivity, setOrderActivity] = useState<OrderActivityEvent[]>([]);
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -220,7 +226,29 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     getOperatorsToday(today)
       .then((res) => setOperatorsToday(res.data ?? []))
       .catch(() => setOperatorsToday([]));
+    getAssignableUsers({ date: today })
+      .then((res) => {
+        setAssignableOnShift(res.data?.onShift ?? []);
+        setAssignableAll(res.data?.all ?? []);
+      })
+      .catch(() => {
+        setAssignableOnShift([]);
+        setAssignableAll([]);
+      });
   }, [today]);
+
+  useEffect(() => {
+    if (poolDeptDefaultApplied) return;
+    getCurrentUser()
+      .then((res) => {
+        const deptId = res.data?.department_id;
+        if (deptId != null && Number(deptId) > 0) {
+          setPoolDepartmentId(Number(deptId));
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => setPoolDeptDefaultApplied(true));
+  }, [poolDeptDefaultApplied]);
 
   const handleExecutorChange = useCallback(
     async (orderId: number, itemId: number, executor_user_id: number | null) => {
@@ -787,6 +815,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               order={selectedOrder}
               currentUserId={currentUserId}
               allUsers={allUsers}
+              assignableOnShift={assignableOnShift}
+              assignableAll={assignableAll}
+              departments={departments}
+              assignableDate={today}
               onResponsibleChange={(userId) => {
                 if (userId == null) {
                   handleReturnToPool(selectedOrder.number!);
@@ -794,6 +826,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   handleReassignTo(selectedOrder.number!, userId);
                 }
               }}
+              onTransferred={(updated) => {
+                updateOrderInList(updated.id, updated);
+                setSelectedOrder(updated);
+                toast.success('Готово', 'Заказ передан');
+                void loadOrders({ activeOnly: true, soft: true });
+              }}
+              onTransferError={(msg) => toast.error('Ошибка', msg)}
               onAssignToMe={() => handleAssignToMe(selectedOrder.number!)}
               onShowFiles={() => setShowFilesModal(true)}
               onShowPrepayment={() => setShowPrepaymentModal(true)}
@@ -863,6 +902,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onLoadOrders={loadOrders}
               readOnly
               operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
+              assignableOnShift={assignableOnShift.length > 0 ? assignableOnShift : undefined}
+              assignableAll={assignableAll.length > 0 ? assignableAll : undefined}
               onExecutorChange={handleExecutorChange}
             />
 

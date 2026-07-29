@@ -10,6 +10,8 @@ interface OrderContentProps {
   readOnly?: boolean;
   /** Операторы за сегодня (для выбора исполнителя) */
   operatorsToday?: Array<{ id: number; name: string }>;
+  assignableOnShift?: Array<{ id: number; name: string; department_id?: number | null }>;
+  assignableAll?: Array<{ id: number; name: string; department_id?: number | null }>;
   /** Обновить исполнителя позиции */
   onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
 }
@@ -20,6 +22,8 @@ export const OrderContent: React.FC<OrderContentProps> = ({
   onEditOrderItem,
   readOnly,
   operatorsToday = [],
+  assignableOnShift,
+  assignableAll,
   onExecutorChange,
 }) => {
   const items = order.items ?? [];
@@ -42,6 +46,8 @@ export const OrderContent: React.FC<OrderContentProps> = ({
           onEditParameters={onEditOrderItem}
           readOnly={readOnly}
           operatorsToday={operatorsToday}
+          assignableOnShift={assignableOnShift}
+          assignableAll={assignableAll}
           onExecutorChange={onExecutorChange}
         />
       ))}

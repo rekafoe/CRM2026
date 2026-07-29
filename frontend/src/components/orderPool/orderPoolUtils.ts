@@ -23,6 +23,92 @@ export function getSourceLabel(source?: string): string {
   }
 }
 
+export type PoolFulfillmentChip = {
+  label: string;
+  title: string;
+};
+
+/**
+ * Компактная сноска способа выдачи на закрытой карточке пула.
+ * Павильоны: Океан / Титан (и др. departments) — не конкуренты.
+ */
+export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null {
+  const delivery = order.delivery;
+  const deptName = String(order.fulfillment_department_name || '').trim();
+  const deptCode = String(order.fulfillment_department_code || '').trim();
+  const kind = String(delivery?.kind || '').toLowerCase();
+  const labelRaw = String(delivery?.label || '').trim();
+  const providerId = String(delivery?.providerId || '').trim();
+  const haystack = `${kind} ${labelRaw} ${providerId} ${deptName} ${deptCode}`.toLowerCase();
+
+  const title =
+    labelRaw ||
+    deptName ||
+    (delivery?.description ? String(delivery.description) : '') ||
+    'Способ получения';
+
+  const pavilionMatch = (): string | null => {
+    const candidates = [deptName, deptCode, labelRaw, providerId]
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const c of candidates) {
+      const lower = c.toLowerCase();
+      if (lower.includes('океан') || lower === 'ocean') return 'Самовывоз Океан';
+      if (lower.includes('титан') || lower === 'titan') return 'Самовывоз Титан';
+    }
+    if (kind === 'pickup' || haystack.includes('самовывоз') || haystack.includes('pickup')) {
+      if (deptName) return `Самовывоз ${deptName}`;
+      return 'Самовывоз';
+    }
+    return null;
+  };
+
+  if (
+    haystack.includes('европочт') ||
+    haystack.includes('evropocht') ||
+    providerId.toLowerCase().includes('euro')
+  ) {
+    return { label: 'Европочта', title };
+  }
+  if (
+    haystack.includes('белпочт') ||
+    haystack.includes('belpoch') ||
+    providerId.toLowerCase().includes('belpost')
+  ) {
+    return { label: 'Белпочта', title };
+  }
+  if (kind === 'courier_minsk' || (haystack.includes('курьер') && haystack.includes('минск'))) {
+    return { label: 'Курьер Минск', title };
+  }
+  if (
+    kind === 'courier_country' ||
+    haystack.includes('курьер') ||
+    haystack.includes('courier')
+  ) {
+    return { label: 'Курьер РБ', title };
+  }
+  if (kind === 'pickup_point' || haystack.includes('пункт выдачи')) {
+    if (haystack.includes('европочт')) return { label: 'Европочта', title };
+    if (haystack.includes('белпочт')) return { label: 'Белпочта', title };
+    const short = labelRaw.slice(0, 28) || 'Пункт выдачи';
+    return { label: short, title };
+  }
+
+  const pickup = pavilionMatch();
+  if (pickup) return { label: pickup, title };
+
+  if (labelRaw) {
+    return { label: labelRaw.length > 28 ? `${labelRaw.slice(0, 26)}…` : labelRaw, title };
+  }
+  if (deptName) {
+    return { label: deptName, title: deptName };
+  }
+  if (delivery) {
+    return { label: 'Доставка', title };
+  }
+  return null;
+}
+
 const READY_LABELS: Record<string, string> = {
   urgent: 'В течение 3 часов',
   promo: '48 часов',

@@ -66,7 +66,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     ? users
     : users.filter(u => u.department_id === departmentFilter);
 
-  const handleCreateUser = async (userData: { name: string; email: string; password: string; role: string; department_id?: number | null }) => {
+  const handleCreateUser = async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    department_id?: number | null;
+    hourly_rate?: number | null;
+  }) => {
     try {
       setErrorMessage(null);
       await createUser(userData);
@@ -78,7 +85,16 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     }
   };
 
-  const handleUpdateUser = async (userId: number, userData: { name: string; email: string; role: string; department_id?: number | null }) => {
+  const handleUpdateUser = async (
+    userId: number,
+    userData: {
+      name: string;
+      email: string;
+      role: string;
+      department_id?: number | null;
+      hourly_rate?: number | null;
+    },
+  ) => {
     try {
       setErrorMessage(null);
       await updateUser(userId, userData);
@@ -256,6 +272,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                   <div className="user-details">
                     <span>📧 {user.email}</span>
                     <span>📅 {new Date(user.created_at).toLocaleDateString('ru-RU')}</span>
+                    {Number(user.hourly_rate) > 0 ? (
+                      <span title="Почасовая ставка">
+                        ⏱ {Number(user.hourly_rate).toFixed(2)} BYN/ч
+                      </span>
+                    ) : null}
                     {!user.department_name && user.department_id == null && (
                       <span title="Без департамента">—</span>
                     )}
@@ -306,7 +327,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
             name: editingUser.name,
             email: editingUser.email,
             role: editingUser.role,
-            department_id: editingUser.department_id ?? undefined
+            department_id: editingUser.department_id ?? undefined,
+            hourly_rate: editingUser.hourly_rate ?? 0,
           }}
           onSubmit={(data) => handleUpdateUser(editingUser.id, data)}
           onClose={() => setEditingUser(null)}
@@ -364,7 +386,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
 interface UserFormModalProps {
   title: string;
   departments: Department[];
-  initialData?: { name: string; email: string; role: string; department_id?: number | null };
+  initialData?: {
+    name: string;
+    email: string;
+    role: string;
+    department_id?: number | null;
+    hourly_rate?: number | null;
+  };
   onSubmit: (data: any) => void;
   onClose: () => void;
 }
@@ -381,13 +409,23 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     email: initialData?.email || '',
     password: '',
     role: initialData?.role || 'user',
-    department_id: initialData?.department_id ?? '' as number | ''
+    department_id: initialData?.department_id ?? '' as number | '',
+    hourly_rate:
+      initialData?.hourly_rate != null && Number.isFinite(Number(initialData.hourly_rate))
+        ? String(initialData.hourly_rate)
+        : '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const payload: any = { ...formData };
     payload.department_id = formData.department_id === '' ? null : Number(formData.department_id);
+    const rate = formData.hourly_rate === '' ? 0 : Number(formData.hourly_rate);
+    payload.hourly_rate = Number.isFinite(rate) && rate >= 0 ? rate : 0;
+    delete payload.password;
+    if (!initialData) {
+      payload.password = formData.password;
+    }
     onSubmit(payload);
   };
 
@@ -472,6 +510,23 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
+          </div>
+          <div className="user-form-group">
+            <label className="user-form-label">
+              Почасовая ставка (BYN/ч):
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={formData.hourly_rate}
+              onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
+              className="user-form-input"
+              placeholder="0"
+            />
+            <p className="user-form-hint">
+              Учитывается в ЗП: часы смен × ставка + проценты с заказов
+            </p>
           </div>
           <div className="user-form-actions">
             <button

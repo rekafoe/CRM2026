@@ -55,6 +55,47 @@ router.get('/operators-today', asyncHandler(async (req: AuthenticatedRequest, re
   res.json(rows)
 }))
 
+/** GET /api/users/assignable?date=&department_id= — в смене + все (для любого авторизованного) */
+router.get('/assignable', asyncHandler(async (req: AuthenticatedRequest, res) => {
+  if (!req.user) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+  const date = String((req.query as any)?.date ?? '').trim().slice(0, 10)
+  const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10)
+  const deptRaw = (req.query as any)?.department_id
+  const departmentId =
+    deptRaw != null && String(deptRaw).trim() !== '' && !Number.isNaN(Number(deptRaw))
+      ? Number(deptRaw)
+      : null
+
+  const db = await getDb()
+  const deptClause = departmentId != null ? ' AND u.department_id = ?' : ''
+  const deptParams = departmentId != null ? [departmentId] : []
+
+  const onShift = await db.all<any>(
+    `SELECT u.id, u.name, u.department_id
+     FROM user_shifts s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.work_date = ?${deptClause}
+     ORDER BY u.name`,
+    [targetDate, ...deptParams]
+  )
+
+  const all = await db.all<any>(
+    `SELECT u.id, u.name, u.department_id
+     FROM users u
+     WHERE 1=1${deptClause}
+     ORDER BY u.name`,
+    deptParams
+  )
+
+  res.json({
+    onShift: Array.isArray(onShift) ? onShift : [],
+    all: Array.isArray(all) ? all : [],
+  })
+}))
+
 // GET /api/users/all — полный список пользователей с деталями
 router.get('/all', requireAdmin, asyncHandler(async (req, res) => {
   const db = await getDb()
@@ -62,7 +103,8 @@ router.get('/all', requireAdmin, asyncHandler(async (req, res) => {
     SELECT u.id, u.name, u.email, u.role, u.created_at,
            LENGTH(u.api_token) > 0 as has_api_token,
            u.department_id,
-           d.name as department_name
+           d.name as department_name,
+           COALESCE(u.hourly_rate, 0) as hourly_rate
     FROM users u
     LEFT JOIN departments d ON d.id = u.department_id
     ORDER BY u.name
@@ -72,7 +114,7 @@ router.get('/all', requireAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/users — создать пользователя
 router.post('/', requireAdmin, asyncHandler(async (req, res) => {
-  const { name, email, password, role, department_id } = req.body
+  const { name, email, password, role, department_id, hourly_rate } = req.body
   const db = await getDb()
 
   // Проверяем, существует ли пользователь с таким email
@@ -89,24 +131,27 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const apiToken = require('crypto').randomBytes(32).toString('hex')
 
   const deptId = department_id != null && department_id !== '' ? Number(department_id) : null
+  const rateRaw = hourly_rate != null && hourly_rate !== '' ? Number(hourly_rate) : 0
+  const rate = Number.isFinite(rateRaw) && rateRaw >= 0 ? rateRaw : 0
   const result = await db.run(`
-    INSERT INTO users (name, email, password_hash, role, api_token, department_id, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-  `, [name, email, hashedPassword, role || 'user', apiToken, Number.isFinite(deptId) ? deptId : null])
+    INSERT INTO users (name, email, password_hash, role, api_token, department_id, hourly_rate, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `, [name, email, hashedPassword, role || 'user', apiToken, Number.isFinite(deptId) ? deptId : null, rate])
 
   res.json({
     id: result.lastID,
     name,
     email,
     role: role || 'user',
-    department_id: Number.isFinite(deptId) ? deptId : null
+    department_id: Number.isFinite(deptId) ? deptId : null,
+    hourly_rate: rate,
   })
 }))
 
 // PUT /api/users/:id — обновить пользователя
 router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, email, role, department_id } = req.body
+  const { name, email, role, department_id, hourly_rate } = req.body
   const db = await getDb()
 
   // Проверяем, существует ли другой пользователь с таким email
@@ -117,11 +162,13 @@ router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
   }
 
   const deptId = department_id != null && department_id !== '' ? Number(department_id) : null
+  const rateRaw = hourly_rate != null && hourly_rate !== '' ? Number(hourly_rate) : 0
+  const rate = Number.isFinite(rateRaw) && rateRaw >= 0 ? rateRaw : 0
   await db.run(`
     UPDATE users
-    SET name = ?, email = ?, role = ?, department_id = ?
+    SET name = ?, email = ?, role = ?, department_id = ?, hourly_rate = ?
     WHERE id = ?
-  `, [name, email, role, Number.isFinite(deptId) ? deptId : null, id])
+  `, [name, email, role, Number.isFinite(deptId) ? deptId : null, rate, id])
 
   res.json({ message: 'Пользователь обновлен' })
 }))

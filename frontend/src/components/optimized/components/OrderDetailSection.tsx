@@ -6,7 +6,7 @@ import { OrderTotal } from '../../order/OrderTotal';
 import { MemoizedOrderItem } from '../MemoizedOrderItem';
 import { OrderDates } from '../../order/OrderDates';
 import { useToast } from '../../Toast';
-import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount, updateOrderPaymentChannel, updateOrderNotes } from '../../../api';
+import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount, updateOrderPaymentChannel, updateOrderNotes, getDepartments, type Department } from '../../../api';
 import { parseNumberFlexible } from '../../../utils/numberInput';
 import { getOrderAmounts } from '../../../utils/orderTotal';
 import { CustomerSelector } from '../../customers/CustomerSelector';
@@ -14,6 +14,10 @@ import { AppIcon } from '../../ui/AppIcon';
 import { OrderMailLogPanel } from '../../orders/OrderMailLogPanel';
 import { OrderSmsPanel } from '../../orders/OrderSmsPanel';
 import { OrderDeliveryBlock } from '../../orders/OrderDeliveryBlock';
+import { AssignableUserSelect } from '../../orders/AssignableUserSelect';
+import { OrderTransferModal } from '../../orders/OrderTransferModal';
+import { useAssignableUsers } from '../../../hooks/useAssignableUsers';
+import { Button } from '../../common/Button';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -76,6 +80,20 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   const discountMenuRef = useRef<HTMLDivElement>(null);
   const [paymentChannelMenuOpen, setPaymentChannelMenuOpen] = useState(false);
   const paymentChannelMenuRef = useRef<HTMLDivElement>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+  const { onShift: assignableOnShift, all: assignableAll } = useAssignableUsers({
+    date: contextDate,
+  });
+  const roleOnShift = assignableOnShift.length > 0 ? assignableOnShift : operatorsToday;
+  const roleAll = assignableAll.length > 0 ? assignableAll : (allUsers.length > 0 ? allUsers : operatorsToday);
+
+  useEffect(() => {
+    getDepartments()
+      .then((res) => setDepartments(res.data ?? []))
+      .catch(() => setDepartments([]));
+  }, []);
 
   const items = selectedOrder.items ?? [];
   const orderAmounts = React.useMemo(
@@ -493,43 +511,43 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
           />
           
           <div className="detail-meta-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {((operatorsToday.length > 0 || allUsers.length > 0) && onAssigneesChange) ? (
+            {((roleOnShift.length > 0 || roleAll.length > 0) && onAssigneesChange) ? (
               <>
                 <div className="detail-meta-field">
                   <label>Контактёр</label>
-                  <select
-                    value={selectedOrder.contact_user_id ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      onAssigneesChange(selectedOrder.id, { contact_user_id: v === '' ? null : Number(v) });
-                    }}
-                  >
-                    <option value="">—</option>
-                    {(operatorsToday.length > 0 ? operatorsToday : allUsers).map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
+                  <AssignableUserSelect
+                    value={selectedOrder.contact_user_id ?? null}
+                    onChange={(uid) => onAssigneesChange(selectedOrder.id, { contact_user_id: uid })}
+                    onShift={roleOnShift}
+                    all={roleAll}
+                  />
                 </div>
                 <span className="detail-meta-divider" />
                 <div className="detail-meta-field">
                   <label>Ответственный</label>
-                  <select
-                    value={(selectedOrder.responsible_user_id ?? selectedOrder.userId) ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' && onReturnToPool) {
+                  <AssignableUserSelect
+                    value={(selectedOrder.responsible_user_id ?? selectedOrder.userId) ?? null}
+                    onChange={(uid) => {
+                      if (uid == null && onReturnToPool) {
                         void onReturnToPool(selectedOrder);
                         return;
                       }
-                      onAssigneesChange(selectedOrder.id, { responsible_user_id: v === '' ? null : Number(v) });
+                      onAssigneesChange(selectedOrder.id, { responsible_user_id: uid });
                     }}
-                  >
-                    <option value="">—</option>
-                    {(operatorsToday.length > 0 ? operatorsToday : allUsers).map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
+                    onShift={roleOnShift}
+                    all={roleAll}
+                  />
                 </div>
+                <span className="detail-meta-divider" />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setTransferOpen(true)}
+                  title="Передать коллеге или в другой павильон"
+                >
+                  Передать
+                </Button>
                 <span className="detail-meta-divider" />
               </>
             ) : null}
@@ -626,10 +644,26 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             onUpdate={onLoadOrders}
             onEditParameters={onEditOrderItem}
             operatorsToday={operatorsToday}
+            assignableOnShift={roleOnShift}
+            assignableAll={roleAll}
             onExecutorChange={onExecutorChange}
           />
         ))}
       </div>
+
+      <OrderTransferModal
+        isOpen={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        order={selectedOrder}
+        departments={departments}
+        date={contextDate}
+        onTransferred={(updated) => {
+          onOrderPatch?.(updated.id, updated);
+          onLoadOrders();
+          addToast({ type: 'success', title: 'Готово', message: 'Заказ передан' });
+        }}
+        onError={(msg) => addToast({ type: 'error', title: 'Ошибка', message: msg })}
+      />
 
       <OrderTotal
         subtotal={orderAmounts.subtotal}

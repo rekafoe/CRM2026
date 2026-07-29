@@ -125,6 +125,38 @@ export const updateOrderAssignees = (orderId: number, data: { contact_user_id?: 
 export const getOperatorsToday = (date?: string) =>
   api.get<Array<{ id: number; name: string }>>('/users/operators-today', { params: date ? { date } : {} });
 
+export type AssignableUser = { id: number; name: string; department_id?: number | null };
+export type AssignableUsersResponse = {
+  onShift: AssignableUser[];
+  all: AssignableUser[];
+};
+
+/** Список для назначения: в смене + все (любой авторизованный) */
+export const getAssignableUsers = (params?: { date?: string; department_id?: number | null }) =>
+  api.get<AssignableUsersResponse>('/users/assignable', {
+    params: {
+      date: params?.date || undefined,
+      department_id:
+        params?.department_id != null && Number(params.department_id) > 0
+          ? params.department_id
+          : undefined,
+    },
+  });
+
+export type OrderTransferPayload =
+  | { mode: 'colleague'; userId: number; transferContact?: boolean }
+  | {
+      mode: 'pavilion';
+      department_id: number;
+      contact_user_id?: number | null;
+      responsible_user_id?: number | null;
+      executor_user_id?: number | null;
+    };
+
+/** Передача заказа коллеге или в другой павильон */
+export const transferOrder = (orderId: number, data: OrderTransferPayload) =>
+  api.post<Order>(`/orders/${orderId}/transfer`, data);
+
 export type InboxNotification = {
   id: number;
   userId: number;
@@ -396,13 +428,29 @@ export interface User {
   has_api_token?: boolean;
   department_id?: number | null;
   department_name?: string | null;
+  /** Почасовая ставка, BYN/час */
+  hourly_rate?: number | null;
 }
 
 export const getAllUsers = () => api.get<User[]>('/users/all');
-export const createUser = (user: { name: string; email: string; password: string; role: string; department_id?: number | null }) =>
-  api.post<User>('/users', user);
-export const updateUser = (id: number, user: { name: string; email: string; role: string; department_id?: number | null }) =>
-  api.put(`/users/${id}`, user);
+export const createUser = (user: {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  department_id?: number | null;
+  hourly_rate?: number | null;
+}) => api.post<User>('/users', user);
+export const updateUser = (
+  id: number,
+  user: {
+    name: string;
+    email: string;
+    role: string;
+    department_id?: number | null;
+    hourly_rate?: number | null;
+  },
+) => api.put(`/users/${id}`, user);
 export const deleteUser = (id: number) => api.delete(`/users/${id}`);
 export const resetUserToken = (id: number) => api.post<{ api_token: string }>(`/users/${id}/reset-token`);
 

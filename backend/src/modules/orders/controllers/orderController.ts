@@ -723,6 +723,36 @@ export class OrderController {
     }
   }
 
+  static async transferOrder(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      const authUser = (req as any).user as { id?: number } | undefined
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Неверный ID заказа' })
+        return
+      }
+      const body = req.body as {
+        mode?: 'colleague' | 'pavilion'
+        userId?: number
+        transferContact?: boolean
+        department_id?: number
+        contact_user_id?: number | null
+        responsible_user_id?: number | null
+        executor_user_id?: number | null
+      }
+      if (body.mode !== 'colleague' && body.mode !== 'pavilion') {
+        res.status(400).json({ error: 'mode должен быть colleague или pavilion' })
+        return
+      }
+      const updated = await OrderService.transferOrder(id, { ...body, mode: body.mode }, authUser?.id)
+      res.json(updated)
+    } catch (error: any) {
+      const msg = String(error?.message || '')
+      const status = msg.includes('не найден') || msg.includes('не найдена') ? 404 : 400
+      res.status(status).json({ error: msg || 'Ошибка передачи' })
+    }
+  }
+
   static async getOrderActivity(req: Request, res: Response) {
     try {
       const id = Number(req.params.id)

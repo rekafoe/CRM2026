@@ -10,7 +10,8 @@ export {
   formatShortDate,
   formatPoolDateTime,
   formatPoolDateTimeFull,
+  getPoolFulfillmentChip,
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
 } from './orderPoolUtils';
-export type { FilterState, FilterAction, OrderPoolFilterCounts } from './orderPoolUtils';
+export type { FilterState, FilterAction, OrderPoolFilterCounts, PoolFulfillmentChip } from './orderPoolUtils';

@@ -28,6 +28,9 @@ export const EarningsPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [totalPenalties, setTotalPenalties] = useState(0);
   const [totalBonuses, setTotalBonuses] = useState(0);
+  const [hourlyRate, setHourlyRate] = useState(0);
+  const [hours, setHours] = useState(0);
+  const [hourlyPay, setHourlyPay] = useState(0);
   const [totalNet, setTotalNet] = useState(0);
   const [penalties, setPenalties] = useState<Array<{ id: number; amount: number; reason: string; penaltyDate: string }>>([]);
   const [bonuses, setBonuses] = useState<Array<{ id: number; amount: number; reason: string; bonusDate: string }>>([]);
@@ -44,10 +47,14 @@ export const EarningsPage: React.FC = () => {
       setTotal(Number(payload.total) || 0);
       setTotalPenalties(Number(payload.totalPenalties) || 0);
       setTotalBonuses(Number(payload.totalBonuses) || 0);
+      setHourlyRate(Number(payload.hourlyRate) || 0);
+      setHours(Number(payload.hours) || 0);
+      setHourlyPay(Number(payload.hourlyPay) || 0);
       const t = Number(payload.total) || 0;
       const tp = Number(payload.totalPenalties) || 0;
       const tb = Number(payload.totalBonuses) || 0;
-      setTotalNet(Number(payload.totalNet) ?? Math.max(0, t + tb - tp));
+      const hp = Number(payload.hourlyPay) || 0;
+      setTotalNet(Number(payload.totalNet) ?? Math.max(0, t + tb + hp - tp));
       setPenalties(Array.isArray(payload.penalties) ? payload.penalties : []);
       setBonuses(Array.isArray(payload.bonuses) ? payload.bonuses : []);
     } catch (e: any) {
@@ -180,6 +187,17 @@ export const EarningsPage: React.FC = () => {
           <div className="earnings-summary-card">
             <div className="earnings-summary-title">Итого за месяц</div>
             <div className="earnings-summary-value"><MoneyAmount value={total} /></div>
+          </div>
+          <div
+            className="earnings-summary-card"
+            title={
+              hourlyRate > 0
+                ? `${hours.toFixed(1)} ч × ${hourlyRate.toFixed(2)} BYN`
+                : 'Почасовая ставка не задана'
+            }
+          >
+            <div className="earnings-summary-title">Часы × ставка</div>
+            <div className="earnings-summary-value"><MoneyAmount value={hourlyPay} /></div>
           </div>
           <button
             type="button"

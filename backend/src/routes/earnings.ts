@@ -117,9 +117,34 @@ router.get('/me', asyncHandler(async (req, res) => {
     createdAt: b.created_at,
   }))
   const totalBonuses = bonuses.reduce((s: number, b: any) => s + (Number(b.amount) || 0), 0)
-  const totalNet = Math.max(0, total + totalBonuses - totalPenalties)
 
-  res.json({ month, total, totalPenalties, totalBonuses, totalNet, penalties, bonuses, items })
+  const userRow = await db.get<{ hourly_rate?: number }>(
+    'SELECT COALESCE(hourly_rate, 0) as hourly_rate FROM users WHERE id = ?',
+    [authUser.id],
+  ).catch(() => ({ hourly_rate: 0 }))
+  const hourlyRate = Number(userRow?.hourly_rate) || 0
+  const shiftRow = await db.get<{ hours?: number }>(
+    `SELECT COALESCE(SUM(hours), 0) as hours FROM user_shifts
+     WHERE user_id = ? AND substr(work_date, 1, 7) = ?`,
+    [authUser.id, month],
+  ).catch(() => ({ hours: 0 }))
+  const hours = Number(shiftRow?.hours) || 0
+  const hourlyPay = Math.round(hours * hourlyRate * 100) / 100
+  const totalNet = Math.max(0, total + totalBonuses + hourlyPay - totalPenalties)
+
+  res.json({
+    month,
+    total,
+    totalPenalties,
+    totalBonuses,
+    hourlyRate,
+    hours,
+    hourlyPay,
+    totalNet,
+    penalties,
+    bonuses,
+    items,
+  })
 }))
 
 router.get('/daily', asyncHandler(async (req, res) => {
@@ -192,9 +217,32 @@ router.get('/daily', asyncHandler(async (req, res) => {
     [requestedUserId, String(date)]
   ).catch(() => [])
   const totalBonuses = (bonusRows || []).reduce((s: number, b: any) => s + (Number(b.amount) || 0), 0)
-  const totalNet = Math.max(0, total + totalBonuses - totalPenalties)
 
-  res.json({ date, total, totalPenalties, totalBonuses, totalNet, items })
+  const userRow = await db.get<{ hourly_rate?: number }>(
+    'SELECT COALESCE(hourly_rate, 0) as hourly_rate FROM users WHERE id = ?',
+    [requestedUserId],
+  ).catch(() => ({ hourly_rate: 0 }))
+  const hourlyRate = Number(userRow?.hourly_rate) || 0
+  const shiftRow = await db.get<{ hours?: number }>(
+    `SELECT COALESCE(hours, 0) as hours FROM user_shifts
+     WHERE user_id = ? AND work_date = ?`,
+    [requestedUserId, String(date)],
+  ).catch(() => ({ hours: 0 }))
+  const hours = Number(shiftRow?.hours) || 0
+  const hourlyPay = Math.round(hours * hourlyRate * 100) / 100
+  const totalNet = Math.max(0, total + totalBonuses + hourlyPay - totalPenalties)
+
+  res.json({
+    date,
+    total,
+    totalPenalties,
+    totalBonuses,
+    hourlyRate,
+    hours,
+    hourlyPay,
+    totalNet,
+    items,
+  })
 }))
 
 router.get('/admin', asyncHandler(async (req, res) => {
@@ -209,7 +257,11 @@ router.get('/admin', asyncHandler(async (req, res) => {
   const departmentId = (req.query as any)?.department_id != null ? parseInt(String((req.query as any).department_id), 10) : undefined
 
   const db = await getDb()
-  let users = await db.all<any>('SELECT id, name, role, is_active, department_id FROM users ORDER BY name')
+  let users = await db.all<any>(
+    'SELECT id, name, role, is_active, department_id, COALESCE(hourly_rate, 0) as hourly_rate FROM users ORDER BY name',
+  ).catch(async () =>
+    db.all<any>('SELECT id, name, role, is_active, department_id FROM users ORDER BY name'),
+  )
   if (Number.isFinite(departmentId)) {
     users = users.filter((u: any) => u.department_id === departmentId)
   }
@@ -287,7 +339,12 @@ router.get('/admin', asyncHandler(async (req, res) => {
     const earnings = totalsCurrentMap.get(u.id) || 0
     const totalPenalties = penaltiesMap.get(u.id) || 0
     const totalBonuses = bonusesMap.get(u.id) || 0
-    const totalNet = Math.max(0, Number(earnings) + Number(totalBonuses) - Number(totalPenalties))
+    const hourlyRate = Number(u.hourly_rate) || 0
+    const hourlyPay = Math.round(shift.hours * hourlyRate * 100) / 100
+    const totalNet = Math.max(
+      0,
+      Number(earnings) + Number(totalBonuses) + hourlyPay - Number(totalPenalties),
+    )
     const history = historyKeys.map((key) => ({
       month: key,
       total: historyMap.get(`${u.id}_${key}`) || 0,
@@ -301,6 +358,8 @@ router.get('/admin', asyncHandler(async (req, res) => {
       totalPreviousMonth: totalsPrevMap.get(u.id) || 0,
       totalPenalties,
       totalBonuses,
+      hourlyRate,
+      hourlyPay,
       totalNet,
       hours: shift.hours,
       shifts: shift.shifts,

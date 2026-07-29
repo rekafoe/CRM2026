@@ -424,6 +424,20 @@
   padding: 2px 7px;
 }
 
+.order-pool-card__fulfillment {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary, #495057);
+  background: color-mix(in srgb, var(--accent-primary, #6c8eb8) 12%, #fff);
+  border: 1px solid color-mix(in srgb, var(--accent-primary, #6c8eb8) 28%, transparent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .order-pool-card__tag {
   font-size: 10px;
   font-weight: 700;
@@ -1295,7 +1309,8 @@
   color: var(--text-primary, #212529);
 }
 
-.order-detail-responsible select {
+.order-detail-responsible select,
+.order-detail-responsible .assignable-user-select {
   padding: 8px 12px;
   border: 1px solid var(--border-color, #dee2e6);
   border-radius: 8px;
@@ -1305,7 +1320,8 @@
   color: var(--text-primary, #212529);
 }
 
-.order-detail-responsible select:focus {
+.order-detail-responsible select:focus,
+.order-detail-responsible .assignable-user-select:focus {
   outline: none;
   border-color: var(--accent-primary, #6c8eb8);
 }

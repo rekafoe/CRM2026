@@ -1109,6 +1109,158 @@ export class OrderService {
     return preDay
   }
 
+  /** Массово выставить executor_user_id на все позиции заказа */
+  static async setAllItemsExecutor(orderId: number, executorUserId: number | null): Promise<void> {
+    const db = await getDb()
+    let hasExecutor = false
+    try {
+      hasExecutor = await hasColumn('items', 'executor_user_id')
+    } catch {
+      hasExecutor = false
+    }
+    if (!hasExecutor) return
+    await db.run(
+      'UPDATE items SET executor_user_id = ? WHERE orderId = ?',
+      [executorUserId, orderId],
+    )
+  }
+
+  /**
+   * Передача заказа: коллеге (тот же павильон) или в другой павильон (пул).
+   * mode colleague: { userId, transferContact? }
+   * mode pavilion: { department_id, contact_user_id?, responsible_user_id?, executor_user_id? }
+   */
+  static async transferOrder(
+    id: number,
+    payload: {
+      mode: 'colleague' | 'pavilion'
+      userId?: number
+      transferContact?: boolean
+      department_id?: number
+      contact_user_id?: number | null
+      responsible_user_id?: number | null
+      executor_user_id?: number | null
+    },
+    actorUserId?: number,
+  ): Promise<Order> {
+    const db = await getDb()
+    let hasFulfillmentCol = false
+    try {
+      hasFulfillmentCol = await hasColumn('orders', 'fulfillment_department_id')
+    } catch {
+      hasFulfillmentCol = false
+    }
+    const existing = await db.get<any>(
+      hasFulfillmentCol
+        ? `SELECT id, number, userId, contact_user_id, responsible_user_id, fulfillment_department_id
+           FROM orders WHERE id = ?`
+        : `SELECT id, number, userId, contact_user_id, responsible_user_id
+           FROM orders WHERE id = ?`,
+      [id],
+    )
+    if (!existing) {
+      throw new Error('Заказ не найден')
+    }
+
+    if (payload.mode === 'colleague') {
+      const targetUserId = Number(payload.userId)
+      if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
+        throw new Error('Укажите сотрудника для передачи')
+      }
+      const targetUser = await db.get<{ id: number; name: string }>(
+        'SELECT id, name FROM users WHERE id = ?',
+        [targetUserId],
+      )
+      if (!targetUser) {
+        throw new Error('Сотрудник не найден')
+      }
+      const transferContact = payload.transferContact !== false
+      await OrderService.updateOrderAssignees(
+        id,
+        transferContact ? targetUserId : undefined,
+        targetUserId,
+        actorUserId,
+      )
+      await OrderService.setAllItemsExecutor(id, targetUserId)
+      await this.recordOrderActivity(db, {
+        orderId: id,
+        eventType: 'transfer_colleague',
+        message: `Передан коллеге ${targetUser.name}`,
+        oldValue: existing.responsible_user_id != null
+          ? String(existing.responsible_user_id)
+          : existing.userId != null
+            ? String(existing.userId)
+            : null,
+        newValue: String(targetUserId),
+        userId: actorUserId ?? null,
+        meta: {
+          mode: 'colleague',
+          target_user_id: targetUserId,
+          transfer_contact: transferContact,
+        },
+      })
+      return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order
+    }
+
+    if (payload.mode === 'pavilion') {
+      const departmentId = Number(payload.department_id)
+      if (!Number.isFinite(departmentId) || departmentId <= 0) {
+        throw new Error('Укажите павильон назначения')
+      }
+      const dept = await db.get<{ id: number; name: string }>(
+        'SELECT id, name FROM departments WHERE id = ?',
+        [departmentId],
+      )
+      if (!dept) {
+        throw new Error('Павильон не найден')
+      }
+
+      const prevFulfillment =
+        existing.fulfillment_department_id != null
+          ? Number(existing.fulfillment_department_id)
+          : null
+      await OrderService.setFulfillmentDepartmentId(id, departmentId)
+
+      const nextContact =
+        payload.contact_user_id !== undefined ? payload.contact_user_id : undefined
+      const nextResponsible =
+        payload.responsible_user_id !== undefined ? payload.responsible_user_id : null
+      await OrderService.updateOrderAssignees(id, nextContact, nextResponsible, actorUserId)
+
+      const nextExecutor =
+        payload.executor_user_id !== undefined ? payload.executor_user_id : null
+      await OrderService.setAllItemsExecutor(id, nextExecutor)
+
+      await this.recordOrderActivity(db, {
+        orderId: id,
+        eventType: 'transfer_pavilion',
+        message: `Передан в павильон ${dept.name}`,
+        oldValue: prevFulfillment != null ? String(prevFulfillment) : null,
+        newValue: String(departmentId),
+        userId: actorUserId ?? null,
+        meta: {
+          mode: 'pavilion',
+          department_id: departmentId,
+          department_name: dept.name,
+          responsible_user_id: nextResponsible,
+          executor_user_id: nextExecutor,
+          contact_user_id: nextContact ?? null,
+        },
+      })
+
+      void EarningsService.recalculateEarningsForOrderDays({ orderId: id }).catch((e) => {
+        logger.error('Earnings recalc after pavilion transfer failed', {
+          orderId: id,
+          message: (e as Error)?.message,
+        })
+      })
+
+      return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order
+    }
+
+    throw new Error('Неизвестный режим передачи')
+  }
+
   /** Обновить контактёра и/или ответственного заказа */
   static async updateOrderAssignees(id: number, contact_user_id?: number | null, responsible_user_id?: number | null, actorUserId?: number): Promise<Order> {
     const db = await getDb();

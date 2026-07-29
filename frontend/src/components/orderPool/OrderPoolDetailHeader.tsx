@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Order } from '../../types';
 import { StatusBadge } from '../common/StatusBadge';
 import { Button } from '../common/Button';
+import { AssignableUserSelect } from '../orders/AssignableUserSelect';
+import { OrderTransferModal } from '../orders/OrderTransferModal';
+import type { AssignableUser, Department } from '../../api';
 import {
   formatPoolDateTimeFull,
   getEffectiveResponsibleUserId,
@@ -13,7 +16,13 @@ interface OrderPoolDetailHeaderProps {
   order: Order;
   currentUserId: number;
   allUsers: Array<{ id: number; name: string }>;
+  assignableOnShift?: AssignableUser[];
+  assignableAll?: AssignableUser[];
+  departments?: Department[];
+  assignableDate?: string;
   onResponsibleChange: (userId: number | null) => void;
+  onTransferred?: (order: Order) => void;
+  onTransferError?: (message: string) => void;
   onAssignToMe: () => void;
   onShowFiles: () => void;
   onShowPrepayment: () => void;
@@ -34,7 +43,13 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   order,
   currentUserId,
   allUsers,
+  assignableOnShift = [],
+  assignableAll = [],
+  departments = [],
+  assignableDate,
   onResponsibleChange,
+  onTransferred,
+  onTransferError,
   onAssignToMe,
   onShowFiles,
   onShowPrepayment,
@@ -50,6 +65,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   showPermanentDelete,
   issuing,
 }) => {
+  const [transferOpen, setTransferOpen] = useState(false);
   const responsibleId = getEffectiveResponsibleUserId(order);
   const canReassign = Number(order.status) === 0 || Number(order.status) === 1;
   const showCancelled = order.is_cancelled === 1;
@@ -57,6 +73,8 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const needsAssign = canReassign && responsibleId !== currentUserId;
   const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
   const createdLabel = formatPoolDateTimeFull(createdAt);
+  const roleOnShift = assignableOnShift.length > 0 ? assignableOnShift : allUsers;
+  const roleAll = assignableAll.length > 0 ? assignableAll : allUsers;
 
   return (
     <div className="order-pool-detail-header">
@@ -109,37 +127,40 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
         )}
       </div>
 
-      <div className="order-detail-responsible">
+      <div className="order-detail-responsible order-detail-responsible--with-transfer">
         <label htmlFor="order-pool-responsible">
           Ответственный
-          <select
+          <AssignableUserSelect
             id="order-pool-responsible"
-            value={responsibleId ?? ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === '') {
+            value={responsibleId}
+            onChange={(uid) => {
+              if (uid == null) {
                 if (responsibleId != null) onResponsibleChange(null);
                 return;
               }
-              const uid = Number(v);
               if (uid === responsibleId) return;
               onResponsibleChange(uid);
             }}
+            onShift={roleOnShift}
+            all={roleAll}
+            emptyLabel="— Не назначен"
             disabled={!canReassign}
             title={
               !canReassign
                 ? 'Переназначить можно только при статусе «Ожидает» (0 или 1)'
                 : undefined
             }
-          >
-            <option value="">— Не назначен</option>
-            {allUsers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+          />
         </label>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setTransferOpen(true)}
+          title="Передать коллеге или в другой павильон"
+        >
+          Передать
+        </Button>
       </div>
 
       <div className="order-detail-actions" role="toolbar" aria-label="Действия по заказу">
@@ -186,6 +207,16 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
           </Button>
         )}
       </div>
+
+      <OrderTransferModal
+        isOpen={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        order={order}
+        departments={departments}
+        date={assignableDate}
+        onTransferred={(updated) => onTransferred?.(updated)}
+        onError={onTransferError}
+      />
     </div>
   );
 };

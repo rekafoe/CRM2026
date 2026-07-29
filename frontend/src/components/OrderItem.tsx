@@ -20,6 +20,8 @@ import { getEditorItemSummary, type DesignTemplateRoyaltyInfo } from './order/ed
 import { getItemLineTotal } from '../utils/orderTotal';
 import { calcAuthorPayoutPerUnit } from '../pages/admin/designTemplates/designTemplateCatalogUtils';
 import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
+import { AssignableUserSelect } from './orders/AssignableUserSelect';
+import type { AssignableUser } from '../api';
 
 // Кэш отображаемых имён типов бумаги из склада
 let paperTypeDisplayCache: Record<string, string> | null = null;
@@ -74,11 +76,25 @@ interface OrderItemProps {
   readOnly?: boolean;
   /** Операторы за сегодня (для выбора исполнителя) */
   operatorsToday?: Array<{ id: number; name: string }>;
+  /** Списки «В смене» / «Все» для селекта исполнителя */
+  assignableOnShift?: AssignableUser[];
+  assignableAll?: AssignableUser[];
   /** Обновить исполнителя позиции */
   onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
 }
 
-export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUpdate, onEditParameters, readOnly, operatorsToday = [], onExecutorChange }) => {
+export const OrderItem: React.FC<OrderItemProps> = ({
+  item,
+  orderId,
+  order,
+  onUpdate,
+  onEditParameters,
+  readOnly,
+  operatorsToday = [],
+  assignableOnShift,
+  assignableAll,
+  onExecutorChange,
+}) => {
   const { addToast } = useToast();
   const effectiveExecutorId = useMemo(() => {
     const fromItem = item.executor_user_id;
@@ -358,41 +374,32 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   }, [parameterSummary, item.params, item.quantity, qty, materialFormat]);
 
   const useBreakdownChrome = showPositionBreakdown && !editing;
-  const canShowAssign =
-    (operatorsToday.length > 0 && onExecutorChange) || !readOnly;
+  const executorOnShift = assignableOnShift ?? operatorsToday;
+  const executorAll = assignableAll ?? operatorsToday;
+  const hasExecutorOptions = executorOnShift.length > 0 || executorAll.length > 0;
+  const canShowAssign = (hasExecutorOptions && onExecutorChange) || !readOnly;
   const assignFields = canShowAssign ? (
     <>
-      {operatorsToday.length > 0 && onExecutorChange && (
+      {hasExecutorOptions && onExecutorChange && (
         <div className="order-item-meta-field-row order-item-meta-field-row--assign-line">
           <span className="order-item-meta-assign-label">Исполнитель</span>
           <div className="order-item-meta-assign-select-wrap">
-            <select
+            <AssignableUserSelect
               className="order-item-meta-select order-item-meta-select--inline"
               value={
                 item.executor_user_id != null && Number(item.executor_user_id) > 0
-                  ? String(item.executor_user_id)
-                  : ''
+                  ? Number(item.executor_user_id)
+                  : null
               }
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!onExecutorChange) return;
-                onExecutorChange(orderId, item.id, v === '' ? null : Number(v));
-              }}
-            >
-              <option value="">—</option>
-              {item.executor_user_id != null &&
-                Number(item.executor_user_id) > 0 &&
-                !operatorsToday.some((u) => u.id === Number(item.executor_user_id)) && (
-                  <option value={String(item.executor_user_id)}>
-                    {`Пользователь #${item.executor_user_id}`}
-                  </option>
-                )}
-              {operatorsToday.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+              onChange={(uid) => onExecutorChange(orderId, item.id, uid)}
+              onShift={executorOnShift}
+              all={executorAll}
+              orphanLabel={
+                item.executor_user_id != null
+                  ? `Пользователь #${item.executor_user_id}`
+                  : undefined
+              }
+            />
           </div>
         </div>
       )}

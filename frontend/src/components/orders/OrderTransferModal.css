@@ -1,0 +1,72 @@
+.order-transfer-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-transfer-modal__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-secondary, #f1f3f5);
+  border-radius: 8px;
+}
+
+.order-transfer-modal__tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #495057);
+  cursor: pointer;
+}
+
+.order-transfer-modal__tab.is-active {
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #212529);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.order-transfer-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-transfer-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-primary, #212529);
+}
+
+.order-transfer-modal__field > span {
+  font-weight: 600;
+}
+
+.order-transfer-modal__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #212529);
+  cursor: pointer;
+}
+
+.order-transfer-modal__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, #6c757d);
+}
+
+.order-transfer-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
