@@ -298,14 +298,23 @@ export class OrderService {
   }
 
   /** Все заказы без фильтра по пользователю (для пула заказов). Batch loading — устранение N+1. */
-  static async getAllOrdersForPool(options: { activeOnly?: boolean; departmentId?: number } = {}) {
+  static async getAllOrdersForPool(options: {
+    activeOnly?: boolean
+    departmentId?: number
+    limit?: number
+    light?: boolean
+  } = {}) {
+    const poolLimit = options.limit != null && Number.isFinite(options.limit)
+      ? Math.min(Math.max(1, Math.floor(options.limit)), 500)
+      : 150
     const poolStatuses = options.activeOnly ? await this.resolvePoolActiveStatusIds() : undefined
     const fromOrders = (await OrderRepository.listAllOrders({
       ...(poolStatuses ? { statuses: poolStatuses } : {}),
       ...(options.departmentId != null ? { departmentId: options.departmentId } : {}),
+      limit: poolLimit,
     })) as Order[]
     const orderIds = new Set(fromOrders.map((o) => o.id))
-    const photoRows = await OrderRepository.listPhotoOrdersForPool()
+    const photoRows = await OrderRepository.listPhotoOrdersForPool(poolLimit)
     const fromPhoto: Order[] = []
     for (const row of photoRows) {
       if (orderIds.has(row.id)) {
@@ -321,7 +330,11 @@ export class OrderService {
       const ta = new Date(a.created_at).getTime()
       const tb = new Date(b.created_at).getTime()
       return tb - ta
-    })
+    }).slice(0, poolLimit)
+
+    // Всегда items для пула (готово/суммы), но только для ограниченного списка.
+    // options.light зарезервирован: раньше без attach — ломало UI; сейчас = «короткий список».
+    void options.light
     return OrderService.attachItemsToOrders(orders)
   }
 

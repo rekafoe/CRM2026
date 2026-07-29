@@ -84,6 +84,8 @@ export const getOrders = (params?: {
   date?: string;
   poolActiveOnly?: boolean;
   department_id?: number;
+  light?: boolean;
+  limit?: number;
 }) => {
   const p: Record<string, string> = {};
   if (params?.all) p.all = '1';
@@ -91,6 +93,8 @@ export const getOrders = (params?: {
   if (params?.date) p.date = params.date.slice(0, 10);
   if (params?.poolActiveOnly) p.poolActiveOnly = '1';
   if (params?.department_id != null) p.department_id = String(params.department_id);
+  if (params?.light) p.light = '1';
+  if (params?.limit != null) p.limit = String(params.limit);
   return api.get<Order[]>('/orders', { params: Object.keys(p).length ? p : undefined });
 };
 

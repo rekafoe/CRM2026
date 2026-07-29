@@ -56,6 +56,9 @@ export class OrderController {
       const dateFilter = (req as any).query?.date as string | undefined
       const all = (req as any).query?.all === '1' || (req as any).query?.all === true
       const poolActiveOnly = (req as any).query?.poolActiveOnly === '1' || (req as any).query?.poolActiveOnly === true
+      const light = (req as any).query?.light === '1' || (req as any).query?.light === true
+      const limitRaw = (req as any).query?.limit
+      const limitParsed = limitRaw != null && limitRaw !== '' ? parseInt(String(limitRaw), 10) : undefined
       const departmentIdRaw = (req as any).query?.department_id
       const departmentId =
         departmentIdRaw != null && departmentIdRaw !== ''
@@ -78,6 +81,8 @@ export class OrderController {
         ? await OrderService.getAllOrdersForPool({
             activeOnly: poolActiveOnly,
             departmentId: scopedDepartmentId,
+            limit: Number.isFinite(limitParsed) ? limitParsed : 150,
+            light: Boolean(light),
           })
         : await OrderService.getAllOrders(authUser.id, day)
       res.json(orders)

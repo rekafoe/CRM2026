@@ -142,6 +142,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           : await getOrders({
               all: true,
               poolActiveOnly: options.activeOnly ?? true,
+              light: true,
+              limit: 150,
               ...deptParam,
             });
         if (requestSeq !== searchRequestSeqRef.current) return;
@@ -174,7 +176,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     try {
       const deptParam =
         poolDepartmentId === '' ? undefined : { department_id: poolDepartmentId };
-      const res = await getOrders({ all: true, poolActiveOnly: true, ...deptParam });
+      const res = await getOrders({ all: true, poolActiveOnly: true, light: true, limit: 150, ...deptParam });
       const list = res.data as Order[];
       const prevIds = orderIdsRef.current;
       const newCount = list.filter((o) => !prevIds.has(o.id)).length;

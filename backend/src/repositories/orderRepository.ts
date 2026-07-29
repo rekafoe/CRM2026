@@ -20,6 +20,8 @@ function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(orde
 type ListAllOrdersOptions = {
   statuses?: number[]
   departmentId?: number
+  /** Ограничение размера пула (по умолчанию без лимита для обратной совместимости внутренних вызовов) */
+  limit?: number
 }
 
 /** Имя колонки принтера в items (на проде может быть printer_id). Кэш на время жизни процесса. */
@@ -155,31 +157,37 @@ export const OrderRepository = {
     const deliverySel = hasDeliveryJson ? 'o.delivery_json' : 'NULL as delivery_json'
     const contactSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
     const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
-    const assignedAsExecutorSel = hasExecutorUserId
-      ? `CASE
-           WHEN o.userId = ? THEN 0
-           WHEN EXISTS (
-             SELECT 1 FROM items i
-             WHERE i.orderId = o.id AND i.executor_user_id = ?
-           ) THEN 1
-           ELSE 0
-         END as assigned_as_executor`
-      : '0 as assigned_as_executor'
-    const accessWhere = hasExecutorUserId
-      ? `(o.userId = ? OR EXISTS (
-           SELECT 1 FROM items i
-           WHERE i.orderId = o.id AND i.executor_user_id = ?
-         ))`
-      : 'o.userId = ?'
-    const selectParams: Array<string | number> = hasExecutorUserId ? [userId, userId] : []
-    const whereParams: Array<string | number> = hasExecutorUserId ? [userId, userId] : [userId]
+
+    // Без correlated EXISTS: один SELECT id, затем IN — иначе SQLite сканит items на каждую строку orders.
+    const executorOrderIds = new Set<number>()
+    if (hasExecutorUserId) {
+      try {
+        const rows = await db.all<{ orderId: number }>(
+          `SELECT DISTINCT orderId FROM items WHERE executor_user_id = ? AND orderId IS NOT NULL`,
+          [userId],
+        )
+        for (const row of Array.isArray(rows) ? rows : []) {
+          const id = Number(row.orderId)
+          if (Number.isFinite(id)) executorOrderIds.add(id)
+        }
+      } catch { /* ignore */ }
+    }
+
+    const whereParts: string[] = ['o.userId = ?']
+    const whereParams: Array<string | number> = [userId]
+    if (executorOrderIds.size > 0) {
+      const ids = Array.from(executorOrderIds)
+      whereParts[0] = `(o.userId = ? OR o.id IN (${ids.map(() => '?').join(',')}))`
+      whereParams.push(...ids)
+    }
+
     const day = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date.slice(0, 10))
       ? options.date.slice(0, 10)
       : null
-    const dateWhere = day
-      ? ` AND date(COALESCE(o.created_at, o.createdAt)) = date(?)`
-      : ''
-    if (day) whereParams.push(day)
+    if (day) {
+      whereParts.push(`date(COALESCE(o.created_at, o.createdAt)) = date(?)`)
+      whereParams.push(day)
+    }
 
     const orders = await db.all<any>(
       `SELECT 
@@ -196,7 +204,7 @@ export const OrderRepository = {
         ${paymentChannelSel},
         ${notesSel},
         ${deliverySel},
-        ${assignedAsExecutorSel},
+        0 as assigned_as_executor,
         c.id as customer__id,
         c.first_name as customer__first_name,
         c.last_name as customer__last_name,
@@ -208,9 +216,8 @@ export const OrderRepository = {
         c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE ${accessWhere}${dateWhere}
+      WHERE ${whereParts.join(' AND ')}
       ORDER BY o.id DESC`,
-      ...selectParams,
       ...whereParams
     )
     // Преобразуем плоские поля customer__ в объект customer
@@ -221,6 +228,10 @@ export const OrderRepository = {
         customer__phone, customer__email,
         ...order 
       } = row
+
+      const oid = Number(order.id)
+      const isOwner = Number(order.userId) === userId
+      order.assigned_as_executor = !isOwner && executorOrderIds.has(oid) ? 1 : 0
       
       if (customer__id) {
         order.customer = {
@@ -490,6 +501,10 @@ export const OrderRepository = {
       }
     }
     const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
+    const limit = options.limit != null && Number.isFinite(options.limit) && options.limit > 0
+      ? Math.min(Math.floor(options.limit), 500)
+      : null
+    const limitSql = limit != null ? ` LIMIT ${limit}` : ''
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -517,7 +532,7 @@ export const OrderRepository = {
       LEFT JOIN customers c ON o.customer_id = c.id
       ${deptJoin}
       ${whereClause}
-      ORDER BY o.id DESC`,
+      ORDER BY o.id DESC${limitSql}`,
       ...queryParams
     )
     return orders.map((row: any) => {
@@ -548,16 +563,19 @@ export const OrderRepository = {
    * Фото-заказы Telegram-бота (photo_orders) — в общем пуле наравне с orders, без отдельного сценария.
    * Исключаем только завершённые/отклонённые; назначенные (userId) тоже в списке, как у CRM-заказов.
    */
-  async listPhotoOrdersForPool(): Promise<PhotoOrderRow[]> {
+  async listPhotoOrdersForPool(limit = 150): Promise<PhotoOrderRow[]> {
     const db = await getDb()
     const hasUserId = await hasColumn('photo_orders', 'userId')
     const uidSel = hasUserId ? 'userId' : 'NULL as userId'
+    const lim = Math.min(Math.max(1, Math.floor(limit)), 500)
     try {
       const rows = await db.all<PhotoOrderRow>(
         `SELECT id, status, ${uidSel}, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
          FROM photo_orders
          WHERE lower(coalesce(status, '')) NOT IN ('completed', 'rejected')
-         ORDER BY datetime(created_at) DESC`
+         ORDER BY datetime(created_at) DESC
+         LIMIT ?`,
+        [lim],
       )
       return Array.isArray(rows) ? rows : []
     } catch {
@@ -739,26 +757,32 @@ export const OrderRepository = {
       try {
         hasExecutorUserId = await hasColumn('items', 'executor_user_id')
       } catch { /* ignore */ }
+      const accessParts: string[] = ['o.userId = ?']
+      params.push(userId)
+      accessParts.push(
+        `EXISTS (
+          SELECT 1 FROM user_order_page_orders uopo
+          JOIN user_order_pages uop ON uopo.page_id = uop.id
+          WHERE uopo.order_id = o.id AND uopo.order_type = 'website' AND uop.user_id = ?
+        )`
+      )
+      params.push(userId)
       if (hasExecutorUserId) {
-        whereConditions.push(
-          `(o.userId = ?
-            OR EXISTS (
-              SELECT 1 FROM user_order_page_orders uopo
-              JOIN user_order_pages uop ON uopo.page_id = uop.id
-              WHERE uopo.order_id = o.id AND uopo.order_type = 'website' AND uop.user_id = ?
-            )
-            OR EXISTS (
-              SELECT 1 FROM items i
-              WHERE i.orderId = o.id AND i.executor_user_id = ?
-            ))`
-        )
-        params.push(userId, userId, userId)
-      } else {
-        whereConditions.push(
-          '(o.userId = ? OR EXISTS (SELECT 1 FROM user_order_page_orders uopo JOIN user_order_pages uop ON uopo.page_id = uop.id WHERE uopo.order_id = o.id AND uopo.order_type = \'website\' AND uop.user_id = ?))'
-        )
-        params.push(userId, userId)
+        try {
+          const execRows = await db.all<{ orderId: number }>(
+            `SELECT DISTINCT orderId FROM items WHERE executor_user_id = ? AND orderId IS NOT NULL`,
+            [userId],
+          )
+          const ids = (Array.isArray(execRows) ? execRows : [])
+            .map((r) => Number(r.orderId))
+            .filter((id) => Number.isFinite(id))
+          if (ids.length > 0) {
+            accessParts.push(`o.id IN (${ids.map(() => '?').join(',')})`)
+            params.push(...ids)
+          }
+        } catch { /* ignore */ }
       }
+      whereConditions.push(`(${accessParts.join(' OR ')})`)
     }
 
     if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {

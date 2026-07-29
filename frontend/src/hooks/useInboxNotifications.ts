@@ -6,7 +6,7 @@ import {
 } from '../api';
 import { useToastNotifications } from '../components/Toast';
 
-const POLL_MS = 15000;
+const POLL_MS = 45000;
 
 export function useInboxNotifications(opts?: {
   enabled?: boolean;

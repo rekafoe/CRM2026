@@ -107,6 +107,7 @@ export class EarningsService {
   }
 
   static async recalculateForDate(date: string) {
+    const started = Date.now()
     const db = await getDb();
 
     const [earningsExists, itemsExists, ordersExists] = await Promise.all([
@@ -125,9 +126,11 @@ export class EarningsService {
 
     try {
       await this.doRecalculateForDate(db, date);
+      logger.info('EarningsService recalculateForDate done', { date, durationMs: Date.now() - started });
     } catch (error) {
       logger.error('EarningsService recalculateForDate failed', {
         date,
+        durationMs: Date.now() - started,
         message: (error as Error)?.message,
         code: (error as { code?: string })?.code,
       });

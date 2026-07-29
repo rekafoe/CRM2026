@@ -1,6 +1,5 @@
 import { getDb } from '../db';
-import { TelegramService, LowStockNotification } from './telegramService';
-import { UserNotificationService } from './userNotificationService';
+import { TelegramService } from './telegramService';
 import { Material } from '../models/Material';
 
 export interface StockAlert {
@@ -104,6 +103,7 @@ export class StockMonitoringService {
    * Проверка уровней запасов
    */
   static async checkStockLevels(): Promise<StockAlert[]> {
+    const started = Date.now();
     console.log('🔍 Checking stock levels...');
     
     const db = await getDb();
@@ -129,6 +129,9 @@ export class StockMonitoringService {
     });
 
     const alerts: StockAlert[] = [];
+    // По умолчанию НЕ шлём Telegram/UserNotification на каждый материал —
+    // на Railway ConnectTimeout × N материалов вешает весь CRM на 1–3 минуты.
+    const telegramAlertsEnabled = process.env.STOCK_TELEGRAM_ALERTS === 'true';
 
     for (const material of materials) {
       const minStock = material.min_quantity || material.min_quantity || 10;
@@ -162,36 +165,33 @@ export class StockMonitoringService {
 
         alerts.push(alert);
 
-        // Сначала БД — без ожидания Telegram (на Railway api.telegram.org часто ConnectTimeout ~10с × N материалов).
         try {
           await this.saveStockAlert(alert);
         } catch (e) {
           console.error('❌ Failed to save stock alert:', e);
         }
-
-        const notification: LowStockNotification = {
-          materialId: material.id,
-          materialName: material.name,
-          currentQuantity,
-          minQuantity: minStock,
-          supplierName: material.supplier_name,
-          supplierContact: material.supplier_contact,
-          categoryName: material.category_name
-        };
-
-        if (TelegramService.isNetworkAvailable()) {
-          void TelegramService.sendLowStockNotification(notification).catch(() => {});
-          void UserNotificationService.sendLowStockAlert(
-            material.name,
-            currentQuantity,
-            minStock,
-            material.supplier_name
-          ).catch(() => {});
-        }
       }
     }
 
-    console.log(`📊 Stock check completed. Found ${alerts.length} alerts`);
+    // Один digest максимум — и только по явному env + живой сети
+    if (
+      telegramAlertsEnabled
+      && alerts.length > 0
+      && TelegramService.isNetworkAvailable()
+    ) {
+      const top = alerts.slice(0, 5);
+      const summary = top
+        .map((a) => `• ${a.materialName}: ${a.currentQuantity}/${a.minQuantity}`)
+        .join('\n');
+      const more = alerts.length > top.length ? `\n…и ещё ${alerts.length - top.length}` : '';
+      void TelegramService.sendNotification(
+        'Низкие остатки',
+        `${alerts.length} позиций\n${summary}${more}`,
+        'high',
+      ).catch(() => {});
+    }
+
+    console.log(`📊 Stock check completed. Found ${alerts.length} alerts in ${Date.now() - started}ms`);
     return alerts;
   }
 
