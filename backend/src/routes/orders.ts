@@ -522,13 +522,13 @@ router.patch('/:id/external-files/:fileId', (req, res, next) => {
   res.json(sanitizeOrderFileForClient(file))
 }))
 
-// Все остальные маршруты заказов требуют аутентификации
-router.use(authenticate)
-
-/** Лёгкий эндпоинт для CRM: при обращении к orderpool API с сайта (printcore.by) значение меняется — страница Order Pool принудительно обновляет список */
+/** Лёгкий эндпоинт до authenticate: только in-memory timestamp (см. PUBLIC_ROUTE_RULES). */
 router.get('/pool-sync', (_req, res) => {
   res.json({ lastWebsiteOrderAt: getLastWebsiteOrderAt() })
 })
+
+// Все остальные маршруты заказов требуют аутентификации
+router.use(authenticate)
 
 /**
  * @swagger

@@ -21,11 +21,14 @@ export function useInboxNotifications(opts?: {
   const [open, setOpen] = useState(false);
   const knownIdsRef = useRef<Set<number>>(new Set());
   const bootstrappedRef = useRef(false);
+  const refreshInFlightRef = useRef(false);
   const onExecutorAssignedRef = useRef(opts?.onExecutorAssigned);
   onExecutorAssignedRef.current = opts?.onExecutorAssigned;
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     try {
       const res = await getInboxNotifications({ limit: 30 });
       const nextItems = Array.isArray(res.data?.items) ? res.data.items : [];
@@ -51,6 +54,8 @@ export function useInboxNotifications(opts?: {
       setUnreadCount(nextUnread);
     } catch {
       // тихо: нет смысла спамить ошибками поллинга
+    } finally {
+      refreshInFlightRef.current = false;
     }
   }, [enabled]);
 

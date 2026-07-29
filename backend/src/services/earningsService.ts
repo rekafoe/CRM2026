@@ -55,14 +55,23 @@ export class EarningsService {
       }
     }, this.config.intervalMinutes * 60 * 1000);
 
+    // Не гоняем тяжёлый пересчёт сразу при буте: одно SQLite-соединение,
+    // и login/me/orders встают в очередь на десятки секунд (белый экран CRM).
+    const startupDelayMs = Math.max(
+      0,
+      parseInt(process.env.EARNINGS_STARTUP_DELAY_MS || '120000', 10) || 120000,
+    );
     const today = new Date().toISOString().slice(0, 10);
-    this.recalculateForDate(today).catch((error) => {
-      logger.error('EarningsService initial recalculation failed', {
-        error,
-        message: (error as Error)?.message,
-        code: (error as { code?: string })?.code,
+    logger.info('EarningsService: initial recalculation scheduled', { startupDelayMs, date: today });
+    setTimeout(() => {
+      this.recalculateForDate(today).catch((error) => {
+        logger.error('EarningsService initial recalculation failed', {
+          error,
+          message: (error as Error)?.message,
+          code: (error as { code?: string })?.code,
+        });
       });
-    });
+    }, startupDelayMs);
   }
 
   static stop() {
@@ -274,10 +283,24 @@ export class EarningsService {
       hasEarningType = await hasColumn('order_item_earnings', 'earning_type');
     } catch { /* ignore */ }
 
-    await db.run('BEGIN');
-    try {
-      await db.run('DELETE FROM order_item_earnings WHERE earned_date = ?', [date]);
+    // Короткие транзакции + yield: иначе одно SQLite-соединение блокирует login/me на минуты.
+    const batchSize = Math.max(
+      10,
+      parseInt(process.env.EARNINGS_WRITE_BATCH_SIZE || '40', 10) || 40,
+    );
 
+    await db.run('DELETE FROM order_item_earnings WHERE earned_date = ?', [date]);
+
+    let pendingInBatch = 0;
+    const commitBatchIfNeeded = async (force = false) => {
+      if (!force && pendingInBatch < batchSize) return;
+      if (pendingInBatch === 0) return;
+      pendingInBatch = 0;
+      // Отдаём event loop / другим запросам доступ к тому же соединению
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    };
+
+    try {
       for (const row of rows) {
         const effectiveUserId = effectiveEarningsUserId(row);
         if (effectiveUserId == null || !Number.isFinite(effectiveUserId)) continue;
@@ -385,6 +408,7 @@ export class EarningsService {
             ],
           );
         }
+        pendingInBatch++;
 
         const designTemplateId = Number(params?.designTemplateId);
         if (
@@ -416,13 +440,14 @@ export class EarningsService {
                 date,
               ],
             );
+            pendingInBatch++;
           }
         }
-      }
 
-      await db.run('COMMIT');
+        await commitBatchIfNeeded(false);
+      }
+      await commitBatchIfNeeded(true);
     } catch (error) {
-      await db.run('ROLLBACK');
       throw error;
     }
   }

@@ -49,6 +49,19 @@ export class TelegramService {
    * Инициализация конфигурации Telegram
    */
   static initialize(config: TelegramConfig) {
+    // UserNotificationService тоже вызывает initialize — не перезапускаем polling второй раз
+    // и не затираем useWebhook пустым конфигом.
+    if (this.config?.botToken && this.config.botToken === config.botToken) {
+      this.config = {
+        ...this.config,
+        ...config,
+        useWebhook: config.useWebhook ?? this.config.useWebhook,
+        chatId: config.chatId || this.config.chatId,
+      };
+      console.log('🤖 Telegram service already initialized — config merged, polling not restarted');
+      return;
+    }
+
     this.config = config;
     console.log('🤖 Telegram service initialized:', {
       enabled: config.enabled,
@@ -460,6 +473,9 @@ export class TelegramService {
         ? 'Fetch aborted by timeout'
         : (error as any)?.message || String(error);
       console.error('❌ Error getting Telegram updates:', message);
+      // Пробрасываем, чтобы startPolling включил exponential backoff
+      // (иначе при «fetch failed» опрос долбит API каждые 5с без паузы).
+      throw error;
     }
   }
 

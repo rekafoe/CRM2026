@@ -39,14 +39,18 @@ export class UserNotificationService {
     if (this.isInitialized) return;
 
     console.log('👥 Initializing User Notification Service...');
-    const token = this.getBotTokenFromEnv();
-    const enabled = process.env.TELEGRAM_ENABLED === 'true' && token.length > 0;
-
-    TelegramService.initialize({
-      botToken: token,
-      chatId: '', // Будет устанавливаться для каждого пользователя
-      enabled
-    });
+    // TelegramService уже поднимается из index.ts — повторный initialize() раньше
+    // стартовал второй long-poll («Starting Telegram polling» ×2) и сбрасывал useWebhook.
+    if (!TelegramService.getConfig()?.botToken) {
+      const token = this.getBotTokenFromEnv();
+      const enabled = process.env.TELEGRAM_ENABLED === 'true' && token.length > 0;
+      TelegramService.initialize({
+        botToken: token,
+        chatId: '',
+        enabled,
+        useWebhook: process.env.TELEGRAM_USE_WEBHOOK === 'true',
+      });
+    }
 
     this.isInitialized = true;
     console.log('✅ User Notification Service initialized');

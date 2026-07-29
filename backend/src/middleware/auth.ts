@@ -69,6 +69,8 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/orders\/from-website\/confirm-prepayment$/ },
   { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/confirm-prepayment$/ },
   { method: 'GET', path: /^\/api\/orders\/from-website\/[0-9]+\/status$/ },
+  // Только timestamp в памяти — без SQLite. Иначе poll CRM (5с) встаёт в очередь auth при нагрузке.
+  { method: 'GET', path: /^\/api\/orders\/pool-sync\/?$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/items$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
   // Public design editor: templates are anonymous; draft mutations are checked by WEBSITE_ORDER_API_KEY in route.
@@ -113,6 +115,52 @@ function isPublicRoute(req: Request): boolean {
   return PUBLIC_ROUTE_RULES.some((rule) => rule.method === method && rule.path.test(pathname))
 }
 
+/** Кэш api_token → user: poll (pool-sync/inbox/me) иначе долбит SQLite на каждый запрос. */
+const AUTH_CACHE_TTL_MS = Math.max(
+  5_000,
+  parseInt(process.env.AUTH_TOKEN_CACHE_TTL_MS || '60000', 10) || 60_000,
+)
+type AuthCacheEntry = { user: { id: number; role: string }; expiresAt: number }
+const tokenUserCache = new Map<string, AuthCacheEntry>()
+
+function getCachedAuthUser(token: string): { id: number; role: string } | null {
+  const entry = tokenUserCache.get(token)
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) {
+    tokenUserCache.delete(token)
+    return null
+  }
+  return entry.user
+}
+
+function setCachedAuthUser(token: string, user: { id: number; role: string }) {
+  tokenUserCache.set(token, { user, expiresAt: Date.now() + AUTH_CACHE_TTL_MS })
+  // Простая защита от роста Map
+  if (tokenUserCache.size > 2000) {
+    const now = Date.now()
+    for (const [key, value] of tokenUserCache) {
+      if (value.expiresAt <= now) tokenUserCache.delete(key)
+    }
+  }
+}
+
+async function resolveUserByApiToken(token: string): Promise<{ id: number; role: string } | null> {
+  const cached = getCachedAuthUser(token)
+  if (cached) return cached
+  const db = await getDb()
+  const user = await db.get<{ id: number; role: string }>(
+    'SELECT id, role FROM users WHERE api_token = ?',
+    token,
+  )
+  if (user) setCachedAuthUser(token, user)
+  return user ?? null
+}
+
+function isPoolSyncPath(req: Request): boolean {
+  const pathname = getAuthPathname(req)
+  return /\/orders\/pool-sync\/?$/.test(pathname)
+}
+
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   // Пересчёт ЗП: всегда пропускаем запрос в обработчик (авторизация там: admin или secret)
   const isRecalcPath = req.path.endsWith('/earnings/recalculate') || req.path === '/earnings/recalculate'
@@ -134,6 +182,11 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   if (isOpenPath) {
     // Open path = анонимный доступ разрешён, но если токен передан — попробуем определить пользователя
     // (нужно для админских действий на "частично открытых" эндпоинтах вроде /api/suppliers).
+    // pool-sync: только in-memory timestamp — не ходим в БД даже при Bearer (иначе poll × N вкладок).
+    if (isPoolSyncPath(req)) {
+      return next()
+    }
+
     const auth = req.headers['authorization'] || ''
     const token = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : undefined
 
@@ -145,11 +198,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
             ;(req as AuthenticatedRequest).miniApp = { telegramUserId: p.sub }
           }
         } else {
-          const db = await getDb()
-          const user = await db.get<{ id: number; role: string }>(
-            'SELECT id, role FROM users WHERE api_token = ?',
-            token
-          )
+          const user = await resolveUserByApiToken(token)
           if (user) {
             ;(req as AuthenticatedRequest).user = user
           }
@@ -180,8 +229,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     return
   }
   
-  const db = await getDb()
-  const user = await db.get<{ id: number; role: string }>('SELECT id, role FROM users WHERE api_token = ?', token)
+  const user = await resolveUserByApiToken(token)
   
   if (!user) {
     res.status(401).json({ message: 'Unauthorized' })

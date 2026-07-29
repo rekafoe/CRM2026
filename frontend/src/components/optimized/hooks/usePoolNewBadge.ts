@@ -34,9 +34,26 @@ export function usePoolNewBadge() {
   }, [lastSeenAt]);
 
   useEffect(() => {
-    fetchAndCompare();
-    const interval = setInterval(fetchAndCompare, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let inFlight = false;
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        await fetchAndCompare();
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void tick();
+    timer = setInterval(tick, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
   }, [fetchAndCompare]);
 
   const markAsSeen = useCallback(() => {

@@ -75,8 +75,17 @@ export class StockMonitoringService {
       }
     }, this.config.checkInterval * 60 * 1000);
 
-    // Первоначальная проверка
-    this.checkStockLevels();
+    // Откладываем первую проверку: Telegram + запись alerts конкурируют с логином на одном SQLite.
+    const startupDelayMs = Math.max(
+      0,
+      parseInt(process.env.STOCK_STARTUP_DELAY_MS || '60000', 10) || 60000,
+    );
+    console.log(`⏳ Stock monitoring: first check in ${startupDelayMs}ms`);
+    setTimeout(() => {
+      this.checkStockLevels().catch((error) => {
+        console.error('❌ Error in initial stock monitoring:', error);
+      });
+    }, startupDelayMs);
   }
 
   /**

@@ -287,25 +287,46 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const poolSyncRef = useRef<number>(0);
   useEffect(() => {
     if (!isInitialized) return;
-    const pollMs = 5000;
-    const tid = setInterval(async () => {
+    const pollMs = 8000;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let inFlight = false;
+
+    const schedule = () => {
+      if (cancelled) return;
+      timer = setTimeout(runPoll, pollMs);
+    };
+
+    const runPoll = async () => {
+      if (cancelled || inFlight) {
+        schedule();
+        return;
+      }
+      inFlight = true;
       try {
         const { data } = await getOrderPoolSync();
         const at = data?.lastWebsiteOrderAt ?? 0;
-        if (at <= 0) return;
-        if (poolSyncRef.current === 0) {
-          poolSyncRef.current = at;
-          return;
-        }
-        if (at !== poolSyncRef.current) {
-          poolSyncRef.current = at;
-          refreshOrdersInBackground();
+        if (at > 0) {
+          if (poolSyncRef.current === 0) {
+            poolSyncRef.current = at;
+          } else if (at !== poolSyncRef.current) {
+            poolSyncRef.current = at;
+            refreshOrdersInBackground();
+          }
         }
       } catch {
         /* ignore poll errors */
+      } finally {
+        inFlight = false;
+        schedule();
       }
-    }, pollMs);
-    return () => clearInterval(tid);
+    };
+
+    void runPoll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [isInitialized, refreshOrdersInBackground]);
 
   useEffect(() => {
