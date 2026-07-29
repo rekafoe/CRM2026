@@ -162,7 +162,13 @@ export class StockMonitoringService {
 
         alerts.push(alert);
 
-        // Отправляем уведомление в Telegram (общее)
+        // Сначала БД — без ожидания Telegram (на Railway api.telegram.org часто ConnectTimeout ~10с × N материалов).
+        try {
+          await this.saveStockAlert(alert);
+        } catch (e) {
+          console.error('❌ Failed to save stock alert:', e);
+        }
+
         const notification: LowStockNotification = {
           materialId: material.id,
           materialName: material.name,
@@ -173,18 +179,15 @@ export class StockMonitoringService {
           categoryName: material.category_name
         };
 
-        await TelegramService.sendLowStockNotification(notification);
-
-        // Отправляем уведомление админам через UserNotificationService
-        await UserNotificationService.sendLowStockAlert(
-          material.name,
-          currentQuantity,
-          minStock,
-          material.supplier_name
-        );
-
-        // Сохраняем предупреждение в базу данных
-        await this.saveStockAlert(alert);
+        if (TelegramService.isNetworkAvailable()) {
+          void TelegramService.sendLowStockNotification(notification).catch(() => {});
+          void UserNotificationService.sendLowStockAlert(
+            material.name,
+            currentQuantity,
+            minStock,
+            material.supplier_name
+          ).catch(() => {});
+        }
       }
     }
 

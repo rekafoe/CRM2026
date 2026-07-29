@@ -233,43 +233,13 @@ export class UserNotificationService {
    * Отправка сообщения в Telegram
    */
   private static async sendTelegramMessage(chatId: string, notification: NotificationMessage): Promise<boolean> {
-    const token = this.getBotTokenFromEnv();
-    if (!token) {
-      console.error('❌ TELEGRAM_BOT_TOKEN is not set, skip sendTelegramMessage');
+    if (!TelegramService.isNetworkAvailable()) {
       return false;
     }
-    try {
-      const emoji = notification.priority === 'high' ? '🚨' : 
-                   notification.priority === 'medium' ? '⚠️' : 'ℹ️';
-      
-      const message = `${emoji} *${notification.title}*\n\n${notification.message}`;
-      
-      const url = `https://api.telegram.org/bot${token}/sendMessage`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: starMarkdownToHtml(message),
-          parse_mode: 'HTML',
-          disable_web_page_preview: true
-        })
-      });
-
-      const result = await response.json();
-      
-      if (result.ok) {
-        return true;
-      } else {
-        console.error(`❌ Telegram API error for chat ${chatId}:`, result);
-        return false;
-      }
-    } catch (error: any) {
-      console.error(`❌ Failed to send Telegram message to ${chatId}:`, error.message);
-      return false;
-    }
+    const emoji = notification.priority === 'high' ? '🚨' : 
+                 notification.priority === 'medium' ? '⚠️' : 'ℹ️';
+    const message = `${emoji} *${notification.title}*\n\n${notification.message}`;
+    return TelegramService.sendMessageToUser(chatId, message);
   }
 
   /**

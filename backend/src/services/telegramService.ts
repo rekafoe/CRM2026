@@ -42,8 +42,64 @@ export class TelegramService {
   private static isPollingInProgress: boolean = false;
   private static consecutivePollingErrors: number = 0;
   private static nextAllowedPollAt: number = 0;
-  private static readonly DEFAULT_POLL_INTERVAL_MS: number = Number(process.env.TELEGRAM_POLL_INTERVAL_MS || 5000);
-  private static readonly DEFAULT_FETCH_TIMEOUT_MS: number = Number(process.env.TELEGRAM_POLL_TIMEOUT_MS || 30000); // 30s
+  /** После серии ConnectTimeout — полностью молчим, иначе CRM встаёт на минуты. */
+  private static networkCircuitOpenUntil: number = 0;
+  private static networkFailureStreak: number = 0;
+  private static readonly DEFAULT_POLL_INTERVAL_MS: number = Number(process.env.TELEGRAM_POLL_INTERVAL_MS || 15000);
+  /** Короткий abort: undici connect timeout сам по себе ~10с и убивает отзывчивость. */
+  private static readonly DEFAULT_FETCH_TIMEOUT_MS: number = Number(process.env.TELEGRAM_POLL_TIMEOUT_MS || 5000);
+  private static readonly SEND_TIMEOUT_MS: number = Number(process.env.TELEGRAM_SEND_TIMEOUT_MS || 4000);
+  private static readonly CIRCUIT_OPEN_MS: number = Number(process.env.TELEGRAM_CIRCUIT_OPEN_MS || 30 * 60 * 1000);
+  private static readonly CIRCUIT_FAIL_THRESHOLD: number = Number(process.env.TELEGRAM_CIRCUIT_FAIL_THRESHOLD || 2);
+
+  private static isCircuitOpen(): boolean {
+    return Date.now() < this.networkCircuitOpenUntil;
+  }
+
+  private static noteNetworkSuccess() {
+    this.networkFailureStreak = 0;
+    this.networkCircuitOpenUntil = 0;
+  }
+
+  private static noteNetworkFailure(reason: string) {
+    this.networkFailureStreak += 1;
+    if (this.networkFailureStreak < this.CIRCUIT_FAIL_THRESHOLD) return;
+    this.networkCircuitOpenUntil = Date.now() + this.CIRCUIT_OPEN_MS;
+    console.warn(
+      `⏸️ Telegram: сеть недоступна (${reason}). Пауза ${Math.round(this.CIRCUIT_OPEN_MS / 60000)} мин — polling/send пропущены, CRM не ждёт api.telegram.org.`,
+    );
+    this.stopPolling();
+  }
+
+  /** fetch к Telegram с abort; при circuit open сразу false/throw. */
+  private static async telegramFetch(
+    url: string,
+    init: RequestInit | undefined,
+    timeoutMs: number,
+  ): Promise<Response> {
+    if (this.isCircuitOpen()) {
+      throw new Error('Telegram circuit open');
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal });
+      this.noteNetworkSuccess();
+      return response;
+    } catch (error) {
+      const msg = (error as any)?.name === 'AbortError'
+        ? 'Fetch aborted by timeout'
+        : (error as any)?.cause?.code || (error as any)?.message || String(error);
+      this.noteNetworkFailure(String(msg));
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  static isNetworkAvailable(): boolean {
+    return this.isEnabled() && !this.isCircuitOpen();
+  }
 
   /**
    * Инициализация конфигурации Telegram
@@ -72,8 +128,12 @@ export class TelegramService {
     if (config.enabled && config.botToken) {
       if (config.useWebhook) {
         console.log('🌐 Telegram: webhook mode — getUpdates/polling in this process is not started (use POST .../api/notifications/telegram/webhook).');
-      } else {
+      } else if (process.env.TELEGRAM_POLLING_ENABLED === 'true') {
         this.startPolling();
+      } else {
+        // Railway часто не достучится до api.telegram.org — long polling вешает CRM на ConnectTimeout.
+        // Входящие: TELEGRAM_USE_WEBHOOK=true. Исходящие sendMessage всё ещё работают при живой сети.
+        console.log('⏭️ Telegram polling disabled (set TELEGRAM_POLLING_ENABLED=true to enable long polling).');
       }
     }
   }
@@ -101,8 +161,7 @@ export class TelegramService {
    * Отправка уведомления о низких остатках
    */
   static async sendLowStockNotification(notification: LowStockNotification): Promise<boolean> {
-    if (!this.isEnabled()) {
-      console.log('⚠️ Telegram notifications disabled');
+    if (!this.isNetworkAvailable()) {
       return false;
     }
 
@@ -149,11 +208,12 @@ export class TelegramService {
       console.error('❌ Telegram config not initialized');
       return false;
     }
+    if (!this.isNetworkAvailable()) return false;
 
     try {
       const url = `https://api.telegram.org/bot${this.config.botToken}/sendMessage`;
       
-      const response = await fetch(url, {
+      const response = await this.telegramFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -164,7 +224,7 @@ export class TelegramService {
           parse_mode: 'HTML',
           disable_web_page_preview: true
         })
-      });
+      }, this.SEND_TIMEOUT_MS);
 
       const data = await response.json();
 
@@ -331,19 +391,24 @@ export class TelegramService {
       console.log('⚠️ Telegram service is not enabled');
       return false;
     }
+    if (!this.isNetworkAvailable()) return false;
 
     try {
-      const response = await fetch(`https://api.telegram.org/bot${this.config!.botToken}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await this.telegramFetch(
+        `https://api.telegram.org/bot${this.config!.botToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: starMarkdownToHtml(message),
+            parse_mode: 'HTML'
+          })
         },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: starMarkdownToHtml(message),
-          parse_mode: 'HTML'
-        })
-      });
+        this.SEND_TIMEOUT_MS,
+      );
 
       const result = await response.json();
       
@@ -409,15 +474,16 @@ export class TelegramService {
 
     console.log('🔄 Starting Telegram polling...');
     
-    const baseIntervalMs = this.DEFAULT_POLL_INTERVAL_MS; // базовый интервал
+    const baseIntervalMs = this.DEFAULT_POLL_INTERVAL_MS;
 
     this.pollingInterval = setInterval(async () => {
+      if (this.isCircuitOpen()) {
+        return;
+      }
       if (this.isPollingInProgress) {
-        // предотвращаем параллельные запросы
         return;
       }
 
-      // backoff: если была серия ошибок, ждём увеличенный интервал
       const now = Date.now();
       if (now < this.nextAllowedPollAt) {
         return;
@@ -426,14 +492,12 @@ export class TelegramService {
       this.isPollingInProgress = true;
       try {
         await this.getUpdates();
-        // сбрасываем счётчик ошибок при успешном запросе
         this.consecutivePollingErrors = 0;
         this.nextAllowedPollAt = 0;
       } catch (error) {
         console.error('❌ Error in Telegram polling:', error);
-        this.consecutivePollingErrors = Math.min(this.consecutivePollingErrors + 1, 5);
-        // экспоненциальный backoff: 2^n секунд, максимум 60 сек
-        const backoffMs = Math.min(Math.pow(2, this.consecutivePollingErrors) * 1000, 60000);
+        this.consecutivePollingErrors = Math.min(this.consecutivePollingErrors + 1, 8);
+        const backoffMs = Math.min(Math.pow(2, this.consecutivePollingErrors) * 2000, 300000);
         this.nextAllowedPollAt = Date.now() + backoffMs;
       } finally {
         this.isPollingInProgress = false;
@@ -441,24 +505,27 @@ export class TelegramService {
     }, baseIntervalMs);
   }
 
+  private static stopPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      console.log('⏹️ Telegram polling stopped');
+    }
+  }
+
   /**
    * Получение обновлений от Telegram API
    */
   private static async getUpdates() {
     if (!this.config?.botToken) return;
+    if (this.isCircuitOpen()) return;
 
     try {
-      // Используем long polling: Telegram рекомендует до 50 сек; берём 25 сек
-      const longPollSeconds = Number(process.env.TELEGRAM_LONGPOLL_TIMEOUT_SEC || 25);
+      // Короткий poll: long-poll 25с + connect timeout 10с = CRM «висит» под нагрузкой на Railway.
+      const longPollSeconds = Number(process.env.TELEGRAM_LONGPOLL_TIMEOUT_SEC || 0);
       const url = `https://api.telegram.org/bot${this.config.botToken}/getUpdates?offset=${this.lastUpdateId + 1}&timeout=${longPollSeconds}`;
 
-      // управляем таймаутом через AbortController, чтобы не накапливались висящие запросы
-      const controller = new AbortController();
-      const pollingTimeoutMs = this.DEFAULT_FETCH_TIMEOUT_MS; // по умолчанию 30 сек, можно настроить через ENV
-      const timeout = setTimeout(() => controller.abort(), pollingTimeoutMs);
-
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
+      const response = await this.telegramFetch(url, undefined, this.DEFAULT_FETCH_TIMEOUT_MS);
       const data = await response.json();
 
       if (data.ok && data.result.length > 0) {
@@ -468,13 +535,10 @@ export class TelegramService {
         }
       }
     } catch (error) {
-      // Уточняем сообщение об ошибке, особенно для таймаутов соединения
       const message = (error as any)?.name === 'AbortError'
         ? 'Fetch aborted by timeout'
         : (error as any)?.message || String(error);
       console.error('❌ Error getting Telegram updates:', message);
-      // Пробрасываем, чтобы startPolling включил exponential backoff
-      // (иначе при «fetch failed» опрос долбит API каждые 5с без паузы).
       throw error;
     }
   }
@@ -607,15 +671,12 @@ export class TelegramService {
    * Отправка сообщения с inline клавиатурой
    */
   static async sendMessageWithKeyboard(chatId: string, message: string, keyboard: any): Promise<boolean> {
-    if (!this.isEnabled()) {
-      console.log('⚠️ Telegram service is not enabled');
-      return false;
-    }
+    if (!this.isNetworkAvailable()) return false;
 
     try {
       const url = `https://api.telegram.org/bot${this.config!.botToken}/sendMessage`;
       
-      const response = await fetch(url, {
+      const response = await this.telegramFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -626,7 +687,7 @@ export class TelegramService {
           parse_mode: 'HTML',
           reply_markup: keyboard
         }),
-      });
+      }, this.SEND_TIMEOUT_MS);
 
       const result = await response.json();
       
@@ -647,15 +708,12 @@ export class TelegramService {
    * Редактирование сообщения с клавиатурой
    */
   static async editMessageWithKeyboard(chatId: string, messageId: number, message: string, keyboard: any): Promise<boolean> {
-    if (!this.isEnabled()) {
-      console.log('⚠️ Telegram service is not enabled');
-      return false;
-    }
+    if (!this.isNetworkAvailable()) return false;
 
     try {
       const url = `https://api.telegram.org/bot${this.config!.botToken}/editMessageText`;
       
-      const response = await fetch(url, {
+      const response = await this.telegramFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -667,7 +725,7 @@ export class TelegramService {
           parse_mode: 'HTML',
           reply_markup: keyboard
         }),
-      });
+      }, this.SEND_TIMEOUT_MS);
 
       const result = await response.json();
       
@@ -688,15 +746,12 @@ export class TelegramService {
    * Ответ на callback query
    */
   static async answerCallbackQuery(callbackQueryId: string, text?: string, showAlert: boolean = false): Promise<boolean> {
-    if (!this.isEnabled()) {
-      console.log('⚠️ Telegram service is not enabled');
-      return false;
-    }
+    if (!this.isNetworkAvailable()) return false;
 
     try {
       const url = `https://api.telegram.org/bot${this.config!.botToken}/answerCallbackQuery`;
       
-      const response = await fetch(url, {
+      const response = await this.telegramFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -706,7 +761,7 @@ export class TelegramService {
           text: text,
           show_alert: showAlert
         }),
-      });
+      }, this.SEND_TIMEOUT_MS);
 
       const result = await response.json();
       

@@ -305,6 +305,9 @@ async function startServer() {
           ? 'enabled (webhook, no local polling)'
           : 'enabled (long polling)'
       logger.info(`Telegram: ${tgMode}`)
+      if (telegramConfig.enabled && !telegramConfig.useWebhook && process.env.TELEGRAM_POLLING_ENABLED !== 'true') {
+        logger.info('Telegram polling: off (TELEGRAM_POLLING_ENABLED!=true). Use webhook or set TELEGRAM_POLLING_ENABLED=true')
+      }
       logger.info(`Stock monitoring: ${process.env.STOCK_MONITORING_ENABLED !== 'false' ? 'enabled' : 'disabled'}`)
       logger.info(`Auto ordering: ${process.env.AUTO_ORDER_ENABLED === 'true' ? 'enabled' : 'disabled'}`)
       logger.info(`Earnings recalculation: ${earningsConfig.enabled ? 'enabled' : 'disabled'} (${earningsConfig.intervalMinutes}m)`)
