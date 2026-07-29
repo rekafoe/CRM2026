@@ -32,13 +32,24 @@ export const useOrderHandlers = ({
   const { getPresets } = useReasonPresets();
 
   const handleCreateOrder = useCallback(async () => {
-    const res = await createOrder(contextDate);
-    const order = res.data;
-    const uniqueOrders = orders.filter(o => o.id !== order.id);
-    setOrders([order, ...uniqueOrders]);
-    setSelectedId(order.id);
-    return order;
-  }, [orders, contextDate, setOrders, setSelectedId]);
+    try {
+      const res = await createOrder(contextDate);
+      const order = res.data;
+      if (!order?.id) {
+        toast.error('Ошибка создания', 'Сервер не вернул заказ');
+        return null;
+      }
+      const uniqueOrders = orders.filter(o => o.id !== order.id);
+      setOrders([order, ...uniqueOrders]);
+      setSelectedId(order.id);
+      return order;
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? e?.message ?? 'Не удалось создать заказ';
+      toast.error('Ошибка создания заказа', msg);
+      logger.error('Failed to create order', e);
+      return null;
+    }
+  }, [orders, contextDate, setOrders, setSelectedId, toast, logger]);
 
   const handleDeleteOrder = useCallback(async (orderId: number) => {
     try {

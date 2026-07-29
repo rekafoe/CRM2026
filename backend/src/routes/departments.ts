@@ -4,6 +4,7 @@ import { getDb } from '../config/database'
 
 const router = Router()
 
+/** Полный SELECT для admin write-путей (после миграций колонки есть). GET '/' — динамический. */
 const DEPT_SELECT = `id, name, description, sort_order, created_at, code, address, is_pickup_point, is_active`
 
 function requireAdmin(req: AuthenticatedRequest, res: any): boolean {
@@ -27,12 +28,34 @@ function normalizeCode(raw: unknown): string | null {
 
 router.get('/', asyncHandler(async (_req, res) => {
   const db = await getDb()
-  const rows = await db.all<any>(
-    `SELECT ${DEPT_SELECT}
-     FROM departments
-     ORDER BY sort_order ASC, name ASC`
-  )
-  res.json(rows)
+  try {
+    const colsRaw = await db.all<{ name: string }>(`PRAGMA table_info(departments)`)
+    const colNames = new Set((Array.isArray(colsRaw) ? colsRaw : []).map((c) => c.name))
+    if (colNames.size === 0) {
+      res.json([])
+      return
+    }
+    const wanted = [
+      'id',
+      'name',
+      'description',
+      'sort_order',
+      'created_at',
+      'code',
+      'address',
+      'is_pickup_point',
+      'is_active',
+    ]
+    const selectList = wanted.filter((c) => colNames.has(c)).join(', ')
+    const rows = await db.all<any>(
+      `SELECT ${selectList}
+       FROM departments
+       ORDER BY ${colNames.has('sort_order') ? 'sort_order ASC, ' : ''}name ASC`
+    )
+    res.json(rows)
+  } catch {
+    res.json([])
+  }
 }))
 
 router.post('/', asyncHandler(async (req, res) => {

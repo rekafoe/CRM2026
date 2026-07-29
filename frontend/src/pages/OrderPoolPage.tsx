@@ -358,12 +358,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       return orders;
     }
 
-    let filtered = orders.filter((o) => {
-      const s = Number(o.status);
-      if (s === 0) return true;
-      if (s === 1) return true;
-      return false;
-    });
+    // Пул: бэкенд уже отдаёт activeOnly; не режем по жёстким 0/1
+    // (на части БД «Ожидает»/«Оформлен» имеют другие id).
+    let filtered = [...orders];
 
     if (filters.source !== 'all') {
       filtered = filtered.filter((o) => o.source === filters.source);

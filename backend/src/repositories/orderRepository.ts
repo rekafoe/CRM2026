@@ -425,6 +425,9 @@ export const OrderRepository = {
     let hasResponsibleUserId = false
     let hasDeliveryJson = false
     let hasFulfillmentDept = false
+    let hasDepartmentsTable = false
+    let hasDeptCode = false
+    let hasUsersDepartmentId = false
     try {
       hasIsCancelled = await hasColumn('orders', 'is_cancelled')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
@@ -434,6 +437,17 @@ export const OrderRepository = {
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
       hasDeliveryJson = await hasColumn('orders', 'delivery_json')
       hasFulfillmentDept = await hasColumn('orders', 'fulfillment_department_id')
+      if (hasFulfillmentDept) {
+        const dbCheck = await getDb()
+        const deptTable = await dbCheck.get<{ name?: string }>(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='departments' LIMIT 1`,
+        )
+        hasDepartmentsTable = Boolean(deptTable?.name)
+        if (hasDepartmentsTable) {
+          hasDeptCode = await hasColumn('departments', 'code')
+        }
+      }
+      hasUsersDepartmentId = await hasColumn('users', 'department_id')
     } catch { /* ignore */ }
     const isCancelledSel = hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'
     const paymentChannelSel = hasPaymentChannel
@@ -443,10 +457,13 @@ export const OrderRepository = {
     const deliverySel = hasDeliveryJson ? 'o.delivery_json' : 'NULL as delivery_json'
     const contactUserIdSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
     const responsibleUserIdSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
-    const fulfillmentSel = hasFulfillmentDept
-      ? `o.fulfillment_department_id, d.name as fulfillment_department_name, d.code as fulfillment_department_code`
-      : `NULL as fulfillment_department_id, NULL as fulfillment_department_name, NULL as fulfillment_department_code`
-    const deptJoin = hasFulfillmentDept ? 'LEFT JOIN departments d ON d.id = o.fulfillment_department_id' : ''
+    const canJoinDepartments = hasFulfillmentDept && hasDepartmentsTable
+    const fulfillmentSel = canJoinDepartments
+      ? `o.fulfillment_department_id, d.name as fulfillment_department_name, ${hasDeptCode ? 'd.code' : 'NULL'} as fulfillment_department_code`
+      : hasFulfillmentDept
+        ? `o.fulfillment_department_id, NULL as fulfillment_department_name, NULL as fulfillment_department_code`
+        : `NULL as fulfillment_department_id, NULL as fulfillment_department_name, NULL as fulfillment_department_code`
+    const deptJoin = canJoinDepartments ? 'LEFT JOIN departments d ON d.id = o.fulfillment_department_id' : ''
     const whereParts: string[] = []
     const queryParams: number[] = []
     if (options.statuses?.length) {
@@ -455,10 +472,15 @@ export const OrderRepository = {
       queryParams.push(...options.statuses)
     }
     if (options.departmentId != null && Number.isFinite(options.departmentId) && hasFulfillmentDept) {
-      whereParts.push(
-        `(o.fulfillment_department_id = ? OR (o.fulfillment_department_id IS NULL AND o.userId IN (SELECT id FROM users WHERE department_id = ?)))`
-      )
-      queryParams.push(options.departmentId, options.departmentId)
+      if (hasUsersDepartmentId) {
+        whereParts.push(
+          `(o.fulfillment_department_id = ? OR (o.fulfillment_department_id IS NULL AND o.userId IN (SELECT id FROM users WHERE department_id = ?)))`
+        )
+        queryParams.push(options.departmentId, options.departmentId)
+      } else {
+        whereParts.push(`o.fulfillment_department_id = ?`)
+        queryParams.push(options.departmentId)
+      }
     }
     const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
     const orders = await db.all<any>(
@@ -721,10 +743,21 @@ export const OrderRepository = {
     }
 
     if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {
-      whereConditions.push(
-        `(o.fulfillment_department_id = ? OR (o.fulfillment_department_id IS NULL AND o.userId IN (SELECT id FROM users WHERE department_id = ?)))`
-      )
-      params.push(searchParams.department_id, searchParams.department_id)
+      let hasFulfillment = false
+      let hasUsersDept = false
+      try {
+        hasFulfillment = await hasColumn('orders', 'fulfillment_department_id')
+        hasUsersDept = await hasColumn('users', 'department_id')
+      } catch { /* ignore */ }
+      if (hasFulfillment && hasUsersDept) {
+        whereConditions.push(
+          `(o.fulfillment_department_id = ? OR (o.fulfillment_department_id IS NULL AND o.userId IN (SELECT id FROM users WHERE department_id = ?)))`
+        )
+        params.push(searchParams.department_id, searchParams.department_id)
+      } else if (hasFulfillment) {
+        whereConditions.push(`o.fulfillment_department_id = ?`)
+        params.push(searchParams.department_id)
+      }
     }
 
     const rawQuery = String(searchParams.query || '').trim()

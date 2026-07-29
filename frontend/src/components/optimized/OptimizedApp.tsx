@@ -399,9 +399,14 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 title="Добавить заказ"
                 aria-label="Добавить заказ"
                 onClick={async () => {
-                  const order = await orderHandlers.handleCreateOrder();
-                  if (order?.id) {
-                    openCalculator(undefined, order.id);
+                  try {
+                    const order = await orderHandlers.handleCreateOrder();
+                    if (order?.id) {
+                      openCalculator(undefined, order.id);
+                    }
+                  } catch (e) {
+                    // ошибка уже показана в handleCreateOrder
+                    console.error('create order click failed', e);
                   }
                 }}
               >

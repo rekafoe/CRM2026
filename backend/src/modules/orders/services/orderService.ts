@@ -280,10 +280,28 @@ export class OrderService {
     })
   }
 
+  /** Статусы пула: канонично id 0/1, но на части БД «Ожидает»/«Оформлен» имеют другие id. */
+  private static async resolvePoolActiveStatusIds(): Promise<number[]> {
+    const db = await getDb()
+    const ids = new Set<number>([0, 1])
+    try {
+      const rows = await db.all<{ id: number }>(
+        `SELECT id FROM order_statuses
+         WHERE name IN ('Ожидает', 'Оформлен', 'Новый')`
+      )
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const id = Number(row.id)
+        if (Number.isFinite(id)) ids.add(id)
+      }
+    } catch { /* ignore */ }
+    return Array.from(ids)
+  }
+
   /** Все заказы без фильтра по пользователю (для пула заказов). Batch loading — устранение N+1. */
   static async getAllOrdersForPool(options: { activeOnly?: boolean; departmentId?: number } = {}) {
+    const poolStatuses = options.activeOnly ? await this.resolvePoolActiveStatusIds() : undefined
     const fromOrders = (await OrderRepository.listAllOrders({
-      ...(options.activeOnly ? { statuses: [0, 1] } : {}),
+      ...(poolStatuses ? { statuses: poolStatuses } : {}),
       ...(options.departmentId != null ? { departmentId: options.departmentId } : {}),
     })) as Order[]
     const orderIds = new Set(fromOrders.map((o) => o.id))
@@ -425,10 +443,11 @@ export class OrderService {
     const number = buildOrderNumberFromSourceAndId(source || 'crm', id)
     await db.run('UPDATE orders SET number = ? WHERE id = ?', [number, id])
 
-    // CRM-заказ без явной точки → точка = департамент создателя
+    // CRM-заказ без явной точки → точка = департамент создателя (только если колонки есть)
     try {
       const hasFulfillment = await hasColumn('orders', 'fulfillment_department_id')
-      if (hasFulfillment && creatorId != null) {
+      const hasUserDept = await hasColumn('users', 'department_id')
+      if (hasFulfillment && hasUserDept && creatorId != null) {
         const creator = await db.get<{ department_id: number | null }>(
           'SELECT department_id FROM users WHERE id = ?',
           [creatorId]
@@ -442,7 +461,7 @@ export class OrderService {
         }
       }
     } catch {
-      /* колонка/юзер могут отсутствовать */
+      /* колонка/юзер могут отсутствовать — заказ уже создан, точку не ставим */
     }
 
     const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
