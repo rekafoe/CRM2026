@@ -125,11 +125,19 @@ export const useOptimizedAppData = (
         list = list
           .filter(o => {
             const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
-            // Исполнитель по позиции: бэкенд может отдать заказ другого дня — не режем по created_at
-            if (assigned) return true;
             const rawDate = (o as any).created_at ?? (o as any).createdAt;
-            if (!rawDate) return true;
-            return extractDate(rawDate) === targetDate;
+            const onDay = !rawDate || extractDate(rawDate) === targetDate;
+            if (!assigned) return onDay;
+            // Чужой executor-заказ другого дня: не тащим завершённые/отменённые
+            if (onDay) return true;
+            if ((o as any).is_cancelled === 1) return false;
+            const st = Number((o as any).status);
+            if (st === 7) return false;
+            const name = String((o as any).status_name || '').toLowerCase();
+            if (name.includes('заверш') || name.includes('выполнен') || name.includes('выдан') || name.includes('отмен')) {
+              return false;
+            }
+            return true;
           })
           .filter(o => {
             if (uid == null) return true;

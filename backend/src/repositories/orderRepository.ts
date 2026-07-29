@@ -177,21 +177,62 @@ export const OrderRepository = {
     const day = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date.slice(0, 10))
       ? options.date.slice(0, 10)
       : null
-    // На «сегодня» исполнителю показываем и заказы прошлых дней (пул/сайт),
-    // иначе назначение видно только в селекте позиции у ответственного.
     const todayLocal = getTodayString()
+
+    // Завершённые/отменённые не тащим в «сегодня» как чужие executor-заказы.
+    const terminalStatusIds = new Set<number>([7])
+    try {
+      const stRows = await db.all<{ id: number; name: string }>(
+        `SELECT id, name FROM order_statuses`
+      )
+      for (const row of Array.isArray(stRows) ? stRows : []) {
+        const name = String(row.name || '').trim().toLowerCase()
+        if (
+          name.includes('заверш') ||
+          name.includes('выполнен') ||
+          name.includes('выдан') ||
+          name.includes('отмен')
+        ) {
+          const id = Number(row.id)
+          if (Number.isFinite(id)) terminalStatusIds.add(id)
+        }
+      }
+    } catch { /* ignore */ }
+    const terminalIds = Array.from(terminalStatusIds)
+    let hasIsCancelled = false
+    try {
+      hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+    } catch { /* ignore */ }
 
     const whereParts: string[] = []
     const whereParams: Array<string | number> = []
     const execIds = executorOrderIds.size > 0 ? Array.from(executorOrderIds) : []
     const execInSql = execIds.length > 0 ? `o.id IN (${execIds.map(() => '?').join(',')})` : null
+    const createdDateSql = `date(COALESCE(o.created_at, o.createdAt))`
 
     if (day && execInSql && day === todayLocal) {
-      // Свои за сегодня + все заказы, где юзер исполнитель по позиции (любая дата создания)
+      // Свои за сегодня
+      // + чужие, где я исполнитель: созданные сегодня ИЛИ ещё «живые» (не завершён/отменён)
+      const activeExtra = [
+        hasIsCancelled ? 'COALESCE(o.is_cancelled, 0) = 0' : null,
+        terminalIds.length > 0
+          ? `o.status NOT IN (${terminalIds.map(() => '?').join(',')})`
+          : null,
+      ].filter(Boolean).join(' AND ')
       whereParts.push(
-        `((o.userId = ? AND date(COALESCE(o.created_at, o.createdAt)) = date(?)) OR (${execInSql}))`,
+        `((o.userId = ? AND ${createdDateSql} = date(?))
+          OR (
+            ${execInSql}
+            AND (
+              ${createdDateSql} = date(?)
+              OR (${activeExtra || '1=1'})
+            )
+          ))`,
       )
-      whereParams.push(userId, day, ...execIds)
+      whereParams.push(userId, day, ...execIds, day)
+      if (terminalIds.length > 0 && activeExtra.includes('NOT IN')) {
+        whereParams.push(...terminalIds)
+      }
     } else if (day) {
       if (execInSql) {
         whereParts.push(`(o.userId = ? OR ${execInSql})`)
@@ -200,7 +241,7 @@ export const OrderRepository = {
         whereParts.push('o.userId = ?')
         whereParams.push(userId)
       }
-      whereParts.push(`date(COALESCE(o.created_at, o.createdAt)) = date(?)`)
+      whereParts.push(`${createdDateSql} = date(?)`)
       whereParams.push(day)
     } else if (execInSql) {
       whereParts.push(`(o.userId = ? OR ${execInSql})`)
