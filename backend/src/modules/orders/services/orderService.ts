@@ -1631,6 +1631,13 @@ export class OrderService {
         });
         void trySyncWebsiteOrderStatusFromCrm(db, id);
 
+        void EarningsService.recalculateEarningsForOrderDays({ orderId: id }).catch((e) => {
+          logger.error('Earnings recalc after status change failed', {
+            orderId: id,
+            message: (e as Error)?.message,
+          });
+        });
+
         const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
         const updated: Order = { ...(raw as Order), items: [] }
         return OrderService.orderForApi(updated) as Order
@@ -2216,6 +2223,12 @@ export class OrderService {
           newStatusId: n,
         });
         void trySyncWebsiteOrderStatusFromCrm(db, row.id);
+        void EarningsService.recalculateEarningsForOrderDays({ orderId: row.id }).catch((e) => {
+          logger.error('Earnings recalc after bulk status change failed', {
+            orderId: row.id,
+            message: (e as Error)?.message,
+          });
+        });
       }
     }
     
