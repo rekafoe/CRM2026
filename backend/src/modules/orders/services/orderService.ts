@@ -200,11 +200,11 @@ export class OrderService {
 
   // DB row types (internal)
   // use shared mapper
-  static async getAllOrders(userId: number) {
-    const orders = await OrderRepository.listUserOrders(userId)
+  static async getAllOrders(userId: number, dateYmd?: string) {
+    const orders = await OrderRepository.listUserOrders(userId, dateYmd ? { date: dateYmd } : undefined)
     let assignedOrders: Order[] = []
     try {
-      assignedOrders = (await OrderRepository.listAssignedOrdersForUser(userId)) as Order[]
+      assignedOrders = (await OrderRepository.listAssignedOrdersForUser(userId, dateYmd ? { date: dateYmd } : undefined)) as Order[]
     } catch (e) {
       // user_order_page_orders / user_order_pages могут отсутствовать
     }

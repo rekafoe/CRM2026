@@ -130,7 +130,7 @@ export const OrderRepository = {
     }
   },
 
-  async listUserOrders(userId: number): Promise<Order[]> {
+  async listUserOrders(userId: number, options?: { date?: string }): Promise<Order[]> {
     const db = await getDb()
     let hasPaymentChannel = false
     let hasIsInternal = false
@@ -171,8 +171,15 @@ export const OrderRepository = {
            WHERE i.orderId = o.id AND i.executor_user_id = ?
          ))`
       : 'o.userId = ?'
-    const selectParams: number[] = hasExecutorUserId ? [userId, userId] : []
-    const whereParams: number[] = hasExecutorUserId ? [userId, userId] : [userId]
+    const selectParams: Array<string | number> = hasExecutorUserId ? [userId, userId] : []
+    const whereParams: Array<string | number> = hasExecutorUserId ? [userId, userId] : [userId]
+    const day = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date.slice(0, 10))
+      ? options.date.slice(0, 10)
+      : null
+    const dateWhere = day
+      ? ` AND date(COALESCE(o.created_at, o.createdAt)) = date(?)`
+      : ''
+    if (day) whereParams.push(day)
 
     const orders = await db.all<any>(
       `SELECT 
@@ -201,7 +208,7 @@ export const OrderRepository = {
         c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE ${accessWhere}
+      WHERE ${accessWhere}${dateWhere}
       ORDER BY o.id DESC`,
       ...selectParams,
       ...whereParams
@@ -558,7 +565,7 @@ export const OrderRepository = {
     }
   },
 
-  async listAssignedOrdersForUser(userId: number): Promise<any[]> {
+  async listAssignedOrdersForUser(userId: number, options?: { date?: string }): Promise<any[]> {
     const db = await getDb()
     let hasDeliveryJson = false
     try {
@@ -569,6 +576,18 @@ export const OrderRepository = {
     const deliverySel = hasDeliveryJson
       ? `CASE WHEN uopo.order_type = 'website' THEN o.delivery_json ELSE NULL END as delivery_json`
       : `NULL as delivery_json`
+    const day = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date.slice(0, 10))
+      ? options.date.slice(0, 10)
+      : null
+    const dateWhere = day
+      ? ` AND date(CASE 
+            WHEN uopo.order_type = 'website' THEN COALESCE(uop.date, substr(uopo.assigned_at, 1, 10), COALESCE(o.created_at, o.createdAt))
+            WHEN uopo.order_type = 'telegram' THEN COALESCE(uop.date, uopo.assigned_at)
+            ELSE COALESCE(uop.date, uopo.assigned_at)
+          END) = date(?)`
+      : ''
+    const params: Array<string | number> = [userId]
+    if (day) params.push(day)
     try {
       const assignedOrders = await db.all(
         `SELECT 
@@ -637,9 +656,9 @@ export const OrderRepository = {
         JOIN user_order_pages uop ON uop.id = uopo.page_id
         LEFT JOIN orders o ON uopo.order_type = 'website' AND uopo.order_id = o.id
         LEFT JOIN photo_orders po ON uopo.order_type = 'telegram' AND uopo.order_id = po.id
-        WHERE uop.user_id = ?
+        WHERE uop.user_id = ?${dateWhere}
         ORDER BY uopo.assigned_at DESC`,
-        [userId]
+        params
       )
       const rows = Array.isArray(assignedOrders) ? assignedOrders : []
       return rows.map((row: any) => attachDeliveryFromRow(row))

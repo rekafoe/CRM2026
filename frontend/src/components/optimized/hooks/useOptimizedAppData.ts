@@ -116,7 +116,7 @@ export const useOptimizedAppData = (
     
     const fetchOrders = ordersListTab === 'issued'
       ? getOrders({ issued_on: targetDate })
-      : getOrders();
+      : getOrders({ date: targetDate });
     
     fetchOrders.then((res) => {
       if (cancelled) return;
@@ -124,8 +124,9 @@ export const useOptimizedAppData = (
       if (ordersListTab === 'orders') {
         list = list
           .filter(o => {
+            // Бэкенд уже фильтрует по date; оставляем страховку по дате
             const rawDate = (o as any).created_at ?? (o as any).createdAt;
-            if (!rawDate) return false;
+            if (!rawDate) return true;
             return extractDate(rawDate) === targetDate;
           })
           .filter(o => {
@@ -215,7 +216,7 @@ export const useOptimizedAppData = (
       const uid = contextUserId ?? currentUser?.id ?? null;
       const fetchOrders = ordersListTab === 'issued'
         ? getOrders({ issued_on: targetDate })
-        : getOrders();
+        : getOrders({ date: targetDate });
       
       fetchOrders.then((res) => {
         let list = Array.isArray(res.data) ? res.data : [];
@@ -223,7 +224,7 @@ export const useOptimizedAppData = (
           list = list
             .filter(o => {
               const rawDate = (o as any).created_at ?? (o as any).createdAt;
-              if (!rawDate) return false;
+              if (!rawDate) return true;
               return extractDate(rawDate) === targetDate;
             })
             .filter(o => {

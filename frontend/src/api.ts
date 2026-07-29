@@ -3,7 +3,11 @@ import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
 import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, CustomerLegalDocument, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
 import { API_BASE_URL } from './config/constants';
 
-const api = axios.create({ baseURL: API_BASE_URL });
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  // Без timeout клики «зависают» на минуты, пока Railway/SQLite отвечает.
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000),
+});
 
 // 🆕 Экспортируем api для использования в других компонентах
 export { api };
@@ -76,12 +80,15 @@ export function setAuthToken(token?: string) {
 export const getOrders = (params?: {
   all?: boolean;
   issued_on?: string;
+  /** YYYY-MM-DD — только заказы за день (иначе бэкенд отдаёт всю историю → UI «не кликается») */
+  date?: string;
   poolActiveOnly?: boolean;
   department_id?: number;
 }) => {
   const p: Record<string, string> = {};
   if (params?.all) p.all = '1';
   if (params?.issued_on) p.issued_on = params.issued_on.slice(0, 10);
+  if (params?.date) p.date = params.date.slice(0, 10);
   if (params?.poolActiveOnly) p.poolActiveOnly = '1';
   if (params?.department_id != null) p.department_id = String(params.department_id);
   return api.get<Order[]>('/orders', { params: Object.keys(p).length ? p : undefined });

@@ -53,6 +53,7 @@ export class OrderController {
         return
       }
       const issuedOn = (req as any).query?.issued_on as string | undefined
+      const dateFilter = (req as any).query?.date as string | undefined
       const all = (req as any).query?.all === '1' || (req as any).query?.all === true
       const poolActiveOnly = (req as any).query?.poolActiveOnly === '1' || (req as any).query?.poolActiveOnly === true
       const departmentIdRaw = (req as any).query?.department_id
@@ -68,13 +69,17 @@ export class OrderController {
         res.json(orders)
         return
       }
+      const day =
+        dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(String(dateFilter).slice(0, 10))
+          ? String(dateFilter).slice(0, 10)
+          : undefined
       // all=1: страница Order Pool — все пользователи (не только админ) видят заказы всех
       const orders = all
         ? await OrderService.getAllOrdersForPool({
             activeOnly: poolActiveOnly,
             departmentId: scopedDepartmentId,
           })
-        : await OrderService.getAllOrders(authUser.id)
+        : await OrderService.getAllOrders(authUser.id, day)
       res.json(orders)
     } catch (error: any) {
       const msg = error?.message ?? String(error)
