@@ -1,9 +1,14 @@
 import { Canvas } from 'fabric';
 import type { DesignTemplate } from '../../../api';
-import { loadDesignPageScene } from './designPageLoader';
+import { loadDesignPageScene, normalizeFabricJsonRoot } from './designPageLoader';
 import type { DesignPage } from './types';
 import { getIosSafariCanvasOptions } from './canvas/iosSafariCanvasSafeMode';
 import { reloadFabricCanvasFonts } from '../../../utils/fabricFontReload';
+import {
+  extractDesignedTextLayoutsFromFabricJson,
+  normalizeDesignedTextInFabricJSON,
+  restoreTextLayoutsFromSnapshots,
+} from './textStyleRuns';
 
 async function waitForCanvasPaint(canvas: Canvas): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -18,6 +23,20 @@ async function waitForCanvasPaint(canvas: Canvas): Promise<void> {
     canvas.requestRenderAll();
     window.setTimeout(finish, 120);
   });
+}
+
+function restorePageTextLayoutsFromPageData(
+  canvas: Canvas,
+  pageData: DesignPage | undefined,
+): void {
+  const fabricJson = normalizeFabricJsonRoot(pageData?.fabricJSON);
+  if (!fabricJson) return;
+  const snaps = extractDesignedTextLayoutsFromFabricJson(
+    normalizeDesignedTextInFabricJSON(fabricJson),
+  );
+  if (snaps.size > 0) {
+    restoreTextLayoutsFromSnapshots(canvas, snaps);
+  }
 }
 
 export type ClientRenderedDesignPageExport = {
@@ -68,9 +87,10 @@ export async function exportClientRenderedDesignPages(input: {
   try {
     for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
       onProgress?.(pageIndex + 1, pages.length);
+      const pageData = pages[pageIndex];
       await loadDesignPageScene({
         canvas,
-        pageData: pages[pageIndex],
+        pageData,
         pageIndex,
         template,
         pageW,
@@ -81,6 +101,8 @@ export async function exportClientRenderedDesignPages(input: {
       });
       // Шрифты уже подгружены в loadDesignPageScene с preserveLayout; повтор — только soft.
       await reloadFabricCanvasFonts(canvas, { preserveLayout: true });
+      // После font kick снова якорим left/top из JSON (client text иначе уезжает вверх).
+      restorePageTextLayoutsFromPageData(canvas, pageData);
       await waitForCanvasPaint(canvas);
       const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
       if (!dataUrl.startsWith('data:image/png')) {

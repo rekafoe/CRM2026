@@ -2,19 +2,17 @@ import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import type { Canvas, FabricObject } from 'fabric';
 import { normalizeDesignFieldsOnCanvas } from '../designFields';
 import { fabricDeserializeReviver } from '../designPageLoader';
-import { fillPhotoField } from './canvasCommands';
+import { fillPhotoField, fillPhotoFieldFromStableUrl } from './canvasCommands';
 import { applyBasicModeConstraints, releaseBasicModeConstraints } from './canvasBasicMode';
+import { lockSacredTextPositions, restoreDesignedTextLayoutsAfterCanvasLoad, finalizeCanvasTextEditingBeforeSave, finalizeCanvasTextEditingPreservingLayout, isAnyTextObjectEditingOnCanvas } from '../textStyleRuns';
 import type { CanvasHistoryStack } from './canvasHistory';
 import { canvasToJSON } from './canvasSerialization';
 import type { EditorMode, ResolveImageFileUrl } from './types';
 import {
-  finalizeCanvasTextEditingBeforeSave,
-  isAnyTextObjectEditingOnCanvas,
-} from '../textStyleRuns';
-import {
   recordPublicEditorPerfMetric,
   startPublicEditorPerfSpan,
 } from '../../../../features/publicDesignEditor/publicEditorPerf';
+import { isPhotoPlacementBatchActive } from '../../../../features/publicDesignEditor/photoPlacementBatchMode';
 
 interface UseDesignEditorCanvasHistoryInput {
   fabricRef: MutableRefObject<Canvas | null>;
@@ -32,6 +30,7 @@ interface UseDesignEditorCanvasHistoryInput {
   resolveImageFileUrlRef: MutableRefObject<ResolveImageFileUrl | undefined>;
   reportPhotoFillProgress: (progress: number | null) => void;
   onHistoryChange: (canUndo: boolean, canRedo: boolean) => void;
+  prepareCanvasForPersistenceRef?: MutableRefObject<(() => void) | undefined>;
 }
 
 export function useDesignEditorCanvasHistory({
@@ -50,6 +49,7 @@ export function useDesignEditorCanvasHistory({
   resolveImageFileUrlRef,
   reportPhotoFillProgress,
   onHistoryChange,
+  prepareCanvasForPersistenceRef,
 }: UseDesignEditorCanvasHistoryInput) {
   const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const documentCommitEpochRef = useRef(0);
@@ -114,6 +114,7 @@ export function useDesignEditorCanvasHistory({
 
   const saveSnapshotNow = useCallback((options?: {
     scheduleDocumentCommit?: boolean;
+    movedTextObject?: FabricObject;
     /** Order/flush: завершить inline-edit и снять snapshot даже во время editing. */
     forceExitEditing?: boolean;
   }) => {
@@ -121,9 +122,16 @@ export function useDesignEditorCanvasHistory({
     if (!canvas || isLoadingRef.current) return;
     const forceExit = Boolean(options?.forceExitEditing);
     if (!forceExit && isAnyTextObjectEditingOnCanvas(canvas)) return;
-    finalizeCanvasTextEditingBeforeSave(canvas, {
-      preserveActiveEditing: !forceExit,
-    });
+    prepareCanvasForPersistenceRef?.current?.();
+    // flush перед «Заказать» (forceExit) — без stabilize/lock, иначе top уезжает в pages[].
+    if (forceExit && !options?.movedTextObject) {
+      finalizeCanvasTextEditingPreservingLayout(canvas);
+    } else {
+      finalizeCanvasTextEditingBeforeSave(canvas, {
+        preserveActiveEditing: !forceExit,
+        movedTextObject: options?.movedTextObject,
+      });
+    }
     const stopSerialize = startPublicEditorPerfSpan('history.snapshot.serialize.ms');
     const json = JSON.stringify(canvasToJSON(canvas));
     stopSerialize();
@@ -133,15 +141,15 @@ export function useDesignEditorCanvasHistory({
     if (options?.scheduleDocumentCommit !== false) {
       scheduleCanvasDocumentCommit();
     }
-  }, [fabricRef, historyRef, isLoadingRef, onHistoryChange, scheduleCanvasDocumentCommit]);
+  }, [fabricRef, historyRef, isLoadingRef, onHistoryChange, prepareCanvasForPersistenceRef, scheduleCanvasDocumentCommit]);
 
-  const saveSnapshot = useCallback((options?: { debounce?: boolean }) => {
+  const saveSnapshot = useCallback((options?: { debounce?: boolean; movedTextObject?: FabricObject }) => {
     if (!options?.debounce) {
       if (snapshotTimerRef.current) {
         clearTimeout(snapshotTimerRef.current);
         snapshotTimerRef.current = null;
       }
-      saveSnapshotNow();
+      saveSnapshotNow({ movedTextObject: options?.movedTextObject });
       return;
     }
     if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current);
@@ -182,6 +190,7 @@ export function useDesignEditorCanvasHistory({
   }, [
     documentCommitTimerRef,
     isLoadingRef,
+    pageLoadKeyRef,
     pageTransitionLockRef,
     runCanvasDocumentCommit,
     saveSnapshotNow,
@@ -226,13 +235,56 @@ export function useDesignEditorCanvasHistory({
         isLoadingRef.current = false;
         reportPhotoFillProgress(null);
       }
-      if (changed) saveSnapshot();
+      if (changed && !isPhotoPlacementBatchActive()) saveSnapshot();
     },
     [
       isLoadingRef,
       modeRef,
       reportPhotoFillProgress,
       resolveImageFileUrlRef,
+      saveSnapshot,
+      selectionDisplayScaleRef,
+    ],
+  );
+
+  const fillPhotoFieldWithStableUrlSnapshot = useCallback(
+    async (
+      canvas: Canvas,
+      field: FabricObject,
+      url: string,
+      originalName?: string,
+      originalUrl?: string,
+    ): Promise<void> => {
+      let changed = false;
+      isLoadingRef.current = true;
+      reportPhotoFillProgress(0);
+      try {
+        await fillPhotoFieldFromStableUrl(
+          canvas,
+          field,
+          url,
+          originalName,
+          () => {
+            if (modeRef.current === 'basic') {
+              applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
+            } else {
+              releaseBasicModeConstraints(canvas);
+            }
+          },
+          originalUrl ? { originalUrl } : undefined,
+        );
+        reportPhotoFillProgress(96);
+        changed = true;
+      } finally {
+        isLoadingRef.current = false;
+        reportPhotoFillProgress(null);
+      }
+      if (changed && !isPhotoPlacementBatchActive()) saveSnapshot();
+    },
+    [
+      isLoadingRef,
+      modeRef,
+      reportPhotoFillProgress,
       saveSnapshot,
       selectionDisplayScaleRef,
     ],
@@ -245,11 +297,14 @@ export function useDesignEditorCanvasHistory({
     if (!target) return;
     isLoadingRef.current = true;
     try {
-      await canvas.loadFromJSON(JSON.parse(target) as Record<string, unknown>, fabricDeserializeReviver);
+      const parsed = JSON.parse(target) as Record<string, unknown>;
+      await canvas.loadFromJSON(parsed, fabricDeserializeReviver);
+      restoreDesignedTextLayoutsAfterCanvasLoad(canvas, parsed);
       const pw = pageWidthRef.current;
       const ph = pageHeightRef.current;
       await normalizeDesignFieldsOnCanvas(canvas, pw, ph);
       if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
+      try { lockSacredTextPositions(canvas); } catch {}
       canvas.requestRenderAll();
     } finally {
       isLoadingRef.current = false;
@@ -274,11 +329,14 @@ export function useDesignEditorCanvasHistory({
     if (!target) return;
     isLoadingRef.current = true;
     try {
-      await canvas.loadFromJSON(JSON.parse(target) as Record<string, unknown>, fabricDeserializeReviver);
+      const parsed = JSON.parse(target) as Record<string, unknown>;
+      await canvas.loadFromJSON(parsed, fabricDeserializeReviver);
+      restoreDesignedTextLayoutsAfterCanvasLoad(canvas, parsed);
       const pw = pageWidthRef.current;
       const ph = pageHeightRef.current;
       await normalizeDesignFieldsOnCanvas(canvas, pw, ph);
       if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
+      try { lockSacredTextPositions(canvas); } catch {}
       canvas.requestRenderAll();
     } finally {
       isLoadingRef.current = false;
@@ -302,6 +360,7 @@ export function useDesignEditorCanvasHistory({
     saveSnapshot,
     flushCanvasDocumentCommit,
     fillPhotoFieldWithSnapshot,
+    fillPhotoFieldWithStableUrlSnapshot,
     undo,
     redo,
   };
