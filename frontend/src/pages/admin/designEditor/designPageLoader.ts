@@ -85,7 +85,7 @@ function captureSacredTemplateTextsOnCanvas(
   }
 }
 
-function normalizeFabricJsonRoot(value: unknown): Record<string, unknown> | null {
+export function normalizeFabricJsonRoot(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const root = { ...(value as Record<string, unknown>) };
   if (!Array.isArray(root.objects)) root.objects = [];

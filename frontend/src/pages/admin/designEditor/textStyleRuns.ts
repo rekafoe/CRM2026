@@ -1017,6 +1017,65 @@ export function restoreTextLayoutsFromSnapshots(
   }
 }
 
+
+/** Снимок left/top/width живого холста — до finalize/exitEditing перед «Заказать». */
+export function captureLiveTextLayoutsFromCanvas(
+  canvas: { getObjects: () => unknown[] },
+): Map<string, DesignedTextLayoutSnapshot> {
+  const out = new Map<string, DesignedTextLayoutSnapshot>();
+  const visit = (objects: unknown[]) => {
+    for (const raw of objects) {
+      const obj = raw as TextLikeObject;
+      if (isFabricTextObjectType(obj.type)) {
+        const id = String(obj.id ?? '').trim();
+        if (id) {
+          const isDesigned = isDesignedTemplateText(obj);
+          const isClientText =
+            obj.textFieldClientAdded === true || /^text[-_]/i.test(id);
+          if (isDesigned || isClientText) {
+            const width = Number(
+              (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth ?? obj.width ?? 0,
+            );
+            if (Number.isFinite(width) && width > 0) {
+              out.set(id, {
+                left: Number(obj.left ?? 0),
+                top: Number(obj.top ?? 0),
+                width,
+                height: Number.isFinite(Number(obj.height)) ? Number(obj.height) : undefined,
+                angle: Number(obj.angle ?? 0),
+                originX: String((obj as { originX?: string }).originX ?? 'left'),
+                originY: String((obj as { originY?: string }).originY ?? 'top'),
+                textFieldLayoutWidth: width,
+                textAlign:
+                  (obj as { textAlign?: string }).textAlign != null
+                    ? String((obj as { textAlign?: string }).textAlign)
+                    : undefined,
+              });
+            }
+          }
+        }
+      }
+      const group = obj as { getObjects?: () => unknown[] };
+      if (typeof group.getObjects === 'function') {
+        visit(group.getObjects());
+      }
+    }
+  };
+  visit(canvas.getObjects());
+  return out;
+}
+
+/**
+ * ExitEditing без stabilize/lock, затем вернуть left/top с живого холста.
+ * Нужно перед сериализацией на «Заказать» — иначе top уезжает вверх в JSON/PNG.
+ */
+export function finalizeCanvasTextEditingPreservingLayout(canvas: Canvas): void {
+  const snaps = captureLiveTextLayoutsFromCanvas(canvas);
+  finalizeCanvasTextEditingBeforeSave(canvas, { preserveLayout: true });
+  restoreTextLayoutsFromSnapshots(canvas, snaps);
+}
+
+
 /** Захват геометрии из loadFromJSON до любых force-origin / hydrate мутаций. */
 export function captureSacredTemplateTextGeometry(
   obj: TextLikeObject,
@@ -1551,6 +1610,42 @@ function readClientTextboxLayoutWidth(obj: TextLikeObject): number | null {
  * Клиентский textbox (+текст): держим фиксированную ширину (ручной resize / lock),
  * перенос строк вниз через initDimensions, без горизонтального auto-grow.
  */
+
+/** Снимок якоря клиентского текста — initDimensions на сувенирке иногда двигает top. */
+function readClientTextSceneAnchor(obj: TextLikeObject): {
+  left: number;
+  top: number;
+  originX: string;
+  originY: string;
+  width: number;
+} | null {
+  if (obj.textFieldClientAdded !== true) return null;
+  const left = Number(obj.left);
+  const top = Number(obj.top);
+  const width = Number(obj.width);
+  if (![left, top, width].every(Number.isFinite)) return null;
+  return {
+    left,
+    top,
+    originX: String((obj as { originX?: string }).originX ?? 'left'),
+    originY: String((obj as { originY?: string }).originY ?? 'top'),
+    width,
+  };
+}
+
+function restoreClientTextSceneAnchor(
+  obj: TextLikeObject,
+  anchor: NonNullable<ReturnType<typeof readClientTextSceneAnchor>>,
+): void {
+  obj.set({
+    left: anchor.left,
+    top: anchor.top,
+    originX: anchor.originX as 'left' | 'center' | 'right',
+    originY: anchor.originY as 'top' | 'center' | 'bottom',
+    width: anchor.width,
+  } as Parameters<typeof obj.set>[0]);
+}
+
 export function preserveClientTextboxLayoutWidth(obj: TextLikeObject): boolean {
   const targetW = readClientTextboxLayoutWidth(obj);
   if (targetW == null) return false;
@@ -1560,11 +1655,13 @@ export function preserveClientTextboxLayoutWidth(obj: TextLikeObject): boolean {
     setTextboxWidthPreservingOrigin(obj, targetW);
     (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = targetW;
   }
+  const anchor = readClientTextSceneAnchor(obj);
   try {
     (obj as TextLikeObject & { initDimensions?: () => void }).initDimensions?.();
   } catch {
     /* noop */
   }
+  if (anchor) restoreClientTextSceneAnchor(obj, anchor);
   obj.setCoords?.();
   return needsWidthPin;
 }
@@ -1581,11 +1678,13 @@ export function lockClientTextboxLayoutWidth(obj: TextLikeObject): void {
   } as Parameters<typeof obj.set>[0]);
   (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = width;
   obj.textFieldUserLayoutWidth = true;
+  const anchor = readClientTextSceneAnchor(obj);
   try {
     (obj as TextLikeObject & { initDimensions?: () => void }).initDimensions?.();
   } catch {
     /* noop */
   }
+  if (anchor) restoreClientTextSceneAnchor(obj, anchor);
   obj.setCoords?.();
 }
 
@@ -2183,11 +2282,13 @@ export function kickTextObjectFontRerender(obj: TextLikeObject): void {
     textObj.set({ fontFamily: family });
   }
   if (!shouldSkipInitDimensionsForTemplateText(textObj)) {
+    const clientAnchor = readClientTextSceneAnchor(textObj);
     try {
       textObj.initDimensions?.();
     } catch {
       /* noop */
     }
+    if (clientAnchor) restoreClientTextSceneAnchor(textObj, clientAnchor);
   }
   textObj.dirty = true;
   textObj.setCoords?.();
@@ -2480,8 +2581,13 @@ export function remeasureTextObjectsAfterFontLoad(objects: FabricObject[]): void
           captureSacredTemplateTextGeometry(textObj, { overwrite: true });
         }
       } else {
+        const clientAnchor = readClientTextSceneAnchor(textObj);
         textObj.initDimensions?.();
-        normalizeImportedSingleLineTextboxWidth(textObj);
+        if (clientAnchor) {
+          restoreClientTextSceneAnchor(textObj, clientAnchor);
+        } else {
+          normalizeImportedSingleLineTextboxWidth(textObj);
+        }
       }
       textObj.setCoords?.();
     }
@@ -2566,9 +2672,11 @@ export function finalizeCanvasTextEditingBeforeSave(
     }
   };
   visit(canvas.getObjects());
-  if (!options?.preserveLayout) {
-    stabilizeAllTextboxWidthsOnCanvas(canvas);
+  // Order/export / «Заказать»: только exitEditing. stabilize+lock двигают top.
+  if (options?.preserveLayout) {
+    return;
   }
+  stabilizeAllTextboxWidthsOnCanvas(canvas);
   lockSacredTextPositions(canvas);
 }
 

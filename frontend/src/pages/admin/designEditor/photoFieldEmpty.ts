@@ -53,7 +53,9 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
   ax(frameRect).photoFieldRole = 'frame';
 
   const minSide = Math.min(frameW, frameH);
-  const badgeR = Math.max(16, Math.min(72, minSide * 0.16));
+  // print-DPI: не раздувать бейдж (раньше до 72 выглядел огромным на сувенирке)
+  const badgeR = Math.max(7, Math.min(42, Math.round(minSide * 0.16)));
+  const showBadge = minSide >= 36;
   const badgeCx = 0;
   const badgeCy = 0;
   const camBodyW = badgeR * 0.82;
@@ -64,7 +66,8 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     top: badgeCy,
     originX: 'center',
     originY: 'center',
-    radius: badgeR,
+    radius: Math.max(1, badgeR),
+    visible: showBadge,
     fill: EMPTY_PHOTO_BADGE_FILL,
     stroke: EMPTY_PHOTO_ICON_FILL,
     strokeWidth: 1,
@@ -84,6 +87,7 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     rx: 2,
     ry: 2,
     fill: EMPTY_PHOTO_ICON_FILL,
+    visible: showBadge,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -100,6 +104,7 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     rx: 1,
     ry: 1,
     fill: EMPTY_PHOTO_ICON_FILL,
+    visible: showBadge,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -111,10 +116,11 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     top: badgeCy + 1,
     originX: 'center',
     originY: 'center',
-    radius: Math.max(2, badgeR * 0.15),
+    radius: Math.max(1.5, badgeR * 0.15),
     fill: '#ffffff',
     stroke: EMPTY_PHOTO_ICON_FILL,
     strokeWidth: 1,
+    visible: showBadge,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -126,10 +132,11 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     top: badgeCy + badgeR + 8,
     originX: 'center',
     originY: 'top',
-    fontSize: Math.max(12, Math.min(32, badgeR * 0.62)),
+    fontSize: Math.max(10, Math.min(22, badgeR * 0.55)),
     fontWeight: 'bold',
     fontFamily: 'Arial',
     fill: EMPTY_PHOTO_LABEL_FILL,
+    visible: false,
     selectable: false,
     evented: false,
     objectCaching: false,

@@ -9,6 +9,7 @@ import { canvasToJSON } from './canvasSerialization';
 import type { EditorMode, ResolveImageFileUrl } from './types';
 import {
   finalizeCanvasTextEditingBeforeSave,
+  finalizeCanvasTextEditingPreservingLayout,
   isAnyTextObjectEditingOnCanvas,
 } from '../textStyleRuns';
 import {
@@ -121,9 +122,14 @@ export function useDesignEditorCanvasHistory({
     if (!canvas || isLoadingRef.current) return;
     const forceExit = Boolean(options?.forceExitEditing);
     if (!forceExit && isAnyTextObjectEditingOnCanvas(canvas)) return;
-    finalizeCanvasTextEditingBeforeSave(canvas, {
-      preserveActiveEditing: !forceExit,
-    });
+    // flush перед «Заказать» (forceExit) — без stabilize/lock, иначе top уезжает в pages[].
+    if (forceExit) {
+      finalizeCanvasTextEditingPreservingLayout(canvas);
+    } else {
+      finalizeCanvasTextEditingBeforeSave(canvas, {
+        preserveActiveEditing: !forceExit,
+      });
+    }
     const stopSerialize = startPublicEditorPerfSpan('history.snapshot.serialize.ms');
     const json = JSON.stringify(canvasToJSON(canvas));
     stopSerialize();

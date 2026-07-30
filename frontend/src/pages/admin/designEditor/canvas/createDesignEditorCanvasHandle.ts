@@ -21,7 +21,7 @@ import { clearPhotoFieldDropHighlight, createPhotoFieldDropHighlightState } from
 import { loadDesignPageScene, loadSpreadMergedScene } from '../designPageLoader';
 import { isRestrictiveInAppBrowser, shouldPreferTextEditSheet } from '../inAppBrowser';
 import { splitSpreadCanvasToPagesSync } from '../spreadCanvas';
-import { applyFormatToTextField, type TextStyleRun } from '../textStyleRuns';
+import { applyFormatToTextField, finalizeCanvasTextEditingPreservingLayout, type TextStyleRun } from '../textStyleRuns';
 import type { TextBlockPresetKind } from '../constants';
 import { TEXT_BLOCK_PRESETS, TEXT_FONTS } from '../constants';
 import type { DesignPage, SelectedObjProps } from '../types';
@@ -461,6 +461,8 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         if (!canvas) return { kind: 'single', json: {} };
         const pw = d.pageWidthRef.current;
         clearPhotoFieldDropHighlight(canvas, d.photoFieldDropHighlightRef.current);
+        // «Заказать»: не давать stabilize сдвинуть top перед toJSON.
+        finalizeCanvasTextEditingPreservingLayout(canvas);
         if (d.spreadPairPagesRef.current) {
           const { left, right } = splitSpreadCanvasToPagesSync(canvas, pw);
           return { kind: 'spread', left, right };

@@ -163,7 +163,8 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
   }
 
   const minSide = Math.min(frameW, frameH);
-  const badgeR = Math.max(18, Math.min(80, minSide * 0.18));
+  const badgeR = Math.max(7, Math.min(42, Math.round(minSide * 0.16)));
+  const showBadge = minSide >= 36;
   const badgeCx = 0;
   const badgeCy = 0;
   const camBodyW = badgeR * 0.82;
@@ -182,9 +183,10 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       top: badgeCy,
       originX: 'center',
       originY: 'center',
-      radius: badgeR,
+      radius: Math.max(1, badgeR),
       scaleX: 1,
       scaleY: 1,
+      visible: showBadge,
     });
   }
   if (camBody?.type === 'rect') {
@@ -197,6 +199,7 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       height: camBodyH,
       scaleX: 1,
       scaleY: 1,
+      visible: showBadge,
     });
   }
   if (camTop?.type === 'rect') {
@@ -209,6 +212,7 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       height: badgeR * 0.18,
       scaleX: 1,
       scaleY: 1,
+      visible: showBadge,
     });
   }
   if (camLens?.type === 'circle') {
@@ -217,18 +221,20 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       top: badgeCy + 1,
       originX: 'center',
       originY: 'center',
-      radius: Math.max(2, badgeR * 0.15),
+      radius: Math.max(1.5, badgeR * 0.15),
       scaleX: 1,
       scaleY: 1,
+      visible: showBadge,
     });
   }
   if (photoLabel?.type === 'text') {
     photoLabel.set({
       left: badgeCx,
-      top: badgeCy + badgeR + 10,
+      top: badgeCy + badgeR + 6,
       originX: 'center',
       originY: 'top',
-      fontSize: Math.max(12, Math.min(32, badgeR * 0.62)),
+      fontSize: Math.max(10, Math.min(22, badgeR * 0.55)),
+      visible: false,
       scaleX: 1,
       scaleY: 1,
     });
