@@ -1,6 +1,12 @@
 import type { FabricObject } from 'fabric';
 import type { Group } from 'fabric';
 import { Point } from 'fabric';
+import {
+  EMPTY_PHOTO_FIELD_FILL,
+  EMPTY_PHOTO_FIELD_STROKE,
+  EMPTY_PHOTO_FIELD_STROKE_DASH,
+  resolveEmptyPhotoFieldChromeMetrics,
+} from './photoFieldEmpty';
 
 type AnyObj = Record<string, unknown>;
 
@@ -146,6 +152,19 @@ export function resolvePhotoFieldFrameSize(field: FabricObject): { fw: number; f
 export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, frameH: number): void {
   const ox = -frameW / 2;
   const oy = -frameH / 2;
+  const {
+    badgeR,
+    badgeCx,
+    badgeCy,
+    camBodyW,
+    camBodyH,
+    showBadge,
+    showPhotoLabel,
+    strokeWidth,
+    labelFontSize,
+  } = resolveEmptyPhotoFieldChromeMetrics(frameW, frameH);
+  const cornerR = Math.max(2, Math.min(6, Math.round(Math.min(frameW, frameH) * 0.04)));
+
   const frameRect = pickEmptyPhotoFieldFrameRect(group);
   if (frameRect) {
     frameRect.set({
@@ -157,17 +176,16 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       height: frameH,
       scaleX: 1,
       scaleY: 1,
+      fill: EMPTY_PHOTO_FIELD_FILL,
+      stroke: EMPTY_PHOTO_FIELD_STROKE,
+      strokeWidth,
+      strokeDashArray: [...EMPTY_PHOTO_FIELD_STROKE_DASH],
       strokeUniform: true,
+      rx: cornerR,
+      ry: cornerR,
       objectCaching: false,
     });
   }
-
-  const minSide = Math.min(frameW, frameH);
-  const badgeR = Math.max(18, Math.min(80, minSide * 0.18));
-  const badgeCx = 0;
-  const badgeCy = 0;
-  const camBodyW = badgeR * 0.82;
-  const camBodyH = badgeR * 0.55;
 
   const kids = group.getObjects();
   const badge = kids.find((obj) => ax(obj).photoFieldRole === 'badge') ?? kids[1];
@@ -182,9 +200,12 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       top: badgeCy,
       originX: 'center',
       originY: 'center',
-      radius: badgeR,
+      radius: Math.max(1, badgeR),
       scaleX: 1,
       scaleY: 1,
+      stroke: undefined,
+      strokeWidth: 0,
+      visible: showBadge,
     });
   }
   if (camBody?.type === 'rect') {
@@ -197,6 +218,7 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       height: camBodyH,
       scaleX: 1,
       scaleY: 1,
+      visible: showBadge,
     });
   }
   if (camTop?.type === 'rect') {
@@ -205,10 +227,11 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       top: badgeCy - camBodyH / 2 - 2,
       originX: 'center',
       originY: 'center',
-      width: badgeR * 0.42,
-      height: badgeR * 0.18,
+      width: badgeR * 0.46,
+      height: badgeR * 0.2,
       scaleX: 1,
       scaleY: 1,
+      visible: showBadge,
     });
   }
   if (camLens?.type === 'circle') {
@@ -217,18 +240,22 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       top: badgeCy + 1,
       originX: 'center',
       originY: 'center',
-      radius: Math.max(2, badgeR * 0.15),
+      radius: Math.max(1.5, badgeR * 0.18),
       scaleX: 1,
       scaleY: 1,
+      stroke: undefined,
+      strokeWidth: 0,
+      visible: showBadge,
     });
   }
   if (photoLabel?.type === 'text') {
     photoLabel.set({
       left: badgeCx,
-      top: badgeCy + badgeR + 10,
+      top: badgeCy + badgeR + 6,
       originX: 'center',
       originY: 'top',
-      fontSize: Math.max(12, Math.min(32, badgeR * 0.62)),
+      fontSize: labelFontSize,
+      visible: showPhotoLabel,
       scaleX: 1,
       scaleY: 1,
     });
