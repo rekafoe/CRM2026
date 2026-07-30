@@ -961,63 +961,6 @@ export function restoreTextLayoutsFromSnapshots(
   }
 }
 
-/** Снимок left/top/width живого холста — до finalize/exitEditing перед «Заказать». */
-export function captureLiveTextLayoutsFromCanvas(
-  canvas: { getObjects: () => unknown[] },
-): Map<string, DesignedTextLayoutSnapshot> {
-  const out = new Map<string, DesignedTextLayoutSnapshot>();
-  const visit = (objects: unknown[]) => {
-    for (const raw of objects) {
-      const obj = raw as TextLikeObject;
-      if (isFabricTextObjectType(obj.type)) {
-        const id = String(obj.id ?? '').trim();
-        if (id) {
-          const isDesigned = isDesignedTemplateText(obj);
-          const isClientText =
-            obj.textFieldClientAdded === true || /^text[-_]/i.test(id);
-          if (isDesigned || isClientText) {
-            const width = Number(
-              (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth ?? obj.width ?? 0,
-            );
-            if (Number.isFinite(width) && width > 0) {
-              out.set(id, {
-                left: Number(obj.left ?? 0),
-                top: Number(obj.top ?? 0),
-                width,
-                height: Number.isFinite(Number(obj.height)) ? Number(obj.height) : undefined,
-                angle: Number(obj.angle ?? 0),
-                originX: String((obj as { originX?: string }).originX ?? 'left'),
-                originY: String((obj as { originY?: string }).originY ?? 'top'),
-                textFieldLayoutWidth: width,
-                textAlign:
-                  (obj as { textAlign?: string }).textAlign != null
-                    ? String((obj as { textAlign?: string }).textAlign)
-                    : undefined,
-              });
-            }
-          }
-        }
-      }
-      const group = obj as { getObjects?: () => unknown[] };
-      if (typeof group.getObjects === 'function') {
-        visit(group.getObjects());
-      }
-    }
-  };
-  visit(canvas.getObjects());
-  return out;
-}
-
-/**
- * ExitEditing без stabilize/lock, затем вернуть left/top с живого холста.
- * Нужно перед сериализацией на «Заказать» — иначе top уезжает вверх в JSON/PNG.
- */
-export function finalizeCanvasTextEditingPreservingLayout(canvas: Canvas): void {
-  const snaps = captureLiveTextLayoutsFromCanvas(canvas);
-  finalizeCanvasTextEditingBeforeSave(canvas, { preserveLayout: true });
-  restoreTextLayoutsFromSnapshots(canvas, snaps);
-}
-
 /** Захват геометрии из loadFromJSON до любых force-origin / hydrate мутаций. */
 export function captureSacredTemplateTextGeometry(
   obj: TextLikeObject,
@@ -2544,12 +2487,9 @@ export function finalizeCanvasTextEditingBeforeSave(
     }
   };
   visit(canvas.getObjects());
-  // Order/export / «Заказать»: только exitEditing. stabilize+lock двигают top
-  // (originY≠top / initDimensions) и цементируют сдвиг в fabricJSON → client_png.
-  if (options?.preserveLayout) {
-    return;
+  if (!options?.preserveLayout) {
+    stabilizeAllTextboxWidthsOnCanvas(canvas);
   }
-  stabilizeAllTextboxWidthsOnCanvas(canvas);
   lockSacredTextPositions(canvas);
 }
 
