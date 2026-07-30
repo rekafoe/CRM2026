@@ -1,4 +1,5 @@
 import type { Canvas, FabricObject } from 'fabric';
+import { util } from 'fabric';
 import { isFabricTextObjectType } from './patchFabricTextObjects';
 import { PUBLIC_EDITOR_DEV, isTextPositionDebugEnabled, isTextWidthDebugEnabled } from '../../../features/publicDesignEditor/publicEditorPerf';
 import {
@@ -18,6 +19,31 @@ export type TextStyleRun = {
 };
 
 type FabricStyles = Record<number, Record<number, Record<string, unknown>>>;
+type FabricStylesArray = Array<{ start: number; end: number; style: Record<string, unknown> }>;
+
+/**
+ * Fabric 7 в toObject() пишет styles как массив range'ей.
+ * Наш код и soft-load ждут map line→char — иначе repairStylesRecord удаляет styles целиком
+ * и кегль «соскакивает» к base fontSize при flip/snapshot.
+ */
+function coerceFabricStylesMap(
+  styles: unknown,
+  text: string,
+): FabricStyles | undefined {
+  if (!styles) return undefined;
+  if (Array.isArray(styles)) {
+    if (styles.length === 0) return undefined;
+    try {
+      const mapped = util.stylesFromArray(styles as FabricStylesArray, text);
+      if (!mapped || typeof mapped !== 'object' || Array.isArray(mapped)) return undefined;
+      return mapped as FabricStyles;
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof styles === 'object') return styles as FabricStyles;
+  return undefined;
+}
 
 export type TextLikeObject = FabricObject & {
   text?: string;
@@ -123,8 +149,10 @@ export function buildFabricStylesFromRuns(
 
 export function extractRunsFromFabricStyles(
   text: string,
-  styles: FabricStyles,
+  styles: FabricStyles | FabricStylesArray | unknown,
 ): TextStyleRun[] {
+  const map = coerceFabricStylesMap(styles, text);
+  if (!map) return [];
   const lines = text.split('\n');
   const lineStartOffsets: number[] = [];
   let offset = 0;
@@ -133,7 +161,7 @@ export function extractRunsFromFabricStyles(
     offset += line.length + 1;
   }
   const markers: Array<{ absIndex: number; patch: Record<string, unknown> }> = [];
-  for (const [lineKey, lineStyles] of Object.entries(styles)) {
+  for (const [lineKey, lineStyles] of Object.entries(map)) {
     const lineIndex = Number(lineKey);
     if (!Number.isFinite(lineIndex) || !lineStyles) continue;
     const lineStart = lineStartOffsets[lineIndex] ?? 0;
@@ -271,7 +299,7 @@ function captureDesignedTextboxLayoutFloor(obj: TextLikeObject): void {
   const beforeLayoutW = Number(obj.textFieldLayoutWidth ?? 0);
   const floor = resolveEffectiveDesignedTextboxLayoutFloor(obj);
   if (floor <= 0) return;
-  const anyObj = obj as Record<string, unknown>;
+  const anyObj = obj as unknown as Record<string, unknown>;
   anyObj._editLayoutWidthFloor = floor;
   const layoutW = Number(obj.textFieldLayoutWidth) || 0;
   if (floor > layoutW) {
@@ -348,16 +376,20 @@ export function clampTextStyleRuns(
 /** Убирает style-индексы, не соответствующие строкам/символам текста (Fabric removeStyleFromTo). */
 function repairStylesRecord(
   text: string,
-  styles: FabricStyles | undefined,
+  styles: FabricStyles | FabricStylesArray | unknown,
 ): { styles: FabricStyles | undefined; runs: TextStyleRun[] | undefined } {
   const lines = text.split('\n');
-  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) {
+  const normalized = coerceFabricStylesMap(styles, text);
+  if (!normalized) {
     return { styles: undefined, runs: undefined };
   }
 
   const repaired: FabricStyles = {};
   let changed = false;
-  for (const [lineKey, lineStyles] of Object.entries(styles)) {
+  // Если пришли из Fabric array — всегда считаем changed, чтобы записать map обратно в JSON.
+  if (Array.isArray(styles)) changed = true;
+
+  for (const [lineKey, lineStyles] of Object.entries(normalized)) {
     const lineIndex = Number(lineKey);
     if (!Number.isFinite(lineIndex) || lineIndex < 0 || lineIndex >= lines.length) {
       changed = true;
@@ -385,10 +417,10 @@ function repairStylesRecord(
   }
 
   const nextStyles = Object.keys(repaired).length > 0 ? repaired : undefined;
-  if (changed || nextStyles !== styles) {
+  if (changed || nextStyles !== normalized) {
     return { styles: nextStyles, runs: undefined };
   }
-  return { styles, runs: undefined };
+  return { styles: normalized, runs: undefined };
 }
 
 export function repairTextObjectStyles(obj: TextLikeObject): void {
@@ -452,6 +484,29 @@ function resolvePersistedDesignedTextboxWidth(
 function prepareDesignedTextObjectJson(o: Record<string, unknown>): void {
   if (!isDesignedTemplateText(o)) return;
   repairTextObjectInFabricJson(o);
+  // Подтянуть base fontSize из styles (Corel часто держит кегль только в styles).
+  const text = String(o.text ?? '');
+  const map = coerceFabricStylesMap(o.styles, text);
+  if (map) {
+    let styleFs: number | undefined;
+    for (const line of Object.values(map)) {
+      if (!line || typeof line !== 'object') continue;
+      for (const char of Object.values(line)) {
+        const fs = Number((char as { fontSize?: unknown })?.fontSize);
+        if (Number.isFinite(fs) && fs > 0) {
+          styleFs = fs;
+          break;
+        }
+      }
+      if (styleFs != null) break;
+    }
+    if (styleFs != null) {
+      const base = Number(o.fontSize);
+      if (!Number.isFinite(base) || Math.abs(base - styleFs) > 0.5) {
+        o.fontSize = Math.max(6, Math.round(styleFs));
+      }
+    }
+  }
   if (o.originX == null) o.originX = 'left';
   if (o.originY == null) o.originY = 'top';
   if (o.angle == null) o.angle = 0;
@@ -462,7 +517,7 @@ function prepareDesignedTextObjectJson(o: Record<string, unknown>): void {
   if (Number.isFinite(floorW) && floorW > 0) {
     persistW = persistW != null ? Math.max(persistW, floorW) : floorW;
   }
-  if (Number.isFinite(persistW) && persistW > 0) {
+  if (persistW != null && Number.isFinite(persistW) && persistW > 0) {
     o.width = persistW;
     o.textFieldLayoutWidth = persistW;
   }
@@ -737,7 +792,7 @@ function finalizeDesignedMultilineTextboxWidth(obj: TextLikeObject): void {
 function scrubDesignedSingleLineStaleWidth(obj: TextLikeObject, contentW: number): void {
   if (obj.textFieldUserEdited !== true && !hasTrustedTextMetrics(obj)) return;
   const layoutW = Number((obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth ?? 0);
-  const anyObj = obj as Record<string, unknown>;
+  const anyObj = obj as unknown as Record<string, unknown>;
   const floor = Number(anyObj._editLayoutWidthFloor ?? 0);
   const sacredW = Number((obj as { _sacredWidth?: number })._sacredWidth ?? 0);
   const scrubbed: string[] = [];
@@ -958,6 +1013,7 @@ export function restoreTextLayoutsFromSnapshots(
     const snap = snapshots.get(id) ?? snapshots.get(stripSpreadPageIdPrefix(id));
     if (!snap) continue;
     applyDesignedTextLayoutSnapshot(obj, snap);
+    normalizeClientCenteredTextboxOrigin(obj);
   }
 }
 
@@ -967,7 +1023,7 @@ export function captureSacredTemplateTextGeometry(
   options?: { overwrite?: boolean; jsonSnapshot?: DesignedTextLayoutSnapshot },
 ): void {
   if (!isDesignedTemplateText(obj)) return;
-  const anyObj = obj as Record<string, unknown>;
+  const anyObj = obj as unknown as Record<string, unknown>;
   const overwrite = options?.overwrite === true;
   const snapshot = options?.jsonSnapshot;
   // До trusted metrics — только JSON/persisted, без content-замера (cold fallback).
@@ -1017,7 +1073,7 @@ function maybeRestoreSacredGeometryDuringHydrate(obj: TextLikeObject): void {
 /** После переноса на canvas — обновить только позицию в sacred, ширину не трогать. */
 function syncSacredTemplateTextPositionFromObject(obj: TextLikeObject): void {
   if (!isDesignedTemplateText(obj)) return;
-  const anyObj = obj as Record<string, unknown>;
+  const anyObj = obj as unknown as Record<string, unknown>;
   const left = Number(obj.left);
   const top = Number(obj.top);
   const angle = Number(obj.angle ?? 0);
@@ -1101,7 +1157,7 @@ export function hydrateTextObjectStyles(obj: TextLikeObject): void {
     && Object.keys(obj.styles as object).length > 0;
   let runs = clampTextStyleRuns(text, obj.textStyleRuns);
   if ((!runs || runs.length === 0) && hadIncomingStyles) {
-    runs = extractRunsFromFabricStyles(text, obj.styles);
+    runs = extractRunsFromFabricStyles(text, obj.styles!);
     if (runs.length > 0) {
       (obj as { textStyleRuns?: TextStyleRun[] }).textStyleRuns = runs;
     }
@@ -1127,6 +1183,7 @@ export function hydrateTextObjectStyles(obj: TextLikeObject): void {
   // prefer to keep the detailed incoming styles verbatim. Re-building from our TextStyleRun model
   // can lose per-char оформление (fontStyle, specific families for script, sizes etc) on page flips.
   // If styles map is empty but runs exist (typical SVG import) — materialize styles from runs.
+  // Кегль/формат после правок синхронизирует applyFormatToTextField → styles map напрямую.
   const isDesigned = isDesignedTemplateText(obj);
   if (isDesigned && !obj.textFieldUserEdited) {
     if (!hadIncomingStyles) {
@@ -1448,7 +1505,7 @@ function finalizeDesignedSingleLineTextboxWidth(obj: TextLikeObject): void {
   const beforeW = Number(obj.width ?? 0);
   const contentW = measureStableTextboxContentWidth(obj);
   setDesignedTextboxWidthPreservingOrigin(obj, contentW);
-  const anyObj = obj as Record<string, unknown>;
+  const anyObj = obj as unknown as Record<string, unknown>;
   anyObj._sacredWidth = contentW;
   (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = contentW;
   if (obj.textFieldUserEdited === true) {
@@ -1490,41 +1547,6 @@ function readClientTextboxLayoutWidth(obj: TextLikeObject): number | null {
   return null;
 }
 
-/** Снимок якоря клиентского текста — initDimensions на сувенирке иногда двигает top. */
-function readClientTextSceneAnchor(obj: TextLikeObject): {
-  left: number;
-  top: number;
-  originX: string;
-  originY: string;
-  width: number;
-} | null {
-  if (obj.textFieldClientAdded !== true) return null;
-  const left = Number(obj.left);
-  const top = Number(obj.top);
-  const width = Number(obj.width);
-  if (![left, top, width].every(Number.isFinite)) return null;
-  return {
-    left,
-    top,
-    originX: String((obj as { originX?: string }).originX ?? 'left'),
-    originY: String((obj as { originY?: string }).originY ?? 'top'),
-    width,
-  };
-}
-
-function restoreClientTextSceneAnchor(
-  obj: TextLikeObject,
-  anchor: NonNullable<ReturnType<typeof readClientTextSceneAnchor>>,
-): void {
-  obj.set({
-    left: anchor.left,
-    top: anchor.top,
-    originX: anchor.originX as 'left' | 'center' | 'right',
-    originY: anchor.originY as 'top' | 'center' | 'bottom',
-    width: anchor.width,
-  } as Parameters<typeof obj.set>[0]);
-}
-
 /**
  * Клиентский textbox (+текст): держим фиксированную ширину (ручной resize / lock),
  * перенос строк вниз через initDimensions, без горизонтального auto-grow.
@@ -1538,13 +1560,11 @@ export function preserveClientTextboxLayoutWidth(obj: TextLikeObject): boolean {
     setTextboxWidthPreservingOrigin(obj, targetW);
     (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = targetW;
   }
-  const anchor = readClientTextSceneAnchor(obj);
   try {
     (obj as TextLikeObject & { initDimensions?: () => void }).initDimensions?.();
   } catch {
     /* noop */
   }
-  if (anchor) restoreClientTextSceneAnchor(obj, anchor);
   obj.setCoords?.();
   return needsWidthPin;
 }
@@ -1561,13 +1581,11 @@ export function lockClientTextboxLayoutWidth(obj: TextLikeObject): void {
   } as Parameters<typeof obj.set>[0]);
   (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = width;
   obj.textFieldUserLayoutWidth = true;
-  const anchor = readClientTextSceneAnchor(obj);
   try {
     (obj as TextLikeObject & { initDimensions?: () => void }).initDimensions?.();
   } catch {
     /* noop */
   }
-  if (anchor) restoreClientTextSceneAnchor(obj, anchor);
   obj.setCoords?.();
 }
 
@@ -1665,7 +1683,7 @@ export function tightenDraftTextboxWidthOnLoad(obj: TextLikeObject): void {
     designedTemplate: true,
   });
   const measuredW = Number(obj.width ?? 0);
-  const anyObj = obj as Record<string, unknown>;
+  const anyObj = obj as unknown as Record<string, unknown>;
 
   // Unedited: content width is authoritative. Do NOT re-expand via inflated
   // textFieldLayoutWidth from SVG import (maxLineLen * 0.7), or the box stays
@@ -1776,7 +1794,10 @@ export function stabilizeAllTextboxWidthsOnCanvas(canvas: Canvas): void {
         const textObj = obj as TextLikeObject;
         if (textObj.type !== 'textbox') continue;
         if (isDesignedTemplateText(textObj)) {
-          stabilizeDesignedTextboxWidthFromContent(textObj);
+          // Authored template text: keep master/import geometry until user edits.
+          if (textObj.textFieldUserEdited === true) {
+            stabilizeDesignedTextboxWidthFromContent(textObj);
+          }
         } else if (textObj.textFieldClientAdded === true) {
           /* Клиентский textbox — фиксированная ширина, без auto-grow к краю страницы. */
         }
@@ -1843,6 +1864,54 @@ function formatPatchAffectsTextboxWidth(patch: Record<string, unknown>): boolean
     || typeof patch.letterSpacing === 'number';
 }
 
+const MIN_TEXT_FONT_SIZE = 6;
+
+function clampTextFontSize(value: number): number {
+  return Math.max(MIN_TEXT_FONT_SIZE, Math.round(value));
+}
+
+function formatPatchAffectsFabricStyles(patch: Record<string, unknown>): boolean {
+  return typeof patch.fontSize === 'number'
+    || typeof patch.fill === 'string'
+    || typeof patch.fontWeight === 'string'
+    || typeof patch.fontStyle === 'string'
+    || typeof patch.underline === 'boolean';
+}
+
+/** Синхронизирует per-char Fabric styles с toolbar-патчем (иначе кегль откатывается после flip). */
+function applyFormatPatchToFabricStyles(
+  styles: FabricStyles | undefined,
+  patch: Record<string, unknown>,
+): FabricStyles | undefined {
+  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return styles;
+  if (!formatPatchAffectsFabricStyles(patch)) return styles;
+
+  const next: FabricStyles = {};
+  for (const [lineKey, lineStyles] of Object.entries(styles)) {
+    const lineIndex = Number(lineKey);
+    if (!Number.isFinite(lineIndex) || !lineStyles || typeof lineStyles !== 'object') continue;
+    const lineNext: Record<number, Record<string, unknown>> = {};
+    for (const [charKey, charStyle] of Object.entries(lineStyles)) {
+      const charIndex = Number(charKey);
+      if (!Number.isFinite(charIndex) || !charStyle || typeof charStyle !== 'object') continue;
+      const charNext: Record<string, unknown> = { ...(charStyle as Record<string, unknown>) };
+      if (typeof patch.fontSize === 'number') {
+        // Единый кегль — только base; per-char fontSize иначе переживает serialize/load.
+        delete charNext.fontSize;
+      }
+      if (typeof patch.fill === 'string') charNext.fill = patch.fill;
+      if (typeof patch.fontWeight === 'string') charNext.fontWeight = patch.fontWeight;
+      if (typeof patch.fontStyle === 'string') charNext.fontStyle = patch.fontStyle;
+      if (typeof patch.underline === 'boolean') charNext.underline = patch.underline;
+      if (Object.keys(charNext).length > 0) {
+        lineNext[charIndex] = charNext;
+      }
+    }
+    if (Object.keys(lineNext).length > 0) next[lineIndex] = lineNext;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
 /** После смены кегля/шрифта поджимает или расширяет textbox под новый контент. */
 function syncDesignedTextboxWidthAfterFormatChange(obj: TextLikeObject): void {
   if (obj.type !== 'textbox' || !isDesignedTemplateText(obj)) return;
@@ -1893,6 +1962,9 @@ export function applyFormatToTextField(
 ): void {
   markTextFieldUserEdited(obj);
   const next: Record<string, unknown> = { ...patch };
+  if (typeof next.fontSize === 'number') {
+    next.fontSize = clampTextFontSize(next.fontSize);
+  }
   if (next.shadow != null && typeof next.shadow === 'object') {
     // Shadow handled by caller (Fabric Shadow instance).
   }
@@ -1904,7 +1976,7 @@ export function applyFormatToTextField(
     delete next.fontFamily;
   }
 
-  if (typeof patch.fontSize === 'number') {
+  if (typeof next.fontSize === 'number') {
     next.scaleX = 1;
     next.scaleY = 1;
   }
@@ -1913,26 +1985,59 @@ export function applyFormatToTextField(
     obj.set(next as Parameters<typeof obj.set>[0]);
   }
 
+  const effectivePatch: Record<string, unknown> = {
+    ...patch,
+    ...(typeof next.fontSize === 'number' ? { fontSize: next.fontSize } : {}),
+  };
+
   const runs = obj.textStyleRuns;
   if (runs?.length) {
     const updated = runs.map((run) => {
       const merged = { ...run };
-      if (typeof patch.fill === 'string') merged.fill = patch.fill;
-      if (typeof patch.fontWeight === 'string') merged.fontWeight = patch.fontWeight;
-      if (typeof patch.fontStyle === 'string') merged.fontStyle = patch.fontStyle;
-      if (typeof patch.fontSize === 'number') merged.fontSize = patch.fontSize;
-      if (typeof patch.underline === 'boolean') {
-        (merged as TextStyleRun & { underline?: boolean }).underline = patch.underline;
+      if (typeof effectivePatch.fill === 'string') merged.fill = effectivePatch.fill;
+      if (typeof effectivePatch.fontWeight === 'string') merged.fontWeight = effectivePatch.fontWeight;
+      if (typeof effectivePatch.fontStyle === 'string') merged.fontStyle = effectivePatch.fontStyle;
+      if (typeof effectivePatch.fontSize === 'number') {
+        // Кегль только в base — иначе buildFabricStylesFromRuns снова пропишет override.
+        delete merged.fontSize;
+      }
+      if (typeof effectivePatch.underline === 'boolean') {
+        (merged as TextStyleRun & { underline?: boolean }).underline = effectivePatch.underline;
       }
       return merged;
     });
     obj.textStyleRuns = updated;
-    hydrateTextObjectStyles(obj);
+    // Designed text_* часто хранит кегль в styles; hydrate для них early-return и не пересобирает map.
+    if (formatPatchAffectsFabricStyles(effectivePatch) && obj.styles) {
+      const patchedStyles = applyFormatPatchToFabricStyles(
+        coerceFabricStylesMap(obj.styles, String(obj.text ?? '')),
+        effectivePatch,
+      );
+      obj.set('styles', (patchedStyles ?? undefined) as unknown as FabricStyles);
+    } else {
+      hydrateTextObjectStyles(obj);
+    }
   } else if (typeof patch.fontFamily !== 'string') {
+    if (formatPatchAffectsFabricStyles(effectivePatch) && obj.styles) {
+      const patchedStyles = applyFormatPatchToFabricStyles(
+        coerceFabricStylesMap(obj.styles, String(obj.text ?? '')),
+        effectivePatch,
+      );
+      obj.set('styles', (patchedStyles ?? undefined) as unknown as FabricStyles);
+    }
     obj.setCoords?.();
   }
 
-  if (obj.type === 'textbox' && formatPatchAffectsTextboxWidth(patch)) {
+  if (typeof effectivePatch.fontSize === 'number') {
+    try {
+      (obj as TextLikeObject & { initDimensions?: () => void }).initDimensions?.();
+    } catch {
+      /* noop */
+    }
+    obj.dirty = true;
+  }
+
+  if (obj.type === 'textbox' && formatPatchAffectsTextboxWidth(effectivePatch)) {
     if (isDesignedTemplateText(obj)) {
       syncDesignedTextboxWidthAfterFormatChange(obj);
     } else if (obj.textFieldClientAdded === true) {
@@ -2058,10 +2163,7 @@ function cloneFabricStyles(styles: FabricStyles): FabricStyles {
 }
 
 /** Сброс кэша Fabric и повторный layout после document.fonts (без hydrate). */
-export function kickTextObjectFontRerender(
-  obj: TextLikeObject,
-  options?: { preserveLayout?: boolean },
-): void {
+export function kickTextObjectFontRerender(obj: TextLikeObject): void {
   const textObj = obj as TextLikeObject & {
     _clearCache?: () => void;
     dirty?: boolean;
@@ -2080,15 +2182,12 @@ export function kickTextObjectFontRerender(
   if (family) {
     textObj.set({ fontFamily: family });
   }
-  // Export/order: initDimensions меняет height и визуальный top у client text.
-  if (!options?.preserveLayout && !shouldSkipInitDimensionsForTemplateText(textObj)) {
-    const clientAnchor = readClientTextSceneAnchor(textObj);
+  if (!shouldSkipInitDimensionsForTemplateText(textObj)) {
     try {
       textObj.initDimensions?.();
     } catch {
       /* noop */
     }
-    if (clientAnchor) restoreClientTextSceneAnchor(textObj, clientAnchor);
   }
   textObj.dirty = true;
   textObj.setCoords?.();
@@ -2114,9 +2213,13 @@ export function dehydrateTextObjectsInFabricJSON(fabricJSON: Record<string, unkn
   walkFabricJsonObjects(objects, (o) => {
     if (!isFabricTextObjectType(o.type)) return;
     const text = String(o.text ?? '');
+    const stylesMap = coerceFabricStylesMap(o.styles, text);
+    if (stylesMap) o.styles = stylesMap;
+    else if (Array.isArray(o.styles)) delete o.styles;
+
     if ((!o.textStyleRuns || !Array.isArray(o.textStyleRuns) || !(o.textStyleRuns as unknown[]).length)
-      && o.styles) {
-      const runs = extractRunsFromFabricStyles(text, o.styles as FabricStyles);
+      && stylesMap) {
+      const runs = extractRunsFromFabricStyles(text, stylesMap);
       if (runs.length > 0) o.textStyleRuns = runs;
     }
     // For designed template texts keep the original detailed `styles` (if present) so that
@@ -2132,25 +2235,12 @@ export function forceTemplateOriginLeft(obj: TextLikeObject): void {
   const id = String(obj.id ?? '');
   if (!isTemplateTextLayerId(id) || (obj as any).textFieldClientAdded === true) return;
   const cur = String((obj as any).originX ?? '');
-  if (cur === 'left') return;
-  const withOrigin = obj as TextLikeObject & {
-    getPointByOrigin?: (ox: string, oy: string) => { x: number; y: number };
-    setPositionByOrigin?: (p: { x: number; y: number }, ox: string, oy: string) => void;
-  };
-  const originY = String((obj as { originY?: string }).originY ?? 'top');
-  const beforeLeft = obj.left;
-  const anchor =
-    cur
-    && typeof withOrigin.getPointByOrigin === 'function'
-      ? withOrigin.getPointByOrigin(cur, originY)
-      : null;
-  obj.set({ originX: 'left' as any });
-  if (anchor && typeof withOrigin.setPositionByOrigin === 'function') {
-    withOrigin.setPositionByOrigin(anchor, 'left', originY);
-    obj.setCoords?.();
-  }
-  if (cur && isTextPositionDebugEnabled()) {
-    console.log(`[TEXT-POS] FORCE originX left id=${id} was=${cur} left=${beforeLeft} -> ${obj.left} angle=${obj.angle ?? 0}`);
+  if (cur !== 'left') {
+    const beforeLeft = obj.left;
+    obj.set({ originX: 'left' as any });
+    if (cur && isTextPositionDebugEnabled()) {
+      console.log(`[TEXT-POS] FORCE originX left id=${id} was=${cur} left=${beforeLeft} -> ${obj.left} angle=${obj.angle ?? 0}`);
+    }
   }
 }
 
@@ -2158,25 +2248,12 @@ export function forceTemplateOriginTop(obj: TextLikeObject): void {
   const id = String(obj.id ?? '');
   if (!isTemplateTextLayerId(id) || (obj as any).textFieldClientAdded === true) return;
   const cur = String((obj as any).originY ?? '');
-  if (cur === 'top') return;
-  const withOrigin = obj as TextLikeObject & {
-    getPointByOrigin?: (ox: string, oy: string) => { x: number; y: number };
-    setPositionByOrigin?: (p: { x: number; y: number }, ox: string, oy: string) => void;
-  };
-  const originX = String((obj as { originX?: string }).originX ?? 'left');
-  const beforeTop = obj.top;
-  const anchor =
-    cur
-    && typeof withOrigin.getPointByOrigin === 'function'
-      ? withOrigin.getPointByOrigin(originX, cur)
-      : null;
-  obj.set({ originY: 'top' as any });
-  if (anchor && typeof withOrigin.setPositionByOrigin === 'function') {
-    withOrigin.setPositionByOrigin(anchor, originX, 'top');
-    obj.setCoords?.();
-  }
-  if (cur && isTextPositionDebugEnabled()) {
-    console.log(`[TEXT-POS] FORCE originY top id=${id} was=${cur} top=${beforeTop} -> ${obj.top} angle=${obj.angle ?? 0}`);
+  if (cur !== 'top') {
+    const beforeTop = obj.top;
+    obj.set({ originY: 'top' as any });
+    if (cur && isTextPositionDebugEnabled()) {
+      console.log(`[TEXT-POS] FORCE originY top id=${id} was=${cur} top=${beforeTop} -> ${obj.top} angle=${obj.angle ?? 0}`);
+    }
   }
 }
 
@@ -2224,7 +2301,7 @@ function shouldSkipInitDimensionsForTemplateText(obj: TextLikeObject): boolean {
 function restoreSacredPosition(obj: TextLikeObject): void {
   const id = String(obj.id ?? '');
   if (!isTemplateTextLayerId(id) || (obj as any).textFieldClientAdded === true) return;
-  const anyObj = obj as Record<string, unknown>;
+  const anyObj = obj as unknown as Record<string, unknown>;
   if (shouldPreserveDesignedTemplateGeometry(obj)) {
     const ox = anyObj._sacredOriginX;
     const oy = anyObj._sacredOriginY;
@@ -2320,9 +2397,10 @@ export function migrateAndHydrateTextObject(
     console.log(`[TEXT-POS] migrate start id=${id} left=${textObj.left} top=${textObj.top} w=${textObj.width} angle=${textObj.angle ?? 0} originX=${textObj.originX}`);
   }
 
-  // client_png / order export: не трогаем left/top/width/origin — только styles для глифов.
+  // client_png / order export: не трогаем left/top/width — только материализуем styles для глифов.
   if (options?.preserveLayout) {
     hydrateTextObjectStyles(textObj);
+    normalizeClientCenteredTextboxOrigin(textObj);
     textObj.setCoords?.();
     if (isTemplateText && isTextPositionDebugEnabled()) {
       console.log(`[TEXT-POS] migrate end (preserve) id=${id} left=${textObj.left} top=${textObj.top} w=${textObj.width}`);
@@ -2335,20 +2413,26 @@ export function migrateAndHydrateTextObject(
     // otherwise fonts/colors only appear after click (prepareTextStylesForEditing).
     hydrateTextObjectStyles(textObj);
     if (textObj.type === 'textbox') {
-      tightenDraftTextboxWidthOnLoad(textObj);
       if (textObj.textFieldUserEdited === true) {
+        tightenDraftTextboxWidthOnLoad(textObj);
         stabilizeDesignedTextboxWidthFromContent(textObj);
         captureDesignedTextboxLayoutFloor(textObj);
         ensureDesignedTextboxLayoutFloor(textObj);
+        captureSacredTemplateTextGeometry(textObj, { overwrite: true });
       } else {
-        stabilizeDesignedTextboxWidthFromContent(textObj);
+        // Soft-load authored template text: keep left/top/width from fabricJSON / sacred.
+        captureDesignedTextboxLayoutFloor(textObj);
+        captureSacredTemplateTextGeometry(textObj, { overwrite: false });
       }
+    } else {
+      captureSacredTemplateTextGeometry(textObj, {
+        overwrite: textObj.textFieldUserEdited === true,
+      });
     }
-    captureSacredTemplateTextGeometry(textObj, { overwrite: true });
     textObj.setCoords?.();
     restoreSacredPosition(textObj);
     if (isTemplateText && isTextPositionDebugEnabled()) {
-      const tag = textObj.textFieldUserEdited ? 'designed-edited' : 'designed';
+      const tag = textObj.textFieldUserEdited ? 'designed-edited' : 'designed-soft';
       console.log(`[TEXT-POS] migrate end (${tag}) id=${id} left=${textObj.left} top=${textObj.top} w=${textObj.width} angle=${textObj.angle ?? 0}`);
     }
     return;
@@ -2396,13 +2480,8 @@ export function remeasureTextObjectsAfterFontLoad(objects: FabricObject[]): void
           captureSacredTemplateTextGeometry(textObj, { overwrite: true });
         }
       } else {
-        const clientAnchor = readClientTextSceneAnchor(textObj);
         textObj.initDimensions?.();
-        if (clientAnchor) {
-          restoreClientTextSceneAnchor(textObj, clientAnchor);
-        } else {
-          normalizeImportedSingleLineTextboxWidth(textObj);
-        }
+        normalizeImportedSingleLineTextboxWidth(textObj);
       }
       textObj.setCoords?.();
     }
@@ -2629,7 +2708,7 @@ export function finishTextEditOnObject(
   }
 
   if (isDesignedTemplateText(obj) && obj.type === 'textbox') {
-    delete (obj as Record<string, unknown>)._editSessionLayoutWidth;
+    delete (obj as unknown as Record<string, unknown>)._editSessionLayoutWidth;
   }
 
   logTextWidthDebug('finish-edit:end', obj, {

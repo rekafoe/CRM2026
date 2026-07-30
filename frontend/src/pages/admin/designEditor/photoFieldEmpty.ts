@@ -3,7 +3,10 @@
  * Один Fabric Rect на сцене ломал ресайз в Fabric 7 — группа с noop layout и relayoutEmptyPhotoFieldChrome.
  */
 import { Circle, Group, Point, Rect, Text, type Canvas, type FabricObject } from 'fabric';
-import { createPhotoFieldStaticLayoutManager, ensurePhotoFieldStaticLayout } from './photoFieldFit';
+import {
+  createPhotoFieldStaticLayoutManager,
+  ensurePhotoFieldStaticLayout,
+} from './photoFieldFit';
 import { copyImportStackMetadata } from './designFields/importStackOrder';
 import {
   resolvePhotoFieldFrameSceneTL,
@@ -18,89 +21,17 @@ function ax(obj: unknown): AnyObj {
   return obj as AnyObj;
 }
 
-export const EMPTY_PHOTO_FIELD_FILL = '#cbd5e1';
-export const EMPTY_PHOTO_FIELD_STROKE = '#2563eb';
-export const EMPTY_PHOTO_FIELD_STROKE_WIDTH = 2;
-export const EMPTY_PHOTO_FIELD_STROKE_DASH: [number, number] = [6, 4];
-const EMPTY_PHOTO_BADGE_FILL = '#dbeafe';
-const EMPTY_PHOTO_ICON_FILL = '#1d4ed8';
-const EMPTY_PHOTO_LABEL_FILL = '#1e40af';
-
-export type EmptyPhotoFieldChromeMetrics = {
-  badgeR: number;
-  badgeCx: number;
-  badgeCy: number;
-  camBodyW: number;
-  camBodyH: number;
-  showBadge: boolean;
-  showPhotoLabel: boolean;
-  strokeWidth: number;
-  labelFontSize: number;
-};
-
-/**
- * Доля minSide — не 0.38: на print-DPI (300) «маленькое» поле всё ещё сотни px,
- * и старый ratio давал огромный кружок + PHOTO, обрезанный selection-рамкой.
- */
-const EMPTY_PHOTO_BADGE_SIZE_RATIO = 0.16;
-const EMPTY_PHOTO_BADGE_MIN_R = 7;
-const EMPTY_PHOTO_BADGE_MAX_R = 42;
-const EMPTY_PHOTO_ICON_LENS_RATIO = 0.18;
-
-/** Размер иконки камеры в пустом фото-поле (общий для create и relayout, мобилка и десктоп). */
-export function resolveEmptyPhotoFieldChromeMetrics(
-  frameW: number,
-  frameH: number,
-): EmptyPhotoFieldChromeMetrics {
-  const minSide = Math.min(frameW, frameH);
-  const maxByFrame = Math.max(
-    EMPTY_PHOTO_BADGE_MIN_R,
-    Math.floor(Math.min(frameW, frameH) * 0.22) - 2,
-  );
-  const badgeR = Math.max(
-    EMPTY_PHOTO_BADGE_MIN_R,
-    Math.min(
-      EMPTY_PHOTO_BADGE_MAX_R,
-      maxByFrame,
-      Math.round(minSide * EMPTY_PHOTO_BADGE_SIZE_RATIO),
-    ),
-  );
-  const showBadge = minSide >= 36;
-  const labelFontSize = Math.max(10, Math.min(22, Math.round(badgeR * 0.55)));
-  // Подпись PHOTO на print-DPI сувенирки почти всегда выглядит громоздко и режется
-  // selection-handle — достаточно иконки камеры.
-  const showPhotoLabel = false;
-  const badgeCy = 0;
-  const strokeWidth =
-    minSide < 70 ? 1 : minSide < 120 ? 1.25 : EMPTY_PHOTO_FIELD_STROKE_WIDTH;
-  return {
-    badgeR: showBadge ? badgeR : 0,
-    badgeCx: 0,
-    badgeCy,
-    camBodyW: badgeR * 0.88,
-    camBodyH: badgeR * 0.58,
-    showBadge,
-    showPhotoLabel,
-    strokeWidth,
-    labelFontSize,
-  };
-}
+const EMPTY_PHOTO_FIELD_FILL = '#bfdbfe';
+const EMPTY_PHOTO_FIELD_STROKE = '#1e3a8a';
+const EMPTY_PHOTO_BADGE_FILL = '#93c5fd';
+const EMPTY_PHOTO_ICON_FILL = '#1e3a8a';
+const EMPTY_PHOTO_LABEL_FILL = '#172554';
+const EMPTY_PHOTO_FIELD_STROKE_WIDTH = 2.5;
+const EMPTY_PHOTO_FIELD_DASH = [8, 4] as const;
 
 function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObject[] {
   const ox = -frameW / 2;
   const oy = -frameH / 2;
-  const {
-    badgeR,
-    badgeCx,
-    badgeCy,
-    camBodyW,
-    camBodyH,
-    showBadge,
-    showPhotoLabel,
-    strokeWidth,
-    labelFontSize,
-  } = resolveEmptyPhotoFieldChromeMetrics(frameW, frameH);
-  const cornerR = Math.max(2, Math.min(6, Math.round(Math.min(frameW, frameH) * 0.04)));
   const frameRect = new Rect({
     left: ox,
     top: oy,
@@ -110,27 +41,33 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     height: frameH,
     fill: EMPTY_PHOTO_FIELD_FILL,
     stroke: EMPTY_PHOTO_FIELD_STROKE,
-    strokeWidth,
-    strokeDashArray: [...EMPTY_PHOTO_FIELD_STROKE_DASH],
+    strokeWidth: EMPTY_PHOTO_FIELD_STROKE_WIDTH,
+    strokeDashArray: [...EMPTY_PHOTO_FIELD_DASH],
     strokeUniform: true,
-    rx: cornerR,
-    ry: cornerR,
+    rx: 6,
+    ry: 6,
     selectable: false,
     evented: false,
     objectCaching: false,
   });
   ax(frameRect).photoFieldRole = 'frame';
 
+  const minSide = Math.min(frameW, frameH);
+  const badgeR = Math.max(16, Math.min(72, minSide * 0.16));
+  const badgeCx = 0;
+  const badgeCy = 0;
+  const camBodyW = badgeR * 0.82;
+  const camBodyH = badgeR * 0.55;
+
   const badge = new Circle({
     left: badgeCx,
     top: badgeCy,
     originX: 'center',
     originY: 'center',
-    radius: Math.max(1, badgeR),
+    radius: badgeR,
     fill: EMPTY_PHOTO_BADGE_FILL,
-    stroke: undefined,
-    strokeWidth: 0,
-    visible: showBadge,
+    stroke: EMPTY_PHOTO_ICON_FILL,
+    strokeWidth: 1,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -147,7 +84,6 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     rx: 2,
     ry: 2,
     fill: EMPTY_PHOTO_ICON_FILL,
-    visible: showBadge,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -159,12 +95,11 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     top: badgeCy - camBodyH / 2 - 2,
     originX: 'center',
     originY: 'center',
-    width: badgeR * 0.46,
-    height: badgeR * 0.2,
+    width: badgeR * 0.42,
+    height: badgeR * 0.18,
     rx: 1,
     ry: 1,
     fill: EMPTY_PHOTO_ICON_FILL,
-    visible: showBadge,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -176,11 +111,10 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     top: badgeCy + 1,
     originX: 'center',
     originY: 'center',
-    radius: Math.max(1.5, badgeR * EMPTY_PHOTO_ICON_LENS_RATIO),
+    radius: Math.max(2, badgeR * 0.15),
     fill: '#ffffff',
-    stroke: undefined,
-    strokeWidth: 0,
-    visible: showBadge,
+    stroke: EMPTY_PHOTO_ICON_FILL,
+    strokeWidth: 1,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -189,14 +123,13 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
 
   const photoLabel = new Text('PHOTO', {
     left: badgeCx,
-    top: badgeCy + badgeR + 6,
+    top: badgeCy + badgeR + 8,
     originX: 'center',
     originY: 'top',
-    fontSize: labelFontSize,
+    fontSize: Math.max(12, Math.min(32, badgeR * 0.62)),
     fontWeight: 'bold',
     fontFamily: 'Arial',
     fill: EMPTY_PHOTO_LABEL_FILL,
-    visible: showPhotoLabel,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -331,21 +264,6 @@ export function createEmptyPhotoField(opts: {
   return group;
 }
 
-export function applyEmptyPhotoFieldRectChrome(field: FabricObject): boolean {
-  if (!isEmptyPhotoFieldRect(field)) return false;
-  field.set({
-    fill: EMPTY_PHOTO_FIELD_FILL,
-    stroke: EMPTY_PHOTO_FIELD_STROKE,
-    strokeWidth: EMPTY_PHOTO_FIELD_STROKE_WIDTH,
-    strokeDashArray: [...EMPTY_PHOTO_FIELD_STROKE_DASH],
-    strokeUniform: true,
-    rx: 6,
-    ry: 6,
-    objectCaching: false,
-  });
-  return true;
-}
-
 /**
  * После drag Fabric иногда сбрасывает width/height, оставляя photoFieldFw/Fh.
  * Восстанавливаем запечённый размер без пересчёта по уменьшенному bbox.
@@ -440,5 +358,81 @@ export function bakeEmptyPhotoFieldRectScale(
   o.photoFieldFh = frameH;
   field.setCoords();
   return true;
+}
+
+function readPositiveSize(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function resolveEmptyPhotoFieldFrameFromJson(obj: Record<string, unknown>): { fw: number; fh: number } {
+  const sx = Math.abs(readPositiveSize(obj.scaleX, 1)) || 1;
+  const sy = Math.abs(readPositiveSize(obj.scaleY, 1)) || 1;
+  const baseW = readPositiveSize(obj.photoFieldFw, readPositiveSize(obj.width));
+  const baseH = readPositiveSize(obj.photoFieldFh, readPositiveSize(obj.height));
+  return {
+    fw: Math.max(32, Math.round(baseW * sx)),
+    fh: Math.max(32, Math.round(baseH * sy)),
+  };
+}
+
+/**
+ * Master/template contract: пустые photo_* в designState — простые rect (как SVG-импорт).
+ * Chrome-группы с кастомным layoutManager после Save ломают load на сайте.
+ */
+export function dehydrateEmptyPhotoFieldJsonObject(
+  obj: Record<string, unknown>,
+): Record<string, unknown> {
+  if (obj.isPhotoField !== true || obj.photoFieldFilled === true) {
+    if (obj.isPhotoField === true && String(obj.type ?? '').toLowerCase() === 'group') {
+      const next = { ...obj };
+      delete next.layoutManager;
+      return next;
+    }
+    return obj;
+  }
+
+  const { fw, fh } = resolveEmptyPhotoFieldFrameFromJson(obj);
+  const left = Number(obj.left);
+  const top = Number(obj.top);
+  const angle = Number(obj.angle);
+  const rect: Record<string, unknown> = {
+    type: 'rect',
+    version: obj.version ?? '6.0.0',
+    originX: 'left',
+    originY: 'top',
+    left: Number.isFinite(left) ? left : 0,
+    top: Number.isFinite(top) ? top : 0,
+    width: fw,
+    height: fh,
+    fill: '#bfdbfe',
+    stroke: '#1e3a8a',
+    strokeWidth: 2.5,
+    strokeDashArray: [8, 4],
+    rx: 6,
+    ry: 6,
+    scaleX: 1,
+    scaleY: 1,
+    angle: Number.isFinite(angle) ? angle : 0,
+    id: obj.id,
+    isPhotoField: true,
+    photoFieldFilled: false,
+    photoFieldFw: fw,
+    photoFieldFh: fh,
+  };
+  if (obj.importStackIndex != null) rect.importStackIndex = obj.importStackIndex;
+  if (obj.isDecorElement != null) rect.isDecorElement = obj.isDecorElement;
+  if (obj.decorLayerName != null) rect.decorLayerName = obj.decorLayerName;
+  if (obj.photoFieldClientAdded === true) rect.photoFieldClientAdded = true;
+  return rect;
+}
+
+/** Перед записью page snapshot / design_templates: empty photo Groups → rect. */
+export function dehydrateEmptyPhotoFieldsInFabricJSON(fabricJSON: Record<string, unknown>): void {
+  if (!Array.isArray(fabricJSON.objects)) return;
+  fabricJSON.objects = fabricJSON.objects.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    return dehydrateEmptyPhotoFieldJsonObject(item as Record<string, unknown>);
+  });
 }
 
