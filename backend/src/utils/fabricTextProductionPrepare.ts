@@ -48,13 +48,37 @@ function expandSingleLineTextboxWidthInJson(obj: FabricObj): void {
 }
 
 function adjustTextboxWidthPreservingOriginInJson(obj: FabricObj, nextWidth: number): void {
-  // For template text fields the original left/top (from Corel SVG import) is sacred.
-  // On production render we may widen the measured box, but we must never mutate
-  // the placement so that the rendered result matches what the user saw in the editor.
-  const preservedLeft = obj.left
+  // For template text fields the original placement must stay visually stable.
+  // textAlign center/right + originX left: glyphs anchor to box width — changing width
+  // without shifting left moves the visual (same as frontend setTextboxWidthPreservingOrigin).
+  const originX = String(obj.originX ?? 'left').toLowerCase()
+  const originY = String(obj.originY ?? 'top').toLowerCase()
+  const oldWidth = Number(obj.width ?? 0)
+  const textAlign = String(obj.textAlign ?? 'left').toLowerCase()
   const preservedTop = obj.top
+  let nextLeft = obj.left
+
+  if (
+    Number.isFinite(oldWidth)
+    && oldWidth > 0
+    && Number.isFinite(nextWidth)
+    && Math.abs(oldWidth - nextWidth) > 0.5
+    && originX === 'left'
+  ) {
+    const left = Number(obj.left ?? 0)
+    if (Number.isFinite(left)) {
+      if (textAlign === 'center') {
+        nextLeft = left + (oldWidth - nextWidth) / 2
+      } else if (textAlign === 'right') {
+        nextLeft = left + (oldWidth - nextWidth)
+      }
+    }
+  }
+
   obj.width = nextWidth
-  if (preservedLeft != null) obj.left = preservedLeft
+  obj.originX = originX
+  obj.originY = originY
+  if (nextLeft != null) obj.left = nextLeft
   if (preservedTop != null) obj.top = preservedTop
 }
 

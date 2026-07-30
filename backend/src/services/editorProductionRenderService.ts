@@ -19,6 +19,7 @@ import {
 } from './designFontService'
 import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
 import { prepareFabricJsonTextForProduction } from '../utils/fabricTextProductionPrepare'
+import { resolveProductionSceneScale } from '../utils/productionSceneScale'
 import { extractUsedFontFamiliesFromDesignState } from '../utils/extractDesignStateFonts'
 import { getDesignTemplate } from './designTemplateService'
 import { logger } from '../utils/logger'
@@ -1068,31 +1069,48 @@ async function renderFabricPageToPng(
               if (family && typeof obj.set === 'function') {
                 obj.set('fontFamily', family)
               }
-              const text = String(obj.text ?? '')
-              if (!text.includes('\n') && typeof obj.calcTextWidth === 'function') {
-                try {
-                  const fontSize = Math.max(6, Number(obj.fontSize) || 16)
-                  const measured = Number(obj.calcTextWidth())
-                  const currentWidth = Number(obj.width)
-                  if (Number.isFinite(measured) && measured > 0) {
-                    const target = measured + fontSize * 0.3
-                    if (!Number.isFinite(currentWidth) || currentWidth + 1 < target) {
-                      // Preserve the original placement for template text_* exactly.
-                      // Widen the box for correct wrapping/measurement in the PDF render,
-                      // but restore left/top so the text does not move relative to the page
-                      // compared to what the user saw while flipping pages in the editor.
-                      const preservedLeft = obj.left
-                      const preservedTop = obj.top
-                      obj.set({ width: target })
-                      if (preservedLeft != null) obj.set({ left: preservedLeft })
-                      if (preservedTop != null) obj.set({ top: preservedTop })
+              // Клиентский текст: не трогаем width (как prepareFabricJsonTextForProduction).
+              if (obj.textFieldClientAdded === true) {
+                if (typeof obj.set === 'function') obj.set('dirty', true)
+              } else {
+                const text = String(obj.text ?? '')
+                if (!text.includes('\n') && typeof obj.calcTextWidth === 'function') {
+                  try {
+                    const fontSize = Math.max(6, Number(obj.fontSize) || 16)
+                    const measured = Number(obj.calcTextWidth())
+                    const currentWidth = Number(obj.width)
+                    if (Number.isFinite(measured) && measured > 0) {
+                      const target = measured + fontSize * 0.3
+                      if (!Number.isFinite(currentWidth) || currentWidth + 1 < target) {
+                        const originX = String(obj.originX ?? 'left').toLowerCase()
+                        const textAlign = String(obj.textAlign ?? 'left').toLowerCase()
+                        const preservedTop = obj.top
+                        let nextLeft = obj.left
+                        if (
+                          Number.isFinite(currentWidth)
+                          && currentWidth > 0
+                          && originX === 'left'
+                        ) {
+                          const left = Number(obj.left ?? 0)
+                          if (Number.isFinite(left)) {
+                            if (textAlign === 'center') {
+                              nextLeft = left + (currentWidth - target) / 2
+                            } else if (textAlign === 'right') {
+                              nextLeft = left + (currentWidth - target)
+                            }
+                          }
+                        }
+                        obj.set({ width: target })
+                        if (nextLeft != null) obj.set({ left: nextLeft })
+                        if (preservedTop != null) obj.set({ top: preservedTop })
+                      }
                     }
+                  } catch {
+                    /* ignore measurement errors */
                   }
-                } catch {
-                  /* ignore measurement errors */
                 }
+                if (typeof obj.set === 'function') obj.set('dirty', true)
               }
-              if (typeof obj.set === 'function') obj.set('dirty', true)
             }
             const children = typeof obj.getObjects === 'function'
               ? obj.getObjects()
@@ -1317,7 +1335,28 @@ export async function renderDesignStateProductionPdf(
   const pageHeightMm = Number(state.pageHeight ?? 50)
   const prepress = parseJsonObject(state.prepress)
   const bleedMm = Number(prepress.bleedMm ?? 0)
-  const sceneScale = Number(state.sceneScale)
+  const { scale: sceneScale, diagnostics: scaleDiagnostics } = resolveProductionSceneScale(state)
+  if (scaleDiagnostics.mismatched) {
+    logger.warn('Editor production sceneScale mismatch — using inferred from object extents', {
+      orderId,
+      orderItemId,
+      explicit: scaleDiagnostics.explicit,
+      inferred: scaleDiagnostics.inferred,
+      resolved: scaleDiagnostics.resolved,
+      pageWidthMm: scaleDiagnostics.pageWidthMm,
+      pageHeightMm: scaleDiagnostics.pageHeightMm,
+      textSamples: scaleDiagnostics.textSamples,
+    })
+  } else {
+    logger.info('Editor production sceneScale', {
+      orderId,
+      orderItemId,
+      sceneScale,
+      explicit: scaleDiagnostics.explicit,
+      inferred: scaleDiagnostics.inferred,
+      textSamples: scaleDiagnostics.textSamples.slice(0, 3),
+    })
+  }
   const pages = Array.isArray(state.pages) ? state.pages : []
   if (pages.length === 0) throw new Error('В designState нет страниц')
 

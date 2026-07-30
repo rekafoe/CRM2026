@@ -58,7 +58,7 @@ export function inferSceneScaleFromPageExtents(
 
   if (maxW < 1 || maxH < 1) return bgScale;
 
-  for (const scale of [3, 2, 1] as const) {
+  for (const scale of [6, 3, 2, 1] as const) {
     const expectedW = basePxW * scale;
     const expectedH = basePxH * scale;
     const matchW = maxW >= expectedW * 0.82 && maxW <= expectedW * 1.15;
@@ -68,6 +68,7 @@ export function inferSceneScaleFromPageExtents(
 
   if (maxW <= basePxW * 1.12 && maxH <= basePxH * 1.12) return 1;
   if (maxW <= basePxW * 3.15 && maxH <= basePxH * 3.15 && maxW > basePxW * 1.4) return 3;
+  if (maxW <= basePxW * 6.3 && maxH <= basePxH * 6.3 && maxW > basePxW * 3.4) return 6;
 
   return bgScale;
 }

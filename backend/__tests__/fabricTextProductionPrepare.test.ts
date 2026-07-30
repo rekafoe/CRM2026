@@ -66,4 +66,52 @@ describe('fabricTextProductionPrepare', () => {
     // center origin: left (center x) must remain unchanged
     expect(Number(title.left)).toBe(200)
   })
+
+  it('shifts left when widening originX:left + textAlign:center', () => {
+    const input = {
+      version: '6.0.0',
+      objects: [
+        {
+          type: 'textbox',
+          id: 'text_client',
+          left: 100,
+          top: 20,
+          originX: 'left',
+          textAlign: 'center',
+          width: 80,
+          fontSize: 36,
+          fontFamily: 'Times New Roman',
+          text: 'Очень длинный заголовок для проверки',
+        },
+      ],
+    }
+
+    const prepared = prepareFabricJsonTextForProduction(input) as typeof input
+    const title = prepared.objects[0] as Record<string, unknown>
+    const newW = Number(title.width)
+    expect(newW).toBeGreaterThan(80)
+    // visual center stays at 100 + 80/2 = 140
+    expect(Number(title.left)).toBeCloseTo(100 + (80 - newW) / 2, 5)
+  })
+
+  it('does not widen client-added textbox', () => {
+    const input = {
+      version: '6.0.0',
+      objects: [
+        {
+          type: 'textbox',
+          id: 'text_client',
+          left: 50,
+          top: 20,
+          width: 60,
+          fontSize: 36,
+          text: 'Очень длинный клиентский текст',
+          textFieldClientAdded: true,
+        },
+      ],
+    }
+    const prepared = prepareFabricJsonTextForProduction(input) as typeof input
+    expect(Number(prepared.objects[0].width)).toBe(60)
+    expect(Number(prepared.objects[0].left)).toBe(50)
+  })
 })

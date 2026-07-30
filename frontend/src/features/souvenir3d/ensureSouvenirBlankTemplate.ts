@@ -287,6 +287,9 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
     pageWidth: area.widthMm,
     pageHeight: area.heightMm,
     pageCount: 1,
+    // Явный scale=1: координаты объектов и production PDF в одном пространстве.
+    // Не угадываем 3/6 — иначе макет в PDF уезжает вверх-влево.
+    sceneScale: 1,
   });
 
   const nameBase = (productName || 'Сувенир').trim() || 'Сувенир';

@@ -280,6 +280,21 @@ async function processProductionPdfJob(jobId: number, orderId: number, orderItem
   const designState = await resolveLatestDesignStateForProduction(params)
   if (!designState) throw new Error('Нет designState')
 
+  const editorKind = String(
+    (designState as { editorKind?: string })?.editorKind
+      ?? (params as { editorKind?: string }).editorKind
+      ?? (params as { editorDraftMode?: string }).editorDraftMode
+      ?? '',
+  )
+  if (editorKind.includes('souvenir') || String(params.editorDraftMode || '').includes('souvenir')) {
+    logger.warn('Editor production fabric_legacy for souvenir — prefer client_png when available', {
+      orderId,
+      orderItemId,
+      productionRenderSource: params.productionRenderSource ?? null,
+      hasClientManifest: Boolean(clientRenderedPages),
+    })
+  }
+
   await renderDesignStateProductionPdf(orderId, orderItemId, designState)
   await markJob(jobId, 'done')
 }
@@ -328,6 +343,32 @@ export async function requestManualProductionRegeneration(
   orderItemId: number,
 ): Promise<{ jobId: number }> {
   const db = await getDb()
+  const item = await db.get<{ params: string | null }>(
+    'SELECT params FROM items WHERE id = ? AND orderId = ?',
+    [orderItemId, orderId],
+  )
+  const params = parseParams(item?.params)
+  if (expectsClientPngProduction(params)) {
+    const manifest = readClientRenderedPagesManifest(params)
+    const uploaded = await countClientRenderedPages(orderId, orderItemId)
+    logger.info('Manual production regen with client_png path', {
+      orderId,
+      orderItemId,
+      expectedPages: manifest?.pageCount ?? null,
+      uploadedPages: uploaded,
+    })
+    if (!manifest || uploaded < (manifest.pageCount || 0)) {
+      logger.warn(
+        'Manual regen: client_png expected but PNG incomplete — job will fail until pages uploaded; will not silently fall back to fabric_legacy',
+        { orderId, orderItemId, uploaded, expected: manifest?.pageCount },
+      )
+    }
+  } else {
+    logger.info('Manual production regen via fabric_legacy (no productionRenderSource=client_png)', {
+      orderId,
+      orderItemId,
+    })
+  }
   const result = await db.run(
     `INSERT INTO editor_production_jobs (order_id, order_item_id, job_type, status, updated_at)
      VALUES (?, ?, 'production_pdf', 'pending', datetime('now'))`,
