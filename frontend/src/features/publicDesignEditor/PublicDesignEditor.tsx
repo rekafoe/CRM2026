@@ -681,6 +681,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setPrepressConfig,
     onDraftTokenChange,
     onReadyForCart,
+    preparePagesForCart: () => commitCanvasToPagesRef.current(),
     selectedParams,
   });
 
@@ -764,9 +765,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   const openCheckoutPreviewAfterFlush = useCallback(() => {
     void (async () => {
+      await canvasHandleRef.current?.commitPendingTextEditSheet?.({ force: true });
       await canvasHandleRef.current?.flushPendingDocumentCommit?.();
+      const committedPages = await commitCanvasToPagesRef.current();
+      const pagesForCheck = committedPages ?? latestPagesRef.current;
       const latestPreflight = buildPublicDesignPreflightSummary(
-        latestPagesRef.current.map((page, pageIndex) => analyzePublicDesignPage(page, pageIndex, preflightBounds)),
+        pagesForCheck.map((page, pageIndex) => analyzePublicDesignPage(page, pageIndex, preflightBounds)),
       );
       if (latestPreflight.hasBlockingIssues) {
         setActiveTaskTab('check');

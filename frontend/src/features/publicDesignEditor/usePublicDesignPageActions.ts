@@ -136,6 +136,7 @@ export function usePublicDesignPageActions({
   const saveCurrentCanvasPage = useCallback(async (): Promise<DesignPage[] | null> => {
     const handle = canvasHandleRef.current;
     if (!handle) return null;
+    handle.commitPendingTextEditSheet?.({ force: true });
     await handle.whenPageTransitionIdle?.();
     const displayedKey = handle.getDisplayedPageLoadKey?.() ?? null;
     const parsedDisplayed = displayedKey ? parsePageLoadKey(displayedKey) : null;

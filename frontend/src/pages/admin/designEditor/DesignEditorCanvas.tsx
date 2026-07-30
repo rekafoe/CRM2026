@@ -145,6 +145,8 @@ export interface DesignEditorCanvasHandle {
   getDisplayedPageLoadKey: () => string | null;
   /** Сбросить отложенную синхронизацию live canvas → pages[] перед save/navigation. */
   flushPendingDocumentCommit: () => Promise<void>;
+  /** Применить отложенный text-sheet на холст (если sheet открыт). */
+  commitPendingTextEditSheet?: (options?: { force?: boolean }) => void;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────

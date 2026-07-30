@@ -8,6 +8,10 @@ import type { CanvasHistoryStack } from './canvasHistory';
 import { canvasToJSON } from './canvasSerialization';
 import type { EditorMode, ResolveImageFileUrl } from './types';
 import {
+  finalizeCanvasTextEditingBeforeSave,
+  isAnyTextObjectEditingOnCanvas,
+} from '../textStyleRuns';
+import {
   recordPublicEditorPerfMetric,
   startPublicEditorPerfSpan,
 } from '../../../../features/publicDesignEditor/publicEditorPerf';
@@ -108,9 +112,18 @@ export function useDesignEditorCanvasHistory({
     runScheduledDocumentCommit,
   ]);
 
-  const saveSnapshotNow = useCallback((options?: { scheduleDocumentCommit?: boolean }) => {
+  const saveSnapshotNow = useCallback((options?: {
+    scheduleDocumentCommit?: boolean;
+    /** Order/flush: завершить inline-edit и снять snapshot даже во время editing. */
+    forceExitEditing?: boolean;
+  }) => {
     const canvas = fabricRef.current;
     if (!canvas || isLoadingRef.current) return;
+    const forceExit = Boolean(options?.forceExitEditing);
+    if (!forceExit && isAnyTextObjectEditingOnCanvas(canvas)) return;
+    finalizeCanvasTextEditingBeforeSave(canvas, {
+      preserveActiveEditing: !forceExit,
+    });
     const stopSerialize = startPublicEditorPerfSpan('history.snapshot.serialize.ms');
     const json = JSON.stringify(canvasToJSON(canvas));
     stopSerialize();
@@ -141,11 +154,9 @@ export function useDesignEditorCanvasHistory({
   const flushCanvasDocumentCommit = useCallback(async () => {
     const stopFlush = startPublicEditorPerfSpan('history.flushDocumentCommit.ms');
     try {
-      let hadPendingSnapshot = false;
       if (snapshotTimerRef.current) {
         clearTimeout(snapshotTimerRef.current);
         snapshotTimerRef.current = null;
-        hadPendingSnapshot = true;
       }
       if (documentCommitTimerRef.current) {
         clearTimeout(documentCommitTimerRef.current);
@@ -156,8 +167,12 @@ export function useDesignEditorCanvasHistory({
         await waitForPageTransitionIdle();
         stopWait();
       }
-      if (hadPendingSnapshot) {
-        saveSnapshotNow({ scheduleDocumentCommit: false });
+      // Всегда свежий snapshot с exitEditing — иначе правки текста во время edit не попадают в pages[].
+      saveSnapshotNow({ scheduleDocumentCommit: false, forceExitEditing: true });
+      if (isLoadingRef.current || pageTransitionLockRef.current) {
+        const stopWait = startPublicEditorPerfSpan('history.flush.waitIdleBeforeCommit.ms');
+        await waitForPageTransitionIdle();
+        stopWait();
       }
       if (isLoadingRef.current || pageTransitionLockRef.current) return;
       await runCanvasDocumentCommit();

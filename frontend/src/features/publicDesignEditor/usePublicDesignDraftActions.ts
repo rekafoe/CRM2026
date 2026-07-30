@@ -65,11 +65,27 @@ interface UsePublicDesignDraftActionsInput {
   setPrepressConfig: Dispatch<SetStateAction<DesignPrepressConfig>>;
   onDraftTokenChange?: (token: string) => void;
   onReadyForCart?: (draftToken: string) => void;
+  /**
+   * Перед preflight/export: commit text sheet + saveCurrentPage в pages[].
+   * Без этого свежие правки с live-холста не попадают в заказ.
+   */
+  preparePagesForCart?: () => Promise<DesignPage[] | null>;
   selectedParams?: Record<string, unknown>;
 }
 
 interface PersistDraftOptions {
   skipExpectedVersion?: boolean;
+  pagesOverride?: DesignPage[];
+  skipCanvasFlush?: boolean;
+  forcePersist?: boolean;
+}
+
+/** Для export/заказа: свежий saveCurrentPage важнее устаревшего React state. */
+export function pickPagesForCartExport<T>(
+  preparedPages: T[] | null | undefined,
+  statePages: T[],
+): T[] {
+  return preparedPages ?? statePages;
 }
 
 interface QueuedPersistRequest {
@@ -117,6 +133,9 @@ function mergePersistOptions(
   if (!left && !right) return undefined;
   return {
     skipExpectedVersion: Boolean(left?.skipExpectedVersion || right?.skipExpectedVersion),
+    skipCanvasFlush: Boolean(left?.skipCanvasFlush || right?.skipCanvasFlush),
+    forcePersist: Boolean(left?.forcePersist || right?.forcePersist),
+    pagesOverride: right?.pagesOverride ?? left?.pagesOverride,
   };
 }
 
@@ -153,6 +172,7 @@ export function usePublicDesignDraftActions({
   setPrepressConfig,
   onDraftTokenChange,
   onReadyForCart,
+  preparePagesForCart,
   selectedParams,
 }: UsePublicDesignDraftActionsInput) {
   const savedDirtyVersionRef = useRef(0);
@@ -249,8 +269,8 @@ export function usePublicDesignDraftActions({
     void hydrateDraftVersion(draftToken).catch(() => undefined);
   }, [draftToken, hydrateDraftVersion, loading]);
 
-  const buildCurrentDesignState = useCallback(() => {
-    const updatedPages = getLatestPages?.() ?? pages;
+  const buildCurrentDesignState = useCallback((pagesOverride?: DesignPage[]) => {
+    const updatedPages = pagesOverride ?? getLatestPages?.() ?? pages;
     const nextSelectedParams = documentMode === 'multipage'
       ? { ...(selectedParams ?? {}), pages: pageSpec.pageCount }
       : selectedParams;
@@ -291,13 +311,17 @@ export function usePublicDesignDraftActions({
     setSaveState('saving');
     if (!silent) setStatus(null);
     try {
-      await canvasHandleRef.current?.flushPendingDocumentCommit?.();
-      await canvasHandleRef.current?.whenPageTransitionIdle?.();
+      if (!options?.skipCanvasFlush) {
+        await canvasHandleRef.current?.flushPendingDocumentCommit?.();
+        await canvasHandleRef.current?.whenPageTransitionIdle?.();
+      }
       const token = await ensureDraft();
       if (!options?.skipExpectedVersion) {
         await hydrateDraftVersion(token).catch(() => undefined);
       }
-      const { designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
+      const { designState, selectedParams: nextSelectedParams } = buildCurrentDesignState(
+        options?.pagesOverride,
+      );
       const productionDesignState = buildProductionDesignState(designState);
       const digest = buildAutosavePayloadDigest({
         designState: designState as unknown as Record<string, unknown>,
@@ -308,7 +332,8 @@ export function usePublicDesignDraftActions({
         token,
       });
       if (
-        !options?.skipExpectedVersion
+        !options?.forcePersist
+        && !options?.skipExpectedVersion
         && lastSavedPayloadTokenRef.current === token
         && lastSavedPayloadHashRef.current === digest.hash
       ) {
@@ -421,10 +446,13 @@ export function usePublicDesignDraftActions({
     });
   }, [executePersistRequest]);
 
-  const handleSaveDraft = useCallback(async (silent = false) => {
+  const handleSaveDraft = useCallback(async (
+    silent = false,
+    options?: PersistDraftOptions,
+  ) => {
     if (draftConflictOpen || autosavePausedRef.current) return;
     try {
-      await enqueuePersistDraft(silent);
+      await enqueuePersistDraft(silent, options);
     } catch (err) {
       if (isDraftVersionConflictError(err)) {
         setDraftConflictOpen(true);
@@ -542,8 +570,14 @@ export function usePublicDesignDraftActions({
   const handleReadyForCart = useCallback(async () => {
     try {
       setError(null);
+      // Text sheet → canvas, затем явный saveCurrentPage в pages[] до сохранения/заказа.
+      await canvasHandleRef.current?.commitPendingTextEditSheet?.({ force: true });
       await canvasHandleRef.current?.flushPendingDocumentCommit?.();
-      const { pages: updatedPages } = buildCurrentDesignState();
+      const preparedPages = preparePagesForCart
+        ? await preparePagesForCart()
+        : null;
+      const { pages: statePages } = buildCurrentDesignState();
+      const updatedPages = pickPagesForCartExport(preparedPages, statePages);
       const nextPreflight = analyzePublicDesignPages(updatedPages, 'saved');
       setPages(updatedPages);
       if (nextPreflight.hasBlockingIssues) {
@@ -551,7 +585,11 @@ export function usePublicDesignDraftActions({
         setError('Перед возвратом в корзину исправьте ошибки проверки макета.');
         return;
       }
-      await handleSaveDraft(true);
+      await handleSaveDraft(true, {
+        pagesOverride: updatedPages,
+        skipCanvasFlush: true,
+        forcePersist: true,
+      });
       const token = await ensureDraft();
       onReadyForCart?.(token);
       setStatus('Макет готов к заказу.');
@@ -564,6 +602,7 @@ export function usePublicDesignDraftActions({
     ensureDraft,
     handleSaveDraft,
     onReadyForCart,
+    preparePagesForCart,
     setActiveTaskTab,
     setError,
     setPages,
