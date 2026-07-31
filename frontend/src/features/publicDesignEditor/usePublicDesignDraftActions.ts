@@ -21,6 +21,7 @@ import {
   startPublicEditorPerfSpan,
 } from './publicEditorPerf';
 import { buildProductionDesignState } from './productionDesignState';
+import { reconcileDesignPagesTextLoss } from '../../pages/admin/designEditor/fabricSnapshotReconcile';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -184,6 +185,8 @@ export function usePublicDesignDraftActions({
   const versionHydrationPromiseRef = useRef<Promise<void> | null>(null);
   const lastSavedPayloadHashRef = useRef<string | null>(null);
   const lastSavedPayloadTokenRef = useRef<string | null>(null);
+  /** Последний успешно ушедший на сервер pages[] — защита от PATCH с пустыми text. */
+  const lastPersistedPagesRef = useRef<DesignPage[] | null>(null);
 
   const applyDesignStateFromServer = useCallback(async (designState: DesignState) => {
     const spreadModeActive = documentMode === 'multipage' && designState.spread_mode === true;
@@ -207,6 +210,7 @@ export function usePublicDesignDraftActions({
     setCoverPages(nextCoverPages);
     setPrepressConfig(normalizePrepressFromDesignState(designState.prepress));
     setCurrentPage(0);
+    lastPersistedPagesRef.current = nextPages;
     await canvasHandleRef.current?.whenPageTransitionIdle?.();
     await canvasHandleRef.current?.applyEditorViewState(nextPages);
   }, [
@@ -226,6 +230,7 @@ export function usePublicDesignDraftActions({
     draftVersionRef.current = null;
     lastSavedPayloadHashRef.current = null;
     lastSavedPayloadTokenRef.current = null;
+    lastPersistedPagesRef.current = null;
     versionHydrationPromiseRef.current = null;
   }, [draftToken]);
 
@@ -319,9 +324,18 @@ export function usePublicDesignDraftActions({
       if (!options?.skipExpectedVersion) {
         await hydrateDraftVersion(token).catch(() => undefined);
       }
-      const { designState, selectedParams: nextSelectedParams } = buildCurrentDesignState(
-        options?.pagesOverride,
+      const built = buildCurrentDesignState(options?.pagesOverride);
+      const safePages = reconcileDesignPagesTextLoss(
+        lastPersistedPagesRef.current ?? undefined,
+        built.pages,
       );
+      const { designState, selectedParams: nextSelectedParams } = safePages === built.pages
+        ? built
+        : buildCurrentDesignState(safePages);
+      if (safePages !== built.pages) {
+        recordPublicEditorPerfMetric('autosave.textReconcile.count', 1, { token });
+        setPages(safePages);
+      }
       const productionDesignState = buildProductionDesignState(designState);
       const digest = buildAutosavePayloadDigest({
         designState: designState as unknown as Record<string, unknown>,
@@ -365,6 +379,7 @@ export function usePublicDesignDraftActions({
       }
       lastSavedPayloadHashRef.current = digest.hash;
       lastSavedPayloadTokenRef.current = token;
+      lastPersistedPagesRef.current = designState.pages ?? safePages;
       savedDirtyVersionRef.current = dirtyVersion;
       setSaveState('saved');
       if (!silent) setStatus('Макет сохранён.');
@@ -379,6 +394,7 @@ export function usePublicDesignDraftActions({
     draftPayloadExtras,
     ensureDraft,
     hydrateDraftVersion,
+    setPages,
     setSaveState,
     setStatus,
   ]);

@@ -47,6 +47,7 @@ interface DesignEditorCanvasViewProps {
   onPhotoSelected: (file: File) => void;
   onTextClose: () => void;
   onTextSave: (text: string) => void;
+  onTextDraftChange?: (text: string) => void;
 }
 
 export const DesignEditorCanvasView: React.FC<DesignEditorCanvasViewProps> = ({
@@ -75,6 +76,7 @@ export const DesignEditorCanvasView: React.FC<DesignEditorCanvasViewProps> = ({
   onPhotoSelected,
   onTextClose,
   onTextSave,
+  onTextDraftChange,
 }) => (
   <div className="fabric-canvas-outer">
     <div className="fabric-canvas-inner">
@@ -160,6 +162,7 @@ export const DesignEditorCanvasView: React.FC<DesignEditorCanvasViewProps> = ({
       onPhotoSelected={(file) => onPhotoSelected(file)}
       onTextClose={onTextClose}
       onTextSave={onTextSave}
+      onTextDraftChange={onTextDraftChange}
     />
   </div>
 );

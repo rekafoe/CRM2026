@@ -26,6 +26,13 @@
   min-width: 0;
 }
 
+.text-mobile-toolbar__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .text-mobile-toolbar__title {
   color: #334155;
   font-size: 13px;
@@ -43,6 +50,26 @@
   cursor: pointer;
   font-size: 13px;
   font-weight: 800;
+}
+
+.text-mobile-toolbar__delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.text-mobile-toolbar__delete-btn:active {
+  background: #fee2e2;
 }
 
 .text-mobile-toolbar__text-field {

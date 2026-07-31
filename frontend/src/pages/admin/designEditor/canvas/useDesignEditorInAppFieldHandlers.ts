@@ -44,6 +44,7 @@ interface UseDesignEditorInAppFieldHandlersInput {
   saveSnapshot: () => void;
   emitTextFillHintIfNeeded: (textBefore: string | undefined, textAfter: string | undefined) => void;
   onSelectionChange: (info: SelectedObjProps | null) => void;
+  textEditDraftRef: MutableRefObject<string>;
 }
 
 function createApplyPhotoFileToTarget(input: {
@@ -76,6 +77,7 @@ export function useDesignEditorInAppFieldHandlers({
   saveSnapshot,
   emitTextFillHintIfNeeded,
   onSelectionChange,
+  textEditDraftRef,
 }: UseDesignEditorInAppFieldHandlersInput) {
   const applyPhotoFileToTarget = useCallback(
     createApplyPhotoFileToTarget({ fabricRef, fillPhotoFieldWithSnapshot }),
@@ -125,6 +127,13 @@ export function useDesignEditorInAppFieldHandlers({
     textEditSheet,
   ]);
 
+  /** Перед flush/навигацией/заказом: применить открытый sheet на холст. */
+  const commitPendingTextEditSheet = useCallback((options?: { force?: boolean }) => {
+    if (!textEditSheet) return;
+    if (!options?.force) return;
+    handleInAppTextSave(textEditDraftRef.current);
+  }, [handleInAppTextSave, textEditDraftRef, textEditSheet]);
+
   const handleCropApply = useCallback((panX: number, panY: number, zoom: number) => {
     void (async () => {
       const canvas = fabricRef.current;
@@ -160,6 +169,7 @@ export function useDesignEditorInAppFieldHandlers({
     handleInAppPhotoSelected,
     handleInAppTextClose,
     handleInAppTextSave,
+    commitPendingTextEditSheet,
     handleCropApply,
     handleCropReplaceFile,
   };

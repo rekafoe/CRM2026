@@ -1242,7 +1242,8 @@
 
   .public-design-editor__mobile-dock {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: stretch;
     flex: 0 0 auto;
     box-sizing: border-box;
     width: 100%;
@@ -1252,6 +1253,43 @@
     background: #ffffff;
     border-top: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .public-design-editor__mobile-dock-history {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+
+  .public-design-editor__mobile-dock-history-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 36px;
+    margin: 0;
+    padding: 0;
+    color: #0f172a;
+    font-size: 20px;
+    line-height: 1;
+    background: #f8fafc;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  .public-design-editor__mobile-dock-history-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .public-design-editor__mobile-dock-tabs {
+    grid-column: 2;
+  }
+
+  .public-design-editor__mobile-dock-next {
+    grid-column: 1 / -1;
   }
 
   .public-design-editor__mobile-dock-tabs {

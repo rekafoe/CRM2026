@@ -36,11 +36,8 @@ import {
   applyBasicModeConstraints,
   bakeClientPhotoFieldIfNeeded,
   beginTextEditingOnCanvas,
-  canDeleteObjectInBasicMode,
   canKeyboardTransformObject,
   CLIPBOARD_PASTE_OFFSET_PX,
-  detachFabricObject,
-  deletePhotoFieldTargetInBasicMode,
   duplicateActiveObjects,
   enforceSingleObjectSelectionOnCoarse,
   getObjProps,
@@ -65,6 +62,8 @@ import {
   getKeyboardTargetObjects,
   asAny,
 } from './index';
+import { deleteCanvasSelection } from './deleteCanvasSelection';
+import { DESIGN_EDITOR_DELETE_REQUEST } from '../designEditorDeleteControl';
 import type { AnyObj } from './canvasUtils';
 
 export type CropModalState = {
@@ -270,6 +269,8 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
             const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
             hidden?.classList.remove('de-fabric-text-input');
             onTextEditCommittedRef.current?.();
+            // Зафиксировать результат inline-edit сразу, без ожидания debounce text:changed.
+            saveSnapshot();
           }
           resetCanvasWrapScroll();
         });
@@ -936,26 +937,12 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
 
           if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
-            const targets = canvas.getActiveObjects().filter((obj) => (
-              modeRef.current === 'basic'
-                ? canDeleteObjectInBasicMode(obj)
-                : !asAny(obj).isBackground
-            ));
-            if (targets.length === 0) return;
-            targets.forEach((obj) => {
-              if (modeRef.current === 'basic' && (asAny(obj).isPhotoField || resolvePhotoFieldTarget(obj))) {
-                deletePhotoFieldTargetInBasicMode(canvas, obj);
-              } else {
-                detachFabricObject(canvas, obj);
-              }
-            });
-            canvas.discardActiveObject();
-            if (modeRef.current === 'basic') {
-              applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
-            }
-            canvas.requestRenderAll();
-            onSelectionChange(null);
-            saveSnapshot();
+            deleteCanvasSelection(
+              canvas,
+              modeRef.current,
+              selectionDisplayScaleRef.current,
+              { onSelectionChange, saveSnapshot },
+            );
           }
           if (isModifierShortcut && key === 'z') {
             e.preventDefault();
@@ -971,6 +958,20 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           }
         };
         window.addEventListener('keydown', onKeyDown);
+
+        const onDeleteControlRequest = () => {
+          deleteCanvasSelection(
+            canvas,
+            modeRef.current,
+            selectionDisplayScaleRef.current,
+            { onSelectionChange, saveSnapshot },
+          );
+        };
+        // Custom control marker (не в стандартных Fabric event types).
+        (canvas as unknown as { on: (e: string, h: () => void) => void }).on(
+          DESIGN_EDITOR_DELETE_REQUEST,
+          onDeleteControlRequest,
+        );
 
         // Ctrl+V — вставка изображения из буфера обмена
         const onPaste = (e: ClipboardEvent) => {
@@ -1014,6 +1015,10 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
     scheduleTextAnchorRef.current = null;
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('paste', onPaste);
+    (canvas as unknown as { off: (e: string, h: () => void) => void }).off(
+      DESIGN_EDITOR_DELETE_REQUEST,
+      onDeleteControlRequest,
+    );
     canvas.upperCanvasEl.removeEventListener('mousemove', trackPasteScene);
     canvas.upperCanvasEl.removeEventListener('touchstart', onCanvasTouchStart, true);
     canvas.lowerCanvasEl.removeEventListener('touchstart', onCanvasTouchStart, true);

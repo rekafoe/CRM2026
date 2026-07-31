@@ -58,8 +58,12 @@ function isTextObject(obj: FabricJsonObject): boolean {
   return type === 'i-text' || type === 'itext' || type === 'textbox' || type === 'text'
 }
 
+function normalizeTextForPlaceholderCheck(text: unknown): string {
+  return String(text ?? '').replace(/\u200b/g, '').trim()
+}
+
 function isPlaceholderText(text: string): boolean {
-  const normalized = text.trim().toLowerCase()
+  const normalized = normalizeTextForPlaceholderCheck(text).toLowerCase()
   return PLACEHOLDER_TEXTS.has(normalized) || normalized.includes('placeholder')
 }
 
@@ -117,7 +121,7 @@ export function analyzeDesignStatePreflight(
 
       if (isTextObject(obj)) {
         textTotal += 1
-        const text = String(obj.text ?? '').trim()
+        const text = normalizeTextForPlaceholderCheck(obj.text)
         const placeholder = isPlaceholderText(text)
         const empty = text.length === 0
         if (!empty && !placeholder) textReady += 1

@@ -24,6 +24,8 @@ interface EditorInAppFieldSheetsProps {
   onPhotoSelected: (file: File) => void;
   onTextClose: () => void;
   onTextSave: (text: string) => void;
+  /** Живой draft textarea — для commit перед flush/заказом без «Готово». */
+  onTextDraftChange?: (text: string) => void;
 }
 
 export const EditorInAppFieldSheets: React.FC<EditorInAppFieldSheetsProps> = ({
@@ -33,12 +35,15 @@ export const EditorInAppFieldSheets: React.FC<EditorInAppFieldSheetsProps> = ({
   onPhotoSelected,
   onTextClose,
   onTextSave,
+  onTextDraftChange,
 }) => {
   const [draftText, setDraftText] = useState(textEdit?.text ?? '');
 
   React.useEffect(() => {
-    setDraftText(textEdit?.text ?? '');
-  }, [textEdit?.fieldId, textEdit?.text]);
+    const next = textEdit?.text ?? '';
+    setDraftText(next);
+    onTextDraftChange?.(next);
+  }, [textEdit?.fieldId, textEdit?.text, onTextDraftChange]);
 
   return (
     <>
@@ -92,7 +97,11 @@ export const EditorInAppFieldSheets: React.FC<EditorInAppFieldSheetsProps> = ({
             enterKeyHint="done"
             aria-label="Текст на макете"
             placeholder="Введите текст"
-            onChange={(event) => setDraftText(event.target.value)}
+            onChange={(event) => {
+              const next = event.target.value;
+              setDraftText(next);
+              onTextDraftChange?.(next);
+            }}
           />
         </label>
         <div className="de-inapp-field-sheet__actions">

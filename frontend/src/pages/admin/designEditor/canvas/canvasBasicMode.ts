@@ -3,7 +3,9 @@ import {
   applyPhotoFieldSelectionChrome,
   applyTextSelectionChrome,
   isTextLikeFabricObject,
+  buildBasicTextSelectionChrome,
 } from '../designEditorTextChrome';
+import { applyDesignEditorDeleteControl } from '../designEditorDeleteControl';
 import { ensurePhotoFieldStaticLayout } from '../photoFieldFit';
 import { createEmptyPhotoField, isClientAddedPhotoField } from '../designFields';
 import { finalizeEmptyPhotoFieldPlacement } from '../photoFieldEmpty';
@@ -68,6 +70,18 @@ export function applyBasicModeConstraints(canvas: Canvas, displayScale = 1): voi
       });
       if (clientAdded) {
         applyPhotoFieldSelectionChrome(obj, displayScale, canvasZoom);
+      } else {
+        // Template photo: без resize-углов, но с маркером удаления / очистки.
+        const chrome = buildBasicTextSelectionChrome(displayScale, canvasZoom);
+        obj.set({
+          hasControls: true,
+          cornerSize: chrome.cornerSize,
+          touchCornerSize: chrome.touchCornerSize,
+        });
+        applyDesignEditorDeleteControl(obj, {
+          size: chrome.touchCornerSize ?? chrome.cornerSize,
+          onlyDeleteControl: true,
+        });
       }
       if (filled) {
         obj.set({ hoverCursor: 'pointer' });
@@ -75,6 +89,7 @@ export function applyBasicModeConstraints(canvas: Canvas, displayScale = 1): voi
     } else if (isTextLikeFabricObject(obj)) {
       applyTextSelectionChrome(obj, 'basic', displayScale, canvasZoom);
     } else if (isBasicDecorShape(obj)) {
+      const chrome = buildBasicTextSelectionChrome(displayScale, canvasZoom);
       obj.set({
         selectable: true,
         evented: true,
@@ -83,11 +98,17 @@ export function applyBasicModeConstraints(canvas: Canvas, displayScale = 1): voi
         lockScalingX: true,
         lockScalingY: true,
         lockRotation: true,
-        hasControls: false,
+        hasControls: true,
         hasBorders: true,
         borderColor: '#2563eb',
         borderScaleFactor: 2.75 * inv,
         padding: Math.round(8 * inv),
+        cornerSize: chrome.cornerSize,
+        touchCornerSize: chrome.touchCornerSize,
+      });
+      applyDesignEditorDeleteControl(obj, {
+        size: chrome.touchCornerSize ?? chrome.cornerSize,
+        onlyDeleteControl: true,
       });
     } else {
       obj.set({ selectable: false, evented: false });

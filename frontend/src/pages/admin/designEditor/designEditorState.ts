@@ -2,6 +2,7 @@ import type { DesignTemplate } from '../../../api';
 import type { DesignPage, DesignPrepressConfig, DesignState } from './types';
 import type { PageSaveSnapshot } from './mergePagesSnapshot';
 import { mergePagesWithSavedSnapshot } from './mergePagesSnapshot';
+import { reconcileSavedSnapshotLoss } from './fabricSnapshotReconcile';
 import { inferSceneScaleFromPageExtents } from './designFields/sceneScale';
 
 export type DesignTemplateSpec = {
@@ -36,11 +37,10 @@ export function mergeSavedEditorPages(
   leftPageIdx: number,
   rightPageIdx: number,
 ): DesignPage[] {
-  return mergePagesWithSavedSnapshot(pages, saved, {
-    currentPage,
-    leftPageIdx,
-    rightPageIdx,
-  });
+  const mergeContext = { currentPage, leftPageIdx, rightPageIdx };
+  // Public + admin: не даём пустому/урезанному canvas snapshot затереть текст и поля.
+  const reconciled = reconcileSavedSnapshotLoss(pages, saved, mergeContext);
+  return mergePagesWithSavedSnapshot(pages, reconciled, mergeContext);
 }
 
 /** sceneScale: явное значение из designState, иначе вывод по JSON / backgroundSceneScale. */

@@ -5,6 +5,7 @@ import type { DesignPage } from '../types';
 import { cropSpreadThumbnail } from '../cropSpreadThumbnail';
 import { loadDesignPageScene, loadSpreadMergedScene } from '../designPageLoader';
 import { mergePagesWithSavedSnapshot, type PageSaveSnapshot } from '../mergePagesSnapshot';
+import { reconcileSavedSnapshotLoss } from '../fabricSnapshotReconcile';
 import { splitSpreadCanvasToPagesSync } from '../spreadCanvas';
 import type { EditorMode } from './types';
 import { applyBasicModeConstraints, lockTextInlineEditing } from './canvasBasicMode';
@@ -169,11 +170,9 @@ function commitOutgoingCanvasToPages(input: {
       currentPage = parsedPrev.index;
     }
 
-    const nextPages = mergePagesWithSavedSnapshot(input.pages, saved, {
-      currentPage,
-      leftPageIdx,
-      rightPageIdx,
-    });
+    const mergeContext = { currentPage, leftPageIdx, rightPageIdx };
+    const reconciled = reconcileSavedSnapshotLoss(input.pages, saved, mergeContext);
+    const nextPages = mergePagesWithSavedSnapshot(input.pages, reconciled, mergeContext);
 
     if (nextPages.length === input.pages.length) {
       const stopCompare = startPublicEditorPerfSpan('transition.pages.compare.ms');

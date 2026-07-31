@@ -20,6 +20,10 @@ interface PublicDesignEditorMobileDockProps {
   missingTextCount: number;
   checkIssueCount: number;
   nextAction: PublicEditorNextAction;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   onPanelChange: (panel: PublicDesignMobilePanel) => void;
   onNextAction: () => void;
   /** When true (e.g. during page transition), tab buttons are disabled to prevent
@@ -35,11 +39,37 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
   missingTextCount,
   checkIssueCount,
   nextAction,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onPanelChange,
   onNextAction,
   disabled = false,
 }) => (
   <nav className="public-design-editor__mobile-dock" aria-label="Переключение макета, фото и текста">
+    <div className="public-design-editor__mobile-dock-history" role="group" aria-label="История действий">
+      <button
+        type="button"
+        className="public-design-editor__mobile-dock-history-btn"
+        disabled={disabled || !canUndo}
+        aria-label="Отменить"
+        title="Отменить"
+        onClick={onUndo}
+      >
+        ↶
+      </button>
+      <button
+        type="button"
+        className="public-design-editor__mobile-dock-history-btn"
+        disabled={disabled || !canRedo}
+        aria-label="Повторить"
+        title="Повторить"
+        onClick={onRedo}
+      >
+        ↷
+      </button>
+    </div>
     <div className="public-design-editor__mobile-dock-tabs" role="tablist">
       <button
         type="button"

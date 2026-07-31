@@ -21,7 +21,12 @@ import { clearPhotoFieldDropHighlight, createPhotoFieldDropHighlightState } from
 import { loadDesignPageScene, loadSpreadMergedScene } from '../designPageLoader';
 import { isRestrictiveInAppBrowser, shouldPreferTextEditSheet } from '../inAppBrowser';
 import { splitSpreadCanvasToPagesSync } from '../spreadCanvas';
-import { applyFormatToTextField, finalizeCanvasTextEditingPreservingLayout, type TextStyleRun } from '../textStyleRuns';
+import {
+  applyFormatToTextField,
+  applyTextContentSafely,
+  finalizeCanvasTextEditingPreservingLayout,
+  type TextStyleRun,
+} from '../textStyleRuns';
 import type { TextBlockPresetKind } from '../constants';
 import { TEXT_BLOCK_PRESETS, TEXT_FONTS } from '../constants';
 import type { DesignPage, SelectedObjProps } from '../types';
@@ -36,18 +41,15 @@ import {
 } from './canvasCommands';
 import {
   applyBasicModeConstraints,
-  canDeleteObjectInBasicMode,
   clearFilledPhotoField,
-  deletePhotoFieldTargetInBasicMode,
 } from './canvasBasicMode';
 import { beginTextEditingOnCanvas } from './canvasTextEditing';
 import { duplicateActiveObjects } from './canvasKeyboard';
-import { detachFabricObject } from './canvasObjectDetach';
+import { deleteCanvasSelection } from './deleteCanvasSelection';
 import {
   findDesignObjectByIdDeep,
   findPhotoFieldByIdDeep,
   getObjProps,
-  resolvePhotoFieldTarget,
 } from './canvasSelection';
 import { canvasToJSON, parsePageLoadKey } from './canvasSerialization';
 import {
@@ -88,6 +90,7 @@ export interface DesignEditorCanvasHandleDeps {
   fillPhotoFieldWithSnapshot: (canvas: Canvas, field: FabricObject, file: File) => Promise<void>;
   openTextEditSheetForTarget: (target: FabricObject) => boolean;
   captureTextEditBaseline: (target: FabricObject) => void;
+  commitPendingTextEditSheetRef: MutableRefObject<((options?: { force?: boolean }) => void) | null>;
   setPhotoPickSheet: (state: PhotoPickSheetState | null) => void;
   onSelectionChange: (info: SelectedObjProps | null) => void;
   onZoomChange: (zoom: number) => void;
@@ -142,24 +145,15 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
       deleteSelected: () => {
         const canvas = d.fabricRef.current;
         if (!canvas) return;
-        const targets = canvas.getActiveObjects().filter((obj) => (
-          d.modeRef.current === 'basic'
-            ? canDeleteObjectInBasicMode(obj)
-            : !asAny(obj).isBackground
-        ));
-        if (targets.length === 0) return;
-        targets.forEach((obj) => {
-          if (d.modeRef.current === 'basic' && (asAny(obj).isPhotoField || resolvePhotoFieldTarget(obj))) {
-            deletePhotoFieldTargetInBasicMode(canvas, obj);
-          } else {
-            detachFabricObject(canvas, obj);
-          }
-        });
-        canvas.discardActiveObject();
-        if (d.modeRef.current === 'basic') applyBasicModeConstraints(canvas, d.selectionDisplayScaleRef.current);
-        canvas.requestRenderAll();
-        d.onSelectionChange(null);
-        d.saveSnapshot();
+        deleteCanvasSelection(
+          canvas,
+          d.modeRef.current,
+          d.selectionDisplayScaleRef.current,
+          {
+            onSelectionChange: d.onSelectionChange,
+            saveSnapshot: d.saveSnapshot,
+          },
+        );
       },
       clearPhotoField: (id) => {
         const canvas = d.fabricRef.current;
@@ -560,6 +554,16 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         if (!canvas) return;
         const active = canvas.getActiveObject();
         if (!active || !isTextLikeObject(active)) return;
+        if (key === 'text') {
+          applyTextContentSafely(
+            active as IText & { textStyleRuns?: TextStyleRun[] },
+            String(value ?? ''),
+          );
+          canvas.requestRenderAll();
+          d.onSelectionChange(getObjProps(active));
+          d.saveSnapshot({ debounce: true });
+          return;
+        }
         applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, { [key]: value });
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
@@ -763,5 +767,8 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
       isPageTransitionBusy: () => d.pageTransitionGate.isBusy(),
       getDisplayedPageLoadKey: () => d.prevPageLoadKeyRef.current,
       flushPendingDocumentCommit: () => d.flushCanvasDocumentCommit(),
+      commitPendingTextEditSheet: (options) => {
+        d.commitPendingTextEditSheetRef.current?.(options);
+      },
     };
 }

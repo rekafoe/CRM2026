@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AppIcon } from '../../../components/ui/AppIcon';
 import { TextFormattingControls, type TextFormattingHandlers } from './TextFormattingControls';
 import type { SelectedObjProps } from './types';
 import './TextMobileToolbar.css';
@@ -14,6 +15,7 @@ export const TextMobileToolbar: React.FC<TextMobileToolbarProps> = ({
   selectedObj,
   onTextChange,
   onOpenTextEdit,
+  onDelete,
   ...handlers
 }) => {
   const [draftText, setDraftText] = useState(selectedObj.text ?? '');
@@ -36,11 +38,22 @@ export const TextMobileToolbar: React.FC<TextMobileToolbarProps> = ({
     >
       <div className="text-mobile-toolbar__head">
         <span className="text-mobile-toolbar__title">Текст на макете</span>
-        {onOpenTextEdit ? (
-          <button type="button" className="text-mobile-toolbar__edit-btn" onClick={onOpenTextEdit}>
-            В окне
+        <div className="text-mobile-toolbar__head-actions">
+          {onOpenTextEdit ? (
+            <button type="button" className="text-mobile-toolbar__edit-btn" onClick={onOpenTextEdit}>
+              В окне
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="text-mobile-toolbar__delete-btn"
+            onClick={onDelete}
+            aria-label="Удалить текст"
+            title="Удалить"
+          >
+            <AppIcon name="trash" size="sm" />
           </button>
-        ) : null}
+        </div>
       </div>
       <label className="text-mobile-toolbar__text-field">
         <textarea
@@ -65,6 +78,7 @@ export const TextMobileToolbar: React.FC<TextMobileToolbarProps> = ({
       <div className="text-mobile-toolbar__scroll">
         <TextFormattingControls
           {...handlers}
+          onDelete={onDelete}
           selectedObj={selectedObj}
           variant="mobile-dock"
         />

@@ -1349,6 +1349,40 @@ function measureMaxTextboxLineWidth(obj: TextLikeObject): number {
 }
 
 const TIGHT_TEXTBOX_MIN_WIDTH_PX = 32;
+/** Пустое поле после стирания: иначе hit-area ~0 и поле «пропадает», хотя объект жив. */
+const EMPTY_TEXT_HIT_MIN_WIDTH_PX = 96;
+
+/** Держит кликабельную ширину у пустого textbox (после erase / load). */
+export function ensureEmptyTextFieldHitTarget(obj: TextLikeObject): void {
+  if (!isFabricTextObjectType(obj.type)) return;
+  const text = normalizeTextContent(obj.text).trim();
+  if (text) return;
+
+  const fontSize = Math.max(6, Number(obj.fontSize) || 16);
+  const layoutW = Number((obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth ?? 0);
+  const sacredW = Number((obj as { _sacredWidth?: number })._sacredWidth ?? 0);
+  const editFloor = Number((obj as { _editLayoutWidthFloor?: number })._editLayoutWidthFloor ?? 0);
+  const currentW = Number(obj.width ?? 0);
+  const minHit = Math.max(EMPTY_TEXT_HIT_MIN_WIDTH_PX, Math.ceil(fontSize * 5));
+  const targetW = Math.max(minHit, layoutW, sacredW, editFloor, currentW);
+
+  if (obj.type === 'textbox' && Number.isFinite(targetW) && targetW > 0) {
+    if (currentW + 0.5 < targetW) {
+      setTextboxWidthPreservingOrigin(obj, targetW);
+    }
+    if (!(layoutW > 0)) {
+      (obj as { textFieldLayoutWidth?: number }).textFieldLayoutWidth = targetW;
+    }
+  }
+
+  const pad = Math.max(Number((obj as { padding?: number }).padding) || 0, Math.ceil(fontSize * 0.45));
+  obj.set({
+    padding: pad,
+    // Иначе пустой i-text/textbox почти не ловит клик по «дырке».
+    perPixelTargetFind: false,
+  } as Parameters<typeof obj.set>[0]);
+  obj.setCoords?.();
+}
 
 /** Декоративные/скриптовые семейства (в т.ч. Ceremonious One — без слова "script" в имени). */
 const SCRIPT_FONT_FAMILY_RE = /script|cursive|hand|calligraph|wedding|signature|swan|elegant|flourish|ceremonious|allura|vibes|pinyon|brush|sacramento|dancing|corsiva|champagne|ballet|romant|amatic|pacifico|satisfy|yellowtail|arizonia|alex|monsieur|tangerine|great.?vibes|free.?hand|handwrit/i;
@@ -2556,6 +2590,9 @@ export function prepareTextObjectsOnCanvas(
 ): void {
   for (const obj of objects) {
     migrateAndHydrateTextObject(obj, options);
+    if (!options?.preserveLayout && isFabricTextObjectType(obj.type)) {
+      ensureEmptyTextFieldHitTarget(obj as TextLikeObject);
+    }
     const group = obj as { getObjects?: () => FabricObject[] };
     if (typeof group.getObjects === 'function') {
       prepareTextObjectsOnCanvas(group.getObjects(), options);
@@ -2818,6 +2855,8 @@ export function finishTextEditOnObject(
   if (isDesignedTemplateText(obj) && obj.type === 'textbox') {
     delete (obj as unknown as Record<string, unknown>)._editSessionLayoutWidth;
   }
+
+  ensureEmptyTextFieldHitTarget(obj);
 
   logTextWidthDebug('finish-edit:end', obj, {
     textChanged,

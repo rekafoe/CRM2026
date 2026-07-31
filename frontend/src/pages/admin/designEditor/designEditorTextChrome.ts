@@ -1,5 +1,6 @@
 import { Point, Rect, type Control, type FabricObject, type Group, type TMat2D } from 'fabric';
 import { measureFilledPhotoFieldFrameSize } from './photoFieldGeometry';
+import { applyDesignEditorDeleteControl } from './designEditorDeleteControl';
 
 /** Визуальное выделение текстовых блоков на холсте (рамка + угловые маркеры). */
 export const DESIGN_EDITOR_TEXT_CHROME = {
@@ -158,7 +159,9 @@ export function applyPhotoFieldSelectionChrome(
     padding: chrome.padding,
     borderColor: DESIGN_EDITOR_TEXT_CHROME.borderColor,
     hasBorders: true,
+    hasControls: true,
   });
+  applyDesignEditorDeleteControl(obj, { size: chrome.touchCornerSize ?? chrome.cornerSize });
   obj.setCoords();
 }
 
@@ -176,8 +179,9 @@ export function applyTextSelectionChrome(
   if (!isTextLikeFabricObject(obj)) return;
 
   if (mode === 'basic') {
+    const chrome = buildBasicTextSelectionChrome(displayScale, canvasZoom);
     obj.set({
-      ...buildBasicTextSelectionChrome(displayScale, canvasZoom),
+      ...chrome,
       selectable: true,
       evented: true,
       editable: false,
@@ -186,7 +190,9 @@ export function applyTextSelectionChrome(
       lockScalingX: false,
       lockScalingY: false,
       lockRotation: true,
+      hasControls: true,
     });
+    applyDesignEditorDeleteControl(obj, { size: chrome.touchCornerSize ?? chrome.cornerSize });
     return;
   }
 
@@ -196,4 +202,5 @@ export function applyTextSelectionChrome(
     lockScalingY: false,
     lockRotation: false,
   });
+  applyDesignEditorDeleteControl(obj, { size: DESIGN_EDITOR_TEXT_CHROME.touchCornerSize });
 }

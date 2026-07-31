@@ -146,7 +146,7 @@ export interface DesignEditorCanvasHandle {
   /** Сбросить отложенную синхронизацию live canvas → pages[] перед save/navigation. */
   flushPendingDocumentCommit: () => Promise<void>;
   /** Применить отложенный text-sheet на холст (если sheet открыт). */
-  commitPendingTextEditSheet?: (options?: { force?: boolean }) => void;
+  commitPendingTextEditSheet: (options?: { force?: boolean }) => void;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -314,6 +314,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     onPageTransitionBusyChangeRef.current = onPageTransitionBusyChange;
     const documentCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
+    const commitPendingTextEditSheetRef = useRef<((options?: { force?: boolean }) => void) | null>(null);
 
     const photoPickerTargetIdRef = useRef<string | null>(null);
     const photoFileInputRef = useRef<HTMLInputElement>(null);
@@ -328,6 +329,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const [cropModal, setCropModal] = useState<DesignEditorCanvasCropModalState | null>(null);
     const [photoPickSheet, setPhotoPickSheet] = useState<PhotoPickSheetState | null>(null);
     const [textEditSheet, setTextEditSheet] = useState<TextEditSheetState | null>(null);
+    const textEditDraftRef = useRef('');
 
     const [photoFieldFillLoading, setPhotoFieldFillLoading] = useState<{ progress: number } | null>(null);
 
@@ -540,6 +542,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       fillPhotoFieldWithSnapshot,
       openTextEditSheetForTarget,
       captureTextEditBaseline,
+      commitPendingTextEditSheetRef,
       setPhotoPickSheet,
       onSelectionChange,
       onZoomChange,
@@ -550,6 +553,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       handleInAppPhotoSelected,
       handleInAppTextClose,
       handleInAppTextSave,
+      commitPendingTextEditSheet,
       handleCropApply,
       handleCropReplaceFile,
     } = useDesignEditorInAppFieldHandlers({
@@ -569,7 +573,9 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       saveSnapshot,
       emitTextFillHintIfNeeded,
       onSelectionChange,
+      textEditDraftRef,
     });
+    commitPendingTextEditSheetRef.current = commitPendingTextEditSheet;
 
     return (
       <DesignEditorCanvasView
@@ -598,6 +604,9 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         onPhotoSelected={(file) => void handleInAppPhotoSelected(file)}
         onTextClose={handleInAppTextClose}
         onTextSave={handleInAppTextSave}
+        onTextDraftChange={(text) => {
+          textEditDraftRef.current = text;
+        }}
       />
     );
   },

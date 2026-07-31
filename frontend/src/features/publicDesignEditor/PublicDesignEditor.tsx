@@ -1117,6 +1117,10 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onPageThumbReady: handlePageThumbReady,
           onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
           onTextFillHint: handleTextFillHint,
+          onTextEditCommitted: () => {
+            markDirty();
+            void commitCanvasToPagesRef.current().catch(() => undefined);
+          },
           onCanvasDocumentCommit: () => {
             return commitCanvasToPagesRef.current().then(() => undefined);
           },
@@ -1316,9 +1320,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             missingTextCount={missingTextCount}
             checkIssueCount={checkIssueCount}
             nextAction={editorNextAction}
+            canUndo={canUndo}
+            canRedo={canRedo}
             disabled={pageTransitionBusy}
             onPanelChange={handleMobilePanelChange}
             onNextAction={handleMobileNextAction}
+            onUndo={() => canvasHandleRef.current?.undo()}
+            onRedo={() => canvasHandleRef.current?.redo()}
           />
         </footer>
       )}

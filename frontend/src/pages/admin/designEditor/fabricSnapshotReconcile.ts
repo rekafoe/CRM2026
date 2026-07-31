@@ -363,8 +363,9 @@ export function reconcilePhotoFieldSnapshotLoss(
   for (const [id, savedObj] of replacements) {
     const prev = prevById.get(id);
     if (!prev) continue;
-    const [upgraded] = preserveDesignedTextLayoutWhenSavedNarrower([prev], [savedObj]);
-    replacements.set(id, upgraded);
+    const [withText] = preserveTextContentWhenSavedEmpty([prev], [savedObj]);
+    const [upgraded] = preserveDesignedTextLayoutWhenSavedNarrower([prev], [withText ?? savedObj]);
+    replacements.set(id, upgraded ?? withText ?? savedObj);
   }
   const usedIds = new Set<string>();
   const nextObjects = replaceObjectsById(
@@ -388,6 +389,7 @@ export function reconcilePhotoFieldSnapshotLoss(
     .map((obj) => cloneFabricJson(obj));
 
   let mergedObjects = deduplicateFabricJsonObjectsById([...nextObjects, ...appendedObjects]);
+  mergedObjects = preserveTextContentWhenSavedEmpty(previousObjects, mergedObjects);
   if (siblingObjects && siblingObjects.length > 0) {
     const siblingById = collectObjectsById(siblingObjects);
     const before = mergedObjects.length;
@@ -409,6 +411,34 @@ export function reconcilePhotoFieldSnapshotLoss(
     ...saved,
     objects: mergedObjects,
   };
+}
+
+/** Сверка pages[] перед autosave/PATCH: не дать пустым text затереть последний хороший snapshot. */
+export function reconcileDesignPagesTextLoss(
+  previousPages: DesignPage[] | undefined,
+  nextPages: DesignPage[],
+): DesignPage[] {
+  if (!previousPages?.length) return nextPages;
+  let changed = false;
+  const result = nextPages.map((page, index) => {
+    const previous = previousPages[index]?.fabricJSON;
+    const saved = page.fabricJSON && typeof page.fabricJSON === 'object' && !Array.isArray(page.fabricJSON)
+      ? page.fabricJSON as Record<string, unknown>
+      : {};
+    const reconciled = reconcilePhotoFieldSnapshotLoss(previous, saved);
+    if (reconciled === saved) return page;
+    try {
+      if (JSON.stringify(reconciled) === JSON.stringify(saved)) return page;
+    } catch {
+      /* fall through */
+    }
+    changed = true;
+    return {
+      ...page,
+      fabricJSON: reconciled,
+    };
+  });
+  return changed ? result : nextPages;
 }
 
 export function reconcileSavedSnapshotLoss(
