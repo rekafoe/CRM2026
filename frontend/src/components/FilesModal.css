@@ -180,10 +180,41 @@
   animation: fm-spin 0.8s linear infinite;
 }
 
+.fm-spinner--muted {
+  border-color: rgba(100, 116, 139, 0.25);
+  border-top-color: #475569;
+}
+
 @keyframes fm-spin {
   to {
     transform: rotate(360deg);
   }
+}
+
+.fm-download-status {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 16px 0;
+  padding: 8px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 12px;
+}
+
+.fm-download-status__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fm-download-status__text strong,
+.fm-download-status__text span {
+  overflow-wrap: anywhere;
 }
 
 .fm-editor-bar {
@@ -308,6 +339,12 @@
   text-decoration: underline;
 }
 
+.fm-file__name:disabled {
+  cursor: wait;
+  opacity: 0.75;
+  text-decoration: none;
+}
+
 .fm-file__meta {
   display: flex;
   flex-wrap: wrap;
@@ -356,6 +393,16 @@
 .fm-chip--preflight-none {
   background: #e0e7ff;
   color: #3730a3;
+}
+
+.fm-chip--download-wait {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.fm-chip--download-active {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .fm-file__actions {

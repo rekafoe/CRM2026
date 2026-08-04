@@ -22,6 +22,10 @@ import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 import './FilesModal.css';
 
 const PREFLIGHT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff'];
+const EXTERNAL_DOWNLOAD_POLL_INTERVAL_MS = 2000;
+const EXTERNAL_DOWNLOAD_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
+
+type FileDownloadStage = 'waiting' | 'downloading';
 
 interface FilesModalProps {
   isOpen: boolean;
@@ -85,12 +89,29 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [previewItem, setPreviewItem] = useState<Item | null>(null);
   const [editorActionLoading, setEditorActionLoading] = useState(false);
   const [editorActionError, setEditorActionError] = useState<string | null>(null);
+  const [fileDownloadStageById, setFileDownloadStageById] = useState<Record<number, FileDownloadStage>>({});
+  const [downloadProgressByFileId, setDownloadProgressByFileId] = useState<
+    Record<number, { loadedBytes: number; totalBytes: number | null }>
+  >({});
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [downloadAllSummary, setDownloadAllSummary] = useState<{
+    total: number;
+    completed: number;
+    failed: number;
+    currentFileName: string;
+    phase: FileDownloadStage;
+  } | null>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       void loadFiles();
       void loadCurrentUserRole();
+      return;
     }
+    setFileDownloadStageById({});
+    setDownloadProgressByFileId({});
+    setDownloadNotice(null);
+    setDownloadAllSummary(null);
   }, [isOpen, orderId]);
 
   const loadCurrentUserRole = async () => {
@@ -160,40 +181,171 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     }
   };
 
-  const handleDownloadAll = async () => {
-    if (isDownloadingAll) return;
-    setIsDownloadingAll(true);
+  const setFileDownloadStage = (fileId: number, stage: FileDownloadStage | null) => {
+    setFileDownloadStageById((prev) => {
+      if (stage) return { ...prev, [fileId]: stage };
+      if (!(fileId in prev)) return prev;
+      const next = { ...prev };
+      delete next[fileId];
+      return next;
+    });
+    if (!stage) {
+      setDownloadProgressByFileId((prev) => {
+        if (!(fileId in prev)) return prev;
+        const next = { ...prev };
+        delete next[fileId];
+        return next;
+      });
+    }
+  };
+
+  const waitForExternalFileReady = async (file: OrderFile): Promise<OrderFile> => {
+    const fileName = file.originalName || file.filename;
+    const startedAt = Date.now();
+    while (true) {
+      const response = await listOrderFiles(orderId);
+      const latestFiles = response.data ?? [];
+      setFiles(latestFiles);
+      const latest = latestFiles.find((candidate) => candidate.id === file.id);
+      if (!latest) {
+        throw new Error(`Файл «${fileName}» больше не найден в заказе.`);
+      }
+      if (!isExternalFile(latest) || !latest.externalStatus || latest.externalStatus === 'ready') {
+        return latest;
+      }
+      if (latest.externalStatus === 'failed') {
+        throw new Error(`Подготовка файла «${fileName}» завершилась ошибкой.`);
+      }
+      const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+      setDownloadNotice(`Подготавливаем «${fileName}»… ${elapsedSeconds} c`);
+      if (Date.now() - startedAt > EXTERNAL_DOWNLOAD_WAIT_TIMEOUT_MS) {
+        throw new Error(`Превышено время ожидания готовности файла «${fileName}».`);
+      }
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, EXTERNAL_DOWNLOAD_POLL_INTERVAL_MS);
+      });
+    }
+  };
+
+  const downloadSingleFile = async (
+    file: OrderFile,
+    options?: { silent?: boolean; onStageChange?: (stage: FileDownloadStage) => void },
+  ): Promise<boolean> => {
+    const fileName = file.originalName || file.filename;
+    const notifyError = !options?.silent;
+    const setStage = (stage: FileDownloadStage) => {
+      setFileDownloadStage(file.id, stage);
+      options?.onStageChange?.(stage);
+    };
     try {
-      await Promise.all(
-        files.map(
-          (file, index) =>
-            new Promise<void>((resolve) => {
-              window.setTimeout(() => {
-                void handleDownloadFile(file).finally(resolve);
-              }, index * 200);
-            }),
-        ),
-      );
+      let latestFile = file;
+      if (isExternalFile(latestFile) && latestFile.externalStatus && latestFile.externalStatus !== 'ready') {
+        setStage('waiting');
+        setDownloadNotice(`Файл «${fileName}» в очереди подготовки…`);
+        latestFile = await waitForExternalFileReady(latestFile);
+      }
+      setStage('downloading');
+      await downloadOrderFile(orderId, latestFile.id, fileName, {
+        onPhaseChange: (phase) => {
+          if (phase === 'requesting') {
+            setDownloadNotice(`Запрашиваем «${fileName}»…`);
+            options?.onStageChange?.('waiting');
+            return;
+          }
+          if (phase === 'streaming') {
+            setDownloadNotice(`Скачиваем «${fileName}»…`);
+            options?.onStageChange?.('downloading');
+            return;
+          }
+          if (phase === 'saving') {
+            setDownloadNotice(`Подготавливаем сохранение «${fileName}»…`);
+            return;
+          }
+          if (phase === 'done') {
+            setDownloadNotice(`Файл «${fileName}» скачан.`);
+          }
+        },
+        onProgress: (loadedBytes, totalBytes) => {
+          setDownloadProgressByFileId((prev) => ({
+            ...prev,
+            [file.id]: { loadedBytes, totalBytes },
+          }));
+        },
+      });
+      setDownloadNotice(`Файл «${fileName}» скачан.`);
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось скачать файл';
+      if (notifyError) alert(message);
+      setDownloadNotice(message);
+      return false;
+    } finally {
+      setFileDownloadStage(file.id, null);
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    if (isDownloadingAll || files.length === 0) return;
+    const queue = [...files];
+    setIsDownloadingAll(true);
+    let completed = 0;
+    let failed = 0;
+    try {
+      for (const file of queue) {
+        const fileName = file.originalName || file.filename;
+        setDownloadAllSummary({
+          total: queue.length,
+          completed,
+          failed,
+          currentFileName: fileName,
+          phase: 'waiting',
+        });
+        const ok = await downloadSingleFile(file, {
+          silent: true,
+          onStageChange: (phase) => {
+            setDownloadAllSummary((prev) =>
+              prev
+                ? { ...prev, currentFileName: fileName, phase }
+                : {
+                    total: queue.length,
+                    completed,
+                    failed,
+                    currentFileName: fileName,
+                    phase,
+                  },
+            );
+          },
+        });
+        if (ok) completed += 1;
+        else failed += 1;
+        setDownloadAllSummary({
+          total: queue.length,
+          completed,
+          failed,
+          currentFileName: fileName,
+          phase: 'downloading',
+        });
+      }
+      if (failed > 0) {
+        alert(`Скачивание завершено с ошибками: успешно ${completed}, ошибок ${failed}.`);
+      } else {
+        setDownloadNotice(`Скачивание завершено: ${completed} файлов.`);
+      }
     } finally {
       setIsDownloadingAll(false);
+      window.setTimeout(() => {
+        setDownloadAllSummary(null);
+      }, 1800);
     }
   };
 
   const handleDownloadFile = async (file: OrderFile) => {
-    if (isExternalFile(file)) {
-      if (file.externalStatus && file.externalStatus !== 'ready') {
-        alert(`Файл ещё не готов: ${getExternalStatusLabel(file.externalStatus)}`);
-        return;
-      }
-      await downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch((error) => {
-        const msg = error instanceof Error ? error.message : 'Не удалось скачать внешний файл';
-        alert(msg);
-      });
-      return;
+    const ok = await downloadSingleFile(file);
+    if (ok) {
+      window.setTimeout(() => {
+        setDownloadNotice((current) => (current && current.startsWith('Файл «') ? null : current));
+      }, 1500);
     }
-    await downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() =>
-      alert('Не удалось скачать файл'),
-    );
   };
 
   const handleApproveFile = async (fileId: number) => {
@@ -284,6 +436,10 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const canOpenEditorPreview = Boolean(
     selectedOrderItem?.params.designState || selectedOrderItem?.params.photoBatch,
   );
+  const isAnyDownloadActive = isDownloadingAll || Object.keys(fileDownloadStageById).length > 0;
+  const downloadSummaryLabel = downloadAllSummary
+    ? `Скачивание ${Math.min(downloadAllSummary.total, downloadAllSummary.completed + downloadAllSummary.failed + 1)}/${downloadAllSummary.total}: ${downloadAllSummary.currentFileName} · ${downloadAllSummary.phase === 'waiting' ? 'ожидание готовности' : 'получение файла'}`
+    : null;
 
   const filesByItem = useMemo(() => {
     const map = new Map<number | null, OrderFile[]>();
@@ -300,7 +456,21 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       const cached = canPreflight(file) ? preflightCache[file.id] : null;
       const status = cached ? getPreflightStatus(cached) : null;
       const external = isExternalFile(file);
-      const canDownload = !external || !file.externalStatus || file.externalStatus === 'ready';
+      const requiresPreparation =
+        external && Boolean(file.externalStatus) && file.externalStatus !== 'ready' && file.externalStatus !== 'failed';
+      const canDownload = !external || file.externalStatus !== 'failed';
+      const downloadStage = fileDownloadStageById[file.id] ?? null;
+      const downloadProgress = downloadProgressByFileId[file.id] ?? null;
+      const downloadPercent =
+        downloadProgress && downloadProgress.totalBytes && downloadProgress.totalBytes > 0
+          ? Math.max(
+              0,
+              Math.min(
+                100,
+                Math.round((downloadProgress.loadedBytes / downloadProgress.totalBytes) * 100),
+              ),
+            )
+          : null;
       return (
         <div
           key={file.id}
@@ -311,7 +481,18 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               type="button"
               className="fm-file__name"
               onClick={() => void handleDownloadFile(file)}
-              title="Скачать"
+              title={
+                !canDownload
+                  ? 'Подготовка файла завершилась ошибкой'
+                  : downloadStage === 'waiting'
+                    ? 'Ожидаем готовность файла'
+                    : downloadStage === 'downloading'
+                      ? 'Скачивание уже выполняется'
+                      : requiresPreparation
+                        ? 'Поставить в очередь скачивания'
+                        : 'Скачать'
+              }
+              disabled={!canDownload || isDownloadingAll || Boolean(downloadStage)}
             >
               {file.originalName || file.filename}
             </button>
@@ -347,6 +528,23 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                   {status === null && 'Префлайт'}
                 </span>
               )}
+              {downloadStage && (
+                <span
+                  className={`fm-chip ${downloadStage === 'waiting' ? 'fm-chip--download-wait' : 'fm-chip--download-active'}`}
+                >
+                  {downloadStage === 'waiting'
+                    ? 'Подготовка…'
+                    : downloadPercent != null
+                      ? `Скачивание ${downloadPercent}%`
+                      : 'Скачивание…'}
+                </span>
+              )}
+              {downloadStage === 'downloading' && downloadProgress && (
+                <span className="fm-chip fm-chip--muted">
+                  {formatFileSize(downloadProgress.loadedBytes)}
+                  {downloadProgress.totalBytes ? ` / ${formatFileSize(downloadProgress.totalBytes)}` : ''}
+                </span>
+              )}
               {file.approved && <span className="fm-chip fm-chip--ok">Утверждён</span>}
             </div>
           </div>
@@ -365,8 +563,18 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               type="button"
               className="fm-icon-btn"
               onClick={() => void handleDownloadFile(file)}
-              title={canDownload ? 'Скачать' : 'Файл ещё не готов'}
-              disabled={!canDownload}
+              title={
+                !canDownload
+                  ? 'Подготовка файла завершилась ошибкой'
+                  : downloadStage === 'waiting'
+                    ? 'Ожидаем готовность файла'
+                    : downloadStage === 'downloading'
+                      ? 'Скачивание уже выполняется'
+                      : requiresPreparation
+                        ? 'Поставить в очередь скачивания'
+                        : 'Скачать'
+              }
+              disabled={!canDownload || isDownloadingAll || Boolean(downloadStage)}
             >
               <AppIcon name="download" size="xs" />
             </button>
@@ -460,7 +668,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               {isDownloadingAll ? (
                 <>
                   <span className="fm-spinner" aria-hidden />
-                  Скачиваем…
+                  Скачиваем {downloadAllSummary?.completed ?? 0}/{downloadAllSummary?.total ?? files.length}
                 </>
               ) : (
                 <>
@@ -487,6 +695,16 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             )}
           </label>
         </div>
+
+        {(downloadSummaryLabel || downloadNotice) && (
+          <div className="fm-download-status" role="status" aria-live="polite">
+            {isAnyDownloadActive && <span className="fm-spinner fm-spinner--muted" aria-hidden />}
+            <div className="fm-download-status__text">
+              {downloadSummaryLabel && <strong>{downloadSummaryLabel}</strong>}
+              {downloadNotice && <span>{downloadNotice}</span>}
+            </div>
+          </div>
+        )}
 
         {selectedOrderItem && selectedEditorSummary && (
           <div className={`fm-editor-bar fm-editor-bar--${selectedEditorSummary.kind}`}>

@@ -936,25 +936,66 @@ export const getOrderFileAccessLogs = (orderId: number, fileId: number) =>
   api.get<OrderFileAccessLog[]>(`/orders/${orderId}/files/${fileId}/access-logs`);
 
 /** Скачивание файла по ID через fetch. Имя — из Content-Disposition. */
-export const downloadOrderFile = async (orderId: number, fileId: number, suggestedFileName: string) => {
+export type OrderFileDownloadPhase = 'requesting' | 'streaming' | 'saving' | 'done';
+
+export interface DownloadOrderFileOptions {
+  onPhaseChange?: (phase: OrderFileDownloadPhase) => void;
+  onProgress?: (loadedBytes: number, totalBytes: number | null) => void;
+}
+
+export const downloadOrderFile = async (
+  orderId: number,
+  fileId: number,
+  suggestedFileName: string,
+  options?: DownloadOrderFileOptions,
+) => {
   const base = api.defaults.baseURL || API_BASE_URL || '/api';
   const fullUrl = (base.startsWith('http') ? base : `${typeof window !== 'undefined' ? window.location.origin : ''}${base}`).replace(/\/$/, '') + `/orders/${orderId}/files/${fileId}/download`;
   const token = typeof localStorage !== 'undefined' ? (localStorage.getItem(APP_CONFIG?.storage?.token || '') || localStorage.getItem('crmToken')) : '';
+  options?.onPhaseChange?.('requesting');
   const res = await fetch(fullUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(res.status === 404 ? 'Файл не найден' : `${res.status}: ${text || res.statusText}`);
   }
-  const blob = await res.blob();
+  const contentLengthHeader = res.headers.get('content-length');
+  const parsedTotal = Number(contentLengthHeader ?? 0);
+  const totalBytes = Number.isFinite(parsedTotal) && parsedTotal > 0 ? parsedTotal : null;
+  let blob: Blob;
+  options?.onPhaseChange?.('streaming');
+  if (res.body) {
+    const reader = res.body.getReader();
+    const chunks: ArrayBuffer[] = [];
+    let loadedBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      const normalized = new Uint8Array(value.byteLength);
+      normalized.set(value);
+      chunks.push(normalized.buffer);
+      loadedBytes += value.byteLength;
+      options?.onProgress?.(loadedBytes, totalBytes);
+    }
+    blob = new Blob(chunks, {
+      type: res.headers.get('content-type') || 'application/octet-stream',
+    });
+  } else {
+    blob = await res.blob();
+    options?.onProgress?.(blob.size, totalBytes ?? (blob.size > 0 ? blob.size : null));
+  }
   if (blob.size === 0) {
     throw new Error('Сервер вернул пустой файл (0 байт). Проверьте, что файл есть на диске.');
   }
+  options?.onPhaseChange?.('saving');
+  options?.onProgress?.(blob.size, totalBytes ?? blob.size);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = suggestedFileName || 'download';
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  options?.onPhaseChange?.('done');
 };
 
 /** Загрузка файла для превью (без скачивания). Возвращает Blob. */
