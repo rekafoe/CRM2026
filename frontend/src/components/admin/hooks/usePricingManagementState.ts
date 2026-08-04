@@ -14,10 +14,17 @@ export interface PrintPriceM2Tier {
   price_per_m2: number
 }
 
+export interface PrintPriceRollM2Tier {
+  min_total_m2: number
+  max_total_m2?: number | null
+  price_per_m2: number
+}
+
 export interface PrintPrice {
   id: number
   technology_code: string
   counter_unit: 'sheets' | 'meters' | 'm2'
+  m2_pricing_kind?: 'uv_flatbed' | 'roll_wide' | null
   sheet_width_mm?: number | null
   sheet_height_mm?: number | null
   price_bw_single: number | null
@@ -35,6 +42,7 @@ export interface PrintPrice {
   is_active: number
   tiers?: PrintPriceTier[]
   m2_tiers?: PrintPriceM2Tier[]
+  roll_m2_tiers?: PrintPriceRollM2Tier[]
 }
 
 export interface ServicePrice {

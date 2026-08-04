@@ -33,13 +33,19 @@ export function parsePricingTab(
 
 export function formatCounterUnit(unit: PrintPrice['counter_unit']): string {
   if (unit === 'meters') return 'Пог. метры';
-  if (unit === 'm2') return 'Кв. метры (УФ)';
+  if (unit === 'm2') return 'Кв. метры';
   return 'Листы';
+}
+
+export function formatM2PricingKind(kind: PrintPrice['m2_pricing_kind']): string {
+  if (kind === 'uv_flatbed') return 'УФ-планшет';
+  if (kind === 'roll_wide') return 'ШФП рулон';
+  return 'm² профиль не выбран';
 }
 
 export function formatPricingMode(mode: string | undefined): string {
   if (mode === 'per_meter') return 'Пог. метр';
-  if (mode === 'per_m2') return 'Кв. метр (УФ)';
+  if (mode === 'per_m2') return 'Кв. метр';
   return 'За лист';
 }
 

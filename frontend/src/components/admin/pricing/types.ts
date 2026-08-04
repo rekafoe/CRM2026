@@ -6,6 +6,7 @@ export interface PrintTechnology {
   name: string;
   pricing_mode: PricingMode;
   supports_duplex: number;
+  supports_bw: number;
   is_active: number;
   price_single?: number | null;
   price_duplex?: number | null;
@@ -18,7 +19,7 @@ export interface PrinterRow {
   code: string;
   name: string;
   technology_code?: string | null;
-  counter_unit?: 'sheets' | 'meters';
+  counter_unit?: 'sheets' | 'meters' | 'm2';
   max_width_mm?: number | null;
   color_mode?: 'bw' | 'color' | 'both';
   printer_class?: 'office' | 'pro';

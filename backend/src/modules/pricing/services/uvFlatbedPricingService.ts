@@ -186,6 +186,7 @@ export class UvFlatbedPricingService {
     const pp = await db.get<{
       id: number;
       counter_unit: string;
+      m2_pricing_kind?: string | null;
       price_color_per_m2: number | null;
       price_white_per_m2: number | null;
       price_varnish_per_m2: number | null;
@@ -193,10 +194,16 @@ export class UvFlatbedPricingService {
       max_width_mm: number | null;
       max_height_mm: number | null;
     }>(
-      `SELECT id, counter_unit, price_color_per_m2, price_white_per_m2, price_varnish_per_m2,
+      `SELECT id, counter_unit, m2_pricing_kind, price_color_per_m2, price_white_per_m2, price_varnish_per_m2,
               min_charge, max_width_mm, max_height_mm
        FROM print_prices
-       WHERE LOWER(technology_code) = LOWER(?) AND is_active = 1 AND counter_unit = 'm2'
+       WHERE LOWER(technology_code) = LOWER(?)
+         AND is_active = 1
+         AND counter_unit = 'm2'
+         AND (
+           m2_pricing_kind = 'uv_flatbed'
+           OR (m2_pricing_kind IS NULL AND LOWER(technology_code) = 'uv')
+         )
        ORDER BY id DESC LIMIT 1`,
       code,
     );
@@ -230,8 +237,8 @@ export class UvFlatbedPricingService {
   static async buildMissingRatesError(technologyCode: string): Promise<Error & { status?: number }> {
     const code = normalizeTechnologyCode(technologyCode);
     const db = await getDb();
-    const existing = await db.get<{ counter_unit: string }>(
-      `SELECT counter_unit FROM print_prices
+    const existing = await db.get<{ counter_unit: string; m2_pricing_kind?: string | null }>(
+      `SELECT counter_unit, m2_pricing_kind FROM print_prices
        WHERE LOWER(technology_code) = LOWER(?) AND is_active = 1
        ORDER BY id DESC LIMIT 1`,
       code,
@@ -242,6 +249,11 @@ export class UvFlatbedPricingService {
         `Для УФ-планшета нужна цена печати с единицей учёта «м²» (технология «${code}»). ` +
         `Сейчас в центре цен активна запись с единицей «${existing.counter_unit}». ` +
         'Откройте Админ-панель → Принтеры → Цены печати и создайте запись с единицей «Кв. метры (УФ-планшет)».';
+      err.status = 422;
+    } else if (existing?.counter_unit === 'm2' && existing?.m2_pricing_kind === 'roll_wide') {
+      err.message =
+        `Для технологии «${code}» активен m²-профиль «ШФП рулон», а не УФ. ` +
+        'Создайте/выберите запись с m2_pricing_kind=uv_flatbed.';
       err.status = 422;
     } else {
       err.message =

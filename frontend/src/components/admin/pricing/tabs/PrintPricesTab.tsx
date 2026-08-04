@@ -4,6 +4,7 @@ import { MoneyAmount } from '../../../ui';
 import type { PrintPrice } from '../../hooks/usePricingManagementState';
 import {
   formatCounterUnit,
+  formatM2PricingKind,
   resolveTechnologyName,
   sortPrintPrices,
 } from '../printPriceDisplay';
@@ -42,6 +43,7 @@ function getFilteredData(
       item.price_color_per_m2,
       item.price_white_per_m2,
       item.price_varnish_per_m2,
+      item.m2_pricing_kind,
       item.min_charge,
       item.max_width_mm,
       item.max_height_mm,
@@ -66,7 +68,13 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
   onNavigateToAdd,
 }) => {
   const hasUvM2 = useMemo(
-    () => printPrices.some((p) => p.technology_code === 'uv' && p.counter_unit === 'm2'),
+    () =>
+      printPrices.some(
+        (p) =>
+          p.counter_unit === 'm2' &&
+          (p.m2_pricing_kind === 'uv_flatbed' ||
+            (p.m2_pricing_kind == null && p.technology_code === 'uv')),
+      ),
     [printPrices],
   );
 
@@ -81,8 +89,8 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
         <div className="section-header__text">
           <h3>Цены печати по технологиям</h3>
           <p>
-            Центральные ставки: лист, погонный метр или кв. метр (УФ-планшет). Редактирование — на отдельной
-            странице.
+            Центральные ставки: лист, погонный метр или кв. метр (профили УФ и ШФП рулон). Редактирование — на
+            отдельной странице.
           </p>
         </div>
         <div className="section-actions">
@@ -95,7 +103,7 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
       {!hasUvM2 && (
         <div className="print-price-hint-banner">
           Для УФ-планшета создайте запись с технологией <strong>uv</strong> и единицей учёта{' '}
-          <strong>Кв. метры (УФ)</strong>. Подробная настройка — в документации{' '}
+          <strong>Кв. метры</strong> и профилем <strong>УФ-планшет</strong>. Подробная настройка — в документации{' '}
           <code>docs/uv-flatbed-setup-guide.md</code> в репозитории.
         </div>
       )}
@@ -113,7 +121,10 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
             const sheetW = (item as PrintPrice & { sheet_width_mm?: number }).sheet_width_mm;
             const sheetH = (item as PrintPrice & { sheet_height_mm?: number }).sheet_height_mm;
             const tiersCount = (item as PrintPrice & { tiers?: unknown[] }).tiers?.length ?? 0;
-            const m2TiersCount = item.m2_tiers?.length ?? 0;
+            const m2TiersCount =
+              item.m2_pricing_kind === 'roll_wide'
+                ? item.roll_m2_tiers?.length ?? 0
+                : item.m2_tiers?.length ?? 0;
 
             return (
               <div key={item.id} className="data-card">
@@ -154,14 +165,21 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
                     )}
                     {item.counter_unit === 'm2' && (
                       <>
+                        <PriceLine label="m² профиль" value={formatM2PricingKind(item.m2_pricing_kind ?? null)} />
                         <PriceLine label="Цвет / м²" value={<MoneyAmount value={item.price_color_per_m2} />} />
-                        <PriceLine label="Белый / м²" value={<MoneyAmount value={item.price_white_per_m2} />} />
-                        <PriceLine label="Лак / м²" value={<MoneyAmount value={item.price_varnish_per_m2} />} />
+                        {item.m2_pricing_kind !== 'roll_wide' && (
+                          <>
+                            <PriceLine label="Белый / м²" value={<MoneyAmount value={item.price_white_per_m2} />} />
+                            <PriceLine label="Лак / м²" value={<MoneyAmount value={item.price_varnish_per_m2} />} />
+                          </>
+                        )}
                         <PriceLine label="Мин. заказ" value={<MoneyAmount value={item.min_charge} />} />
-                        <PriceLine
-                          label="Стол"
-                          value={`${item.max_width_mm ?? 600}×${item.max_height_mm ?? 900} мм`}
-                        />
+                        {item.m2_pricing_kind !== 'roll_wide' && (
+                          <PriceLine
+                            label="Стол"
+                            value={`${item.max_width_mm ?? 600}×${item.max_height_mm ?? 900} мм`}
+                          />
+                        )}
                       </>
                     )}
                   </div>
@@ -169,7 +187,9 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
                     <div className="text-muted text-sm mt-2">Диапазонов (листы): {tiersCount}</div>
                   )}
                   {m2TiersCount > 0 && (
-                    <div className="text-muted text-sm mt-2">Ступеней м²: {m2TiersCount}</div>
+                    <div className="text-muted text-sm mt-2">
+                      {item.m2_pricing_kind === 'roll_wide' ? 'Ступеней total_m²' : 'Ступеней м²'}: {m2TiersCount}
+                    </div>
                   )}
                 </div>
               </div>

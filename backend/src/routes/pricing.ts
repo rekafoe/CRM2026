@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
+import { isRollWideM2Enabled } from '../config/app'
 import { hasColumn, invalidateTableSchemaCache } from '../utils/tableSchemaCache'
 import { ServiceManagementService } from '../modules/pricing/services/serviceManagementService'
 import { PriceTypeService } from '../modules/pricing/services/priceTypeService'
@@ -13,10 +14,24 @@ import {
   normalizeUvPrintConfig,
   type UvPrintConfiguration,
 } from '../modules/pricing/services/uvFlatbedPricingService'
+import {
+  RollWideM2PricingService,
+  deriveQtyTiersFromTotalM2,
+  type RollWideM2TierRow,
+} from '../modules/pricing/services/rollWideM2PricingService'
 
 console.log('Loading pricing routes...')
 
 const router = Router()
+
+function ensureRollWideM2FeatureEnabled(res: any): boolean {
+  if (isRollWideM2Enabled()) return true
+  res.status(403).json({
+    error:
+      'Профиль roll_wide_m2 временно отключён feature-flag FEATURE_ROLL_WIDE_M2. Обратитесь к администратору.',
+  })
+  return false
+}
 
 const toServiceResponse = (service: any) => ({
   id: service.id,
@@ -52,22 +67,98 @@ const toTierResponse = (tier: any) => ({
   is_active: tier.isActive,
 })
 
+type M2PricingKind = 'uv_flatbed' | 'roll_wide'
+type UvM2TierInput = { layer: string; min_m2: number; max_m2?: number | null; price_per_m2: number }
+type RollM2TierInput = { min_m2: number; max_m2?: number | null; price_per_m2: number }
+
+const UV_M2_LAYERS = new Set(['color', 'white', 'varnish'])
+
+function parsePositiveNumberOrNull(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function parseNonNegativeNumber(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+function normalizeM2PricingKind(rawKind: unknown, technologyCode: unknown, counterUnit: unknown): M2PricingKind | null {
+  if (String(counterUnit || '').toLowerCase() !== 'm2') return null
+  const kind = String(rawKind || '').trim().toLowerCase()
+  if (kind === 'roll_wide') return 'roll_wide'
+  if (kind === 'uv_flatbed') return 'uv_flatbed'
+  return String(technologyCode || '').trim().toLowerCase() === 'uv' ? 'uv_flatbed' : 'roll_wide'
+}
+
+async function readTechnologySupportsBw(db: any, technologyCode: unknown): Promise<boolean> {
+  const code = String(technologyCode || '').trim()
+  if (!code) return true
+  try {
+    const row = (await db.get(
+      `SELECT supports_bw FROM print_technologies WHERE LOWER(code) = LOWER(?) LIMIT 1`,
+      [code],
+    )) as { supports_bw?: number | null } | undefined
+    if (!row || row.supports_bw == null) return true
+    return Number(row.supports_bw) !== 0
+  } catch {
+    return true
+  }
+}
+
+function normalizeUvM2Tiers(raw: unknown): UvM2TierInput[] {
+  if (!Array.isArray(raw)) return []
+  const rows: UvM2TierInput[] = []
+  for (const item of raw) {
+    const layer = String((item as { layer?: string }).layer || '').toLowerCase()
+    if (!UV_M2_LAYERS.has(layer)) continue
+    const min = parseNonNegativeNumber((item as { min_m2?: unknown }).min_m2)
+    const price = parseNonNegativeNumber((item as { price_per_m2?: unknown }).price_per_m2)
+    if (min == null || price == null) continue
+    const maxRaw = parseNonNegativeNumber((item as { max_m2?: unknown }).max_m2)
+    rows.push({
+      layer,
+      min_m2: min,
+      max_m2: maxRaw,
+      price_per_m2: price,
+    })
+  }
+  return rows.sort((a, b) => a.layer.localeCompare(b.layer) || a.min_m2 - b.min_m2)
+}
+
+function normalizeRollM2Tiers(raw: unknown): RollM2TierInput[] {
+  if (!Array.isArray(raw)) return []
+  const rows: RollM2TierInput[] = []
+  for (const item of raw) {
+    const min = parseNonNegativeNumber((item as { min_m2?: unknown }).min_m2)
+    const price = parseNonNegativeNumber((item as { price_per_m2?: unknown }).price_per_m2)
+    if (min == null || price == null) continue
+    const maxRaw = parseNonNegativeNumber((item as { max_m2?: unknown }).max_m2)
+    rows.push({
+      min_m2: min,
+      max_m2: maxRaw,
+      price_per_m2: price,
+    })
+  }
+  return rows.sort((a, b) => a.min_m2 - b.min_m2)
+}
+
 /** Сохранить ступени УФ по м² (по слоям) */
 async function upsertPrintPriceM2Tiers(
   db: any,
   printPriceId: number,
-  m2Tiers: Array<{ layer: string; min_m2: number; max_m2?: number | null; price_per_m2: number }> | undefined,
+  m2Tiers: UvM2TierInput[] | undefined,
 ) {
-  if (!m2Tiers || !Array.isArray(m2Tiers) || m2Tiers.length === 0) return
+  if (!Array.isArray(m2Tiers)) return
   try {
     await db.run('DELETE FROM print_price_m2_tiers WHERE print_price_id = ?', [printPriceId])
     for (const t of m2Tiers) {
-      const layer = String(t.layer || '').toLowerCase()
-      if (!['color', 'white', 'varnish'].includes(layer) || t.min_m2 == null) continue
       await db.run(
         `INSERT INTO print_price_m2_tiers (print_price_id, layer, min_m2, max_m2, price_per_m2)
          VALUES (?, ?, ?, ?, ?)`,
-        [printPriceId, layer, t.min_m2, t.max_m2 ?? null, t.price_per_m2 ?? 0],
+        [printPriceId, t.layer, t.min_m2, t.max_m2 ?? null, t.price_per_m2],
       )
     }
   } catch (e) {
@@ -75,9 +166,30 @@ async function upsertPrintPriceM2Tiers(
   }
 }
 
+/** Сохранить ступени roll-wide по оси total_m2 */
+async function upsertPrintPriceRollM2Tiers(
+  db: any,
+  printPriceId: number,
+  rollM2Tiers: RollM2TierInput[] | undefined,
+) {
+  if (!Array.isArray(rollM2Tiers)) return
+  try {
+    await db.run('DELETE FROM print_price_roll_m2_tiers WHERE print_price_id = ?', [printPriceId])
+    for (const t of rollM2Tiers) {
+      await db.run(
+        `INSERT INTO print_price_roll_m2_tiers (print_price_id, min_m2, max_m2, price_per_m2)
+         VALUES (?, ?, ?, ?)`,
+        [printPriceId, t.min_m2, t.max_m2 ?? null, t.price_per_m2],
+      )
+    }
+  } catch (e) {
+    console.warn('print_price_roll_m2_tiers not available:', e)
+  }
+}
+
 /** Сохранить диапазоны цен печати (по листам) */
 async function upsertPrintPriceTiers(db: any, printPriceId: number, tiers: Array<{ price_mode: string; min_sheets: number; max_sheets?: number; price_per_sheet: number }> | undefined) {
-  if (!tiers || !Array.isArray(tiers) || tiers.length === 0) return
+  if (!Array.isArray(tiers)) return
   try {
     await db.run('DELETE FROM print_price_tiers WHERE print_price_id = ?', [printPriceId])
     for (const t of tiers) {
@@ -350,6 +462,7 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
         pp.price_color_duplex,
         pp.price_bw_per_meter,
         pp.price_color_per_meter,
+        pp.m2_pricing_kind,
         pp.price_color_per_m2,
         pp.price_white_per_m2,
         pp.price_varnish_per_m2,
@@ -400,6 +513,24 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
     } catch {
       printPrices.forEach((pp: any) => { pp.m2_tiers = [] })
     }
+    try {
+      const rollM2Tiers = await db.all<any>(`
+        SELECT print_price_id, min_m2, max_m2, price_per_m2
+        FROM print_price_roll_m2_tiers
+        ORDER BY print_price_id, min_m2
+      `)
+      const rollByPp = rollM2Tiers.reduce((acc: Record<number, any[]>, t: any) => {
+        const id = t.print_price_id
+        if (!acc[id]) acc[id] = []
+        acc[id].push({ min_m2: t.min_m2, max_m2: t.max_m2, price_per_m2: t.price_per_m2 })
+        return acc
+      }, {})
+      printPrices.forEach((pp: any) => {
+        pp.roll_m2_tiers = rollByPp[pp.id] || []
+      })
+    } catch {
+      printPrices.forEach((pp: any) => { pp.roll_m2_tiers = [] })
+    }
     res.json(printPrices)
   } catch (error) {
     // Если таблицы не существуют, возвращаем пустой массив
@@ -438,12 +569,72 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
   const priceMode = (color_mode === 'bw' ? 'bw' : 'color') + '_' + (sides_mode === 'duplex' ? 'duplex' : 'single')
   try {
     const db = await getDb()
+    const isBwRequested = String(color_mode).toLowerCase() === 'bw'
+    const supportsBw = await readTechnologySupportsBw(db, technology_code)
+    if (isBwRequested && !supportsBw) {
+      res.status(422).json({
+        error: `Технология ${technology_code} не поддерживает режим ч/б. Выберите цветной режим.`,
+      })
+      return
+    }
     const pp = await db.get<any>(`
       SELECT id, sheet_width_mm, sheet_height_mm FROM print_prices
       WHERE technology_code = ? AND is_active = 1 AND counter_unit = 'sheets'
       ORDER BY id DESC LIMIT 1
     `, [technology_code])
     if (!pp) {
+      const rollRates = await RollWideM2PricingService.loadRatesByTechnology(String(technology_code))
+      if (rollRates?.m2PricingKind === 'roll_wide') {
+        if (!ensureRollWideM2FeatureEnabled(res)) return
+        const areaM2 = (w * h) / 1_000_000
+        if (!Number.isFinite(areaM2) || areaM2 <= 0) {
+          res.status(400).json({ error: 'Некорректная площадь изделия для расчёта по м²' })
+          return
+        }
+
+        let rollTiers: RollWideM2TierRow[] = []
+        try {
+          rollTiers = await db.all<RollWideM2TierRow[]>(
+            `SELECT min_m2, max_m2, price_per_m2
+             FROM print_price_roll_m2_tiers
+             WHERE print_price_id = ?
+             ORDER BY min_m2`,
+            [rollRates.printPriceId],
+          )
+        } catch {
+          rollTiers = []
+        }
+
+        let tiers = deriveQtyTiersFromTotalM2(rollTiers, areaM2).map((t) => ({
+          min_qty: t.min_qty,
+          max_qty: t.max_qty,
+          unit_price: t.unit_price,
+        }))
+
+        if (tiers.length === 0) {
+          const baseRate = Number(rollRates.price_color_per_m2 ?? 0)
+          if (!Number.isFinite(baseRate) || baseRate <= 0) {
+            res.status(404).json({
+              error: `Для технологии ${technology_code} (roll m²) не задана color-ставка`,
+            })
+            return
+          }
+          const unitPrice = Math.round(baseRate * areaM2 * 100) / 100
+          tiers = [{ min_qty: 1, max_qty: undefined, unit_price: unitPrice }]
+        }
+
+        res.json({
+          counter_unit: 'm2',
+          m2_pricing_kind: 'roll_wide',
+          piece_area_m2: areaM2,
+          min_charge: rollRates.min_charge,
+          tiers,
+          note:
+            'Roll-wide m²: диапазоны конвертированы из total_m² в qty для текущего формата. Цена заказа в runtime остаётся в оси м².',
+        })
+        return
+      }
+
       // Рулон / пог. м: в центре нет листовых диапазонов — считаем одну «цену за изделие» как в SimplifiedPricingService (roll)
       const ppMeters = await db.get<{
         id: number
@@ -461,7 +652,7 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
         res.status(404).json({ error: `Цены для технологии ${technology_code} не найдены` })
         return
       }
-      const isColor = String(color_mode).toLowerCase() !== 'bw'
+      const isColor = !isBwRequested
       const perMeter = isColor
         ? ppMeters.price_color_per_meter != null
           ? Number(ppMeters.price_color_per_meter)
@@ -657,6 +848,15 @@ router.get('/print-prices/:id', asyncHandler(async (req, res) => {
       pp.m2_tiers = m2Tiers
     } catch {
       pp.m2_tiers = []
+    }
+    try {
+      const rollM2Tiers = await db.all<any>(`
+        SELECT min_m2, max_m2, price_per_m2
+        FROM print_price_roll_m2_tiers WHERE print_price_id = ? ORDER BY min_m2
+      `, [id])
+      pp.roll_m2_tiers = rollM2Tiers
+    } catch {
+      pp.roll_m2_tiers = []
     }
     res.json(pp)
   } catch (e) {
@@ -1069,12 +1269,68 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
     max_height_mm,
     tiers,
     m2_tiers,
+    m2_pricing_kind,
+    roll_m2_tiers,
   } = req.body
 
   try {
     const db = await getDb()
+    const resolvedCounterUnit = String(counter_unit || 'sheets').toLowerCase()
+    const resolvedM2PricingKind = normalizeM2PricingKind(m2_pricing_kind, technology_code, resolvedCounterUnit)
+    const supportsBw = await readTechnologySupportsBw(db, technology_code)
+    if (
+      !supportsBw &&
+      (parsePositiveNumberOrNull(price_bw_single) != null ||
+        parsePositiveNumberOrNull(price_bw_duplex) != null ||
+        parsePositiveNumberOrNull(price_bw_per_meter) != null)
+    ) {
+      res.status(422).json({
+        error: `Технология ${technology_code} не поддерживает ч/б ставки. Используйте только color-поля.`,
+      })
+      return
+    }
+
+    if (resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'roll_wide') {
+      if (!ensureRollWideM2FeatureEnabled(res)) return
+      if (
+        parsePositiveNumberOrNull(price_white_per_m2) != null ||
+        parsePositiveNumberOrNull(price_varnish_per_m2) != null
+      ) {
+        res.status(422).json({
+          error: 'Для профиля roll_wide допустима только color-ставка за м² (без white/varnish).',
+        })
+        return
+      }
+      if (
+        Array.isArray(m2_tiers) &&
+        m2_tiers.some((t: any) => t?.layer && String(t.layer).toLowerCase() !== 'color')
+      ) {
+        res.status(422).json({
+          error: 'Для roll_wide нельзя передавать layer-ступени кроме color. Используйте roll_m2_tiers.',
+        })
+        return
+      }
+    }
+
+    const normalizedUvM2Tiers = normalizeUvM2Tiers(m2_tiers)
+    const normalizedRollM2Tiers = normalizeRollM2Tiers(
+      roll_m2_tiers ?? (resolvedM2PricingKind === 'roll_wide' ? m2_tiers : undefined),
+    )
+
     const sw = sheet_width_mm ?? 320
     const sh = sheet_height_mm ?? 450
+    const m2KindForSave = resolvedCounterUnit === 'm2' ? resolvedM2PricingKind : null
+    const colorPerM2ForSave = resolvedCounterUnit === 'm2' ? (price_color_per_m2 ?? null) : null
+    const whitePerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? (price_white_per_m2 ?? null) : null
+    const varnishPerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed'
+        ? (price_varnish_per_m2 ?? null)
+        : null
+    const minChargeForSave = resolvedCounterUnit === 'm2' ? (min_charge ?? 0) : 0
+    const maxWidthForSave = resolvedCounterUnit === 'm2' ? (max_width_mm ?? 600) : null
+    const maxHeightForSave = resolvedCounterUnit === 'm2' ? (max_height_mm ?? 900) : null
+
     const result = await db.run(`
       INSERT INTO print_prices (
         technology_code,
@@ -1087,6 +1343,7 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
         price_color_duplex,
         price_bw_per_meter,
         price_color_per_meter,
+        m2_pricing_kind,
         price_color_per_m2,
         price_white_per_m2,
         price_varnish_per_m2,
@@ -1096,10 +1353,10 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
         is_active,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
     `, [
       technology_code,
-      counter_unit || 'sheets',
+      resolvedCounterUnit || 'sheets',
       sw,
       sh,
       price_bw_single || 0,
@@ -1108,22 +1365,33 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
       price_color_duplex || 0,
       price_bw_per_meter || null,
       price_color_per_meter || null,
-      price_color_per_m2 ?? null,
-      price_white_per_m2 ?? null,
-      price_varnish_per_m2 ?? null,
-      min_charge ?? 0,
-      max_width_mm ?? 600,
-      max_height_mm ?? 900,
+      m2KindForSave,
+      colorPerM2ForSave,
+      whitePerM2ForSave,
+      varnishPerM2ForSave,
+      minChargeForSave,
+      maxWidthForSave,
+      maxHeightForSave,
     ])
 
     const id = result.lastID
-    await upsertPrintPriceTiers(db, id, tiers)
-    await upsertPrintPriceM2Tiers(db, id, m2_tiers)
+    await upsertPrintPriceTiers(db, id, resolvedCounterUnit === 'sheets' ? (Array.isArray(tiers) ? tiers : []) : [])
+    await upsertPrintPriceM2Tiers(
+      db,
+      id,
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? normalizedUvM2Tiers : [],
+    )
+    await upsertPrintPriceRollM2Tiers(
+      db,
+      id,
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'roll_wide' ? normalizedRollM2Tiers : [],
+    )
 
     res.json({
       id,
       technology_code,
-      counter_unit: counter_unit || 'sheets',
+      counter_unit: resolvedCounterUnit || 'sheets',
+      m2_pricing_kind: m2KindForSave,
       sheet_width_mm: sw,
       sheet_height_mm: sh,
       price_bw_single: price_bw_single || 0,
@@ -1132,6 +1400,9 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
       price_color_duplex: price_color_duplex || 0,
       price_bw_per_meter: price_bw_per_meter || null,
       price_color_per_meter: price_color_per_meter || null,
+      price_color_per_m2: colorPerM2ForSave,
+      price_white_per_m2: whitePerM2ForSave,
+      price_varnish_per_m2: varnishPerM2ForSave,
       is_active: 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -1728,12 +1999,66 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
     is_active,
     tiers,
     m2_tiers,
+    m2_pricing_kind,
+    roll_m2_tiers,
   } = req.body
 
   try {
     const db = await getDb()
+    const resolvedCounterUnit = String(counter_unit || 'sheets').toLowerCase()
+    const resolvedM2PricingKind = normalizeM2PricingKind(m2_pricing_kind, technology_code, resolvedCounterUnit)
+    const supportsBw = await readTechnologySupportsBw(db, technology_code)
+    if (
+      !supportsBw &&
+      (parsePositiveNumberOrNull(price_bw_single) != null ||
+        parsePositiveNumberOrNull(price_bw_duplex) != null ||
+        parsePositiveNumberOrNull(price_bw_per_meter) != null)
+    ) {
+      res.status(422).json({
+        error: `Технология ${technology_code} не поддерживает ч/б ставки. Используйте только color-поля.`,
+      })
+      return
+    }
+    if (resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'roll_wide') {
+      if (!ensureRollWideM2FeatureEnabled(res)) return
+      if (
+        parsePositiveNumberOrNull(price_white_per_m2) != null ||
+        parsePositiveNumberOrNull(price_varnish_per_m2) != null
+      ) {
+        res.status(422).json({
+          error: 'Для профиля roll_wide допустима только color-ставка за м² (без white/varnish).',
+        })
+        return
+      }
+      if (
+        Array.isArray(m2_tiers) &&
+        m2_tiers.some((t: any) => t?.layer && String(t.layer).toLowerCase() !== 'color')
+      ) {
+        res.status(422).json({
+          error: 'Для roll_wide нельзя передавать layer-ступени кроме color. Используйте roll_m2_tiers.',
+        })
+        return
+      }
+    }
+
+    const normalizedUvM2Tiers = normalizeUvM2Tiers(m2_tiers)
+    const normalizedRollM2Tiers = normalizeRollM2Tiers(
+      roll_m2_tiers ?? (resolvedM2PricingKind === 'roll_wide' ? m2_tiers : undefined),
+    )
+
     const sw = sheet_width_mm ?? 320
     const sh = sheet_height_mm ?? 450
+    const m2KindForSave = resolvedCounterUnit === 'm2' ? resolvedM2PricingKind : null
+    const colorPerM2ForSave = resolvedCounterUnit === 'm2' ? (price_color_per_m2 ?? null) : null
+    const whitePerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? (price_white_per_m2 ?? null) : null
+    const varnishPerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed'
+        ? (price_varnish_per_m2 ?? null)
+        : null
+    const minChargeForSave = resolvedCounterUnit === 'm2' ? (min_charge ?? 0) : 0
+    const maxWidthForSave = resolvedCounterUnit === 'm2' ? (max_width_mm ?? 600) : null
+    const maxHeightForSave = resolvedCounterUnit === 'm2' ? (max_height_mm ?? 900) : null
     await db.run(`
       UPDATE print_prices SET
         technology_code = ?,
@@ -1746,6 +2071,7 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
         price_color_duplex = ?,
         price_bw_per_meter = ?,
         price_color_per_meter = ?,
+        m2_pricing_kind = ?,
         price_color_per_m2 = ?,
         price_white_per_m2 = ?,
         price_varnish_per_m2 = ?,
@@ -1757,7 +2083,7 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       WHERE id = ?
     `, [
       technology_code,
-      counter_unit || 'sheets',
+      resolvedCounterUnit || 'sheets',
       sw,
       sh,
       price_bw_single || 0,
@@ -1766,23 +2092,38 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       price_color_duplex || 0,
       price_bw_per_meter || null,
       price_color_per_meter || null,
-      price_color_per_m2 ?? null,
-      price_white_per_m2 ?? null,
-      price_varnish_per_m2 ?? null,
-      min_charge ?? 0,
-      max_width_mm ?? 600,
-      max_height_mm ?? 900,
+      m2KindForSave,
+      colorPerM2ForSave,
+      whitePerM2ForSave,
+      varnishPerM2ForSave,
+      minChargeForSave,
+      maxWidthForSave,
+      maxHeightForSave,
       is_active !== undefined ? is_active : 1,
       id
     ])
 
-    await upsertPrintPriceTiers(db, parseInt(id), tiers)
-    await upsertPrintPriceM2Tiers(db, parseInt(id), m2_tiers)
+    await upsertPrintPriceTiers(
+      db,
+      parseInt(id),
+      resolvedCounterUnit === 'sheets' ? (Array.isArray(tiers) ? tiers : []) : [],
+    )
+    await upsertPrintPriceM2Tiers(
+      db,
+      parseInt(id),
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? normalizedUvM2Tiers : [],
+    )
+    await upsertPrintPriceRollM2Tiers(
+      db,
+      parseInt(id),
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'roll_wide' ? normalizedRollM2Tiers : [],
+    )
 
     res.json({
       id: parseInt(id),
       technology_code,
-      counter_unit: counter_unit || 'sheets',
+      counter_unit: resolvedCounterUnit || 'sheets',
+      m2_pricing_kind: m2KindForSave,
       sheet_width_mm: sw,
       sheet_height_mm: sh,
       price_bw_single: price_bw_single || 0,
@@ -1791,6 +2132,9 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       price_color_duplex: price_color_duplex || 0,
       price_bw_per_meter: price_bw_per_meter || null,
       price_color_per_meter: price_color_per_meter || null,
+      price_color_per_m2: colorPerM2ForSave,
+      price_white_per_m2: whitePerM2ForSave,
+      price_varnish_per_m2: varnishPerM2ForSave,
       is_active: is_active !== undefined ? is_active : 1,
       updated_at: new Date().toISOString()
     })

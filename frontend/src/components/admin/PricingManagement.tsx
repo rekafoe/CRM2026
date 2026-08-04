@@ -5,11 +5,11 @@ import {
   searchPlaceholderForTab,
   type PricingTabKey,
 } from './pricing/printPriceDisplay';
-import { Button, Alert, LoadingState, Modal } from '../common';
+import { Alert, LoadingState } from '../common';
 import { AppIcon } from '../ui';
 import './PricingManagement.css';
 import { api } from '../../api';
-import { numberInputFromString, numberInputToNullable, type NumberInputValue } from '../../utils/numberInput';
+import type { NumberInputValue } from '../../utils/numberInput';
 import { useDebounce } from '../../hooks/useDebounce';
 import {
   usePricingManagementState,
@@ -38,6 +38,7 @@ interface PrintTechnology {
   name: string;
   pricing_mode: PricingMode;
   supports_duplex: number;
+  supports_bw: number;
   is_active: number;
   price_single?: number | null;
   price_duplex?: number | null;
@@ -50,7 +51,7 @@ interface PrinterRow {
   code: string;
   name: string;
   technology_code?: string | null;
-  counter_unit?: 'sheets' | 'meters';
+  counter_unit?: 'sheets' | 'meters' | 'm2';
   max_width_mm?: number | null;
   color_mode?: 'bw' | 'color' | 'both';
   printer_class?: 'office' | 'pro';

@@ -8,7 +8,7 @@ import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/usePro
 import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes'
 import { PrintPricesCard } from './PrintPricesCard'
 import { UvPrintCard } from './UvPrintCard'
-import type { SimplifiedUvPrintConfig } from '../hooks/useProductTemplate'
+import type { SimplifiedRollM2Config, SimplifiedUvPrintConfig } from '../hooks/useProductTemplate'
 import { MaterialsCard } from './MaterialsCard'
 import { FinishingCard } from './FinishingCard'
 import { SubtypeDesignsCard } from './SubtypeDesignsCard'
@@ -26,7 +26,14 @@ import {
 } from '../../../utils/multipageProduct'
 import './SimplifiedTemplateSection.css'
 
-type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
+type PrintTechRow = {
+  code: string
+  name: string
+  pricing_mode?: 'per_sheet' | 'per_meter' | 'per_m2' | string
+  is_active?: number | boolean
+  supports_duplex?: number | boolean
+  supports_bw?: number | boolean
+}
 type PaperTypeRow = PaperTypeForCalculator
 type ServiceRow = { 
   id: number; 
@@ -229,25 +236,81 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     return value.uv_print
   }, [hasTypes, selectedTypeId, effectiveConfig.uv_print, value.uv_print])
 
+  const effectiveRollM2 = useMemo((): SimplifiedRollM2Config | undefined => {
+    if (hasTypes && selectedTypeId != null) {
+      return effectiveConfig.roll_m2
+    }
+    return value.roll_m2
+  }, [hasTypes, selectedTypeId, effectiveConfig.roll_m2, value.roll_m2])
+
   const updateUvPrint = useCallback(
     (next: SimplifiedUvPrintConfig | undefined) => {
       const withLayoutFlag = (rest: SimplifiedConfig): SimplifiedConfig => {
         if (next?.mode === 'flatbed_m2') {
-          return { ...rest, uv_print: next, use_layout: false }
+          return { ...rest, uv_print: next, roll_m2: undefined, use_layout: false }
         }
-        return next ? { ...rest, uv_print: next } : rest
+        return next ? { ...rest, uv_print: next, roll_m2: undefined } : rest
       }
       if (hasTypes && selectedTypeId != null) {
         applyToCurrentConfig((prev) => {
-          const { uv_print: _removed, ...rest } = prev
+          const { uv_print: _removedUv, roll_m2: _removedRoll, ...rest } = prev
           return withLayoutFlag(rest)
         })
       } else {
-        const { uv_print: _removed, ...rest } = value
+        const { uv_print: _removedUv, roll_m2: _removedRoll, ...rest } = value
         onChange(withLayoutFlag(rest))
       }
     },
     [hasTypes, selectedTypeId, applyToCurrentConfig, value, onChange],
+  )
+
+  const updateRollM2 = useCallback(
+    (next: SimplifiedRollM2Config | undefined) => {
+      const applyMode = (rest: SimplifiedConfig): SimplifiedConfig => {
+        if (next?.mode === 'roll_wide_m2') {
+          return { ...rest, roll_m2: next, uv_print: undefined }
+        }
+        return rest
+      }
+      if (hasTypes && selectedTypeId != null) {
+        applyToCurrentConfig((prev) => {
+          const { uv_print: _removedUv, roll_m2: _removedRoll, ...rest } = prev
+          return applyMode(rest)
+        })
+      } else {
+        const { uv_print: _removedUv, roll_m2: _removedRoll, ...rest } = value
+        onChange(applyMode(rest))
+      }
+    },
+    [hasTypes, selectedTypeId, applyToCurrentConfig, value, onChange],
+  )
+
+  const activeM2Mode = useMemo<'none' | 'uv' | 'roll'>(() => {
+    if (effectiveUvPrint?.mode === 'flatbed_m2') return 'uv'
+    if (effectiveRollM2?.mode === 'roll_wide_m2') return 'roll'
+    return 'none'
+  }, [effectiveUvPrint?.mode, effectiveRollM2?.mode])
+
+  const setActiveM2Mode = useCallback(
+    (mode: 'none' | 'uv' | 'roll') => {
+      if (mode === 'uv') {
+        updateUvPrint(
+          effectiveUvPrint ?? {
+            mode: 'flatbed_m2',
+            layers: ['color', 'white', 'varnish'],
+            default_passes: { color: 1, white: 1, varnish: 1 },
+            dimensions_mode: 'custom_only',
+          },
+        )
+        return
+      }
+      if (mode === 'roll') {
+        updateRollM2({ mode: 'roll_wide_m2' })
+        return
+      }
+      updateRollM2(undefined)
+    },
+    [effectiveUvPrint, updateRollM2, updateUvPrint],
   )
 
   const setUseOwnMaterials = useCallback(
@@ -438,19 +501,30 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         finishing: false,
       }
     }
-    const hasPrint =
-      Array.isArray(selected.print_prices) &&
-      selected.print_prices.some((p) => Array.isArray(p.tiers) && p.tiers.some((t) => Number(t.unit_price ?? 0) > 0))
+    const hasM2PrintMode = activeM2Mode !== 'none'
+    const hasPrint = hasM2PrintMode
+      ? Boolean(selected.default_print?.technology_code)
+      : Array.isArray(selected.print_prices) &&
+        selected.print_prices.some((p) => Array.isArray(p.tiers) && p.tiers.some((t) => Number(t.unit_price ?? 0) > 0))
     return {
       size: Boolean(String(selected.label || '').trim() && selected.width_mm > 0 && selected.height_mm > 0),
       print: hasPrint,
       materials: effectiveAllowedMaterialIds.length > 0,
       finishing: Array.isArray(selected.finishing) && selected.finishing.length > 0,
     }
-  }, [selected, effectiveAllowedMaterialIds])
+  }, [selected, effectiveAllowedMaterialIds, activeM2Mode])
 
   const quickTestPrintPreset = useMemo(() => {
     if (!selected) return null
+    if (activeM2Mode !== 'none') {
+      const technology = selected.default_print?.technology_code || (activeM2Mode === 'uv' ? 'uv' : '')
+      if (!technology) return null
+      return {
+        technology,
+        color: 'color' as const,
+        sides: 1 as const,
+      }
+    }
     const pp = selected.print_prices || []
     if (pp.length === 0) return null
 
@@ -466,7 +540,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       color: (row.color_mode as 'bw' | 'color') || 'color',
       sides: row.sides_mode === 'duplex' || row.sides_mode === 'duplex_bw_back' ? 2 : 1,
     }
-  }, [selected])
+  }, [selected, activeM2Mode])
 
   const isMultipageEditorTab =
     showPagesConfig && (editorTab === 'pages' || editorTab === 'assembly')
@@ -1016,10 +1090,79 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                 )}
 
                 {editorTab === 'print' && (
+                  <div className="simplified-card">
+                    <div className="simplified-card__header">
+                      <div>
+                        {headerWithHint(
+                          'Режим m²-печати',
+                          'Выберите профиль m²: УФ-планшет или ШФП рулон. В режиме m² листовые print_prices не используются.',
+                        )}
+                      </div>
+                    </div>
+                    <div className="simplified-card__content simplified-form-grid">
+                      <FormField label="Профиль">
+                        <select
+                          className="form-input"
+                          value={activeM2Mode}
+                          onChange={(e) => setActiveM2Mode(e.target.value as 'none' | 'uv' | 'roll')}
+                        >
+                          <option value="none">Стандартный (лист/метр)</option>
+                          <option value="uv">УФ-планшет (flatbed_m2)</option>
+                          <option value="roll">ШФП рулон (roll_wide_m2)</option>
+                        </select>
+                      </FormField>
+                      {activeM2Mode !== 'none' && (
+                        <FormField label="Технология печати">
+                          <select
+                            className="form-input"
+                            value={selected.default_print?.technology_code || ''}
+                            onChange={(e) => {
+                              const technologyCode = e.target.value
+                              if (!technologyCode) {
+                                updateSize(selected.id, { default_print: undefined })
+                                return
+                              }
+                              updateSize(selected.id, {
+                                default_print: {
+                                  technology_code: technologyCode,
+                                  color_mode: 'color',
+                                  sides_mode: 'single',
+                                },
+                              })
+                            }}
+                            disabled={loadingLists}
+                          >
+                            <option value="">-- Выберите технологию --</option>
+                            {printTechs
+                              .filter((tech) => (tech.is_active ?? 1) !== 0 && tech.pricing_mode === 'per_m2')
+                              .map((tech) => (
+                                <option key={tech.code} value={tech.code}>
+                                  {tech.name}
+                                </option>
+                              ))}
+                          </select>
+                        </FormField>
+                      )}
+                      {activeM2Mode === 'roll' && (
+                        <div className="text-muted text-sm">
+                          Для roll_wide_m2 используются только color-ставки из «Цен печати» и ступени по total_m².
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {editorTab === 'print' && activeM2Mode === 'uv' && (
                   <UvPrintCard config={effectiveUvPrint} onChange={updateUvPrint} />
                 )}
 
-                {editorTab === 'print' && effectiveUvPrint?.mode !== 'flatbed_m2' && (
+                {editorTab === 'print' && activeM2Mode === 'roll' && (
+                  <Alert type="info">
+                    Листовые цены по размерам скрыты в режиме «ШФП рулон (m²)». Используется централизованный профиль m².
+                  </Alert>
+                )}
+
+                {editorTab === 'print' && activeM2Mode === 'none' && (
                   <PrintPricesCard
                     selected={selected}
                     printTechs={printTechs}

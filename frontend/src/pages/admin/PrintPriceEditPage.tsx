@@ -5,13 +5,18 @@ import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { Button, FormField, Alert, LoadingState } from '../../components/common';
 import { AppIcon } from '../../components/ui';
 import { api } from '../../api';
-import type { PrintPrice, PrintPriceTier } from '../../components/admin/hooks/usePricingManagementState';
+import type {
+  PrintPrice,
+  PrintPriceTier,
+  PrintPriceRollM2Tier,
+} from '../../components/admin/hooks/usePricingManagementState';
 import '../../components/admin/PricingManagement.css';
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../../features/productTemplate/hooks/useTierRangeFloating';
 import { PriceCell } from '../../features/productTemplate/components/PriceCell';
 import { MoneyAmount } from '../../components/ui';
 import {
   formatCounterUnit,
+  formatM2PricingKind,
   PRINTERS_PRINT_TAB_URL,
   resolveTechnologyName,
 } from '../../components/admin/pricing/printPriceDisplay';
@@ -42,6 +47,7 @@ const PRICE_MODES = [
   { key: 'bw_single', label: 'ЧБ, односторонняя' },
   { key: 'bw_duplex', label: 'ЧБ, двусторонняя' },
 ] as const;
+const PRICE_MODES_COLOR_ONLY = PRICE_MODES.filter((mode) => !mode.key.startsWith('bw_'));
 
 const DEFAULT_TIER_BOUNDARIES = [1, 5, 10, 50, 100, 500, 1000];
 
@@ -150,6 +156,12 @@ type TierModalState = {
   anchorElement?: HTMLElement
 }
 
+type PrintTechnologyOption = {
+  code: string
+  name: string
+  supports_bw?: number | boolean
+}
+
 export const PrintPriceEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -160,7 +172,7 @@ export const PrintPriceEditPage: React.FC = () => {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [printTechnologies, setPrintTechnologies] = useState<{ code: string; name: string }[]>([]);
+  const [printTechnologies, setPrintTechnologies] = useState<PrintTechnologyOption[]>([]);
   const [m2LayerTab, setM2LayerTab] = useState<M2LayerKey>('color');
   const [m2PreviewLoading, setM2PreviewLoading] = useState(false);
   const [m2Preview, setM2Preview] = useState<{
@@ -172,6 +184,7 @@ export const PrintPriceEditPage: React.FC = () => {
   const [form, setForm] = useState({
     technology_code: '',
     counter_unit: 'sheets' as 'sheets' | 'meters' | 'm2',
+    m2_pricing_kind: 'uv_flatbed' as 'uv_flatbed' | 'roll_wide',
     sheet_width_mm: 320,
     sheet_height_mm: 450,
     price_bw_per_meter: null as number | null,
@@ -184,24 +197,45 @@ export const PrintPriceEditPage: React.FC = () => {
     max_height_mm: 900,
     tiers: [] as PrintPriceTier[],
     m2_tiers: [] as Array<{ layer: string; min_m2: number; max_m2?: number | null; price_per_m2: number }>,
+    roll_m2_tiers: [] as PrintPriceRollM2Tier[],
   });
+
+  const selectedTech = printTechnologies.find((t) => t.code === form.technology_code);
+  const technologySupportsBw = selectedTech ? selectedTech.supports_bw !== 0 && selectedTech.supports_bw !== false : true;
+  const activeSheetModes = technologySupportsBw ? PRICE_MODES : PRICE_MODES_COLOR_ONLY;
+  const isRollWideM2Profile = form.counter_unit === 'm2' && form.m2_pricing_kind === 'roll_wide';
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const [techRes, priceRes] = await Promise.all([
-        api.get<{ code: string; name: string }[]>('/printing-technologies'),
-        isNew ? null : api.get<PrintPrice & { tiers?: PrintPriceTier[]; m2_tiers?: typeof form.m2_tiers }>(`/pricing/print-prices/${id}`),
+        api.get<PrintTechnologyOption[]>('/printing-technologies'),
+        isNew
+          ? null
+          : api.get<
+              PrintPrice & {
+                tiers?: PrintPriceTier[];
+                m2_tiers?: typeof form.m2_tiers;
+                roll_m2_tiers?: PrintPriceRollM2Tier[];
+              }
+            >(`/pricing/print-prices/${id}`),
       ]);
       setPrintTechnologies(Array.isArray(techRes.data) ? techRes.data : []);
 
       if (!isNew && priceRes?.data) {
-        const item = priceRes.data as PrintPrice & { tiers?: PrintPriceTier[]; m2_tiers?: typeof form.m2_tiers };
+        const item = priceRes.data as PrintPrice & {
+          tiers?: PrintPriceTier[];
+          m2_tiers?: typeof form.m2_tiers;
+          roll_m2_tiers?: PrintPriceRollM2Tier[];
+        };
         const loadedTiers = (item.tiers ?? []) as PrintPriceTier[];
         setForm({
           technology_code: item.technology_code || '',
           counter_unit: (item.counter_unit as 'sheets' | 'meters' | 'm2') || 'sheets',
+          m2_pricing_kind:
+            (item.m2_pricing_kind as 'uv_flatbed' | 'roll_wide' | undefined) ??
+            (item.technology_code === 'uv' ? 'uv_flatbed' : 'roll_wide'),
           sheet_width_mm: (item as any).sheet_width_mm ?? 320,
           sheet_height_mm: (item as any).sheet_height_mm ?? 450,
           price_bw_per_meter: item.price_bw_per_meter ?? null,
@@ -214,6 +248,7 @@ export const PrintPriceEditPage: React.FC = () => {
           max_height_mm: (item as any).max_height_mm ?? 900,
           tiers: loadedTiers.length > 0 ? loadedTiers : PRICE_MODES.flatMap((m) => buildDefaultTiers(m.key)),
           m2_tiers: Array.isArray((item as any).m2_tiers) ? (item as any).m2_tiers : [],
+          roll_m2_tiers: Array.isArray((item as any).roll_m2_tiers) ? (item as any).roll_m2_tiers : [],
         });
       } else if (isNew) {
         setForm((prev) => ({
@@ -232,6 +267,25 @@ export const PrintPriceEditPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (technologySupportsBw) return;
+    setForm((prev) => ({
+      ...prev,
+      price_bw_per_meter: null,
+      tiers: prev.tiers.filter((tier) => !String(tier.price_mode).startsWith('bw_')),
+    }));
+  }, [technologySupportsBw]);
+
+  useEffect(() => {
+    if (form.counter_unit !== 'm2' || form.m2_pricing_kind !== 'roll_wide') return;
+    setM2Preview(null);
+    setForm((prev) => ({
+      ...prev,
+      price_white_per_m2: null,
+      price_varnish_per_m2: null,
+    }));
+  }, [form.counter_unit, form.m2_pricing_kind]);
 
   const updateForm = useCallback((patch: Partial<typeof form>) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -348,7 +402,7 @@ export const PrintPriceEditPage: React.FC = () => {
         priceMap.set(`${t.price_mode}:${t.min_sheets}`, t.price_per_sheet)
       }
       const newTiers: PrintPriceTier[] = []
-      for (const mode of PRICE_MODES) {
+      for (const mode of activeSheetModes) {
         for (const r of newRanges) {
           newTiers.push({
             price_mode: mode.key,
@@ -360,14 +414,14 @@ export const PrintPriceEditPage: React.FC = () => {
       }
       return { ...prev, tiers: newTiers }
     })
-  }, [])
+  }, [activeSheetModes])
 
   const techDisplayName = form.technology_code
     ? resolveTechnologyName(form.technology_code, printTechnologies)
     : '';
 
   const fetchM2Preview = async () => {
-    if (form.counter_unit !== 'm2' || !form.technology_code) return;
+    if (form.counter_unit !== 'm2' || form.m2_pricing_kind !== 'uv_flatbed' || !form.technology_code) return;
     setM2PreviewLoading(true);
     setError(null);
     try {
@@ -405,6 +459,17 @@ export const PrintPriceEditPage: React.FC = () => {
     });
   };
 
+  const addRollM2Tier = () => {
+    const maxMin = form.roll_m2_tiers.reduce((m, t) => Math.max(m, t.min_total_m2), -1);
+    const nextMin = maxMin >= 0 ? Number((maxMin + 0.001).toFixed(3)) : 0;
+    updateForm({
+      roll_m2_tiers: [
+        ...form.roll_m2_tiers,
+        { min_total_m2: nextMin, max_total_m2: null, price_per_m2: 0 },
+      ],
+    });
+  };
+
   const m2TiersForActiveLayer = form.m2_tiers
     .map((tier, idx) => ({ tier, idx }))
     .filter(({ tier }) => tier.layer === m2LayerTab);
@@ -417,12 +482,24 @@ export const PrintPriceEditPage: React.FC = () => {
     try {
       setSaving(true);
       setError(null);
+      const normalizedSheetTiers = (form.tiers || []).filter((tier) =>
+        activeSheetModes.some((mode) => mode.key === tier.price_mode),
+      );
       const payload = {
         ...form,
+        m2_pricing_kind: form.counter_unit === 'm2' ? form.m2_pricing_kind : undefined,
         sheet_width_mm: form.counter_unit === 'sheets' ? form.sheet_width_mm : undefined,
         sheet_height_mm: form.counter_unit === 'sheets' ? form.sheet_height_mm : undefined,
-        tiers: form.counter_unit === 'sheets' ? form.tiers : undefined,
-        m2_tiers: form.counter_unit === 'm2' ? form.m2_tiers : undefined,
+        tiers: form.counter_unit === 'sheets' ? normalizedSheetTiers : undefined,
+        m2_tiers:
+          form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.m2_tiers : undefined,
+        roll_m2_tiers:
+          form.counter_unit === 'm2' && form.m2_pricing_kind === 'roll_wide' ? form.roll_m2_tiers : undefined,
+        price_bw_per_meter: technologySupportsBw ? form.price_bw_per_meter : null,
+        price_white_per_m2:
+          form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.price_white_per_m2 : null,
+        price_varnish_per_m2:
+          form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.price_varnish_per_m2 : null,
       };
       if (isNew) {
         await api.post('/pricing/print-prices', payload);
@@ -480,6 +557,9 @@ export const PrintPriceEditPage: React.FC = () => {
             <span className="pricing-chip">{form.technology_code}</span>
             <span className="pricing-chip">{formatCounterUnit(form.counter_unit)}</span>
             {form.counter_unit === 'm2' && (
+              <span className="pricing-chip">{formatM2PricingKind(form.m2_pricing_kind)}</span>
+            )}
+            {form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' && (
               <span className="pricing-chip">
                 стол {form.max_width_mm}×{form.max_height_mm} мм
               </span>
@@ -514,10 +594,30 @@ export const PrintPriceEditPage: React.FC = () => {
                 >
                   <option value="sheets">Листы</option>
                   <option value="meters">Пог. метры</option>
-                  <option value="m2">Кв. метры (УФ-планшет)</option>
+                  <option value="m2">Кв. метры</option>
                 </select>
               </FormField>
+              {form.counter_unit === 'm2' && (
+                <FormField label="m² профиль">
+                  <select
+                    className="form-control"
+                    value={form.m2_pricing_kind}
+                    onChange={(e) =>
+                      updateForm({ m2_pricing_kind: e.target.value as 'uv_flatbed' | 'roll_wide' })
+                    }
+                  >
+                    <option value="uv_flatbed">УФ-планшет</option>
+                    <option value="roll_wide">ШФП рулон</option>
+                  </select>
+                </FormField>
+              )}
             </div>
+
+            {!technologySupportsBw && (
+              <Alert type="info" className="mt-3">
+                Для выбранной технологии отключён Ч/Б режим: доступны только цветные ставки.
+              </Alert>
+            )}
 
             {form.counter_unit === 'sheets' && (
               <FormField label="Размер печатного листа (мм)" className="mt-3">
@@ -549,7 +649,9 @@ export const PrintPriceEditPage: React.FC = () => {
               <h4>Ставки</h4>
               <p className="text-muted text-sm">
                 {form.counter_unit === 'm2'
-                  ? 'Базовые руб/м² по слоям и минимум на позицию заказа.'
+                  ? isRollWideM2Profile
+                    ? 'Базовая цветная ставка руб/м² + минимум на позицию (профиль ШФП рулон).'
+                    : 'Базовые руб/м² по слоям и минимум на позицию заказа (профиль УФ).'
                   : 'Плоские ставки за погонный метр.'}
               </p>
             </div>
@@ -560,52 +662,70 @@ export const PrintPriceEditPage: React.FC = () => {
                     <FormField label="Цвет, руб/м² (база)">
                       <input type="number" step="0.01" className="form-control" value={form.price_color_per_m2 ?? ''} onChange={(e) => updateForm({ price_color_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
                     </FormField>
-                    <FormField label="Белый, руб/м² (база)">
-                      <input type="number" step="0.01" className="form-control" value={form.price_white_per_m2 ?? ''} onChange={(e) => updateForm({ price_white_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
-                    </FormField>
-                    <FormField label="Лак, руб/м² (база)">
-                      <input type="number" step="0.01" className="form-control" value={form.price_varnish_per_m2 ?? ''} onChange={(e) => updateForm({ price_varnish_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
-                    </FormField>
+                    {form.m2_pricing_kind === 'uv_flatbed' && (
+                      <>
+                        <FormField label="Белый, руб/м² (база)">
+                          <input type="number" step="0.01" className="form-control" value={form.price_white_per_m2 ?? ''} onChange={(e) => updateForm({ price_white_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                        </FormField>
+                        <FormField label="Лак, руб/м² (база)">
+                          <input type="number" step="0.01" className="form-control" value={form.price_varnish_per_m2 ?? ''} onChange={(e) => updateForm({ price_varnish_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                        </FormField>
+                      </>
+                    )}
                     <FormField label="Мин. заказ на печать">
                       <input type="number" step="0.01" className="form-control" value={form.min_charge} onChange={(e) => updateForm({ min_charge: parseFloat(e.target.value) || 0 })} />
                     </FormField>
-                    <FormField label="Макс. ширина стола (мм)">
-                      <input type="number" className="form-control" value={form.max_width_mm} onChange={(e) => updateForm({ max_width_mm: Number(e.target.value) || 600 })} />
-                    </FormField>
-                    <FormField label="Макс. высота стола (мм)">
-                      <input type="number" className="form-control" value={form.max_height_mm} onChange={(e) => updateForm({ max_height_mm: Number(e.target.value) || 900 })} />
-                    </FormField>
+                    {form.m2_pricing_kind === 'uv_flatbed' && (
+                      <>
+                        <FormField label="Макс. ширина стола (мм)">
+                          <input type="number" className="form-control" value={form.max_width_mm} onChange={(e) => updateForm({ max_width_mm: Number(e.target.value) || 600 })} />
+                        </FormField>
+                        <FormField label="Макс. высота стола (мм)">
+                          <input type="number" className="form-control" value={form.max_height_mm} onChange={(e) => updateForm({ max_height_mm: Number(e.target.value) || 900 })} />
+                        </FormField>
+                      </>
+                    )}
                   </div>
-                  <div className="mt-3">
-                    <Button variant="secondary" size="sm" onClick={fetchM2Preview} loading={m2PreviewLoading}>
-                      Превью расчёта (100×100 мм, цвет 1 проход)
-                    </Button>
-                  </div>
-                  {m2Preview && (
-                    <div className="print-price-m2-preview">
-                      <div>
-                        За 1 шт.: <MoneyAmount value={m2Preview.unit_price} />
-                        {' · '}
-                        Позиция: <MoneyAmount value={m2Preview.total_price} />
+                  {form.m2_pricing_kind === 'uv_flatbed' ? (
+                    <>
+                      <div className="mt-3">
+                        <Button variant="secondary" size="sm" onClick={fetchM2Preview} loading={m2PreviewLoading}>
+                          Превью расчёта (100×100 мм, цвет 1 проход)
+                        </Button>
                       </div>
-                      {m2Preview.min_charge_applied && (
-                        <div className="text-muted text-sm">Применён минимальный заказ на печать</div>
+                      {m2Preview && (
+                        <div className="print-price-m2-preview">
+                          <div>
+                            За 1 шт.: <MoneyAmount value={m2Preview.unit_price} />
+                            {' · '}
+                            Позиция: <MoneyAmount value={m2Preview.total_price} />
+                          </div>
+                          {m2Preview.min_charge_applied && (
+                            <div className="text-muted text-sm">Применён минимальный заказ на печать</div>
+                          )}
+                        </div>
                       )}
+                    </>
+                  ) : (
+                    <div className="text-muted text-sm mt-3">
+                      Для профиля «ШФП рулон» используются только цветные ставки и ступени по total_m².
                     </div>
                   )}
                 </>
               )}
               {form.counter_unit === 'meters' && (
                 <div className="form-grid">
-                  <FormField label="ЧБ, пог. метр">
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      value={form.price_bw_per_meter ?? ''}
-                      onChange={(e) => updateForm({ price_bw_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
-                    />
-                  </FormField>
+                  {technologySupportsBw && (
+                    <FormField label="ЧБ, пог. метр">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control"
+                        value={form.price_bw_per_meter ?? ''}
+                        onChange={(e) => updateForm({ price_bw_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
+                      />
+                    </FormField>
+                  )}
                   <FormField label="Цвет, пог. метр">
                     <input
                       type="number"
@@ -778,54 +898,58 @@ export const PrintPriceEditPage: React.FC = () => {
                           })}
                           <td></td>
                         </tr>
-                        {/* Черно-белая - родительская строка */}
-                        <tr className="simplified-table__parent-row">
-                          <td className="simplified-table__parent-cell">
-                            <PrintPriceModeLabel muted>черно-белая</PrintPriceModeLabel>
-                          </td>
-                          {commonRanges.map((_, ti) => (
-                            <td key={`bw-empty-${ti}`} className="simplified-table__parent-fill"></td>
-                          ))}
-                          <td className="simplified-table__parent-fill"></td>
-                        </tr>
-                        {/* ЧБ, односторонняя */}
-                        <tr className="simplified-table__child-row">
-                          <td className="simplified-table__child-cell">
-                            <PrintPriceModeLabel child>односторонняя</PrintPriceModeLabel>
-                          </td>
-                          {commonRanges.map((t, ti) => {
-                            const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_single' && rt.min_sheets === t.min_sheets)
-                            return (
-                              <td key={ti}>
-                                <PriceCell
-                                  className="form-input form-input--compact-table"
-                                  value={priceTier?.price_per_sheet ?? 0}
-                                  onChange={(v) => updateTierPrice('bw_single', t.min_sheets, v)}
-                                />
+                        {technologySupportsBw && (
+                          <>
+                            {/* Черно-белая - родительская строка */}
+                            <tr className="simplified-table__parent-row">
+                              <td className="simplified-table__parent-cell">
+                                <PrintPriceModeLabel muted>черно-белая</PrintPriceModeLabel>
                               </td>
-                            )
-                          })}
-                          <td></td>
-                        </tr>
-                        {/* ЧБ, двусторонняя */}
-                        <tr className="simplified-table__child-row">
-                          <td className="simplified-table__child-cell">
-                            <PrintPriceModeLabel child>двухсторонняя</PrintPriceModeLabel>
-                          </td>
-                          {commonRanges.map((t, ti) => {
-                            const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_duplex' && rt.min_sheets === t.min_sheets)
-                            return (
-                              <td key={ti}>
-                                <PriceCell
-                                  className="form-input form-input--compact-table"
-                                  value={priceTier?.price_per_sheet ?? 0}
-                                  onChange={(v) => updateTierPrice('bw_duplex', t.min_sheets, v)}
-                                />
+                              {commonRanges.map((_, ti) => (
+                                <td key={`bw-empty-${ti}`} className="simplified-table__parent-fill"></td>
+                              ))}
+                              <td className="simplified-table__parent-fill"></td>
+                            </tr>
+                            {/* ЧБ, односторонняя */}
+                            <tr className="simplified-table__child-row">
+                              <td className="simplified-table__child-cell">
+                                <PrintPriceModeLabel child>односторонняя</PrintPriceModeLabel>
                               </td>
-                            )
-                          })}
-                          <td></td>
-                        </tr>
+                              {commonRanges.map((t, ti) => {
+                                const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_single' && rt.min_sheets === t.min_sheets)
+                                return (
+                                  <td key={ti}>
+                                    <PriceCell
+                                      className="form-input form-input--compact-table"
+                                      value={priceTier?.price_per_sheet ?? 0}
+                                      onChange={(v) => updateTierPrice('bw_single', t.min_sheets, v)}
+                                    />
+                                  </td>
+                                )
+                              })}
+                              <td></td>
+                            </tr>
+                            {/* ЧБ, двусторонняя */}
+                            <tr className="simplified-table__child-row">
+                              <td className="simplified-table__child-cell">
+                                <PrintPriceModeLabel child>двухсторонняя</PrintPriceModeLabel>
+                              </td>
+                              {commonRanges.map((t, ti) => {
+                                const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_duplex' && rt.min_sheets === t.min_sheets)
+                                return (
+                                  <td key={ti}>
+                                    <PriceCell
+                                      className="form-input form-input--compact-table"
+                                      value={priceTier?.price_per_sheet ?? 0}
+                                      onChange={(v) => updateTierPrice('bw_duplex', t.min_sheets, v)}
+                                    />
+                                  </td>
+                                )
+                              })}
+                              <td></td>
+                            </tr>
+                          </>
+                        )}
                       </tbody>
                     </table>
 
@@ -918,113 +1042,208 @@ export const PrintPriceEditPage: React.FC = () => {
         {form.counter_unit === 'm2' && (
           <div className="data-card mt-4">
             <div className="card-header">
-              <h4>Ступени по объёму (м² тиража)</h4>
-              <p className="text-muted text-sm">
-                Ось: total_m² = площадь изделия × тираж. Для каждого слоя — своя шкала; если ступеней нет — базовые
-                ставки из блока «Ставки».
-              </p>
+              <h4>Ступени по объёму (total_m²)</h4>
+              {form.m2_pricing_kind === 'uv_flatbed' ? (
+                <p className="text-muted text-sm">
+                  Для каждого слоя — своя шкала; если ступеней нет, применяются базовые ставки из блока «Ставки».
+                </p>
+              ) : (
+                <p className="text-muted text-sm">
+                  Ось: total_m² = площадь изделия × тираж. Профиль ШФП рулон использует только цветные ступени.
+                </p>
+              )}
             </div>
             <div className="card-content">
-              <div className="print-price-m2-layer-tabs">
-                {M2_LAYER_KEYS.map((layer) => (
-                  <button
-                    key={layer}
-                    type="button"
-                    className={`print-price-m2-layer-tab ${m2LayerTab === layer ? 'print-price-m2-layer-tab--active' : ''}`}
-                    onClick={() => setM2LayerTab(layer)}
-                  >
-                    {M2_LAYER_LABELS[layer]}
-                    {' '}
-                    ({form.m2_tiers.filter((t) => t.layer === layer).length})
-                  </button>
-                ))}
-              </div>
-              <table className="simplified-table simplified-table--compact">
-                <thead>
-                  <tr>
-                    <th>От м²</th>
-                    <th>До м²</th>
-                    <th>Руб/м²</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {m2TiersForActiveLayer.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="text-muted text-sm">
-                        Нет ступеней для слоя «{M2_LAYER_LABELS[m2LayerTab]}» — используется базовая ставка.
-                      </td>
-                    </tr>
-                  ) : (
-                    m2TiersForActiveLayer.map(({ tier, idx }) => (
-                      <tr key={idx}>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.001"
-                            min={0}
-                            className="form-control"
-                            value={tier.min_m2}
-                            onChange={(e) => {
-                              const next = [...form.m2_tiers];
-                              next[idx] = { ...next[idx], min_m2: parseFloat(e.target.value) || 0 };
-                              updateForm({ m2_tiers: next });
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.001"
-                            className="form-control"
-                            placeholder="∞"
-                            value={tier.max_m2 ?? ''}
-                            onChange={(e) => {
-                              const next = [...form.m2_tiers];
-                              next[idx] = {
-                                ...next[idx],
-                                max_m2: e.target.value ? parseFloat(e.target.value) : null,
-                              };
-                              updateForm({ m2_tiers: next });
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min={0}
-                            className="form-control"
-                            value={tier.price_per_m2}
-                            onChange={(e) => {
-                              const next = [...form.m2_tiers];
-                              next[idx] = { ...next[idx], price_per_m2: parseFloat(e.target.value) || 0 };
-                              updateForm({ m2_tiers: next });
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => updateForm({ m2_tiers: form.m2_tiers.filter((_, i) => i !== idx) })}
-                          >
-                            Удалить
-                          </Button>
-                        </td>
+              {form.m2_pricing_kind === 'uv_flatbed' ? (
+                <>
+                  <div className="print-price-m2-layer-tabs">
+                    {M2_LAYER_KEYS.map((layer) => (
+                      <button
+                        key={layer}
+                        type="button"
+                        className={`print-price-m2-layer-tab ${m2LayerTab === layer ? 'print-price-m2-layer-tab--active' : ''}`}
+                        onClick={() => setM2LayerTab(layer)}
+                      >
+                        {M2_LAYER_LABELS[layer]}
+                        {' '}
+                        ({form.m2_tiers.filter((t) => t.layer === layer).length})
+                      </button>
+                    ))}
+                  </div>
+                  <table className="simplified-table simplified-table--compact">
+                    <thead>
+                      <tr>
+                        <th>От м²</th>
+                        <th>До м²</th>
+                        <th>Руб/м²</th>
+                        <th />
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-3"
-                onClick={() => addM2TierForLayer(m2LayerTab)}
-              >
-                + Добавить ступень ({M2_LAYER_LABELS[m2LayerTab]})
-              </Button>
+                    </thead>
+                    <tbody>
+                      {m2TiersForActiveLayer.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="text-muted text-sm">
+                            Нет ступеней для слоя «{M2_LAYER_LABELS[m2LayerTab]}» — используется базовая ставка.
+                          </td>
+                        </tr>
+                      ) : (
+                        m2TiersForActiveLayer.map(({ tier, idx }) => (
+                          <tr key={idx}>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.001"
+                                min={0}
+                                className="form-control"
+                                value={tier.min_m2}
+                                onChange={(e) => {
+                                  const next = [...form.m2_tiers];
+                                  next[idx] = { ...next[idx], min_m2: parseFloat(e.target.value) || 0 };
+                                  updateForm({ m2_tiers: next });
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.001"
+                                className="form-control"
+                                placeholder="∞"
+                                value={tier.max_m2 ?? ''}
+                                onChange={(e) => {
+                                  const next = [...form.m2_tiers];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    max_m2: e.target.value ? parseFloat(e.target.value) : null,
+                                  };
+                                  updateForm({ m2_tiers: next });
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                className="form-control"
+                                value={tier.price_per_m2}
+                                onChange={(e) => {
+                                  const next = [...form.m2_tiers];
+                                  next[idx] = { ...next[idx], price_per_m2: parseFloat(e.target.value) || 0 };
+                                  updateForm({ m2_tiers: next });
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => updateForm({ m2_tiers: form.m2_tiers.filter((_, i) => i !== idx) })}
+                              >
+                                Удалить
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => addM2TierForLayer(m2LayerTab)}
+                  >
+                    + Добавить ступень ({M2_LAYER_LABELS[m2LayerTab]})
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <table className="simplified-table simplified-table--compact">
+                    <thead>
+                      <tr>
+                        <th>От total_m²</th>
+                        <th>До total_m²</th>
+                        <th>Руб/м²</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.roll_m2_tiers.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="text-muted text-sm">
+                            Нет ступеней total_m² — используется базовая цветная ставка.
+                          </td>
+                        </tr>
+                      ) : (
+                        form.roll_m2_tiers.map((tier, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.001"
+                                min={0}
+                                className="form-control"
+                                value={tier.min_total_m2}
+                                onChange={(e) => {
+                                  const next = [...form.roll_m2_tiers];
+                                  next[idx] = { ...next[idx], min_total_m2: parseFloat(e.target.value) || 0 };
+                                  updateForm({ roll_m2_tiers: next });
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.001"
+                                className="form-control"
+                                placeholder="∞"
+                                value={tier.max_total_m2 ?? ''}
+                                onChange={(e) => {
+                                  const next = [...form.roll_m2_tiers];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    max_total_m2: e.target.value ? parseFloat(e.target.value) : null,
+                                  };
+                                  updateForm({ roll_m2_tiers: next });
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                className="form-control"
+                                value={tier.price_per_m2}
+                                onChange={(e) => {
+                                  const next = [...form.roll_m2_tiers];
+                                  next[idx] = { ...next[idx], price_per_m2: parseFloat(e.target.value) || 0 };
+                                  updateForm({ roll_m2_tiers: next });
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() =>
+                                  updateForm({ roll_m2_tiers: form.roll_m2_tiers.filter((_, i) => i !== idx) })
+                                }
+                              >
+                                Удалить
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                  <Button variant="secondary" size="sm" className="mt-3" onClick={addRollM2Tier}>
+                    + Добавить ступень
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}

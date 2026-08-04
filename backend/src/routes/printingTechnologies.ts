@@ -27,7 +27,7 @@ router.get('/', asyncHandler(async (_req, res) => {
   }
   const db = await getDb()
   const rows = await db.all<any>(
-    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.is_active,
+    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.supports_bw, t.is_active,
             p.id as price_id, p.price_single, p.price_duplex, p.price_per_meter, p.is_active as price_is_active
        FROM print_technologies t
   LEFT JOIN print_technology_prices p ON p.technology_code = t.code
@@ -47,11 +47,12 @@ router.post('/', asyncHandler(async (req, res) => {
     return
   }
 
-  const { code, name, pricing_mode, supports_duplex = 0, is_active = 1 } = req.body as {
+  const { code, name, pricing_mode, supports_duplex = 0, supports_bw = 1, is_active = 1 } = req.body as {
     code: string
     name: string
     pricing_mode: string
     supports_duplex?: number | boolean
+    supports_bw?: number | boolean
     is_active?: number | boolean
   }
 
@@ -62,12 +63,13 @@ router.post('/', asyncHandler(async (req, res) => {
 
   const db = await getDb()
   await db.run(
-    `INSERT INTO print_technologies (code, name, pricing_mode, supports_duplex, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+    `INSERT INTO print_technologies (code, name, pricing_mode, supports_duplex, supports_bw, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
     code,
     name,
     pricing_mode,
     supports_duplex ? 1 : 0,
+    supports_bw ? 1 : 0,
     is_active ? 1 : 0
   )
   await db.run(
@@ -77,7 +79,7 @@ router.post('/', asyncHandler(async (req, res) => {
   )
 
   const row = await db.get<any>(
-    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.is_active,
+    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.supports_bw, t.is_active,
             p.id as price_id, p.price_single, p.price_duplex, p.price_per_meter, p.is_active as price_is_active
        FROM print_technologies t
   LEFT JOIN print_technology_prices p ON p.technology_code = t.code
@@ -99,15 +101,16 @@ router.put('/:code', asyncHandler(async (req, res) => {
   }
 
   const code = String(req.params.code)
-  const { name, pricing_mode, supports_duplex, is_active } = req.body as {
+  const { name, pricing_mode, supports_duplex, supports_bw, is_active } = req.body as {
     name?: string
     pricing_mode?: string
     supports_duplex?: number | boolean
+    supports_bw?: number | boolean
     is_active?: number | boolean
   }
 
   if (pricing_mode && !validatePricingMode(pricing_mode)) {
-    res.status(400).json({ message: 'pricing_mode должен быть per_sheet или per_meter' })
+    res.status(400).json({ message: 'pricing_mode должен быть per_sheet, per_meter или per_m2' })
     return
   }
 
@@ -120,18 +123,20 @@ router.put('/:code', asyncHandler(async (req, res) => {
         SET name = COALESCE(?, name),
             pricing_mode = COALESCE(?, pricing_mode),
             supports_duplex = COALESCE(?, supports_duplex),
+            supports_bw = COALESCE(?, supports_bw),
             is_active = COALESCE(?, is_active),
             updated_at = datetime('now')
       WHERE code = ?`,
     name ?? null,
     pricing_mode ?? null,
     supports_duplex === undefined ? null : (supports_duplex ? 1 : 0),
+    supports_bw === undefined ? null : (supports_bw ? 1 : 0),
     is_active === undefined ? null : (is_active ? 1 : 0),
     code
   )
 
   const row = await db.get<any>(
-    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.is_active,
+    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.supports_bw, t.is_active,
             p.id as price_id, p.price_single, p.price_duplex, p.price_per_meter, p.is_active as price_is_active
        FROM print_technologies t
   LEFT JOIN print_technology_prices p ON p.technology_code = t.code
@@ -194,7 +199,7 @@ router.put('/:code/prices', asyncHandler(async (req, res) => {
   }
 
   const row = await db.get<any>(
-    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.is_active,
+    `SELECT t.code, t.name, t.pricing_mode, t.supports_duplex, t.supports_bw, t.is_active,
             p.id as price_id, p.price_single, p.price_duplex, p.price_per_meter, p.is_active as price_is_active
        FROM print_technologies t
   LEFT JOIN print_technology_prices p ON p.technology_code = t.code

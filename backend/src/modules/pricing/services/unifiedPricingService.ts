@@ -166,10 +166,19 @@ export class UnifiedPricingService {
               layout?.sheetsNeeded != null && Number.isFinite(Number(layout.sheetsNeeded))
                 ? Number(layout.sheetsNeeded)
                 : 0;
+            const totalM2 =
+              result.rollWideM2Details?.totalM2 != null && Number.isFinite(Number(result.rollWideM2Details.totalM2))
+                ? Number(result.rollWideM2Details.totalM2)
+                : layout?.totalM2Needed != null && Number.isFinite(Number(layout.totalM2Needed))
+                  ? Number(layout.totalM2Needed)
+                  : 0;
             /** Фактический расход листов / п.м., как у строки материала — не тираж экземпляров */
-            let priceUnit: 'per_meter' | 'per_sheet' | 'per_item' = 'per_item';
+            let priceUnit: 'per_m2' | 'per_meter' | 'per_sheet' | 'per_item' = 'per_item';
             let physQty = result.quantity;
-            if (meters > 0) {
+            if (totalM2 > 0) {
+              priceUnit = 'per_m2';
+              physQty = totalM2;
+            } else if (meters > 0) {
               priceUnit = 'per_meter';
               physQty = meters;
             } else if (sheets > 0) {
@@ -209,6 +218,7 @@ export class UnifiedPricingService {
         itemsPerSheet: result.layout.itemsPerSheet,
         sheetsNeeded: result.layout.sheetsNeeded,
         metersNeeded: result.layout.metersNeeded,
+        totalM2Needed: result.layout.totalM2Needed,
         wastePercentage: result.layout.wastePercentage,
         recommendedSheetSize: result.layout.recommendedSheetSize,
         cutsPerSheet: result.layout.cutsPerSheet,

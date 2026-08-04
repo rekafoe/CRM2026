@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../middleware'
 import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
+const VALID_COUNTER_UNITS = new Set(['sheets', 'meters', 'm2'])
 
 const PRINTERS_BASE_SELECT = [
   'p.id',
@@ -162,7 +163,7 @@ router.post('/', asyncHandler(async (req, res) => {
     code: string
     name: string
     technology_code?: string | null
-    counter_unit?: 'sheets' | 'meters'
+    counter_unit?: 'sheets' | 'meters' | 'm2'
     max_width_mm?: number | null
     color_mode?: 'bw' | 'color' | 'both'
     printer_class?: 'office' | 'pro'
@@ -181,6 +182,10 @@ router.post('/', asyncHandler(async (req, res) => {
 
   if (!code || !name) {
     res.status(400).json({ message: 'code и name обязательны' })
+    return
+  }
+  if (!VALID_COUNTER_UNITS.has(String(counter_unit))) {
+    res.status(400).json({ message: 'counter_unit должен быть одним из: sheets, meters, m2' })
     return
   }
 
@@ -266,7 +271,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
     code?: string
     name?: string
     technology_code?: string | null
-    counter_unit?: 'sheets' | 'meters'
+    counter_unit?: 'sheets' | 'meters' | 'm2'
     max_width_mm?: number | null
     color_mode?: 'bw' | 'color' | 'both'
     printer_class?: 'office' | 'pro'
@@ -299,6 +304,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
       res.status(400).json({ message: 'Департамент не найден' })
       return
     }
+  }
+  if (counter_unit !== undefined && !VALID_COUNTER_UNITS.has(String(counter_unit))) {
+    res.status(400).json({ message: 'counter_unit должен быть одним из: sheets, meters, m2' })
+    return
   }
 
   const sets: string[] = []

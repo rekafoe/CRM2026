@@ -52,6 +52,10 @@ export type SimplifiedUvPrintConfig = {
   dimensions_mode?: 'custom_only' | 'presets_and_custom'
 }
 
+export type SimplifiedRollM2Config = {
+  mode: 'roll_wide_m2'
+}
+
 export type MultiPageStructureConfig = {
   innerBlock?: {
     pagesSource?: 'parameter' | 'fixed';
@@ -200,6 +204,8 @@ export type SimplifiedTypeConfig = {
   allowed_price_types?: string[];
   /** УФ-планшет: расчёт по м², слои и дефолты проходов */
   uv_print?: SimplifiedUvPrintConfig;
+  /** ШФП рулон: расчёт по total_m² с центральными ставками */
+  roll_m2?: SimplifiedRollM2Config;
 }
 
 /**
@@ -248,6 +254,8 @@ export type SimplifiedConfig = {
   print_optional?: boolean;
   /** УФ-планшет (legacy без типов продукта) */
   uv_print?: SimplifiedUvPrintConfig;
+  /** ШФП рулон (legacy без типов продукта) */
+  roll_m2?: SimplifiedRollM2Config;
 }
 
 function toTypeConfigKey(id: ProductTypeId): string {

@@ -2,7 +2,9 @@
 
 Документ описывает расчёт УФ-печати на планшетном принтере (стол до 600×900 мм) в simplified-калькуляторе.
 
-**Пошаговая настройка в CRM (для администратора):** [uv-flatbed-setup-guide.md](./uv-flatbed-setup-guide.md)
+**Пошаговая настройка в CRM (для администратора):**
+- UV: [uv-flatbed-setup-guide.md](./uv-flatbed-setup-guide.md)
+- ШФП рулон (m²): [wide-format-roll-m2-setup.md](./wide-format-roll-m2-setup.md)
 
 См. также: [pricing-architecture.md](./pricing-architecture.md), [dynamic-layout-bleed.md](./dynamic-layout-bleed.md).
 
@@ -41,7 +43,7 @@ print_price = max(Σ layer_cost, min_charge)
 
 Таблица `print_price_m2_tiers`: `layer`, `min_m2`, `max_m2`, `price_per_m2`.
 
-Настройка: **Админка → Принтеры → Цены печати → Изменить** (режим «Кв. метры (УФ-планшет)»).
+Настройка: **Админка → Принтеры → Цены печати → Изменить** (`counter_unit = m2`, профиль `uv_flatbed`).
 
 Превью: `GET /api/pricing/print-prices/derive-m2?width_mm=&height_mm=&quantity=&uv_print=`.
 

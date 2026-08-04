@@ -35,12 +35,28 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   selectedSizeId,
   materialInFirstColumn,
 }) => {
-  const [printTechnologies, setPrintTechnologies] = useState<Array<{ code: string; name: string; pricing_mode: string; supports_duplex?: number | boolean }>>([]);
+  const [printTechnologies, setPrintTechnologies] = useState<
+    Array<{
+      code: string
+      name: string
+      pricing_mode: string
+      supports_duplex?: number | boolean
+      supports_bw?: number | boolean
+    }>
+  >([]);
 
   // Загружаем типы печати
   useEffect(() => {
     // Проверяем кэш
-    const cached = apiCache.get<Array<{ code: string; name: string; pricing_mode: string; supports_duplex?: number | boolean }>>(CACHE_KEY);
+    const cached = apiCache.get<
+      Array<{
+        code: string
+        name: string
+        pricing_mode: string
+        supports_duplex?: number | boolean
+        supports_bw?: number | boolean
+      }>
+    >(CACHE_KEY);
     if (cached) {
       setPrintTechnologies(cached);
     } else {
@@ -178,15 +194,9 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   const supportsSingle = allowedSides.includes(1);
   const sidesChoiceAvailable = supportsDuplex && supportsSingle;
 
-  // Проверяем, поддерживает ли технология только цветную печать
-  // Для струйных пигментных технологий обычно только цветная печать
   const isColorOnly = useMemo(() => {
     if (!selectedPrintTechnology) return false;
-    const code = selectedPrintTechnology.code?.toLowerCase() || '';
-    const name = selectedPrintTechnology.name?.toLowerCase() || '';
-    // Проверяем по коду или названию
-    return code.includes('inkjet_pigment') || 
-           code.includes('inkjet') && (code.includes('pigment') || name.includes('пигмент'));
+    return selectedPrintTechnology.supports_bw === 0 || selectedPrintTechnology.supports_bw === false;
   }, [selectedPrintTechnology]);
 
   // Режимы цвета только из шаблона (print_prices). Без подстановки из принтеров — иначе расчёт расходится с ценами.

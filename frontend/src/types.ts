@@ -351,7 +351,7 @@ export interface Printer {
   code: string;
   name: string;
   technology_code?: string | null;
-  counter_unit?: 'sheets' | 'meters';
+  counter_unit?: 'sheets' | 'meters' | 'm2';
   max_width_mm?: number | null;
   color_mode?: 'bw' | 'color' | 'both';
   printer_class?: 'office' | 'pro';

@@ -90,6 +90,8 @@ console.log(result.calculationMethod);
 
 **УФ-планшет (м²):** отдельная ветка при `uv_print.mode === 'flatbed_m2'` в шаблоне — `UvFlatbedPricingService`, центральные ставки `print_prices.counter_unit = m2`. Подробно: **[uv-flatbed-pricing.md](./uv-flatbed-pricing.md)**. Настройка в интерфейсе: **[uv-flatbed-setup-guide.md](./uv-flatbed-setup-guide.md)**.
 
+**ШФП рулон (m²):** отдельная ветка при `roll_m2.mode === 'roll_wide_m2'` — `RollWideM2PricingService`, профиль `print_prices.m2_pricing_kind = roll_wide`, ступени в `print_price_roll_m2_tiers` по оси `total_m2`. Поэтапное включение управляется флагом `FEATURE_ROLL_WIDE_M2`. Подробно: **[wide-format-roll-m2-setup.md](./wide-format-roll-m2-setup.md)**.
+
 ### 3. DynamicPricingService (Настройки)
 
 **Файл:** `backend/src/modules/pricing/services/dynamicPricingService.ts`

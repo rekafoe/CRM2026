@@ -13,6 +13,15 @@ function parseCorsOrigin(): string[] {
     .filter(Boolean);
 }
 
+function parseBooleanEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]
+  if (raw == null || String(raw).trim() === '') return fallback
+  const normalized = String(raw).trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on', 'enable', 'enabled'].includes(normalized)) return true
+  if (['0', 'false', 'no', 'off', 'disable', 'disabled'].includes(normalized)) return false
+  return fallback
+}
+
 /** Vercel CRM (и preview *.vercel.app) — прямой fetch на Railway для multipart upload */
 const VERCEL_APP_ORIGIN_RE = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i
 
@@ -44,6 +53,11 @@ export function corsDynamicOrigin(
   callback(null, false)
 }
 
+/** Feature-flag для поэтапного rollout ШФП рулонного m²-профиля */
+export function isRollWideM2Enabled(): boolean {
+  return parseBooleanEnv('FEATURE_ROLL_WIDE_M2', true)
+}
+
 export const config = {
   port: Number(process.env.PORT || 3001),
   corsOrigin: parseCorsOrigin(),
@@ -57,4 +71,5 @@ export const config = {
   jwtExpiry: process.env.JWT_EXPIRY || '24h',
   rateLimitMax: Number(process.env.RATE_LIMIT_MAX || 20_000),
   rateLimitWindow: Number(process.env.RATE_LIMIT_WINDOW_MS || 60 * 1000), // синхронно с rateLimiter.ts generalRateLimit
+  featureRollWideM2: isRollWideM2Enabled(),
 }

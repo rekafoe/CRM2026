@@ -8,7 +8,13 @@ import { PriceCell } from './PriceCell'
 import { type Tier, defaultTiers, addRangeBoundary, editRangeBoundary, removeRange, normalizeTiers } from '../utils/tierManagement'
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../hooks/useTierRangeFloating'
 
-type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
+type PrintTechRow = {
+  code: string
+  name: string
+  is_active?: number | boolean
+  supports_duplex?: number | boolean
+  supports_bw?: number | boolean
+}
 
 type TierRangeModalState = {
   type: 'add' | 'edit'
@@ -177,10 +183,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
               const layoutMaterialId = firstMaterialIdWithSheetDims(allMaterials, allowedMaterialIds)
               const selectedTech = printTechs.find((t) => t.code === tech)
               const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
-              const isColorOnly =
-                tech.toLowerCase().includes('inkjet_pigment') ||
-                (tech.toLowerCase().includes('inkjet') &&
-                  (selectedTech?.name?.toLowerCase().includes('пигмент') ?? false))
+              const isColorOnly = selectedTech?.supports_bw === 0 || selectedTech?.supports_bw === false
               const modes: Array<{ color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' }> = []
               if (isColorOnly) {
                 modes.push({ color_mode: 'color', sides_mode: 'single' })
@@ -298,8 +301,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
 
                 const selectedTech = printTechs.find(t => t.code === techCode)
                 const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
-                const isColorOnly = techCode.toLowerCase().includes('inkjet_pigment') ||
-                                   (techCode.toLowerCase().includes('inkjet') && selectedTech?.name?.toLowerCase().includes('пигмент'))
+                const isColorOnly = selectedTech?.supports_bw === 0 || selectedTech?.supports_bw === false
 
                 const existingRanges = getSizeRanges(selected)
                 const variations: Array<{ technology_code: string; color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex'; tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }> = []
@@ -355,8 +357,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           const techCode = selected.print_prices[0]?.technology_code ?? selected.default_print?.technology_code ?? ''
           const selectedTech = techCode ? printTechs.find(t => t.code === techCode) : null
           const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
-          const isColorOnly = techCode.toLowerCase().includes('inkjet_pigment') ||
-            (techCode.toLowerCase().includes('inkjet') && selectedTech?.name?.toLowerCase().includes('пигмент'))
+          const isColorOnly = selectedTech?.supports_bw === 0 || selectedTech?.supports_bw === false
 
           const removeVariant = (color_mode: 'color' | 'bw', sides_mode: 'single' | 'duplex') => {
             const remaining = selected.print_prices.filter(

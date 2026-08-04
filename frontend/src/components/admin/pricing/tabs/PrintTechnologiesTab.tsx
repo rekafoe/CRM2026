@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Button, FormField, StatusBadge, Modal } from '../../../common';
 import { api } from '../../../../api';
-import { numberInputFromString, type NumberInputValue } from '../../../../utils/numberInput';
+import type { NumberInputValue } from '../../../../utils/numberInput';
 import type { PrintTechnology, PricingMode } from '../types';
 import { formatPricingMode } from '../printPriceDisplay';
 
@@ -29,11 +29,13 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
   const [techForm, setTechForm] = useState<TechFormState>({ 
     pricing_mode: 'per_sheet', 
     supports_duplex: 1, 
+    supports_bw: 1,
     is_active: 1 
   });
   const [newTechForm, setNewTechForm] = useState<TechFormState>({ 
     pricing_mode: 'per_sheet', 
     supports_duplex: 1, 
+    supports_bw: 1,
     is_active: 1 
   });
   const [editingTechCode, setEditingTechCode] = useState<string | null>(null);
@@ -45,13 +47,14 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
       ...tech,
       pricing_mode: tech.pricing_mode,
       supports_duplex: tech.supports_duplex,
+      supports_bw: tech.supports_bw,
       is_active: tech.is_active,
     });
   };
 
   const cancelEditTech = () => {
     setEditingTechCode(null);
-    setTechForm({ pricing_mode: 'per_sheet', supports_duplex: 1, is_active: 1 });
+    setTechForm({ pricing_mode: 'per_sheet', supports_duplex: 1, supports_bw: 1, is_active: 1 });
   };
 
   const saveTech = async () => {
@@ -61,6 +64,7 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
         name: techForm.name,
         pricing_mode: techForm.pricing_mode,
         supports_duplex: techForm.supports_duplex,
+        supports_bw: techForm.supports_bw,
         is_active: techForm.is_active,
       });
       await onLoadData();
@@ -83,9 +87,10 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
         name: newTechForm.name,
         pricing_mode: newTechForm.pricing_mode,
         supports_duplex: newTechForm.supports_duplex,
+        supports_bw: newTechForm.supports_bw,
         is_active: newTechForm.is_active,
       });
-      setNewTechForm({ pricing_mode: 'per_sheet', supports_duplex: 1, is_active: 1 });
+      setNewTechForm({ pricing_mode: 'per_sheet', supports_duplex: 1, supports_bw: 1, is_active: 1 });
       await onLoadData();
       onSuccess('Тип печати добавлен');
     } catch (error) {
@@ -151,10 +156,10 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
               >
                 <option value="per_sheet">Цена за лист</option>
                 <option value="per_meter">Цена за погонный метр</option>
-                <option value="per_m2">Цена за кв. метр (УФ-планшет)</option>
+                <option value="per_m2">Цена за кв. метр</option>
               </select>
               <p className="pricing-hint">
-                Для УФ-планшета выберите «кв. метр» и настройте ставки на вкладке «Цены печати».
+                Для UV/ШФП по м² выберите «кв. метр» и настройте профиль + ставки на вкладке «Цены печати».
               </p>
             </FormField>
             <FormField label="Двусторонняя поддержка">
@@ -165,6 +170,16 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
               >
                 <option value={1}>Да</option>
                 <option value={0}>Нет</option>
+              </select>
+            </FormField>
+            <FormField label="Поддержка Ч/Б">
+              <select
+                className="form-control"
+                value={(newTechForm.supports_bw ?? 1) ? 1 : 0}
+                onChange={(e) => setNewTechForm({ ...newTechForm, supports_bw: Number(e.target.value) })}
+              >
+                <option value={1}>Да</option>
+                <option value={0}>Нет (только цвет)</option>
               </select>
             </FormField>
             <FormField label="Активность">
@@ -231,10 +246,10 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
                     >
                       <option value="per_sheet">Цена за лист</option>
                       <option value="per_meter">Цена за пог. метр</option>
-                      <option value="per_m2">Цена за кв. метр (УФ)</option>
+                      <option value="per_m2">Цена за кв. метр</option>
                     </select>
                     <p className="pricing-hint">
-                      Для УФ-планшета — per_m2 и вкладка «Цены печати».
+                      Для m²-технологий (UV/ШФП) — per_m2 и вкладка «Цены печати».
                     </p>
                   </FormField>
                   <FormField label="Двусторонняя поддержка">
@@ -245,6 +260,16 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
                     >
                       <option value={1}>Да</option>
                       <option value={0}>Нет</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Поддержка Ч/Б">
+                    <select
+                      className="form-control"
+                      value={(techForm.supports_bw ?? tech.supports_bw ?? 1) ? 1 : 0}
+                      onChange={(e) => setTechForm({ ...techForm, supports_bw: Number(e.target.value) })}
+                    >
+                      <option value={1}>Да</option>
+                      <option value={0}>Нет (только цвет)</option>
                     </select>
                   </FormField>
                   <FormField label="Стоимость печати">
@@ -270,6 +295,9 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
                   </FormField>
                   <FormField label="Двусторонняя поддержка">
                     <span className="field-value">{tech.supports_duplex ? 'Да' : 'Нет'}</span>
+                  </FormField>
+                  <FormField label="Поддержка Ч/Б">
+                    <span className="field-value">{tech.supports_bw ? 'Да' : 'Нет (только цвет)'}</span>
                   </FormField>
                   <FormField label="Стоимость печати">
                     <span className="field-value">Задаётся в принтере</span>

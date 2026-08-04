@@ -6,16 +6,20 @@
  */
 
 import { getDb } from '../../../db';
+import { isRollWideM2Enabled } from '../../../config/app';
 import { getTableColumns } from '../../../utils/tableSchemaCache';
 import { logger } from '../../../utils/logger';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
 import { LayoutCalculationService } from './layoutCalculationService';
-import { PrintPriceService } from './printPriceService';
 import {
   UvFlatbedPricingService,
   type UvFlatbedPricingResult,
   type UvPrintConfiguration,
 } from './uvFlatbedPricingService';
+import {
+  RollWideM2PricingService,
+  type RollWideM2PricingResult,
+} from './rollWideM2PricingService';
 import { PriceTypeService } from './priceTypeService';
 import { BindingPricingService, BindingQuoteResult } from './bindingPricingService';
 import {
@@ -132,6 +136,8 @@ export interface SimplifiedPricingResult {
   };
   /** УФ-планшет: разбивка по слоям */
   uvPrintDetails?: UvFlatbedPricingResult;
+  /** ШФП рулон по м²: агрегированные детали ставки */
+  rollWideM2Details?: RollWideM2PricingResult;
   materialDetails?: {
     tier: { min_qty: number; max_qty?: number; price: number };
     priceForQuantity: number;
@@ -165,6 +171,8 @@ export interface SimplifiedPricingResult {
     sheetsNeeded: number;
     /** Для рулонной печати: пог. м к списанию */
     metersNeeded?: number;
+    /** Для roll-wide m²: суммарная площадь тиража */
+    totalM2Needed?: number;
     wastePercentage?: number;
     recommendedSheetSize?: { width: number; height: number };
     /** Количество резов на лист (для резки стопой) */
@@ -254,6 +262,15 @@ interface SimplifiedTypeConfig {
     roll_allowed_material_ids?: number[];
     mounting_film_material_id?: number;
   };
+  roll_m2?: {
+    mode?: 'roll_wide_m2';
+  };
+  uv_print?: {
+    mode?: 'flatbed_m2';
+    layers?: Array<'color' | 'white' | 'varnish'>;
+    default_passes?: { color?: number; white?: number; varnish?: number };
+    dimensions_mode?: 'custom_only' | 'presets_and_custom';
+  };
 }
 
 function getEffectiveAllowedMaterialIds(typeConfig: SimplifiedTypeConfig, size: SimplifiedSizeConfig): number[] {
@@ -288,6 +305,10 @@ interface SimplifiedConfig {
     layers?: Array<'color' | 'white' | 'varnish'>;
     default_passes?: { color?: number; white?: number; varnish?: number };
     dimensions_mode?: 'custom_only' | 'presets_and_custom';
+  };
+  /** ШФП рулон: печать по м² */
+  roll_m2?: {
+    mode?: 'roll_wide_m2';
   };
   pages?: {
     options?: number[];
@@ -412,9 +433,10 @@ export class SimplifiedPricingService {
       simplifiedConfig.pages,
       (typeConfig as { pages?: SimplifiedPagesConfigLike } | null)?.pages,
     );
-    const uvTemplateConfig =
-      (typeConfig as SimplifiedConfig | null)?.uv_print ?? simplifiedConfig.uv_print;
+    const uvTemplateConfig = typeConfig?.uv_print ?? simplifiedConfig.uv_print;
+    const rollM2TemplateConfig = typeConfig?.roll_m2 ?? simplifiedConfig.roll_m2;
     const isUvFlatbedMode = uvTemplateConfig?.mode === 'flatbed_m2';
+    const isRollWideM2TemplateMode = rollM2TemplateConfig?.mode === 'roll_wide_m2';
     if (typeId && typeConfigs?.[typeId]?.sizes?.length) {
       sizesToUse = typeConfigs[typeId].sizes;
       logger.info('Используем размеры из typeConfigs', { typeId, sizesCount: sizesToUse.length });
@@ -667,8 +689,29 @@ export class SimplifiedPricingService {
 
     // Проверяем, рулонная ли печать (counter_unit=meters) — для неё другая логика
     const centralPriceForRoll = normalizedConfig.print_technology
-      ? await PrintPriceService.getByTechnology(normalizedConfig.print_technology)
+      ? await db.get<{
+          id: number;
+          counter_unit: string;
+          price_bw_per_meter: number | null;
+          price_color_per_meter: number | null;
+        }>(
+          `SELECT id, counter_unit, price_bw_per_meter, price_color_per_meter
+           FROM print_prices
+           WHERE LOWER(technology_code) = LOWER(?)
+             AND is_active = 1
+             AND counter_unit = 'meters'
+           ORDER BY id DESC LIMIT 1`,
+          [normalizedConfig.print_technology],
+        )
       : undefined;
+    const rollWideM2Rates =
+      normalizedConfig.print_technology && isRollWideM2TemplateMode
+        ? await RollWideM2PricingService.loadRatesByTechnology(normalizedConfig.print_technology)
+        : null;
+    const isRollWideM2Mode =
+      !isUvFlatbedMode &&
+      isRollWideM2TemplateMode &&
+      rollWideM2Rates?.m2PricingKind === 'roll_wide';
     // УФ-планшет (flatbed_m2) считает печать по м² отдельно; рулонная логика (пог. м) к материалам не применяется,
     // даже если в центре цен для uv осталась запись counter_unit=meters.
     const isRollPrint =
@@ -706,7 +749,7 @@ export class SimplifiedPricingService {
         ? 1
         : (selectedSize.min_qty ?? 1)
       : selectedSize.min_qty ?? (
-          isOfficePrint || isRollPrint || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
+          isOfficePrint || isRollPrint || isRollWideM2Mode || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
         );
     const maxQtyLimit = selectedSize.max_qty;
     if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
@@ -715,6 +758,7 @@ export class SimplifiedPricingService {
         !usePagesMultiplier &&
         !isOfficePrint &&
         !isRollPrint &&
+        !isRollWideM2Mode &&
         !plotterRollMode &&
         !hasManualItemsPerSheet &&
         minQtyLimit === itemsPerSheet
@@ -773,6 +817,9 @@ export class SimplifiedPricingService {
     // Длина в направлении подачи: меньшая сторона (594×420 → 0.42 м, т.к. 420 мм вдоль рулона)
     const metersPerItem = isRollMeterage ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
     const metersNeeded = isRollMeterage ? metersPerItem * quantity : 0;
+    const totalM2Needed = isRollWideM2Mode
+      ? (Math.max(0, Number(layoutTrim.width)) * Math.max(0, Number(layoutTrim.height)) / 1_000_000) * quantity
+      : 0;
     const effectivePrintQuantity = isRollMeterage ? metersNeeded : sheetsNeeded;
     /** В шаблоне unit_price — за одно поле раскладки (A4 на SRA3); за физический лист = unit × itemsPerSheet */
     const multipagePrintUnits = usePagesMultiplier
@@ -814,6 +861,7 @@ export class SimplifiedPricingService {
     let printPrice = 0;
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
     let uvPrintDetails: UvFlatbedPricingResult | undefined;
+    let rollWideM2Details: RollWideM2PricingResult | undefined;
 
     if (isUvFlatbedMode) {
       const techCode = String(normalizedConfig.print_technology || 'uv').trim().toLowerCase() || 'uv';
@@ -840,6 +888,45 @@ export class SimplifiedPricingService {
         pieceAreaM2: uvPrintDetails.pieceAreaM2,
         totalM2: uvPrintDetails.totalM2,
         layers: uvPrintDetails.layers.length,
+      });
+    } else if (isRollWideM2TemplateMode && normalizedConfig.print_technology) {
+      if (!isRollWideM2Enabled()) {
+        const err: any = new Error(
+          'Профиль roll_wide_m2 отключён feature-flag FEATURE_ROLL_WIDE_M2. Обратитесь к администратору.',
+        );
+        err.status = 403;
+        throw err;
+      }
+      if (!isRollWideM2Mode || !rollWideM2Rates) {
+        throw await RollWideM2PricingService.buildMissingRatesError(normalizedConfig.print_technology);
+      }
+      normalizedConfig.print_color_mode = (normalizedConfig.print_color_mode ?? 'color') as 'color' | 'bw';
+      normalizedConfig.print_sides_mode = (normalizedConfig.print_sides_mode ?? 'single') as
+        | 'single'
+        | 'duplex'
+        | 'duplex_bw_back';
+      rollWideM2Details = await RollWideM2PricingService.calculate({
+        technologyCode: normalizedConfig.print_technology,
+        trimWidthMm: layoutTrim.width,
+        trimHeightMm: layoutTrim.height,
+        quantity,
+        colorMode: normalizedConfig.print_color_mode,
+      });
+      printPrice = rollWideM2Details.printPrice;
+      printDetails = {
+        tier: {
+          min_qty: 1,
+          max_qty: undefined,
+          price: quantity > 0 ? printPrice / quantity : printPrice,
+        },
+        priceForQuantity: printPrice,
+      };
+      logger.info('Цена ШФП рулон (м²)', {
+        printPrice,
+        technology: normalizedConfig.print_technology,
+        totalM2: rollWideM2Details.totalM2,
+        ratePerM2: rollWideM2Details.ratePerM2,
+        minChargeApplied: rollWideM2Details.minChargeApplied,
       });
     } else if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
       const techNorm = (s: string) => (s ?? '').trim().toLowerCase();
@@ -2045,6 +2132,7 @@ export class SimplifiedPricingService {
       itemsPerSheet: layoutCheck.itemsPerSheet,
       sheetsNeeded: isRollMeterage ? 0 : sheetsNeeded,
       ...(isRollMeterage && { metersNeeded }),
+      ...(isRollWideM2Mode && totalM2Needed > 0 ? { totalM2Needed } : {}),
       ...(knifePathMetersTotal > 0 ? { knifePathM: knifePathMetersTotal } : {}),
       wastePercentage: layoutCheck.wastePercentage,
       recommendedSheetSize: layoutCheck.recommendedSheetSize,
@@ -2057,7 +2145,12 @@ export class SimplifiedPricingService {
         `Применён минимальный заказ на печать УФ: ${uvPrintDetails.printPrice.toFixed(2)} BYN`,
       );
     }
-    if (!isUvFlatbedMode && !isRollMeterage && !layoutCheck.fitsOnSheet) {
+    if (rollWideM2Details?.minChargeApplied) {
+      warnings.push(
+        `Применён минимальный заказ на печать ШФП (м²): ${rollWideM2Details.printPrice.toFixed(2)} BYN`,
+      );
+    }
+    if (!isUvFlatbedMode && !isRollMeterage && !isRollWideM2Mode && !layoutCheck.fitsOnSheet) {
       warnings.push(
         `Формат ${layoutTrim.width}×${layoutTrim.height} мм (обрез) не помещается на печатный лист. Проверьте размер, материал или дозаливку.`
       );
@@ -2184,6 +2277,7 @@ export class SimplifiedPricingService {
       pricePerUnit,
       printDetails,
       ...(uvPrintDetails ? { uvPrintDetails } : {}),
+      ...(rollWideM2Details ? { rollWideM2Details } : {}),
       materialDetails,
       baseMaterialDetails,
       finishingDetails: finishingDetails.length > 0 ? finishingDetails : undefined,
@@ -2207,6 +2301,8 @@ export class SimplifiedPricingService {
         ? multipageTierPrintUnits
         : isRollMeterage
           ? Math.max(1, Math.floor(metersNeeded))
+          : isRollWideM2Mode
+            ? Math.max(0.001, Math.round(totalM2Needed * 1000) / 1000)
           : quantity,
     };
   }
