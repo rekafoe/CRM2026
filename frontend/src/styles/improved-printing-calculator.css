@@ -877,6 +877,35 @@
   color: #4a5568;
 }
 
+.param-group__size-custom-toggle {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.param-check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #2d3748;
+  cursor: pointer;
+  user-select: none;
+}
+
+.param-check-inline input[type='checkbox'] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #667eea;
+}
+
+.custom-format-inputs--size {
+  margin-top: 2px;
+}
+
 /* Управление количеством */
 .quantity-controls {
   display: flex;

@@ -100,6 +100,11 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
     ? effectiveSizesProp
     : schema?.template?.simplified?.sizes;
   const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
+  const allowCustomTrimForSimplified =
+    isSimplifiedProduct &&
+    !hideSimplifiedSizeSelect &&
+    schema?.template?.simplified != null &&
+    (schema.template.simplified as { allow_custom_trim?: boolean }).allow_custom_trim === true;
 
   const selectedSizeId = specs.size_id ?? (simplifiedSizes?.length ? simplifiedSizes[0].id : undefined);
   const selectedSize = simplifiedSizes?.find((s: any) => String(s.id) === String(selectedSizeId));
@@ -152,11 +157,32 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                   const id = e.target.value;
                   const size = simplifiedSizes.find((s: any) => String(s.id) === String(id)) as any;
                   const minQty = resolveMinQtyForSize(size);
-                  updateSpecs({
+                  const nextUpdates: Partial<any> = {
                     size_id: id,
-                    format: size ? `${size.width_mm}×${size.height_mm}` : specs.format,
                     quantity: minQty,
-                  }, true);
+                  };
+
+                  if (isCustomFormat) {
+                    const fallbackWidth = customFormat.width || (size ? String(size.width_mm) : '');
+                    const fallbackHeight = customFormat.height || (size ? String(size.height_mm) : '');
+                    if ((!customFormat.width || !customFormat.height) && size) {
+                      setCustomFormat((prev) => ({
+                        ...prev,
+                        width: prev.width || String(size.width_mm),
+                        height: prev.height || String(size.height_mm),
+                      }));
+                    }
+                    if (fallbackWidth && fallbackHeight) {
+                      nextUpdates.format = `${fallbackWidth}×${fallbackHeight}`;
+                      nextUpdates.customFormat = { width: fallbackWidth, height: fallbackHeight };
+                    } else {
+                      nextUpdates.format = size ? `${size.width_mm}×${size.height_mm}` : specs.format;
+                    }
+                  } else {
+                    nextUpdates.format = size ? `${size.width_mm}×${size.height_mm}` : specs.format;
+                  }
+
+                  updateSpecs(nextUpdates, true);
                 }}
                 className="form-control"
                 required
@@ -168,6 +194,87 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                   </option>
                 ))}
               </select>
+              {allowCustomTrimForSimplified && (
+                <div className="param-group__size-custom-toggle">
+                  <label className="param-check-inline">
+                    <input
+                      type="checkbox"
+                      checked={isCustomFormat}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        if (enabled) {
+                          const fallbackWidth = customFormat.width || (selectedSize ? String(selectedSize.width_mm) : '');
+                          const fallbackHeight = customFormat.height || (selectedSize ? String(selectedSize.height_mm) : '');
+                          setIsCustomFormat(true);
+                          setCustomFormat((prev) => ({
+                            ...prev,
+                            width: prev.width || fallbackWidth,
+                            height: prev.height || fallbackHeight,
+                          }));
+                          if (fallbackWidth && fallbackHeight) {
+                            updateSpecs({
+                              format: `${fallbackWidth}×${fallbackHeight}`,
+                              customFormat: { width: fallbackWidth, height: fallbackHeight },
+                            }, true);
+                          }
+                          return;
+                        }
+
+                        setIsCustomFormat(false);
+                        updateSpecs({
+                          format: selectedSize ? `${selectedSize.width_mm}×${selectedSize.height_mm}` : specs.format,
+                          customFormat: undefined,
+                        }, true);
+                      }}
+                    />
+                    Свой размер изделия (мм)
+                  </label>
+                  <p className="param-hint">
+                    Можно выбрать базовый размер и задать собственные ширину/высоту для расчёта.
+                  </p>
+                  {isCustomFormat && (
+                    <div className="custom-format-inputs custom-format-inputs--size">
+                      <input
+                        type="number"
+                        placeholder="Ширина (мм)"
+                        value={customFormat.width}
+                        onChange={(e) => {
+                          const nextWidth = e.target.value;
+                          setCustomFormat((prev) => ({ ...prev, width: nextWidth }));
+                          const nextHeight = customFormat.height;
+                          if (nextWidth && nextHeight) {
+                            updateSpecs({
+                              format: `${nextWidth}×${nextHeight}`,
+                              customFormat: { width: nextWidth, height: nextHeight },
+                            }, true);
+                          }
+                        }}
+                        className="form-control"
+                        min="1"
+                      />
+                      <span>×</span>
+                      <input
+                        type="number"
+                        placeholder="Высота (мм)"
+                        value={customFormat.height}
+                        onChange={(e) => {
+                          const nextHeight = e.target.value;
+                          setCustomFormat((prev) => ({ ...prev, height: nextHeight }));
+                          const nextWidth = customFormat.width;
+                          if (nextWidth && nextHeight) {
+                            updateSpecs({
+                              format: `${nextWidth}×${nextHeight}`,
+                              customFormat: { width: nextWidth, height: nextHeight },
+                            }, true);
+                          }
+                        }}
+                        className="form-control"
+                        min="1"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })()}
