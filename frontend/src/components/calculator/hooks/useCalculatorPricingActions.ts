@@ -67,10 +67,12 @@ export function productRequiresPrint(schema: any, effectiveSizes?: any[]): boole
   if (!schema) return false;
   const simp = schema.template?.simplified;
   if (simp?.uv_print?.mode === 'flatbed_m2') return true;
+  if (simp?.roll_m2?.mode === 'roll_wide_m2') return true;
   const typeConfigs = simp?.typeConfigs;
   if (typeConfigs && typeof typeConfigs === 'object') {
-    for (const tc of Object.values(typeConfigs) as Array<{ uv_print?: { mode?: string } }>) {
+    for (const tc of Object.values(typeConfigs) as Array<{ uv_print?: { mode?: string }; roll_m2?: { mode?: string } }>) {
       if (tc?.uv_print?.mode === 'flatbed_m2') return true;
+      if (tc?.roll_m2?.mode === 'roll_wide_m2') return true;
     }
   }
   const constraints = schema.constraints;

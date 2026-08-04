@@ -228,6 +228,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             backendProductSchema={backendProductSchema}
             effectiveSizes={effectiveSizes}
             selectedSizeId={(specs as any).size_id}
+            selectedTypeId={selectedTypeId}
             materialInFirstColumn={
               hasEffectiveSizes && (specs as any).size_id
                 ? (

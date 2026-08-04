@@ -16,6 +16,8 @@ interface PrintingSettingsSectionProps {
   effectiveSizes?: Array<{ id: string; print_prices?: any[]; [key: string]: any }>;
   /** ID выбранного размера (если применимо) */
   selectedSizeId?: string | number;
+  /** ID выбранного подтипа (для typeConfigs) */
+  selectedTypeId?: number | null;
   /** Блок «Материал» для первой колонки (под «Тип печати») — одна линия по вертикали */
   materialInFirstColumn?: React.ReactNode;
 }
@@ -33,6 +35,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   backendProductSchema,
   effectiveSizes: effectiveSizesProp,
   selectedSizeId,
+  selectedTypeId,
   materialInFirstColumn,
 }) => {
   const [printTechnologies, setPrintTechnologies] = useState<
@@ -74,13 +77,24 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     }
   }, []);
 
+  const simplifiedConfig = backendProductSchema?.template?.simplified;
+  const selectedTypeConfig = useMemo(() => {
+    if (selectedTypeId == null) return null;
+    return simplifiedConfig?.typeConfigs?.[String(selectedTypeId)] ?? null;
+  }, [simplifiedConfig, selectedTypeId]);
+  const isRollWideM2Mode = useMemo(() => {
+    const cfg = selectedTypeConfig?.roll_m2 ?? simplifiedConfig?.roll_m2;
+    return cfg?.mode === 'roll_wide_m2';
+  }, [selectedTypeConfig, simplifiedConfig]);
+
   // Получаем разрешенные типы печати из цен печати размера/продукта и constraints
   const allowedPrintTechnologies = useMemo(() => {
+    const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase();
     const constraints = backendProductSchema?.constraints;
     const constrainedCodes = Array.isArray(constraints?.allowed_print_technologies)
       ? new Set<string>(
           constraints.allowed_print_technologies
-            .map((code: unknown) => String(code ?? '').trim())
+            .map((code: unknown) => normalize(code))
             .filter(Boolean)
         )
       : null;
@@ -89,13 +103,24 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     const techListFromOrder = (order: string[]) => {
       const seen = new Set<string>();
       return order
+        .map((code) => normalize(code))
         .filter((code) => {
           if (!code || seen.has(code)) return false;
           seen.add(code);
           return !constrainedCodes || constrainedCodes.has(code);
         })
-        .map((code) => printTechnologies.find((t) => t.code === code))
+        .map((code) => printTechnologies.find((t) => normalize(t.code) === code))
         .filter((t): t is NonNullable<typeof t> => Boolean(t));
+    };
+    const enforcePerM2 = (list: Array<{
+      code: string;
+      name: string;
+      pricing_mode: string;
+      supports_duplex?: number | boolean;
+      supports_bw?: number | boolean;
+    }>) => {
+      if (!isRollWideM2Mode) return list;
+      return list.filter((tech) => normalize(tech.pricing_mode) === 'per_m2');
     };
 
     // 1) Для упрощённых продуктов: технологии из print_prices в порядке появления в продукте
@@ -116,10 +141,34 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         }
       });
       if (orderFromSize.length > 0) {
-        const ordered = techListFromOrder(orderFromSize);
+        const ordered = enforcePerM2(techListFromOrder(orderFromSize));
         if (ordered.length > 0) return ordered;
       }
     }
+
+    // 1.1) Roll-wide m²: листовые print_prices обычно скрыты, берём технологию из sizes[].default_print
+    if (isRollWideM2Mode && sizesToCheck && Array.isArray(sizesToCheck)) {
+      const orderFromDefaults: string[] = [];
+      const targetSizes = selectedSizeId
+        ? sizesToCheck.filter((s: any) => String(s.id) === String(selectedSizeId))
+        : sizesToCheck;
+      targetSizes.forEach((size: any) => {
+        const techCode =
+          size?.default_print?.technology_code ??
+          size?.default_print?.technologyCode ??
+          size?.default_print?.print_technology;
+        if (techCode && typeof techCode === 'string') orderFromDefaults.push(techCode);
+      });
+      const initialTech = selectedTypeConfig?.initial?.print_technology;
+      if (initialTech && typeof initialTech === 'string') {
+        orderFromDefaults.push(initialTech);
+      }
+      if (orderFromDefaults.length > 0) {
+        const ordered = enforcePerM2(techListFromOrder(orderFromDefaults));
+        if (ordered.length > 0) return ordered;
+      }
+    }
+
     const template = backendProductSchema?.template;
 
     // 2) Для обычных продуктов: порядок из config_data.print_prices (как в шаблоне продукта)
@@ -131,19 +180,22 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         if (techCode && typeof techCode === 'string') orderFromConfig.push(techCode);
       });
       if (orderFromConfig.length > 0) {
-        const ordered = techListFromOrder(orderFromConfig);
+        const ordered = enforcePerM2(techListFromOrder(orderFromConfig));
         if (ordered.length > 0) return ordered;
       }
     }
 
     // 3) Если заданы constraints, но не нашли в ценах — показываем только их
     if (constrainedCodes && constrainedCodes.size > 0) {
-      return printTechnologies.filter((tech) => constrainedCodes.has(tech.code));
+      const constrained = printTechnologies.filter((tech) => constrainedCodes.has(normalize(tech.code)));
+      const constrainedForMode = enforcePerM2(constrained);
+      if (constrainedForMode.length > 0) return constrainedForMode;
+      return constrained;
     }
 
     // 4) Если ничего не найдено — пусто (без подстановки из справочника принтеров)
     return [];
-  }, [printTechnologies, backendProductSchema, effectiveSizesProp, selectedSizeId]);
+  }, [printTechnologies, backendProductSchema, effectiveSizesProp, selectedSizeId, isRollWideM2Mode, selectedTypeConfig]);
 
   // Получаем информацию о выбранной технологии печати
   const selectedPrintTechnology = useMemo(() => {
@@ -168,6 +220,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   const allowedSides = useMemo((): Array<1 | 2> => {
     const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase();
     if (!printTechnology) return [];
+    if (isRollWideM2Mode) return [1];
 
     const matching = selectedSizePrintPrices.filter((row: any) => {
       const sameTech = normalize(row.technology_code ?? row.technologyCode) === normalize(printTechnology);
@@ -188,7 +241,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     if (modes.has(1)) out.push(1);
     if (modes.has(2)) out.push(2);
     return out;
-  }, [selectedSizePrintPrices, printTechnology, printColorMode]);
+  }, [selectedSizePrintPrices, printTechnology, printColorMode, isRollWideM2Mode]);
 
   const supportsDuplex = allowedSides.includes(2);
   const supportsSingle = allowedSides.includes(1);
@@ -203,6 +256,9 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   const allowedColorModes = useMemo(() => {
     if (!printTechnology) {
       return [];
+    }
+    if (isRollWideM2Mode) {
+      return ['color'];
     }
 
     // Если технология поддерживает только цветную печать - возвращаем только 'color'
@@ -250,7 +306,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     if (configData?.print_prices) collectFromPrintPrices(configData.print_prices, fromTemplate);
 
     return orderModes(fromTemplate);
-  }, [printTechnology, isColorOnly, backendProductSchema, effectiveSizesProp, selectedSizeId]);
+  }, [printTechnology, isColorOnly, backendProductSchema, effectiveSizesProp, selectedSizeId, isRollWideM2Mode]);
 
   // 🆕 Устанавливаем дефолтные значения для селекторов печати
   useEffect(() => {
