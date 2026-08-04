@@ -48,6 +48,11 @@ total_m2 = (trim_width_mm * trim_height_mm / 1_000_000) * quantity
 print_price = max(rate_per_m2(total_m2) * total_m2, min_charge)
 ```
 
+- Для `roll_wide_m2` списание материала считается отдельно в погонных метрах:
+  - берётся `sheet_width` выбранного материала как ширина рулона;
+  - автоматически выбирается ориентация изделия (0°/90°) с минимальной длиной подачи;
+  - расход = `roll_width × feed_length` (в учёте: `layout.metersNeeded`, в м²: `layout.totalM2Needed` остаётся для печати).
+
 ## Smoke-check после включения
 
 1. **Roll m²**

@@ -158,6 +158,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     material_cost: number;
     sheets_needed: number;
     price_per_sheet: number;
+    quantity_unit?: string;
+    price_unit_label?: string;
     base_material_cost?: number;
   } | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
@@ -346,7 +348,11 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const calculateCost = async () => {
     try {
       // ⚠️ ВАЖНО: Используем реальные данные из результата бэкенда, если они есть
-      if (result?.materials && result.materials.length > 0 && result.layout?.sheetsNeeded) {
+      if (
+        result?.materials &&
+        result.materials.length > 0 &&
+        (result.layout?.sheetsNeeded != null || (result.layout as { metersNeeded?: number } | undefined)?.metersNeeded != null)
+      ) {
         const sheetMaterial =
           specs.material_id != null
             ? result.materials.find((m) =>
@@ -362,7 +368,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
         if (!sheetMaterial) return;
 
-        const sheetsNeeded = result.layout.sheetsNeeded;
+        const sheetsNeededRaw = result.layout?.sheetsNeeded;
+        const metersNeededRaw = (result.layout as { metersNeeded?: number } | undefined)?.metersNeeded;
+        const hasMeters = metersNeededRaw != null && Number.isFinite(Number(metersNeededRaw)) && Number(metersNeededRaw) > 0;
+        const quantityForWriteoff = hasMeters ? Number(metersNeededRaw) : Number(sheetsNeededRaw ?? 0);
+        const quantityUnit = hasMeters ? 'п.м.' : 'шт';
+        const priceUnitLabel = hasMeters ? 'Цена за пог. м:' : (uvFlatbed ? 'Цена за заготовку:' : 'Цена за лист:');
         const pricePerSheet = Number(
           (sheetMaterial as any).unitPrice ?? (sheetMaterial as any).price ?? 0,
         );
@@ -372,13 +383,15 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
         if (
           Number.isFinite(pricePerSheet) &&
-          Number.isFinite(sheetsNeeded) &&
+          Number.isFinite(quantityForWriteoff) &&
           Number.isFinite(totalMaterialCost)
         ) {
           setMaterialCost({
             material_cost: totalMaterialCost,
-            sheets_needed: sheetsNeeded,
+            sheets_needed: quantityForWriteoff,
             price_per_sheet: pricePerSheet,
+            quantity_unit: quantityUnit,
+            price_unit_label: priceUnitLabel,
             ...(baseCost > 0 ? { base_material_cost: baseCost } : {}),
           });
           return;
@@ -1045,14 +1058,18 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           <div className="material-cost-info">
             <div className="cost-breakdown">
               <div className="cost-item">
-                <span className="cost-label">{uvFlatbed ? 'Цена за заготовку:' : 'Цена за лист:'}</span>
+                <span className="cost-label">{materialCost.price_unit_label ?? (uvFlatbed ? 'Цена за заготовку:' : 'Цена за лист:')}</span>
                 <span className="cost-value"><MoneyAmount value={materialCost.price_per_sheet} /></span>
               </div>
               <div className="cost-item">
                 <span className="cost-label">
-                  {uvFlatbed ? 'Списание (заготовок):' : 'Списание (листов материала):'}
+                  {materialCost.quantity_unit === 'п.м.'
+                    ? 'Списание (пог. м материала):'
+                    : uvFlatbed
+                      ? 'Списание (заготовок):'
+                      : 'Списание (листов материала):'}
                 </span>
-                <span className="cost-value">{materialCost.sheets_needed ?? 0} шт</span>
+                <span className="cost-value">{materialCost.sheets_needed ?? 0} {materialCost.quantity_unit ?? 'шт'}</span>
               </div>
               {materialCost.base_material_cost != null && materialCost.base_material_cost > 0 && (
                 <div className="cost-item">

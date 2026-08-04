@@ -25,6 +25,7 @@ import { BindingPricingService, BindingQuoteResult } from './bindingPricingServi
 import {
   computeKnifePathMetersRoll,
   computeKnifePathMetersSheet,
+  computeOptimizedRollFeedMeters,
   resolvePlotterMargins,
   SHEET_PLOTTER_SRA3_MM,
 } from './plotterLayout';
@@ -169,7 +170,7 @@ export interface SimplifiedPricingResult {
     fitsOnSheet: boolean;
     itemsPerSheet: number;
     sheetsNeeded: number;
-    /** Для рулонной печати: пог. м к списанию */
+    /** Для рулонного списания материала: пог. м к списанию */
     metersNeeded?: number;
     /** Для roll-wide m²: суммарная площадь тиража */
     totalM2Needed?: number;
@@ -817,10 +818,51 @@ export class SimplifiedPricingService {
     // Длина в направлении подачи: меньшая сторона (594×420 → 0.42 м, т.к. 420 мм вдоль рулона)
     const metersPerItem = isRollMeterage ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
     const metersNeeded = isRollMeterage ? metersPerItem * quantity : 0;
+    const rollMaterialLayout =
+      isRollWideM2Mode && (materialSheetMm?.width ?? 0) > 0
+        ? computeOptimizedRollFeedMeters({
+            rollWidthMm: materialSheetMm!.width,
+            trimMm: layoutTrim,
+            bleedMm: resolvedBleedMm,
+            quantity,
+            margins: {
+              edgeMm:
+                customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+                  ? Number(customMarginMm)
+                  : 0,
+              gapMm:
+                customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+                  ? Number(customGapMm)
+                  : 0,
+            },
+          })
+        : null;
+    const rollWideMetersNeeded = isRollWideM2Mode ? rollMaterialLayout?.feedMeters ?? 0 : 0;
+    const rollWideMetersPerItem = isRollWideM2Mode && quantity > 0 ? rollWideMetersNeeded / quantity : 0;
+    const materialMetersNeeded = isRollMeterage ? metersNeeded : rollWideMetersNeeded;
+    const materialMetersPerItem = isRollMeterage ? metersPerItem : rollWideMetersPerItem;
+    const isMaterialMeterBased = materialMetersNeeded > 0 && (isRollMeterage || isRollWideM2Mode);
+    const rollWideMaterialWarning =
+      isRollWideM2Mode && normalizedConfig.material_id && !isMaterialMeterBased
+        ? 'Для ШФП рулона не удалось посчитать списание материала в пог. м. Проверьте sheet_width у выбранного материала.'
+        : null;
     const totalM2Needed = isRollWideM2Mode
       ? (Math.max(0, Number(layoutTrim.width)) * Math.max(0, Number(layoutTrim.height)) / 1_000_000) * quantity
       : 0;
     const effectivePrintQuantity = isRollMeterage ? metersNeeded : sheetsNeeded;
+    const effectiveMaterialQuantity = isMaterialMeterBased ? materialMetersNeeded : effectivePrintQuantity;
+    if (isRollWideM2Mode && rollMaterialLayout) {
+      logger.info('Расход материала ШФП рулон (пог. м)', {
+        material_id: normalizedConfig.material_id,
+        rollWidthMm: materialSheetMm?.width,
+        orientation: rollMaterialLayout.orientation,
+        cols: rollMaterialLayout.cols,
+        rowsFeed: rollMaterialLayout.rowsFeed,
+        feedMeters: rollMaterialLayout.feedMeters,
+        metersPerItem: rollMaterialLayout.metersPerItem,
+        totalAreaM2: rollMaterialLayout.totalAreaM2,
+      });
+    }
     /** В шаблоне unit_price — за одно поле раскладки (A4 на SRA3); за физический лист = unit × itemsPerSheet */
     const multipagePrintUnits = usePagesMultiplier
       ? computeMultipagePrintUnits(effectivePrintQuantity, itemsPerSheet)
@@ -1056,17 +1098,18 @@ export class SimplifiedPricingService {
           `SELECT sheet_price_single FROM materials WHERE id = ? AND is_active = 1`,
           [normalizedConfig.material_id]
         );
-        const pricePerSheet = material?.sheet_price_single ?? 0;
-        const baseMaterialPrice = effectivePrintQuantity * pricePerSheet;
+        const pricePerMaterialUnit = material?.sheet_price_single ?? 0;
+        const baseMaterialPrice = effectiveMaterialQuantity * pricePerMaterialUnit;
         materialPrice = baseMaterialPrice * billingModeMultiplier;
         materialDetails = {
-          tier: { min_qty: 1, max_qty: undefined, price: pricePerSheet },
+          tier: { min_qty: 1, max_qty: undefined, price: pricePerMaterialUnit },
           priceForQuantity: materialPrice,
         };
         logger.info('Цена материала со склада', {
           material_id: normalizedConfig.material_id,
-          pricePerSheet,
-          effectivePrintQuantity,
+          unit: isMaterialMeterBased ? 'meter' : 'sheet',
+          pricePerMaterialUnit,
+          effectiveMaterialQuantity,
           baseMaterialPrice,
           billingModeMultiplier,
           materialPrice,
@@ -1115,6 +1158,7 @@ export class SimplifiedPricingService {
     // ✅ Теперь всегда берём цены из централизованной системы услуг (service_volume_prices / post_processing_services),
     //    а в simplified-конфиге используем только ссылки на service_id и конфиг units_per_item/price_unit.
     const pricingWarnings: string[] = [];
+    if (rollWideMaterialWarning) pricingWarnings.push(rollWideMaterialWarning);
     let finishingPrice = 0;
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
     let serviceTiersMap: Map<string, SimplifiedQtyTier[]> = new Map();
@@ -1561,12 +1605,12 @@ export class SimplifiedPricingService {
           const meterBasis = serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path';
           const meterUnits =
             isPerMeterOp && meterBasis === 'feed'
-              ? metersNeeded
+              ? materialMetersNeeded
               : isPerMeterOp
                 ? knifePathMetersTotal
                 : 0;
           const perSheetUnits = isPerSheetOp
-            ? (isRollMeterage ? metersNeeded : sheetsNeeded)
+            ? (isMaterialMeterBased ? materialMetersNeeded : sheetsNeeded)
             : 0;
 
           if (limits) {
@@ -1580,7 +1624,7 @@ export class SimplifiedPricingService {
             if (maxLimit !== undefined && checkQty > maxLimit) {
               const serviceName = serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
               const unitLabel = isPerSheetOp
-                ? (isRollMeterage ? 'пог. м' : 'листов')
+                ? (isMaterialMeterBased ? 'пог. м' : 'листов')
                 : isPerMeterOp
                   ? 'п.м.'
                   : 'шт';
@@ -1607,7 +1651,7 @@ export class SimplifiedPricingService {
               }
               const serviceName = serviceNamesMap.get(finConfig.service_id) || `Услуга #${finConfig.service_id}`;
               const unitLabel = isPerSheetOp
-                ? isRollMeterage
+                ? isMaterialMeterBased
                   ? 'пог. м'
                   : 'листов печати'
                 : isPerMeterOp
@@ -1706,8 +1750,8 @@ export class SimplifiedPricingService {
             operationType,
             isPerSheetOp,
             perSheetUnits: isPerSheetOp ? perSheetUnits : undefined,
-            sheetsNeeded: isPerSheetOp && !isRollMeterage ? sheetsNeeded : undefined,
-            metersNeeded: isPerSheetOp && isRollMeterage ? metersNeeded : undefined,
+            sheetsNeeded: isPerSheetOp && !isMaterialMeterBased ? sheetsNeeded : undefined,
+            metersNeeded: isPerSheetOp && isMaterialMeterBased ? materialMetersNeeded : undefined,
             priceUnit,
             unitsPerItem,
             quantity,
@@ -1851,8 +1895,8 @@ export class SimplifiedPricingService {
       typeConfig?.plotter?.enabled === true &&
       normalizedConfig.plotter_mounting === true &&
       typeConfig.plotter.mounting_film_material_id != null &&
-      isRollMeterage &&
-      metersNeeded > 0
+      isMaterialMeterBased &&
+      materialMetersNeeded > 0
     ) {
       const mid = typeConfig.plotter.mounting_film_material_id;
       const mrow = await db.get<{ name: string }>(
@@ -1860,7 +1904,7 @@ export class SimplifiedPricingService {
         [mid]
       );
       if (mrow) {
-        const qMount = metersNeeded;
+        const qMount = materialMetersNeeded;
         const existing = operationMaterials.find((m) => m.material_id === mid);
         if (existing) existing.quantity += qMount;
         else operationMaterials.push({ material_id: mid, material_name: mrow.name, quantity: qMount });
@@ -2036,8 +2080,8 @@ export class SimplifiedPricingService {
       serviceMeterBasisMap: serviceMeterBasisMap ?? new Map(),
       currentQuantity: quantity,
       isRollPrint,
-      isRollMeterage,
-      metersPerItem,
+      isRollMeterage: isMaterialMeterBased,
+      metersPerItem: materialMetersPerItem,
       knifePathByQty,
       rollPlotterCutLevelMultiplier,
       plotterTierVolumeCtx,
@@ -2130,8 +2174,8 @@ export class SimplifiedPricingService {
     const layoutResult: SimplifiedPricingResult['layout'] = {
       fitsOnSheet: layoutCheck.fitsOnSheet,
       itemsPerSheet: layoutCheck.itemsPerSheet,
-      sheetsNeeded: isRollMeterage ? 0 : sheetsNeeded,
-      ...(isRollMeterage && { metersNeeded }),
+      sheetsNeeded: isMaterialMeterBased ? 0 : sheetsNeeded,
+      ...(isMaterialMeterBased && { metersNeeded: materialMetersNeeded }),
       ...(isRollWideM2Mode && totalM2Needed > 0 ? { totalM2Needed } : {}),
       ...(knifePathMetersTotal > 0 ? { knifePathM: knifePathMetersTotal } : {}),
       wastePercentage: layoutCheck.wastePercentage,
@@ -2333,7 +2377,7 @@ export class SimplifiedPricingService {
     /** Текущее количество — добавляем в boundaries, чтобы «Цена» для выбранного тиража совпадала с итогом */
     currentQuantity?: number;
     isRollPrint?: boolean;
-    /** Рулонный метраж материала: печать рулоном или режим плоттера roll */
+    /** Рулонный метраж материала: roll printers / plotter roll / roll_wide_m2 */
     isRollMeterage?: boolean;
     metersPerItem?: number;
     knifePathByQty?: (q: number) => number;

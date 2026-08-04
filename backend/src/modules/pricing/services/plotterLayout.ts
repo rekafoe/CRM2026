@@ -99,6 +99,143 @@ export function computeKnifePathMetersRoll(input: KnifePathRollInput): KnifePath
   };
 }
 
+export type RollFeedMetersInput = {
+  rollWidthMm: number;
+  trimMm: { width: number; height: number };
+  bleedMm: number;
+  quantity: number;
+  margins: PlotterMargins;
+};
+
+export type RollFeedMetersResult = {
+  /** Погонные метры подачи рулона */
+  feedMeters: number;
+  /** Длина подачи в мм */
+  feedLengthMm: number;
+  /** Погонные метры на одно изделие */
+  metersPerItem: number;
+  /** Количество изделий поперек рулона */
+  cols: number;
+  /** Количество рядов по подаче */
+  rowsFeed: number;
+  /** Выбранная ориентация изделия на рулоне */
+  orientation: 'normal' | 'rotated';
+  /** Списываемая площадь рулона: ширина рулона × длина подачи */
+  totalAreaM2: number;
+};
+
+type RollFeedVariant = {
+  orientation: 'normal' | 'rotated';
+  feedLengthMm: number;
+  cols: number;
+  rowsFeed: number;
+  totalAreaM2: number;
+  feedMeters: number;
+  metersPerItem: number;
+};
+
+function evalRollFeedVariant(params: {
+  orientation: 'normal' | 'rotated';
+  rollWidthMm: number;
+  usableWidthMm: number;
+  pieceAcrossMm: number;
+  pieceFeedMm: number;
+  gapMm: number;
+  edgeMm: number;
+  quantity: number;
+}): RollFeedVariant | null {
+  const {
+    orientation,
+    rollWidthMm,
+    usableWidthMm,
+    pieceAcrossMm,
+    pieceFeedMm,
+    gapMm,
+    edgeMm,
+    quantity,
+  } = params;
+  if (pieceAcrossMm <= 0 || pieceFeedMm <= 0 || usableWidthMm <= 0) return null;
+  const pitchAcross = pieceAcrossMm + gapMm;
+  if (pitchAcross <= 0) return null;
+
+  // +gap в числителе учитывает отсутствие зазора после последней колонки.
+  const cols = Math.floor((usableWidthMm + gapMm) / pitchAcross);
+  if (!Number.isFinite(cols) || cols <= 0) return null;
+
+  const rowsFeed = Math.ceil(quantity / cols);
+  const feedLengthMm = rowsFeed * pieceFeedMm + Math.max(0, rowsFeed - 1) * gapMm + 2 * edgeMm;
+  const feedMeters = feedLengthMm / 1000;
+  const totalAreaM2 = (rollWidthMm * feedLengthMm) / 1_000_000;
+
+  return {
+    orientation,
+    feedLengthMm,
+    cols,
+    rowsFeed,
+    totalAreaM2,
+    feedMeters,
+    metersPerItem: quantity > 0 ? feedMeters / quantity : 0,
+  };
+}
+
+/**
+ * Оптимальный расход рулона (пог. м) с учетом поворота 90°.
+ * Используется для списания материала: ширина рулона × длина подачи.
+ */
+export function computeOptimizedRollFeedMeters(input: RollFeedMetersInput): RollFeedMetersResult | null {
+  const { cellW, cellH } = cellSize(input.trimMm, input.bleedMm);
+  const gapMm = Math.max(0, Number(input.margins?.gapMm) || 0);
+  const edgeMm = Math.max(0, Number(input.margins?.edgeMm) || 0);
+  const rollWidthMm = Math.max(0, Number(input.rollWidthMm) || 0);
+  const quantity = Math.max(1, Math.floor(Number(input.quantity) || 0));
+  const usableWidthMm = rollWidthMm - 2 * edgeMm;
+  if (rollWidthMm <= 0 || usableWidthMm <= 0 || quantity <= 0) return null;
+
+  const normal = evalRollFeedVariant({
+    orientation: 'normal',
+    rollWidthMm,
+    usableWidthMm,
+    pieceAcrossMm: cellW,
+    pieceFeedMm: cellH,
+    gapMm,
+    edgeMm,
+    quantity,
+  });
+
+  const rotated = evalRollFeedVariant({
+    orientation: 'rotated',
+    rollWidthMm,
+    usableWidthMm,
+    pieceAcrossMm: cellH,
+    pieceFeedMm: cellW,
+    gapMm,
+    edgeMm,
+    quantity,
+  });
+
+  const candidates = [normal, rotated].filter((v): v is RollFeedVariant => v != null);
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => {
+    if (Math.abs(a.feedLengthMm - b.feedLengthMm) > 0.0001) {
+      return a.feedLengthMm - b.feedLengthMm;
+    }
+    if (a.cols !== b.cols) return b.cols - a.cols;
+    return a.totalAreaM2 - b.totalAreaM2;
+  });
+
+  const best = candidates[0];
+  return {
+    feedMeters: best.feedMeters,
+    feedLengthMm: best.feedLengthMm,
+    metersPerItem: best.metersPerItem,
+    cols: best.cols,
+    rowsFeed: best.rowsFeed,
+    orientation: best.orientation,
+    totalAreaM2: best.totalAreaM2,
+  };
+}
+
 /**
  * Лист: сколько помещается на листе; пробег = на лист × число листов.
  */

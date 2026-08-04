@@ -31,6 +31,7 @@ export interface UnifiedPricingResult {
     materialId: number;
     materialName: string;
     quantity: number;
+    unit?: string;
     unitPrice: number;
     totalCost: number;
     density?: number; // 🆕 Плотность материала
@@ -241,6 +242,13 @@ export class UnifiedPricingService {
             const sheets = result.layout?.sheetsNeeded;
             if (sheets != null && Number(sheets) > 0) return Number(sheets);
             return result.quantity;
+          })(),
+          unit: (() => {
+            const meters = result.layout?.metersNeeded;
+            if (meters != null && Number(meters) > 0) return 'п.м.';
+            const sheets = result.layout?.sheetsNeeded;
+            if (sheets != null && Number(sheets) > 0) return 'лист';
+            return 'шт';
           })(),
           unitPrice: result.materialDetails?.tier.price || 0,
           totalCost: result.materialDetails?.priceForQuantity ?? result.materialPrice,

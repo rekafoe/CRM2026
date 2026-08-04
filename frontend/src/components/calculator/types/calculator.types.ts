@@ -101,6 +101,8 @@ export interface CalculationResult {
   formatInfo?: string;
   layout?: {
     sheetsNeeded?: number;
+    metersNeeded?: number;
+    totalM2Needed?: number;
     itemsPerSheet?: number;
     sheetSize?: string;
     wastePercentage?: number;

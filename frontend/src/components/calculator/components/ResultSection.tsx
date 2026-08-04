@@ -11,6 +11,8 @@ interface ResultSectionProps {
     parameterSummary?: Array<{ label: string; value: string }>;
     layout?: {
       sheetsNeeded?: number;
+      metersNeeded?: number;
+      totalM2Needed?: number;
       itemsPerSheet?: number;
       sheetSize?: string;
       fitsOnSheet?: boolean;
@@ -90,6 +92,8 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   }
 
   const sheetsNeeded = result.layout?.sheetsNeeded;
+  const metersNeeded = result.layout?.metersNeeded;
+  const totalM2Needed = result.layout?.totalM2Needed;
   const itemsPerSheet = result.layout?.itemsPerSheet;
   const sheetSize = result.layout?.sheetSize;
   const fitsOnSheet = result.layout?.fitsOnSheet;
@@ -161,12 +165,16 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
         </div>
       )}
       {(sheetsNeeded ||
+        metersNeeded ||
+        totalM2Needed ||
         itemsPerSheet ||
         sheetSize ||
         (bleedMm != null && bleedMm > 0) ||
         (cutsPerSheetUi != null && cutsPerSheetUi > 0)) && (
         <div className="result-sheet-info">
           {sheetsNeeded != null && <span><AppIcon name="document" size="xs" /> Листов: {sheetsNeeded}</span>}
+          {metersNeeded != null && <span>• Подача рулона: {formatNumber(metersNeeded, 'п.м.', true)}</span>}
+          {totalM2Needed != null && <span>• Печать: {formatNumber(totalM2Needed, 'м²', true)}</span>}
           {itemsPerSheet != null && <span>• На листе: {itemsPerSheet} шт.</span>}
           {sheetSize && <span>• Формат листа: {sheetSize}</span>}
           {bleedMm != null && bleedMm > 0 && <span>• Дозаливка: {bleedMm} мм</span>}

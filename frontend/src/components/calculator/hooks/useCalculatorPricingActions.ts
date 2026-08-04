@@ -713,14 +713,26 @@ export function useCalculatorPricingActions({
         const computedSheets = itemsPerSheet
           ? Math.ceil(specs.quantity / Math.max(itemsPerSheet, 1))
           : undefined;
-        const sheetsFromBackend = layoutData.sheetsNeeded ?? layoutData.sheets_needed;
-        const sheetsNeeded = computedSheets ?? (Number.isFinite(Number(sheetsFromBackend)) ? Number(sheetsFromBackend) : undefined);
+        const sheetsFromBackendRaw = layoutData.sheetsNeeded ?? layoutData.sheets_needed;
+        const hasSheetsFromBackend =
+          sheetsFromBackendRaw != null && Number.isFinite(Number(sheetsFromBackendRaw));
+        const sheetsNeeded = hasSheetsFromBackend ? Number(sheetsFromBackendRaw) : computedSheets;
+        const metersFromBackendRaw = layoutData.metersNeeded ?? layoutData.meters_needed;
+        const metersNeeded =
+          metersFromBackendRaw != null && Number.isFinite(Number(metersFromBackendRaw))
+            ? Number(metersFromBackendRaw)
+            : undefined;
+        const totalM2FromBackendRaw = layoutData.totalM2Needed ?? layoutData.total_m2_needed;
+        const totalM2Needed =
+          totalM2FromBackendRaw != null && Number.isFinite(Number(totalM2FromBackendRaw))
+            ? Number(totalM2FromBackendRaw)
+            : undefined;
 
         console.log('📊 Расчет количества листов:');
         console.log(`  itemsPerSheet: ${itemsPerSheet}`);
         console.log(`  specs.quantity: ${specs.quantity}`);
         console.log(`  computedSheets: ${computedSheets} (Math.ceil(${specs.quantity} / ${itemsPerSheet}))`);
-        console.log(`  sheetsFromBackend: ${sheetsFromBackend}`);
+        console.log(`  sheetsFromBackend: ${sheetsFromBackendRaw}`);
         console.log(`  sheetsNeeded: ${sheetsNeeded}`);
         console.log('');
 
@@ -760,6 +772,8 @@ export function useCalculatorPricingActions({
         const layoutSummary =
           itemsPerSheet ||
           sheetsNeeded ||
+          metersNeeded != null ||
+          totalM2Needed != null ||
           sheetSizeLabel ||
           wastePercentage ||
           fitsOnSheet === false ||
@@ -768,6 +782,8 @@ export function useCalculatorPricingActions({
             ? {
                 itemsPerSheet,
                 sheetsNeeded,
+                ...(metersNeeded != null ? { metersNeeded: Math.round(metersNeeded * 1000) / 1000 } : {}),
+                ...(totalM2Needed != null ? { totalM2Needed: Math.round(totalM2Needed * 1000) / 1000 } : {}),
                 sheetSize: sheetSizeLabel,
                 wastePercentage:
                   wastePercentage != null ? Math.round(Number(wastePercentage) * 100) / 100 : undefined,
