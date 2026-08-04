@@ -50,6 +50,8 @@ const PRICE_MODES = [
 const PRICE_MODES_COLOR_ONLY = PRICE_MODES.filter((mode) => !mode.key.startsWith('bw_'));
 
 const DEFAULT_TIER_BOUNDARIES = [1, 5, 10, 50, 100, 500, 1000];
+const DEFAULT_ROLL_M2_BOUNDARIES = [1, 5, 10, 25, 50, 100];
+const M2_RANGE_STEP = 0.001;
 
 function buildDefaultTiers(priceMode: string): PrintPriceTier[] {
   return DEFAULT_TIER_BOUNDARIES.map((min, i) => ({
@@ -61,6 +63,114 @@ function buildDefaultTiers(priceMode: string): PrintPriceTier[] {
 }
 
 type SheetTier = { min_sheets: number; max_sheets?: number; price_per_sheet: number }
+type RollM2TierDraft = { min_m2: number; max_m2?: number | null; price_per_m2: number }
+
+const roundM2 = (value: number): number => Math.round(value * 1000) / 1000;
+const rollRangeKey = (value: number): string => roundM2(value).toFixed(3);
+
+function formatM2Boundary(value: number): string {
+  const rounded = roundM2(value);
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(3).replace(/\.?0+$/, '');
+}
+
+function normalizeRollM2Tiers(
+  raw: Array<
+    | RollM2TierDraft
+    | {
+        min_m2?: number | null;
+        max_m2?: number | null;
+        min_total_m2?: number | null;
+        max_total_m2?: number | null;
+        price_per_m2?: number | null;
+      }
+  >,
+): RollM2TierDraft[] {
+  if (!Array.isArray(raw)) return [];
+
+  const byMin = new Map<string, RollM2TierDraft>();
+  raw.forEach((tier) => {
+    const minRaw = Number((tier as { min_m2?: number | null; min_total_m2?: number | null }).min_m2 ?? (tier as { min_total_m2?: number | null }).min_total_m2);
+    const priceRaw = Number((tier as { price_per_m2?: number | null }).price_per_m2 ?? 0);
+    if (!Number.isFinite(minRaw) || minRaw < 0) return;
+    if (!Number.isFinite(priceRaw) || priceRaw < 0) return;
+    const min = roundM2(minRaw);
+    const key = rollRangeKey(min);
+    const maxCandidate = Number(
+      (tier as { max_m2?: number | null; max_total_m2?: number | null }).max_m2 ??
+        (tier as { max_total_m2?: number | null }).max_total_m2,
+    );
+    const maxValue = Number.isFinite(maxCandidate) && maxCandidate >= min ? roundM2(maxCandidate) : null;
+    byMin.set(key, { min_m2: min, max_m2: maxValue, price_per_m2: roundM2(priceRaw) });
+  });
+
+  const sorted = [...byMin.values()].sort((a, b) => a.min_m2 - b.min_m2);
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const nextMin = sorted[i + 1].min_m2;
+    const maxCandidate = roundM2(nextMin - M2_RANGE_STEP);
+    sorted[i] = { ...sorted[i], max_m2: maxCandidate >= sorted[i].min_m2 ? maxCandidate : sorted[i].min_m2 };
+  }
+  if (sorted.length > 0) {
+    sorted[sorted.length - 1] = { ...sorted[sorted.length - 1], max_m2: null };
+  }
+  return sorted;
+}
+
+function buildDefaultRollM2Tiers(): RollM2TierDraft[] {
+  return normalizeRollM2Tiers(
+    DEFAULT_ROLL_M2_BOUNDARIES.map((min, index) => ({
+      min_m2: min,
+      max_m2: index < DEFAULT_ROLL_M2_BOUNDARIES.length - 1 ? DEFAULT_ROLL_M2_BOUNDARIES[index + 1] - M2_RANGE_STEP : null,
+      price_per_m2: 0,
+    })),
+  );
+}
+
+const addRollM2RangeBoundary = (tiers: RollM2TierDraft[], newBoundary: number): RollM2TierDraft[] => {
+  const normalizedBoundary = roundM2(newBoundary);
+  const sortedTiers = normalizeRollM2Tiers(tiers);
+  if (sortedTiers.some((tier) => rollRangeKey(tier.min_m2) === rollRangeKey(normalizedBoundary))) {
+    return sortedTiers;
+  }
+
+  if (sortedTiers.length === 0) {
+    return normalizeRollM2Tiers([
+      { min_m2: 1, max_m2: roundM2(normalizedBoundary - M2_RANGE_STEP), price_per_m2: 0 },
+      { min_m2: normalizedBoundary, max_m2: null, price_per_m2: 0 },
+    ]);
+  }
+
+  const newRows = [
+    ...sortedTiers,
+    { min_m2: normalizedBoundary, max_m2: null, price_per_m2: 0 },
+  ];
+  return normalizeRollM2Tiers(newRows);
+};
+
+const editRollM2RangeBoundary = (tiers: RollM2TierDraft[], tierIndex: number, newBoundary: number): RollM2TierDraft[] => {
+  const normalizedBoundary = roundM2(newBoundary);
+  const sortedTiers = normalizeRollM2Tiers(tiers);
+  if (tierIndex < 0 || tierIndex >= sortedTiers.length) return sortedTiers;
+  const currentKey = rollRangeKey(sortedTiers[tierIndex].min_m2);
+  if (
+    sortedTiers.some((tier) => rollRangeKey(tier.min_m2) === rollRangeKey(normalizedBoundary)) &&
+    rollRangeKey(normalizedBoundary) !== currentKey
+  ) {
+    return sortedTiers;
+  }
+
+  const next = [...sortedTiers];
+  next[tierIndex] = { ...next[tierIndex], min_m2: normalizedBoundary };
+  return normalizeRollM2Tiers(next);
+};
+
+const removeRollM2Range = (tiers: RollM2TierDraft[], tierIndex: number): RollM2TierDraft[] => {
+  const sortedTiers = normalizeRollM2Tiers(tiers);
+  if (tierIndex < 0 || tierIndex >= sortedTiers.length) return sortedTiers;
+  if (sortedTiers.length <= 1) return sortedTiers;
+  const next = [...sortedTiers];
+  next.splice(tierIndex, 1);
+  return normalizeRollM2Tiers(next);
+};
 
 const addRangeBoundary = (tiers: SheetTier[], newBoundary: number): SheetTier[] => {
   if (tiers.length === 0) {
@@ -197,7 +307,7 @@ export const PrintPriceEditPage: React.FC = () => {
     max_height_mm: 900,
     tiers: [] as PrintPriceTier[],
     m2_tiers: [] as Array<{ layer: string; min_m2: number; max_m2?: number | null; price_per_m2: number }>,
-    roll_m2_tiers: [] as PrintPriceRollM2Tier[],
+    roll_m2_tiers: [] as RollM2TierDraft[],
   });
 
   const selectedTech = printTechnologies.find((t) => t.code === form.technology_code);
@@ -217,7 +327,7 @@ export const PrintPriceEditPage: React.FC = () => {
               PrintPrice & {
                 tiers?: PrintPriceTier[];
                 m2_tiers?: typeof form.m2_tiers;
-                roll_m2_tiers?: PrintPriceRollM2Tier[];
+                roll_m2_tiers?: PrintPriceRollM2Tier[] | RollM2TierDraft[];
               }
             >(`/pricing/print-prices/${id}`),
       ]);
@@ -227,7 +337,7 @@ export const PrintPriceEditPage: React.FC = () => {
         const item = priceRes.data as PrintPrice & {
           tiers?: PrintPriceTier[];
           m2_tiers?: typeof form.m2_tiers;
-          roll_m2_tiers?: PrintPriceRollM2Tier[];
+          roll_m2_tiers?: PrintPriceRollM2Tier[] | RollM2TierDraft[];
         };
         const loadedTiers = (item.tiers ?? []) as PrintPriceTier[];
         setForm({
@@ -248,7 +358,9 @@ export const PrintPriceEditPage: React.FC = () => {
           max_height_mm: (item as any).max_height_mm ?? 900,
           tiers: loadedTiers.length > 0 ? loadedTiers : PRICE_MODES.flatMap((m) => buildDefaultTiers(m.key)),
           m2_tiers: Array.isArray((item as any).m2_tiers) ? (item as any).m2_tiers : [],
-          roll_m2_tiers: Array.isArray((item as any).roll_m2_tiers) ? (item as any).roll_m2_tiers : [],
+          roll_m2_tiers: normalizeRollM2Tiers(
+            Array.isArray((item as any).roll_m2_tiers) ? (item as any).roll_m2_tiers : [],
+          ),
         });
       } else if (isNew) {
         setForm((prev) => ({
@@ -284,6 +396,8 @@ export const PrintPriceEditPage: React.FC = () => {
       ...prev,
       price_white_per_m2: null,
       price_varnish_per_m2: null,
+      roll_m2_tiers:
+        prev.roll_m2_tiers.length > 0 ? normalizeRollM2Tiers(prev.roll_m2_tiers) : buildDefaultRollM2Tiers(),
     }));
   }, [form.counter_unit, form.m2_pricing_kind]);
 
@@ -379,6 +493,70 @@ export const PrintPriceEditPage: React.FC = () => {
     };
   }, [tierModal.isOpen]);
 
+  const [rollTierModal, setRollTierModal] = useState<TierModalState>({
+    type: 'add',
+    isOpen: false,
+    boundary: '',
+  });
+  const rollTierModalRef = useRef<HTMLDivElement>(null);
+  const rollTierRangeFloating = useTierRangeFloating(
+    rollTierModal.anchorElement ?? null,
+    Boolean(rollTierModal.isOpen && rollTierModal.anchorElement),
+  );
+
+  useEffect(() => {
+    const el = rollTierModalRef.current;
+    if (!el || !rollTierModal.isOpen) return;
+
+    el.style.zIndex = String(TIER_RANGE_POPOVER_Z_INDEX);
+
+    if (rollTierModal.anchorElement && rollTierRangeFloating.floatingStyles) {
+      const fs = rollTierRangeFloating.floatingStyles;
+      el.style.position = (fs.position as string) ?? 'fixed';
+      el.style.top = fs.top != null ? String(fs.top) : '';
+      el.style.left = fs.left != null ? String(fs.left) : '';
+      el.style.transform = fs.transform != null ? String(fs.transform) : '';
+    } else {
+      el.style.position = 'fixed';
+      el.style.top = '50%';
+      el.style.left = '50%';
+      el.style.transform = 'translate(-50%, -50%)';
+    }
+  }, [rollTierModal.isOpen, rollTierModal.anchorElement, rollTierRangeFloating.floatingStyles]);
+
+  useEffect(() => {
+    if (!rollTierModal.isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!rollTierModalRef.current) return;
+      const target = e.target as HTMLElement;
+
+      if (rollTierModalRef.current.contains(target)) return;
+
+      const button = target.closest('button');
+      if (button) {
+        const buttonText = button.textContent || '';
+        if (buttonText.includes('Диапазон')) return;
+      }
+
+      setRollTierModal((prev) => ({
+        ...prev,
+        isOpen: false,
+        tierIndex: undefined,
+        anchorElement: undefined,
+      }));
+    };
+
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside, true);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleClickOutside, true);
+    };
+  }, [rollTierModal.isOpen]);
+
   const getCommonRanges = useCallback((): SheetTier[] => {
     const allMinSheets = [...new Set(form.tiers.map((t) => t.min_sheets))].sort((a, b) => a - b)
     if (allMinSheets.length === 0) {
@@ -415,6 +593,29 @@ export const PrintPriceEditPage: React.FC = () => {
       return { ...prev, tiers: newTiers }
     })
   }, [activeSheetModes])
+
+  const getRollM2Ranges = useCallback((): RollM2TierDraft[] => {
+    return normalizeRollM2Tiers(form.roll_m2_tiers);
+  }, [form.roll_m2_tiers]);
+
+  const updateRollM2Ranges = useCallback((newRanges: RollM2TierDraft[]) => {
+    setForm((prev) => {
+      const normalizedPrev = normalizeRollM2Tiers(prev.roll_m2_tiers);
+      const priceMap = new Map<string, number>();
+      normalizedPrev.forEach((tier) => {
+        priceMap.set(rollRangeKey(tier.min_m2), tier.price_per_m2);
+      });
+      const normalizedRanges = normalizeRollM2Tiers(newRanges);
+      return {
+        ...prev,
+        roll_m2_tiers: normalizedRanges.map((tier) => ({
+          min_m2: tier.min_m2,
+          max_m2: tier.max_m2 ?? null,
+          price_per_m2: priceMap.get(rollRangeKey(tier.min_m2)) ?? tier.price_per_m2 ?? 0,
+        })),
+      };
+    });
+  }, []);
 
   const techDisplayName = form.technology_code
     ? resolveTechnologyName(form.technology_code, printTechnologies)
@@ -459,16 +660,16 @@ export const PrintPriceEditPage: React.FC = () => {
     });
   };
 
-  const addRollM2Tier = () => {
-    const maxMin = form.roll_m2_tiers.reduce((m, t) => Math.max(m, t.min_total_m2), -1);
-    const nextMin = maxMin >= 0 ? Number((maxMin + 0.001).toFixed(3)) : 0;
-    updateForm({
-      roll_m2_tiers: [
-        ...form.roll_m2_tiers,
-        { min_total_m2: nextMin, max_total_m2: null, price_per_m2: 0 },
-      ],
+  const updateRollM2TierPrice = useCallback((minM2: number, nextPrice: number) => {
+    setForm((prev) => {
+      const normalized = normalizeRollM2Tiers(prev.roll_m2_tiers);
+      const targetKey = rollRangeKey(minM2);
+      const updated = normalized.map((tier) =>
+        rollRangeKey(tier.min_m2) === targetKey ? { ...tier, price_per_m2: nextPrice } : tier,
+      );
+      return { ...prev, roll_m2_tiers: updated };
     });
-  };
+  }, []);
 
   const m2TiersForActiveLayer = form.m2_tiers
     .map((tier, idx) => ({ tier, idx }))
@@ -485,6 +686,11 @@ export const PrintPriceEditPage: React.FC = () => {
       const normalizedSheetTiers = (form.tiers || []).filter((tier) =>
         activeSheetModes.some((mode) => mode.key === tier.price_mode),
       );
+      const normalizedRollM2Tiers = normalizeRollM2Tiers(form.roll_m2_tiers).map((tier) => ({
+        min_m2: tier.min_m2,
+        max_m2: tier.max_m2 ?? null,
+        price_per_m2: tier.price_per_m2,
+      }));
       const payload = {
         ...form,
         m2_pricing_kind: form.counter_unit === 'm2' ? form.m2_pricing_kind : undefined,
@@ -494,7 +700,7 @@ export const PrintPriceEditPage: React.FC = () => {
         m2_tiers:
           form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.m2_tiers : undefined,
         roll_m2_tiers:
-          form.counter_unit === 'm2' && form.m2_pricing_kind === 'roll_wide' ? form.roll_m2_tiers : undefined,
+          form.counter_unit === 'm2' && form.m2_pricing_kind === 'roll_wide' ? normalizedRollM2Tiers : undefined,
         price_bw_per_meter: technologySupportsBw ? form.price_bw_per_meter : null,
         price_white_per_m2:
           form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.price_white_per_m2 : null,
@@ -707,8 +913,9 @@ export const PrintPriceEditPage: React.FC = () => {
                       )}
                     </>
                   ) : (
-                    <div className="text-muted text-sm mt-3">
-                      Для профиля «ШФП рулон» используются только цветные ставки и ступени по total_m².
+                    <div className="print-price-hint-banner mt-3">
+                      Профиль ШФП рулон использует только цветную базовую ставку и диапазоны по оси total_m².
+                      Диапазоны редактируются ниже в формате, как для лазерной печати.
                     </div>
                   )}
                 </>
@@ -1158,91 +1365,226 @@ export const PrintPriceEditPage: React.FC = () => {
                   </Button>
                 </>
               ) : (
-                <>
-                  <table className="simplified-table simplified-table--compact">
-                    <thead>
-                      <tr>
-                        <th>От total_m²</th>
-                        <th>До total_m²</th>
-                        <th>Руб/м²</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.roll_m2_tiers.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="text-muted text-sm">
-                            Нет ступеней total_m² — используется базовая цветная ставка.
-                          </td>
-                        </tr>
-                      ) : (
-                        form.roll_m2_tiers.map((tier, idx) => (
-                          <tr key={idx}>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.001"
-                                min={0}
-                                className="form-control"
-                                value={tier.min_total_m2}
-                                onChange={(e) => {
-                                  const next = [...form.roll_m2_tiers];
-                                  next[idx] = { ...next[idx], min_total_m2: parseFloat(e.target.value) || 0 };
-                                  updateForm({ roll_m2_tiers: next });
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.001"
-                                className="form-control"
-                                placeholder="∞"
-                                value={tier.max_total_m2 ?? ''}
-                                onChange={(e) => {
-                                  const next = [...form.roll_m2_tiers];
-                                  next[idx] = {
-                                    ...next[idx],
-                                    max_total_m2: e.target.value ? parseFloat(e.target.value) : null,
-                                  };
-                                  updateForm({ roll_m2_tiers: next });
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                className="form-control"
-                                value={tier.price_per_m2}
-                                onChange={(e) => {
-                                  const next = [...form.roll_m2_tiers];
-                                  next[idx] = { ...next[idx], price_per_m2: parseFloat(e.target.value) || 0 };
-                                  updateForm({ roll_m2_tiers: next });
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() =>
-                                  updateForm({ roll_m2_tiers: form.roll_m2_tiers.filter((_, i) => i !== idx) })
-                                }
-                              >
-                                Удалить
-                              </Button>
-                            </td>
-                          </tr>
-                        ))
+                <div className="simplified-tiers-table">
+                  {(() => {
+                    const rollRanges = getRollM2Ranges();
+                    if (rollRanges.length === 0) {
+                      return (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => updateRollM2Ranges(buildDefaultRollM2Tiers())}
+                        >
+                          Добавить диапазоны m²
+                        </Button>
+                      );
+                    }
+
+                    return (
+                      <>
+                        <table className="simplified-table simplified-table--compact">
+                          <thead>
+                            <tr>
+                              <th>Параметры печати (руб/м²)</th>
+                              {rollRanges.map((tier, tierIndex) => (
+                                <th key={`roll-head-${rollRangeKey(tier.min_m2)}-${tierIndex}`} className="simplified-table__range-cell">
+                                  <div className="cell">
+                                    <span
+                                      className="simplified-table__range-cell--clickable"
+                                      onClick={(e) => {
+                                        setRollTierModal({
+                                          type: 'edit',
+                                          tierIndex,
+                                          isOpen: true,
+                                          boundary: String(tier.min_m2),
+                                          anchorElement: e.currentTarget as HTMLElement,
+                                        });
+                                      }}
+                                    >
+                                      {formatM2Boundary(tier.min_m2)} м²
+                                    </span>
+                                    <span>
+                                      <button
+                                        type="button"
+                                        className="simplified-table__remove-range"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          updateRollM2Ranges(removeRollM2Range(rollRanges, tierIndex));
+                                        }}
+                                        aria-label="Удалить диапазон"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  </div>
+                                </th>
+                              ))}
+                              <th>
+                                <div className="cell">
+                                  <div className="simplified-row__add-range-wrapper">
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      className="simplified-row__add-range-btn"
+                                      onClick={(e) => {
+                                        if (!e) return;
+                                        e.stopPropagation();
+                                        setRollTierModal({
+                                          type: 'add',
+                                          isOpen: true,
+                                          boundary: '',
+                                          anchorElement: e.currentTarget as HTMLElement,
+                                        });
+                                      }}
+                                    >
+                                      + Диапазон
+                                    </Button>
+                                  </div>
+                                </div>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="simplified-table__parent-row">
+                              <td className="simplified-table__parent-cell">
+                                <PrintPriceModeLabel muted>полноцветная</PrintPriceModeLabel>
+                              </td>
+                              {rollRanges.map((tier, tierIndex) => (
+                                <td key={`roll-parent-${rollRangeKey(tier.min_m2)}-${tierIndex}`} className="simplified-table__parent-fill"></td>
+                              ))}
+                              <td className="simplified-table__parent-fill"></td>
+                            </tr>
+                            <tr className="simplified-table__child-row">
+                              <td className="simplified-table__child-cell">
+                                <PrintPriceModeLabel child>ставка за м²</PrintPriceModeLabel>
+                              </td>
+                              {rollRanges.map((tier, tierIndex) => (
+                                <td key={`roll-price-${rollRangeKey(tier.min_m2)}-${tierIndex}`}>
+                                  <PriceCell
+                                    className="form-input form-input--compact-table"
+                                    value={tier.price_per_m2 ?? 0}
+                                    onChange={(nextPrice) => updateRollM2TierPrice(tier.min_m2, nextPrice)}
+                                  />
+                                </td>
+                              ))}
+                              <td></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div className="text-muted text-sm mt-3">
+                          Ось диапазонов: total_m² (площадь изделия × тираж). Пример: 1 м², 5 м², 10 м² и далее.
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  {rollTierModal.isOpen && createPortal(
+                    <div
+                      ref={tierModalFloatingRef(
+                        rollTierModalRef,
+                        rollTierRangeFloating.setFloating,
+                        Boolean(rollTierModal.anchorElement),
                       )}
-                    </tbody>
-                  </table>
-                  <Button variant="secondary" size="sm" className="mt-3" onClick={addRollM2Tier}>
-                    + Добавить ступень
-                  </Button>
-                </>
+                      className="simplified-tier-modal pricing-glass"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
+                        <div className="simplified-tier-modal__header">
+                          <strong>{rollTierModal.type === 'add' ? 'Добавить диапазон m²' : 'Редактировать диапазон m²'}</strong>
+                          <button
+                            type="button"
+                            className="simplified-tier-modal__close"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRollTierModal({
+                                type: 'add',
+                                isOpen: false,
+                                boundary: '',
+                                tierIndex: undefined,
+                                anchorElement: undefined,
+                              });
+                            }}
+                            title="Закрыть"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <div className="simplified-tier-modal__body">
+                          <FormField label="Граница диапазона (м²)">
+                            <input
+                              className="form-input form-input--compact"
+                              type="number"
+                              min="0.001"
+                              step="0.001"
+                              placeholder="Например: 5"
+                              value={rollTierModal.boundary}
+                              onChange={(e) => setRollTierModal({ ...rollTierModal, boundary: e.target.value })}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={(e) => e.stopPropagation()}
+                            />
+                          </FormField>
+                          <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) => {
+                                e?.stopPropagation();
+                                setRollTierModal({
+                                  type: 'add',
+                                  isOpen: false,
+                                  boundary: '',
+                                  tierIndex: undefined,
+                                  anchorElement: undefined,
+                                });
+                              }}
+                            >
+                              Отменить
+                            </Button>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => {
+                                const boundary = Number(rollTierModal.boundary);
+                                if (!Number.isFinite(boundary) || boundary <= 0) return;
+
+                                const currentRanges = getRollM2Ranges();
+                                const normalizedBoundary = roundM2(boundary);
+                                let newRanges: RollM2TierDraft[];
+
+                                if (rollTierModal.type === 'add') {
+                                  newRanges = addRollM2RangeBoundary(currentRanges, normalizedBoundary);
+                                } else if (rollTierModal.tierIndex !== undefined) {
+                                  newRanges = editRollM2RangeBoundary(
+                                    currentRanges,
+                                    rollTierModal.tierIndex,
+                                    normalizedBoundary,
+                                  );
+                                } else {
+                                  return;
+                                }
+
+                                updateRollM2Ranges(newRanges);
+                                setRollTierModal({
+                                  type: 'add',
+                                  isOpen: false,
+                                  boundary: '',
+                                  tierIndex: undefined,
+                                  anchorElement: undefined,
+                                });
+                              }}
+                            >
+                              {rollTierModal.type === 'add' ? 'Добавить' : 'Сохранить'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
+                </div>
               )}
             </div>
           </div>
