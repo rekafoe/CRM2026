@@ -1,26 +1,29 @@
 import React from 'react';
 import { AppIcon, BynSymbol } from '../../ui';
 import { WarehouseFormField } from '../common/WarehouseForm';
+import type { MaterialsListFilters } from './MaterialsList';
 
 interface MaterialsFiltersProps {
   isOpen: boolean;
   onClose: () => void;
-  filters: {
-    categoryId: string;
-    materialTypeId: string;
-    materialKind: string;
-    supplier: string;
-    minQuantity: number;
-    maxQuantity: number;
-    minPrice: number;
-    maxPrice: number;
-    stockStatus: string;
-  };
-  onFiltersChange: (filters: any) => void;
+  filters: MaterialsListFilters;
+  onFiltersChange: (filters: MaterialsListFilters) => void;
   categories: Array<{ id: number; name: string }>;
   materialTypes: Array<{ id: number; name: string }>;
   suppliers: string[];
 }
+
+export const DEFAULT_MATERIALS_FILTERS: MaterialsListFilters = {
+  categoryId: '',
+  materialTypeId: '',
+  materialKind: '',
+  supplier: '',
+  minQuantity: 0,
+  maxQuantity: null,
+  minPrice: 0,
+  maxPrice: null,
+  stockStatus: '',
+};
 
 export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
   isOpen,
@@ -33,11 +36,10 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  // Отладочная информация
-  console.log('🔍 MaterialsFilters - categories:', categories);
-  console.log('🔍 MaterialsFilters - suppliers:', suppliers);
-
-  const handleFilterChange = (field: string, value: any) => {
+  const handleFilterChange = <K extends keyof MaterialsListFilters>(
+    field: K,
+    value: MaterialsListFilters[K],
+  ) => {
     onFiltersChange({
       ...filters,
       [field]: value,
@@ -45,17 +47,7 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
   };
 
   const resetFilters = () => {
-    onFiltersChange({
-      categoryId: '',
-      materialTypeId: '',
-      materialKind: '',
-      supplier: '',
-      minQuantity: 0,
-      maxQuantity: 1000,
-      minPrice: 0,
-      maxPrice: 1000,
-      stockStatus: '',
-    });
+    onFiltersChange({ ...DEFAULT_MATERIALS_FILTERS });
   };
 
   return (
@@ -81,39 +73,36 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
       </div>
 
       <div className="filters-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Категория */}
         <WarehouseFormField
           label="Категория"
           id="category-filter"
           as="select"
           value={filters.categoryId}
-          onChange={(value) => handleFilterChange('categoryId', value)}
+          onChange={(value) => handleFilterChange('categoryId', String(value ?? ''))}
           options={[
             { value: '', label: 'Все категории' },
             ...categories.map(cat => ({ value: String(cat.id), label: cat.name }))
           ]}
         />
 
-        {/* Тип материала */}
         <WarehouseFormField
           label="Тип материала"
           id="material-type-filter"
           as="select"
           value={filters.materialTypeId}
-          onChange={(value) => handleFilterChange('materialTypeId', value)}
+          onChange={(value) => handleFilterChange('materialTypeId', String(value ?? ''))}
           options={[
             { value: '', label: 'Все типы' },
             ...materialTypes.map(type => ({ value: String(type.id), label: type.name }))
           ]}
         />
 
-        {/* Класс материала */}
         <WarehouseFormField
           label="Класс"
           id="material-kind-filter"
           as="select"
           value={filters.materialKind}
-          onChange={(value) => handleFilterChange('materialKind', value)}
+          onChange={(value) => handleFilterChange('materialKind', String(value ?? ''))}
           options={[
             { value: '', label: 'Все классы' },
             { value: 'sheet', label: 'Листовой' },
@@ -123,26 +112,24 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
           ]}
         />
 
-        {/* Поставщик */}
         <WarehouseFormField
           label="Поставщик"
           id="supplier-filter"
           as="select"
           value={filters.supplier}
-          onChange={(value) => handleFilterChange('supplier', value)}
+          onChange={(value) => handleFilterChange('supplier', String(value ?? ''))}
           options={[
             { value: '', label: 'Все поставщики' },
             ...suppliers.map(sup => ({ value: sup, label: sup }))
           ]}
         />
 
-        {/* Статус запаса */}
         <WarehouseFormField
           label="Статус запаса"
           id="stock-status-filter"
           as="select"
           value={filters.stockStatus}
-          onChange={(value) => handleFilterChange('stockStatus', value)}
+          onChange={(value) => handleFilterChange('stockStatus', String(value ?? ''))}
           options={[
             { value: '', label: 'Все статусы' },
             { value: 'in_stock', label: 'В наличии' },
@@ -151,46 +138,46 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
           ]}
         />
 
-        {/* Минимальное количество */}
         <WarehouseFormField
           label="Мин. количество"
           id="min-quantity-filter"
           type="number"
           value={filters.minQuantity}
-          onChange={(value) => handleFilterChange('minQuantity', value)}
+          onChange={(value) => handleFilterChange('minQuantity', value == null ? 0 : Number(value))}
           min={0}
         />
 
-        {/* Максимальное количество */}
         <WarehouseFormField
           label="Макс. количество"
           id="max-quantity-filter"
           type="number"
           value={filters.maxQuantity}
-          onChange={(value) => handleFilterChange('maxQuantity', value)}
+          onChange={(value) => handleFilterChange('maxQuantity', value == null ? null : Number(value))}
           min={0}
+          placeholder="Без лимита"
+          helpText="Пусто — без верхнего лимита"
         />
 
-        {/* Минимальная цена */}
         <WarehouseFormField
-          label={<>Мин. цена (<BynSymbol />)</>}
+          label={<>Мин. закупочная цена (<BynSymbol />)</>}
           id="min-price-filter"
           type="number"
           value={filters.minPrice}
-          onChange={(value) => handleFilterChange('minPrice', value)}
+          onChange={(value) => handleFilterChange('minPrice', value == null ? 0 : Number(value))}
           min={0}
           step={0.01}
         />
 
-        {/* Максимальная цена */}
         <WarehouseFormField
-          label={<>Макс. цена (<BynSymbol />)</>}
+          label={<>Макс. закупочная цена (<BynSymbol />)</>}
           id="max-price-filter"
           type="number"
           value={filters.maxPrice}
-          onChange={(value) => handleFilterChange('maxPrice', value)}
+          onChange={(value) => handleFilterChange('maxPrice', value == null ? null : Number(value))}
           min={0}
           step={0.01}
+          placeholder="Без лимита"
+          helpText="Пусто — без верхнего лимита"
         />
       </div>
     </div>

@@ -4,8 +4,8 @@ interface WarehouseFormFieldProps {
   label: React.ReactNode;
   id: string;
   type?: 'text' | 'number' | 'email' | 'password' | 'tel' | 'url';
-  value: string | number;
-  onChange: (value: string | number) => void;
+  value: string | number | null | undefined;
+  onChange: (value: string | number | null) => void;
   placeholder?: string;
   error?: string;
   helpText?: string;
@@ -38,16 +38,21 @@ export const WarehouseFormField: React.FC<WarehouseFormFieldProps> = ({
   rows,
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const newValue = type === 'number' ? Number(e.target.value) : e.target.value;
-    onChange(newValue);
+    if (type === 'number') {
+      onChange(e.target.value === '' ? null : Number(e.target.value));
+      return;
+    }
+    onChange(e.target.value);
   };
+
+  const inputValue = value == null ? '' : value;
 
   const renderInput = () => {
     if (as === 'select' && options) {
       return (
         <select
           id={id}
-          value={value}
+          value={inputValue}
           onChange={handleChange}
           disabled={disabled}
           className="form-select"
@@ -65,7 +70,7 @@ export const WarehouseFormField: React.FC<WarehouseFormFieldProps> = ({
       return (
         <textarea
           id={id}
-          value={value}
+          value={inputValue}
           onChange={handleChange}
           placeholder={placeholder}
           disabled={disabled}
@@ -79,7 +84,7 @@ export const WarehouseFormField: React.FC<WarehouseFormFieldProps> = ({
       <input
         id={id}
         type={type}
-        value={value}
+        value={inputValue}
         onChange={handleChange}
         placeholder={placeholder}
         disabled={disabled}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Material } from '../../../types/shared';
-import { materialPriceSecondaryLabel } from '../../../utils/materialPriceLabels';
+import { materialPriceSecondaryLabel, materialSellPriceSecondaryLabel } from '../../../utils/materialPriceLabels';
 import { formatRollStockLabel, isRollMaterial } from '../../../utils/materialRollLabels';
 import { WarehouseButton } from '../common/WarehouseButton';
 import { StatusBadge } from '../../common/StatusBadge';
@@ -49,6 +49,8 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
     area: 'Площадной',
   };
   const kindLabel = kindLabelMap[String((material as any).material_kind || '')] || '—';
+  const hasPurchasePrice = material.purchase_price != null && Number.isFinite(Number(material.purchase_price));
+  const sellPrice = material.sheet_price_single ?? material.price;
 
   return (
     <div className={`material-row-card ${isSelected ? 'selected' : ''}`}>
@@ -101,16 +103,31 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
 
       {/* Status Column */}
       <div className="row-column status-column">
-        <StatusBadge status={stockInfo.status} />
+        <StatusBadge status={stockInfo.status} color={stockInfo.type} />
       </div>
 
       {/* Price Column */}
       <div className="row-column price-column">
         <div className="price-info">
           <div className="font-bold">
-            {material.purchase_price ?? material.sheet_price_single ?? material.price ?? 0} <BynSymbol />
+            {hasPurchasePrice ? (
+              <>
+                {Number(material.purchase_price)} <BynSymbol />
+              </>
+            ) : (
+              '—'
+            )}
           </div>
-          <div className="text-xs text-text-secondary">{materialPriceSecondaryLabel(material.unit)}</div>
+          <div className="text-xs text-text-secondary">
+            {hasPurchasePrice
+              ? materialPriceSecondaryLabel(material.unit)
+              : 'закуп не указана'}
+          </div>
+          {sellPrice != null && Number.isFinite(Number(sellPrice)) && (
+            <div className="text-xs text-text-secondary">
+              {Number(sellPrice)} <BynSymbol /> · {materialSellPriceSecondaryLabel(material.unit)}
+            </div>
+          )}
         </div>
       </div>
 

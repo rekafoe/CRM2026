@@ -7,6 +7,10 @@
   flex-direction: column;
 }
 
+.materials-list-grid {
+  align-items: stretch;
+}
+
 .materials-management-container {
   min-height: auto;
   display: flex;

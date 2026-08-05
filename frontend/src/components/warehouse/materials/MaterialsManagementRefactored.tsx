@@ -2,11 +2,12 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { Material } from '../../../types/shared';
 import { useCreateMaterial, useUpdateMaterial, useDeleteMaterial } from '../../../api/hooks/useMaterials';
 import { useUIStore } from '../../../stores/uiStore';
+import { ConfirmDialog } from '../../common/ConfirmDialog';
 import { MaterialFormModal } from '../MaterialFormModal';
 import MaterialReservationModal from '../MaterialReservationModal';
 import { MaterialsToolbar } from './MaterialsToolbar';
-import { MaterialsList } from './MaterialsList';
-import { MaterialsFilters } from './MaterialsFilters';
+import { MaterialsList, MaterialsListFilters } from './MaterialsList';
+import { DEFAULT_MATERIALS_FILTERS, MaterialsFilters } from './MaterialsFilters';
 
 interface MaterialsManagementProps {
   materials: Material[];
@@ -20,18 +21,6 @@ type ViewMode = 'grid' | 'cards';
 type SortField = 'name' | 'category' | 'quantity' | 'price' | 'updated_at';
 type SortOrder = 'asc' | 'desc';
 
-interface Filters {
-  categoryId: string;
-  materialTypeId: string;
-  materialKind: string;
-  supplier: string;
-  minQuantity: number;
-  maxQuantity: number;
-  minPrice: number;
-  maxPrice: number;
-  stockStatus: string;
-}
-
 export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> = ({
   materials,
   selectedMaterials,
@@ -39,7 +28,6 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
   onSelectAll,
   onRefresh,
 }) => {
-  // Состояние компонента
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -49,31 +37,15 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [showReservationModal, setShowReservationModal] = useState(false);
   const [selectedMaterialForReservation, setSelectedMaterialForReservation] = useState<Material | null>(null);
+  const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
 
-  // Фильтры
-  const [filters, setFilters] = useState<Filters>({
-    categoryId: '',
-    materialTypeId: '',
-    materialKind: '',
-    supplier: '',
-    minQuantity: 0,
-    maxQuantity: 1000,
-    minPrice: 0,
-    maxPrice: 1000,
-    stockStatus: '',
-  });
+  const [filters, setFilters] = useState<MaterialsListFilters>({ ...DEFAULT_MATERIALS_FILTERS });
 
-  // Мутации
   const createMaterialMutation = useCreateMaterial();
   const updateMaterialMutation = useUpdateMaterial();
   const deleteMaterialMutation = useDeleteMaterial();
   const { showToast } = useUIStore();
 
-  // Отладочная информация для материалов
-  console.log('🔍 MaterialsManagement - materials:', materials);
-  console.log('🔍 MaterialsManagement - materials sample:', materials.slice(0, 2));
-
-  // Получение уникальных категорий и поставщиков
   const categories = useMemo(() => {
     const categoryMap = new Map<number, { id: number; name: string }>();
     materials.forEach((material) => {
@@ -84,9 +56,7 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
         });
       }
     });
-    const cats = Array.from(categoryMap.values());
-    console.log('🔍 MaterialsManagement - categories:', cats);
-    return cats;
+    return Array.from(categoryMap.values());
   }, [materials]);
 
   const materialTypes = useMemo(() => {
@@ -110,26 +80,14 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
   }, [filters.categoryId, materialTypes]);
 
   const suppliers = useMemo(() => {
-    const supps = materials
+    return materials
       .map(m => (m as any).supplier_name)
-      .filter((sup, index, arr) => sup && arr.indexOf(sup) === index);
-    console.log('🔍 MaterialsManagement - suppliers:', supps);
-    return supps as string[];
+      .filter((sup, index, arr) => sup && arr.indexOf(sup) === index) as string[];
   }, [materials]);
 
-  // Обработчики
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
   }, []);
-
-  const handleSort = useCallback((field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  }, [sortField]);
 
   const handleAddMaterial = useCallback(() => {
     setShowAddModal(true);
@@ -140,17 +98,22 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
     setShowAddModal(true);
   }, []);
 
-  const handleDeleteMaterial = useCallback(async (material: Material) => {
-    if (window.confirm(`Удалить материал "${material.name}"?`)) {
-      try {
-        await deleteMaterialMutation.mutateAsync(material.id);
-        showToast('Материал удален', 'success');
-        onRefresh();
-      } catch (error) {
-        showToast('Ошибка при удалении материала', 'error');
-      }
+  const handleDeleteMaterial = useCallback((material: Material) => {
+    setMaterialToDelete(material);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!materialToDelete) return;
+    try {
+      await deleteMaterialMutation.mutateAsync(materialToDelete.id);
+      showToast('Материал удален', 'success');
+      onRefresh();
+    } catch (error) {
+      showToast('Ошибка при удалении материала', 'error');
+    } finally {
+      setMaterialToDelete(null);
     }
-  }, [deleteMaterialMutation, showToast, onRefresh]);
+  }, [materialToDelete, deleteMaterialMutation, showToast, onRefresh]);
 
   const handleReserveMaterial = useCallback((material: Material) => {
     setSelectedMaterialForReservation(material);
@@ -176,7 +139,7 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
     }
   }, [selectedMaterials.length, showToast]);
 
-  const handleFiltersChange = useCallback((newFilters: Filters) => {
+  const handleFiltersChange = useCallback((newFilters: MaterialsListFilters) => {
     if (
       newFilters.categoryId &&
       newFilters.materialTypeId &&
@@ -192,6 +155,11 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
     setFilters(newFilters);
   }, [materialTypes]);
 
+  const handleResetFilters = useCallback(() => {
+    setFilters({ ...DEFAULT_MATERIALS_FILTERS });
+    setSearchQuery('');
+  }, []);
+
   const handleModalClose = useCallback(() => {
     setShowAddModal(false);
     setEditingMaterial(null);
@@ -204,7 +172,6 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
 
   return (
     <div className="materials-management materials-management-container">
-      {/* Панель инструментов */}
       <MaterialsToolbar
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
@@ -218,7 +185,6 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
         onSearchChange={setSearchQuery}
       />
 
-      {/* Фильтры */}
       <MaterialsFilters
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
@@ -229,9 +195,7 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
         suppliers={suppliers}
       />
 
-      {/* Область контента */}
       <div className="materials-content">
-        {/* Список материалов */}
         <MaterialsList
           materials={materials}
           selectedMaterials={selectedMaterials}
@@ -240,6 +204,8 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
           onEdit={handleEditMaterial}
           onDelete={handleDeleteMaterial}
           onReserve={handleReserveMaterial}
+          onAdd={handleAddMaterial}
+          onResetFilters={handleResetFilters}
           viewMode={viewMode}
           sortField={sortField}
           sortOrder={sortOrder}
@@ -248,7 +214,6 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
         />
       </div>
 
-      {/* Модальные окна */}
       <MaterialFormModal
         isOpen={showAddModal}
         onClose={handleModalClose}
@@ -278,6 +243,17 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
         onClose={handleReservationModalClose}
         material={selectedMaterialForReservation || undefined}
         onReserve={onRefresh}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(materialToDelete)}
+        onClose={() => setMaterialToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Удаление материала"
+        message={materialToDelete ? `Удалить материал «${materialToDelete.name}»?` : ''}
+        confirmText="Удалить"
+        cancelText="Отмена"
+        variant="danger"
       />
     </div>
   );

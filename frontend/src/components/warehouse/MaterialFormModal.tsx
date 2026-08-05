@@ -310,14 +310,12 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('=== ОТПРАВКА ФОРМЫ ===');
     const payload = {
       ...formData,
       material_kind: inferredKind,
       material_type_id: formData.material_type_id || undefined,
       unit: formData.unit || KIND_DEFAULT_UNITS[inferredKind],
     };
-    console.log('formData:', payload);
     onSave(payload);
   };
 
@@ -425,7 +423,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   </option>
                 ))}
               </select>
-              <small style={{ color: '#666', fontSize: '12px' }}>
+              <small className="form-hint">
                 Категория → тип → SKU: этот класс задаёт правила списания и обязательные поля.
               </small>
             </div>
@@ -465,7 +463,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   ))}
                 </select>
                 {loadingPaperTypes && (
-                  <small style={{ color: '#666', fontSize: '12px' }}>
+                  <small className="form-hint">
                     Загрузка типов бумаги...
                   </small>
                 )}
@@ -484,7 +482,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   max="500"
                   step="1"
                 />
-                <small style={{ color: '#666', fontSize: '12px' }}>
+                <small className="form-hint">
                   Укажите плотность бумаги для точного сопоставления с калькулятором
                 </small>
               </div>
@@ -522,7 +520,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   max="250"
                   step="1"
                 />
-                <small style={{ color: '#666', fontSize: '12px' }}>
+                <small className="form-hint">
                   Используем поле толщины для ламинации (в микронах)
                 </small>
               </div>
