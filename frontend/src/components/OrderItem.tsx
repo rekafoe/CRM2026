@@ -52,6 +52,58 @@ const loadPaperTypeDisplayMap = async (): Promise<Record<string, string>> => {
   return paperTypeDisplayPromise;
 };
 
+function normalizeItemText(value: string): string {
+  return String(value)
+    .toLowerCase()
+    .replace(/[|,;:()]/g, ' ')
+    .replace(/[—–]/g, '-')
+    .replace(/\s*-\s*/g, ' ')
+    .replace(/шт\./g, 'шт')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stripDisplayedInfoFromDescription(
+  description: string,
+  shownParts: Array<string | null | undefined>,
+): string {
+  let next = String(description || '').trim();
+  if (!next) return '';
+
+  const primary = String(shownParts[0] || '').trim();
+  if (primary) {
+    const escapedPrimary = primary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const withoutPrimary = next.replace(
+      new RegExp(`^${escapedPrimary}\\s*([,;|—–-]\\s*)?`, 'i'),
+      '',
+    ).trim();
+    if (withoutPrimary !== next) {
+      next = withoutPrimary;
+    }
+  }
+
+  const shownNormalized = new Set(
+    shownParts
+      .map((part) => normalizeItemText(String(part || '')))
+      .filter(Boolean),
+  );
+  if (shownNormalized.size === 0) return next;
+
+  const segments = next
+    .split(/\s*[,;|]\s*/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (segments.length <= 1) return next;
+
+  const filtered = segments.filter((segment) => {
+    const normalized = normalizeItemText(segment);
+    if (!normalized) return false;
+    return !shownNormalized.has(normalized);
+  });
+
+  return filtered.join(', ').trim();
+}
+
 
 interface OrderItemProps {
   item: Item;
@@ -442,7 +494,10 @@ export const OrderItem: React.FC<OrderItemProps> = ({
     <div className="item order-item-row">
       <div className="order-item-body">
         {(() => {
-          const display = sanitizeOrderItemDescription(String(customDescription || ''), (item as any).type);
+          const display = stripDisplayedInfoFromDescription(
+            sanitizeOrderItemDescription(String(customDescription || ''), (item as any).type),
+            [itemDisplayName, titleParts.formatText, titleParts.quantityText],
+          );
           const showDesc = Boolean(display) && display !== 'Без описания';
           // Инструкция: печать (листы) → послепечатные по имени → резка. Без названия не показываем.
           const params = item.params || {};

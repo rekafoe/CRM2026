@@ -63,9 +63,9 @@ API:
 | `editable` | `false` после финализации заказа в печать |
 | `expires_at` | +365 дней от создания |
 
-API (CRM auth): `GET /api/customers/:id/projects`
+API (website key): `GET /api/public-editor/projects?customerId=` → список с `displayId` (`web{id}`), `resume` (параметры печати).
 
-API (website key): `POST /api/public-editor/projects/:id/clone-draft` → новый `editorDraftToken`
+API (website key): `POST /api/public-editor/projects/:id/clone-draft` → новый `editorDraftToken` + `displayId` + `resume` (в payload нового draft копируется `selectedParams`).
 
 ## Группировка открыток
 

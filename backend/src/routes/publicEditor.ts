@@ -16,7 +16,11 @@ import {
   listEditorDraftsForOwner,
   updateEditorDraftPayload,
 } from '../services/publicEditorDraftService'
-import { cloneCustomerProjectToDraft, listCustomerProjects } from '../services/customerProjectService'
+import {
+  cloneCustomerProjectToDraft,
+  listCustomerProjects,
+  toCustomerProjectListDto,
+} from '../services/customerProjectService'
 import { ensureWebsiteCustomer } from '../services/editorDraftOwnerService'
 
 const router = Router()
@@ -327,21 +331,7 @@ router.get('/projects', asyncHandler(async (req: Request, res: Response) => {
   }
   const projects = await listCustomerProjects(customerId)
   res.json({
-    projects: projects.map((project) => ({
-      id: project.id,
-      title: project.title,
-      created_at: project.created_at,
-      updated_at: project.updated_at,
-      expires_at: project.expires_at,
-      source_order_id: project.source_order_id,
-      design_template_id: project.design_template_id,
-      editor_mode: project.editor_mode,
-      editable: Number(project.editable) === 1,
-      product_id: project.product_id ?? null,
-      type_id: project.type_id ?? null,
-      size_id: project.size_id ?? null,
-      resume: project.resume,
-    })),
+    projects: projects.map((project) => toCustomerProjectListDto(project)),
   })
 }))
 

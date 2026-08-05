@@ -58,7 +58,7 @@ export const CustomerDetailProjectsPanel: React.FC<CustomerDetailProjectsPanelPr
             : 0;
           return (
             <li key={project.id} className="customer-detail-projects__card">
-              <strong>{project.title ?? `Проект #${project.id}`}</strong>
+              <strong>web{project.id} · {project.title ?? `Проект #${project.id}`}</strong>
               <span>{pageCount > 0 ? `${pageCount} стр.` : '—'} · {project.editor_mode ?? 'single'}</span>
               {project.source_order_id != null && (
                 <span>Заказ #{project.source_order_id}{project.source_order_item_id != null ? ` / поз. ${project.source_order_item_id}` : ''}</span>

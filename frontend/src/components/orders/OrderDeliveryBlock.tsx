@@ -14,6 +14,17 @@ type Props = {
   compact?: boolean;
 };
 
+function sanitizeDeliveryLabel(value: string | null | undefined): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  const withoutPickupCodeTail = raw
+    .replace(/\s*\(\s*pickup-[^)]+\s*\)\s*$/i, '')
+    .trim();
+  if (withoutPickupCodeTail) return withoutPickupCodeTail;
+  if (/^pickup-[a-z0-9_-]+$/i.test(raw)) return '';
+  return raw;
+}
+
 function formatCost(delivery: WebsiteOrderDelivery): string | null {
   if (delivery.cost != null && Number.isFinite(delivery.cost)) {
     return `${delivery.cost.toFixed(2)} BYN`;
@@ -29,29 +40,30 @@ function addressLabel(kind: string): string {
 }
 
 /** Для самовывоза адрес часто лежит в label; для доставки — в address. */
-function resolveLocation(delivery: WebsiteOrderDelivery): string | null {
+function resolveLocation(delivery: WebsiteOrderDelivery, label: string): string | null {
   const address = typeof delivery.address === 'string' ? delivery.address.trim() : '';
   if (address) return address;
-  if (delivery.kind === 'pickup' && delivery.label?.trim()) {
-    return delivery.label.trim();
+  if (delivery.kind === 'pickup' && label) {
+    return label;
   }
   return null;
 }
 
 export function OrderDeliveryBlock({ delivery, compact }: Props) {
+  const label = sanitizeDeliveryLabel(delivery.label);
   const kindLabel = KIND_LABELS[delivery.kind] ?? delivery.kind;
   const cost = formatCost(delivery);
-  const location = resolveLocation(delivery);
+  const location = resolveLocation(delivery, label);
   const showVariant =
     delivery.kind !== 'pickup'
-    && Boolean(delivery.label?.trim())
-    && delivery.label.trim() !== location;
+    && Boolean(label)
+    && label !== location;
 
   if (compact) {
     return (
       <span className="order-delivery-block order-delivery-block--compact">
         {kindLabel}
-        {location ? `: ${location}` : delivery.label ? `: ${delivery.label}` : ''}
+        {location ? `: ${location}` : label ? `: ${label}` : ''}
         {cost ? ` (${cost})` : ''}
       </span>
     );
@@ -68,7 +80,7 @@ export function OrderDeliveryBlock({ delivery, compact }: Props) {
         {showVariant ? (
           <div className="order-delivery-block__row">
             <dt>Вариант</dt>
-            <dd>{delivery.label}</dd>
+            <dd>{label}</dd>
           </div>
         ) : null}
         {location ? (

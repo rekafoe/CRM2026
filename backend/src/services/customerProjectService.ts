@@ -23,6 +23,24 @@ export interface CustomerProjectRow {
   resume_json?: string | null
 }
 
+export type CustomerProjectListDto = {
+  id: number
+  displayId: string
+  title: string | null
+  created_at: string
+  updated_at: string
+  expires_at: string
+  source_order_id: number | null
+  source_order_item_id?: number | null
+  design_template_id: number | null
+  editor_mode: string | null
+  editable: boolean
+  product_id: number | null
+  type_id: number | null
+  size_id: string | null
+  resume: Record<string, unknown> | null
+}
+
 function parseJson(value: string | null): unknown {
   if (!value) return null
   try {
@@ -32,10 +50,19 @@ function parseJson(value: string | null): unknown {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
 function oneYearFromNow(): string {
   const d = new Date()
   d.setUTCFullYear(d.getUTCFullYear() + 1)
   return d.toISOString()
+}
+
+/** Стабильный публичный id макета в ЛК: web{project.id} */
+export function customerProjectDisplayId(projectId: number): string {
+  return `web${projectId}`
 }
 
 async function ensureCustomerProjectResumeColumns(): Promise<void> {
@@ -55,6 +82,142 @@ async function ensureCustomerProjectResumeColumns(): Promise<void> {
   invalidateTableSchemaCache('customer_projects')
 }
 
+function readFiniteNumber(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function readSizeId(params: Record<string, unknown>): string | null {
+  if (params.sizeId != null && String(params.sizeId).trim()) return String(params.sizeId)
+  if (params.size_id != null && String(params.size_id).trim()) return String(params.size_id)
+  const specs = isRecord(params.specifications) ? params.specifications : null
+  if (specs?.size_id != null && String(specs.size_id).trim()) return String(specs.size_id)
+  if (specs?.sizeId != null && String(specs.sizeId).trim()) return String(specs.sizeId)
+  return null
+}
+
+/** Контекст для повторного открытия редактора / калькулятора после дубля. */
+export function buildCustomerProjectResume(
+  params: Record<string, unknown>,
+  quantity: number,
+): Record<string, unknown> {
+  const productId =
+    readFiniteNumber(params.productId) ??
+    readFiniteNumber(params.crmProductId)
+  const typeId = readFiniteNumber(params.typeId)
+  const sizeId = readSizeId(params)
+
+  const selectedParams = isRecord(params.selectedParams)
+    ? params.selectedParams
+    : (isRecord(params.selectedEditorParams) ? params.selectedEditorParams : null)
+
+  const configuration = isRecord(params.crmCalculateConfiguration)
+    ? params.crmCalculateConfiguration
+    : (isRecord(params.configuration) ? params.configuration : null)
+
+  const editorPending = isRecord(params.editorPending) ? params.editorPending : null
+  const fieldValues = isRecord(params.fieldValues)
+    ? params.fieldValues
+    : (editorPending && isRecord(editorPending.fieldValues) ? editorPending.fieldValues : null)
+  const specifications = isRecord(params.specifications) ? params.specifications : null
+
+  const qtyFromParams = readFiniteNumber(
+    params.quantity ?? specifications?.quantity ?? editorPending?.quantity,
+  )
+  const resolvedQty =
+    Number.isFinite(quantity) && quantity > 0
+      ? quantity
+      : (qtyFromParams != null && qtyFromParams > 0 ? qtyFromParams : 1)
+
+  const priceType =
+    typeof params.priceType === 'string' && params.priceType.trim()
+      ? params.priceType.trim()
+      : (typeof specifications?.priceType === 'string' && String(specifications.priceType).trim()
+        ? String(specifications.priceType).trim()
+        : (typeof editorPending?.priceType === 'string' ? editorPending.priceType : null))
+
+  const slugFromPending =
+    editorPending && typeof editorPending.slug === 'string' ? editorPending.slug : null
+  const typeParamFromPending =
+    editorPending && typeof editorPending.typeIdParam === 'string'
+      ? editorPending.typeIdParam
+      : null
+
+  return {
+    productId: productId != null && productId > 0 ? productId : null,
+    typeId: typeId != null && Number.isFinite(typeId) ? typeId : null,
+    sizeId:
+      sizeId ??
+      (editorPending && editorPending.sizeId != null && String(editorPending.sizeId).trim()
+        ? String(editorPending.sizeId)
+        : null),
+    quantity: resolvedQty,
+    priceType,
+    poligrafySlug:
+      typeof params.poligrafySlug === 'string' ? params.poligrafySlug : slugFromPending,
+    poligrafyTypeIdParam:
+      typeof params.poligrafyTypeIdParam === 'string'
+        ? params.poligrafyTypeIdParam
+        : (typeParamFromPending ?? (params.typeId != null ? String(params.typeId) : null)),
+    designEditorMode:
+      typeof params.editorDraftMode === 'string'
+        ? params.editorDraftMode
+        : (typeof editorPending?.designEditorMode === 'string'
+          ? editorPending.designEditorMode
+          : null),
+    designTemplateId:
+      readFiniteNumber(params.designTemplateId) ??
+      readFiniteNumber(editorPending?.designTemplateId),
+    designTemplateCode:
+      typeof params.designTemplateCode === 'string'
+        ? params.designTemplateCode
+        : (typeof editorPending?.designTemplateCode === 'string'
+          ? editorPending.designTemplateCode
+          : null),
+    selectedParams,
+    configuration,
+    fieldValues,
+    specifications,
+    editorPending,
+    serviceId: typeof editorPending?.serviceId === 'string' ? editorPending.serviceId : null,
+    productName:
+      typeof params.productName === 'string'
+        ? params.productName
+        : (typeof editorPending?.productName === 'string' ? editorPending.productName : null),
+    calculationResult: isRecord(editorPending?.calculationResult)
+      ? editorPending.calculationResult
+      : (isRecord(params.calculationResult) ? params.calculationResult : null),
+    orderMode: typeof editorPending?.orderMode === 'string' ? editorPending.orderMode : null,
+  }
+}
+
+export function toCustomerProjectListDto(
+  project: CustomerProjectRow & { resume: Record<string, unknown> | null },
+): CustomerProjectListDto {
+  const displayId = customerProjectDisplayId(project.id)
+  const resume = project.resume
+    ? { ...project.resume, displayId }
+    : { displayId }
+  return {
+    id: project.id,
+    displayId,
+    title: project.title,
+    created_at: project.created_at,
+    updated_at: project.updated_at,
+    expires_at: project.expires_at,
+    source_order_id: project.source_order_id,
+    source_order_item_id: project.source_order_item_id,
+    design_template_id: project.design_template_id,
+    editor_mode: project.editor_mode,
+    editable: Number(project.editable) === 1,
+    product_id: project.product_id ?? null,
+    type_id: project.type_id ?? null,
+    size_id: project.size_id ?? null,
+    resume,
+  }
+}
+
 export async function createCustomerProjectFromOrderItem(input: {
   customerId: number
   orderId: number
@@ -64,8 +227,8 @@ export async function createCustomerProjectFromOrderItem(input: {
 }): Promise<CustomerProjectRow | null> {
   await ensureCustomerProjectResumeColumns()
   const db = await getDb()
-  const item = await db.get<{ params: string | null }>(
-    'SELECT params FROM items WHERE id = ? AND orderId = ?',
+  const item = await db.get<{ params: string | null; quantity: number | null }>(
+    'SELECT params, quantity FROM items WHERE id = ? AND orderId = ?',
     [input.orderItemId, input.orderId],
   )
   if (!item?.params) return null
@@ -81,27 +244,11 @@ export async function createCustomerProjectFromOrderItem(input: {
   const photoBatch = params.photoBatch
   if (!designState && !photoBatch) return null
 
-  const productId =
-    params.productId != null
-      ? Number(params.productId)
-      : (params.crmProductId != null ? Number(params.crmProductId) : null)
-  const typeId = params.typeId != null ? Number(params.typeId) : null
-  const sizeId =
-    params.sizeId != null
-      ? String(params.sizeId)
-      : (params.size_id != null ? String(params.size_id) : null)
-  const resume = {
-    productId: Number.isFinite(productId) ? productId : null,
-    typeId: Number.isFinite(typeId) ? typeId : null,
-    sizeId,
-    poligrafySlug: typeof params.poligrafySlug === 'string' ? params.poligrafySlug : null,
-    poligrafyTypeIdParam:
-      typeof params.poligrafyTypeIdParam === 'string'
-        ? params.poligrafyTypeIdParam
-        : (params.typeId != null ? String(params.typeId) : null),
-    designEditorMode: typeof params.editorDraftMode === 'string' ? params.editorDraftMode : null,
-    designTemplateId: params.designTemplateId != null ? Number(params.designTemplateId) : null,
-  }
+  const itemQty = Math.max(1, Number(item.quantity) || 1)
+  const resume = buildCustomerProjectResume(params, itemQty)
+  const productId = readFiniteNumber(resume.productId)
+  const typeId = readFiniteNumber(resume.typeId)
+  const sizeId = typeof resume.sizeId === 'string' ? resume.sizeId : null
 
   const result = await db.run(
     `INSERT INTO customer_projects (
@@ -122,8 +269,8 @@ export async function createCustomerProjectFromOrderItem(input: {
       typeof params.editorDraftMode === 'string' ? params.editorDraftMode : null,
       input.editable === false ? 0 : 1,
       oneYearFromNow(),
-      Number.isFinite(productId as number) ? productId : null,
-      Number.isFinite(typeId as number) ? typeId : null,
+      productId != null && productId > 0 ? productId : null,
+      typeId != null && Number.isFinite(typeId) ? typeId : null,
       sizeId,
       JSON.stringify(resume),
     ],
@@ -158,7 +305,14 @@ export async function listCustomerProjects(customerId: number): Promise<Array<Cu
 export async function cloneCustomerProjectToDraft(
   projectId: number,
   options?: { customerId?: number | null },
-): Promise<{ token: string; productId?: number | null; typeId?: number | null; sizeId?: string | null; resume?: Record<string, unknown> | null }> {
+): Promise<{
+  token: string
+  displayId: string
+  productId?: number | null
+  typeId?: number | null
+  sizeId?: string | null
+  resume?: Record<string, unknown> | null
+}> {
   await ensureCustomerProjectResumeColumns()
   const db = await getDb()
   const row = await db.get<CustomerProjectRow>('SELECT * FROM customer_projects WHERE id = ?', projectId)
@@ -172,12 +326,16 @@ export async function cloneCustomerProjectToDraft(
     }
   }
 
+  const resume = (parseJson(row.resume_json ?? null) as Record<string, unknown> | null) ?? null
   const payload: Record<string, unknown> = {}
   const designState = parseJson(row.design_state_json)
   const photoBatch = parseJson(row.photo_batch_json)
   if (designState) payload.designState = designState
   if (photoBatch) payload.photoBatch = photoBatch
   if (row.title) payload.title = row.title
+
+  const selectedParams = resume && isRecord(resume.selectedParams) ? resume.selectedParams : null
+  if (selectedParams) payload.selectedParams = selectedParams
 
   const draft = await createEditorDraft({
     designTemplateId: row.design_template_id ?? undefined,
@@ -189,12 +347,14 @@ export async function cloneCustomerProjectToDraft(
     customerId: row.customer_id,
   })
 
+  const displayId = customerProjectDisplayId(row.id)
   return {
     token: draft.token,
+    displayId,
     productId: row.product_id ?? null,
     typeId: row.type_id ?? null,
     sizeId: row.size_id ?? null,
-    resume: (parseJson(row.resume_json ?? null) as Record<string, unknown> | null) ?? null,
+    resume: resume ? { ...resume, displayId } : { displayId },
   }
 }
 

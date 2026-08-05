@@ -28,6 +28,17 @@ export type PoolFulfillmentChip = {
   title: string;
 };
 
+function sanitizeDeliveryLabel(value: string | null | undefined): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  const withoutPickupCodeTail = raw
+    .replace(/\s*\(\s*pickup-[^)]+\s*\)\s*$/i, '')
+    .trim();
+  if (withoutPickupCodeTail) return withoutPickupCodeTail;
+  if (/^pickup-[a-z0-9_-]+$/i.test(raw)) return '';
+  return raw;
+}
+
 /**
  * Компактная сноска способа выдачи на закрытой карточке пула.
  * Павильоны: Океан / Титан (и др. departments) — не конкуренты.
@@ -38,17 +49,18 @@ export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null
   const deptCode = String(order.fulfillment_department_code || '').trim();
   const kind = String(delivery?.kind || '').toLowerCase();
   const labelRaw = String(delivery?.label || '').trim();
+  const labelDisplay = sanitizeDeliveryLabel(labelRaw);
   const providerId = String(delivery?.providerId || '').trim();
   const haystack = `${kind} ${labelRaw} ${providerId} ${deptName} ${deptCode}`.toLowerCase();
 
   const title =
-    labelRaw ||
+    labelDisplay ||
     deptName ||
     (delivery?.description ? String(delivery.description) : '') ||
     'Способ получения';
 
   const pavilionMatch = (): string | null => {
-    const candidates = [deptName, deptCode, labelRaw, providerId]
+    const candidates = [deptName, deptCode, labelDisplay, providerId]
       .map((s) => s.trim())
       .filter(Boolean);
     for (const c of candidates) {
@@ -90,15 +102,14 @@ export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null
   if (kind === 'pickup_point' || haystack.includes('пункт выдачи')) {
     if (haystack.includes('европочт')) return { label: 'Европочта', title };
     if (haystack.includes('белпочт')) return { label: 'Белпочта', title };
-    const short = labelRaw.slice(0, 28) || 'Пункт выдачи';
-    return { label: short, title };
+    return { label: labelDisplay || 'Пункт выдачи', title };
   }
 
   const pickup = pavilionMatch();
   if (pickup) return { label: pickup, title };
 
-  if (labelRaw) {
-    return { label: labelRaw.length > 28 ? `${labelRaw.slice(0, 26)}…` : labelRaw, title };
+  if (labelDisplay) {
+    return { label: labelDisplay, title };
   }
   if (deptName) {
     return { label: deptName, title: deptName };
