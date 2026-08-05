@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { FormField, Button } from '../../../components/common'
 import { getPricingServicesBundle } from '../../../services/pricing/api'
@@ -14,6 +14,8 @@ export interface ServiceItem {
   name: string
   price_unit?: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order' | 'per_meter'
   operation_type?: string
+  categoryId?: number | null
+  categoryName?: string | null
 }
 
 export interface ServicePricing {
@@ -407,6 +409,31 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
     }
   }
 
+  const servicesByCategory = useMemo(() => {
+    const groups = new Map<string, { categoryId: number | null; categoryName: string; services: ServiceWithTiers[] }>()
+    for (const service of servicesWithTiers) {
+      const categoryId = service.categoryId ?? null
+      const categoryName = (service.categoryName ?? '').trim() || 'Без категории'
+      const key = categoryId !== null ? `id:${categoryId}` : `name:${categoryName}`
+      if (!groups.has(key)) {
+        groups.set(key, { categoryId, categoryName, services: [] })
+      }
+      groups.get(key)!.services.push(service)
+    }
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        services: [...group.services].sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+      }))
+      .sort((a, b) => {
+        if (a.categoryName === 'Без категории') return 1
+        if (b.categoryName === 'Без категории') return -1
+        return a.categoryName.localeCompare(b.categoryName, 'ru')
+      })
+  }, [servicesWithTiers])
+
+  const tableColSpan = commonRanges.length + (rangesEditable ? 2 : 1) + 1
+
   return (
     <div className="simplified-tiers-table">
       {description && <div className="text-muted text-sm" style={{ marginBottom: '12px' }}>{description}</div>}
@@ -482,12 +509,19 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
         <tbody>
           {loadingTiers ? (
             <tr>
-              <td colSpan={commonRanges.length + (rangesEditable ? 2 : 1) + 1}>
+              <td colSpan={tableColSpan}>
                 <div className="text-muted">Загрузка цен услуг...</div>
               </td>
             </tr>
           ) : (
-            servicesWithTiers.length > 0 ? servicesWithTiers.map(serviceWithTiers => {
+            servicesByCategory.length > 0 ? servicesByCategory.map((group) => (
+              <React.Fragment key={group.categoryId !== null ? `cat-${group.categoryId}` : `cat-${group.categoryName}`}>
+                <tr className="simplified-table__category-row">
+                  <td colSpan={tableColSpan}>
+                    <div className="simplified-table__category-title">{group.categoryName}</div>
+                  </td>
+                </tr>
+                {group.services.map((serviceWithTiers) => {
               const service = services.find(s => s.id === serviceWithTiers.id) || serviceWithTiers
               const pricing = servicePricings.find(p => p.service_id === Number(service.id))
               const isSelected = !!pricing
@@ -561,7 +595,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               
               return (
                 <React.Fragment key={service.id}>
-                  <tr style={{ opacity: isSelected ? 1 : 0.6 }}>
+                  <tr className="simplified-table__service-row" style={{ opacity: isSelected ? 1 : 0.6 }}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input
@@ -667,9 +701,11 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                 </tr>
                 </React.Fragment>
               )
-            }) : (
+                })}
+              </React.Fragment>
+            )) : (
               <tr>
-                <td colSpan={commonRanges.length + (rangesEditable ? 2 : 1) + 1}>
+                <td colSpan={tableColSpan}>
                   <div className="text-muted">Нет доступных услуг</div>
                 </td>
               </tr>

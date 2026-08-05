@@ -14,6 +14,10 @@ type ServiceRow = {
   service_type?: string
   priceUnit?: string
   price_unit?: string
+  categoryId?: number | null
+  category_id?: number | null
+  categoryName?: string | null
+  category_name?: string | null
 }
 
 interface FinishingCardProps {
@@ -105,11 +109,15 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
             : (opType === 'cut' || opType === 'score' || opType === 'fold')
               ? ('per_cut' as const)
               : ('per_item' as const)
+          const categoryId = s.categoryId ?? s.category_id ?? null
+          const categoryName = (s.categoryName ?? s.category_name ?? '').trim() || null
           return {
             id: Number(s.id),
             name: s.name || s.service_name || `Услуга #${s.id}`,
             price_unit,
-            operation_type: opType
+            operation_type: opType,
+            categoryId,
+            categoryName,
           }
         })
 

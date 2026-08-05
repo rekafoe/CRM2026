@@ -44,7 +44,11 @@ type ServiceRow = {
   type?: string;
   service_type?: string;
   priceUnit?: string; 
-  price_unit?: string 
+  price_unit?: string;
+  categoryId?: number | null;
+  category_id?: number | null;
+  categoryName?: string | null;
+  category_name?: string | null;
 }
 
 export type BindingServiceRow = {

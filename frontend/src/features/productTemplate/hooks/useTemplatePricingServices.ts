@@ -30,18 +30,34 @@ export function useTemplatePricingServices(
         const allServices = Array.isArray(servicesData) ? servicesData : [];
         const excludedTypes = new Set(['print', 'printing']);
 
-        const filteredServices: ServiceRow[] = allServices.filter((service: any) => {
-          if (!service || !service.id || !service.name) return false;
-          const operationType = String(
-            service.operation_type ??
-              service.operationType ??
-              service.type ??
-              service.service_type ??
-              ''
-          ).toLowerCase();
-          if (!operationType) return true;
-          return !excludedTypes.has(operationType);
-        });
+        const filteredServices: ServiceRow[] = allServices
+          .filter((service: any) => {
+            if (!service || !service.id || !service.name) return false;
+            const operationType = String(
+              service.operation_type ??
+                service.operationType ??
+                service.type ??
+                service.service_type ??
+                ''
+            ).toLowerCase();
+            if (!operationType) return true;
+            return !excludedTypes.has(operationType);
+          })
+          .map((service: any) => ({
+            id: Number(service.id),
+            name: service.name,
+            service_name: service.service_name ?? service.name,
+            operationType: service.operationType ?? service.operation_type,
+            operation_type: service.operation_type ?? service.operationType,
+            type: service.type ?? service.service_type,
+            service_type: service.service_type ?? service.type,
+            priceUnit: service.priceUnit ?? service.price_unit,
+            price_unit: service.price_unit ?? service.priceUnit,
+            categoryId: service.categoryId ?? service.category_id ?? null,
+            category_id: service.category_id ?? service.categoryId ?? null,
+            categoryName: service.categoryName ?? service.category_name ?? null,
+            category_name: service.category_name ?? service.categoryName ?? null,
+          }));
 
         const bindingsData = (bindingsResp.data as any)?.data ?? bindingsResp.data ?? [];
         const bindings: BindingServiceRow[] = Array.isArray(bindingsData) ? bindingsData : [];

@@ -1405,6 +1405,30 @@
   min-width: 200px;
 }
 
+/* Заголовки категорий в таблице отделки */
+.simplified-table__category-row td {
+  padding: 10px 8px 6px !important;
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.simplified-table__category-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.simplified-table__category-row + .simplified-table__service-row td {
+  border-top: none;
+}
+
+.simplified-table__service-row + .simplified-table__category-row td {
+  padding-top: 16px !important;
+}
+
 /* Иерархия строк в таблице */
 .simplified-table__parent-row {
   background-color: #f8fafc;
