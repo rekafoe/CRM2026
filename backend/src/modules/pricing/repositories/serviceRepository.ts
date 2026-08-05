@@ -74,6 +74,72 @@ const ALLOWED_OPERATION_TYPES = new Set<string>([
 const ALLOWED_CONSUMPTION_MODES = new Set<string>(['fixed', 'roll_feed']);
 const ALLOWED_METER_BASES = new Set<string>(['knife_path', 'feed']);
 
+/** Значения CHECK(price_unit) в post_processing_services */
+const ALLOWED_PRICE_UNITS = new Set<string>([
+  'per_sheet',
+  'per_item',
+  'per_m2',
+  'per_hour',
+  'fixed',
+  'per_order',
+  'per_cut',
+  'per_meter',
+]);
+
+/** UI/алиасы → канонический price_unit (иначе CHECK → 500). */
+const PRICE_UNIT_ALIASES: Record<string, string> = {
+  per_sheet: 'per_sheet',
+  per_item: 'per_item',
+  per_m2: 'per_m2',
+  per_hour: 'per_hour',
+  fixed: 'fixed',
+  per_order: 'per_order',
+  per_cut: 'per_cut',
+  per_meter: 'per_meter',
+  m2: 'per_m2',
+  'м2': 'per_m2',
+  'м²': 'per_m2',
+  sqm: 'per_m2',
+  hour: 'per_hour',
+  'час': 'per_hour',
+  sheet: 'per_sheet',
+  'лист': 'per_sheet',
+  item: 'per_item',
+  'шт': 'per_item',
+  click: 'per_item',
+};
+
+const PRICE_UNIT_DEFAULT_UNIT: Record<string, string> = {
+  per_m2: 'м²',
+  per_hour: 'час',
+  per_sheet: 'лист',
+  per_meter: 'пог.м',
+  per_order: 'заказ',
+  per_cut: 'шт',
+  per_item: 'шт',
+  fixed: 'шт',
+};
+
+/** Значения селекта «Единица» в админке, которые означают выбор тарифа (не просто unit). */
+const UI_PRICE_SELECTORS = new Set<string>([
+  'per_cut',
+  'per_sheet',
+  'per_item',
+  'fixed',
+  'per_order',
+  'per_meter',
+  'per_m2',
+  'per_hour',
+  'm2',
+  'м2',
+  'м²',
+  'sqm',
+  'hour',
+  'sheet',
+  'item',
+  'click',
+]);
+
 function normalizeOperationType(raw: unknown): string {
   const v = typeof raw === 'string' ? raw.trim() : '';
   if (!v) return 'other';
@@ -85,6 +151,56 @@ function normalizeOperationType(raw: unknown): string {
       : v;
 
   return ALLOWED_OPERATION_TYPES.has(mapped) ? mapped : 'other';
+}
+
+function canonicalizePriceUnit(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  const v = String(raw).trim();
+  if (!v) return null;
+  const aliased = PRICE_UNIT_ALIASES[v] || PRICE_UNIT_ALIASES[v.toLowerCase()];
+  if (aliased && ALLOWED_PRICE_UNITS.has(aliased)) return aliased;
+  if (ALLOWED_PRICE_UNITS.has(v)) return v;
+  return null;
+}
+
+function isUiPriceSelector(raw: string): boolean {
+  return UI_PRICE_SELECTORS.has(raw) || UI_PRICE_SELECTORS.has(raw.toLowerCase());
+}
+
+/**
+ * UI кладёт в unit и физическую единицу (m2), и price_unit (per_cut).
+ * Нормализуем в пару, совместимую с CHECK(price_unit) — иначе SQLite даёт 500.
+ */
+function resolveServiceUnits(
+  unitRaw: unknown,
+  priceUnitRaw: unknown,
+  fallbackUnit: string = 'шт',
+  fallbackPriceUnit: string = 'per_item'
+): { unit: string; priceUnit: string } {
+  const rawUnit = unitRaw != null ? String(unitRaw).trim() : '';
+  const fromPriceField = canonicalizePriceUnit(priceUnitRaw);
+  const fromUnitSelector =
+    rawUnit && isUiPriceSelector(rawUnit) ? canonicalizePriceUnit(rawUnit) : null;
+
+  const priceUnit =
+    fromPriceField ||
+    fromUnitSelector ||
+    canonicalizePriceUnit(fallbackPriceUnit) ||
+    'per_item';
+
+  if (!ALLOWED_PRICE_UNITS.has(priceUnit)) {
+    const err: any = new Error(
+      `Недопустимый price_unit: "${priceUnitRaw ?? unitRaw}". Для квадратных метров укажите m2 или per_m2.`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  const unit = fromUnitSelector
+    ? PRICE_UNIT_DEFAULT_UNIT[priceUnit] || fallbackUnit
+    : rawUnit || PRICE_UNIT_DEFAULT_UNIT[priceUnit] || fallbackUnit;
+
+  return { unit, priceUnit };
 }
 
 function normalizeConsumptionMode(
@@ -515,12 +631,13 @@ export class PricingServiceRepository {
       err.status = 400;
       throw err;
     }
-    // Совместимость с UI: если payload.unit содержит per_cut/per_sheet/... — это на самом деле price_unit
-    const rawUnit = (payload.unit ?? '').toString();
-    const rawPriceUnit = (payload.priceUnit ?? '').toString();
-    const isPriceUnitFromUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(rawUnit);
-    const resolvedPriceUnit = rawPriceUnit || (isPriceUnitFromUnit ? rawUnit : 'per_item');
-    const resolvedUnit = isPriceUnitFromUnit ? 'шт' : rawUnit;
+    // Совместимость с UI: unit может быть m2 / per_cut / … — маппим в CHECK-совместимый price_unit
+    const { unit: resolvedUnit, priceUnit: resolvedPriceUnit } = resolveServiceUnits(
+      payload.unit,
+      payload.priceUnit,
+      'шт',
+      'per_item'
+    );
     const minQuantity = payload.minQuantity ?? 1;
     const maxQuantity = payload.maxQuantity ?? null;
     if (maxQuantity !== null && maxQuantity < minQuantity) {
@@ -586,10 +703,23 @@ export class PricingServiceRepository {
     if (includeMaterial) { insertParams.push(materialIdVal); insertParams.push(qtyPerItemVal); }
     if (includeConsumptionMode) insertParams.push(consumptionModeVal);
     if (includeMeterBasis) insertParams.push(meterBasisVal);
-    const result = await db.run(
-      `INSERT INTO post_processing_services (${insertCols.join(', ')}) VALUES (${insertVals})`,
-      ...insertParams
-    );
+    let result: { lastID?: number };
+    try {
+      result = await db.run(
+        `INSERT INTO post_processing_services (${insertCols.join(', ')}) VALUES (${insertVals})`,
+        ...insertParams
+      );
+    } catch (e: any) {
+      const msg = String(e?.message || e || '');
+      if (/CHECK constraint|constraint failed/i.test(msg)) {
+        const err: any = new Error(
+          `Не удалось создать услугу: нарушено ограничение БД (${msg}). Для кв. метров используйте единицу m2 / per_m2.`
+        );
+        err.status = 400;
+        throw err;
+      }
+      throw e;
+    }
     const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const categorySel = hasCategoryId ? ', category_id, (SELECT name FROM service_categories WHERE id = post_processing_services.category_id) as category_name' : '';
     const materialSel = includeMaterial ? ', material_id, qty_per_item' : '';
@@ -650,13 +780,12 @@ export class PricingServiceRepository {
       throw err;
     }
 
-    const rawUnit = payload.unit !== undefined ? String(payload.unit) : '';
-    const rawPriceUnit = payload.priceUnit !== undefined ? String(payload.priceUnit) : '';
-    const isPriceUnitFromUnit = rawUnit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(rawUnit) : false;
-    const resolvedPriceUnit = rawPriceUnit || (isPriceUnitFromUnit ? rawUnit : (current.price_unit ?? 'per_item'));
-    const resolvedUnit = isPriceUnitFromUnit
-      ? (current.unit ?? 'шт')
-      : (payload.unit ?? current.unit);
+    const { unit: resolvedUnit, priceUnit: resolvedPriceUnit } = resolveServiceUnits(
+      payload.unit !== undefined ? payload.unit : current.unit,
+      payload.priceUnit !== undefined ? payload.priceUnit : current.price_unit,
+      current.unit ?? 'шт',
+      current.price_unit ?? 'per_item'
+    );
     const minQuantity = payload.minQuantity !== undefined ? payload.minQuantity : (current.min_quantity ?? 1);
     const maxQuantity = payload.maxQuantity !== undefined ? payload.maxQuantity : (current.max_quantity ?? null);
     if (maxQuantity !== null && maxQuantity < minQuantity) {

@@ -49,18 +49,19 @@ const defaultTypeOptions: Array<{ value: PricingServiceType; label: string }> = 
 ];
 
 const defaultUnitOptions = [
-  { value: 'item', label: 'item' },
-  { value: 'sheet', label: 'sheet' },
-  { value: 'hour', label: 'hour' },
-  { value: 'm2', label: 'm2' },
-  { value: 'click', label: 'click' },
-  { value: 'per_cut', label: 'per_cut (🔪 за рез)' },
-  { value: 'шт', label: 'шт (per_item)' },
-  { value: 'per_sheet', label: 'per_sheet (за лист)' },
-  { value: 'per_item', label: 'per_item (за изделие)' },
-  { value: 'fixed', label: 'fixed (фикс. цена)' },
-  { value: 'per_order', label: 'per_order (за заказ)' },
-  { value: 'per_meter', label: 'per_meter (п.м. пробега)' },
+  { value: 'item', label: 'шт (изделие)' },
+  { value: 'sheet', label: 'лист' },
+  { value: 'hour', label: 'час' },
+  { value: 'm2', label: 'кв. метры (м²)' },
+  { value: 'click', label: 'клик' },
+  { value: 'per_cut', label: 'за рез (per_cut)' },
+  { value: 'шт', label: 'шт' },
+  { value: 'per_sheet', label: 'за лист (per_sheet)' },
+  { value: 'per_item', label: 'за изделие (per_item)' },
+  { value: 'per_m2', label: 'кв. метры (per_m2)' },
+  { value: 'fixed', label: 'фикс. цена (fixed)' },
+  { value: 'per_order', label: 'за заказ (per_order)' },
+  { value: 'per_meter', label: 'пог. м (per_meter)' },
 ];
 
 const operationTypeOptions = [

@@ -1534,6 +1534,8 @@ router.post('/services', asyncHandler(async (req, res) => {
     name,
     service_type,
     type,
+    operation_type,
+    operationType,
     unit,
     price_unit,
     priceUnit,
@@ -1554,6 +1556,7 @@ router.post('/services', asyncHandler(async (req, res) => {
   const created = await ServiceManagementService.createService({
     name,
     type: (service_type ?? type) || 'generic',
+    operationType: operation_type ?? operationType,
     unit,
     priceUnit: price_unit ?? priceUnit,
     rate: Number(rate ?? 0),

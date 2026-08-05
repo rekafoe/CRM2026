@@ -130,11 +130,46 @@ export async function getBindingServices(): Promise<PricingService[]> {
   return list.map(mapService);
 }
 
+/** Алиасы селекта «Единица» → price_unit (CHECK в БД; m2 → per_m2). */
+const PRICE_UNIT_ALIASES: Record<string, string> = {
+  per_cut: 'per_cut',
+  per_sheet: 'per_sheet',
+  per_item: 'per_item',
+  fixed: 'fixed',
+  per_order: 'per_order',
+  per_meter: 'per_meter',
+  per_m2: 'per_m2',
+  per_hour: 'per_hour',
+  m2: 'per_m2',
+  'м2': 'per_m2',
+  'м²': 'per_m2',
+  sqm: 'per_m2',
+  hour: 'per_hour',
+  sheet: 'per_sheet',
+  item: 'per_item',
+  click: 'per_item',
+};
+
+function resolveServiceUnitFields(unit?: string, priceUnit?: string): { unit?: string; priceUnit?: string } {
+  if (unit === undefined && priceUnit === undefined) {
+    return {};
+  }
+  const rawUnit = (unit ?? '').trim();
+  const fromPrice = priceUnit ? PRICE_UNIT_ALIASES[priceUnit] || priceUnit : undefined;
+  const fromUnit = rawUnit ? PRICE_UNIT_ALIASES[rawUnit] : undefined;
+  const resolvedPriceUnit = fromPrice || fromUnit;
+  const isSelector = Boolean(fromUnit);
+  return {
+    unit: isSelector ? 'item' : rawUnit || undefined,
+    priceUnit: resolvedPriceUnit,
+  };
+}
+
 export async function createPricingService(payload: CreatePricingServicePayload): Promise<PricingService> {
-  // Совместимость с существующей формой: поле unit в UI иногда содержит per_cut/per_sheet (это price_unit)
-  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit);
-  const resolvedUnit = isPriceUnit ? 'item' : payload.unit;
-  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+  const { unit: resolvedUnit, priceUnit: resolvedPriceUnit } = resolveServiceUnitFields(
+    payload.unit,
+    payload.priceUnit
+  );
 
   const response = await api.post('/pricing/services', {
     name: payload.name,
@@ -158,9 +193,10 @@ export async function createPricingService(payload: CreatePricingServicePayload)
 }
 
 export async function createBindingService(payload: CreatePricingServicePayload): Promise<PricingService> {
-  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit);
-  const resolvedUnit = isPriceUnit ? 'item' : payload.unit;
-  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+  const { unit: resolvedUnit, priceUnit: resolvedPriceUnit } = resolveServiceUnitFields(
+    payload.unit,
+    payload.priceUnit
+  );
 
   const response = await api.post('/pricing/bindings', {
     name: payload.name,
@@ -182,9 +218,10 @@ export async function createBindingService(payload: CreatePricingServicePayload)
 }
 
 export async function updatePricingService(id: number, payload: UpdatePricingServicePayload): Promise<PricingService> {
-  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit) : false;
-  const resolvedUnit = payload.unit ? (isPriceUnit ? 'item' : payload.unit) : undefined;
-  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+  const { unit: resolvedUnit, priceUnit: resolvedPriceUnit } = resolveServiceUnitFields(
+    payload.unit,
+    payload.priceUnit
+  );
 
   const response = await api.put(`/pricing/services/${id}`, {
     name: payload.name,
@@ -208,9 +245,10 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
 }
 
 export async function updateBindingService(id: number, payload: UpdatePricingServicePayload): Promise<PricingService> {
-  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit) : false;
-  const resolvedUnit = payload.unit ? (isPriceUnit ? 'item' : payload.unit) : undefined;
-  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+  const { unit: resolvedUnit, priceUnit: resolvedPriceUnit } = resolveServiceUnitFields(
+    payload.unit,
+    payload.priceUnit
+  );
 
   const response = await api.put(`/pricing/bindings/${id}`, {
     name: payload.name,

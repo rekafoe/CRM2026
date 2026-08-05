@@ -34,15 +34,32 @@ const defaultGetServiceTypeLabel = (type: string) => {
 const defaultGetUnitLabel = (unit: string) => {
   switch (unit) {
     case 'item':
+    case 'шт':
+    case 'per_item':
       return 'шт';
     case 'sheet':
+    case 'лист':
+    case 'per_sheet':
       return 'лист';
     case 'hour':
+    case 'час':
+    case 'per_hour':
       return 'час';
     case 'm2':
-      return 'м²';
+    case 'м2':
+    case 'м²':
+    case 'per_m2':
+      return 'кв. метры';
     case 'click':
       return 'клик';
+    case 'per_cut':
+      return 'за рез';
+    case 'per_meter':
+      return 'пог. м';
+    case 'fixed':
+      return 'фикс.';
+    case 'per_order':
+      return 'заказ';
     default:
       return unit;
   }

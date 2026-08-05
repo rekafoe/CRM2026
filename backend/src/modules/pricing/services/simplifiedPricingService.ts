@@ -92,6 +92,7 @@ const ALLOWED_FINISHING_PRICE_UNITS = new Set([
   'per_sheet',
   'per_cut',
   'per_meter',
+  'per_m2',
   'fixed',
   'per_order',
 ]);
