@@ -3,13 +3,30 @@ import { WarehouseReportsService } from '../services/warehouseReportsService';
 import { PDFReportService } from '../services/pdfReportService';
 import { Logger } from '../utils/logger';
 
+const toOptionalNumber = (raw: unknown): number | undefined => {
+  if (raw == null || raw === '') return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const toOptionalString = (raw: unknown): string | undefined => {
+  if (raw == null) return undefined;
+  const s = String(raw).trim();
+  return s === '' ? undefined : s;
+};
+
 export class WarehouseReportsController {
   /**
    * Получение сводки по складу
    */
   static async getSummary(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        categoryId: toOptionalNumber(req.query.categoryId),
+        supplierId: toOptionalNumber(req.query.supplierId),
+        dateFrom: toOptionalString(req.query.dateFrom),
+        dateTo: toOptionalString(req.query.dateTo),
+      };
       const summary = await WarehouseReportsService.getSummary(filters);
       
       res.json({
@@ -30,7 +47,11 @@ export class WarehouseReportsController {
    */
   static async getLowStockItems(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        categoryId: toOptionalNumber(req.query.categoryId),
+        supplierId: toOptionalNumber(req.query.supplierId),
+        limit: toOptionalNumber(req.query.limit),
+      };
       const items = await WarehouseReportsService.getLowStockItems(filters);
       
       res.json({
@@ -51,7 +72,11 @@ export class WarehouseReportsController {
    */
   static async getSupplierSummary(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        categoryId: toOptionalNumber(req.query.categoryId),
+        dateFrom: toOptionalString(req.query.dateFrom),
+        dateTo: toOptionalString(req.query.dateTo),
+      };
       const summary = await WarehouseReportsService.getSupplierSummary(filters);
       
       res.json({
@@ -72,7 +97,18 @@ export class WarehouseReportsController {
    */
   static async getMaterialMovements(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const movementTypeRaw = toOptionalString(req.query.movementType);
+      const movementType: 'in' | 'out' | 'adjustment' | undefined =
+        movementTypeRaw === 'in' || movementTypeRaw === 'out' || movementTypeRaw === 'adjustment'
+          ? movementTypeRaw
+          : undefined;
+      const filters = {
+        materialId: toOptionalNumber(req.query.materialId),
+        movementType,
+        dateFrom: toOptionalString(req.query.dateFrom),
+        dateTo: toOptionalString(req.query.dateTo),
+        limit: toOptionalNumber(req.query.limit),
+      };
       const movements = await WarehouseReportsService.getMaterialMovements(filters);
       
       res.json({
@@ -93,7 +129,9 @@ export class WarehouseReportsController {
    */
   static async getCategorySummary(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        supplierId: toOptionalNumber(req.query.supplierId),
+      };
       const summary = await WarehouseReportsService.getCategorySummary(filters);
       
       res.json({
@@ -114,7 +152,10 @@ export class WarehouseReportsController {
    */
   static async getABCAnalysis(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        categoryId: toOptionalNumber(req.query.categoryId),
+        supplierId: toOptionalNumber(req.query.supplierId),
+      };
       const analysis = await WarehouseReportsService.getABCAnalysis(filters);
       
       res.json({
@@ -135,7 +176,10 @@ export class WarehouseReportsController {
    */
   static async getTurnoverAnalysis(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        categoryId: toOptionalNumber(req.query.categoryId),
+        supplierId: toOptionalNumber(req.query.supplierId),
+      };
       const analysis = await WarehouseReportsService.getTurnoverAnalysis(filters);
       
       res.json({
@@ -156,7 +200,10 @@ export class WarehouseReportsController {
    */
   static async getCostAnalysis(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        dateFrom: toOptionalString(req.query.dateFrom),
+        dateTo: toOptionalString(req.query.dateTo),
+      };
       const analysis = await WarehouseReportsService.getCostAnalysis(filters);
       
       res.json({
@@ -177,7 +224,11 @@ export class WarehouseReportsController {
    */
   static async getSupplierAnalytics(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        categoryId: toOptionalNumber(req.query.categoryId),
+        dateFrom: toOptionalString(req.query.dateFrom),
+        dateTo: toOptionalString(req.query.dateTo),
+      };
       const analytics = await WarehouseReportsService.getSupplierAnalytics(filters);
       
       res.json({
@@ -198,7 +249,11 @@ export class WarehouseReportsController {
    */
   static async getForecastingData(req: Request, res: Response) {
     try {
-      const filters = req.query;
+      const filters = {
+        materialId: toOptionalNumber(req.query.materialId),
+        categoryId: toOptionalNumber(req.query.categoryId),
+        months: toOptionalNumber(req.query.months),
+      };
       const data = await WarehouseReportsService.getForecastingData(filters);
       
       res.json({

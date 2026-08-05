@@ -1184,6 +1184,26 @@ export const createMaterialCategory = (category: any) => api.post<any>('/materia
 export const updateMaterialCategory = (id: number, category: any) => api.put<any>(`/material-categories/${id}`, category);
 export const deleteMaterialCategory = (id: number) => api.delete(`/material-categories/${id}`);
 
+// Типы материалов (иерархия внутри категорий)
+export interface MaterialTypeDto {
+  id: number;
+  category_id: number;
+  category_name?: string;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  is_active?: number | boolean;
+  materials_count?: number;
+}
+
+export const getMaterialTypes = (params?: { category_id?: number; search?: string; only_active?: boolean }) =>
+  api.get<MaterialTypeDto[]>('/material-types', { params });
+export const getMaterialTypeById = (id: number) => api.get<MaterialTypeDto>(`/material-types/${id}`);
+export const createMaterialType = (payload: Partial<MaterialTypeDto>) => api.post<MaterialTypeDto>('/material-types', payload);
+export const updateMaterialType = (id: number, payload: Partial<MaterialTypeDto>) =>
+  api.put<MaterialTypeDto>(`/material-types/${id}`, payload);
+export const deleteMaterialType = (id: number) => api.delete(`/material-types/${id}`);
+
 // Поставщики
 export const getSuppliers = () => api.get<any[]>('/suppliers');
 export const getActiveSuppliers = () => api.get<any[]>('/suppliers/active');

@@ -51,23 +51,32 @@ export interface UpdateOrderRequest {
 
 export interface CreateMaterialRequest {
   name: string;
-  category: string;
+  description?: string;
+  category_id?: number | null;
+  material_type_id?: number | null;
+  material_kind?: 'sheet' | 'roll' | 'consumable' | 'area';
   quantity: number;
   unit: string;
-  price_per_unit: number;
-  supplier?: string;
+  price?: number;
+  sheet_price_single?: number;
+  purchase_price?: number;
+  supplier_id?: number | null;
+  paper_type_id?: number | null;
+  density?: number | null;
+  finish?: string | null;
+  sheet_width?: number | null;
+  sheet_height?: number | null;
+  min_quantity?: number | null;
+  min_stock_level?: number;
+  max_stock_level?: number;
+  location?: string;
+  barcode?: string;
+  sku?: string;
+  is_active?: boolean;
   notes?: string;
 }
 
-export interface UpdateMaterialRequest {
-  name?: string;
-  category?: string;
-  quantity?: number;
-  unit?: string;
-  price_per_unit?: number;
-  supplier?: string;
-  notes?: string;
-}
+export type UpdateMaterialRequest = Partial<CreateMaterialRequest>;
 
 export interface CalculatePriceRequest {
   productType: string;
@@ -99,6 +108,9 @@ export interface OrderFilters {
 }
 
 export interface MaterialFilters {
+  categoryId?: number;
+  materialTypeId?: number;
+  materialKind?: 'sheet' | 'roll' | 'consumable' | 'area';
   category?: string;
   low_stock?: boolean;
   search?: string;

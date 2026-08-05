@@ -188,10 +188,29 @@ export function useVariantOperations(
     }
   }, [serviceId, variants, setVariants, setError]); // reloadVariants через ref
 
-  const updateVariantMaterial = useCallback(async (variantId: number, material_id: number | null, qty_per_item: number) => {
+  const updateVariantMaterial = useCallback(async (
+    variantId: number,
+    patch: {
+      material_id: number | null;
+      qty_per_item: number;
+      consumption_mode?: 'fixed' | 'roll_feed';
+      meter_basis?: 'knife_path' | 'feed';
+    }
+  ) => {
     try {
+      const { material_id, qty_per_item, consumption_mode, meter_basis } = patch;
       setVariants((prev) =>
-        prev.map((v) => (v.id === variantId ? { ...v, material_id: material_id ?? undefined, qty_per_item } : v))
+        prev.map((v) =>
+          v.id === variantId
+            ? {
+                ...v,
+                material_id: material_id ?? undefined,
+                qty_per_item,
+                ...(consumption_mode !== undefined ? { consumption_mode } : {}),
+                ...(meter_basis !== undefined ? { meter_basis } : {}),
+              }
+            : v
+        )
       );
       const v = variants.find((x) => x.id === variantId);
       const parentPayload = v ? variantParentVariantIdForPayload(v) : undefined;
@@ -199,6 +218,8 @@ export function useVariantOperations(
         parameters: v?.parameters ?? {},
         material_id: material_id ?? undefined,
         qty_per_item,
+        consumption_mode: consumption_mode ?? v?.consumption_mode ?? undefined,
+        meter_basis: meter_basis ?? v?.meter_basis ?? undefined,
         ...(parentPayload !== undefined ? { parentVariantId: parentPayload } : {}),
       });
     } catch (err) {

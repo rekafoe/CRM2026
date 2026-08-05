@@ -49,25 +49,32 @@ export interface UpdateOrderRequest {
 
 export interface CreateMaterialRequest {
   name: string;
-  category: string;
+  description?: string;
+  category_id?: number | null;
+  material_type_id?: number | null;
+  material_kind?: 'sheet' | 'roll' | 'consumable' | 'area';
   quantity: number;
   unit: string;
-  price_per_unit: number;
-  sheet_price_single?: number; // Добавляем поле для backend
-  supplier?: string;
+  price?: number;
+  sheet_price_single?: number;
+  purchase_price?: number;
+  supplier_id?: number | null;
+  min_quantity?: number | null;
+  min_stock_level?: number;
+  max_stock_level?: number;
+  location?: string;
+  barcode?: string;
+  sku?: string;
+  is_active?: boolean;
+  paper_type_id?: number | null;
+  density?: number | null;
+  finish?: string | null;
+  sheet_width?: number | null;
+  sheet_height?: number | null;
   notes?: string;
 }
 
-export interface UpdateMaterialRequest {
-  name?: string;
-  category?: string;
-  quantity?: number;
-  unit?: string;
-  price_per_unit?: number;
-  sheet_price_single?: number; // Добавляем поле для backend
-  supplier?: string;
-  notes?: string;
-}
+export type UpdateMaterialRequest = Partial<CreateMaterialRequest>;
 
 // Типы для резервирования материалов
 export interface CreateMaterialReservationRequest {
@@ -142,9 +149,19 @@ export interface OrderFilters {
 }
 
 export interface MaterialFilters {
+  categoryId?: number;
+  materialTypeId?: number;
+  materialKind?: 'sheet' | 'roll' | 'consumable' | 'area';
   category?: string;
+  supplierId?: number;
+  supplier?: string;
   low_stock?: boolean;
   search?: string;
+  minQuantity?: number;
+  maxQuantity?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  stockStatus?: 'all' | 'in' | 'low' | 'out';
   page?: number;
   limit?: number;
 }
@@ -152,6 +169,8 @@ export interface MaterialFilters {
 // Реэкспорт базовых сущностей из shared (единый источник правды для типов)
 export type {
   Material,
+  MaterialType,
+  MaterialKind,
   Order,
   User,
   Category,

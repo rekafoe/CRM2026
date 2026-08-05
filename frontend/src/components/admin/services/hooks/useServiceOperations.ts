@@ -47,6 +47,8 @@ export function useServiceOperations({
       categoryId?: number | null;
       material_id?: number | null;
       qty_per_item?: number | null;
+      consumption_mode?: 'fixed' | 'roll_feed' | null;
+      meter_basis?: 'knife_path' | 'feed' | null;
     }) => {
       try {
         if (!payload.name.trim() || !payload.unit.trim()) {
@@ -67,6 +69,8 @@ export function useServiceOperations({
           categoryId: payload.categoryId,
           material_id: payload.material_id,
           qty_per_item: payload.qty_per_item,
+          consumption_mode: payload.consumption_mode,
+          meter_basis: payload.meter_basis,
         });
 
         // Если услуга сложная (hasVariants = true), создаем первый вариант-тип
@@ -123,6 +127,8 @@ export function useServiceOperations({
       categoryId?: number | null;
       material_id?: number | null;
       qty_per_item?: number | null;
+      consumption_mode?: 'fixed' | 'roll_feed' | null;
+      meter_basis?: 'knife_path' | 'feed' | null;
     }) => {
       try {
         if (!payload.name.trim() || !payload.unit.trim()) {
@@ -143,6 +149,8 @@ export function useServiceOperations({
           categoryId: payload.categoryId,
           material_id: payload.material_id,
           qty_per_item: payload.qty_per_item,
+          consumption_mode: payload.consumption_mode,
+          meter_basis: payload.meter_basis,
         });
 
         if (payload.hasVariants) {

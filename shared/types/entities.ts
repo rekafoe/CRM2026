@@ -92,12 +92,26 @@ export interface Material {
   id: number;
   name: string;
   description?: string;
-  category_id: number;
+  category_id?: number;
+  category_name?: string;
+  category_color?: string;
+  material_type_id?: number;
+  material_type_name?: string;
+  material_kind?: MaterialKind;
   quantity: number;
   unit: string;
-  price: number; // Для совместимости с фронтендом
-  sheet_price_single?: number; // Основное поле для цены в backend
+  price: number; // Для совместимости с фронтендом (отпускная)
+  sheet_price_single?: number; // Отпускная цена (калькулятор)
+  purchase_price?: number; // Закупочная цена (склад / аналитика)
   supplier_id?: number;
+  supplier_name?: string;
+  supplier_contact?: string;
+  finish?: string;
+  density?: number;
+  sheet_width?: number;
+  sheet_height?: number;
+  printable_width?: number;
+  printable_height?: number;
   min_stock_level?: number;
   max_stock_level?: number;
   location?: string;
@@ -116,6 +130,21 @@ export interface Material {
   // Поля для резервирования
   reserved_quantity?: number; // Зарезервированное количество
   available_quantity?: number; // Доступное количество (quantity - reserved_quantity)
+}
+
+export type MaterialKind = 'sheet' | 'roll' | 'consumable' | 'area';
+
+export interface MaterialType {
+  id: number;
+  category_id: number;
+  category_name?: string;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  is_active?: boolean | number;
+  materials_count?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface MaterialReservation {

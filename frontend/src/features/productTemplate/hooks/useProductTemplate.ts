@@ -13,7 +13,7 @@ export type SimplifiedPrintPrice = SimplifiedPrintKey & { tiers: SimplifiedQtyTi
 export type SimplifiedMaterialPrice = { material_id: number; tiers: SimplifiedQtyTier[] }
 export type SimplifiedFinishingPrice = {
   service_id: number;
-  price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order';
+  price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order' | 'per_meter';
   units_per_item: number; // для per_item/per_cut — на изделие; для per_sheet в расчёте не умножает листы (см. бэкенд)
   // ✅ tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
   // tiers оставлен только для обратной совместимости со старыми данными

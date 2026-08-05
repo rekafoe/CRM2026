@@ -21,8 +21,8 @@ type ReportTab = 'summary' | 'low-stock' | 'movements' | 'suppliers' | 'abc-anal
 
 export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, stats }) => {
   const [active, setActive] = React.useState<ReportTab>('summary');
-  const [category, setCategory] = React.useState<string>('');
-  const [supplier, setSupplier] = React.useState<string>('');
+  const [categoryId, setCategoryId] = React.useState<number | ''>('');
+  const [supplierId, setSupplierId] = React.useState<number | ''>('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string>('');
   
@@ -41,11 +41,27 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
   const [selectedMaterialId, setSelectedMaterialId] = React.useState<number | undefined>(undefined);
 
   const categories = React.useMemo(() => {
-    return Array.from(new Set((materials || []).map(m => (m as any).category_name).filter(Boolean))) as string[];
+    const map = new Map<number, string>();
+    (materials || []).forEach((m) => {
+      const id = Number((m as any).category_id);
+      const name = String((m as any).category_name || '').trim();
+      if (Number.isFinite(id) && id > 0 && name) map.set(id, name);
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }, [materials]);
 
   const suppliers = React.useMemo(() => {
-    return Array.from(new Set((materials || []).map(m => (m as any).supplier_name).filter(Boolean))) as string[];
+    const map = new Map<number, string>();
+    (materials || []).forEach((m) => {
+      const id = Number((m as any).supplier_id);
+      const name = String((m as any).supplier_name || '').trim();
+      if (Number.isFinite(id) && id > 0 && name) map.set(id, name);
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }, [materials]);
 
   // Загрузка данных с бэкенда
@@ -55,8 +71,8 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
       setError('');
       
       const filters: any = {
-        categoryId: category ? categories.findIndex(c => c === category) + 1 : undefined,
-        supplierId: supplier ? suppliers.findIndex(s => s === supplier) + 1 : undefined
+        categoryId: categoryId === '' ? undefined : Number(categoryId),
+        supplierId: supplierId === '' ? undefined : Number(supplierId)
       };
       if (selectedMaterialId) filters.materialId = selectedMaterialId;
       
@@ -98,7 +114,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
     } finally {
       setLoading(false);
     }
-  }, [category, supplier, categories, suppliers, selectedMaterialId, active]);
+  }, [categoryId, supplierId, selectedMaterialId, active]);
 
   React.useEffect(() => {
     loadData();
@@ -241,16 +257,22 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
       </div>
 
       <div className="filters" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <select value={category} onChange={e => setCategory(e.target.value)}>
+        <select
+          value={categoryId === '' ? '' : String(categoryId)}
+          onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
+        >
           <option value="">Все категории</option>
-          {categories.map(c => (
-            <option key={c} value={c}>{c}</option>
+          {categories.map((c) => (
+            <option key={c.id} value={String(c.id)}>{c.name}</option>
           ))}
         </select>
-        <select value={supplier} onChange={e => setSupplier(e.target.value)}>
+        <select
+          value={supplierId === '' ? '' : String(supplierId)}
+          onChange={(e) => setSupplierId(e.target.value === '' ? '' : Number(e.target.value))}
+        >
           <option value="">Все поставщики</option>
-          {suppliers.map(s => (
-            <option key={s} value={s}>{s}</option>
+          {suppliers.map((s) => (
+            <option key={s.id} value={String(s.id)}>{s.name}</option>
           ))}
         </select>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
@@ -368,7 +390,15 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
               {supplierData.length === 0 ? (
                 <tr><td colSpan={6}>Данные отсутствуют</td></tr>
               ) : supplierData.map(row => (
-                <tr key={row.supplier_name} onClick={() => { setSupplier(row.supplier_name); setActive('low-stock'); }} style={{ cursor: 'pointer' }}>
+                <tr
+                  key={row.supplier_name}
+                  onClick={() => {
+                    const supplierMatch = suppliers.find((supplier) => supplier.name === row.supplier_name);
+                    setSupplierId(supplierMatch?.id ?? '');
+                    setActive('low-stock');
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td style={{ textAlign: 'left' }}>{row.supplier_name}</td>
                   <td>{row.materials_count}</td>
                   <td>{row.total_quantity}</td>

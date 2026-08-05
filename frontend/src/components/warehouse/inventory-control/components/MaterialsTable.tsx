@@ -1,5 +1,6 @@
 import React from 'react';
 import { Material } from '../../../../types/shared';
+import { formatRollStockLabel, isRollMaterial } from '../../../../utils/materialRollLabels';
 
 interface MaterialsTableProps {
   materials: Material[];
@@ -20,12 +21,12 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
             <th>Название</th>
             <th>Категория</th>
             <th>Поставщик</th>
-            <th>Кол-во</th>
+            <th>Остаток</th>
             <th>Зарезерв.</th>
             <th>Доступно</th>
             <th>Мин. остаток</th>
             <th>Ед.</th>
-            <th title="Для ед. «м» — за погонный метр">Цена за ед.</th>
+            <th title="Закупочная цена за единицу / пог. м">Закуп. цена</th>
             <th>Статус</th>
             <th>Действия</th>
           </tr>
@@ -36,17 +37,29 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
             const available = (m as any).available_quantity ?? m.quantity ?? 0;
             const status = (m as any).status ?? '';
             const supplierName = (m as any).supplier_name || (m as any).supplier?.name || '';
+            const isRoll = isRollMaterial(m as any);
+            const quantityLabel = isRoll
+              ? formatRollStockLabel(m as any)
+              : String(m.quantity ?? 0);
+            const availableLabel = isRoll
+              ? formatRollStockLabel({
+                  sheet_width: (m as any).sheet_width,
+                  quantity: available,
+                })
+              : String(available);
+            const hasPurchase = (m as any).purchase_price != null
+              && Number.isFinite(Number((m as any).purchase_price));
             return (
               <tr key={m.id}>
                 <td>{m.name}</td>
                 <td>{(m as any).category_name || '—'}</td>
                 <td>{supplierName || '—'}</td>
-                <td>{m.quantity ?? 0}</td>
+                <td>{quantityLabel}</td>
                 <td>{reserved}</td>
-                <td>{available}</td>
+                <td>{availableLabel}</td>
                 <td>{(m as any).min_quantity ?? (m as any).min_stock_level ?? '—'}</td>
                 <td>{m.unit}</td>
-                <td>{(m as any).sheet_price_single ? Number((m as any).sheet_price_single).toFixed(2) : '—'}</td>
+                <td>{hasPurchase ? Number((m as any).purchase_price).toFixed(2) : '—'}</td>
                 <td>
                   {status ? <span className={`inv-badge status-${status}`}>{status}</span> : '—'}
                 </td>

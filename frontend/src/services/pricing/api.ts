@@ -66,6 +66,8 @@ const mapService = (svc: any): PricingService => ({
   categoryName: svc.categoryName ?? svc.category_name ?? undefined,
   material_id: svc.material_id != null ? Number(svc.material_id) : undefined,
   qty_per_item: svc.qty_per_item != null ? Number(svc.qty_per_item) : undefined,
+  consumption_mode: svc.consumption_mode ?? svc.consumptionMode ?? undefined,
+  meter_basis: svc.meter_basis ?? svc.meterBasis ?? undefined,
 });
 
 const mapTier = (tier: any): ServiceVolumeTier => ({
@@ -148,6 +150,8 @@ export async function createPricingService(payload: CreatePricingServicePayload)
     ...(payload.categoryId !== undefined && payload.categoryId !== null ? { category_id: payload.categoryId } : {}),
     ...(payload.material_id !== undefined && payload.material_id !== null ? { material_id: payload.material_id } : {}),
     ...(payload.qty_per_item !== undefined && payload.qty_per_item !== null ? { qty_per_item: payload.qty_per_item } : {}),
+    ...(payload.consumption_mode !== undefined ? { consumption_mode: payload.consumption_mode } : {}),
+    ...(payload.meter_basis !== undefined ? { meter_basis: payload.meter_basis } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -170,6 +174,8 @@ export async function createBindingService(payload: CreatePricingServicePayload)
     category_id: payload.categoryId,
     material_id: payload.material_id,
     qty_per_item: payload.qty_per_item,
+    consumption_mode: payload.consumption_mode,
+    meter_basis: payload.meter_basis,
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -194,6 +200,8 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
     ...(payload.categoryId !== undefined ? { category_id: payload.categoryId } : {}),
     ...(payload.material_id !== undefined ? { material_id: payload.material_id } : {}),
     ...(payload.qty_per_item !== undefined ? { qty_per_item: payload.qty_per_item } : {}),
+    ...(payload.consumption_mode !== undefined ? { consumption_mode: payload.consumption_mode } : {}),
+    ...(payload.meter_basis !== undefined ? { meter_basis: payload.meter_basis } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -216,6 +224,8 @@ export async function updateBindingService(id: number, payload: UpdatePricingSer
     category_id: payload.categoryId,
     material_id: payload.material_id,
     qty_per_item: payload.qty_per_item,
+    consumption_mode: payload.consumption_mode,
+    meter_basis: payload.meter_basis,
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -409,6 +419,8 @@ const mapVariant = (data: any): ServiceVariant => {
     updatedAt: data.updatedAt ?? data.updated_at,
     material_id: data.material_id != null ? Number(data.material_id) : undefined,
     qty_per_item: data.qty_per_item != null ? Number(data.qty_per_item) : undefined,
+    consumption_mode: data.consumption_mode ?? data.consumptionMode ?? undefined,
+    meter_basis: data.meter_basis ?? data.meterBasis ?? undefined,
     ...(parentFinal !== undefined ? { parentVariantId: parentFinal } : {}),
   };
 };
@@ -428,6 +440,8 @@ export async function createServiceVariant(serviceId: number, payload: ServiceVa
     is_active: payload.isActive ?? true,
     ...(payload.material_id !== undefined && payload.material_id !== null ? { material_id: payload.material_id } : {}),
     ...(payload.qty_per_item !== undefined && payload.qty_per_item !== null ? { qty_per_item: payload.qty_per_item } : {}),
+    ...(payload.consumption_mode !== undefined ? { consumption_mode: payload.consumption_mode } : {}),
+    ...(payload.meter_basis !== undefined ? { meter_basis: payload.meter_basis } : {}),
     ...(payload.parentVariantId !== undefined ? { parent_variant_id: payload.parentVariantId } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
@@ -451,6 +465,8 @@ export async function updateServiceVariant(serviceId: number, variantId: number 
   if (payload.isActive !== undefined) body.is_active = payload.isActive;
   if (payload.material_id !== undefined) body.material_id = payload.material_id;
   if (payload.qty_per_item !== undefined) body.qty_per_item = payload.qty_per_item;
+  if (payload.consumption_mode !== undefined) body.consumption_mode = payload.consumption_mode;
+  if (payload.meter_basis !== undefined) body.meter_basis = payload.meter_basis;
   if (payload.parentVariantId !== undefined) body.parent_variant_id = payload.parentVariantId;
 
   const response = await api.put(`/pricing/services/${serviceId}/variants/${normalizedVariantId}`, body);

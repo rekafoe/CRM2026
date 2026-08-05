@@ -1,11 +1,26 @@
 import { getDb, withTransaction } from '../../../db';
 import { logger } from '../../../utils/logger';
+import { resolveMaterialPurchasePrice } from '../../../utils/materialCost';
 
 /**
  * Единая точка для всех транзакций со складом
  * Заменяет дублирование UPDATE materials и INSERT material_moves
  */
 export class MaterialTransactionService {
+  private static isMeterUnit(unitRaw: unknown): boolean {
+    const unit = String(unitRaw || '').trim().toLowerCase();
+    return unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
+  }
+
+  private static normalizeQuantityByUnit(quantityRaw: unknown, unitRaw: unknown): number {
+    const quantity = Number(quantityRaw);
+    if (!Number.isFinite(quantity)) return 0;
+    if (this.isMeterUnit(unitRaw)) {
+      return Math.round(quantity * 100) / 100;
+    }
+    return Math.ceil(quantity);
+  }
+
   private static async spendWithDb(
     db: Awaited<ReturnType<typeof getDb>>,
     params: {
@@ -26,8 +41,10 @@ export class MaterialTransactionService {
       quantity: number; 
       min_quantity: number | null;
       unit?: string | null;
+      sheet_price_single?: number | null;
+      purchase_price?: number | null;
     }>(
-      'SELECT id, name, quantity, min_quantity, unit FROM materials WHERE id = ?',
+      'SELECT id, name, quantity, min_quantity, unit, sheet_price_single, purchase_price FROM materials WHERE id = ?',
       materialId
     );
 
@@ -36,11 +53,7 @@ export class MaterialTransactionService {
     }
 
     // Для материалов в пог. м — округляем до 2 знаков, иначе ceil (листы, шт.)
-    const unit = (material.unit ?? '').toLowerCase();
-    const isMeters = unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
-    const roundedQty = isMeters
-      ? Math.round(Number(quantity) * 100) / 100
-      : Math.ceil(Number(quantity));
+    const roundedQty = this.normalizeQuantityByUnit(quantity, material.unit);
     const oldQuantity = Number(material.quantity);
     const newQuantity = oldQuantity - roundedQty;
 
@@ -84,46 +97,37 @@ export class MaterialTransactionService {
     // Запись движения
     const delta = -roundedQty;
     let hasWarehouseCol = false
+    let hasPriceCol = false
     try {
       const { hasColumn } = await import('../../../utils/tableSchemaCache')
       hasWarehouseCol = await hasColumn('material_moves', 'warehouse_id')
+      hasPriceCol = await hasColumn('material_moves', 'price')
     } catch {
       hasWarehouseCol = false
+      hasPriceCol = false
     }
+    const moveCols = ['material_id', 'type', 'quantity', 'delta', 'reason', 'order_id', 'user_id'];
+    const moveValues: Array<number | string | null> = [
+      materialId,
+      'spend',
+      roundedQty,
+      delta,
+      reason,
+      orderId ?? null,
+      userId ?? null,
+    ];
     if (hasWarehouseCol && warehouseId != null) {
-      await db.run(
-        `INSERT INTO material_moves (
-          material_id, type, quantity, delta, reason, order_id, user_id, warehouse_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        materialId,
-        'spend',
-        roundedQty,
-        delta,
-        reason,
-        orderId ?? null,
-        userId ?? null,
-        warehouseId
-      )
-    } else {
-      await db.run(
-        `INSERT INTO material_moves (
-          material_id,
-          type,
-          quantity,
-          delta,
-          reason,
-          order_id,
-          user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        materialId,
-        'spend',
-        roundedQty,
-        delta,
-        reason,
-        orderId ?? null,
-        userId ?? null
-      )
+      moveCols.push('warehouse_id');
+      moveValues.push(warehouseId);
     }
+    if (hasPriceCol) {
+      moveCols.push('price');
+      moveValues.push(resolveMaterialPurchasePrice(material));
+    }
+    await db.run(
+      `INSERT INTO material_moves (${moveCols.join(', ')}) VALUES (${moveCols.map(() => '?').join(', ')})`,
+      ...moveValues
+    );
 
     logger.info('Материал списан', {
       materialId,
@@ -166,8 +170,8 @@ export class MaterialTransactionService {
     } = params;
 
     // Получаем текущее состояние
-    const material = await db.get<{ id: number; name: string; quantity: number }>(
-      'SELECT id, name, quantity FROM materials WHERE id = ?',
+    const material = await db.get<{ id: number; name: string; quantity: number; unit?: string | null; sheet_price_single?: number | null; purchase_price?: number | null }>(
+      'SELECT id, name, quantity, unit, sheet_price_single, purchase_price FROM materials WHERE id = ?',
       materialId
     );
 
@@ -175,7 +179,7 @@ export class MaterialTransactionService {
       throw new Error(`Материал с ID ${materialId} не найден`);
     }
 
-    const roundedQty = Math.ceil(Number(quantity));
+    const roundedQty = this.normalizeQuantityByUnit(quantity, material.unit);
     const oldQuantity = Number(material.quantity);
     const newQuantity = oldQuantity + roundedQty;
 
@@ -187,21 +191,28 @@ export class MaterialTransactionService {
     );
 
     // Запись движения с расширенными полями для поставок
-    await db.run(
-      `INSERT INTO material_moves (
-        material_id,
-        type,
-        quantity,
-        delta,
-        reason,
-        order_id,
-        user_id,
-        supplier_id,
-        delivery_number,
-        invoice_number,
-        delivery_date,
-        delivery_notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    let hasPriceCol = false;
+    try {
+      const { hasColumn } = await import('../../../utils/tableSchemaCache');
+      hasPriceCol = await hasColumn('material_moves', 'price');
+    } catch {
+      hasPriceCol = false;
+    }
+    const moveCols = [
+      'material_id',
+      'type',
+      'quantity',
+      'delta',
+      'reason',
+      'order_id',
+      'user_id',
+      'supplier_id',
+      'delivery_number',
+      'invoice_number',
+      'delivery_date',
+      'delivery_notes',
+    ];
+    const moveValues: Array<number | string | null> = [
       materialId,
       'add',
       roundedQty,
@@ -213,7 +224,15 @@ export class MaterialTransactionService {
       deliveryNumber ?? null,
       invoiceNumber ?? null,
       deliveryDate ?? null,
-      deliveryNotes ?? null
+      deliveryNotes ?? null,
+    ];
+    if (hasPriceCol) {
+      moveCols.push('price');
+      moveValues.push(resolveMaterialPurchasePrice(material));
+    }
+    await db.run(
+      `INSERT INTO material_moves (${moveCols.join(', ')}) VALUES (${moveCols.map(() => '?').join(', ')})`,
+      ...moveValues
     );
 
     logger.info('Материал добавлен', {
@@ -354,8 +373,8 @@ export class MaterialTransactionService {
     const db = await getDb();
     const { materialId, newQuantity, reason, userId } = params;
 
-    const material = await db.get<{ id: number; name: string; quantity: number }>(
-      'SELECT id, name, quantity FROM materials WHERE id = ?',
+    const material = await db.get<{ id: number; name: string; quantity: number; unit?: string | null; sheet_price_single?: number | null; purchase_price?: number | null }>(
+      'SELECT id, name, quantity, unit, sheet_price_single, purchase_price FROM materials WHERE id = ?',
       materialId
     );
 
@@ -364,7 +383,7 @@ export class MaterialTransactionService {
     }
 
     const oldQuantity = Number(material.quantity);
-    const roundedNewQty = Math.ceil(Number(newQuantity));
+    const roundedNewQty = this.normalizeQuantityByUnit(newQuantity, material.unit);
     const delta = roundedNewQty - oldQuantity;
 
     await db.run(
@@ -373,23 +392,30 @@ export class MaterialTransactionService {
       materialId
     );
 
-    await db.run(
-      `INSERT INTO material_moves (
-        material_id,
-        type,
-        quantity,
-        delta,
-        reason,
-        order_id,
-        user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    let hasPriceCol = false;
+    try {
+      const { hasColumn } = await import('../../../utils/tableSchemaCache');
+      hasPriceCol = await hasColumn('material_moves', 'price');
+    } catch {
+      hasPriceCol = false;
+    }
+    const moveCols = ['material_id', 'type', 'quantity', 'delta', 'reason', 'order_id', 'user_id'];
+    const moveValues: Array<number | string | null> = [
       materialId,
       delta >= 0 ? 'adjust_increase' : 'adjust_decrease',
       Math.abs(delta),
       delta,
       reason,
       null,
-      userId ?? null
+      userId ?? null,
+    ];
+    if (hasPriceCol) {
+      moveCols.push('price');
+      moveValues.push(resolveMaterialPurchasePrice(material));
+    }
+    await db.run(
+      `INSERT INTO material_moves (${moveCols.join(', ')}) VALUES (${moveCols.map(() => '?').join(', ')})`,
+      ...moveValues
     );
 
     logger.info('Количество материала скорректировано', {
@@ -416,8 +442,8 @@ export class MaterialTransactionService {
   }> {
     const db = await getDb();
 
-    const material = await db.get<{ name: string; quantity: number }>(
-      'SELECT name, quantity FROM materials WHERE id = ?',
+    const material = await db.get<{ name: string; quantity: number; unit?: string | null }>(
+      'SELECT name, quantity, unit FROM materials WHERE id = ?',
       materialId
     );
 
@@ -436,7 +462,7 @@ export class MaterialTransactionService {
     const currentQuantity = Number(material.quantity);
     const reservedQuantity = Number(reservedResult?.reserved || 0);
     const availableQuantity = currentQuantity - reservedQuantity;
-    const roundedRequired = Math.ceil(Number(requiredQuantity));
+    const roundedRequired = this.normalizeQuantityByUnit(requiredQuantity, material.unit);
 
     return {
       available: availableQuantity >= roundedRequired,

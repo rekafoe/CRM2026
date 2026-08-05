@@ -12,6 +12,7 @@ export interface Material {
   quantity: number;
   min_quantity?: number;
   sheet_price_single?: number;
+  purchase_price?: number;
   category_id?: number;
   category_name?: string;
   category_color?: string;
@@ -156,13 +157,14 @@ export class WarehouseService {
           m.quantity,
           m.min_quantity,
           m.sheet_price_single,
+          m.purchase_price,
           m.category_id,
           c.name as category_name,
           c.color as category_color,
           m.supplier_id,
           s.name as supplier_name,
           s.contact_person as supplier_contact,
-          COALESCE(m.sheet_price_single, 0) as price_per_unit,
+          COALESCE(m.purchase_price, m.sheet_price_single, 0) as price_per_unit,
           COALESCE(c.name, 'paper') as material_type,
           1 as is_active,
           COALESCE((
@@ -203,13 +205,14 @@ export class WarehouseService {
           m.quantity,
           m.min_quantity,
           m.sheet_price_single,
+          m.purchase_price,
           m.category_id,
           c.name as category_name,
           c.color as category_color,
           m.supplier_id,
           s.name as supplier_name,
           s.contact_person as supplier_contact,
-          COALESCE(m.sheet_price_single, 0) as price_per_unit,
+          COALESCE(m.purchase_price, m.sheet_price_single, 0) as price_per_unit,
           COALESCE(c.name, 'paper') as material_type,
           1 as is_active,
           COALESCE((
@@ -244,7 +247,10 @@ export class WarehouseService {
       const db = await getDb();
       
       // Get current quantity
-      const material = await db.get('SELECT quantity FROM materials WHERE id = ?', [id]);
+      const material = await db.get<{ quantity: number; sheet_price_single?: number | null; purchase_price?: number | null }>(
+        'SELECT quantity, sheet_price_single, purchase_price FROM materials WHERE id = ?',
+        [id]
+      );
       if (!material) {
         throw new Error('Material not found');
       }
@@ -265,8 +271,9 @@ export class WarehouseService {
            delta,
            reason,
            order_id,
-           user_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+           user_id,
+           price
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
         [
           id,
           delta >= 0 ? 'adjust_increase' : 'adjust_decrease',
@@ -274,7 +281,8 @@ export class WarehouseService {
           delta,
           reason || 'Manual adjustment',
           null,
-          null
+          null,
+          Number(material?.purchase_price ?? material?.sheet_price_single ?? 0),
         ]
       );
       
@@ -396,6 +404,10 @@ export class WarehouseService {
         `, [reservationId]);
         
         // Log transaction
+        const materialPrice = await db.get<{ sheet_price_single?: number | null; purchase_price?: number | null }>(
+          'SELECT sheet_price_single, purchase_price FROM materials WHERE id = ?',
+          [reservation.material_id]
+        );
         await db.run(
           `INSERT INTO material_moves (
             material_id,
@@ -404,8 +416,9 @@ export class WarehouseService {
             delta,
             reason,
             order_id,
-            user_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            user_id,
+            price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             reservation.material_id,
             'confirm_reservation',
@@ -413,7 +426,8 @@ export class WarehouseService {
             -Math.abs(Number(reservation.quantity || 0)),
             'Reservation confirmed',
             reservation.order_id ?? null,
-            null
+            null,
+            Number(materialPrice?.purchase_price ?? materialPrice?.sheet_price_single ?? 0),
           ]
         );
       }
@@ -524,6 +538,7 @@ export class WarehouseService {
       quantity: row.quantity,
       min_quantity: row.min_quantity,
       sheet_price_single: row.sheet_price_single,
+      purchase_price: row.purchase_price,
       category_id: row.category_id,
       category_name: row.category_name,
       category_color: row.category_color,

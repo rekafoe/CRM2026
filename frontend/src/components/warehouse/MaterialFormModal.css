@@ -1,1 +1,15 @@
 .help-muted { color: #666; font-size: 12px; }
+
+.form-hint {
+  color: #666;
+  font-size: 12px;
+  display: block;
+  margin-top: 4px;
+}
+
+.form-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #222);
+  margin: 8px 0 4px;
+}

@@ -71,6 +71,9 @@ const ALLOWED_OPERATION_TYPES = new Set<string>([
   'other',
 ]);
 
+const ALLOWED_CONSUMPTION_MODES = new Set<string>(['fixed', 'roll_feed']);
+const ALLOWED_METER_BASES = new Set<string>(['knife_path', 'feed']);
+
 function normalizeOperationType(raw: unknown): string {
   const v = typeof raw === 'string' ? raw.trim() : '';
   if (!v) return 'other';
@@ -82,6 +85,21 @@ function normalizeOperationType(raw: unknown): string {
       : v;
 
   return ALLOWED_OPERATION_TYPES.has(mapped) ? mapped : 'other';
+}
+
+function normalizeConsumptionMode(
+  raw: unknown,
+  fallback: 'fixed' | 'roll_feed' = 'fixed'
+): 'fixed' | 'roll_feed' {
+  const v = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (ALLOWED_CONSUMPTION_MODES.has(v)) return v as 'fixed' | 'roll_feed';
+  return fallback;
+}
+
+function normalizeMeterBasis(raw: unknown, fallback: 'knife_path' | 'feed' | null = null): 'knife_path' | 'feed' | null {
+  if (raw === null || raw === undefined || raw === '') return fallback;
+  const v = String(raw).trim().toLowerCase();
+  return ALLOWED_METER_BASES.has(v) ? (v as 'knife_path' | 'feed') : fallback;
 }
 
 type RawServiceRow = {
@@ -100,6 +118,8 @@ type RawServiceRow = {
   category_name?: string | null;
   material_id?: number | null;
   qty_per_item?: number | null;
+  consumption_mode?: string | null;
+  meter_basis?: string | null;
 };
 
 type RawTierRow = {
@@ -256,6 +276,47 @@ export class PricingServiceRepository {
       // ignore
     }
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_post_processing_services_category_id ON post_processing_services(category_id)`);
+
+    try {
+      if (!(await hasColumn('post_processing_services', 'consumption_mode'))) {
+        await db.run(
+          `ALTER TABLE post_processing_services ADD COLUMN consumption_mode TEXT NOT NULL DEFAULT 'fixed' CHECK (consumption_mode IN ('fixed', 'roll_feed'))`
+        );
+        invalidateTableSchemaCache('post_processing_services');
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      if (!(await hasColumn('post_processing_services', 'meter_basis'))) {
+        await db.run(
+          `ALTER TABLE post_processing_services ADD COLUMN meter_basis TEXT CHECK (meter_basis IN ('knife_path', 'feed'))`
+        );
+        invalidateTableSchemaCache('post_processing_services');
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      if (!(await hasColumn('service_variants', 'consumption_mode'))) {
+        await db.run(
+          `ALTER TABLE service_variants ADD COLUMN consumption_mode TEXT NOT NULL DEFAULT 'fixed' CHECK (consumption_mode IN ('fixed', 'roll_feed'))`
+        );
+        invalidateTableSchemaCache('service_variants');
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      if (!(await hasColumn('service_variants', 'meter_basis'))) {
+        await db.run(
+          `ALTER TABLE service_variants ADD COLUMN meter_basis TEXT CHECK (meter_basis IN ('knife_path', 'feed'))`
+        );
+        invalidateTableSchemaCache('service_variants');
+      }
+    } catch {
+      // ignore
+    }
   }
 
   private static mapService(row: RawServiceRow): PricingServiceDTO {
@@ -280,6 +341,14 @@ export class PricingServiceRepository {
       categoryName: row.category_name != null && row.category_name !== '' ? row.category_name : undefined,
       material_id: row.material_id != null ? row.material_id : undefined,
       qty_per_item: row.qty_per_item != null ? Number(row.qty_per_item) : undefined,
+      consumption_mode:
+        row.consumption_mode != null
+          ? normalizeConsumptionMode(row.consumption_mode)
+          : undefined,
+      meter_basis:
+        row.meter_basis != null
+          ? normalizeMeterBasis(row.meter_basis, null)
+          : undefined,
     };
   }
 
@@ -300,13 +369,19 @@ export class PricingServiceRepository {
     let hasCategoryId = false;
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
     try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('post_processing_services', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('post_processing_services', 'meter_basis'); } catch { /* ignore */ }
     const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
     const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
     const materialSel = (hasMaterialId && hasQtyPerItem) ? `, ${hasCategoryId ? 'pps.' : ''}material_id, ${hasCategoryId ? 'pps.' : ''}qty_per_item` : '';
+    const consumptionSel = hasConsumptionMode ? `, ${hasCategoryId ? 'pps.' : ''}consumption_mode` : '';
+    const meterBasisSel = hasMeterBasis ? `, ${hasCategoryId ? 'pps.' : ''}meter_basis` : '';
     const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
     const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
     const prefix = hasCategoryId ? 'pps.' : '';
@@ -321,7 +396,7 @@ export class PricingServiceRepository {
         ${prefix}price as price_per_unit, 
         ${prefix}is_active,
         ${prefix}min_quantity,
-        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}
+        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}${consumptionSel}${meterBasisSel}
       FROM ${fromTable} ${joinCategory}
       ORDER BY ${hasCategoryId ? 'sc.sort_order, sc.name, pps.name' : 'name'}
     `);
@@ -353,13 +428,19 @@ export class PricingServiceRepository {
     let hasCategoryId = false;
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
     try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('post_processing_services', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('post_processing_services', 'meter_basis'); } catch { /* ignore */ }
     const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
     const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
     const materialSel = (hasMaterialId && hasQtyPerItem) ? `, ${hasCategoryId ? 'pps.' : ''}material_id, ${hasCategoryId ? 'pps.' : ''}qty_per_item` : '';
+    const consumptionSel = hasConsumptionMode ? `, ${hasCategoryId ? 'pps.' : ''}consumption_mode` : '';
+    const meterBasisSel = hasMeterBasis ? `, ${hasCategoryId ? 'pps.' : ''}meter_basis` : '';
     const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
     const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
     const prefix = hasCategoryId ? 'pps.' : '';
@@ -374,7 +455,7 @@ export class PricingServiceRepository {
         ${prefix}price as price_per_unit,
         ${prefix}is_active,
         ${prefix}min_quantity,
-        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}
+        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}${consumptionSel}${meterBasisSel}
       FROM ${fromTable} ${joinCategory}
       WHERE ${prefix}operation_type = 'bind'
       ORDER BY ${hasCategoryId ? 'sc.sort_order, sc.name, pps.name' : 'name'}
@@ -388,13 +469,19 @@ export class PricingServiceRepository {
     let hasCategoryId = false;
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
     try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('post_processing_services', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('post_processing_services', 'meter_basis'); } catch { /* ignore */ }
     const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
     const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
     const materialSel = (hasMaterialId && hasQtyPerItem) ? `, ${hasCategoryId ? 'pps.' : ''}material_id, ${hasCategoryId ? 'pps.' : ''}qty_per_item` : '';
+    const consumptionSel = hasConsumptionMode ? `, ${hasCategoryId ? 'pps.' : ''}consumption_mode` : '';
+    const meterBasisSel = hasMeterBasis ? `, ${hasCategoryId ? 'pps.' : ''}meter_basis` : '';
     const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
     const prefix = hasCategoryId ? 'pps.' : '';
     const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
@@ -409,7 +496,7 @@ export class PricingServiceRepository {
         ${prefix}price as price_per_unit, 
         ${prefix}is_active,
         ${prefix}min_quantity,
-        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}
+        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}${consumptionSel}${meterBasisSel}
       FROM ${fromTable} ${joinCategory}
       WHERE ${prefix}id = ?
     `, id);
@@ -431,7 +518,7 @@ export class PricingServiceRepository {
     // Совместимость с UI: если payload.unit содержит per_cut/per_sheet/... — это на самом деле price_unit
     const rawUnit = (payload.unit ?? '').toString();
     const rawPriceUnit = (payload.priceUnit ?? '').toString();
-    const isPriceUnitFromUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(rawUnit);
+    const isPriceUnitFromUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(rawUnit);
     const resolvedPriceUnit = rawPriceUnit || (isPriceUnitFromUnit ? rawUnit : 'per_item');
     const resolvedUnit = isPriceUnitFromUnit ? 'шт' : rawUnit;
     const minQuantity = payload.minQuantity ?? 1;
@@ -446,22 +533,42 @@ export class PricingServiceRepository {
     let hasCategoryId = false;
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
     try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('post_processing_services', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('post_processing_services', 'meter_basis'); } catch { /* ignore */ }
     const opPercentVal = (payload as any).operator_percent;
     const includeOpPercent = hasOpPercent && opPercentVal !== undefined && opPercentVal !== null && Number.isFinite(Number(opPercentVal));
     const categoryIdVal = payload.categoryId != null && Number.isFinite(Number(payload.categoryId)) ? Number(payload.categoryId) : null;
     const includeCategoryId = hasCategoryId;
     const includeMaterial = hasMaterialId && hasQtyPerItem;
+    const includeConsumptionMode = hasConsumptionMode;
+    const includeMeterBasis = hasMeterBasis;
     const materialIdVal = (payload as any).material_id != null && Number.isFinite(Number((payload as any).material_id)) ? Number((payload as any).material_id) : null;
     const qtyPerItemVal = (payload as any).qty_per_item != null && Number.isFinite(Number((payload as any).qty_per_item)) ? Number((payload as any).qty_per_item) : 1;
+    const payloadConsumption = (payload as any).consumption_mode;
+    const defaultConsumption =
+      operationType === 'laminate' && String(resolvedPriceUnit).toLowerCase() === 'per_meter'
+        ? 'roll_feed'
+        : 'fixed';
+    const consumptionModeVal = normalizeConsumptionMode(payloadConsumption, defaultConsumption);
+    const payloadMeterBasis = (payload as any).meter_basis;
+    const defaultMeterBasis =
+      consumptionModeVal === 'roll_feed' || String(resolvedPriceUnit).toLowerCase() === 'per_meter'
+        ? 'feed'
+        : null;
+    const meterBasisVal = normalizeMeterBasis(payloadMeterBasis, defaultMeterBasis);
     const insertCols = [
       'name', 'operation_type', 'unit', 'price_unit', 'price', 'is_active', 'min_quantity', 'max_quantity',
       ...(includeOpPercent ? ['operator_percent'] : []),
       ...(includeCategoryId ? ['category_id'] : []),
       ...(includeMaterial ? ['material_id', 'qty_per_item'] : []),
+      ...(includeConsumptionMode ? ['consumption_mode'] : []),
+      ...(includeMeterBasis ? ['meter_basis'] : []),
     ];
     const insertVals = insertCols.map(() => '?').join(', ');
     const insertParams: any[] = [
@@ -477,6 +584,8 @@ export class PricingServiceRepository {
     if (includeOpPercent) insertParams.push(Number(opPercentVal));
     if (includeCategoryId) insertParams.push(categoryIdVal);
     if (includeMaterial) { insertParams.push(materialIdVal); insertParams.push(qtyPerItemVal); }
+    if (includeConsumptionMode) insertParams.push(consumptionModeVal);
+    if (includeMeterBasis) insertParams.push(meterBasisVal);
     const result = await db.run(
       `INSERT INTO post_processing_services (${insertCols.join(', ')}) VALUES (${insertVals})`,
       ...insertParams
@@ -484,6 +593,8 @@ export class PricingServiceRepository {
     const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const categorySel = hasCategoryId ? ', category_id, (SELECT name FROM service_categories WHERE id = post_processing_services.category_id) as category_name' : '';
     const materialSel = includeMaterial ? ', material_id, qty_per_item' : '';
+    const consumptionSel = includeConsumptionMode ? ', consumption_mode' : '';
+    const meterBasisSel = includeMeterBasis ? ', meter_basis' : '';
     const created = await db.get<any>(`
       SELECT 
         id, 
@@ -495,7 +606,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity${opPercentSel}${categorySel}${materialSel}
+        max_quantity${opPercentSel}${categorySel}${materialSel}${consumptionSel}${meterBasisSel}
       FROM post_processing_services 
       WHERE id = ?
     `, result.lastID);
@@ -541,7 +652,7 @@ export class PricingServiceRepository {
 
     const rawUnit = payload.unit !== undefined ? String(payload.unit) : '';
     const rawPriceUnit = payload.priceUnit !== undefined ? String(payload.priceUnit) : '';
-    const isPriceUnitFromUnit = rawUnit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(rawUnit) : false;
+    const isPriceUnitFromUnit = rawUnit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(rawUnit) : false;
     const resolvedPriceUnit = rawPriceUnit || (isPriceUnitFromUnit ? rawUnit : (current.price_unit ?? 'per_item'));
     const resolvedUnit = isPriceUnitFromUnit
       ? (current.unit ?? 'шт')
@@ -558,16 +669,22 @@ export class PricingServiceRepository {
     let hasCategoryId = false;
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
     try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('post_processing_services', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('post_processing_services', 'meter_basis'); } catch { /* ignore */ }
     const opPercentUpdate = hasOpPercent && (payload as any).operator_percent !== undefined ? ', operator_percent = ?' : '';
     const categoryIdUpdate = hasCategoryId && payload.categoryId !== undefined
       ? ', category_id = ?'
       : '';
     const materialIdUpdate = hasMaterialId && (payload as any).material_id !== undefined ? ', material_id = ?' : '';
     const qtyPerItemUpdate = hasQtyPerItem && (payload as any).qty_per_item !== undefined ? ', qty_per_item = ?' : '';
+    const consumptionModeUpdate = hasConsumptionMode && (payload as any).consumption_mode !== undefined ? ', consumption_mode = ?' : '';
+    const meterBasisUpdate = hasMeterBasis && (payload as any).meter_basis !== undefined ? ', meter_basis = ?' : '';
     const updateParams: any[] = [
       payload.name ?? current.name,
       operationType,
@@ -582,10 +699,18 @@ export class PricingServiceRepository {
     if (categoryIdUpdate) updateParams.push(payload.categoryId != null && Number.isFinite(Number(payload.categoryId)) ? payload.categoryId : null);
     if (materialIdUpdate) updateParams.push((payload as any).material_id != null && Number.isFinite(Number((payload as any).material_id)) ? Number((payload as any).material_id) : null);
     if (qtyPerItemUpdate) updateParams.push((payload as any).qty_per_item != null && Number.isFinite(Number((payload as any).qty_per_item)) ? Number((payload as any).qty_per_item) : (current.qty_per_item ?? 1));
+    if (consumptionModeUpdate) {
+      const fallbackMode = normalizeConsumptionMode(current.consumption_mode ?? 'fixed');
+      updateParams.push(normalizeConsumptionMode((payload as any).consumption_mode, fallbackMode));
+    }
+    if (meterBasisUpdate) {
+      const fallbackBasis = normalizeMeterBasis(current.meter_basis, null);
+      updateParams.push(normalizeMeterBasis((payload as any).meter_basis, fallbackBasis));
+    }
     updateParams.push(id);
     await db.run(
       `UPDATE post_processing_services 
-       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ?${opPercentUpdate}${categoryIdUpdate}${materialIdUpdate}${qtyPerItemUpdate}
+       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ?${opPercentUpdate}${categoryIdUpdate}${materialIdUpdate}${qtyPerItemUpdate}${consumptionModeUpdate}${meterBasisUpdate}
        WHERE id = ?`,
       ...updateParams
     );
@@ -593,6 +718,8 @@ export class PricingServiceRepository {
     const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const categorySel = hasCategoryId ? ', category_id, (SELECT name FROM service_categories WHERE id = post_processing_services.category_id) as category_name' : '';
     const materialSel = (hasMaterialId && hasQtyPerItem) ? ', material_id, qty_per_item' : '';
+    const consumptionSel = hasConsumptionMode ? ', consumption_mode' : '';
+    const meterBasisSel = hasMeterBasis ? ', meter_basis' : '';
     const updated = await db.get<any>(`
       SELECT 
         id, 
@@ -604,7 +731,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity${opPercentSel}${categorySel}${materialSel}
+        max_quantity${opPercentSel}${categorySel}${materialSel}${consumptionSel}${meterBasisSel}
       FROM post_processing_services 
       WHERE id = ?
     `, id);
@@ -847,6 +974,8 @@ export class PricingServiceRepository {
     let hasMaterialId = false;
     let hasQtyPerItem = false;
     let hasParentVariantId = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try {
       hasMaterialId = await hasColumn('service_variants', 'material_id');
     } catch {
@@ -862,12 +991,24 @@ export class PricingServiceRepository {
     } catch {
       /* ignore */
     }
+    try {
+      hasConsumptionMode = await hasColumn('service_variants', 'consumption_mode');
+    } catch {
+      /* ignore */
+    }
+    try {
+      hasMeterBasis = await hasColumn('service_variants', 'meter_basis');
+    } catch {
+      /* ignore */
+    }
     const materialCols = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
     const parentCol = hasParentVariantId ? ', parent_variant_id' : '';
+    const consumptionCol = hasConsumptionMode ? ', consumption_mode' : '';
+    const meterBasisCol = hasMeterBasis ? ', meter_basis' : '';
     const placeholders = uniq.map(() => '?').join(',');
 
     const vRows = await db.all<any[]>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}${consumptionCol}${meterBasisCol}
        FROM service_variants
        WHERE service_id IN (${placeholders})
        ORDER BY service_id, sort_order, id`,
@@ -893,6 +1034,8 @@ export class PricingServiceRepository {
         ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
         ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
         ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
+        ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(row.consumption_mode ?? 'fixed') } : {}),
+        ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(row.meter_basis, null) } : {}),
       });
     }
 
@@ -1044,13 +1187,19 @@ export class PricingServiceRepository {
     let hasMaterialId = false;
     let hasQtyPerItem = false;
     let hasParentVariantId = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
     try { hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('service_variants', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('service_variants', 'meter_basis'); } catch { /* ignore */ }
     const materialCols = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
     const parentCol = hasParentVariantId ? ', parent_variant_id' : '';
+    const consumptionCol = hasConsumptionMode ? ', consumption_mode' : '';
+    const meterBasisCol = hasMeterBasis ? ', meter_basis' : '';
     const rows = await db.all<any[]>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}${consumptionCol}${meterBasisCol}
        FROM service_variants 
        WHERE service_id = ? 
        ORDER BY sort_order, id`,
@@ -1074,6 +1223,8 @@ export class PricingServiceRepository {
         ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
         ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
         ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
+        ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(row.consumption_mode ?? 'fixed') } : {}),
+        ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(row.meter_basis, null) } : {}),
       };
     });
   }
@@ -1084,12 +1235,37 @@ export class PricingServiceRepository {
     let hasMaterialId = false;
     let hasQtyPerItem = false;
     let hasParentVariantId = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
     try { hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('service_variants', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('service_variants', 'meter_basis'); } catch { /* ignore */ }
     const includeMaterial = hasMaterialId && hasQtyPerItem;
     const materialIdVal = payload.material_id != null && Number.isFinite(Number(payload.material_id)) ? Number(payload.material_id) : null;
     const qtyPerItemVal = payload.qty_per_item != null && Number.isFinite(Number(payload.qty_per_item)) ? Number(payload.qty_per_item) : 1;
+    const serviceRow = await db.get<{ operation_type?: string | null; price_unit?: string | null; consumption_mode?: string | null; meter_basis?: string | null }>(
+      `SELECT operation_type, price_unit, consumption_mode, meter_basis FROM post_processing_services WHERE id = ?`,
+      serviceId
+    );
+    const payloadConsumption = (payload as any).consumption_mode;
+    const derivedDefaultConsumption = normalizeConsumptionMode(
+      serviceRow?.consumption_mode ??
+        (String(serviceRow?.operation_type || '').toLowerCase() === 'laminate' &&
+        String(serviceRow?.price_unit || '').toLowerCase() === 'per_meter'
+          ? 'roll_feed'
+          : 'fixed')
+    );
+    const consumptionModeVal = normalizeConsumptionMode(payloadConsumption, derivedDefaultConsumption);
+    const payloadMeterBasis = (payload as any).meter_basis;
+    const defaultMeterBasis = normalizeMeterBasis(
+      serviceRow?.meter_basis,
+      consumptionModeVal === 'roll_feed' || String(serviceRow?.price_unit || '').toLowerCase() === 'per_meter'
+        ? 'feed'
+        : null
+    );
+    const meterBasisVal = normalizeMeterBasis(payloadMeterBasis, defaultMeterBasis);
     const parentId = normalizeParentVariantId(payload.parentVariantId ?? payload.parameters?.parentVariantId);
     const paramsMerged = parametersWithParentSync(payload.parameters || {}, parentId);
 
@@ -1109,13 +1285,23 @@ export class PricingServiceRepository {
       insertCols += ', material_id, qty_per_item';
       insertParams.push(materialIdVal, qtyPerItemVal);
     }
+    if (hasConsumptionMode) {
+      insertCols += ', consumption_mode';
+      insertParams.push(consumptionModeVal);
+    }
+    if (hasMeterBasis) {
+      insertCols += ', meter_basis';
+      insertParams.push(meterBasisVal);
+    }
     const insertPlaces = insertParams.map(() => '?').join(',');
     const result = await db.run(`INSERT INTO service_variants (${insertCols}) VALUES (${insertPlaces})`, ...insertParams);
 
     const parentSel = hasParentVariantId ? ', parent_variant_id' : '';
     const materialSel = includeMaterial ? ', material_id, qty_per_item' : '';
+    const consumptionSel = hasConsumptionMode ? ', consumption_mode' : '';
+    const meterBasisSel = hasMeterBasis ? ', meter_basis' : '';
     const row = await db.get<any>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentSel}${materialSel}
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentSel}${materialSel}${consumptionSel}${meterBasisSel}
        FROM service_variants 
        WHERE id = ?`,
       result.lastID,
@@ -1140,6 +1326,8 @@ export class PricingServiceRepository {
       ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
       ...(row.material_id != null ? { material_id: row.material_id } : {}),
       ...(row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
+      ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(row.consumption_mode ?? 'fixed') } : {}),
+      ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(row.meter_basis, null) } : {}),
     };
   }
 
@@ -1153,9 +1341,13 @@ export class PricingServiceRepository {
     let hasMaterialId = false;
     let hasQtyPerItem = false;
     let hasParentVariantId = false;
+    let hasConsumptionMode = false;
+    let hasMeterBasis = false;
     try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
     try { hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id'); } catch { /* ignore */ }
+    try { hasConsumptionMode = await hasColumn('service_variants', 'consumption_mode'); } catch { /* ignore */ }
+    try { hasMeterBasis = await hasColumn('service_variants', 'meter_basis'); } catch { /* ignore */ }
 
     const currentParsed = parseServiceVariantParameters(current.parameters);
     const mergedParams =
@@ -1176,6 +1368,8 @@ export class PricingServiceRepository {
 
     const materialIdUpdate = hasMaterialId && payload.material_id !== undefined ? ', material_id = ?' : '';
     const qtyPerItemUpdate = hasQtyPerItem && payload.qty_per_item !== undefined ? ', qty_per_item = ?' : '';
+    const consumptionModeUpdate = hasConsumptionMode && (payload as any).consumption_mode !== undefined ? ', consumption_mode = ?' : '';
+    const meterBasisUpdate = hasMeterBasis && (payload as any).meter_basis !== undefined ? ', meter_basis = ?' : '';
 
     let setSql =
       'variant_name = ?, parameters = ?, sort_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP';
@@ -1203,14 +1397,26 @@ export class PricingServiceRepository {
           : (current.qty_per_item ?? 1)
       );
     }
+    if (consumptionModeUpdate) {
+      setSql += ', consumption_mode = ?';
+      const fallbackMode = normalizeConsumptionMode(current.consumption_mode ?? 'fixed');
+      updateParams.push(normalizeConsumptionMode((payload as any).consumption_mode, fallbackMode));
+    }
+    if (meterBasisUpdate) {
+      setSql += ', meter_basis = ?';
+      const fallbackBasis = normalizeMeterBasis(current.meter_basis, null);
+      updateParams.push(normalizeMeterBasis((payload as any).meter_basis, fallbackBasis));
+    }
     updateParams.push(variantId);
 
     await db.run(`UPDATE service_variants SET ${setSql} WHERE id = ?`, ...updateParams);
 
     const parentSel = hasParentVariantId ? ', parent_variant_id' : '';
     const materialSel = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
+    const consumptionSel = hasConsumptionMode ? ', consumption_mode' : '';
+    const meterBasisSel = hasMeterBasis ? ', meter_basis' : '';
     const updated = await db.get<any>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentSel}${materialSel}
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentSel}${materialSel}${consumptionSel}${meterBasisSel}
        FROM service_variants 
        WHERE id = ?`,
       variantId,
@@ -1236,6 +1442,8 @@ export class PricingServiceRepository {
       ...(hasParentVariantId ? { parentVariantId: parentResolvedOut } : {}),
       ...(updated.material_id != null ? { material_id: updated.material_id } : {}),
       ...(updated.qty_per_item != null ? { qty_per_item: Number(updated.qty_per_item) } : {}),
+      ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(updated.consumption_mode ?? 'fixed') } : {}),
+      ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(updated.meter_basis, null) } : {}),
     };
   }
 

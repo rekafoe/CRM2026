@@ -57,11 +57,19 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
     };
 
     const totalMaterials = materials.length;
-    const inStock = materials.filter(m => (m.quantity || 0) > 10).length;
-    const lowStock = materials.filter(m => (m.quantity || 0) > 0 && (m.quantity || 0) <= 10).length;
+    const inStock = materials.filter(m => {
+      const qty = m.quantity || 0;
+      const minStock = m.min_stock_level || 10;
+      return qty > minStock;
+    }).length;
+    const lowStock = materials.filter(m => {
+      const qty = m.quantity || 0;
+      const minStock = m.min_stock_level || 10;
+      return qty > 0 && qty <= minStock;
+    }).length;
     const outOfStock = materials.filter(m => (m.quantity || 0) <= 0).length;
     const totalValue = materials.reduce((sum, m) => {
-      const price = m.sheet_price_single || m.price || 0;
+      const price = m.purchase_price ?? m.sheet_price_single ?? m.price ?? 0;
       return sum + ((m.quantity || 0) * price);
     }, 0);
 

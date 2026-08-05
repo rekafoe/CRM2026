@@ -11,13 +11,13 @@ export type Tier = { min_qty: number; max_qty?: number; unit_price: number }
 export interface ServiceItem {
   id: number
   name: string
-  price_unit?: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order'
+  price_unit?: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order' | 'per_meter'
   operation_type?: string
 }
 
 export interface ServicePricing {
   service_id: number
-  price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order'
+  price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order' | 'per_meter'
   units_per_item: number
   // 🆕 tiers больше не храним в шаблоне продукта - цены берутся из централизованной системы услуг
   // tiers оставлен только для обратной совместимости со старыми данными, но не используется при сохранении

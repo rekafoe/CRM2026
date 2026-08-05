@@ -9,6 +9,8 @@ export class MaterialController {
     try {
       const {
         categoryId,
+        materialTypeId,
+        materialKind,
         category,
         finish,
         minDensity,
@@ -17,8 +19,15 @@ export class MaterialController {
         onlyActive
       } = req.query as Record<string, string | undefined>;
 
+      const normalizedMaterialKind =
+        materialKind && ['sheet', 'roll', 'consumable', 'area'].includes(materialKind)
+          ? (materialKind as 'sheet' | 'roll' | 'consumable' | 'area')
+          : undefined;
+
       const materials = await MaterialService.getAllMaterials({
         categoryId: categoryId ? Number(categoryId) : undefined,
+        materialTypeId: materialTypeId ? Number(materialTypeId) : undefined,
+        materialKind: normalizedMaterialKind,
         category: category || undefined,
         finish: finish || undefined,
         minDensity: minDensity ? Number(minDensity) : undefined,

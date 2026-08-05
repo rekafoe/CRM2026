@@ -76,6 +76,31 @@ function parseServiceMeterBasis(parametersRaw: string | null | undefined): 'knif
   }
 }
 
+function normalizeConsumptionMode(raw: unknown, fallback: 'fixed' | 'roll_feed' = 'fixed'): 'fixed' | 'roll_feed' {
+  const v = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (v === 'roll_feed' || v === 'fixed') return v;
+  return fallback;
+}
+
+function normalizeMeterBasis(raw: unknown, fallback: 'knife_path' | 'feed' = 'knife_path'): 'knife_path' | 'feed' {
+  const v = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return v === 'feed' ? 'feed' : v === 'knife_path' ? 'knife_path' : fallback;
+}
+
+const ALLOWED_FINISHING_PRICE_UNITS = new Set([
+  'per_item',
+  'per_sheet',
+  'per_cut',
+  'per_meter',
+  'fixed',
+  'per_order',
+]);
+
+function normalizeFinishingPriceUnit(raw: unknown, fallback: string = 'per_item'): string {
+  const v = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return ALLOWED_FINISHING_PRICE_UNITS.has(v) ? v : fallback;
+}
+
 export interface SimplifiedPricingResult {
   productId: number;
   productName: string;
@@ -154,9 +179,12 @@ export interface SimplifiedPricingResult {
     service_name: string;
     tier: { min_qty: number; max_qty?: number; price: number };
     units_needed: number;
+    raw_units_needed?: number;
     priceForQuantity: number;
     price_unit?: string;
     operation_type?: string;
+    consumption_mode?: 'fixed' | 'roll_feed';
+    meter_basis?: 'knife_path' | 'feed';
   }>;
   /** Материалы по операциям отделки (ламинирование, крепление и т.д.) — для списания со склада */
   operationMaterials?: Array<{ material_id: number; material_name: string; quantity: number }>;
@@ -243,7 +271,7 @@ interface SimplifiedSizeConfig {
   }>;
   finishing: Array<{
     service_id: number;
-    price_unit: 'per_cut' | 'per_item';
+    price_unit: 'per_cut' | 'per_item' | 'per_sheet' | 'fixed' | 'per_order' | 'per_meter';
     units_per_item: number;
     variant_id?: number; // 🆕 ID варианта для услуг с вариантами (например, ламинация)
     // ✅ tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
@@ -1166,6 +1194,10 @@ export class SimplifiedPricingService {
     let servicePriceUnitMap: Map<number, string> = new Map();
     let serviceLimitsMap: Map<number, { min?: number; max?: number }> = new Map();
     let serviceMeterBasisMap: Map<number, 'knife_path' | 'feed'> = new Map();
+    let serviceConsumptionModeMap: Map<number, 'fixed' | 'roll_feed'> = new Map();
+    let variantConsumptionModeMap: Map<number, 'fixed' | 'roll_feed'> = new Map();
+    let variantMeterBasisMap: Map<number, 'knife_path' | 'feed'> = new Map();
+    let variantPriceUnitMap: Map<number, string> = new Map();
 
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
     // При fallback на selectedSize.finishing фильтруем по is_default/is_required: только операции с галочкой «вкл по умолчанию» участвуют в расчёте
@@ -1442,6 +1474,11 @@ export class SimplifiedPricingService {
       if (uniqueServiceIds.length > 0) {
         const synthPlotterIds = uniqueServiceIds.filter((id) => isPlotterCuttingSyntheticServiceId(id));
         const normalServiceIds = uniqueServiceIds.filter((id) => !isPlotterCuttingSyntheticServiceId(id));
+        const serviceCols = await getTableColumns('post_processing_services');
+        const hasServiceConsumptionMode = serviceCols.has('consumption_mode');
+        const hasServiceMeterBasis = serviceCols.has('meter_basis');
+        const serviceConsumptionSel = hasServiceConsumptionMode ? ', consumption_mode' : '';
+        const serviceMeterBasisSel = hasServiceMeterBasis ? ', meter_basis' : '';
 
         const services =
           normalServiceIds.length > 0
@@ -1454,9 +1491,13 @@ export class SimplifiedPricingService {
                   min_quantity?: number | null;
                   max_quantity?: number | null;
                   parameters?: string | null;
+                  consumption_mode?: string | null;
+                  meter_basis?: string | null;
                 }>
               >(
-                `SELECT id, name, operation_type, price_unit, min_quantity, max_quantity, parameters FROM post_processing_services WHERE id IN (${normalServiceIds.map(() => '?').join(',')})`,
+                `SELECT id, name, operation_type, price_unit, min_quantity, max_quantity, parameters${serviceConsumptionSel}${serviceMeterBasisSel}
+                 FROM post_processing_services
+                 WHERE id IN (${normalServiceIds.map(() => '?').join(',')})`,
                 normalServiceIds
               )
             : [];
@@ -1470,8 +1511,20 @@ export class SimplifiedPricingService {
         serviceMeterBasisMap = new Map<number, 'knife_path' | 'feed'>(
           services.map((s): [number, 'knife_path' | 'feed'] => [
             s.id,
-            parseServiceMeterBasis(s.parameters ?? null),
+            hasServiceMeterBasis
+              ? normalizeMeterBasis(s.meter_basis, parseServiceMeterBasis(s.parameters ?? null))
+              : parseServiceMeterBasis(s.parameters ?? null),
           ])
+        );
+        serviceConsumptionModeMap = new Map<number, 'fixed' | 'roll_feed'>(
+          services.map((s): [number, 'fixed' | 'roll_feed'] => {
+            const fallback =
+              String(s.operation_type || '').toLowerCase() === 'laminate' &&
+              String(s.price_unit || '').toLowerCase() === 'per_meter'
+                ? 'roll_feed'
+                : 'fixed';
+            return [s.id, normalizeConsumptionMode(s.consumption_mode, fallback)];
+          })
         );
 
         // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
@@ -1487,6 +1540,7 @@ export class SimplifiedPricingService {
               serviceTypesMap.set(sid, 'plotter_cut');
               servicePriceUnitMap.set(sid, 'per_meter');
               serviceMeterBasisMap.set(sid, t.meter_basis === 'feed' ? 'feed' : 'knife_path');
+              serviceConsumptionModeMap.set(sid, 'fixed');
               serviceLimitsMap.set(sid, {
                 min: t.min_quantity ?? 1,
                 max: t.max_quantity ?? undefined,
@@ -1504,6 +1558,7 @@ export class SimplifiedPricingService {
               serviceNamesMap.set(sid, title);
               serviceTypesMap.set(sid, 'plotter_cut');
               servicePriceUnitMap.set(sid, 'per_item');
+              serviceConsumptionModeMap.set(sid, 'fixed');
               serviceLimitsMap.set(sid, { min: 1, max: undefined });
               serviceTiersMap.set(
                 String(sid),
@@ -1581,6 +1636,60 @@ export class SimplifiedPricingService {
           }
         }
 
+        const selectedVariantIds = Array.from(
+          new Set(
+            effectiveFinishingToUse
+              .map((item) => Number((item as any).variant_id))
+              .filter((id) => Number.isFinite(id) && id > 0)
+          )
+        );
+        if (selectedVariantIds.length > 0) {
+          const variantCols = await getTableColumns('service_variants');
+          const hasVariantConsumptionMode = variantCols.has('consumption_mode');
+          const hasVariantMeterBasis = variantCols.has('meter_basis');
+          const rows = await db.all<
+            Array<{
+              id: number;
+              parameters?: string | null;
+              consumption_mode?: string | null;
+              meter_basis?: string | null;
+            }>
+          >(
+            `SELECT id, parameters${hasVariantConsumptionMode ? ', consumption_mode' : ''}${
+              hasVariantMeterBasis ? ', meter_basis' : ''
+            }
+             FROM service_variants
+             WHERE id IN (${selectedVariantIds.map(() => '?').join(',')})`,
+            selectedVariantIds
+          );
+          for (const row of rows) {
+            let params: Record<string, unknown> = {};
+            if (row.parameters) {
+              try {
+                const parsed = JSON.parse(row.parameters);
+                if (parsed && typeof parsed === 'object') params = parsed as Record<string, unknown>;
+              } catch {
+                params = {};
+              }
+            }
+            const paramsConsumption = typeof params.consumption_mode === 'string' ? params.consumption_mode : undefined;
+            const paramsMeterBasis = typeof params.meter_basis === 'string' ? params.meter_basis : undefined;
+            const paramsPriceUnit = typeof params.price_unit === 'string' ? params.price_unit : undefined;
+            const fallbackMeterBasis = parseServiceMeterBasis(row.parameters ?? null);
+            variantConsumptionModeMap.set(
+              row.id,
+              normalizeConsumptionMode(row.consumption_mode ?? paramsConsumption ?? 'fixed', 'fixed')
+            );
+            variantMeterBasisMap.set(
+              row.id,
+              normalizeMeterBasis(row.meter_basis ?? paramsMeterBasis, fallbackMeterBasis)
+            );
+            if (paramsPriceUnit) {
+              variantPriceUnitMap.set(row.id, normalizeFinishingPriceUnit(paramsPriceUnit));
+            }
+          }
+        }
+
         logger.info('🔧 [SimplifiedPricingService] Итоговая карта тарифов услуг для finishing', {
           productId,
           serviceIds: Array.from(serviceTiersMap.keys()),
@@ -1593,16 +1702,29 @@ export class SimplifiedPricingService {
           const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
           const operationType = serviceTypesMap.get(finConfig.service_id) || '';
           const limits = serviceLimitsMap.get(finConfig.service_id);
-          const priceUnitFromDb = this.resolveFinishingPriceUnit(
+          let priceUnitFromDb = this.resolveFinishingPriceUnit(
             finConfig.service_id,
             finConfig as { price_unit?: string },
             servicePriceUnitMap
           );
+          if (variantId != null) {
+            const variantPriceUnit = variantPriceUnitMap.get(variantId);
+            if (variantPriceUnit) {
+              priceUnitFromDb = normalizeFinishingPriceUnit(variantPriceUnit, priceUnitFromDb);
+            }
+          }
+          const effectiveConsumptionMode =
+            variantId != null
+              ? variantConsumptionModeMap.get(variantId) ?? serviceConsumptionModeMap.get(finConfig.service_id) ?? 'fixed'
+              : serviceConsumptionModeMap.get(finConfig.service_id) ?? 'fixed';
 
           // Операции с price_unit=per_sheet: считаем по листам печати (или пог. м для рулонной). До резки обрабатываем целые листы.
           const isPerSheetOp = priceUnitFromDb === 'per_sheet';
           const isPerMeterOp = priceUnitFromDb === 'per_meter';
-          const meterBasis = serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path';
+          const meterBasis =
+            variantId != null
+              ? variantMeterBasisMap.get(variantId) ?? serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path'
+              : serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path';
           const meterUnits =
             isPerMeterOp && meterBasis === 'feed'
               ? materialMetersNeeded
@@ -1729,17 +1851,22 @@ export class SimplifiedPricingService {
 
           let servicePrice = 0;
           let totalUnits: number;
+          let rawUnits: number;
           if (isPerSheetOp) {
+            rawUnits = perSheetUnits;
             totalUnits = Math.max(perSheetUnits, serviceMinQty);
             servicePrice = effectivePriceForTier * totalUnits;
           } else if (priceUnit === 'per_meter') {
+            rawUnits = meterUnits;
             totalUnits = Math.max(meterUnits, serviceMinQty);
             servicePrice = effectivePriceForTier * totalUnits;
           } else if (priceUnit === 'per_cut') {
+            rawUnits = totalCutsForOrder;
             totalUnits = Math.max(totalCutsForOrder, serviceMinQty);
             servicePrice = effectivePriceForTier * totalUnits;
           } else {
-            totalUnits = quantity * (unitsPerItem ?? 1);
+            rawUnits = quantity * (unitsPerItem ?? 1);
+            totalUnits = rawUnits;
             servicePrice = effectivePriceForTier * totalUnits;
           }
           
@@ -1766,9 +1893,12 @@ export class SimplifiedPricingService {
             service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
             tier: { ...tier, price: effectivePriceForTier },
             units_needed: totalUnits,
+            raw_units_needed: rawUnits,
             priceForQuantity: servicePrice,
             price_unit: priceUnit,
             operation_type: operationType,
+            consumption_mode: effectiveConsumptionMode,
+            meter_basis: meterBasis,
           });
         }
       }
@@ -1844,47 +1974,152 @@ export class SimplifiedPricingService {
       const ppsCols = await getTableColumns('post_processing_services');
       const hasVariantMaterial = svCols.has('material_id') && svCols.has('qty_per_item');
       const hasServiceMaterial = ppsCols.has('material_id') && ppsCols.has('qty_per_item');
+      const hasVariantConsumptionMode = svCols.has('consumption_mode');
+      const hasVariantMeterBasis = svCols.has('meter_basis');
+      const hasServiceConsumptionMode = ppsCols.has('consumption_mode');
+      const hasServiceMeterBasis = ppsCols.has('meter_basis');
       const variantIds = [...new Set(finishingDetails.map((d) => d.variant_id).filter((id): id is number => typeof id === 'number' && Number.isFinite(id)))];
       const serviceIds = [...new Set(finishingDetails.map((d) => d.service_id))];
-      let variantMaterialMap: Map<number, { material_id: number; qty_per_item: number }> = new Map();
-      let serviceMaterialMap: Map<number, { material_id: number; qty_per_item: number }> = new Map();
+      type OperationMaterialSource = {
+        material_id: number;
+        qty_per_item: number;
+        consumption_mode: 'fixed' | 'roll_feed';
+        meter_basis: 'knife_path' | 'feed';
+      };
+      let variantMaterialMap: Map<number, OperationMaterialSource> = new Map();
+      let serviceMaterialMap: Map<number, OperationMaterialSource> = new Map();
       if (hasVariantMaterial && variantIds.length > 0) {
-        const rows = await db.all<Array<{ id: number; material_id: number | null; qty_per_item: number }>>(
-          `SELECT id, material_id, qty_per_item FROM service_variants WHERE id IN (${variantIds.map(() => '?').join(',')})`,
+        const rows = await db.all<
+          Array<{
+            id: number;
+            material_id: number | null;
+            qty_per_item: number;
+            consumption_mode?: string | null;
+            meter_basis?: string | null;
+          }>
+        >(
+          `SELECT id, material_id, qty_per_item${
+            hasVariantConsumptionMode ? ', consumption_mode' : ''
+          }${hasVariantMeterBasis ? ', meter_basis' : ''}
+           FROM service_variants
+           WHERE id IN (${variantIds.map(() => '?').join(',')})`,
           variantIds
         );
         rows.forEach((r) => {
-          if (r.material_id != null) variantMaterialMap.set(r.id, { material_id: r.material_id, qty_per_item: Number(r.qty_per_item ?? 1) });
+          if (r.material_id != null) {
+            variantMaterialMap.set(r.id, {
+              material_id: r.material_id,
+              qty_per_item: Number(r.qty_per_item ?? 1),
+              consumption_mode: normalizeConsumptionMode(r.consumption_mode, 'fixed'),
+              meter_basis: normalizeMeterBasis(r.meter_basis, 'knife_path'),
+            });
+          }
         });
       }
       if (hasServiceMaterial && serviceIds.length > 0) {
-        const rows = await db.all<Array<{ id: number; material_id: number | null; qty_per_item: number }>>(
-          `SELECT id, material_id, qty_per_item FROM post_processing_services WHERE id IN (${serviceIds.map(() => '?').join(',')})`,
+        const rows = await db.all<
+          Array<{
+            id: number;
+            material_id: number | null;
+            qty_per_item: number;
+            consumption_mode?: string | null;
+            meter_basis?: string | null;
+          }>
+        >(
+          `SELECT id, material_id, qty_per_item${
+            hasServiceConsumptionMode ? ', consumption_mode' : ''
+          }${hasServiceMeterBasis ? ', meter_basis' : ''}
+           FROM post_processing_services
+           WHERE id IN (${serviceIds.map(() => '?').join(',')})`,
           serviceIds
         );
         rows.forEach((r) => {
-          if (r.material_id != null) serviceMaterialMap.set(r.id, { material_id: r.material_id, qty_per_item: Number(r.qty_per_item ?? 1) });
+          if (r.material_id != null) {
+            const fallbackMode = serviceConsumptionModeMap.get(r.id) ?? 'fixed';
+            const fallbackBasis = serviceMeterBasisMap.get(r.id) ?? 'knife_path';
+            serviceMaterialMap.set(r.id, {
+              material_id: r.material_id,
+              qty_per_item: Number(r.qty_per_item ?? 1),
+              consumption_mode: normalizeConsumptionMode(r.consumption_mode, fallbackMode),
+              meter_basis: normalizeMeterBasis(r.meter_basis, fallbackBasis),
+            });
+          }
         });
       }
       const materialIdsToFetch = new Set<number>();
       for (const d of finishingDetails) {
-        const src = d.variant_id != null ? variantMaterialMap.get(d.variant_id) : serviceMaterialMap.get(d.service_id);
+        const src =
+          d.variant_id != null
+            ? variantMaterialMap.get(d.variant_id) ?? serviceMaterialMap.get(d.service_id)
+            : serviceMaterialMap.get(d.service_id);
         if (src) materialIdsToFetch.add(src.material_id);
       }
-      let materialNamesMap: Map<number, string> = new Map();
+      let materialInfoMap: Map<number, { name: string; sheet_width?: number | null; printable_width?: number | null }> = new Map();
       if (materialIdsToFetch.size > 0) {
-        const names = await db.all<Array<{ id: number; name: string }>>(
-          `SELECT id, name FROM materials WHERE id IN (${[...materialIdsToFetch].map(() => '?').join(',')})`,
+        const names = await db.all<Array<{ id: number; name: string; sheet_width?: number | null; printable_width?: number | null }>>(
+          `SELECT id, name, sheet_width, printable_width
+           FROM materials
+           WHERE id IN (${[...materialIdsToFetch].map(() => '?').join(',')})`,
           [...materialIdsToFetch]
         );
-        names.forEach((r) => materialNamesMap.set(r.id, r.name));
+        names.forEach((r) => materialInfoMap.set(r.id, r));
       }
+      const warnedRollFeedMaterials = new Set<number>();
       for (const d of finishingDetails) {
-        const src = d.variant_id != null ? variantMaterialMap.get(d.variant_id) : serviceMaterialMap.get(d.service_id);
+        const src =
+          d.variant_id != null
+            ? variantMaterialMap.get(d.variant_id) ?? serviceMaterialMap.get(d.service_id)
+            : serviceMaterialMap.get(d.service_id);
         if (!src) continue;
-        const qtyPerItem = src.qty_per_item;
-        const totalQty = qtyPerItem * d.units_needed;
-        const name = materialNamesMap.get(src.material_id) ?? `Material #${src.material_id}`;
+        const qtyPerItem = Math.max(0, Number(src.qty_per_item ?? 1));
+        const detailPriceUnit = String(d.price_unit || '').toLowerCase();
+        const detailMeterBasis = d.meter_basis ?? serviceMeterBasisMap.get(d.service_id) ?? 'knife_path';
+        const effectiveMeterBasis = normalizeMeterBasis(src.meter_basis, normalizeMeterBasis(detailMeterBasis, 'knife_path'));
+        const rawUnits = Math.max(0, Number(d.raw_units_needed ?? d.units_needed ?? 0));
+        const effectiveConsumptionMode = normalizeConsumptionMode(
+          src.consumption_mode,
+          d.consumption_mode ?? serviceConsumptionModeMap.get(d.service_id) ?? 'fixed'
+        );
+
+        let baseUnitsForConsumption = rawUnits;
+        if (effectiveConsumptionMode === 'roll_feed') {
+          const matInfo = materialInfoMap.get(src.material_id);
+          const rollWidthMm = Number(matInfo?.sheet_width ?? matInfo?.printable_width ?? 0);
+          if (Number.isFinite(rollWidthMm) && rollWidthMm > 0) {
+            const feedLayout = computeOptimizedRollFeedMeters({
+              rollWidthMm,
+              trimMm: layoutTrim,
+              bleedMm: resolvedBleedMm,
+              quantity,
+              margins: {
+                edgeMm:
+                  customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+                    ? Number(customMarginMm)
+                    : 0,
+                gapMm:
+                  customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+                    ? Number(customGapMm)
+                    : 0,
+              },
+            });
+            baseUnitsForConsumption = Math.max(0, Number(feedLayout.feedMeters || 0));
+          } else {
+            // Fallback: берем уже посчитанный расход базового рулона
+            baseUnitsForConsumption = Math.max(materialMetersNeeded, rawUnits);
+            if (!warnedRollFeedMaterials.has(src.material_id)) {
+              warnedRollFeedMaterials.add(src.material_id);
+              pricingWarnings.push(
+                `Материал операции #${src.material_id}: для roll_feed не задана ширина рулона, использован fallback по общему feed.`
+              );
+            }
+          }
+        } else if (detailPriceUnit === 'per_meter' && effectiveMeterBasis === 'feed') {
+          baseUnitsForConsumption = Math.max(rawUnits, materialMetersNeeded);
+        }
+
+        const totalQty = qtyPerItem * baseUnitsForConsumption;
+        if (!(totalQty > 0)) continue;
+        const name = materialInfoMap.get(src.material_id)?.name ?? `Material #${src.material_id}`;
         const existing = operationMaterials.find((m) => m.material_id === src.material_id);
         if (existing) existing.quantity += totalQty;
         else operationMaterials.push({ material_id: src.material_id, material_name: name, quantity: totalQty });

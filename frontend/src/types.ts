@@ -233,10 +233,24 @@ export interface PresetCategory {
 export interface Material {
   id: number;
   name: string;
+  description?: string;
   unit: string;
   quantity: number;
+  category_id?: number | null;
+  category_name?: string;
+  material_type_id?: number | null;
+  material_type_name?: string;
+  material_kind?: 'sheet' | 'roll' | 'consumable' | 'area';
+  supplier_id?: number | null;
+  supplier_name?: string;
   min_quantity?: number;
-  sheet_price_single?: number | null;
+  sheet_price_single?: number;
+  purchase_price?: number;
+  price?: number;
+  sheet_width?: number;
+  sheet_height?: number;
+  density?: number;
+  finish?: string;
 }
 
 export interface MaterialRow {

@@ -8,6 +8,7 @@ export { WarehouseTransactionService } from './services/warehouseTransactionServ
 export { MaterialBulkService } from './services/materialBulkService';
 export { MaterialReservationService } from './services/materialReservationService';
 export { MaterialCategoryService } from './services/materialCategoryService';
+export { MaterialTypeService } from './services/materialTypeService';
 export { MaterialAlertService } from './services/materialAlertService';
 export { AutoMaterialDeductionService } from './services/autoMaterialDeductionService';
 export { StockMonitoringService } from './services/stockMonitoringService';
@@ -20,5 +21,6 @@ export { WarehouseTransactionController } from './controllers/warehouseTransacti
 export { MaterialBulkController } from './controllers/materialBulkController';
 export { MaterialReservationController } from './controllers/materialReservationController';
 export { MaterialCategoryController } from './controllers/materialCategoryController';
+export { MaterialTypeController } from './controllers/materialTypeController';
 export { MaterialAlertController } from './controllers/materialAlertController';
 

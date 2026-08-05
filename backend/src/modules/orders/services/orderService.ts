@@ -29,6 +29,21 @@ import {
 import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
 
 export class OrderService {
+  private static isMeterUnit(unitRaw: unknown): boolean {
+    const unit = String(unitRaw || '').trim().toLowerCase();
+    return unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
+  }
+
+  private static computeRequiredQty(qtyPerItemRaw: unknown, orderQtyRaw: unknown, unitRaw?: unknown): number {
+    const qtyPerItem = Math.max(0, Number(qtyPerItemRaw) || 0);
+    const orderQty = Math.max(1, Number(orderQtyRaw) || 1);
+    const total = qtyPerItem * orderQty;
+    if (OrderService.isMeterUnit(unitRaw)) {
+      return Math.round(total * 100) / 100;
+    }
+    return Math.ceil(total);
+  }
+
   /** Старые инстансы без миграции — добавляем колонку при первом обращении. */
   private static async ensureOrdersIsCancelledColumn(): Promise<void> {
     if (await hasColumn('orders', 'is_cancelled')) return
@@ -1941,28 +1956,34 @@ export class OrderService {
     const hasLegacyPresetSchema = await hasColumn('product_materials', 'presetCategory')
     for (const item of items) {
       const paramsObj = JSON.parse(item.params || '{}') as { description?: string }
-      let composition: Array<{ materialId: number; qtyPerItem: number }> = []
+      let composition: Array<{ materialId: number; qtyPerItem: number; unit?: string | null }> = []
       if (hasRulesTable) {
         composition = (await db.all<{
           materialId: number
           qtyPerItem: number
+          unit?: string | null
         }>(
-          `SELECT material_id as materialId, qty_per_item as qtyPerItem
+          `SELECT pmr.material_id as materialId, pmr.qty_per_item as qtyPerItem, m.unit
            FROM product_material_rules
+           JOIN materials m ON m.id = pmr.material_id
            WHERE product_type = ? AND product_name = ?`,
           [item.type, paramsObj.description || '']
-        )) as unknown as Array<{ materialId: number; qtyPerItem: number }>
+        )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
       } else if (hasLegacyPresetSchema) {
         composition = (await db.all<{
           materialId: number
           qtyPerItem: number
+          unit?: string | null
         }>(
-          'SELECT materialId, qtyPerItem FROM product_materials WHERE presetCategory = ? AND presetDescription = ?',
+          `SELECT pm.materialId, pm.qtyPerItem, m.unit
+           FROM product_materials pm
+           JOIN materials m ON m.id = pm.materialId
+           WHERE pm.presetCategory = ? AND pm.presetDescription = ?`,
           [item.type, paramsObj.description || '']
-        )) as unknown as Array<{ materialId: number; qtyPerItem: number }>
+        )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
       }
       for (const c of composition) {
-        const add = Math.ceil((c.qtyPerItem || 0) * Math.max(1, Number(item.quantity) || 1))
+        const add = OrderService.computeRequiredQty(c.qtyPerItem || 0, Math.max(1, Number(item.quantity) || 1), c.unit)
         returns[c.materialId] = (returns[c.materialId] || 0) + add
       }
     }
@@ -1973,7 +1994,7 @@ export class OrderService {
     try {
       for (const mid of Object.keys(returns)) {
         const materialId = Number(mid)
-        const addQty = Math.ceil(returns[materialId])
+        const addQty = Number(returns[materialId] || 0)
         if (addQty > 0) {
           await MaterialTransactionService.addInTransaction(db, {
             materialId,
