@@ -62,13 +62,13 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
       {noPriceColumns && (
         <div className="service-variants-ranges-hint">
           Столбцы с ценами появятся после добавления диапазона тиража. Нажмите <strong>«Диапазон»</strong> справа
-          (например, граница <strong>1</strong>). Цены и материал списания — в <strong>конечных</strong> строках
-          (тип без подтипов или сам подтип). Удаление строки — красный <strong>×</strong> в колонке «Действия».
+          (например, граница <strong>1</strong>). Цены и материал — в конечных строках. Удаление — красный{' '}
+          <strong>×</strong> справа в колонке «Действия» (затем сохраните изменения).
         </div>
       )}
       <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small service-variants-grid">
         <div className="el-table__header-wrapper">
-          <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header" style={{ width: '100%' }}>
+          <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header">
             <colgroup>
               <col className="variant-name-col" />
               {commonRangesAsPriceRanges.map((range) => (
@@ -97,7 +97,7 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                   hoveredRangeIndex={hoveredRangeIndex}
                   onRangeHover={onRangeHover}
                 />
-                <th style={{ width: '132px', minWidth: '132px', maxWidth: '132px', padding: 0 }}>
+                <th className="variant-actions-th">
                   <div className="cell">
                     <div className="active-panel variant-actions-header">
                       <span className="variant-actions-label">Действия</span>
@@ -109,7 +109,7 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
           </table>
         </div>
         <div className="el-table__body-wrapper is-scrolling-none">
-          <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body" style={{ width: '100%' }}>
+          <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body">
             <colgroup>
               <col className="variant-name-col" />
               {commonRangesAsPriceRanges.map((range) => (

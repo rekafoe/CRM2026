@@ -52,12 +52,12 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
             <Slot>
               <button
                 type="button"
-                className="el-button el-button--danger el-button--small is-plain variant-delete-btn"
+                className="el-button el-button--danger el-button--small variant-delete-btn"
                 onClick={onDelete}
                 title="Удалить вариант (и все дочерние)"
                 aria-label="Удалить вариант"
               >
-                <span style={{ fontSize: '14px' }}>×</span>
+                <span aria-hidden>×</span>
               </button>
             </Slot>
           </>

@@ -128,17 +128,17 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- только debouncedSearchQuery, иначе бесконечные запросы
   }, [debouncedSearchQuery]);
 
-  // Фильтрованные продукты.
-  // Локальный фильтр обязателен: SQLite LIKE ломает кириллицу («УФ-печать» / «Печать»),
-  // а уже загруженный список products как раз содержит калькуляторные продукты.
+  // Поиск: строго по названию (локально + API), без description/category.
   const filteredProducts = useMemo(() => {
     const q = searchQuery.trim();
     if (q) {
-      const localMatches = products.filter((p) => productMatchesSearchQuery(p, q));
-      const apiMatches = searchResults.filter((p) => productMatchesSearchQuery(p, q));
       const byId = new Map<number, Product>();
-      for (const p of localMatches) byId.set(p.id, p);
-      for (const p of apiMatches) byId.set(p.id, p);
+      for (const p of products) {
+        if (productMatchesSearchQuery(p, q)) byId.set(p.id, p);
+      }
+      for (const p of searchResults) {
+        if (productMatchesSearchQuery(p, q)) byId.set(p.id, p);
+      }
       return Array.from(byId.values()).sort((a, b) =>
         String(a.name || '').localeCompare(String(b.name || ''), 'ru')
       );
@@ -225,7 +225,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
           <div className="search-input-container">
             <input
               type="text"
-              placeholder="Поиск по названию продукта..."
+              placeholder="Поиск по названию…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
@@ -315,46 +315,51 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
             ) : null}
 
             <div className="products-grid">
-              <div
-                className={`product-card custom-product-card ${isProductSelected(postprintProduct) ? 'selected' : ''}`}
-                onClick={() => handleProductSelect(postprintProduct)}
-              >
-                <div className="product-icon">{renderProductIcon(postprintProduct)}</div>
-                <div className="product-info">
-                  <h4 className="product-name">{postprintProduct.name}</h4>
-                  <p className="product-description">{postprintProduct.description}</p>
-                  <div className="product-category">
-                    <span className="category-badge">
-                      <AppIcon name={getProductCategoryIconName(postprintProduct)} size="xs" /> {postprintProduct.category_name}
-                    </span>
+              {/* Служебные карточки — только когда нет поискового запроса */}
+              {!searchQuery.trim() && (
+                <>
+                  <div
+                    className={`product-card custom-product-card ${isProductSelected(postprintProduct) ? 'selected' : ''}`}
+                    onClick={() => handleProductSelect(postprintProduct)}
+                  >
+                    <div className="product-icon">{renderProductIcon(postprintProduct)}</div>
+                    <div className="product-info">
+                      <h4 className="product-name">{postprintProduct.name}</h4>
+                      <p className="product-description">{postprintProduct.description}</p>
+                      <div className="product-category">
+                        <span className="category-badge">
+                          <AppIcon name={getProductCategoryIconName(postprintProduct)} size="xs" /> {postprintProduct.category_name}
+                        </span>
+                      </div>
+                    </div>
+                    {isProductSelected(postprintProduct) && (
+                      <div className="selected-indicator">
+                        <AppIcon name="check" size="sm" />
+                      </div>
+                    )}
                   </div>
-                </div>
-                {isProductSelected(postprintProduct) && (
-                  <div className="selected-indicator">
-                    <AppIcon name="check" size="sm" />
+                  <div
+                    className={`product-card custom-product-card ${isProductSelected(customProduct) ? 'selected' : ''}`}
+                    onClick={() => handleProductSelect(customProduct)}
+                  >
+                    <div className="product-icon">{renderProductIcon(customProduct)}</div>
+                    <div className="product-info">
+                      <h4 className="product-name">{customProduct.name}</h4>
+                      <p className="product-description">{customProduct.description}</p>
+                      <div className="product-category">
+                        <span className="category-badge">
+                          <AppIcon name={getProductCategoryIconName(customProduct)} size="xs" /> {customProduct.category_name}
+                        </span>
+                      </div>
+                    </div>
+                    {isProductSelected(customProduct) && (
+                      <div className="selected-indicator">
+                        <AppIcon name="check" size="sm" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div
-                className={`product-card custom-product-card ${isProductSelected(customProduct) ? 'selected' : ''}`}
-                onClick={() => handleProductSelect(customProduct)}
-              >
-                <div className="product-icon">{renderProductIcon(customProduct)}</div>
-                <div className="product-info">
-                  <h4 className="product-name">{customProduct.name}</h4>
-                  <p className="product-description">{customProduct.description}</p>
-                  <div className="product-category">
-                    <span className="category-badge">
-                      <AppIcon name={getProductCategoryIconName(customProduct)} size="xs" /> {customProduct.category_name}
-                    </span>
-                  </div>
-                </div>
-                {isProductSelected(customProduct) && (
-                  <div className="selected-indicator">
-                    <AppIcon name="check" size="sm" />
-                  </div>
-                )}
-              </div>
+                </>
+              )}
               {Array.isArray(filteredProducts) && filteredProducts.map(product => (
                 <div
                   key={product.id}

@@ -153,7 +153,6 @@
 .table-container .el-table {
   width: 100%;
   min-width: 100%;
-  max-width: 100%;
   margin: 0;
   border: none;
 }
@@ -163,10 +162,12 @@
   min-width: 100%;
 }
 
+/* Таблица растёт по колонкам — скролл у .table-container, а не сжатие «Действий» */
 .service-variants-grid .el-table__header,
 .service-variants-grid .el-table__body {
-  width: 100%;
+  width: max-content;
   min-width: 100%;
+  table-layout: fixed;
 }
 
 /* Закрепленный заголовок диапазонов */
@@ -311,7 +312,8 @@
 }
 
 .actions-col {
-  width: 132px;
+  width: 148px;
+  min-width: 148px;
 }
 
 .range-col {
@@ -519,11 +521,36 @@
   padding-right: 4px;
 }
 
+/* Колонка действий всегда справа поверх диапазонов цен */
+.variant-actions-th,
 .variant-actions-cell {
-  width: 132px;
-  min-width: 132px;
-  max-width: 132px;
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  width: 148px;
+  min-width: 148px;
+  max-width: 148px;
   padding: 0;
+  vertical-align: middle;
+  overflow: visible !important;
+  background: var(--bg-primary, #fff);
+  box-shadow: -6px 0 10px rgba(15, 23, 42, 0.08);
+}
+
+.variant-actions-th {
+  z-index: 5;
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.el-table__body tr:nth-child(odd) > .variant-actions-cell {
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.el-table__body tr:nth-child(even) > .variant-actions-cell {
+  background: var(--bg-primary, #fff);
+}
+
+.variant-actions-cell {
   vertical-align: middle;
 }
 
@@ -700,15 +727,18 @@
   color: #fff;
 }
 
-.service-variants-table .variant-delete-btn {
-  color: var(--danger, #e11d48) !important;
-  background: var(--bg-primary, #ffffff) !important;
-  border-color: var(--danger, #e11d48) !important;
-}
-
-.service-variants-table .variant-delete-btn:hover {
+.service-variants-table .variant-delete-btn,
+.service-variants-grid .variant-delete-btn {
+  color: #fff !important;
   background: var(--danger, #e11d48) !important;
   border-color: var(--danger, #e11d48) !important;
+  font-weight: 700;
+}
+
+.service-variants-table .variant-delete-btn:hover,
+.service-variants-grid .variant-delete-btn:hover {
+  background: #be123c !important;
+  border-color: #be123c !important;
   color: #fff !important;
 }
 

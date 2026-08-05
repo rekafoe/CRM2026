@@ -17,28 +17,26 @@ function normalizeProductSearchText(value: unknown): string {
   return String(value ?? '')
     .toLocaleLowerCase('ru-RU')
     .replace(/ё/g, 'е')
-    .replace(/[\u2010-\u2015\u2212\-_/]+/g, ' ')
+    .replace(/[\u2010-\u2015\u2212]/g, ' ')
+    .replace(/[-_/]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+/** Только название / route_key — не description/category (иначе «печать» тянет почти весь каталог). */
 function productMatchesSearchQuery(
-  product: { name?: unknown; description?: unknown; category_name?: unknown; route_key?: unknown },
+  product: { name?: unknown; route_key?: unknown },
   rawQuery: string
 ): boolean {
   const needle = normalizeProductSearchText(rawQuery);
-  if (!needle) return true;
-  const haystack = [
-    product.name,
-    product.description,
-    product.category_name,
-    product.route_key,
-  ]
+  if (!needle) return false;
+  const tokens = needle.split(' ').filter(Boolean);
+  if (tokens.length === 0) return false;
+  const haystack = [product.name, product.route_key]
     .map(normalizeProductSearchText)
     .filter(Boolean)
     .join(' ');
-  // Все токены запроса должны встретиться (порядок не важен)
-  const tokens = needle.split(' ').filter(Boolean);
+  if (!haystack) return false;
   return tokens.every((token) => haystack.includes(token));
 }
 
