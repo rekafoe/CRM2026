@@ -273,13 +273,23 @@
 
 .warehouse-dashboard--embedded .material-card {
   min-height: 0 !important;
-  padding: 14px !important;
+  padding: 18px !important;
 }
 
 .warehouse-dashboard--embedded .material-actions {
   margin-top: auto !important;
   padding-top: 8px !important;
-  gap: 6px !important;
+  gap: 8px !important;
+}
+
+.warehouse-dashboard--embedded .inv-table th,
+.warehouse-dashboard--embedded .inv-table td {
+  padding: 14px 16px !important;
+}
+
+.warehouse-dashboard--embedded .inv-table--ops th,
+.warehouse-dashboard--embedded .inv-table--ops td {
+  padding: 16px 18px !important;
 }
 
 .warehouse-dashboard--embedded .materials-filters {

@@ -11,6 +11,7 @@
 
 .app-icon__svg {
   display: block;
+  flex-shrink: 0;
 }
 
 /* ---- Circle variant — dark background ---- */

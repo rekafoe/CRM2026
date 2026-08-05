@@ -6,14 +6,22 @@
 
 .inventory-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.inventory-header h2 {
+  margin: 0;
 }
 
 .inv-header-sub {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   font-size: 13px;
+  line-height: 1.45;
   color: #6b7280;
+  max-width: 40rem;
 }
 
 .inv-section-hint {
@@ -72,11 +80,17 @@
 
 .inv-table th,
 .inv-table td {
-  padding: 10px 12px;
+  padding: 14px 16px;
   border-bottom: 1px solid #f1f3f4;
-  border-right: 1px solid #f1f3f4; /* вертикальные разделители */
-  text-align: center; /* центрируем контент по колонке */
+  border-right: 1px solid #f1f3f4;
+  text-align: center;
   font-size: 13px;
+  vertical-align: middle;
+}
+
+.inv-table--ops th,
+.inv-table--ops td {
+  padding: 16px 18px;
 }
 
 /* Убираем правую границу у последней колонки */
@@ -103,28 +117,78 @@
   margin-bottom: 12px;
 }
 
-.inv-actions--labeled {
+.inv-actions--labeled,
+.inv-actions--icon {
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .inv-table .col-name {
   text-align: left;
-  min-width: 160px;
+  min-width: 180px;
 }
 
 .inv-table .col-actions {
-  min-width: 220px;
+  min-width: 280px;
 }
 
 .inv-material-name {
   font-weight: 600;
   color: #111827;
+  line-height: 1.35;
 }
 
 .inv-material-meta {
-  margin-top: 2px;
+  margin-top: 4px;
   font-size: 12px;
   color: #6b7280;
+  line-height: 1.35;
+}
+
+.inv-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inv-icon-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.inv-icon-btn .app-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.inv-icon-btn--in {
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.inv-icon-btn--in:hover {
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.inv-icon-btn--out {
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.inv-icon-btn--out:hover {
+  background: rgba(245, 158, 11, 0.14);
 }
 
 .action-btn {

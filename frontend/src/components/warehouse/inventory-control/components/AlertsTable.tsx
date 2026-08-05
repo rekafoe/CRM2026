@@ -2,6 +2,7 @@ import React from 'react';
 import { Material } from '../../../../types/shared';
 import { formatRollStockLabel, isRollMaterial } from '../../../../utils/materialRollLabels';
 import { getSuggestedReplenishQty } from '../../../../utils/materialStockOps';
+import { AppIcon } from '../../../ui/AppIcon';
 
 interface Alert {
   id: number;
@@ -84,21 +85,23 @@ export const AlertsTable: React.FC<AlertsTableProps> = React.memo(({
                   </span>
                 </td>
                 <td className="col-actions">
-                  <div className="inv-actions inv-actions--labeled">
+                  <div className="inv-actions inv-actions--icon">
                     <button
                       type="button"
-                      className="action-btn action-btn--text primary"
+                      className="inv-icon-btn inv-icon-btn--in"
                       title={`Приход до минимума: +${suggestLabel}`}
                       onClick={() => onReceive(m)}
                     >
-                      Приход +{suggestLabel}
+                      <AppIcon name="arrow-up" size="sm" />
+                      <span>Приход +{suggestLabel}</span>
                     </button>
                     <button
                       type="button"
-                      className="action-btn action-btn--text"
+                      className="inv-icon-btn"
                       onClick={() => onViewHistory(m)}
                     >
-                      История
+                      <AppIcon name="history" size="sm" />
+                      <span>История</span>
                     </button>
                   </div>
                 </td>

@@ -137,7 +137,7 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
           <WarehouseButton
             variant="primary"
             size="sm"
-            icon={<AppIcon name="pencil" size="xs" />}
+            icon={<AppIcon name="pencil" size="sm" />}
             onClick={() => onEdit(material)}
             className="action-btn"
             title="Редактировать"
@@ -147,7 +147,7 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
           <WarehouseButton
             variant="warning"
             size="sm"
-            icon={<AppIcon name="box" size="xs" />}
+            icon={<AppIcon name="reserve" size="sm" />}
             onClick={() => onReserve(material)}
             className="action-btn"
             title="Резерв / списание"
@@ -157,7 +157,7 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
           <WarehouseButton
             variant="danger"
             size="sm"
-            icon={<AppIcon name="trash" size="xs" />}
+            icon={<AppIcon name="trash" size="sm" />}
             onClick={() => onDelete(material)}
             className="action-btn"
             title="Удалить"

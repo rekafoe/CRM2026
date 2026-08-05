@@ -1,6 +1,7 @@
 import React from 'react';
 import { Material } from '../../../../types/shared';
 import { formatRollStockLabel, isRollMaterial } from '../../../../utils/materialRollLabels';
+import { AppIcon } from '../../../ui/AppIcon';
 
 interface MaterialsTableProps {
   materials: Material[];
@@ -73,30 +74,33 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
                   <span className={`inv-badge status-${status.key}`}>{status.label}</span>
                 </td>
                 <td className="col-actions">
-                  <div className="inv-actions inv-actions--labeled">
+                  <div className="inv-actions inv-actions--icon">
                     <button
                       type="button"
-                      className="action-btn action-btn--text primary"
+                      className="inv-icon-btn inv-icon-btn--in"
                       title="Приход"
                       onClick={() => onMaterialAction(m, 'in')}
                     >
-                      Приход
+                      <AppIcon name="arrow-up" size="sm" />
+                      <span>Приход</span>
                     </button>
                     <button
                       type="button"
-                      className="action-btn action-btn--text"
+                      className="inv-icon-btn inv-icon-btn--out"
                       title="Списание"
                       onClick={() => onMaterialAction(m, 'out')}
                     >
-                      Списание
+                      <AppIcon name="arrow-down" size="sm" />
+                      <span>Списание</span>
                     </button>
                     <button
                       type="button"
-                      className="action-btn action-btn--text"
+                      className="inv-icon-btn"
                       title="История движений"
                       onClick={() => onViewTransactions(m.id!)}
                     >
-                      История
+                      <AppIcon name="history" size="sm" />
+                      <span>История</span>
                     </button>
                   </div>
                 </td>
