@@ -23,6 +23,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceMinQuantity,
   serviceMaxQuantity,
   operationType,
+  priceUnit,
   materials = [],
 }) => {
   const isBindService = (operationType ?? '').toLowerCase() === 'bind';
@@ -113,6 +114,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           typeNames={typeNames}
           groupedVariants={groupedVariants}
           materials={materials}
+          priceUnit={priceUnit}
+          operationType={operationType}
           onUpdateMaterial={operations.updateVariantMaterial}
         />
       )}

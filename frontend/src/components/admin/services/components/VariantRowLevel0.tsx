@@ -1,5 +1,6 @@
 /**
  * Строка уровня 0 — тип (родительская строка дерева вариантов).
+ * Если детей нет — это лист: можно вводить цены сразу.
  */
 import React, { memo, useCallback, useRef } from 'react';
 import { PriceRangeCells } from './PriceRangeCells';
@@ -22,9 +23,13 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
   onCreateChild,
   onCreateSibling,
   onDelete,
+  onPriceChange,
 }) => {
   const allRef = useRef(allTypeVariants);
   allRef.current = allTypeVariants;
+
+  // Только сам корень — лист, цены вводим здесь; иначе цены у дочерних строк
+  const isLeaf = (allTypeVariants?.length ?? 1) <= 1;
 
   const handleNameEditStart = useCallback(() => {
     onNameEditStart(variant.id, typeName);
@@ -41,6 +46,13 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
   const handleDelete = useCallback(() => {
     onDelete(typeName, (allRef.current ?? []).map((v) => v.id));
   }, [typeName, onDelete]);
+
+  const handlePriceChange = useCallback(
+    (minQty: number, newPrice: number) => {
+      onPriceChange?.(variant.id, minQty, newPrice);
+    },
+    [variant.id, onPriceChange]
+  );
 
   return (
     <tr className="el-table__row expanded">
@@ -80,10 +92,10 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
         </div>
       </td>
       <PriceRangeCells
-        tiers={[]}
+        tiers={isLeaf ? variant.tiers : []}
         commonRanges={commonRangesAsPriceRanges}
-        onPriceChange={NOOP_PRICE}
-        editable={false}
+        onPriceChange={isLeaf && onPriceChange ? handlePriceChange : NOOP_PRICE}
+        editable={isLeaf && Boolean(onPriceChange)}
       />
       <VariantRowActions
         layout="root"

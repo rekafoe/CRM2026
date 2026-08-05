@@ -94,27 +94,26 @@ export function useVariantOperations(
       // Добавляем новый вариант в локальное состояние
       setVariants((prev) => [...prev, newVariantWithTiers]);
 
-      // 🆕 Обновляем tiers для всех вариантов после создания нового варианта
-      // Это нужно, чтобы таблица диапазонов обновилась для всех вариантов
+      // Подтягиваем tiers с сервера; пустой ответ не затирает локальный default (иначе пропадают колонки цен)
       setTimeout(async () => {
         try {
-          // Получаем tiers для нового варианта
           const newVariantTiers = await getServiceVariantTiers(serviceId, newVariant.id);
-
-          // Обновляем локальный вариант с актуальными tiers
-          setVariants((prev) =>
-            prev.map((v) =>
-              v.id === newVariant.id
-                ? { ...v, tiers: newVariantTiers }
-                : v
-            )
-          );
-          
-          // 🆕 Перезагружаем все варианты, чтобы обновить таблицу диапазонов
+          if (newVariantTiers.length > 0) {
+            setVariants((prev) =>
+              prev.map((v) => (v.id === newVariant.id ? { ...v, tiers: newVariantTiers } : v))
+            );
+          } else {
+            // На старых бэкендах без авто-диапазона — создаём границу «от 1»
+            try {
+              await addRangeBoundaryAPI(serviceId, 1);
+            } catch {
+              /* ignore */
+            }
+          }
+          invalidateCacheRef.current?.();
           await reloadVariantsRef.current();
         } catch (err) {
           console.error('Ошибка обновления tiers после создания варианта:', err);
-          // В случае ошибки все равно перезагружаем варианты
           await reloadVariantsRef.current();
         }
       }, 300);

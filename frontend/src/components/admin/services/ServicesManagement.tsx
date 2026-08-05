@@ -9,7 +9,7 @@ import { AppIcon } from '../../ui/AppIcon';
 import { PricingService } from '../../../types/pricing';
 import { ServiceFormState } from './components/ServiceForm';
 import usePricingServices from '../../../hooks/pricing/usePricingServices';
-import { getServiceCategories } from '../../../services/pricing';
+import { createServiceCategory, getServiceCategories, getServiceVariants } from '../../../services/pricing';
 import { ServiceCategory } from '../../../types/pricing';
 import { getMaterials } from '../../../api';
 import { ServiceCategoriesBlock } from './components/ServiceCategoriesBlock';
@@ -18,17 +18,26 @@ import { useServiceOperations } from './hooks/useServiceOperations';
 import { useTierOperations } from './hooks/useTierOperations';
 import { filterAndSortServices } from './utils/serviceFilters';
 import { getServiceIcon, getServiceTypeLabel, getUnitLabel } from './utils/serviceFormatters';
+import {
+  findWideFormatCategory,
+  isBindingService,
+  isWideFormatService,
+  WIDE_FORMAT_CATEGORY_NAME,
+} from './utils/wideFormatServices';
 import ServiceForm from './components/ServiceForm';
 import ServiceVolumeTiersPanel from './components/ServiceVolumeTiersPanel';
 import { AutoCuttingPriceSidebar } from './components/AutoCuttingPriceSidebar';
 import { ServiceVariantsTable } from './components/ServiceVariantsTable';
 import { ServicesFilters } from './components/ServicesFilters';
 import { ServiceCategoryTableSection } from './components/ServiceCategoryTableSection';
-import { getServiceVariants } from '../../../services/pricing';
 import './ServicesManagement.css';
+
+type ServicesWorkspaceTab = 'ordinary' | 'bindings' | 'wideformat';
+type CreateMode = 'service' | 'binding' | 'wideformat';
 
 /** Ключи секций списка услуг (аккордеон по категориям) */
 const SVC_SECTION_BINDINGS = 'svc-bindings';
+const SVC_SECTION_WIDEFORMAT = 'svc-wideformat';
 const svcSectionKey = (categoryId: number | null) =>
   categoryId != null ? `svc-cat-${categoryId}` : 'svc-cat-none';
 
@@ -58,6 +67,17 @@ const bindingServiceForm: ServiceFormState = {
   hasVariants: true,
 };
 
+const wideFormatServiceForm = (categoryId: number | '' = ''): ServiceFormState => ({
+  ...emptyServiceForm,
+  type: 'postprint',
+  operationType: 'laminate',
+  unit: 'per_m2',
+  hasVariants: true,
+  consumptionMode: 'roll_feed',
+  meterBasis: 'feed',
+  categoryId,
+});
+
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
   name: service.name,
   type: service.type,
@@ -81,7 +101,8 @@ interface ServicesManagementProps {
 }
 
 const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = true }) => {
-  const [createMode, setCreateMode] = useState<'service' | 'binding'>('service');
+  const [workspaceTab, setWorkspaceTab] = useState<ServicesWorkspaceTab>('ordinary');
+  const [createMode, setCreateMode] = useState<CreateMode>('service');
   const [createSubmitting, setCreateSubmitting] = useState(false);
   // Управление состоянием
   const {
@@ -113,7 +134,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
 
   const [servicesWithVariants, setServicesWithVariants] = useState<Set<number>>(new Set());
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
-  const [materials, setMaterials] = useState<Array<{ id: number; name: string }>>([]);
+  const [materials, setMaterials] = useState<Array<{ id: number; name: string; sheet_width?: number | null }>>([]);
 
   const serviceCategoryAccordionId = useId();
   const [openServiceCategorySections, setOpenServiceCategorySections] = useState<Set<string>>(
@@ -143,10 +164,24 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   }, [loadCategories]);
 
   useEffect(() => {
+    if (workspaceTab === 'bindings') {
+      setOpenServiceCategorySections((prev) => new Set(prev).add(SVC_SECTION_BINDINGS));
+    } else if (workspaceTab === 'wideformat') {
+      setOpenServiceCategorySections((prev) => new Set(prev).add(SVC_SECTION_WIDEFORMAT));
+    }
+  }, [workspaceTab]);
+
+  useEffect(() => {
     getMaterials()
       .then((res) => {
         const list = Array.isArray(res?.data) ? res.data : [];
-        setMaterials(list.map((m: any) => ({ id: m.id, name: m.name || `#${m.id}` })));
+        setMaterials(
+          list.map((m: any) => ({
+            id: m.id,
+            name: m.name || `#${m.id}`,
+            sheet_width: m.sheet_width != null ? Number(m.sheet_width) : null,
+          }))
+        );
       })
       .catch(() => setMaterials([]));
   }, []);
@@ -260,18 +295,59 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     return nameOk && unitOk && rateOk;
   }, [state.newServiceForm]);
 
+  const ensureWideFormatCategoryId = useCallback(async (): Promise<number | ''> => {
+    const existing = findWideFormatCategory(categories);
+    if (existing) return existing.id;
+    try {
+      const created = await createServiceCategory(WIDE_FORMAT_CATEGORY_NAME);
+      setCategories((prev) => [...prev, created]);
+      return created.id;
+    } catch {
+      return '';
+    }
+  }, [categories]);
+
+  const openCreateModal = useCallback(
+    async (mode: CreateMode) => {
+      setCreateMode(mode);
+      if (mode === 'binding') {
+        resetNewServiceForm(bindingServiceForm);
+      } else if (mode === 'wideformat') {
+        const categoryId = await ensureWideFormatCategoryId();
+        resetNewServiceForm(wideFormatServiceForm(categoryId));
+      } else {
+        resetNewServiceForm(emptyServiceForm);
+      }
+      setShowCreateService(true);
+    },
+    [ensureWideFormatCategoryId, resetNewServiceForm, setShowCreateService]
+  );
+
   const handleServiceCreate = useCallback(async () => {
     if (createSubmitting || !createFormValid) return;
     setCreateSubmitting(true);
     try {
+      let categoryId =
+        state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined;
+      if (createMode === 'wideformat' && categoryId == null) {
+        const ensured = await ensureWideFormatCategoryId();
+        categoryId = ensured === '' ? undefined : ensured;
+      }
+      const unit =
+        createMode === 'wideformat'
+          ? state.newServiceForm.unit || 'per_m2'
+          : state.newServiceForm.unit || 'item';
       const payload = {
         name: state.newServiceForm.name.trim(),
         type: state.newServiceForm.type || 'postprint',
-        unit: state.newServiceForm.unit || 'item',
+        unit,
         rate: Number(state.newServiceForm.rate || 0),
         isActive: state.newServiceForm.isActive,
         hasVariants: state.newServiceForm.hasVariants,
-        operationType: state.newServiceForm.operationType || 'other',
+        operationType:
+          createMode === 'wideformat'
+            ? state.newServiceForm.operationType || 'laminate'
+            : state.newServiceForm.operationType || 'other',
         minQuantity: state.newServiceForm.minQuantity
           ? Number(state.newServiceForm.minQuantity)
           : undefined,
@@ -281,14 +357,22 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         operator_percent: state.newServiceForm.operatorPercent !== ''
           ? Number(state.newServiceForm.operatorPercent) || 0
           : undefined,
-        categoryId: state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined,
+        categoryId,
         material_id: state.newServiceForm.materialId !== '' ? state.newServiceForm.materialId : undefined,
         qty_per_item: state.newServiceForm.qtyPerItem !== '' && Number(state.newServiceForm.qtyPerItem) > 0 ? Number(state.newServiceForm.qtyPerItem) : undefined,
-        consumption_mode: state.newServiceForm.materialId !== '' ? state.newServiceForm.consumptionMode : undefined,
+        consumption_mode:
+          createMode === 'wideformat'
+            ? state.newServiceForm.consumptionMode || 'roll_feed'
+            : state.newServiceForm.materialId !== ''
+              ? state.newServiceForm.consumptionMode
+              : undefined,
         meter_basis:
-          state.newServiceForm.materialId !== '' &&
-          (state.newServiceForm.consumptionMode === 'roll_feed' || state.newServiceForm.unit === 'per_meter')
-            ? state.newServiceForm.meterBasis
+          createMode === 'wideformat' ||
+          (state.newServiceForm.materialId !== '' &&
+            (state.newServiceForm.consumptionMode === 'roll_feed' ||
+              state.newServiceForm.unit === 'per_meter' ||
+              state.newServiceForm.unit === 'per_m2'))
+            ? state.newServiceForm.meterBasis || 'feed'
             : undefined,
       };
       const created = createMode === 'binding'
@@ -299,11 +383,21 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         setShowCreateService(false);
         setCreateMode('service');
         resetNewServiceForm(emptyServiceForm);
+        if (createMode === 'wideformat') setWorkspaceTab('wideformat');
+        if (createMode === 'binding') setWorkspaceTab('bindings');
       }
     } finally {
       setCreateSubmitting(false);
     }
-  }, [createSubmitting, createFormValid, createMode, state.newServiceForm, setShowCreateService, resetNewServiceForm]);
+  }, [
+    createSubmitting,
+    createFormValid,
+    createMode,
+    state.newServiceForm,
+    setShowCreateService,
+    resetNewServiceForm,
+    ensureWideFormatCategoryId,
+  ]);
 
   const handleServiceDelete = useCallback(async (id: number, serviceName: string) => {
     await serviceOperationsRef.current.deleteService(id, serviceName);
@@ -328,31 +422,39 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     }
   }, [state.expandedServiceId, state.volumeTiers, setExpandedServiceId]); // tierOperations через ref
 
-  // Фильтрация и сортировка
+  const workspaceCounts = useMemo(() => {
+    let ordinary = 0;
+    let bindings = 0;
+    let wideformat = 0;
+    for (const s of services) {
+      if (isBindingService(s)) bindings += 1;
+      else if (isWideFormatService(s)) wideformat += 1;
+      else ordinary += 1;
+    }
+    return { ordinary, bindings, wideformat };
+  }, [services]);
+
+  // Фильтрация и сортировка в рамках текущей вкладки
   const filteredServices = useMemo(() => {
-    return filterAndSortServices(services, {
+    const scoped = services.filter((s) => {
+      if (workspaceTab === 'bindings') return isBindingService(s);
+      if (workspaceTab === 'wideformat') return !isBindingService(s) && isWideFormatService(s);
+      return !isBindingService(s) && !isWideFormatService(s);
+    });
+    return filterAndSortServices(scoped, {
       search: state.serviceSearch,
       typeFilter: state.typeFilter,
       sortBy: state.sortBy,
       sortOrder: state.sortOrder,
     });
-  }, [services, state.serviceSearch, state.typeFilter, state.sortBy, state.sortOrder]);
-
-  const bindingServices = useMemo(
-    () =>
-      filteredServices.filter(
-        (service) => (service.operationType ?? service.type ?? '').toLowerCase() === 'bind'
-      ),
-    [filteredServices]
-  );
-
-  const nonBindingServices = useMemo(
-    () =>
-      filteredServices.filter(
-        (service) => (service.operationType ?? service.type ?? '').toLowerCase() !== 'bind'
-      ),
-    [filteredServices]
-  );
+  }, [
+    services,
+    workspaceTab,
+    state.serviceSearch,
+    state.typeFilter,
+    state.sortBy,
+    state.sortOrder,
+  ]);
 
   // Группировка по категориям для отображения (порядок: по sort_order категорий, затем "Без категории")
   const servicesByCategory = useMemo(() => {
@@ -360,7 +462,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     categories.forEach((c, i) => order.set(c.id, c.sortOrder ?? i));
     order.set(null, 1e9);
     const groups = new Map<string, { categoryId: number | null; categoryName: string; services: PricingService[] }>();
-    for (const s of nonBindingServices) {
+    for (const s of filteredServices) {
       const categoryId = s.categoryId ?? null;
       const categoryName = s.categoryName ?? 'Без категории';
       const key = categoryId !== null ? `id:${categoryId}` : 'none';
@@ -370,7 +472,41 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     return Array.from(groups.values()).sort(
       (a, b) => (order.get(a.categoryId) ?? 1e9) - (order.get(b.categoryId) ?? 1e9)
     );
-  }, [nonBindingServices, categories]);
+  }, [filteredServices, categories]);
+
+  const workspaceMeta = useMemo(() => {
+    if (workspaceTab === 'bindings') {
+      return {
+        title: 'Переплёты',
+        lead: 'Услуги переплёта (bind). Варианты и диапазоны цен — в строке услуги.',
+        createLabel: '+ Добавить переплёт',
+        createMode: 'binding' as CreateMode,
+        emptyTitle: 'Нет переплётов',
+        emptyHint: 'Добавьте первый переплёт',
+        hint: 'Переплёты попадают в отдельный блок привязки к продуктам.',
+      };
+    }
+    if (workspaceTab === 'wideformat') {
+      return {
+        title: 'ШФП послепечатка',
+        lead: 'Широкоформатная послепечатка: тариф per_m2 (ширина рулона × подача). Варианты — разные ширины рулонов со склада.',
+        createLabel: '+ Добавить ШФП',
+        createMode: 'wideformat' as CreateMode,
+        emptyTitle: 'Нет услуг ШФП',
+        emptyHint: 'Добавьте ламинацию, резку или другую рулонную послепечатку',
+        hint: 'Создайте услугу → варианты по ширинам → привяжите рулон (в селекте видна ширина мм).',
+      };
+    }
+    return {
+      title: 'Обычные услуги',
+      lead: 'Категории, поиск, таблица. Цены вариантов — в строке услуги («Диапазоны» / варианты).',
+      createLabel: '+ Добавить услугу',
+      createMode: 'service' as CreateMode,
+      emptyTitle: 'Нет услуг',
+      emptyHint: 'Начните с добавления первой услуги',
+      hint: 'Базовая цена и единица — здесь. Привязка к продуктам — в карточке продукта при настройке.',
+    };
+  }, [workspaceTab]);
 
   // Рендеринг действий для строки услуги
   const renderActions = useCallback((service: PricingService) => (
@@ -411,6 +547,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           serviceMinQuantity={service.minQuantity}
           serviceMaxQuantity={service.maxQuantity}
           operationType={service.operationType}
+          priceUnit={service.priceUnit}
           materials={materials}
         />
       );
@@ -425,7 +562,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         onDeleteTier={(tierId) => tierOperationsRef.current.deleteTier(service.id, tierId)}
       />
     );
-  }, [servicesWithVariants, state.volumeTiers, state.tiersLoading]); // tierOperations через ref
+  }, [servicesWithVariants, state.volumeTiers, state.tiersLoading, materials]); // tierOperations через ref
 
   return (
     <div className="services-management sm-workspace">
@@ -462,15 +599,48 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         <section className="sm-list-panel" aria-label="Справочник услуг">
           <header className="sm-list-panel__head">
             <h2 className="sm-list-panel__title">Услуги</h2>
-            <p className="sm-list-panel__lead">
-              Категории, поиск, таблица. Цены вариантов — в строке услуги («Диапазоны» / варианты).
-            </p>
+            <p className="sm-list-panel__lead">{workspaceMeta.lead}</p>
           </header>
 
-          <ServiceCategoriesBlock categories={categories} onReload={loadCategories} />
+          <div className="sm-workspace-tabs" role="tablist" aria-label="Разделы услуг">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceTab === 'ordinary'}
+              className={`sm-workspace-tabs__tab${workspaceTab === 'ordinary' ? ' is-active' : ''}`}
+              onClick={() => setWorkspaceTab('ordinary')}
+            >
+              Обычные
+              <span className="sm-workspace-tabs__count">{workspaceCounts.ordinary}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceTab === 'bindings'}
+              className={`sm-workspace-tabs__tab${workspaceTab === 'bindings' ? ' is-active' : ''}`}
+              onClick={() => setWorkspaceTab('bindings')}
+            >
+              Переплёты
+              <span className="sm-workspace-tabs__count">{workspaceCounts.bindings}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceTab === 'wideformat'}
+              className={`sm-workspace-tabs__tab${workspaceTab === 'wideformat' ? ' is-active' : ''}`}
+              onClick={() => setWorkspaceTab('wideformat')}
+            >
+              ШФП
+              <span className="sm-workspace-tabs__count">{workspaceCounts.wideformat}</span>
+            </button>
+          </div>
+
+          {workspaceTab === 'ordinary' && (
+            <ServiceCategoriesBlock categories={categories} onReload={loadCategories} />
+          )}
 
           <ServicesFilters
-            services={services}
+            services={filteredServices}
             searchValue={state.serviceSearch}
             typeFilter={state.typeFilter}
             sortBy={state.sortBy}
@@ -481,34 +651,26 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               setSortBy(field);
               setSortOrder(order);
             }}
+            createLabel={workspaceMeta.createLabel}
             onCreateService={() => {
-              setCreateMode('service');
-              resetNewServiceForm(emptyServiceForm);
-              setShowCreateService(true);
-            }}
-            onCreateBinding={() => {
-              setCreateMode('binding');
-              resetNewServiceForm(bindingServiceForm);
-              setShowCreateService(true);
+              void openCreateModal(workspaceMeta.createMode);
             }}
           />
 
-          <p className="sm-hint-line">
-            Базовая цена и единица — здесь. Привязка к продуктам — в карточке продукта при настройке.
-          </p>
+          <p className="sm-hint-line">{workspaceMeta.hint}</p>
 
           {filteredServices.length > 0 ? (
             <>
               <div className="services-table-container sm-table-wrap">
-                {bindingServices.length > 0 && (
+                {workspaceTab === 'bindings' ? (
                   <ServiceCategoryTableSection
                     sectionKey={SVC_SECTION_BINDINGS}
                     label="Переплёты"
-                    count={bindingServices.length}
+                    count={filteredServices.length}
                     isOpen={openServiceCategorySections.has(SVC_SECTION_BINDINGS)}
                     onToggle={toggleServiceCategorySection}
                     panelIdFor={panelIdForServiceSection}
-                    services={bindingServices}
+                    services={filteredServices}
                     expandedServiceId={state.expandedServiceId}
                     renderExpandedRow={renderExpandedRow}
                     getServiceIcon={getServiceIcon}
@@ -516,57 +678,79 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
                     getUnitLabel={getUnitLabel}
                     renderActions={renderActions}
                   />
+                ) : workspaceTab === 'wideformat' ? (
+                  <ServiceCategoryTableSection
+                    sectionKey={SVC_SECTION_WIDEFORMAT}
+                    label="ШФП послепечатка"
+                    count={filteredServices.length}
+                    isOpen={openServiceCategorySections.has(SVC_SECTION_WIDEFORMAT)}
+                    onToggle={toggleServiceCategorySection}
+                    panelIdFor={panelIdForServiceSection}
+                    services={filteredServices}
+                    expandedServiceId={state.expandedServiceId}
+                    renderExpandedRow={renderExpandedRow}
+                    getServiceIcon={getServiceIcon}
+                    getServiceTypeLabel={getServiceTypeLabel}
+                    getUnitLabel={getUnitLabel}
+                    renderActions={renderActions}
+                  />
+                ) : (
+                  servicesByCategory.map((group) => {
+                    const sKey = svcSectionKey(group.categoryId);
+                    return (
+                      <ServiceCategoryTableSection
+                        key={sKey}
+                        sectionKey={sKey}
+                        label={group.categoryName}
+                        count={group.services.length}
+                        isOpen={openServiceCategorySections.has(sKey)}
+                        onToggle={toggleServiceCategorySection}
+                        panelIdFor={panelIdForServiceSection}
+                        services={group.services}
+                        expandedServiceId={state.expandedServiceId}
+                        renderExpandedRow={renderExpandedRow}
+                        getServiceIcon={getServiceIcon}
+                        getServiceTypeLabel={getServiceTypeLabel}
+                        getUnitLabel={getUnitLabel}
+                        renderActions={renderActions}
+                      />
+                    );
+                  })
                 )}
-                {servicesByCategory.map((group) => {
-                  const sKey = svcSectionKey(group.categoryId);
-                  return (
-                    <ServiceCategoryTableSection
-                      key={sKey}
-                      sectionKey={sKey}
-                      label={group.categoryName}
-                      count={group.services.length}
-                      isOpen={openServiceCategorySections.has(sKey)}
-                      onToggle={toggleServiceCategorySection}
-                      panelIdFor={panelIdForServiceSection}
-                      services={group.services}
-                      expandedServiceId={state.expandedServiceId}
-                      renderExpandedRow={renderExpandedRow}
-                      getServiceIcon={getServiceIcon}
-                      getServiceTypeLabel={getServiceTypeLabel}
-                      getUnitLabel={getUnitLabel}
-                      renderActions={renderActions}
-                    />
-                  );
-                })}
               </div>
               <div className="services-table-footer sm-table-footer">
                 <span>
-                  Показано: <strong>{filteredServices.length}</strong> из <strong>{services.length}</strong> услуг
+                  Показано: <strong>{filteredServices.length}</strong>
+                  {' · '}
+                  вкладка «{workspaceMeta.title}»
                 </span>
-                <span>Активных: <strong>{services.filter((s) => s.isActive).length}</strong></span>
+                <span>
+                  Активных на вкладке:{' '}
+                  <strong>{filteredServices.filter((s) => s.isActive).length}</strong>
+                </span>
               </div>
             </>
           ) : (
             <div className="services-empty sm-empty-embedded">
               <div className="services-empty__icon"><AppIcon name="clipboard" size="lg" /></div>
               <h3 className="services-empty__title">
-                {state.serviceSearch || state.typeFilter !== 'all' ? 'Ничего не найдено' : 'Нет услуг'}
+                {state.serviceSearch || state.typeFilter !== 'all'
+                  ? 'Ничего не найдено'
+                  : workspaceMeta.emptyTitle}
               </h3>
               <p className="services-empty__message">
                 {state.serviceSearch || state.typeFilter !== 'all'
                   ? 'Попробуйте изменить поиск или фильтры'
-                  : 'Начните с добавления первой услуги'}
+                  : workspaceMeta.emptyHint}
               </p>
               {!state.serviceSearch && state.typeFilter === 'all' && (
                 <Button
                   variant="primary"
                   onClick={() => {
-                    setCreateMode('service');
-                    resetNewServiceForm(emptyServiceForm);
-                    setShowCreateService(true);
+                    void openCreateModal(workspaceMeta.createMode);
                   }}
                 >
-                  + Добавить первую услугу
+                  {workspaceMeta.createLabel}
                 </Button>
               )}
             </div>
@@ -574,7 +758,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         </section>
       )}
 
-      {/* Модальное окно создания услуги / переплёта */}
+      {/* Модальное окно создания услуги / переплёта / ШФП */}
       {state.showCreateService && (
         <Modal
           isOpen={true}
@@ -595,8 +779,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               aria-selected={createMode === 'service'}
               className={`services-create-modal__tab${createMode === 'service' ? ' is-active' : ''}`}
               onClick={() => {
-                setCreateMode('service');
-                resetNewServiceForm(emptyServiceForm);
+                void openCreateModal('service');
               }}
             >
               Услуга
@@ -607,17 +790,29 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               aria-selected={createMode === 'binding'}
               className={`services-create-modal__tab${createMode === 'binding' ? ' is-active' : ''}`}
               onClick={() => {
-                setCreateMode('binding');
-                resetNewServiceForm(bindingServiceForm);
+                void openCreateModal('binding');
               }}
             >
               Переплёт
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={createMode === 'wideformat'}
+              className={`services-create-modal__tab${createMode === 'wideformat' ? ' is-active' : ''}`}
+              onClick={() => {
+                void openCreateModal('wideformat');
+              }}
+            >
+              ШФП
+            </button>
           </div>
           <p className="services-create-modal__lead">
             {createMode === 'binding'
-              ? 'Переплёт попадает в блок «Переплёты», операция на бэкенде — bind. Варианты (сложная услуга) настраиваются после создания.'
-              : 'Укажите название, единицу и цену. После создания привяжите услугу к продукту в карточке продукта.'}
+              ? 'Переплёт попадает во вкладку «Переплёты», операция на бэкенде — bind. Варианты настраиваются после создания.'
+              : createMode === 'wideformat'
+                ? 'Услуга ШФП: единица per_m2, расход roll_feed. После создания добавьте варианты по ширинам рулонов и привяжите материалы.'
+                : 'Укажите название, единицу и цену. После создания привяжите услугу к продукту в карточке продукта.'}
           </p>
           <form
             className="services-create-modal__form"
@@ -631,13 +826,21 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               onChange={setNewServiceForm}
               categories={categories}
               materials={materials}
-              variant={createMode === 'binding' ? 'binding' : 'default'}
+              variant={
+                createMode === 'binding'
+                  ? 'binding'
+                  : createMode === 'wideformat'
+                    ? 'wideformat'
+                    : 'default'
+              }
               autoFocusName
             />
             <Alert type="info" className="mt-4">
               {createMode === 'binding'
                 ? 'Тип postprint и операция bind подставляются автоматически. Категорию при необходимости задайте в «Редактировать».'
-                : 'Категория нужна для удобной группировки в списке услуг при настройке продукта.'}
+                : createMode === 'wideformat'
+                  ? 'Категория «ШФП послепечатка» создаётся автоматически. Цену за м² и рулоны настройте в вариантах услуги.'
+                  : 'Категория нужна для удобной группировки в списке услуг при настройке продукта.'}
             </Alert>
             <div className="services-create-modal__footer">
               <Button

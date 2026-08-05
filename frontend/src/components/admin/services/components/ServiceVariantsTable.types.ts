@@ -47,8 +47,10 @@ export interface ServiceVariantsTableProps {
   serviceMaxQuantity?: number;
   /** bind — показать лимиты min_pages / max_pages на вариантах */
   operationType?: string;
+  /** price_unit услуги (для подсказки per_m2) */
+  priceUnit?: string;
   /** Список материалов для выбора списания по варианту */
-  materials?: Array<{ id: number; name: string }>;
+  materials?: Array<{ id: number; name: string; sheet_width?: number | null }>;
 }
 
 /**
@@ -69,6 +71,7 @@ export interface VariantRowLevel0Props {
   onDelete: (typeName: string, variantIds: number[]) => void;
   onCreateChild: (typeName: string) => void;
   onCreateSibling: () => void;
+  onPriceChange?: (variantId: number, minQty: number, newPrice: number) => void;
   serviceId?: number;
 }
 
@@ -89,6 +92,7 @@ export interface VariantRowLevel1Props {
   onDelete: (variantId: number, level2ChildIds: number[]) => void;
   onCreateChild: (typeName: string, parentId: number) => void;
   onCreateSibling: (typeName: string) => void;
+  onPriceChange?: (variantId: number, minQty: number, newPrice: number) => void;
 }
 
 /**

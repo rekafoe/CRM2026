@@ -9,6 +9,7 @@ import {
   updatePricingService,
   deletePricingService,
   createServiceVariant,
+  addRangeBoundary,
 } from '../../../../services/pricing';
 import { getErrorMessage } from '../../../../utils/errorUtils';
 
@@ -73,7 +74,7 @@ export function useServiceOperations({
           meter_basis: payload.meter_basis,
         });
 
-        // Если услуга сложная (hasVariants = true), создаем первый вариант-тип
+        // Если услуга сложная (hasVariants = true), создаем первый вариант-тип и диапазон «от 1»
         if (payload.hasVariants) {
           try {
             await createServiceVariant(createdService.id, {
@@ -82,6 +83,11 @@ export function useServiceOperations({
               sortOrder: 0,
               isActive: true,
             });
+            try {
+              await addRangeBoundary(createdService.id, payload.minQuantity ?? 1);
+            } catch {
+              // Бэкенд мог уже создать диапазон при createServiceVariant
+            }
             callbacksRef.current.onServiceCreated?.(createdService.id);
           } catch (variantError) {
             console.error('Ошибка создания варианта:', variantError);
@@ -161,6 +167,11 @@ export function useServiceOperations({
               sortOrder: 0,
               isActive: true,
             });
+            try {
+              await addRangeBoundary(createdService.id, payload.minQuantity ?? 1);
+            } catch {
+              // диапазон мог уже существовать
+            }
             callbacksRef.current.onServiceCreated?.(createdService.id);
           } catch (variantError) {
             console.error('Ошибка создания варианта переплёта:', variantError);

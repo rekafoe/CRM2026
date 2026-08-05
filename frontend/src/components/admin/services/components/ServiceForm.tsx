@@ -30,8 +30,8 @@ interface ServiceFormProps {
   value: ServiceFormState;
   onChange: (next: ServiceFormState) => void;
   disabled?: boolean;
-  /** default — полная форма; binding — переплёт: скрыты лишние поля (тип и операция фиксированы на бэкенде) */
-  variant?: 'default' | 'binding';
+  /** default — полная форма; binding — переплёт; wideformat — ШФП послепечатка */
+  variant?: 'default' | 'binding' | 'wideformat';
   /** Автофокус в поле «Название» (модалка создания) */
   autoFocusName?: boolean;
   typeOptions?: Array<{ value: PricingServiceType; label: string }>;
@@ -110,6 +110,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
   };
 
   const isBinding = variant === 'binding';
+  const isWideFormat = variant === 'wideformat';
   const showMaterialConsumption = materials.length > 0 && value.materialId !== '';
   const showMeterBasis = value.consumptionMode === 'roll_feed' || value.unit === 'per_meter';
 
@@ -121,6 +122,15 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           <span className="service-form-binding-hint__muted">
             Тип услуги postprint и операция bind задаются при сохранении. Категорию при необходимости укажите в
             редактировании услуги.
+          </span>
+        </div>
+      )}
+      {isWideFormat && (
+        <div className="service-form-binding-hint service-form__full" role="status">
+          <strong>ШФП послепечатка</strong>
+          <span className="service-form-binding-hint__muted">
+            Тариф за м² рулона (ширина × подача). После создания добавьте варианты по ширинам и привяжите рулоны
+            со склада — в селекте материала видна ширина в мм.
           </span>
         </div>
       )}
@@ -151,7 +161,13 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
             disabled={disabled}
             autoFocus={autoFocusName}
             autoComplete="off"
-            placeholder={isBinding ? 'Например: Брошюровка на скобу' : 'Название услуги'}
+            placeholder={
+              isBinding
+                ? 'Например: Брошюровка на скобу'
+                : isWideFormat
+                  ? 'Например: Ламинация рулонная'
+                  : 'Название услуги'
+            }
             onChange={(e) => updateField('name', e.target.value)}
           />
         </FormField>
@@ -207,7 +223,9 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           help={
             isBinding
               ? 'Часто: per_item или fixed'
-              : 'per_item, per_sheet, per_cut, fixed…'
+              : isWideFormat
+                ? 'Для ШФП: per_m2 — м² по ширине рулона × подаче'
+                : 'per_item, per_sheet, per_cut, fixed…'
           }
         >
           <select

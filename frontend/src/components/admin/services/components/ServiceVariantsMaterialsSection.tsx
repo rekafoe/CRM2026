@@ -1,5 +1,6 @@
 /**
  * Блок «Списание материалов по вариантам» — иерархия по типам.
+ * Для per_m2 ширина биллинга берётся из sheet_width материала.
  */
 import React from 'react';
 import { VariantWithTiers, VariantsByType } from './ServiceVariantsTable.types';
@@ -7,7 +8,9 @@ import { VariantWithTiers, VariantsByType } from './ServiceVariantsTable.types';
 export interface ServiceVariantsMaterialsSectionProps {
   typeNames: string[];
   groupedVariants: VariantsByType;
-  materials: Array<{ id: number; name: string }>;
+  materials: Array<{ id: number; name: string; sheet_width?: number | null }>;
+  priceUnit?: string;
+  operationType?: string;
   onUpdateMaterial: (
     variantId: number,
     patch: {
@@ -19,10 +22,20 @@ export interface ServiceVariantsMaterialsSectionProps {
   ) => void;
 }
 
+function formatMaterialOption(m: { id: number; name: string; sheet_width?: number | null }): string {
+  const w = m.sheet_width != null ? Number(m.sheet_width) : NaN;
+  if (Number.isFinite(w) && w > 0) {
+    return `${m.name} (ширина ${w} мм)`;
+  }
+  return m.name;
+}
+
 export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsSectionProps> = ({
   typeNames,
   groupedVariants,
   materials,
+  priceUnit,
+  operationType,
   onUpdateMaterial,
 }) => {
   const consumptionModeOptions: Array<{ value: 'fixed' | 'roll_feed'; label: string }> = [
@@ -34,18 +47,33 @@ export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsS
     { value: 'knife_path', label: 'knife_path' },
   ];
 
+  const pu = String(priceUnit || '').toLowerCase();
+  const showPerM2Hint =
+    pu === 'per_m2' || String(operationType || '').toLowerCase() === 'laminate';
+
   const materialsByType = typeNames.map((typeName) => {
     const typeGroup = groupedVariants[typeName];
     const flat: Array<{ variant: VariantWithTiers; label: string }> = [];
     typeGroup.level0.forEach((v) => flat.push({ variant: v, label: '—' }));
     typeGroup.level1.forEach((children) => children.forEach((v) => flat.push({ variant: v, label: v.variantName })));
-    typeGroup.level2.forEach((children) => children.forEach((v) => flat.push({ variant: v, label: (v.parameters?.subType as string) || v.variantName })));
+    typeGroup.level2.forEach((children) =>
+      children.forEach((v) => flat.push({ variant: v, label: (v.parameters?.subType as string) || v.variantName }))
+    );
     return { typeName, rows: flat };
   });
 
   return (
-    <div className="service-variants-materials-section" style={{ marginBottom: 12, padding: 8, background: '#f8f9fa', borderRadius: 6 }}>
+    <div
+      className="service-variants-materials-section"
+      style={{ marginBottom: 12, padding: 8, background: '#f8f9fa', borderRadius: 6 }}
+    >
       <div style={{ fontWeight: 600, marginBottom: 6 }}>Списание материалов по вариантам</div>
+      {showPerM2Hint && (
+        <p className="form-hint" style={{ margin: '0 0 8px', fontSize: 12, color: '#555' }}>
+          Для тарифа за м² ширина биллинга берётся из материала варианта (длина подачи × ширина рулона).
+          Разные ширины — разные варианты, каждый со своим рулоном. Режим расхода: roll_feed.
+        </p>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {materialsByType.map(({ typeName, rows }) => (
           <div key={typeName} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -53,23 +81,36 @@ export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsS
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, paddingLeft: 12 }}>
               {rows.map(({ variant: v, label }) => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ minWidth: 100, fontSize: 13 }} title={v.variantName}>{label}:</span>
+                  <span style={{ minWidth: 100, fontSize: 13 }} title={v.variantName}>
+                    {label}:
+                  </span>
                   <select
                     value={v.material_id ?? ''}
                     onChange={(e) => {
                       const val = e.target.value === '' ? null : Number(e.target.value);
+                      const mat = val != null ? materials.find((m) => m.id === val) : undefined;
+                      const hasRollWidth =
+                        mat?.sheet_width != null &&
+                        Number.isFinite(Number(mat.sheet_width)) &&
+                        Number(mat.sheet_width) > 0;
+                      const nextMode: 'fixed' | 'roll_feed' =
+                        val != null && (pu === 'per_m2' || hasRollWidth)
+                          ? 'roll_feed'
+                          : ((v.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed');
                       onUpdateMaterial(v.id, {
                         material_id: val,
                         qty_per_item: v.qty_per_item ?? 1,
-                        consumption_mode: (v.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed',
+                        consumption_mode: nextMode,
                         meter_basis: (v.meter_basis ?? 'feed') as 'knife_path' | 'feed',
                       });
                     }}
-                    style={{ padding: 4, minWidth: 140 }}
+                    style={{ padding: 4, minWidth: 180 }}
                   >
                     <option value="">— Без списания</option>
                     {materials.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
+                      <option key={m.id} value={m.id}>
+                        {formatMaterialOption(m)}
+                      </option>
                     ))}
                   </select>
                   <input
@@ -105,7 +146,9 @@ export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsS
                     title="Режим расхода"
                   >
                     {consumptionModeOptions.map((mode) => (
-                      <option key={mode.value} value={mode.value}>{mode.label}</option>
+                      <option key={mode.value} value={mode.value}>
+                        {mode.label}
+                      </option>
                     ))}
                   </select>
                   <select
@@ -122,7 +165,9 @@ export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsS
                     title="База metering"
                   >
                     {meterBasisOptions.map((basis) => (
-                      <option key={basis.value} value={basis.value}>{basis.label}</option>
+                      <option key={basis.value} value={basis.value}>
+                        {basis.label}
+                      </option>
                     ))}
                   </select>
                 </div>

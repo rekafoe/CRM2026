@@ -1,7 +1,9 @@
 /**
- * Строка уровня 1 — подтип (дочерняя строка, без цен по диапазонам).
+ * Строка уровня 1 — тип/вариант.
+ * Без дочерних подтипов — лист: можно вводить цены (Матовое / Глянцевое и т.п.).
  */
 import React, { memo, useCallback, useRef } from 'react';
+import { PriceRangeCells } from './PriceRangeCells';
 import { VariantRowActions } from './VariantRowActions';
 import { VariantRowLevel1Props } from './ServiceVariantsTable.types';
 
@@ -19,11 +21,13 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
   onCreateChild,
   onCreateSibling,
   onDelete,
+  onPriceChange,
 }) => {
   const l2Ref = useRef(level2Variants);
   l2Ref.current = level2Variants;
 
   const hasChildren = level2Variants.length > 0;
+  const isLeaf = !hasChildren;
 
   const handleParamsEditStart = useCallback(() => {
     onParamsEditStart(variant.id, variant.parameters?.type || '');
@@ -44,6 +48,13 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
   const handleDelete = useCallback(() => {
     onDelete(variant.id, (l2Ref.current ?? []).map((v) => v.id));
   }, [variant.id, onDelete]);
+
+  const handlePriceChange = useCallback(
+    (minQty: number, newPrice: number) => {
+      onPriceChange?.(variant.id, minQty, newPrice);
+    },
+    [variant.id, onPriceChange]
+  );
 
   return (
     <tr className="el-table__row el-table__row--level-1">
@@ -95,11 +106,20 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
           </div>
         </div>
       </td>
-      {commonRangesAsPriceRanges.map((range) => (
-        <td key={range.minQty} style={{ padding: '8px', textAlign: 'center' }}>
-          <span style={{ color: '#999', fontSize: '12px' }}>—</span>
-        </td>
-      ))}
+      {isLeaf ? (
+        <PriceRangeCells
+          tiers={variant.tiers}
+          commonRanges={commonRangesAsPriceRanges}
+          onPriceChange={handlePriceChange}
+          editable={Boolean(onPriceChange)}
+        />
+      ) : (
+        commonRangesAsPriceRanges.map((range) => (
+          <td key={range.minQty} style={{ padding: '8px', textAlign: 'center' }}>
+            <span style={{ color: '#999', fontSize: '12px' }}>—</span>
+          </td>
+        ))
+      )}
       <VariantRowActions
         layout="branch"
         onAddChild={handleCreateChild}

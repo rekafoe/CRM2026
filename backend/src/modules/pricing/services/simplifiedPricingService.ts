@@ -29,6 +29,14 @@ import {
   resolvePlotterMargins,
   SHEET_PLOTTER_SRA3_MM,
 } from './plotterLayout';
+import {
+  billedM2ForQuantity,
+  defaultRollFeedForPriceUnit,
+  finishingFinKey,
+  loadFinishingRollWidthMmMap,
+  quotePerM2Finishing,
+  resolveWarehouseFeedMeters,
+} from './finishingPerM2';
 import { resolveRollCutLevelMultiplier } from './plotterCutLevel';
 import {
   buildPlotterTiersFromDto,
@@ -1199,6 +1207,8 @@ export class SimplifiedPricingService {
     let variantConsumptionModeMap: Map<number, 'fixed' | 'roll_feed'> = new Map();
     let variantMeterBasisMap: Map<number, 'knife_path' | 'feed'> = new Map();
     let variantPriceUnitMap: Map<number, string> = new Map();
+    /** finKey → ширина рулона мм (для per_m2) */
+    const finishingRollWidthMmMap = new Map<string, number>();
 
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
     // При fallback на selectedSize.finishing фильтруем по is_default/is_required: только операции с галочкой «вкл по умолчанию» участвуют в расчёте
@@ -1519,11 +1529,9 @@ export class SimplifiedPricingService {
         );
         serviceConsumptionModeMap = new Map<number, 'fixed' | 'roll_feed'>(
           services.map((s): [number, 'fixed' | 'roll_feed'] => {
-            const fallback =
-              String(s.operation_type || '').toLowerCase() === 'laminate' &&
-              String(s.price_unit || '').toLowerCase() === 'per_meter'
-                ? 'roll_feed'
-                : 'fixed';
+            const fallback = defaultRollFeedForPriceUnit(s.price_unit, s.operation_type)
+              ? 'roll_feed'
+              : 'fixed';
             return [s.id, normalizeConsumptionMode(s.consumption_mode, fallback)];
           })
         );
@@ -1689,6 +1697,15 @@ export class SimplifiedPricingService {
               variantPriceUnitMap.set(row.id, normalizeFinishingPriceUnit(paramsPriceUnit));
             }
           }
+        }
+
+        {
+          const widthMap = await loadFinishingRollWidthMmMap(
+            db,
+            effectiveFinishingToUse,
+            normalServiceIds
+          );
+          for (const [k, w] of widthMap) finishingRollWidthMmMap.set(k, w);
         }
 
         logger.info('🔧 [SimplifiedPricingService] Итоговая карта тарифов услуг для finishing', {
@@ -1865,6 +1882,33 @@ export class SimplifiedPricingService {
             rawUnits = totalCutsForOrder;
             totalUnits = Math.max(totalCutsForOrder, serviceMinQty);
             servicePrice = effectivePriceForTier * totalUnits;
+          } else if (priceUnit === 'per_m2') {
+            const quoted = quotePerM2Finishing({
+              rollWidthMm: finishingRollWidthMmMap.get(mapKey),
+              layout: {
+                trimMm: layoutTrim,
+                bleedMm: resolvedBleedMm,
+                quantity,
+                margins: {
+                  edgeMm:
+                    customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+                      ? Number(customMarginMm)
+                      : 0,
+                  gapMm:
+                    customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+                      ? Number(customGapMm)
+                      : 0,
+                },
+              },
+              rate: effectivePriceForTier,
+              serviceMinQty,
+              serviceLabel:
+                serviceNamesMap.get(finConfig.service_id) || `Услуга #${finConfig.service_id}`,
+            });
+            if (quoted.warning) pricingWarnings.push(quoted.warning);
+            rawUnits = quoted.rawUnits;
+            totalUnits = quoted.totalUnits;
+            servicePrice = quoted.servicePrice;
           } else {
             rawUnits = quantity * (unitsPerItem ?? 1);
             totalUnits = rawUnits;
@@ -2083,12 +2127,14 @@ export class SimplifiedPricingService {
         );
 
         let baseUnitsForConsumption = rawUnits;
-        if (effectiveConsumptionMode === 'roll_feed') {
+        const useRollFeedUnits =
+          effectiveConsumptionMode === 'roll_feed' || detailPriceUnit === 'per_m2';
+        if (useRollFeedUnits) {
           const matInfo = materialInfoMap.get(src.material_id);
           const rollWidthMm = Number(matInfo?.sheet_width ?? matInfo?.printable_width ?? 0);
-          if (Number.isFinite(rollWidthMm) && rollWidthMm > 0) {
-            const feedLayout = computeOptimizedRollFeedMeters({
-              rollWidthMm,
+          const feed = resolveWarehouseFeedMeters({
+            rollWidthMm: Number.isFinite(rollWidthMm) && rollWidthMm > 0 ? rollWidthMm : null,
+            layout: {
               trimMm: layoutTrim,
               bleedMm: resolvedBleedMm,
               quantity,
@@ -2102,17 +2148,14 @@ export class SimplifiedPricingService {
                     ? Number(customGapMm)
                     : 0,
               },
-            });
-            baseUnitsForConsumption = Math.max(0, Number(feedLayout.feedMeters || 0));
-          } else {
-            // Fallback: берем уже посчитанный расход базового рулона
-            baseUnitsForConsumption = Math.max(materialMetersNeeded, rawUnits);
-            if (!warnedRollFeedMaterials.has(src.material_id)) {
-              warnedRollFeedMaterials.add(src.material_id);
-              pricingWarnings.push(
-                `Материал операции #${src.material_id}: для roll_feed не задана ширина рулона, использован fallback по общему feed.`
-              );
-            }
+            },
+            fallbackMeters: Math.max(materialMetersNeeded, rawUnits),
+            materialId: src.material_id,
+          });
+          baseUnitsForConsumption = feed.feedMeters;
+          if (feed.warning && !warnedRollFeedMaterials.has(src.material_id)) {
+            warnedRollFeedMaterials.add(src.material_id);
+            pricingWarnings.push(feed.warning);
           }
         } else if (detailPriceUnit === 'per_meter' && effectiveMeterBasis === 'feed') {
           baseUnitsForConsumption = Math.max(rawUnits, materialMetersNeeded);
@@ -2323,6 +2366,21 @@ export class SimplifiedPricingService {
       plotterTierVolumeCtx,
       coverPages: separateCoverForTier ? pageSplit.coverPages : 0,
       coverSidesMode: separateCoverForTier ? coverSidesForTier : undefined,
+      rollConsumedAreaCtx: {
+        trimMm: layoutTrim,
+        bleedMm: resolvedBleedMm,
+        margins: {
+          edgeMm:
+            customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+              ? Number(customMarginMm)
+              : 0,
+          gapMm:
+            customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+              ? Number(customGapMm)
+              : 0,
+        },
+        rollWidthByFinKey: finishingRollWidthMmMap,
+      },
     });
     if (usePagesMultiplier && multiPageStructure && tierPricesResult.length > 0) {
       for (const tierRow of tierPricesResult) {
@@ -2628,6 +2686,13 @@ export class SimplifiedPricingService {
     /** Отдельная обложка: страниц обложки на изделие (tier печати = блок + обложка). */
     coverPages?: number;
     coverSidesMode?: string;
+    /** Контекст для finishing per_m2 (ширина рулона × подача). */
+    rollConsumedAreaCtx?: {
+      trimMm: { width: number; height: number };
+      bleedMm: number;
+      margins: { edgeMm: number; gapMm: number };
+      rollWidthByFinKey: Map<string, number>;
+    };
   }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
     // Диапазоны ТОЛЬКО по раскладке листа: 1 лист, 2 листа, 3 листа... (itemsPerSheet, 2*itemsPerSheet, ...)
     const ips = Math.max(1, ctx.itemsPerSheet || 1);
@@ -2738,6 +2803,7 @@ export class SimplifiedPricingService {
         );
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
         const isPerMeterOp = priceUnitFromDb === 'per_meter';
+        const isPerM2Op = priceUnitFromDb === 'per_m2';
         const meterBasis = ctx.serviceMeterBasisMap?.get(finConfig.service_id) ?? 'knife_path';
         const meterUnits =
           isPerMeterOp && meterBasis === 'feed'
@@ -2748,6 +2814,21 @@ export class SimplifiedPricingService {
         const perSheetUnits = isPerSheetOp ? (ctx.isRollMeterage ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
         const totalCutsForOrder = Math.max(unitsPerItem, 1);
+        const finKey = finishingFinKey(finConfig.service_id, finConfig.variant_id);
+        let m2Units = 0;
+        if (isPerM2Op) {
+          const rca = ctx.rollConsumedAreaCtx;
+          m2Units = billedM2ForQuantity({
+            rollWidthMm: rca?.rollWidthByFinKey.get(finKey),
+            trimMm: rca?.trimMm ?? {
+              width: Number(ctx.selectedSize?.width_mm) || 0,
+              height: Number(ctx.selectedSize?.height_mm) || 0,
+            },
+            bleedMm: rca?.bleedMm ?? 0,
+            quantity: q,
+            margins: rca?.margins ?? { edgeMm: 0, gapMm: 0 },
+          });
+        }
         const limitsFin = ctx.serviceLimitsMap?.get(finConfig.service_id);
         const billedPerSheetTier =
           isPerSheetOp && limitsFin ? Math.max(perSheetUnits, limitsFin.min ?? 1) : perSheetUnits;
@@ -2757,13 +2838,17 @@ export class SimplifiedPricingService {
           priceUnitFromDb === 'per_cut' && limitsFin
             ? Math.max(totalCutsForOrder, limitsFin.min ?? 1)
             : totalCutsForOrder;
+        const billedM2Tier =
+          isPerM2Op && limitsFin ? Math.max(m2Units, limitsFin.min ?? 0) : m2Units;
         const tierQty = isPerSheetOp
           ? billedPerSheetTier
           : isPerMeterOp
             ? billedMeterTier
             : priceUnitFromDb === 'per_cut'
               ? billedCutsTier
-              : q;
+              : isPerM2Op
+                ? billedM2Tier
+                : q;
         const sidFin = Number(finConfig.service_id);
         const ptv = ctx.plotterTierVolumeCtx;
         const tierBracketQty =
@@ -2795,6 +2880,8 @@ export class SimplifiedPricingService {
           finishingPrice += effectiveTierPrice * Math.max(meterUnits, serviceMinQty);
         } else if (priceUnit === 'per_cut') {
           finishingPrice += effectiveTierPrice * Math.max(totalCutsForOrder, serviceMinQty);
+        } else if (priceUnit === 'per_m2') {
+          finishingPrice += effectiveTierPrice * Math.max(m2Units, serviceMinQty);
         } else {
           finishingPrice += effectiveTierPrice * (q * (unitsPerItem ?? 1));
         }

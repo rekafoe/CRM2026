@@ -1,6 +1,7 @@
 import { Database } from 'sqlite';
 import { getDb } from '../../../db';
 import { hasColumn, invalidateTableSchemaCache } from '../../../utils/tableSchemaCache';
+import { defaultRollFeedForPriceUnit } from '../services/finishingPerM2';
 import {
   CreatePricingServiceDTO,
   PricingServiceDTO,
@@ -668,14 +669,16 @@ export class PricingServiceRepository {
     const materialIdVal = (payload as any).material_id != null && Number.isFinite(Number((payload as any).material_id)) ? Number((payload as any).material_id) : null;
     const qtyPerItemVal = (payload as any).qty_per_item != null && Number.isFinite(Number((payload as any).qty_per_item)) ? Number((payload as any).qty_per_item) : 1;
     const payloadConsumption = (payload as any).consumption_mode;
-    const defaultConsumption =
-      operationType === 'laminate' && String(resolvedPriceUnit).toLowerCase() === 'per_meter'
-        ? 'roll_feed'
-        : 'fixed';
+    const priceUnitLower = String(resolvedPriceUnit).toLowerCase();
+    const defaultConsumption = defaultRollFeedForPriceUnit(resolvedPriceUnit, operationType)
+      ? 'roll_feed'
+      : 'fixed';
     const consumptionModeVal = normalizeConsumptionMode(payloadConsumption, defaultConsumption);
     const payloadMeterBasis = (payload as any).meter_basis;
     const defaultMeterBasis =
-      consumptionModeVal === 'roll_feed' || String(resolvedPriceUnit).toLowerCase() === 'per_meter'
+      consumptionModeVal === 'roll_feed' ||
+      priceUnitLower === 'per_meter' ||
+      priceUnitLower === 'per_m2'
         ? 'feed'
         : null;
     const meterBasisVal = normalizeMeterBasis(payloadMeterBasis, defaultMeterBasis);
@@ -1007,15 +1010,25 @@ export class PricingServiceRepository {
     const db = await this.getConnection();
     
     try {
-      // Используем новую оптимизированную структуру с JOIN
-      // Если новые таблицы существуют, используем их, иначе fallback на старую структуру
+      const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
+      const seenKeys = new Set<string>();
+
+      const pushTier = (tier: ServiceVolumeTierDTO) => {
+        const variantIdNum = Number(tier.variantId);
+        if (!Number.isFinite(variantIdNum)) return;
+        const key = `${variantIdNum}:${tier.minQuantity}`;
+        if (seenKeys.has(key)) return;
+        seenKeys.add(key);
+        if (!tiersMap.has(variantIdNum)) tiersMap.set(variantIdNum, []);
+        tiersMap.get(variantIdNum)!.push({ ...tier, variantId: variantIdNum });
+      };
+
       const hasNewStructure = await db.get(`
         SELECT name FROM sqlite_master 
         WHERE type='table' AND name='service_range_boundaries'
       `);
-      
+
       if (hasNewStructure) {
-        // Новая структура: JOIN между service_variant_prices и service_range_boundaries
         const rows = await db.all<any[]>(
           `SELECT 
             svp.id, 
@@ -1030,52 +1043,38 @@ export class PricingServiceRepository {
            ORDER BY svp.variant_id, srb.min_quantity`,
           serviceId
         );
-        
-        // Группируем по variant_id
-        const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
         for (const row of rows) {
-          const variantId = row.variant_id;
-          if (variantId !== null && variantId !== undefined) {
-            const variantIdNum = Number(variantId);
-            if (!tiersMap.has(variantIdNum)) {
-              tiersMap.set(variantIdNum, []);
-            }
-            tiersMap.get(variantIdNum)!.push({
-              id: row.id,
-              serviceId: row.service_id,
-              variantId: variantIdNum,
-              minQuantity: row.min_quantity,
-              rate: row.price_per_unit,
-              isActive: !!row.is_active,
-            });
-          }
+          pushTier({
+            id: row.id,
+            serviceId: row.service_id,
+            variantId: Number(row.variant_id),
+            minQuantity: row.min_quantity,
+            rate: row.price_per_unit,
+            isActive: !!row.is_active,
+          });
         }
-        
-        return tiersMap;
-      } else {
-        // Fallback на старую структуру для обратной совместимости
-        const rows = await db.all<RawTierRow[]>(
+      }
+
+      // Подмешиваем старую таблицу: fallback createServiceTier пишет сюда
+      try {
+        const oldRows = await db.all<RawTierRow[]>(
           `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active 
            FROM service_volume_prices 
            WHERE service_id = ? AND variant_id IS NOT NULL
            ORDER BY variant_id, min_quantity`,
           serviceId
         );
-        
-        const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
-        for (const row of rows) {
-          const variantId = row.variant_id;
-          if (variantId !== null && variantId !== undefined) {
-            const variantIdNum = Number(variantId);
-            if (!tiersMap.has(variantIdNum)) {
-              tiersMap.set(variantIdNum, []);
-            }
-            tiersMap.get(variantIdNum)!.push(this.mapTier(row));
-          }
+        for (const row of oldRows) {
+          pushTier(this.mapTier(row));
         }
-        
-        return tiersMap;
+      } catch {
+        // service_volume_prices может отсутствовать на совсем старых БД
       }
+
+      for (const [, list] of tiersMap) {
+        list.sort((a, b) => a.minQuantity - b.minQuantity);
+      }
+      return tiersMap;
     } catch (error: any) {
       console.error('Error in listAllVariantTiers:', error);
       console.error('ServiceId:', serviceId);
@@ -1379,18 +1378,27 @@ export class PricingServiceRepository {
       serviceId
     );
     const payloadConsumption = (payload as any).consumption_mode;
-    const derivedDefaultConsumption = normalizeConsumptionMode(
-      serviceRow?.consumption_mode ??
-        (String(serviceRow?.operation_type || '').toLowerCase() === 'laminate' &&
-        String(serviceRow?.price_unit || '').toLowerCase() === 'per_meter'
-          ? 'roll_feed'
-          : 'fixed')
+    const servicePriceUnitLower = String(serviceRow?.price_unit || '').toLowerCase();
+    const serviceNeedsRollFeed = defaultRollFeedForPriceUnit(
+      serviceRow?.price_unit,
+      serviceRow?.operation_type
     );
-    const consumptionModeVal = normalizeConsumptionMode(payloadConsumption, derivedDefaultConsumption);
+    // При привязке материала к per_m2 — roll_feed по умолчанию
+    const materialLinkedToPerM2 = materialIdVal != null && servicePriceUnitLower === 'per_m2';
+    const defaultRollFeed = serviceNeedsRollFeed || materialLinkedToPerM2;
+    const derivedDefaultConsumption = normalizeConsumptionMode(
+      serviceRow?.consumption_mode ?? (defaultRollFeed ? 'roll_feed' : 'fixed')
+    );
+    const consumptionModeVal = normalizeConsumptionMode(
+      payloadConsumption,
+      defaultRollFeed ? 'roll_feed' : derivedDefaultConsumption
+    );
     const payloadMeterBasis = (payload as any).meter_basis;
     const defaultMeterBasis = normalizeMeterBasis(
       serviceRow?.meter_basis,
-      consumptionModeVal === 'roll_feed' || String(serviceRow?.price_unit || '').toLowerCase() === 'per_meter'
+      consumptionModeVal === 'roll_feed' ||
+        servicePriceUnitLower === 'per_meter' ||
+        servicePriceUnitLower === 'per_m2'
         ? 'feed'
         : null
     );
@@ -1438,6 +1446,15 @@ export class PricingServiceRepository {
     if (!row) {
       throw new Error('Failed to retrieve created service variant');
     }
+
+    // Диапазон «от 1» и нулевые цены по всем границам — иначе в UI нет колонок цен
+    try {
+      await this.ensureDefaultRangeBoundary(serviceId, 1);
+      await this.attachVariantToAllRanges(serviceId, Number(row.id));
+    } catch (attachErr) {
+      console.warn('createServiceVariant: не удалось привязать цены к диапазонам', attachErr);
+    }
+
     const paramsRaw = parseServiceVariantParameters(row.parameters);
     const parentColVal = hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
     const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
@@ -1599,6 +1616,40 @@ export class PricingServiceRepository {
   }
 
   // ========== Новые методы для работы с оптимизированной структурой ==========
+
+  /** Если у услуги ещё нет границ тиража — создаёт диапазон от minQuantity (обычно 1). */
+  static async ensureDefaultRangeBoundary(serviceId: number, minQuantity: number = 1): Promise<number | null> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    const existing = await db.get<{ cnt: number }>(
+      `SELECT COUNT(*) as cnt FROM service_range_boundaries WHERE service_id = ?`,
+      serviceId
+    );
+    if ((existing?.cnt ?? 0) > 0) return null;
+    return this.addRangeBoundary(serviceId, minQuantity);
+  }
+
+  /** Привязывает вариант ко всем существующим границам (цена 0). */
+  static async attachVariantToAllRanges(serviceId: number, variantId: number): Promise<void> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    const ranges = await db.all<{ id: number }[]>(
+      `SELECT id FROM service_range_boundaries WHERE service_id = ? ORDER BY sort_order, min_quantity`,
+      serviceId
+    );
+    for (const range of ranges || []) {
+      try {
+        await db.run(
+          `INSERT INTO service_variant_prices (variant_id, range_id, price_per_unit, is_active)
+           VALUES (?, ?, 0, 1)`,
+          variantId,
+          range.id
+        );
+      } catch (err: any) {
+        if (!String(err?.message || '').includes('UNIQUE constraint')) throw err;
+      }
+    }
+  }
   
   /**
    * Добавляет границу диапазона для сервиса (общую для всех вариантов)
@@ -1613,6 +1664,33 @@ export class PricingServiceRepository {
       const err: any = new Error(`Service with id ${serviceId} not found`);
       err.status = 404;
       throw err;
+    }
+
+    // Идемпотентность: повторное «от 1» не должно падать
+    const existingRange = await db.get<{ id: number }>(
+      `SELECT id FROM service_range_boundaries WHERE service_id = ? AND min_quantity = ?`,
+      serviceId,
+      minQuantity
+    );
+    if (existingRange?.id) {
+      // Досоздаём нулевые цены для вариантов без строки по этой границе
+      const variants = await db.all<{ id: number }[]>(
+        `SELECT id FROM service_variants WHERE service_id = ?`,
+        serviceId
+      );
+      for (const variant of variants || []) {
+        try {
+          await db.run(
+            `INSERT INTO service_variant_prices (variant_id, range_id, price_per_unit, is_active)
+             VALUES (?, ?, 0, 1)`,
+            variant.id,
+            existingRange.id
+          );
+        } catch (err: any) {
+          if (!String(err?.message || '').includes('UNIQUE constraint')) throw err;
+        }
+      }
+      return existingRange.id;
     }
     
     // Получаем текущий максимальный sort_order
@@ -1648,7 +1726,7 @@ export class PricingServiceRepository {
       }
     }
     
-    return rangeId;
+    return rangeId!;
   }
   
   /**

@@ -47,10 +47,9 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
     <div className="table-container">
       {noPriceColumns && (
         <div className="service-variants-ranges-hint">
-          Столбцы с ценами появятся после того, как у услуги появятся диапазоны тиража. Нажмите{' '}
-          <strong>«Диапазон»</strong> справа от заголовка блока (или задайте диапазоны через кнопку «Диапазоны» в
-          списке услуг). Цены вводятся в строках <strong>подтипа</strong> (самый нижний уровень в дереве), не в
-          корне типа.
+          Столбцы с ценами появятся после добавления диапазона тиража. Нажмите <strong>«Диапазон»</strong> справа
+          (например, граница <strong>1</strong>). Цены вводятся в <strong>конечных</strong> строках (тип без
+          подтипов или сам подтип).
         </div>
       )}
       <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small service-variants-grid">
@@ -132,6 +131,7 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                       onCreateChild={actions.level0CreateChild}
                       onCreateSibling={actions.level0CreateSibling}
                       onDelete={actions.level0Delete}
+                      onPriceChange={actions.level2PriceChange}
                     />
 
                     {Array.from(typeGroup.level1.entries()).map(([, level1Variants]) =>
@@ -153,6 +153,7 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                               onCreateChild={actions.level1CreateChild}
                               onCreateSibling={actions.level1CreateSibling}
                               onDelete={actions.level1Delete}
+                              onPriceChange={actions.level2PriceChange}
                             />
 
                             {level2Variants.map((level2Variant) => (

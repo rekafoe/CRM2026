@@ -234,6 +234,39 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
     [commonRanges]
   );
 
+  // У уже созданных сложных услуг без границ тиража колонки цен не появляются — создаём «от 1»
+  const seededDefaultRangeRef = useRef(false);
+  useEffect(() => {
+    seededDefaultRangeRef.current = false;
+  }, [serviceId]);
+  useEffect(() => {
+    if (loading || seededDefaultRangeRef.current) return;
+    if (serverVariants.length === 0) return;
+    if (localChanges.hasUnsavedChanges) return;
+    if (calculateCommonRanges(serverVariants).length > 0) {
+      seededDefaultRangeRef.current = true;
+      return;
+    }
+    seededDefaultRangeRef.current = true;
+    void operations
+      .addRangeBoundary(1)
+      .then(() => {
+        invalidateCache();
+        return reload();
+      })
+      .catch((err) => {
+        console.warn('Не удалось создать диапазон тиража по умолчанию:', err);
+        seededDefaultRangeRef.current = false;
+      });
+  }, [
+    loading,
+    serverVariants,
+    localChanges.hasUnsavedChanges,
+    operations,
+    invalidateCache,
+    reload,
+  ]);
+
   const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
   const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
 
