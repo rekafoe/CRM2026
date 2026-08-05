@@ -6,6 +6,7 @@ import { SupplierModal } from './SupplierModal';
 import { SupplierMaterialsModal } from './SupplierMaterialsModal';
 import { SupplierAnalyticsModal } from './SupplierAnalyticsModal';
 import { api } from '../../api/client';
+import { AppIcon } from '../ui/AppIcon';
 import './SuppliersManagement.css';
 
 interface SuppliersManagementProps {
@@ -366,31 +367,46 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
                 <td>{new Date(supplier.updated_at).toLocaleDateString()}</td>
                 <td>
                   <div className="supplier-actions inline">
-                    <button 
+                    <button
+                      type="button"
                       className="action-btn small"
                       onClick={() => handleViewMaterials(supplier)}
                       title="Материалы"
-                    >📦</button>
-                    <button 
+                    >
+                      <AppIcon name="package" size="sm" />
+                    </button>
+                    <button
+                      type="button"
                       className="action-btn small"
                       onClick={() => handleViewAnalytics(supplier)}
                       title="Аналитика"
-                    >📊</button>
-                    <button 
+                    >
+                      <AppIcon name="chart-bar" size="sm" />
+                    </button>
+                    <button
+                      type="button"
                       className="action-btn small"
                       onClick={() => handleEdit(supplier)}
                       title="Редактировать"
-                    >✏️</button>
-                    <button 
+                    >
+                      <AppIcon name="pencil" size="sm" />
+                    </button>
+                    <button
+                      type="button"
                       className="action-btn small"
                       onClick={() => handleToggleActive(supplier)}
                       title={supplier.is_active ? 'Деактивировать' : 'Активировать'}
-                    >{supplier.is_active ? '⏸️' : '▶️'}</button>
-                    <button 
+                    >
+                      <AppIcon name={supplier.is_active ? 'ban' : 'check'} size="sm" />
+                    </button>
+                    <button
+                      type="button"
                       className="action-btn small danger"
                       onClick={() => handleDelete(supplier)}
                       title="Удалить"
-                    >🗑️</button>
+                    >
+                      <AppIcon name="trash" size="sm" />
+                    </button>
                   </div>
                 </td>
               </tr>

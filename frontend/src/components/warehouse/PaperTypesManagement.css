@@ -116,12 +116,18 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 
-.material-list .material-item {
+.material-list .material-item,
+.materials-grid .material-item,
+.material-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #f1f3f5;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  margin: 0;
 }
 
 .material-list .material-item:last-child {
@@ -133,10 +139,22 @@
 
 .paper-type-card {
   background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.paper-type-action-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px !important;
 }
 
 .paper-type-card:hover {
@@ -195,9 +213,23 @@
 }
 
 .paper-type-details p {
-  margin: 4px 0;
+  margin: 0 0 10px;
   font-size: 14px;
+  line-height: 1.45;
   color: #495057;
+}
+
+.paper-type-details p:last-child {
+  margin-bottom: 0;
+}
+
+.paper-materials {
+  margin-top: 16px;
+}
+
+.paper-materials > strong {
+  display: block;
+  margin-bottom: 10px;
 }
 
 .paper-type-details strong {

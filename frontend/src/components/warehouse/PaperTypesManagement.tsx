@@ -1,6 +1,7 @@
 import React from 'react';
 import { usePaperTypesManagement } from './hooks/usePaperTypesManagement';
 import { BynSymbol, MoneyAmount } from '../ui';
+import { AppIcon } from '../ui/AppIcon';
 import './PaperTypesManagement.css';
 
 interface PaperTypesManagementProps {
@@ -76,20 +77,21 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
               <div className="paper-type-header">
                 <h3>{paperType.display_name}</h3>
                 <div className="paper-type-actions">
-                  <button 
-                    className="btn btn-sm btn-secondary"
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary paper-type-action-btn"
+                    title="Редактировать"
                     onClick={() => updateModal('editingPaperType', paperType)}
                   >
-                    ✏️
+                    <AppIcon name="pencil" size="sm" />
                   </button>
-                  <button 
-                    className="btn btn-sm btn-danger"
-                    onClick={() => {
-                      console.log('🗑️ Delete button clicked for ID:', paperType.id);
-                      handleDeletePaperType(paperType.id);
-                    }}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger paper-type-action-btn"
+                    title="Удалить"
+                    onClick={() => handleDeletePaperType(paperType.id)}
                   >
-                    🗑️
+                    <AppIcon name="trash" size="sm" />
                   </button>
                 </div>
               </div>

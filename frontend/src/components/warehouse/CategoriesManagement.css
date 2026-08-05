@@ -1,14 +1,14 @@
 .categories-management {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .categories-management__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -21,7 +21,7 @@
 
 .categories-management__toolbar {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -29,10 +29,12 @@
 .categories-management__search {
   min-width: 220px;
   flex: 1;
-  padding: 8px 10px;
+  min-height: 36px;
+  padding: 8px 12px;
   border: 1px solid var(--border-color, #ddd);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--bg-primary, #fff);
+  box-sizing: border-box;
 }
 
 .categories-management__layout {

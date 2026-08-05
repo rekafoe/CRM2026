@@ -21,12 +21,13 @@
 
 /* --- Ритм отступов страницы --- */
 .warehouse-dashboard--embedded {
-  --wh-gap: 12px;
-  --wh-gap-lg: 16px;
-  --wh-pad: 12px;
+  --wh-gap: 16px;
+  --wh-gap-lg: 24px;
+  --wh-pad: 16px;
+  --wh-pad-x: 8px;
   --wh-btn-h: 36px;
-  --wh-icon-btn: 32px;
-  --wh-radius: 8px;
+  --wh-icon-btn: 36px;
+  --wh-radius: 10px;
 }
 
 .warehouse-dashboard--embedded .product-controls {
@@ -40,7 +41,7 @@
 
 .warehouse-dashboard--embedded .product-quick-filters {
   padding-top: var(--wh-gap);
-  gap: 8px;
+  gap: 10px;
   border-top: 1px solid var(--border-color, #f1f5f9);
 }
 
@@ -49,11 +50,13 @@
   padding-top: var(--wh-gap);
 }
 
+/* Важно: не обнулять горизонтальные отступы — иначе всё прилипает к краю */
 .warehouse-dashboard--embedded .tabs-content-embedded,
 .product-management .warehouse-dashboard--embedded .tabs-content-embedded,
 .warehouse-page .warehouse-dashboard--embedded .tabs-content-embedded {
-  padding: var(--wh-gap) 0 0;
+  padding: var(--wh-gap-lg) var(--wh-pad-x) 32px;
   min-height: 200px;
+  box-sizing: border-box;
 }
 
 .product-management .warehouse-dashboard--embedded .warehouse-pm-bulk,
@@ -120,25 +123,10 @@
   opacity: 0.9;
 }
 
-.warehouse-dashboard--embedded .wh-section-intro {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 0 0 var(--wh-gap);
-}
-
-.warehouse-dashboard--embedded .wh-section-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 650;
-  color: var(--text-primary, #0f172a);
-}
-
 .warehouse-dashboard--embedded .wh-section-hint {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   font-size: 13px;
+  line-height: 1.45;
   color: var(--text-secondary, #64748b);
   max-width: 52rem;
 }
@@ -182,21 +170,25 @@
   max-height: none !important;
   overflow: visible !important;
   background: transparent;
-  gap: var(--wh-gap);
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--wh-gap-lg) !important;
 }
 
 .warehouse-dashboard--embedded .inventory-header,
 .warehouse-dashboard--embedded .suppliers-header,
 .warehouse-dashboard--embedded .categories-management__header,
+.warehouse-dashboard--embedded .paper-header,
 .warehouse-dashboard--embedded .paper-types-header,
-.warehouse-dashboard--embedded .reports-header {
+.warehouse-dashboard--embedded .reports-header,
+.warehouse-dashboard--embedded .wh-section-intro {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--wh-gap);
   flex-wrap: wrap;
-  margin: 0 0 var(--wh-gap);
-  padding: 0 0 10px;
+  margin: 0 !important;
+  padding: 0 0 16px !important;
   border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
 
@@ -204,20 +196,214 @@
 .warehouse-dashboard--embedded .suppliers-header h2,
 .warehouse-dashboard--embedded .categories-management__title,
 .warehouse-dashboard--embedded .paper-types-header h2,
-.warehouse-dashboard--embedded .reports-header h2 {
+.warehouse-dashboard--embedded .paper-title,
+.warehouse-dashboard--embedded .reports-header h2,
+.warehouse-dashboard--embedded .wh-section-title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.3;
   color: var(--text-primary, #1e293b);
 }
 
 .warehouse-dashboard--embedded .header-actions,
-.warehouse-dashboard--embedded .categories-management__toolbar {
+.warehouse-dashboard--embedded .categories-management__toolbar,
+.warehouse-dashboard--embedded .paper-actions,
+.warehouse-dashboard--embedded .suppliers-controls,
+.warehouse-dashboard--embedded .filter-section {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+}
+
+.warehouse-dashboard--embedded .filter-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.warehouse-dashboard--embedded .filter-group label {
+  margin: 0 !important;
+  white-space: nowrap;
+  color: var(--text-secondary, #64748b);
+  font-size: 13px;
+}
+
+.warehouse-dashboard--embedded .categories-management__toolbar,
+.warehouse-dashboard--embedded .suppliers-controls,
+.warehouse-dashboard--embedded .inv-filters,
+.warehouse-dashboard--embedded .warehouse-reports .filters {
+  margin: 0 !important;
+}
+
+.warehouse-dashboard--embedded .inventory-tabs {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--wh-gap);
+}
+
+.warehouse-dashboard--embedded .inventory-tabs .tabs-header,
+.warehouse-dashboard--embedded .warehouse-reports .tabs-header,
+.warehouse-dashboard--embedded .paper-tabs {
+  display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+.warehouse-dashboard--embedded .inventory-tabs .tabs-content,
+.warehouse-dashboard--embedded .materials-view,
+.warehouse-dashboard--embedded .transactions-view,
+.warehouse-dashboard--embedded .alerts-view,
+.warehouse-dashboard--embedded .auto-order-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wh-gap);
+}
+
+.warehouse-dashboard--embedded .inv-section-hint,
+.warehouse-dashboard--embedded .inv-header-sub {
+  margin: 8px 0 0 !important;
+  line-height: 1.45 !important;
+}
+
+.warehouse-dashboard--embedded .inv-filters,
+.warehouse-dashboard--embedded .warehouse-reports .filters {
+  gap: 12px !important;
+  margin-bottom: 0 !important;
+  align-items: flex-end !important;
+}
+
+.warehouse-dashboard--embedded .suppliers-stats {
+  gap: 12px !important;
+  margin: 0 !important;
+}
+
+.warehouse-dashboard--embedded .suppliers-stats .stat-card {
+  padding: 14px 16px !important;
+  border-radius: 10px !important;
+  gap: 12px !important;
+  align-items: center !important;
+  min-height: 72px;
+}
+
+.warehouse-dashboard--embedded .suppliers-stats .stat-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 8px !important;
+}
+
+.warehouse-dashboard--embedded .suppliers-stats .stat-value {
+  font-size: 20px !important;
+  line-height: 1.2 !important;
+}
+
+.warehouse-dashboard--embedded .suppliers-stats .stat-label {
+  font-size: 12px !important;
+  margin-top: 4px !important;
+  line-height: 1.3 !important;
+}
+
+.warehouse-dashboard--embedded .suppliers-table th,
+.warehouse-dashboard--embedded .suppliers-table td {
+  padding: 14px 16px !important;
+  vertical-align: middle !important;
+}
+
+.warehouse-dashboard--embedded .supplier-actions.inline {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+}
+
+.warehouse-dashboard--embedded .supplier-actions .action-btn.small {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+}
+
+.warehouse-dashboard--embedded .categories-management__panel {
+  padding: 16px !important;
+  border-radius: 12px !important;
+}
+
+.warehouse-dashboard--embedded .categories-management__layout {
+  gap: var(--wh-gap-lg) !important;
+}
+
+.warehouse-dashboard--embedded .paper-type-card {
+  padding: 20px 22px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+.warehouse-dashboard--embedded .paper-type-header {
+  margin-bottom: 16px !important;
+  gap: 12px !important;
+}
+
+.warehouse-dashboard--embedded .paper-type-details {
+  margin-top: 16px !important;
+  padding-top: 16px !important;
+}
+
+.warehouse-dashboard--embedded .paper-type-details p {
+  margin: 0 0 10px !important;
+  line-height: 1.45 !important;
+}
+
+.warehouse-dashboard--embedded .paper-type-details p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.warehouse-dashboard--embedded .paper-materials {
+  margin-top: 16px !important;
+}
+
+.warehouse-dashboard--embedded .paper-types-grid,
+.warehouse-dashboard--embedded .materials-grid {
+  gap: 16px !important;
+  margin-top: 0 !important;
+}
+
+.warehouse-dashboard--embedded .material-item {
+  padding: 12px 14px !important;
+  border-radius: 10px !important;
+  margin: 0 !important;
+  gap: 12px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.warehouse-dashboard--embedded .warehouse-reports .summary-cards {
+  gap: 14px !important;
+  margin-top: 4px !important;
+}
+
+.warehouse-dashboard--embedded .warehouse-reports .summary-cards .card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.warehouse-dashboard--embedded .warehouse-reports .summary-cards .card-body {
+  padding: 16px 18px !important;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.warehouse-dashboard--embedded .warehouse-reports .summary-cards .card-body strong {
+  font-size: 1.35rem;
+  line-height: 1.2;
 }
 
 /* --- Тулбар материалов --- */

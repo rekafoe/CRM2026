@@ -1,7 +1,33 @@
 .inventory-control {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
+}
+
+.inventory-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inventory-tabs .tabs-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inventory-tabs .tabs-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.materials-view,
+.transactions-view,
+.alerts-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .inventory-header {

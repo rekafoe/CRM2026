@@ -62,20 +62,20 @@
 /* Статистика */
 .suppliers-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 0;
   flex-shrink: 0;
 }
 
 .stat-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 8px;
+  border-radius: 10px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   transition: all 0.2s ease;
 }
 
@@ -123,11 +123,19 @@
 /* Элементы управления */
 .suppliers-controls {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 0;
   align-items: center;
   flex-wrap: wrap;
   flex-shrink: 0;
+}
+
+.suppliers-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .search-input {
@@ -185,32 +193,35 @@
 /* Стили для фильтров */
 .filter-section {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .filter-group {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .filter-group label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
   font-weight: 500;
   white-space: nowrap;
+  margin: 0;
 }
 
 .filter-group select {
-  padding: 6px 8px;
+  padding: 8px 12px;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
   background: var(--bg-secondary);
   color: var(--text-primary);
   cursor: pointer;
-  min-width: 100px;
+  min-width: 120px;
+  min-height: 36px;
 }
 
 .reset-filters-btn {
@@ -251,11 +262,12 @@
 
 .suppliers-table th,
 .suppliers-table td {
-  padding: 10px 12px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border-color);
   border-right: 1px solid var(--border-color);
   text-align: center;
   font-size: 13px;
+  vertical-align: middle;
 }
 
 .suppliers-table th {
@@ -280,9 +292,12 @@
 }
 
 .supplier-actions.inline {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .supplier-card {
@@ -388,13 +403,15 @@
 }
 
 .supplier-actions .action-btn.small {
-  padding: 3px 5px;
+  padding: 0;
   font-size: 11px;
-  min-width: 24px;
-  height: 24px;
-  display: flex;
+  min-width: 34px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 8px;
 }
 
 .supplier-actions .action-btn.small:first-child {

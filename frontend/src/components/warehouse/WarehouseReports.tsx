@@ -328,7 +328,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
       {error && <div style={{ padding: 12, color: '#e74c3c', background: '#ffeaea', borderRadius: 4, marginBottom: 12 }}>{error}</div>}
       
       {active === 'summary' && (
-        <div className="summary-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12 }}>
+        <div className="summary-cards">
           <div className="card"><div className="card-body"><div>Всего позиций</div><strong>{backendSummary?.totalMaterials || stats.totalMaterials}</strong></div></div>
           <div className="card"><div className="card-body"><div>В наличии</div><strong>{backendSummary?.inStock || stats.inStock}</strong></div></div>
           <div className="card"><div className="card-body"><div>Низкий остаток</div><strong>{backendSummary?.lowStock || stats.lowStock}</strong></div></div>
