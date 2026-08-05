@@ -89,6 +89,10 @@ export class MaterialBulkService {
           delivery_notes 
         } = spend
         const roundedDelta = Math.ceil(Number(delta)) // Округляем вверх
+        const materialMeta = await db.get<{ sheet_price_single?: number | null; purchase_price?: number | null }>(
+          'SELECT sheet_price_single, purchase_price FROM materials WHERE id = ?',
+          material_id
+        )
         
         // Обновляем количество
         await db.run(
@@ -111,8 +115,9 @@ export class MaterialBulkService {
             delivery_number,
             invoice_number,
             delivery_date,
-            delivery_notes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            delivery_notes,
+            price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           material_id,
           roundedDelta >= 0 ? 'bulk_add' : 'bulk_spend',
           Math.abs(roundedDelta),
@@ -124,7 +129,8 @@ export class MaterialBulkService {
           delivery_number || null,
           invoice_number || null,
           delivery_date || null,
-          delivery_notes || null
+          delivery_notes || null,
+          Number(materialMeta?.purchase_price ?? materialMeta?.sheet_price_single ?? 0),
         )
         
         // Получаем обновленный материал

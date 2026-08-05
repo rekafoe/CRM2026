@@ -80,6 +80,8 @@ const initialState: ServicesManagementState = {
     categoryId: '',
     materialId: '',
     qtyPerItem: '1',
+    consumptionMode: 'fixed',
+    meterBasis: 'feed',
   },
   editingService: null,
   editingServiceForm: null,

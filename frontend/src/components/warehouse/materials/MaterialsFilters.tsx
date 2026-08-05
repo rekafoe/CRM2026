@@ -6,7 +6,9 @@ interface MaterialsFiltersProps {
   isOpen: boolean;
   onClose: () => void;
   filters: {
-    category: string;
+    categoryId: string;
+    materialTypeId: string;
+    materialKind: string;
     supplier: string;
     minQuantity: number;
     maxQuantity: number;
@@ -15,7 +17,8 @@ interface MaterialsFiltersProps {
     stockStatus: string;
   };
   onFiltersChange: (filters: any) => void;
-  categories: string[];
+  categories: Array<{ id: number; name: string }>;
+  materialTypes: Array<{ id: number; name: string }>;
   suppliers: string[];
 }
 
@@ -25,6 +28,7 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
   filters,
   onFiltersChange,
   categories,
+  materialTypes,
   suppliers,
 }) => {
   if (!isOpen) return null;
@@ -42,7 +46,9 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
 
   const resetFilters = () => {
     onFiltersChange({
-      category: '',
+      categoryId: '',
+      materialTypeId: '',
+      materialKind: '',
       supplier: '',
       minQuantity: 0,
       maxQuantity: 1000,
@@ -80,11 +86,40 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
           label="Категория"
           id="category-filter"
           as="select"
-          value={filters.category}
-          onChange={(value) => handleFilterChange('category', value)}
+          value={filters.categoryId}
+          onChange={(value) => handleFilterChange('categoryId', value)}
           options={[
             { value: '', label: 'Все категории' },
-            ...categories.map(cat => ({ value: cat, label: cat }))
+            ...categories.map(cat => ({ value: String(cat.id), label: cat.name }))
+          ]}
+        />
+
+        {/* Тип материала */}
+        <WarehouseFormField
+          label="Тип материала"
+          id="material-type-filter"
+          as="select"
+          value={filters.materialTypeId}
+          onChange={(value) => handleFilterChange('materialTypeId', value)}
+          options={[
+            { value: '', label: 'Все типы' },
+            ...materialTypes.map(type => ({ value: String(type.id), label: type.name }))
+          ]}
+        />
+
+        {/* Класс материала */}
+        <WarehouseFormField
+          label="Класс"
+          id="material-kind-filter"
+          as="select"
+          value={filters.materialKind}
+          onChange={(value) => handleFilterChange('materialKind', value)}
+          options={[
+            { value: '', label: 'Все классы' },
+            { value: 'sheet', label: 'Листовой' },
+            { value: 'roll', label: 'Рулонный' },
+            { value: 'consumable', label: 'Расходка' },
+            { value: 'area', label: 'Площадной' },
           ]}
         />
 

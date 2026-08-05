@@ -1,4 +1,6 @@
 export type PricingServiceType = 'print' | 'postprint' | 'other' | 'generic' | string;
+export type ServiceConsumptionMode = 'fixed' | 'roll_feed';
+export type ServiceMeterBasis = 'knife_path' | 'feed';
 
 export interface PriceType {
   id: number;
@@ -39,6 +41,8 @@ export interface PricingService {
   material_id?: number | null;
   /** Расход материала на единицу операции */
   qty_per_item?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface ServiceVolumeTier {
@@ -70,6 +74,8 @@ export interface ServiceVariant {
   qty_per_item?: number | null;
   /** Родитель в дереве вариантов (дублируется в parameters.parentVariantId для совместимости) */
   parentVariantId?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 /** PUT варианта: поля опциональны — на бэкенде не переданное не затирает колонку */
@@ -81,6 +87,8 @@ export interface ServiceVariantPayload {
   material_id?: number | null;
   qty_per_item?: number | null;
   parentVariantId?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface CreatePricingServicePayload {
@@ -97,6 +105,8 @@ export interface CreatePricingServicePayload {
   categoryId?: number | null;
   material_id?: number | null;
   qty_per_item?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface UpdatePricingServicePayload extends Partial<CreatePricingServicePayload> {}

@@ -16,7 +16,9 @@ interface MaterialsListProps {
   sortOrder: 'asc' | 'desc';
   searchQuery: string;
   filters?: {
-    category: string;
+    categoryId: string;
+    materialTypeId: string;
+    materialKind: string;
     supplier: string;
     minQuantity: number;
     maxQuantity: number;
@@ -67,9 +69,23 @@ export const MaterialsList: React.FC<MaterialsListProps> = ({
     // Применяем фильтры
     if (filters) {
       // Фильтр по категории
-      if (filters.category) {
+      if (filters.categoryId) {
         filtered = filtered.filter(material =>
-          (material as any).category_name === filters.category
+          String(material.category_id || '') === String(filters.categoryId)
+        );
+      }
+
+      // Фильтр по типу материала
+      if (filters.materialTypeId) {
+        filtered = filtered.filter(material =>
+          String((material as any).material_type_id || '') === String(filters.materialTypeId)
+        );
+      }
+
+      // Фильтр по классу материала
+      if (filters.materialKind) {
+        filtered = filtered.filter(material =>
+          String((material as any).material_kind || '') === String(filters.materialKind)
         );
       }
 
@@ -95,13 +111,13 @@ export const MaterialsList: React.FC<MaterialsListProps> = ({
       // Фильтр по цене
       if (filters.minPrice > 0) {
         filtered = filtered.filter(material => {
-          const price = material.sheet_price_single || material.price || 0;
+          const price = material.purchase_price ?? material.sheet_price_single ?? material.price ?? 0;
           return price >= filters.minPrice;
         });
       }
       if (filters.maxPrice < 1000) {
         filtered = filtered.filter(material => {
-          const price = material.sheet_price_single || material.price || 0;
+          const price = material.purchase_price ?? material.sheet_price_single ?? material.price ?? 0;
           return price <= filters.maxPrice;
         });
       }
@@ -170,7 +186,7 @@ export const MaterialsList: React.FC<MaterialsListProps> = ({
         <span className="header-text">КАТЕГОРИЯ</span>
       </div>
       <div className="row-column quantity-column">
-        <span className="header-text">КОЛИЧЕСТВО</span>
+        <span className="header-text">ОСТАТОК</span>
       </div>
       <div className="row-column status-column">
         <span className="header-text">СТАТУС</span>

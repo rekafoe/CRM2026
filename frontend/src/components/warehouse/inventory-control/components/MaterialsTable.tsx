@@ -46,7 +46,11 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
                 <td>{available}</td>
                 <td>{(m as any).min_quantity ?? (m as any).min_stock_level ?? '—'}</td>
                 <td>{m.unit}</td>
-                <td>{(m as any).sheet_price_single ? Number((m as any).sheet_price_single).toFixed(2) : '—'}</td>
+                <td>{
+                  ((m as any).purchase_price ?? (m as any).sheet_price_single) != null
+                    ? Number((m as any).purchase_price ?? (m as any).sheet_price_single).toFixed(2)
+                    : '—'
+                }</td>
                 <td>
                   {status ? <span className={`inv-badge status-${status}`}>{status}</span> : '—'}
                 </td>

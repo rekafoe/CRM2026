@@ -60,6 +60,8 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/material-categories$/ },
   { method: 'GET', path: /^\/api\/material-categories\/stats$/ },
   { method: 'GET', path: /^\/api\/material-categories\/[0-9]+$/ },
+  { method: 'GET', path: /^\/api\/material-types$/ },
+  { method: 'GET', path: /^\/api\/material-types\/[0-9]+$/ },
   { method: 'GET', path: /^\/api\/printing-technologies$/ },
   // webhooks / website orders
   { method: 'POST', path: /^\/api\/webhooks\/bepaid$/ },

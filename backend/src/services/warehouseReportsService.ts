@@ -149,7 +149,7 @@ export class WarehouseReportsService {
         COUNT(DISTINCT CASE WHEN m.quantity > 0 THEN m.id END) as inStock,
         COUNT(DISTINCT CASE WHEN m.quantity > 0 AND m.quantity <= COALESCE(m.min_quantity, 10) THEN m.id END) as lowStock,
         COUNT(DISTINCT CASE WHEN m.quantity <= 0 THEN m.id END) as outOfStock,
-        COALESCE(SUM(m.quantity * COALESCE(m.sheet_price_single, 0)), 0) as totalValue,
+        COALESCE(SUM(m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)), 0) as totalValue,
         COUNT(DISTINCT m.category_id) as categoriesCount,
         COUNT(DISTINCT m.supplier_id) as suppliersCount,
         COUNT(DISTINCT CASE WHEN m.quantity <= COALESCE(m.min_quantity, 10) THEN m.id END) as alertsCount
@@ -203,7 +203,8 @@ export class WarehouseReportsService {
         COALESCE(m.min_quantity, 10) as min_quantity,
         COALESCE(m.unit, 'шт') as unit,
         COALESCE(m.sheet_price_single, 0) as sheet_price_single,
-        (m.quantity * COALESCE(m.sheet_price_single, 0)) as total_value
+        COALESCE(m.purchase_price, m.sheet_price_single, 0) as purchase_price,
+        (m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)) as total_value
       FROM materials m
       LEFT JOIN material_categories c ON m.category_id = c.id
       LEFT JOIN suppliers s ON m.supplier_id = s.id
@@ -237,7 +238,7 @@ export class WarehouseReportsService {
         COALESCE(s.name, 'Без поставщика') as supplier_name,
         COUNT(m.id) as materials_count,
         COALESCE(SUM(m.quantity), 0) as total_quantity,
-        COALESCE(SUM(m.quantity * COALESCE(m.sheet_price_single, 0)), 0) as total_value,
+        COALESCE(SUM(m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)), 0) as total_value,
         COUNT(CASE WHEN m.quantity > 0 AND m.quantity <= COALESCE(m.min_quantity, 10) THEN 1 END) as low_stock_count,
         COUNT(CASE WHEN m.quantity <= 0 THEN 1 END) as out_of_stock_count
       FROM materials m
@@ -340,7 +341,7 @@ export class WarehouseReportsService {
         c.color as category_color,
         COUNT(m.id) as materials_count,
         COALESCE(SUM(m.quantity), 0) as total_quantity,
-        COALESCE(SUM(m.quantity * COALESCE(m.sheet_price_single, 0)), 0) as total_value,
+        COALESCE(SUM(m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)), 0) as total_value,
         COUNT(CASE WHEN m.quantity > 0 AND m.quantity <= COALESCE(m.min_quantity, 10) THEN 1 END) as low_stock_count,
         COUNT(CASE WHEN m.quantity <= 0 THEN 1 END) as out_of_stock_count
       FROM material_categories c
@@ -383,7 +384,15 @@ export class WarehouseReportsService {
         m.id as material_id,
         m.name as material_name,
         COALESCE(c.name, 'Без категории') as category_name,
-        (m.quantity * COALESCE(m.sheet_price_single, 0)) as total_value
+        m.quantity as current_quantity,
+        (m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)) as total_value,
+        COALESCE((
+          SELECT SUM(ABS(mm.delta))
+          FROM material_moves mm
+          WHERE mm.material_id = m.id
+            AND mm.delta < 0
+            AND mm.created_at >= datetime('now', '-90 days')
+        ), 0) as consumption_90d
       FROM materials m
       LEFT JOIN material_categories c ON m.category_id = c.id
       ${whereClause}
@@ -413,8 +422,11 @@ export class WarehouseReportsService {
         abcClass = 'C'
       }
       
-      // Вычисляем оборачиваемость (упрощенная формула)
-      const turnoverRate = material.total_value > 0 ? Math.random() * 12 : 0 // Заглушка
+      // Оборачиваемость: годовой расход к среднему остатку (по данным движений за 90 дней)
+      const currentStock = Math.max(Number(material.current_quantity) || 0, 0)
+      const consumption90d = Math.max(Number(material.consumption_90d) || 0, 0)
+      const annualizedConsumption = consumption90d * (365 / 90)
+      const turnoverRate = currentStock > 0 ? annualizedConsumption / currentStock : 0
       
       let recommendations = ''
       if (abcClass === 'A') {
@@ -472,7 +484,7 @@ export class WarehouseReportsService {
         COALESCE(c.name, 'Без категории') as category_name,
         m.quantity as current_stock,
         COALESCE(m.min_quantity, 10) as min_quantity,
-        COALESCE(m.sheet_price_single, 0) as unit_price
+        COALESCE(m.purchase_price, m.sheet_price_single, 0) as unit_price
       FROM materials m
       LEFT JOIN material_categories c ON m.category_id = c.id
       ${whereClause}
@@ -527,8 +539,37 @@ export class WarehouseReportsService {
         c.id as category_id,
         c.name as category_name,
         COUNT(m.id) as total_materials,
-        COALESCE(SUM(m.quantity * COALESCE(m.sheet_price_single, 0)), 0) as total_value,
-        COALESCE(AVG(m.sheet_price_single), 0) as avg_cost_per_unit
+        COALESCE(SUM(m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)), 0) as total_value,
+        COALESCE(AVG(COALESCE(m.purchase_price, m.sheet_price_single)), 0) as avg_cost_per_unit,
+        COALESCE(MIN(COALESCE(m.purchase_price, m.sheet_price_single)), 0) as min_cost_per_unit,
+        COALESCE(MAX(COALESCE(m.purchase_price, m.sheet_price_single)), 0) as max_cost_per_unit,
+        COALESCE((
+          SELECT SUM(ABS(mm.delta) * COALESCE(mm.price, m2.purchase_price, m2.sheet_price_single, 0))
+          FROM material_moves mm
+          JOIN materials m2 ON m2.id = mm.material_id
+          WHERE m2.category_id = c.id
+            AND mm.delta < 0
+            AND mm.created_at >= datetime('now', '-30 days')
+        ), 0) as monthly_consumption_value,
+        COALESCE((
+          SELECT AVG(mm.price)
+          FROM material_moves mm
+          JOIN materials m2 ON m2.id = mm.material_id
+          WHERE m2.category_id = c.id
+            AND mm.type = 'add'
+            AND mm.price IS NOT NULL
+            AND mm.created_at >= datetime('now', '-30 days')
+        ), 0) as recent_avg_price,
+        COALESCE((
+          SELECT AVG(mm.price)
+          FROM material_moves mm
+          JOIN materials m2 ON m2.id = mm.material_id
+          WHERE m2.category_id = c.id
+            AND mm.type = 'add'
+            AND mm.price IS NOT NULL
+            AND mm.created_at < datetime('now', '-30 days')
+            AND mm.created_at >= datetime('now', '-90 days')
+        ), 0) as previous_avg_price
       FROM material_categories c
       LEFT JOIN materials m ON c.id = m.category_id
       GROUP BY c.id, c.name
@@ -537,27 +578,42 @@ export class WarehouseReportsService {
     
     const categories = await db.all(query)
     
-    return categories.map(category => {
-      // Упрощенные расчеты трендов и волатильности
-      const priceVolatility = Math.random() * 20 // 0-20% волатильность
-      const roiPercentage = Math.random() * 50 + 10 // 10-60% ROI
-      
-      const costTrend = priceVolatility > 15 ? 'increasing' : 
-                       priceVolatility < 5 ? 'decreasing' : 'stable'
-      
+    return categories.map((category) => {
+      const avgCost = Number(category.avg_cost_per_unit) || 0
+      const minCost = Number(category.min_cost_per_unit) || 0
+      const maxCost = Number(category.max_cost_per_unit) || 0
+      const totalValue = Number(category.total_value) || 0
+      const monthlyConsumptionValue = Number(category.monthly_consumption_value) || 0
+      const recentAvgPrice = Number(category.recent_avg_price) || 0
+      const previousAvgPrice = Number(category.previous_avg_price) || 0
+
+      const spread = Math.max(0, maxCost - minCost)
+      const priceVolatility = avgCost > 0 ? (spread / avgCost) * 100 : 0
+      const roiPercentage = totalValue > 0 ? (monthlyConsumptionValue / totalValue) * 100 : 0
+
+      let costTrend: 'increasing' | 'decreasing' | 'stable' = 'stable'
+      if (recentAvgPrice > 0 && previousAvgPrice > 0) {
+        if (recentAvgPrice > previousAvgPrice * 1.05) costTrend = 'increasing'
+        else if (recentAvgPrice < previousAvgPrice * 0.95) costTrend = 'decreasing'
+      }
+
+      const avgMargin = Math.max(0, Math.min(100, roiPercentage - priceVolatility * 0.3))
+      const minMargin = Math.max(0, avgMargin - 7.5)
+      const maxMargin = Math.min(100, avgMargin + 7.5)
+
       return {
         category_id: category.category_id,
         category_name: category.category_name,
-        total_materials: category.total_materials,
-        total_value: category.total_value,
-        avg_cost_per_unit: category.avg_cost_per_unit,
+        total_materials: Number(category.total_materials) || 0,
+        total_value: totalValue,
+        avg_cost_per_unit: avgCost,
         cost_trend: costTrend,
         price_volatility: priceVolatility,
         roi_percentage: roiPercentage,
         margin_analysis: {
-          min_margin: Math.random() * 20,
-          max_margin: Math.random() * 40 + 20,
-          avg_margin: Math.random() * 30 + 15
+          min_margin: minMargin,
+          max_margin: maxMargin,
+          avg_margin: avgMargin
         }
       }
     })
@@ -588,8 +644,48 @@ export class WarehouseReportsService {
         s.id as supplier_id,
         s.name as supplier_name,
         COUNT(m.id) as total_materials,
-        COALESCE(SUM(m.quantity * COALESCE(m.sheet_price_single, 0)), 0) as total_value,
-        COALESCE(AVG(m.sheet_price_single), 0) as avg_price
+        COALESCE(SUM(m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)), 0) as total_value,
+        COALESCE(AVG(COALESCE(m.purchase_price, m.sheet_price_single)), 0) as avg_price,
+        COALESCE((
+          SELECT COUNT(*)
+          FROM material_moves mm
+          WHERE mm.supplier_id = s.id
+            AND mm.type = 'add'
+            AND mm.created_at >= datetime('now', '-90 days')
+        ), 0) as deliveries_90d,
+        COALESCE((
+          SELECT AVG(mm.price)
+          FROM material_moves mm
+          WHERE mm.supplier_id = s.id
+            AND mm.type = 'add'
+            AND mm.price IS NOT NULL
+            AND mm.created_at >= datetime('now', '-30 days')
+        ), 0) as recent_avg_price,
+        COALESCE((
+          SELECT AVG(mm.price)
+          FROM material_moves mm
+          WHERE mm.supplier_id = s.id
+            AND mm.type = 'add'
+            AND mm.price IS NOT NULL
+            AND mm.created_at < datetime('now', '-30 days')
+            AND mm.created_at >= datetime('now', '-90 days')
+        ), 0) as previous_avg_price,
+        COALESCE((
+          SELECT MIN(mm.price)
+          FROM material_moves mm
+          WHERE mm.supplier_id = s.id
+            AND mm.type = 'add'
+            AND mm.price IS NOT NULL
+            AND mm.created_at >= datetime('now', '-180 days')
+        ), 0) as min_purchase_price,
+        COALESCE((
+          SELECT MAX(mm.price)
+          FROM material_moves mm
+          WHERE mm.supplier_id = s.id
+            AND mm.type = 'add'
+            AND mm.price IS NOT NULL
+            AND mm.created_at >= datetime('now', '-180 days')
+        ), 0) as max_purchase_price
       FROM suppliers s
       LEFT JOIN materials m ON s.id = m.supplier_id
       ${whereClause}
@@ -598,36 +694,58 @@ export class WarehouseReportsService {
     `
     
     const suppliers = await db.all(query, ...params)
-    
-    return suppliers.map(supplier => {
-      // Упрощенные расчеты метрик
-      const reliabilityScore = Math.random() * 40 + 60 // 60-100
-      const deliveryPerformance = Math.random() * 30 + 70 // 70-100
-      const qualityRating = Math.random() * 20 + 80 // 80-100
-      const costEffectiveness = Math.random() * 50 + 50 // 50-100
-      
-      const priceTrend = Math.random() > 0.5 ? 'increasing' : 
-                        Math.random() > 0.3 ? 'decreasing' : 'stable'
-      
+
+    const validAvgPrices = suppliers
+      .map((supplier: any) => Number(supplier.avg_price) || 0)
+      .filter((value: number) => value > 0)
+    const globalAvgPrice =
+      validAvgPrices.length > 0
+        ? validAvgPrices.reduce((sum: number, value: number) => sum + value, 0) / validAvgPrices.length
+        : 0
+
+    return suppliers.map((supplier) => {
+      const avgPrice = Number(supplier.avg_price) || 0
+      const deliveries90d = Number(supplier.deliveries_90d) || 0
+      const recentAvgPrice = Number(supplier.recent_avg_price) || 0
+      const previousAvgPrice = Number(supplier.previous_avg_price) || 0
+      const minPurchasePrice = Number(supplier.min_purchase_price) || 0
+      const maxPurchasePrice = Number(supplier.max_purchase_price) || 0
+
+      const volatility =
+        avgPrice > 0 ? ((Math.max(0, maxPurchasePrice - minPurchasePrice)) / avgPrice) * 100 : 0
+      const reliabilityScore = Math.max(50, Math.min(100, 100 - volatility))
+      const deliveryPerformance = Math.max(60, Math.min(100, 60 + deliveries90d * 2))
+      const qualityRating = Math.max(60, Math.min(100, 95 - volatility * 0.5))
+      const costEffectiveness =
+        globalAvgPrice > 0
+          ? Math.max(40, Math.min(100, 100 - ((avgPrice - globalAvgPrice) / globalAvgPrice) * 100))
+          : 75
+
+      let priceTrend: 'increasing' | 'decreasing' | 'stable' = 'stable'
+      if (recentAvgPrice > 0 && previousAvgPrice > 0) {
+        if (recentAvgPrice > previousAvgPrice * 1.05) priceTrend = 'increasing'
+        else if (recentAvgPrice < previousAvgPrice * 0.95) priceTrend = 'decreasing'
+      }
+
       const recommendations: string[] = []
-      if (reliabilityScore < 70) recommendations.push('Улучшить надежность поставок')
-      if (deliveryPerformance < 80) recommendations.push('Оптимизировать сроки доставки')
-      if (qualityRating < 85) recommendations.push('Повысить качество материалов')
-      if (costEffectiveness < 60) recommendations.push('Пересмотреть ценообразование')
-      if (priceTrend === 'increasing') recommendations.push('Обсудить стабильность цен')
+      if (reliabilityScore < 75) recommendations.push('Снизить ценовую волатильность у поставщика')
+      if (deliveryPerformance < 80) recommendations.push('Повысить регулярность поставок')
+      if (qualityRating < 85) recommendations.push('Проверить стабильность качества партий')
+      if (costEffectiveness < 70) recommendations.push('Пересмотреть закупочные цены/условия')
+      if (priceTrend === 'increasing') recommendations.push('Зафиксировать цены или создать запас')
       
       return {
         supplier_id: supplier.supplier_id,
         supplier_name: supplier.supplier_name,
-        total_materials: supplier.total_materials,
-        total_value: supplier.total_value,
-        avg_price: supplier.avg_price,
+        total_materials: Number(supplier.total_materials) || 0,
+        total_value: Number(supplier.total_value) || 0,
+        avg_price: avgPrice,
         price_trend: priceTrend,
         reliability_score: reliabilityScore,
         delivery_performance: deliveryPerformance,
         quality_rating: qualityRating,
         cost_effectiveness: costEffectiveness,
-        recommendations: recommendations
+        recommendations
       }
     })
   }
@@ -671,41 +789,97 @@ export class WarehouseReportsService {
     `
     
     const materials = await db.all(query, ...params)
+
+    const materialIds = materials
+      .map((material: any) => Number(material.material_id))
+      .filter((id: number) => Number.isFinite(id) && id > 0)
+
+    const monthlyRows =
+      materialIds.length > 0
+        ? await db.all(
+            `SELECT 
+               material_id,
+               strftime('%Y-%m', created_at) as month,
+               SUM(CASE WHEN delta < 0 THEN ABS(delta) ELSE 0 END) as consumed
+             FROM material_moves
+             WHERE material_id IN (${materialIds.map(() => '?').join(',')})
+               AND created_at >= datetime('now', '-18 months')
+             GROUP BY material_id, strftime('%Y-%m', created_at)`,
+            ...materialIds
+          )
+        : []
+
+    const consumptionByMaterial = new Map<number, Map<string, number>>()
+    monthlyRows.forEach((row: any) => {
+      const materialId = Number(row.material_id)
+      const month = String(row.month || '')
+      const consumed = Number(row.consumed) || 0
+      if (!consumptionByMaterial.has(materialId)) consumptionByMaterial.set(materialId, new Map())
+      consumptionByMaterial.get(materialId)!.set(month, consumed)
+    })
     
     return materials.map(material => {
-      // Генерируем исторические данные (последние 12 месяцев)
+      const materialId = Number(material.material_id)
+      const materialConsumption = consumptionByMaterial.get(materialId) ?? new Map<string, number>()
+
+      // Исторические данные за последние 12 месяцев из material_moves
       const historicalConsumption = []
       for (let i = 11; i >= 0; i--) {
         const date = new Date()
         date.setMonth(date.getMonth() - i)
         const month = date.toISOString().slice(0, 7)
-        const baseConsumption = Math.max(material.current_stock * 0.1, 1)
-        const seasonalFactor = 1 + 0.3 * Math.sin((date.getMonth() / 12) * 2 * Math.PI)
-        const quantity = Math.round(baseConsumption * seasonalFactor * (0.8 + Math.random() * 0.4))
+        const quantity = Math.max(0, Number(materialConsumption.get(month) || 0))
         
         historicalConsumption.push({ month, quantity })
       }
-      
-      // Генерируем прогнозы на следующие месяцы
+
+      const nonZeroHistory = historicalConsumption.map((item) => item.quantity)
+      const avgHistory =
+        nonZeroHistory.length > 0
+          ? nonZeroHistory.reduce((sum, qty) => sum + qty, 0) / nonZeroHistory.length
+          : 0
+      const recentAvg =
+        historicalConsumption.slice(-3).reduce((sum, item) => sum + item.quantity, 0) / 3
+      const olderAvg =
+        historicalConsumption.slice(0, 3).reduce((sum, item) => sum + item.quantity, 0) / 3
+      const growthRate =
+        olderAvg > 0
+          ? Math.max(-0.2, Math.min(0.2, (recentAvg - olderAvg) / olderAvg))
+          : 0
+
+      const monthFactors = new Map<number, number[]>()
+      historicalConsumption.forEach((item) => {
+        const monthIndex = Number(item.month.slice(5, 7)) - 1
+        if (!monthFactors.has(monthIndex)) monthFactors.set(monthIndex, [])
+        const factor = avgHistory > 0 ? item.quantity / avgHistory : 1
+        monthFactors.get(monthIndex)!.push(factor)
+      })
+      const getSeasonalFactorForMonth = (monthIndex: number) => {
+        const factors = monthFactors.get(monthIndex) || []
+        if (factors.length === 0) return 1
+        return factors.reduce((sum, factor) => sum + factor, 0) / factors.length
+      }
+
+      // Прогноз на N месяцев вперёд: скользящее среднее + тренд + сезонность
       const predictedConsumption = []
+      const baseForecast = recentAvg > 0 ? recentAvg : Math.max(avgHistory, Number(material.min_quantity) || 1)
       for (let i = 1; i <= months; i++) {
         const date = new Date()
         date.setMonth(date.getMonth() + i)
         const month = date.toISOString().slice(0, 7)
-        const baseConsumption = Math.max(material.current_stock * 0.1, 1)
-        const seasonalFactor = 1 + 0.3 * Math.sin((date.getMonth() / 12) * 2 * Math.PI)
-        const quantity = Math.round(baseConsumption * seasonalFactor * (0.8 + Math.random() * 0.4))
+        const monthIndex = date.getMonth()
+        const seasonalFactor = getSeasonalFactorForMonth(monthIndex)
+        const trended = baseForecast * Math.pow(1 + growthRate, i)
+        const quantity = Math.max(0, Math.round(trended * seasonalFactor))
         const confidence = Math.max(0.6, 1 - (i * 0.1)) // Снижаем уверенность со временем
         
         predictedConsumption.push({ month, quantity, confidence })
       }
       
       // Вычисляем сезонный фактор
-      const seasonalFactor = 1 + 0.3 * Math.sin((new Date().getMonth() / 12) * 2 * Math.PI)
+      const seasonalFactor = getSeasonalFactorForMonth(new Date().getMonth())
       
       // Определяем тренд
-      const recentAvg = historicalConsumption.slice(-3).reduce((sum, item) => sum + item.quantity, 0) / 3
-      const olderAvg = historicalConsumption.slice(0, 3).reduce((sum, item) => sum + item.quantity, 0) / 3
       const trend = recentAvg > olderAvg * 1.1 ? 'increasing' : 
                    recentAvg < olderAvg * 0.9 ? 'decreasing' : 'stable'
       
@@ -713,7 +887,9 @@ export class WarehouseReportsService {
       const avgMonthlyConsumption = historicalConsumption.reduce((sum, item) => sum + item.quantity, 0) / 12
       const recommendedOrderQuantity = Math.max(avgMonthlyConsumption * 2, material.min_quantity)
       const recommendedOrderDate = new Date()
-      recommendedOrderDate.setDate(recommendedOrderDate.getDate() + 7) // Через неделю
+      const nextMonthNeed = predictedConsumption[0]?.quantity ?? 0
+      const currentStock = Number(material.current_stock) || 0
+      recommendedOrderDate.setDate(recommendedOrderDate.getDate() + (currentStock < nextMonthNeed ? 3 : 10))
       
       return {
         material_id: material.material_id,

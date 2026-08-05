@@ -53,6 +53,8 @@ const toServiceResponse = (service: any) => ({
   categoryName: service.categoryName ?? service.category_name ?? null,
   material_id: service.material_id ?? null,
   qty_per_item: service.qty_per_item != null ? Number(service.qty_per_item) : null,
+  consumption_mode: service.consumption_mode ?? service.consumptionMode ?? null,
+  meter_basis: service.meter_basis ?? service.meterBasis ?? null,
 })
 
 const toTierResponse = (tier: any) => ({
@@ -83,6 +85,21 @@ function parseNonNegativeNumber(raw: unknown): number | null {
   if (raw == null || raw === '') return null
   const n = Number(raw)
   return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+function normalizeServiceConsumptionMode(raw: unknown): 'fixed' | 'roll_feed' | undefined {
+  if (raw === undefined) return undefined
+  if (raw === null || raw === '') return undefined
+  const value = String(raw).trim().toLowerCase()
+  return value === 'roll_feed' || value === 'fixed' ? value : undefined
+}
+
+function normalizeServiceMeterBasis(raw: unknown): 'knife_path' | 'feed' | null | undefined {
+  if (raw === undefined) return undefined
+  if (raw === null || raw === '') return null
+  const value = String(raw).trim().toLowerCase()
+  if (value === 'feed' || value === 'knife_path') return value
+  return undefined
 }
 
 function normalizeM2PricingKind(rawKind: unknown, technologyCode: unknown, counterUnit: unknown): M2PricingKind | null {
@@ -969,7 +986,25 @@ router.get('/bindings', asyncHandler(async (_req, res) => {
 }))
 
 router.post('/bindings', asyncHandler(async (req, res) => {
-  const { name, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId, material_id, qty_per_item } = req.body
+  const {
+    name,
+    unit,
+    price_unit,
+    priceUnit,
+    rate,
+    currency,
+    is_active,
+    isActive,
+    min_quantity,
+    max_quantity,
+    operator_percent,
+    category_id,
+    categoryId,
+    material_id,
+    qty_per_item,
+    consumption_mode,
+    meter_basis,
+  } = req.body
   const created = await ServiceManagementService.createBinding({
     name,
     type: 'bind',
@@ -985,13 +1020,32 @@ router.post('/bindings', asyncHandler(async (req, res) => {
     categoryId: category_id ?? categoryId,
     material_id: material_id != null && material_id !== '' ? Number(material_id) : undefined,
     qty_per_item: qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : undefined,
+    consumption_mode: normalizeServiceConsumptionMode(consumption_mode),
+    meter_basis: normalizeServiceMeterBasis(meter_basis),
   })
   res.status(201).json(toServiceResponse(created))
 }))
 
 router.put('/bindings/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId, material_id, qty_per_item } = req.body
+  const {
+    name,
+    unit,
+    price_unit,
+    priceUnit,
+    rate,
+    is_active,
+    isActive,
+    min_quantity,
+    max_quantity,
+    operator_percent,
+    category_id,
+    categoryId,
+    material_id,
+    qty_per_item,
+    consumption_mode,
+    meter_basis,
+  } = req.body
   const updated = await ServiceManagementService.updateBinding(Number(id), {
     name,
     type: 'bind',
@@ -1006,6 +1060,8 @@ router.put('/bindings/:id', asyncHandler(async (req, res) => {
     categoryId: category_id !== undefined ? category_id : categoryId,
     material_id: material_id !== undefined ? (material_id != null && material_id !== '' ? Number(material_id) : null) : undefined,
     qty_per_item: qty_per_item !== undefined ? (qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : null) : undefined,
+    consumption_mode: normalizeServiceConsumptionMode(consumption_mode),
+    meter_basis: normalizeServiceMeterBasis(meter_basis),
   })
 
   if (!updated) {
@@ -1474,7 +1530,27 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
 }))
 
 router.post('/services', asyncHandler(async (req, res) => {
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId, material_id, qty_per_item } = req.body
+  const {
+    name,
+    service_type,
+    type,
+    unit,
+    price_unit,
+    priceUnit,
+    rate,
+    currency,
+    is_active,
+    isActive,
+    min_quantity,
+    max_quantity,
+    operator_percent,
+    category_id,
+    categoryId,
+    material_id,
+    qty_per_item,
+    consumption_mode,
+    meter_basis,
+  } = req.body
   const created = await ServiceManagementService.createService({
     name,
     type: (service_type ?? type) || 'generic',
@@ -1489,13 +1565,35 @@ router.post('/services', asyncHandler(async (req, res) => {
     categoryId: category_id ?? categoryId,
     material_id: material_id != null && material_id !== '' ? Number(material_id) : undefined,
     qty_per_item: qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : undefined,
+    consumption_mode: normalizeServiceConsumptionMode(consumption_mode),
+    meter_basis: normalizeServiceMeterBasis(meter_basis),
   })
   res.status(201).json(toServiceResponse(created))
 }))
 
 router.put('/services/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, service_type, type, operation_type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId, material_id, qty_per_item } = req.body
+  const {
+    name,
+    service_type,
+    type,
+    operation_type,
+    unit,
+    price_unit,
+    priceUnit,
+    rate,
+    is_active,
+    isActive,
+    min_quantity,
+    max_quantity,
+    operator_percent,
+    category_id,
+    categoryId,
+    material_id,
+    qty_per_item,
+    consumption_mode,
+    meter_basis,
+  } = req.body
   const updated = await ServiceManagementService.updateService(Number(id), {
     name,
     type: operation_type ?? service_type ?? type,
@@ -1510,6 +1608,8 @@ router.put('/services/:id', asyncHandler(async (req, res) => {
     categoryId: category_id !== undefined ? category_id : categoryId,
     material_id: material_id !== undefined ? (material_id != null && material_id !== '' ? Number(material_id) : null) : undefined,
     qty_per_item: qty_per_item !== undefined ? (qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : null) : undefined,
+    consumption_mode: normalizeServiceConsumptionMode(consumption_mode),
+    meter_basis: normalizeServiceMeterBasis(meter_basis),
   })
 
   if (!updated) {
@@ -1593,6 +1693,8 @@ const toVariantResponse = (variant: any) => ({
   updated_at: variant.updatedAt,
   material_id: variant.material_id ?? null,
   qty_per_item: variant.qty_per_item != null ? Number(variant.qty_per_item) : null,
+  consumption_mode: variant.consumption_mode ?? null,
+  meter_basis: variant.meter_basis ?? null,
   parentVariantId: variant.parentVariantId ?? null,
   parent_variant_id: variant.parentVariantId ?? null,
 })
@@ -1644,7 +1746,19 @@ router.get('/services/:serviceId/variants', asyncHandler(async (req, res) => {
 
 router.post('/services/:serviceId/variants', asyncHandler(async (req, res) => {
   const { serviceId } = req.params
-  const { variant_name, variantName, parameters, sort_order, sortOrder, is_active, isActive, material_id, qty_per_item } = req.body
+  const {
+    variant_name,
+    variantName,
+    parameters,
+    sort_order,
+    sortOrder,
+    is_active,
+    isActive,
+    material_id,
+    qty_per_item,
+    consumption_mode,
+    meter_basis,
+  } = req.body
   const parsedParent = parseParentVariantIdFromBody(req.body)
   const variant = await ServiceManagementService.createServiceVariant(Number(serviceId), {
     variantName: variant_name ?? variantName ?? '',
@@ -1653,6 +1767,8 @@ router.post('/services/:serviceId/variants', asyncHandler(async (req, res) => {
     isActive: is_active !== undefined ? !!is_active : isActive,
     material_id: material_id != null && material_id !== '' ? Number(material_id) : undefined,
     qty_per_item: qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : undefined,
+    consumption_mode: normalizeServiceConsumptionMode(consumption_mode),
+    meter_basis: normalizeServiceMeterBasis(meter_basis),
     ...(parsedParent !== undefined ? { parentVariantId: parsedParent } : {}),
   })
   res.status(201).json(toVariantResponse(variant))
@@ -1670,7 +1786,19 @@ router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, 
     return;
   }
   
-  const { variant_name, variantName, parameters, sort_order, sortOrder, is_active, isActive, material_id, qty_per_item } = req.body
+  const {
+    variant_name,
+    variantName,
+    parameters,
+    sort_order,
+    sortOrder,
+    is_active,
+    isActive,
+    material_id,
+    qty_per_item,
+    consumption_mode,
+    meter_basis,
+  } = req.body
   const parsedParent = parseParentVariantIdFromBody(req.body)
   const updated = await ServiceManagementService.updateServiceVariant(normalizedVariantId, {
     variantName: variant_name ?? variantName,
@@ -1679,6 +1807,8 @@ router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, 
     isActive: is_active !== undefined ? !!is_active : isActive,
     material_id: material_id !== undefined ? (material_id != null && material_id !== '' ? Number(material_id) : null) : undefined,
     qty_per_item: qty_per_item !== undefined ? (qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : null) : undefined,
+    consumption_mode: normalizeServiceConsumptionMode(consumption_mode),
+    meter_basis: normalizeServiceMeterBasis(meter_basis),
     ...(parsedParent !== undefined ? { parentVariantId: parsedParent } : {}),
   })
 

@@ -5,11 +5,15 @@ export interface Material {
   quantity: number;
   min_quantity?: number;
   max_stock_level?: number; // Максимальный уровень запаса
-  sheet_price_single?: number | null;
+  sheet_price_single?: number | null; // Отпускная цена (для калькулятора)
+  purchase_price?: number | null; // Закупочная цена (для склада/аналитики)
   description?: string; // Описание материала
   category_id?: number; // Ссылка на категорию
   category_name?: string; // Название категории для отображения
   category_color?: string; // Цвет категории
+  material_type_id?: number | null; // Ссылка на тип материала (внутри категории)
+  material_type_name?: string; // Название типа материала
+  material_kind?: 'sheet' | 'roll' | 'consumable' | 'area'; // Явный вид материала
   supplier_id?: number; // Ссылка на поставщика
   supplier_name?: string; // Название поставщика для отображения
   supplier_contact?: string; // Контакт поставщика

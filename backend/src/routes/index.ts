@@ -17,9 +17,11 @@ import dailyReportsRoutes from './dailyReports'
 import earningsRoutes from './earnings'
 import shiftsRoutes from './shifts'
 import materialCategoriesRoutes from './materialCategories'
+import materialTypesRoutes from './materialTypes'
 import suppliersRoutes from './suppliers'
 import notificationsRoutes from './notifications'
 import warehouseReportsRoutes from './warehouseReports'
+import materialsAnalyticsRoutes from './materialsAnalytics'
 import quickTemplatesRoutes from './quickTemplates'
 import { customerRoutes } from '../modules/customers'
 import orderManagementRoutes from './orderManagement'
@@ -59,9 +61,11 @@ router.use('/daily-reports', dailyReportsRoutes)
 router.use('/earnings', earningsRoutes)
 router.use('/shifts', shiftsRoutes)
 router.use('/material-categories', materialCategoriesRoutes)
+router.use('/material-types', materialTypesRoutes)
 router.use('/suppliers', suppliersRoutes)
 router.use('/notifications', notificationsRoutes)
 router.use('/warehouse-reports', warehouseReportsRoutes)
+router.use('/materials-analytics', materialsAnalyticsRoutes)
 router.use('/quick-templates', quickTemplatesRoutes)
 router.use('/customers', customerRoutes)
 router.use('/order-management', orderManagementRoutes)

@@ -8,7 +8,15 @@ export interface ServiceVariantsMaterialsSectionProps {
   typeNames: string[];
   groupedVariants: VariantsByType;
   materials: Array<{ id: number; name: string }>;
-  onUpdateMaterial: (variantId: number, materialId: number | null, qtyPerItem: number) => void;
+  onUpdateMaterial: (
+    variantId: number,
+    patch: {
+      material_id: number | null;
+      qty_per_item: number;
+      consumption_mode?: 'fixed' | 'roll_feed';
+      meter_basis?: 'knife_path' | 'feed';
+    }
+  ) => void;
 }
 
 export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsSectionProps> = ({
@@ -17,6 +25,15 @@ export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsS
   materials,
   onUpdateMaterial,
 }) => {
+  const consumptionModeOptions: Array<{ value: 'fixed' | 'roll_feed'; label: string }> = [
+    { value: 'fixed', label: 'fixed' },
+    { value: 'roll_feed', label: 'roll_feed' },
+  ];
+  const meterBasisOptions: Array<{ value: 'feed' | 'knife_path'; label: string }> = [
+    { value: 'feed', label: 'feed' },
+    { value: 'knife_path', label: 'knife_path' },
+  ];
+
   const materialsByType = typeNames.map((typeName) => {
     const typeGroup = groupedVariants[typeName];
     const flat: Array<{ variant: VariantWithTiers; label: string }> = [];
@@ -41,7 +58,12 @@ export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsS
                     value={v.material_id ?? ''}
                     onChange={(e) => {
                       const val = e.target.value === '' ? null : Number(e.target.value);
-                      onUpdateMaterial(v.id, val, v.qty_per_item ?? 1);
+                      onUpdateMaterial(v.id, {
+                        material_id: val,
+                        qty_per_item: v.qty_per_item ?? 1,
+                        consumption_mode: (v.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed',
+                        meter_basis: (v.meter_basis ?? 'feed') as 'knife_path' | 'feed',
+                      });
                     }}
                     style={{ padding: 4, minWidth: 140 }}
                   >
@@ -58,12 +80,51 @@ export const ServiceVariantsMaterialsSection: React.FC<ServiceVariantsMaterialsS
                     onChange={(e) => {
                       const num = Number(e.target.value);
                       if (!Number.isNaN(num) && num >= 0) {
-                        onUpdateMaterial(v.id, v.material_id ?? null, num);
+                        onUpdateMaterial(v.id, {
+                          material_id: v.material_id ?? null,
+                          qty_per_item: num,
+                          consumption_mode: (v.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed',
+                          meter_basis: (v.meter_basis ?? 'feed') as 'knife_path' | 'feed',
+                        });
                       }
                     }}
                     style={{ width: 60, padding: 4 }}
                     title="Норма на ед. операции"
                   />
+                  <select
+                    value={(v.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed'}
+                    onChange={(e) => {
+                      onUpdateMaterial(v.id, {
+                        material_id: v.material_id ?? null,
+                        qty_per_item: v.qty_per_item ?? 1,
+                        consumption_mode: e.target.value as 'fixed' | 'roll_feed',
+                        meter_basis: (v.meter_basis ?? 'feed') as 'knife_path' | 'feed',
+                      });
+                    }}
+                    style={{ padding: 4, minWidth: 95 }}
+                    title="Режим расхода"
+                  >
+                    {consumptionModeOptions.map((mode) => (
+                      <option key={mode.value} value={mode.value}>{mode.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={(v.meter_basis ?? 'feed') as 'knife_path' | 'feed'}
+                    onChange={(e) => {
+                      onUpdateMaterial(v.id, {
+                        material_id: v.material_id ?? null,
+                        qty_per_item: v.qty_per_item ?? 1,
+                        consumption_mode: (v.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed',
+                        meter_basis: e.target.value as 'knife_path' | 'feed',
+                      });
+                    }}
+                    style={{ padding: 4, minWidth: 105 }}
+                    title="База metering"
+                  >
+                    {meterBasisOptions.map((basis) => (
+                      <option key={basis.value} value={basis.value}>{basis.label}</option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>

@@ -46,6 +46,8 @@ const emptyServiceForm: ServiceFormState = {
   categoryId: '',
   materialId: '',
   qtyPerItem: '1',
+  consumptionMode: 'fixed',
+  meterBasis: 'feed',
 };
 
 const bindingServiceForm: ServiceFormState = {
@@ -70,6 +72,8 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   categoryId: service.categoryId != null ? service.categoryId : '',
   materialId: service.material_id != null ? service.material_id : '',
   qtyPerItem: service.qty_per_item != null ? String(service.qty_per_item) : '1',
+  consumptionMode: (service.consumption_mode ?? 'fixed') as ServiceFormState['consumptionMode'],
+  meterBasis: (service.meter_basis ?? 'feed') as ServiceFormState['meterBasis'],
 });
 
 interface ServicesManagementProps {
@@ -236,6 +240,12 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       categoryId: state.editingServiceForm.categoryId !== '' ? state.editingServiceForm.categoryId : null,
       material_id: state.editingServiceForm.materialId !== '' ? state.editingServiceForm.materialId : null,
       qty_per_item: state.editingServiceForm.qtyPerItem !== '' && Number(state.editingServiceForm.qtyPerItem) > 0 ? Number(state.editingServiceForm.qtyPerItem) : undefined,
+      consumption_mode: state.editingServiceForm.materialId !== '' ? state.editingServiceForm.consumptionMode : undefined,
+      meter_basis:
+        state.editingServiceForm.materialId !== '' &&
+        (state.editingServiceForm.consumptionMode === 'roll_feed' || state.editingServiceForm.unit === 'per_meter')
+          ? state.editingServiceForm.meterBasis
+          : undefined,
     };
     await serviceOperationsRef.current.updateService(state.editingService.id, payload);
     resetEditingService();
@@ -274,6 +284,12 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         categoryId: state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined,
         material_id: state.newServiceForm.materialId !== '' ? state.newServiceForm.materialId : undefined,
         qty_per_item: state.newServiceForm.qtyPerItem !== '' && Number(state.newServiceForm.qtyPerItem) > 0 ? Number(state.newServiceForm.qtyPerItem) : undefined,
+        consumption_mode: state.newServiceForm.materialId !== '' ? state.newServiceForm.consumptionMode : undefined,
+        meter_basis:
+          state.newServiceForm.materialId !== '' &&
+          (state.newServiceForm.consumptionMode === 'roll_feed' || state.newServiceForm.unit === 'per_meter')
+            ? state.newServiceForm.meterBasis
+            : undefined,
       };
       const created = createMode === 'binding'
         ? await serviceOperationsRef.current.createBinding(payload)

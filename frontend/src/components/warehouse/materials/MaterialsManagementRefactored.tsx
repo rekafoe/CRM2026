@@ -4,7 +4,6 @@ import { useCreateMaterial, useUpdateMaterial, useDeleteMaterial } from '../../.
 import { useUIStore } from '../../../stores/uiStore';
 import { MaterialFormModal } from '../MaterialFormModal';
 import MaterialReservationModal from '../MaterialReservationModal';
-import { WarehouseModal } from '../common/WarehouseModal';
 import { MaterialsToolbar } from './MaterialsToolbar';
 import { MaterialsList } from './MaterialsList';
 import { MaterialsFilters } from './MaterialsFilters';
@@ -22,7 +21,9 @@ type SortField = 'name' | 'category' | 'quantity' | 'price' | 'updated_at';
 type SortOrder = 'asc' | 'desc';
 
 interface Filters {
-  category: string;
+  categoryId: string;
+  materialTypeId: string;
+  materialKind: string;
   supplier: string;
   minQuantity: number;
   maxQuantity: number;
@@ -51,7 +52,9 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
 
   // Фильтры
   const [filters, setFilters] = useState<Filters>({
-    category: '',
+    categoryId: '',
+    materialTypeId: '',
+    materialKind: '',
     supplier: '',
     minQuantity: 0,
     maxQuantity: 1000,
@@ -72,12 +75,39 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
 
   // Получение уникальных категорий и поставщиков
   const categories = useMemo(() => {
-    const cats = materials
-      .map(m => (m as any).category_name)
-      .filter((cat, index, arr) => cat && arr.indexOf(cat) === index);
+    const categoryMap = new Map<number, { id: number; name: string }>();
+    materials.forEach((material) => {
+      if (material.category_id && (material as any).category_name) {
+        categoryMap.set(Number(material.category_id), {
+          id: Number(material.category_id),
+          name: String((material as any).category_name),
+        });
+      }
+    });
+    const cats = Array.from(categoryMap.values());
     console.log('🔍 MaterialsManagement - categories:', cats);
-    return cats as string[];
+    return cats;
   }, [materials]);
+
+  const materialTypes = useMemo(() => {
+    const typeMap = new Map<number, { id: number; name: string; category_id?: number }>();
+    materials.forEach((material) => {
+      const typeId = (material as any).material_type_id;
+      const typeName = (material as any).material_type_name;
+      if (!typeId || !typeName) return;
+      typeMap.set(Number(typeId), {
+        id: Number(typeId),
+        name: String(typeName),
+        category_id: material.category_id == null ? undefined : Number(material.category_id),
+      });
+    });
+    return Array.from(typeMap.values());
+  }, [materials]);
+
+  const filteredMaterialTypes = useMemo(() => {
+    if (!filters.categoryId) return materialTypes;
+    return materialTypes.filter((type) => String(type.category_id || '') === filters.categoryId);
+  }, [filters.categoryId, materialTypes]);
 
   const suppliers = useMemo(() => {
     const supps = materials
@@ -147,8 +177,20 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
   }, [selectedMaterials.length, showToast]);
 
   const handleFiltersChange = useCallback((newFilters: Filters) => {
+    if (
+      newFilters.categoryId &&
+      newFilters.materialTypeId &&
+      !materialTypes.some(
+        (type) =>
+          String(type.id) === String(newFilters.materialTypeId) &&
+          String(type.category_id || '') === String(newFilters.categoryId),
+      )
+    ) {
+      setFilters({ ...newFilters, materialTypeId: '' });
+      return;
+    }
     setFilters(newFilters);
-  }, []);
+  }, [materialTypes]);
 
   const handleModalClose = useCallback(() => {
     setShowAddModal(false);
@@ -183,6 +225,7 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
         filters={filters}
         onFiltersChange={handleFiltersChange}
         categories={categories}
+        materialTypes={filteredMaterialTypes}
         suppliers={suppliers}
       />
 

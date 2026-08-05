@@ -61,7 +61,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
     const lowStock = materials.filter(m => (m.quantity || 0) > 0 && (m.quantity || 0) <= 10).length;
     const outOfStock = materials.filter(m => (m.quantity || 0) <= 0).length;
     const totalValue = materials.reduce((sum, m) => {
-      const price = m.sheet_price_single || m.price || 0;
+      const price = m.purchase_price ?? m.sheet_price_single ?? m.price ?? 0;
       return sum + ((m.quantity || 0) * price);
     }, 0);
 

@@ -17,6 +17,8 @@ export type {
   Order,
   OrderItem,
   Material,
+  MaterialType,
+  MaterialKind,
   DailyReport,
   OrderFile,
   Printer,

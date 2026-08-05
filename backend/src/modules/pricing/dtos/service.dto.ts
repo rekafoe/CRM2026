@@ -1,3 +1,6 @@
+export type ServiceConsumptionMode = 'fixed' | 'roll_feed';
+export type ServiceMeterBasis = 'knife_path' | 'feed';
+
 export interface PricingServiceDTO {
   id: number;
   name: string;
@@ -17,6 +20,10 @@ export interface PricingServiceDTO {
   material_id?: number | null;
   /** Расход материала на единицу операции (по умолчанию 1) */
   qty_per_item?: number | null;
+  /** Режим расхода материала в складе: fixed или roll_feed */
+  consumption_mode?: ServiceConsumptionMode | null;
+  /** База метража для per_meter: feed или knife_path */
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface ServiceCategoryDTO {
@@ -41,6 +48,8 @@ export interface CreatePricingServiceDTO {
   categoryId?: number | null;
   material_id?: number | null;
   qty_per_item?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface UpdatePricingServiceDTO {
@@ -58,6 +67,8 @@ export interface UpdatePricingServiceDTO {
   categoryId?: number | null;
   material_id?: number | null;
   qty_per_item?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface ServiceVolumeTierDTO {
@@ -96,6 +107,8 @@ export interface ServiceVariantDTO {
   qty_per_item?: number | null;
   /** Родитель в дереве вариантов (уровень 2 → уровень 1); дублируется в parameters.parentVariantId для совместимости */
   parentVariantId?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface CreateServiceVariantDTO {
@@ -106,6 +119,8 @@ export interface CreateServiceVariantDTO {
   material_id?: number | null;
   qty_per_item?: number | null;
   parentVariantId?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 
 export interface UpdateServiceVariantDTO {
@@ -116,5 +131,7 @@ export interface UpdateServiceVariantDTO {
   material_id?: number | null;
   qty_per_item?: number | null;
   parentVariantId?: number | null;
+  consumption_mode?: ServiceConsumptionMode | null;
+  meter_basis?: ServiceMeterBasis | null;
 }
 

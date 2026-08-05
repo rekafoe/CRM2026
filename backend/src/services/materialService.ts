@@ -23,6 +23,7 @@ export interface MaterialCreateRequest {
   quantity: number;
   min_quantity?: number;
   sheet_price_single?: number;
+  purchase_price?: number;
   category_id?: number;
   supplier_id?: number;
   paper_type_id?: number;
@@ -70,6 +71,10 @@ class MaterialValidator {
     
     if (data.sheet_price_single !== undefined && data.sheet_price_single < 0) {
       throw new Error('Price cannot be negative');
+    }
+
+    if (data.purchase_price !== undefined && data.purchase_price < 0) {
+      throw new Error('Purchase price cannot be negative');
     }
   }
 
@@ -504,7 +509,10 @@ export class MaterialService {
           MaterialValidator.validateQuantity(update.quantity);
 
           // Get current quantity
-          const material = await db.get('SELECT quantity, name FROM materials WHERE id = ?', [update.id]);
+          const material = await db.get<{ quantity: number; name: string; sheet_price_single?: number | null }>(
+            'SELECT quantity, name, sheet_price_single FROM materials WHERE id = ?',
+            [update.id]
+          );
           if (!material) {
             throw new Error(`Material with ID ${update.id} not found`);
           }
@@ -523,8 +531,9 @@ export class MaterialService {
               delta,
               reason,
               order_id,
-              user_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+              user_id,
+              price
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
             [
               update.id,
               delta >= 0 ? 'adjust_increase' : 'adjust_decrease',
@@ -532,7 +541,8 @@ export class MaterialService {
               delta,
               update.reason || 'Bulk update',
               null,
-              null
+              null,
+              Number(material?.sheet_price_single ?? 0),
             ]
           );
         }
@@ -641,7 +651,7 @@ export class MaterialService {
       for (const m of materials) {
         const qty = (m as any).quantity ?? 0;
         const minQty = (m as any).min_quantity ?? 0;
-        const price = (m as any).sheet_price_single ?? 0;
+        const price = (m as any).purchase_price ?? (m as any).sheet_price_single ?? 0;
         totalValue += qty * price;
         if (qty === 0) {
           outOfStock++;

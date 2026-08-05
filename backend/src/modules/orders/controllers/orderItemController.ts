@@ -7,12 +7,31 @@ import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMap
 import { EarningsService } from '../../../services/earningsService'
 import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehouseService'
 import { MaterialTransactionService } from '../../warehouse/services/materialTransactionService'
-import { computeClicks, ceilRequiredQuantity } from '../../../utils/printing'
+import { computeClicks } from '../../../utils/printing'
 import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
+
+function isMeterUnit(unitRaw: unknown): boolean {
+  const unit = String(unitRaw || '').trim().toLowerCase();
+  return unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
+}
+
+function computeRequiredQuantityForReservation(
+  qtyPerItemRaw: unknown,
+  orderQtyRaw: unknown,
+  unitRaw?: unknown
+): number {
+  const qtyPerItem = Math.max(0, Number(qtyPerItemRaw) || 0);
+  const orderQty = Math.max(1, Number(orderQtyRaw) || 1);
+  const total = qtyPerItem * orderQty;
+  if (isMeterUnit(unitRaw)) {
+    return Math.round(total * 100) / 100;
+  }
+  return Math.ceil(total);
+}
 
 export class OrderItemController {
   static async addItem(req: Request, res: Response) {
@@ -70,15 +89,27 @@ export class OrderItemController {
       }
       const orderStatus = Number(orderRow.status)
       // Узнаём материалы и остатки (либо из переданных components, либо по пресету)
-      let needed = [] as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null }>
+      let needed = [] as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null; unit?: string | null }>
       if (Array.isArray(components) && components.length > 0) {
         const ids = components.map(c => Number(c.materialId)).filter(Boolean)
         if (ids.length) {
           const placeholders = ids.map(() => '?').join(',')
-          const rows = await db.all<any>(`SELECT id as materialId, quantity, min_quantity FROM materials WHERE id IN (${placeholders})`, ...ids)
-          const byId: Record<number, { quantity: number; min_quantity: number | null }> = {}
-          for (const r of rows) byId[Number(r.materialId)] = { quantity: Number(r.quantity), min_quantity: r.min_quantity == null ? null : Number(r.min_quantity) }
-          needed = components.map(c => ({ materialId: Number(c.materialId), qtyPerItem: Number(c.qtyPerItem), quantity: byId[Number(c.materialId)]?.quantity ?? 0, min_quantity: byId[Number(c.materialId)]?.min_quantity ?? null }))
+          const rows = await db.all<any>(`SELECT id as materialId, quantity, min_quantity, unit FROM materials WHERE id IN (${placeholders})`, ...ids)
+          const byId: Record<number, { quantity: number; min_quantity: number | null; unit?: string | null }> = {}
+          for (const r of rows) {
+            byId[Number(r.materialId)] = {
+              quantity: Number(r.quantity),
+              min_quantity: r.min_quantity == null ? null : Number(r.min_quantity),
+              unit: r.unit ?? null,
+            }
+          }
+          needed = components.map(c => ({
+            materialId: Number(c.materialId),
+            qtyPerItem: Number(c.qtyPerItem),
+            quantity: byId[Number(c.materialId)]?.quantity ?? 0,
+            min_quantity: byId[Number(c.materialId)]?.min_quantity ?? null,
+            unit: byId[Number(c.materialId)]?.unit ?? null,
+          }))
         }
       } else if (params?.description && type) {
         needed = (await db.all<{
@@ -86,14 +117,15 @@ export class OrderItemController {
           qtyPerItem: number
           quantity: number
           min_quantity: number | null
+          unit?: string | null
         }>(
-          `SELECT pm.materialId, pm.qtyPerItem, m.quantity, m.min_quantity as min_quantity
+          `SELECT pm.materialId, pm.qtyPerItem, m.quantity, m.min_quantity as min_quantity, m.unit
              FROM product_materials pm
              JOIN materials m ON m.id = pm.materialId
              WHERE pm.presetCategory = ? AND pm.presetDescription = ?`,
           type,
           params.description
-        )) as unknown as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null }>
+        )) as unknown as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null; unit?: string | null }>
       }
 
       // Транзакция: резервирование материалов и вставка позиции
@@ -101,7 +133,7 @@ export class OrderItemController {
       try {
         const reservationsPayload = needed.map(n => ({
           material_id: n.materialId,
-          quantity: ceilRequiredQuantity(n.qtyPerItem, quantity),
+          quantity: computeRequiredQuantityForReservation(n.qtyPerItem, quantity, n.unit),
           order_id: orderId,
           reason: 'reserve for order add item'
         }))
@@ -510,14 +542,22 @@ export class OrderItemController {
           const composition = (await db.all<{
             materialId: number
             qtyPerItem: number
+            unit?: string | null
           }>(
-            'SELECT materialId, qtyPerItem FROM product_materials WHERE presetCategory = ? AND presetDescription = ?',
+            `SELECT pm.materialId, pm.qtyPerItem, m.unit
+             FROM product_materials pm
+             JOIN materials m ON m.id = pm.materialId
+             WHERE pm.presetCategory = ? AND pm.presetDescription = ?`,
             it.type,
             (paramsObj as any).description || ''
-          )) as unknown as Array<{ materialId: number; qtyPerItem: number }>
+          )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
 
           for (const c of composition) {
-            const returnQty = Math.ceil((c.qtyPerItem || 0) * Math.max(1, Number(it.quantity) || 1))
+            const returnQty = computeRequiredQuantityForReservation(
+              c.qtyPerItem || 0,
+              Math.max(1, Number(it.quantity) || 1),
+              c.unit
+            )
             if (returnQty > 0) {
               await MaterialTransactionService.return({
                 materialId: c.materialId,
@@ -685,9 +725,24 @@ export class OrderItemController {
           if (components.length > 0) {
             if (deltaQty > 0) {
               // Дозарезервировать недостающий объём
+              const componentMaterialIds = components
+                .map((c) => Number(c.materialId))
+                .filter((id) => Number.isFinite(id) && id > 0);
+              let componentUnitsMap = new Map<number, string | null>();
+              if (componentMaterialIds.length > 0) {
+                const unitRows = await db.all<Array<{ id: number; unit?: string | null }>>(
+                  `SELECT id, unit FROM materials WHERE id IN (${componentMaterialIds.map(() => '?').join(',')})`,
+                  componentMaterialIds
+                );
+                unitRows.forEach((row) => componentUnitsMap.set(Number(row.id), row.unit ?? null));
+              }
               const reservationsPayload = components.map(c => ({
                 material_id: Number(c.materialId),
-                quantity: Math.ceil((Math.max(0, Number(c.qtyPerItem) || 0)) * deltaQty),
+                quantity: computeRequiredQuantityForReservation(
+                  Math.max(0, Number(c.qtyPerItem) || 0),
+                  deltaQty,
+                  componentUnitsMap.get(Number(c.materialId))
+                ),
                 order_id: orderId,
                 reason: 'order update qty +'
               })).filter(r => r.quantity > 0)
@@ -712,18 +767,23 @@ export class OrderItemController {
               materialId: number
               qtyPerItem: number
               quantity: number
+              unit?: string | null
             }>(
-              `SELECT pm.materialId, pm.qtyPerItem, m.quantity
+              `SELECT pm.materialId, pm.qtyPerItem, m.quantity, m.unit
                  FROM product_materials pm
                  JOIN materials m ON m.id = pm.materialId
                 WHERE pm.presetCategory = ? AND pm.presetDescription = ?`,
               existing.type,
               (paramsObj as any).description || ''
-            )) as unknown as Array<{ materialId: number; qtyPerItem: number; quantity: number }>
+            )) as unknown as Array<{ materialId: number; qtyPerItem: number; quantity: number; unit?: string | null }>
 
             if (deltaQty > 0) {
               for (const c of composition) {
-                const need = Math.ceil((Math.max(0, Number(c.qtyPerItem) || 0)) * deltaQty)
+                const need = computeRequiredQuantityForReservation(
+                  Math.max(0, Number(c.qtyPerItem) || 0),
+                  deltaQty,
+                  c.unit
+                )
                 if (need > 0) {
                   await MaterialTransactionService.spend({
                     materialId: c.materialId,
@@ -736,7 +796,11 @@ export class OrderItemController {
               }
             } else {
               for (const c of composition) {
-                const back = Math.ceil((Math.max(0, Number(c.qtyPerItem) || 0)) * Math.abs(deltaQty))
+                const back = computeRequiredQuantityForReservation(
+                  Math.max(0, Number(c.qtyPerItem) || 0),
+                  Math.abs(deltaQty),
+                  c.unit
+                )
                 if (back > 0) {
                   await MaterialTransactionService.return({
                     materialId: c.materialId,

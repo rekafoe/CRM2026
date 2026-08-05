@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Material } from '../../types/shared';
+import { Material, MaterialKind } from '../../types/shared';
 import { api } from '../../api';
-import { materialPriceFieldLabel } from '../../utils/materialPriceLabels';
+import { materialPriceFieldLabel, materialPurchasePriceFieldLabel } from '../../utils/materialPriceLabels';
+import { formatRollStockLabel } from '../../utils/materialRollLabels';
 import { BynSymbol } from '../ui';
+import './MaterialFormModal.css';
 
 interface PaperType {
   id: number;
@@ -17,17 +19,40 @@ interface MaterialFormModalProps {
   onSave: (materialData: any) => void;
 }
 
+interface MaterialTypeOption {
+  id: number;
+  category_id: number;
+  name: string;
+  is_active?: number | boolean;
+}
+
+const KIND_LABELS: Record<MaterialKind, string> = {
+  sheet: 'Листовой',
+  roll: 'Рулонный',
+  consumable: 'Расходка',
+  area: 'Площадной',
+};
+
+const KIND_DEFAULT_UNITS: Record<MaterialKind, string> = {
+  sheet: 'шт',
+  roll: 'м',
+  consumable: 'шт',
+  area: 'м²',
+};
+
 export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   isOpen,
   material,
   onClose,
   onSave
 }) => {
-  type MaterialFormData = Partial<Material> & {
+  type MaterialFormData = Omit<Partial<Material>, 'sheet_width' | 'sheet_height' | 'material_kind' | 'material_type_id'> & {
     finish?: string;
     // поля, которые есть в форме, но могут отсутствовать в shared Material типе
     density?: number;
     paper_type_id?: number;
+    material_kind?: MaterialKind;
+    material_type_id?: number;
     /** Размер листа (мм) — для расчёта вместимости в калькуляторе (A4: 210×297, SRA3: 320×450) */
     sheet_width?: number | null | '';
     sheet_height?: number | null | '';
@@ -40,7 +65,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     quantity: 0,
     unit: 'шт',
     price: 0,
-    sheet_price_single: 0, // Добавляем поле для backend
+    sheet_price_single: 0, // Отпускная цена
+    purchase_price: undefined, // Закупочная цена (null = ещё не задана)
     supplier_id: undefined,
     min_stock_level: 0,
     max_stock_level: 100,
@@ -50,6 +76,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     notes: '',
     is_active: true,
     paper_type_id: undefined, // 🆕 Добавляем поле для связи с типом бумаги
+    material_type_id: undefined,
+    material_kind: 'consumable',
     density: undefined, // 🆕 Добавляем поле плотности
     finish: '', // 🆕 Отделка (для ламинации)
     sheet_width: '',
@@ -67,6 +95,34 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   // 🆕 Состояние для категорий
   const [categories, setCategories] = useState<{id: number, name: string}[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+
+  // 🆕 Состояние для типов материалов (внутри категорий)
+  const [materialTypes, setMaterialTypes] = useState<MaterialTypeOption[]>([]);
+  const [loadingMaterialTypes, setLoadingMaterialTypes] = useState(false);
+
+  const inferredKind = React.useMemo<MaterialKind>(() => {
+    const explicitKind = formData.material_kind;
+    if (explicitKind && ['sheet', 'roll', 'consumable', 'area'].includes(explicitKind)) {
+      return explicitKind;
+    }
+
+    const normalizedUnit = String(formData.unit || '').trim().toLowerCase();
+    if (normalizedUnit === 'м' || normalizedUnit === 'm' || normalizedUnit === 'meter' || normalizedUnit === 'meters') {
+      return 'roll';
+    }
+    if (normalizedUnit === 'м²' || normalizedUnit === 'm²' || normalizedUnit === 'm2' || normalizedUnit === 'sqm') {
+      return 'area';
+    }
+    if (formData.paper_type_id || formData.sheet_height || formData.sheet_width) {
+      return 'sheet';
+    }
+    return 'consumable';
+  }, [formData.material_kind, formData.paper_type_id, formData.sheet_height, formData.sheet_width, formData.unit]);
+
+  const isRollKind = inferredKind === 'roll';
+  const isSheetKind = inferredKind === 'sheet';
+  const showDimensionFields = isSheetKind || isRollKind;
+
   const selectedCategory = React.useMemo(
     () => categories.find((c) => c.id === formData.category_id),
     [categories, formData.category_id]
@@ -77,9 +133,6 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     // Показываем ламинационные поля как минимум для категорий, содержащих "лам" или "пленк"
     return name.includes('лам') || name.includes('пленк');
   }, [selectedCategory]);
-
-  /** Погонные метры — в основном рулон; поля мм в форме про условный «лист» для раскладки, не длина бобины */
-  const isRollOrLinearUnit = formData.unit === 'м';
 
   // 🆕 Загрузка типов бумаги
   const loadPaperTypes = async () => {
@@ -100,6 +153,27 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       setPaperTypes([]);
     } finally {
       setLoadingPaperTypes(false);
+    }
+  };
+
+  // 🆕 Загрузка типов материалов
+  const loadMaterialTypes = async (categoryId?: number) => {
+    try {
+      setLoadingMaterialTypes(true);
+      const response = await api.get('/material-types', categoryId ? { params: { category_id: categoryId } } : undefined);
+      const data = (response.data || []) as MaterialTypeOption[];
+      const uniqueMaterialTypes = data.reduce((acc: MaterialTypeOption[], materialType: MaterialTypeOption) => {
+        if (!acc.find(mt => mt.id === materialType.id)) {
+          acc.push(materialType);
+        }
+        return acc;
+      }, []);
+      setMaterialTypes(uniqueMaterialTypes);
+    } catch (error) {
+      console.error('Ошибка загрузки типов материалов:', error);
+      setMaterialTypes([]);
+    } finally {
+      setLoadingMaterialTypes(false);
     }
   };
 
@@ -152,12 +226,13 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     loadPaperTypes();
     loadSuppliers();
     loadCategories();
+    loadMaterialTypes();
   }, []);
 
   useEffect(() => {
     if (material) {
-      // Определяем цену: приоритет у sheet_price_single, затем price
       const price = material.sheet_price_single ?? material.price ?? 0;
+      const purchasePrice = material.purchase_price != null ? Number(material.purchase_price) : undefined;
       
       setFormData({
         name: material.name || '',
@@ -166,7 +241,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         quantity: material.quantity || 0,
         unit: material.unit || 'шт',
         price: price,
-        sheet_price_single: price, // Синхронизируем с backend полем
+        sheet_price_single: price,
+        purchase_price: purchasePrice,
         supplier_id: material.supplier_id,
         min_stock_level: material.min_stock_level || 0,
         max_stock_level: material.max_stock_level || 100,
@@ -176,6 +252,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         notes: material.notes || '',
         is_active: material.is_active !== undefined ? material.is_active : true,
         paper_type_id: (material as any).paper_type_id || undefined, // 🆕 Добавляем поле типа бумаги
+        material_type_id: (material as any).material_type_id || undefined,
+        material_kind: (material as any).material_kind || undefined,
         density: (material as any).density || undefined, // 🆕 Добавляем поле плотности
         finish: (material as any).finish || '', // 🆕 Отделка (для ламинации)
         sheet_width: (material as any).sheet_width ?? '',
@@ -191,6 +269,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         unit: 'шт',
         price: 0,
         sheet_price_single: 0,
+        purchase_price: undefined,
         supplier_id: undefined,
         min_stock_level: 0,
         max_stock_level: 100,
@@ -200,6 +279,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         notes: '',
         is_active: true,
         paper_type_id: undefined,
+        material_type_id: undefined,
+        material_kind: 'consumable',
         density: undefined,
         finish: '',
         sheet_width: '',
@@ -208,14 +289,39 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
   }, [material]);
 
+  useEffect(() => {
+    const categoryId = formData.category_id;
+    if (!categoryId) {
+      setMaterialTypes([]);
+      setFormData(prev => ({ ...prev, material_type_id: undefined }));
+      return;
+    }
+
+    loadMaterialTypes(categoryId);
+  }, [formData.category_id]);
+
+  useEffect(() => {
+    if (!formData.material_type_id) return;
+    const hasType = materialTypes.some((mt) => mt.id === formData.material_type_id);
+    if (!hasType) {
+      setFormData(prev => ({ ...prev, material_type_id: undefined }));
+    }
+  }, [materialTypes, formData.material_type_id]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('=== ОТПРАВКА ФОРМЫ ===');
-    console.log('formData:', formData);
-    onSave(formData);
+    const payload = {
+      ...formData,
+      material_kind: inferredKind,
+      material_type_id: formData.material_type_id || undefined,
+      unit: formData.unit || KIND_DEFAULT_UNITS[inferredKind],
+    };
+    console.log('formData:', payload);
+    onSave(payload);
   };
 
-  const handleChange = (field: keyof Material, value: any) => {
+  const handleChange = (field: keyof MaterialFormData, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -262,7 +368,11 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Категория *</label>
               <select
                 value={formData.category_id || ''}
-                onChange={(e) => handleChange('category_id', parseInt(e.target.value))}
+                onChange={(e) => {
+                  const nextCategoryId = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                  handleChange('category_id', nextCategoryId);
+                  handleChange('material_type_id', undefined);
+                }}
                 required
                 disabled={loadingCategories}
               >
@@ -274,6 +384,50 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 ))}
               </select>
               {loadingCategories && <div className="loading-text">Загрузка категорий...</div>}
+            </div>
+            <div className="form-group">
+              <label>Тип материала</label>
+              <select
+                value={formData.material_type_id || ''}
+                onChange={(e) => handleChange('material_type_id', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                disabled={!formData.category_id || loadingMaterialTypes}
+              >
+                <option value="">{formData.category_id ? 'Выберите тип' : 'Сначала выберите категорию'}</option>
+                {materialTypes
+                  .filter((type) => Number(type.is_active ?? 1) !== 0)
+                  .map((type) => (
+                    <option key={`material-type-${type.id}`} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+              </select>
+              {loadingMaterialTypes && <div className="loading-text">Загрузка типов...</div>}
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Класс материала *</label>
+              <select
+                value={inferredKind}
+                onChange={(e) => {
+                  const nextKind = e.target.value as MaterialKind;
+                  handleChange('material_kind', nextKind);
+                  if ((formData.unit || '').trim() === '' || formData.unit === KIND_DEFAULT_UNITS[inferredKind]) {
+                    handleChange('unit', KIND_DEFAULT_UNITS[nextKind]);
+                  }
+                }}
+                required
+              >
+                {(['sheet', 'roll', 'consumable', 'area'] as MaterialKind[]).map((kind) => (
+                  <option key={kind} value={kind}>
+                    {KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </select>
+              <small style={{ color: '#666', fontSize: '12px' }}>
+                Категория → тип → SKU: этот класс задаёт правила списания и обязательные поля.
+              </small>
             </div>
             <div className="form-group">
               <label>Единица измерения *</label>
@@ -294,7 +448,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
           </div>
 
           {/* Поля для бумаги */}
-          {!isLamination && (
+          {!isLamination && isSheetKind && (
             <div className="form-row">
               <div className="form-group">
                 <label>Тип бумаги</label>
@@ -375,59 +529,106 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             </div>
           )}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>{isRollOrLinearUnit ? 'Ширина полотна / рулона (мм)' : 'Ширина листа (мм)'}</label>
-              <input
-                type="number"
-                value={formData.sheet_width ?? ''}
-                onChange={(e) => handleChange('sheet_width' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
-                placeholder={isRollOrLinearUnit ? 'Напр. 1060 — ширина рулона' : '210 (A4), 320 (SRA3)'}
-                min="1"
-                max="2000"
-                step="1"
-              />
-              <small style={{ color: '#666', fontSize: '12px' }}>
-                {isRollOrLinearUnit
-                  ? 'Опционально: для расчёта раскладки «как на листе». Для рулонной печати (пог. м) размер заказа берётся из продукта; остаток на складе — в поле «Количество» в метрах.'
-                  : 'Размер печатного листа для расчёта вместимости в калькуляторе'}
-              </small>
-            </div>
-            <div className="form-group">
-              <label>{isRollOrLinearUnit ? 'Вторая сторона (мм), опционально' : 'Высота листа (мм)'}</label>
-              <input
-                type="number"
-                value={formData.sheet_height ?? ''}
-                onChange={(e) => handleChange('sheet_height' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
-                placeholder={isRollOrLinearUnit ? 'Оставьте пустым или 1000' : '297 (A4), 450 (SRA3)'}
-                min="1"
-                max="2000"
-                step="1"
-              />
-              {isRollOrLinearUnit && (
-                <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: 4 }}>
-                  Для рулона это не «длина бобины». Если раскладка по листу не нужна — оставьте пустым: калькулятор возьмёт размер изделия.
-                  Если нужен прямоугольник «как лист» (ширина × длина полотна), укажите вторую сторону (например 1000).
-                </small>
+          {showDimensionFields && (
+            <>
+              {isRollKind && (
+                <div className="form-section-title">Параметры рулона (ширина × намотка)</div>
               )}
+              <div className="form-row">
+                <div className="form-group">
+                  <label>{isRollKind ? 'Ширина рулона (мм) *' : 'Ширина листа (мм)'}</label>
+                  <input
+                    type="number"
+                    value={formData.sheet_width ?? ''}
+                    onChange={(e) => handleChange('sheet_width' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
+                    placeholder={isRollKind ? '630 (это 63 см)' : '210 (A4), 320 (SRA3)'}
+                    min="1"
+                    max={isRollKind ? undefined : '2000'}
+                    step="1"
+                    required
+                  />
+                  <small className="form-hint">
+                    {isRollKind
+                      ? 'Ширина полотна в миллиметрах. Пример: 630 мм = 63 см.'
+                      : 'Размер печатного листа для расчёта вместимости в калькуляторе.'}
+                  </small>
+                </div>
+                <div className="form-group">
+                  <label>{isRollKind ? 'Остаток намотки (пог. м) *' : 'Высота листа (мм) *'}</label>
+                  <input
+                    type="number"
+                    value={isRollKind ? (formData.quantity ?? '') : (formData.sheet_height ?? '')}
+                    onChange={(e) => {
+                      if (isRollKind) {
+                        const raw = e.target.value;
+                        const num = raw === '' ? 0 : parseFloat(raw);
+                        handleChange('quantity', Number.isFinite(num) ? num : 0);
+                        return;
+                      }
+                      handleChange('sheet_height' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined));
+                    }}
+                    placeholder={isRollKind ? '50' : '297 (A4), 450 (SRA3)'}
+                    min={isRollKind ? '0' : '1'}
+                    max={isRollKind ? undefined : '2000'}
+                    step={isRollKind ? '0.01' : '1'}
+                    required
+                  />
+                  {isRollKind ? (
+                    <small className="form-hint">
+                      Складской остаток рулона в погонных метрах (не число рулонов).
+                      {' '}
+                      Сейчас: <strong>{formatRollStockLabel({
+                        sheet_width: typeof formData.sheet_width === 'number' ? formData.sheet_width : Number(formData.sheet_width) || null,
+                        quantity: formData.quantity,
+                      })}</strong>
+                    </small>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          )}
+
+          {!isRollKind && (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Количество *</label>
+                <input
+                  type="number"
+                  value={formData.quantity ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const num = v === '' ? 0 : (parseInt(v, 10) ?? 0);
+                    handleChange('quantity', num);
+                  }}
+                  required
+                  min="0"
+                  step="1"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="form-row">
             <div className="form-group">
-              <label>Количество *</label>
+              <label>{materialPurchasePriceFieldLabel(formData.unit)} (<BynSymbol />) *</label>
               <input
                 type="number"
-                value={formData.quantity ?? ''}
+                value={(formData as any).purchase_price ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  const num = v === '' ? 0 : (parseInt(v, 10) ?? 0);
-                  handleChange('quantity', num);
+                  if (v === '') {
+                    handleChange('purchase_price', undefined);
+                    return;
+                  }
+                  handleChange('purchase_price', parseFloat(v) || 0);
                 }}
                 required
                 min="0"
-                step="1"
+                step="0.01"
               />
+              <small className="form-hint">
+                Для стоимости склада и аналитики. Если не задана — временно берётся отпускная.
+              </small>
             </div>
             <div className="form-group">
               <label>{materialPriceFieldLabel(formData.unit)} (<BynSymbol />) *</label>
@@ -438,15 +639,19 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   const v = e.target.value;
                   const price = v === '' ? 0 : (parseFloat(v) ?? 0);
                   handleChange('price', price);
-                  handleChange('sheet_price_single', price); // Синхронизируем с backend полем
+                  handleChange('sheet_price_single', price);
                 }}
                 required
                 min="0"
                 step="0.01"
               />
-              {isRollOrLinearUnit && (
-                <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: 4 }}>
+              {isRollKind ? (
+                <small className="form-hint">
                   В расчёте заказа умножается на списанные погонные метры.
+                </small>
+              ) : (
+                <small className="form-hint">
+                  Цена для калькулятора и клиента.
                 </small>
               )}
             </div>
@@ -454,29 +659,39 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
           <div className="form-row">
             <div className="form-group">
-              <label>Минимальный запас</label>
+              <label>{isRollKind ? 'Мин. остаток намотки (пог. м)' : 'Минимальный запас'}</label>
               <input
                 type="number"
                 value={formData.min_stock_level ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  handleChange('min_stock_level', v === '' ? 0 : (parseInt(v, 10) ?? 0));
+                  if (v === '') {
+                    handleChange('min_stock_level', 0);
+                    return;
+                  }
+                  const parsed = isRollKind ? parseFloat(v) : parseInt(v, 10);
+                  handleChange('min_stock_level', Number.isFinite(parsed) ? parsed : 0);
                 }}
                 min="0"
-                step="1"
+                step={isRollKind ? '0.01' : '1'}
               />
             </div>
             <div className="form-group">
-              <label>Максимальный запас</label>
+              <label>{isRollKind ? 'Макс. намотка (пог. м)' : 'Максимальный запас'}</label>
               <input
                 type="number"
                 value={formData.max_stock_level ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  handleChange('max_stock_level', v === '' ? 0 : (parseInt(v, 10) ?? 100));
+                  if (v === '') {
+                    handleChange('max_stock_level', 0);
+                    return;
+                  }
+                  const parsed = isRollKind ? parseFloat(v) : parseInt(v, 10);
+                  handleChange('max_stock_level', Number.isFinite(parsed) ? parsed : 100);
                 }}
                 min="0"
-                step="1"
+                step={isRollKind ? '0.01' : '1'}
               />
             </div>
           </div>

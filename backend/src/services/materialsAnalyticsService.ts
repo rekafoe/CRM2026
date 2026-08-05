@@ -90,6 +90,7 @@ export class MaterialsAnalyticsService {
           m.quantity,
           m.min_quantity,
           m.sheet_price_single,
+          m.purchase_price,
           c.name as category_name,
           s.name as supplier_name,
           s.id as supplier_id,
@@ -103,19 +104,19 @@ export class MaterialsAnalyticsService {
       // Получаем движения материалов за последние 30 дней
       const movements = await db.all(`
         SELECT 
-          materialId,
+          material_id,
           SUM(CASE WHEN delta < 0 THEN ABS(delta) ELSE 0 END) as consumption,
           COUNT(*) as movement_count,
           MAX(created_at) as last_movement
         FROM material_moves
         WHERE created_at >= datetime('now', '-30 days')
-        GROUP BY materialId
+        GROUP BY material_id
       `)
 
       // Создаем мапу движений для быстрого поиска
       const movementsMap = new Map()
       movements.forEach(movement => {
-        movementsMap.set(movement.materialId, movement)
+        movementsMap.set(movement.material_id, movement)
       })
 
       // Анализируем материалы
@@ -131,8 +132,9 @@ export class MaterialsAnalyticsService {
         // Рассчитываем оборачиваемость
         const turnoverRate = material.quantity > 0 ? consumption / material.quantity : 0
         
-        // Рассчитываем стоимость запаса
-        const stockValue = material.quantity * (material.sheet_price_single || 0)
+        // Стоимость запаса по закупочной цене (fallback на отпускную для legacy)
+        const unitCost = material.purchase_price ?? material.sheet_price_single ?? 0
+        const stockValue = material.quantity * unitCost
 
         return {
           materialId: material.id,
@@ -172,7 +174,10 @@ export class MaterialsAnalyticsService {
         totalValue: materialAnalytics.reduce((sum, m) => sum + m.stockValue, 0),
         lowStockCount: materialAnalytics.filter(m => m.currentStock <= m.minStock).length,
         outOfStockCount: materialAnalytics.filter(m => m.currentStock === 0).length,
-        averageTurnover: materialAnalytics.reduce((sum, m) => sum + m.turnoverRate, 0) / materialAnalytics.length
+        averageTurnover:
+          materialAnalytics.length > 0
+            ? materialAnalytics.reduce((sum, m) => sum + m.turnoverRate, 0) / materialAnalytics.length
+            : 0
       }
 
       logger.info('Аналитика материалов сгенерирована', {
@@ -207,22 +212,42 @@ export class MaterialsAnalyticsService {
       // Получаем потребление по дням за последние 30 дней
       const dailyConsumption = await db.all(`
         SELECT 
-          materialId,
+          material_id,
           DATE(created_at) as date,
           SUM(ABS(delta)) as daily_consumption
         FROM material_moves
         WHERE delta < 0 AND created_at >= datetime('now', '-30 days')
-        GROUP BY materialId, DATE(created_at)
-        ORDER BY materialId, date
+        GROUP BY material_id, DATE(created_at)
+        ORDER BY material_id, date
       `)
+
+      const materialIds = Array.from(
+        new Set(
+          dailyConsumption
+            .map((record: any) => Number(record.material_id))
+            .filter((id: number) => Number.isFinite(id) && id > 0)
+        )
+      )
+
+      const materialNames = materialIds.length > 0
+        ? await db.all(
+            `SELECT id, name FROM materials WHERE id IN (${materialIds.map(() => '?').join(',')})`,
+            ...materialIds
+          )
+        : []
+      const materialNamesMap = new Map<number, string>()
+      materialNames.forEach((row: any) => {
+        materialNamesMap.set(Number(row.id), String(row.name || `Материал ${row.id}`))
+      })
 
       // Группируем по материалам
       const consumptionByMaterial = new Map()
       dailyConsumption.forEach(record => {
-        if (!consumptionByMaterial.has(record.materialId)) {
-          consumptionByMaterial.set(record.materialId, [])
+        const materialId = Number(record.material_id)
+        if (!consumptionByMaterial.has(materialId)) {
+          consumptionByMaterial.set(materialId, [])
         }
-        consumptionByMaterial.get(record.materialId).push({
+        consumptionByMaterial.get(materialId).push({
           date: record.date,
           consumption: record.daily_consumption
         })
@@ -255,7 +280,7 @@ export class MaterialsAnalyticsService {
 
         analysis.push({
           materialId,
-          materialName: `Материал ${materialId}`, // Здесь можно получить название из БД
+          materialName: materialNamesMap.get(Number(materialId)) || `Материал ${materialId}`,
           dailyConsumption,
           weeklyConsumption,
           monthlyConsumption,
@@ -285,8 +310,8 @@ export class MaterialsAnalyticsService {
           s.id,
           s.name,
           COUNT(m.id) as material_count,
-          SUM(m.quantity * m.sheet_price_single) as total_value,
-          AVG(m.sheet_price_single) as average_price,
+          SUM(m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)) as total_value,
+          AVG(COALESCE(m.purchase_price, m.sheet_price_single, 0)) as average_price,
           MAX(m.created_at) as last_delivery
         FROM suppliers s
         LEFT JOIN materials m ON m.supplier_id = s.id
@@ -322,7 +347,7 @@ export class MaterialsAnalyticsService {
           c.id,
           c.name,
           COUNT(m.id) as material_count,
-          SUM(m.quantity * m.sheet_price_single) as total_value
+          SUM(m.quantity * COALESCE(m.purchase_price, m.sheet_price_single, 0)) as total_value
         FROM material_categories c
         LEFT JOIN materials m ON m.category_id = c.id
         GROUP BY c.id, c.name
@@ -427,6 +452,7 @@ export class MaterialsAnalyticsService {
           m.quantity,
           m.min_quantity,
           m.sheet_price_single,
+          m.purchase_price,
           c.name as category_name,
           s.name as supplier_name
         FROM materials m
@@ -444,7 +470,7 @@ export class MaterialsAnalyticsService {
           COUNT(*) as movement_count,
           MAX(created_at) as last_movement
         FROM material_moves
-        WHERE materialId = ? AND created_at >= datetime('now', '-30 days')
+        WHERE material_id = ? AND created_at >= datetime('now', '-30 days')
       `, materialId)
 
       const movement = movements[0]
@@ -463,7 +489,7 @@ export class MaterialsAnalyticsService {
         averageConsumption: consumption / 30,
         consumptionTrend: this.calculateConsumptionTrend(consumption, material.quantity),
         turnoverRate: material.quantity > 0 ? consumption / material.quantity : 0,
-        stockValue: material.quantity * (material.sheet_price_single || 0),
+        stockValue: material.quantity * (material.purchase_price ?? material.sheet_price_single ?? 0),
         lastMovement: lastMovement || 'Нет движений',
         movementCount
       }

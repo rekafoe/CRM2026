@@ -271,7 +271,7 @@ export function useCalculatorPricingActions({
         // selectedOperations (фронтенд) -> finishing (бэкенд, simplified-конфиг)
         type FinishingCalcEntry = {
           service_id: number;
-          price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order';
+          price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order' | 'per_meter';
           units_per_item: number;
           variant_id?: number;
         };

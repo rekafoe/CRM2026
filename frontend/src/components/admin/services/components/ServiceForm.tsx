@@ -1,7 +1,7 @@
 import React from 'react';
 import { FormField } from '../../../common';
 import { BynSymbol } from '../../../ui';
-import { PricingServiceType } from '../../../../types/pricing';
+import { PricingServiceType, ServiceConsumptionMode, ServiceMeterBasis } from '../../../../types/pricing';
 import './ServiceForm.css';
 
 export interface ServiceFormState {
@@ -20,6 +20,10 @@ export interface ServiceFormState {
   materialId: number | '';
   /** Расход материала на единицу операции */
   qtyPerItem: string;
+  /** Режим расхода материала: fixed или roll_feed */
+  consumptionMode: ServiceConsumptionMode;
+  /** База метража для per_meter: feed или knife_path */
+  meterBasis: ServiceMeterBasis;
 }
 
 interface ServiceFormProps {
@@ -77,6 +81,16 @@ const operationTypeOptions = [
   { value: 'delivery', label: 'delivery (доставка)' },
 ];
 
+const consumptionModeOptions: Array<{ value: ServiceConsumptionMode; label: string }> = [
+  { value: 'fixed', label: 'fixed (qty_per_item × units)' },
+  { value: 'roll_feed', label: 'roll_feed (подача рулона)' },
+];
+
+const meterBasisOptions: Array<{ value: ServiceMeterBasis; label: string }> = [
+  { value: 'feed', label: 'feed (подача по раскладке)' },
+  { value: 'knife_path', label: 'knife_path (по пробегу ножа)' },
+];
+
 const inputClass = 'form-input w-full';
 
 const ServiceForm: React.FC<ServiceFormProps> = ({
@@ -95,6 +109,8 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
   };
 
   const isBinding = variant === 'binding';
+  const showMaterialConsumption = materials.length > 0 && value.materialId !== '';
+  const showMeterBasis = value.consumptionMode === 'roll_feed' || value.unit === 'per_meter';
 
   return (
     <div className="service-form-grid">
@@ -259,35 +275,75 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         </FormField>
       </div>
       {materials.length > 0 && (
-        <div className="service-form__row">
-          <FormField label="Материал для списания" help="Со склада при выполнении операции">
-            <select
-              className={inputClass}
-              value={value.materialId === '' ? '' : value.materialId}
-              disabled={disabled}
-              onChange={(e) => updateField('materialId', e.target.value === '' ? '' : Number(e.target.value))}
-            >
-              <option value="">— Без списания</option>
-              {materials.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Расход на ед." help="Норма на одну единицу операции">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              className={inputClass}
-              value={value.qtyPerItem}
-              disabled={disabled}
-              onChange={(e) => updateField('qtyPerItem', e.target.value)}
-              placeholder="1"
-            />
-          </FormField>
-        </div>
+        <>
+          <div className="service-form__row">
+            <FormField label="Материал для списания" help="Со склада при выполнении операции">
+              <select
+                className={inputClass}
+                value={value.materialId === '' ? '' : value.materialId}
+                disabled={disabled}
+                onChange={(e) => updateField('materialId', e.target.value === '' ? '' : Number(e.target.value))}
+              >
+                <option value="">— Без списания</option>
+                {materials.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Расход на ед." help="Норма на одну единицу операции">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                value={value.qtyPerItem}
+                disabled={disabled}
+                onChange={(e) => updateField('qtyPerItem', e.target.value)}
+                placeholder="1"
+              />
+            </FormField>
+          </div>
+          {showMaterialConsumption && (
+            <div className="service-form__row">
+              <FormField
+                label="Режим расхода"
+                help="fixed — по units операции; roll_feed — по подаче рулона"
+              >
+                <select
+                  className={inputClass}
+                  value={value.consumptionMode}
+                  disabled={disabled}
+                  onChange={(e) => updateField('consumptionMode', e.target.value as ServiceConsumptionMode)}
+                >
+                  {consumptionModeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField
+                label="База metering"
+                help="Для per_meter и roll_feed: обычно feed для рулонной ламинации"
+              >
+                <select
+                  className={inputClass}
+                  value={value.meterBasis}
+                  disabled={disabled || !showMeterBasis}
+                  onChange={(e) => updateField('meterBasis', e.target.value as ServiceMeterBasis)}
+                >
+                  {meterBasisOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
+          )}
+        </>
       )}
       <label className="service-form__full inline-flex items-center gap-2 text-sm text-gray-600">
         <input

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Material } from '../../../types/shared';
 import { materialPriceSecondaryLabel } from '../../../utils/materialPriceLabels';
+import { formatRollStockLabel, isRollMaterial } from '../../../utils/materialRollLabels';
 import { WarehouseButton } from '../common/WarehouseButton';
 import { StatusBadge } from '../../common/StatusBadge';
 import { AppIcon } from '../../ui/AppIcon';
@@ -31,6 +32,23 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
 
   const stockInfo = getStockStatus(material.quantity || 0, material.min_stock_level || 10);
   const availableQuantity = (material.quantity || 0) - (material.reserved_quantity || 0);
+  const isRoll = isRollMaterial(material as any);
+  const stockTotalLabel = isRoll
+    ? formatRollStockLabel(material as any)
+    : String(material.quantity || 0);
+  const stockAvailableLabel = isRoll
+    ? formatRollStockLabel({
+        sheet_width: (material as any).sheet_width,
+        quantity: availableQuantity,
+      })
+    : String(availableQuantity);
+  const kindLabelMap: Record<string, string> = {
+    sheet: 'Листовой',
+    roll: 'Рулонный',
+    consumable: 'Расходка',
+    area: 'Площадной',
+  };
+  const kindLabel = kindLabelMap[String((material as any).material_kind || '')] || '—';
 
   return (
     <div className={`material-row-card ${isSelected ? 'selected' : ''}`}>
@@ -58,17 +76,26 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
       <div className="row-column category-column">
         <div className="category-info">
           <div className="text-sm font-medium">{(material as any).category_name || 'Без категории'}</div>
+          <div className="text-xs text-text-secondary">
+            {(material as any).material_type_name || 'Без типа'} · {kindLabel}
+          </div>
           {(material as any).supplier_name && (
             <div className="text-xs text-text-secondary">{(material as any).supplier_name}</div>
           )}
         </div>
       </div>
 
-      {/* Quantity Column */}
+      {/* Quantity / roll winding Column */}
       <div className="row-column quantity-column">
         <div className="quantity-info">
-          <div className="text-sm">Доступно: {availableQuantity}</div>
-          <div className="text-xs text-text-secondary">Всего: {material.quantity || 0}</div>
+          <div className="text-sm">
+            {isRoll ? `Остаток: ${stockTotalLabel}` : `Доступно: ${stockAvailableLabel}`}
+          </div>
+          <div className="text-xs text-text-secondary">
+            {isRoll
+              ? `Доступно: ${stockAvailableLabel}`
+              : `Всего: ${stockTotalLabel}`}
+          </div>
         </div>
       </div>
 
@@ -81,8 +108,8 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
       <div className="row-column price-column">
         <div className="price-info">
           <div className="font-bold">
-          {material.sheet_price_single || material.price || 0} <BynSymbol />
-        </div>
+            {material.purchase_price ?? material.sheet_price_single ?? material.price ?? 0} <BynSymbol />
+          </div>
           <div className="text-xs text-text-secondary">{materialPriceSecondaryLabel(material.unit)}</div>
         </div>
       </div>
