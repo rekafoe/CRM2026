@@ -30,6 +30,9 @@ export const MaterialsTab: React.FC<MaterialsTabProps> = React.memo(({
 }) => {
   return (
     <div className="materials-view">
+      <p className="inv-section-hint">
+        Приход и списание прямо из строки. История — отдельная вкладка или кнопка «История».
+      </p>
       <MaterialsFilters
         search={search}
         categoryFilter={categoryFilter}

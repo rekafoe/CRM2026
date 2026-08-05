@@ -1,19 +1,22 @@
 /* PaperTypesManagement Styles */
 .paper-types-management {
-  padding: 24px;
-  background: #f8f9fa;
-  min-height: 100vh;
+  padding: 0;
+  background: transparent;
+  min-height: 0;
 }
 
 .paper-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  padding: 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 0 0 10px;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
 
 .paper-title {
@@ -25,18 +28,21 @@
 
 .paper-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 0;
 }
 
 .tab-button {
-  padding: 12px 20px;
-  border: none;
-  background: #e9ecef;
-  color: #6c757d;
-  border-radius: 8px;
+  padding: 6px 12px;
+  min-height: 32px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-primary, #334155);
+  border-radius: 999px;
   cursor: pointer;
   font-weight: 500;
+  font-size: 13px;
   transition: all 0.2s ease;
 }
 
@@ -46,20 +52,29 @@
 }
 
 .tab-button.active {
-  background: #007bff;
+  background: #475569;
   color: white;
+  border-color: transparent;
 }
 
 .paper-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.paper-actions__price-btn {
+  margin-left: 8px;
 }
 
 .info-text {
-  color: #6c757d;
-  font-size: 14px;
-  font-style: italic;
+  color: var(--text-secondary, #6c757d);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .loading {

@@ -15,6 +15,7 @@ interface MaterialsManagementProps {
   onMaterialSelect: (id: number) => void;
   onSelectAll: () => void;
   onRefresh: () => void;
+  onOpenInventory?: () => void;
 }
 
 type ViewMode = 'grid' | 'cards';
@@ -27,6 +28,7 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
   onMaterialSelect,
   onSelectAll,
   onRefresh,
+  onOpenInventory,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortField, setSortField] = useState<SortField>('name');
@@ -172,6 +174,19 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
 
   return (
     <div className="materials-management materials-management-container">
+      <div className="wh-section-intro">
+        <div>
+          <h2 className="wh-section-title">Справочник материалов</h2>
+          <p className="wh-section-hint">
+            Создание и правка карточек, цены, типы. Приход и списание — во вкладке «Остатки».
+          </p>
+        </div>
+        {onOpenInventory ? (
+          <button type="button" className="wh-section-link" onClick={onOpenInventory}>
+            К остаткам
+          </button>
+        ) : null}
+      </div>
       <MaterialsToolbar
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}

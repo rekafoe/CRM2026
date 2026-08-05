@@ -1,12 +1,13 @@
 /* ===== СТИЛИ ДЛЯ УПРАВЛЕНИЯ ПОСТАВЩИКАМИ ===== */
 
 .suppliers-management {
-  padding: 8px;
-  background: var(--bg-primary);
-  height: 100vh;
+  padding: 0;
+  background: transparent;
+  height: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Заголовок */

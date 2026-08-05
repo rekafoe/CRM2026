@@ -13,3 +13,38 @@
   color: var(--text-primary, #222);
   margin: 8px 0 4px;
 }
+
+.material-type-select-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.material-type-select-row select {
+  flex: 1;
+}
+
+.material-type-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  background: var(--bg-tertiary, #f3f3f3);
+  cursor: pointer;
+}
+
+.material-type-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.material-type-quick-overlay {
+  z-index: 1100;
+}
+
+.material-type-quick-modal {
+  max-width: 420px;
+}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Material } from '../../types/shared';
 import { getWarehouseSummary, getLowStockItems, getSupplierSummary, getMaterialMovements, generatePdfReport, getABCAnalysis, getTurnoverAnalysis, getCostAnalysis, getSupplierAnalytics, getForecastingData } from '../../api';
 import { BynSymbol, MoneyAmount } from '../ui';
+import './WarehouseReports.css';
 
 interface WarehouseReportsProps {
   materials: Material[];
@@ -15,12 +16,35 @@ interface WarehouseReportsProps {
     suppliers: number;
     alerts: number;
   };
+  onOpenDeficitOps?: () => void;
 }
 
-type ReportTab = 'summary' | 'low-stock' | 'movements' | 'suppliers' | 'abc-analysis' | 'turnover' | 'cost-analysis' | 'supplier-analytics' | 'forecasting';
+type DailyReportTab = 'summary' | 'low-stock' | 'movements' | 'suppliers';
+type AnalyticsReportTab = 'abc-analysis' | 'turnover' | 'cost-analysis' | 'supplier-analytics' | 'forecasting';
+type ReportTab = DailyReportTab | AnalyticsReportTab;
+type TopReportTab = DailyReportTab | 'analytics';
 
-export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, stats }) => {
-  const [active, setActive] = React.useState<ReportTab>('summary');
+const ANALYTICS_TABS: Array<{ id: AnalyticsReportTab; label: string }> = [
+  { id: 'abc-analysis', label: 'ABC' },
+  { id: 'turnover', label: 'Оборачиваемость' },
+  { id: 'cost-analysis', label: 'Стоимость' },
+  { id: 'supplier-analytics', label: 'Поставщики' },
+  { id: 'forecasting', label: 'Прогноз' },
+];
+
+export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, stats, onOpenDeficitOps }) => {
+  const [topTab, setTopTab] = React.useState<TopReportTab>('summary');
+  const [analyticsTab, setAnalyticsTab] = React.useState<AnalyticsReportTab>('abc-analysis');
+  const active: ReportTab = topTab === 'analytics' ? analyticsTab : topTab;
+
+  const setActive = React.useCallback((tab: ReportTab) => {
+    if (ANALYTICS_TABS.some((item) => item.id === tab)) {
+      setTopTab('analytics');
+      setAnalyticsTab(tab as AnalyticsReportTab);
+      return;
+    }
+    setTopTab(tab as DailyReportTab);
+  }, []);
   const [categoryId, setCategoryId] = React.useState<number | ''>('');
   const [supplierId, setSupplierId] = React.useState<number | ''>('');
   const [loading, setLoading] = React.useState(false);
@@ -220,7 +244,6 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                         active === 'supplier-analytics' ? 'supplier-analytics' :
                         active === 'forecasting' ? 'forecasting' : 'summary'
       
-      console.log('🔄 Generating PDF for report type:', reportType)
       const response = await generatePdfReport(reportType)
       
       // Создаем blob и скачиваем файл
@@ -244,19 +267,37 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
 
   return (
     <div className="warehouse-reports">
-      <div className="tabs-header" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <button className={`tab-btn ${active === 'summary' ? 'active' : ''}`} onClick={() => setActive('summary')}>Итоги</button>
-        <button className={`tab-btn ${active === 'low-stock' ? 'active' : ''}`} onClick={() => setActive('low-stock')}>Дефицит</button>
-        <button className={`tab-btn ${active === 'movements' ? 'active' : ''}`} onClick={() => setActive('movements')}>Движения</button>
-        <button className={`tab-btn ${active === 'suppliers' ? 'active' : ''}`} onClick={() => setActive('suppliers')}>Поставщики</button>
-        <button className={`tab-btn ${active === 'abc-analysis' ? 'active' : ''}`} onClick={() => setActive('abc-analysis')}>ABC-анализ</button>
-        <button className={`tab-btn ${active === 'turnover' ? 'active' : ''}`} onClick={() => setActive('turnover')}>Оборачиваемость</button>
-        <button className={`tab-btn ${active === 'cost-analysis' ? 'active' : ''}`} onClick={() => setActive('cost-analysis')}>Стоимость</button>
-        <button className={`tab-btn ${active === 'supplier-analytics' ? 'active' : ''}`} onClick={() => setActive('supplier-analytics')}>Аналитика поставщиков</button>
-        <button className={`tab-btn ${active === 'forecasting' ? 'active' : ''}`} onClick={() => setActive('forecasting')}>Прогнозирование</button>
+      <div className="wh-section-intro">
+        <div>
+          <h2 className="wh-section-title">Отчёты склада</h2>
+          <p className="wh-section-hint">Ежедневная сводка отдельно от глубокой аналитики.</p>
+        </div>
       </div>
 
-      <div className="filters" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div className="tabs-header" role="tablist" aria-label="Разделы отчётов">
+        <button type="button" className={`tab-btn ${topTab === 'summary' ? 'active' : ''}`} onClick={() => setTopTab('summary')}>Итоги</button>
+        <button type="button" className={`tab-btn ${topTab === 'low-stock' ? 'active' : ''}`} onClick={() => setTopTab('low-stock')}>Дефицит</button>
+        <button type="button" className={`tab-btn ${topTab === 'movements' ? 'active' : ''}`} onClick={() => setTopTab('movements')}>Движения</button>
+        <button type="button" className={`tab-btn ${topTab === 'suppliers' ? 'active' : ''}`} onClick={() => setTopTab('suppliers')}>Поставщики</button>
+        <button type="button" className={`tab-btn ${topTab === 'analytics' ? 'active' : ''}`} onClick={() => setTopTab('analytics')}>Аналитика</button>
+      </div>
+
+      {topTab === 'analytics' && (
+        <div className="tabs-header tabs-header--sub" role="tablist" aria-label="Аналитика">
+          {ANALYTICS_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`tab-btn tab-btn--sub ${analyticsTab === tab.id ? 'active' : ''}`}
+              onClick={() => setAnalyticsTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="filters">
         <select
           value={categoryId === '' ? '' : String(categoryId)}
           onChange={(e) => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
@@ -275,7 +316,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
             <option key={s.id} value={String(s.id)}>{s.name}</option>
           ))}
         </select>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div className="filters__actions">
           <button className="btn btn-secondary" onClick={handleExport}>Экспорт CSV</button>
           <button className="btn btn-secondary" onClick={handleExportXlsx}>Экспорт XLSX</button>
           <button className="btn btn-secondary" onClick={handleExportPdf}>Экспорт PDF</button>
@@ -298,6 +339,17 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
 
       {active === 'low-stock' && (
         <div className="materials-table-wrapper" style={{ marginTop: 8 }}>
+          <p className="wh-section-hint">
+            Список для отчёта. Чтобы оформить приход —{' '}
+            {onOpenDeficitOps ? (
+              <button type="button" className="wh-inline-link" onClick={onOpenDeficitOps}>
+                Открыть дефицит в остатках
+              </button>
+            ) : (
+              'вкладка «Остатки» → «Дефицит»'
+            )}
+            .
+          </p>
           <table className="inv-table">
             <thead>
               <tr>

@@ -1,5 +1,7 @@
 import React from 'react';
 import { Material } from '../../../../types/shared';
+import { formatRollStockLabel, isRollMaterial } from '../../../../utils/materialRollLabels';
+import { getSuggestedReplenishQty } from '../../../../utils/materialStockOps';
 
 interface Alert {
   id: number;
@@ -11,60 +13,92 @@ interface Alert {
 
 interface AlertsTableProps {
   alerts: Alert[];
-  onAdjustStock: (material: Material, newQuantity: number) => void;
-  onMaterialAction: (material: Material, action: 'out') => void;
+  onReceive: (material: Material) => void;
+  onViewHistory: (material: Material) => void;
+  onOpenAutoOrder?: () => void;
 }
 
 export const AlertsTable: React.FC<AlertsTableProps> = React.memo(({
   alerts,
-  onAdjustStock,
-  onMaterialAction,
+  onReceive,
+  onViewHistory,
+  onOpenAutoOrder,
 }) => {
+  if (!alerts.length) {
+    return (
+      <div className="materials-table-wrapper">
+        <p className="inv-empty-hint">Сейчас всё в норме — материалов с низким остатком нет</p>
+      </div>
+    );
+  }
+
   return (
     <div className="materials-table-wrapper">
-      <table className="inv-table">
+      <div className="inv-section-hint">
+        Сначала оформите приход. Автозаказ — если нужно правило на будущее.
+        {onOpenAutoOrder ? (
+          <button type="button" className="action-btn action-btn--text" onClick={onOpenAutoOrder}>
+            К автозаказу
+          </button>
+        ) : null}
+      </div>
+      <table className="inv-table inv-table--ops">
         <thead>
           <tr>
-            <th>Материал</th>
-            <th>Категория</th>
+            <th className="col-name">Материал</th>
             <th>Остаток</th>
-            <th>Мин. остаток</th>
+            <th>Мин.</th>
             <th>Статус</th>
-            <th>Действия</th>
+            <th className="col-actions">Что сделать</th>
           </tr>
         </thead>
         <tbody>
-          {alerts.map(alert => {
+          {alerts.map((alert) => {
             const m = alert.material;
             if (!m) return null;
             const qty = m.quantity || 0;
             const minQ = m.min_stock_level || alert.threshold_value || 0;
             const isOut = alert.alert_type === 'out_of_stock' || qty <= 0;
-            const rowClass = isOut ? 'row-danger' : 'row-warning';
+            const stockLabel = isRollMaterial(m as any)
+              ? formatRollStockLabel(m as any)
+              : `${qty} ${m.unit || ''}`.trim();
+            const suggestQty = getSuggestedReplenishQty(m);
+            const suggestLabel = isRollMaterial(m as any)
+              ? formatRollStockLabel({
+                  sheet_width: (m as any).sheet_width,
+                  quantity: suggestQty,
+                })
+              : String(suggestQty);
+
             return (
-              <tr key={alert.id} className={rowClass}>
-                <td>{m.name}</td>
-                <td>{(m as any)?.category_name || '—'}</td>
-                <td>{qty}</td>
+              <tr key={alert.id} className={isOut ? 'row-danger' : 'row-warning'}>
+                <td className="col-name">
+                  <div className="inv-material-name">{m.name}</div>
+                  <div className="inv-material-meta">{(m as any)?.category_name || '—'}</div>
+                </td>
+                <td>{stockLabel}</td>
                 <td>{minQ}</td>
                 <td>
                   <span className={`inv-badge ${isOut ? 'status-out_of_stock' : 'status-low'}`}>
-                    {isOut ? 'Закончился' : 'Низкий остаток'}
+                    {isOut ? 'Закончился' : 'Мало'}
                   </span>
                 </td>
-                <td>
-                  <div className="inv-actions">
-                    <button 
-                      className="action-btn small"
-                      onClick={() => onAdjustStock(m, minQ + 50)}
+                <td className="col-actions">
+                  <div className="inv-actions inv-actions--labeled">
+                    <button
+                      type="button"
+                      className="action-btn action-btn--text primary"
+                      title={`Приход до минимума: +${suggestLabel}`}
+                      onClick={() => onReceive(m)}
                     >
-                      📥 Пополнить
+                      Приход +{suggestLabel}
                     </button>
-                    <button 
-                      className="action-btn small"
-                      onClick={() => onMaterialAction(m, 'out')}
+                    <button
+                      type="button"
+                      className="action-btn action-btn--text"
+                      onClick={() => onViewHistory(m)}
                     >
-                      📤 Списание
+                      История
                     </button>
                   </div>
                 </td>
@@ -76,4 +110,3 @@ export const AlertsTable: React.FC<AlertsTableProps> = React.memo(({
     </div>
   );
 });
-

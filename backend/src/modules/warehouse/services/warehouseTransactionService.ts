@@ -2,6 +2,14 @@ import { getDb } from '../../../config/database';
 import { logger } from '../../../utils/logger';
 import { MaterialTransactionService } from './materialTransactionService';
 
+export interface DeliveryDocumentFields {
+  supplierId?: number;
+  deliveryNumber?: string;
+  invoiceNumber?: string;
+  deliveryDate?: string;
+  deliveryNotes?: string;
+}
+
 export interface TransactionOperation {
   type: 'spend' | 'add' | 'adjust' | 'reserve' | 'unreserve';
   materialId: number;
@@ -10,6 +18,11 @@ export interface TransactionOperation {
   orderId?: number;
   userId?: number;
   metadata?: any;
+  supplierId?: number;
+  deliveryNumber?: string;
+  invoiceNumber?: string;
+  deliveryDate?: string;
+  deliveryNotes?: string;
 }
 
 export interface TransactionResult {
@@ -111,7 +124,12 @@ export class WarehouseTransactionService {
           quantity,
           reason,
           orderId,
-          userId
+          userId,
+          supplierId: operation.supplierId,
+          deliveryNumber: operation.deliveryNumber,
+          invoiceNumber: operation.invoiceNumber,
+          deliveryDate: operation.deliveryDate,
+          deliveryNotes: operation.deliveryNotes,
         });
         newQuantity = result.newQuantity;
         break;
@@ -220,14 +238,26 @@ export class WarehouseTransactionService {
   }
 
   // Безопасное добавление материалов
-  static async addMaterial(materialId: number, quantity: number, reason: string, orderId?: number, userId?: number): Promise<TransactionResult> {
+  static async addMaterial(
+    materialId: number,
+    quantity: number,
+    reason: string,
+    orderId?: number,
+    userId?: number,
+    delivery?: DeliveryDocumentFields
+  ): Promise<TransactionResult> {
     const operations: TransactionOperation[] = [{
       type: 'add',
       materialId,
       quantity,
       reason,
       orderId,
-      userId
+      userId,
+      supplierId: delivery?.supplierId,
+      deliveryNumber: delivery?.deliveryNumber,
+      invoiceNumber: delivery?.invoiceNumber,
+      deliveryDate: delivery?.deliveryDate,
+      deliveryNotes: delivery?.deliveryNotes,
     }];
     
     const results = await this.executeTransaction(operations);

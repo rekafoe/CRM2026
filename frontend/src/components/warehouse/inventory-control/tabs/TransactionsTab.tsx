@@ -34,15 +34,17 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = React.memo(({
 }) => {
   return (
     <div className="transactions-view">
+      <p className="inv-section-hint">История приходов и списаний. Чтобы провести операцию — вкладка «Остатки и операции».</p>
       <TransactionsFilters
         from={filters.from}
         to={filters.to}
         order={filters.order}
-        user={filters.user}
+        materialId={filters.materialId}
+        materials={materials}
         onFromChange={(value) => onFilterChange({ from: value })}
         onToChange={(value) => onFilterChange({ to: value })}
         onOrderChange={(value) => onFilterChange({ order: value })}
-        onUserChange={(value) => onFilterChange({ user: value })}
+        onMaterialChange={(value) => onFilterChange({ materialId: value })}
         onRefresh={onRefresh}
       />
       <TransactionsTable
@@ -53,4 +55,3 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = React.memo(({
     </div>
   );
 });
-

@@ -200,17 +200,64 @@ export class MaterialController {
         return 
       }
       
-      const { materialId, delta, reason, orderId } = req.body as { 
-        materialId: number; 
-        delta: number; 
-        reason?: string; 
-        orderId?: number 
+      const {
+        materialId,
+        delta,
+        reason,
+        orderId,
+        supplier_id,
+        delivery_number,
+        invoice_number,
+        delivery_date,
+        delivery_notes,
+        notes,
+      } = req.body as {
+        materialId: number;
+        delta: number;
+        reason?: string;
+        orderId?: number;
+        supplier_id?: number | string;
+        delivery_number?: string;
+        invoice_number?: string;
+        delivery_date?: string;
+        delivery_notes?: string;
+        notes?: string;
       }
-      
-      const opQuantity = Math.abs(delta)
-      const result = delta < 0
-        ? await WarehouseTransactionService.spendMaterial(materialId, opQuantity, reason || 'Списание материала', orderId, user.id)
-        : await WarehouseTransactionService.addMaterial(materialId, opQuantity, reason || 'Поступление материала', orderId, user.id)
+
+      if (!materialId || !Number.isFinite(Number(delta)) || Number(delta) === 0) {
+        res.status(400).json({ error: 'Укажите materialId и ненулевой delta' })
+        return
+      }
+
+      const opQuantity = Math.abs(Number(delta))
+      const supplierId = supplier_id === '' || supplier_id == null ? undefined : Number(supplier_id)
+      const combinedNotes = [delivery_notes, notes]
+        .map((v) => String(v || '').trim())
+        .filter(Boolean)
+        .join('\n') || undefined
+
+      const result = Number(delta) < 0
+        ? await WarehouseTransactionService.spendMaterial(
+            Number(materialId),
+            opQuantity,
+            reason || 'Списание материала',
+            orderId,
+            user.id
+          )
+        : await WarehouseTransactionService.addMaterial(
+            Number(materialId),
+            opQuantity,
+            reason || 'Поступление материала',
+            orderId,
+            user.id,
+            {
+              supplierId: Number.isFinite(supplierId as number) ? supplierId : undefined,
+              deliveryNumber: delivery_number?.trim() || undefined,
+              invoiceNumber: invoice_number?.trim() || undefined,
+              deliveryDate: delivery_date?.trim() || undefined,
+              deliveryNotes: combinedNotes,
+            }
+          )
 
       res.json(result)
     } catch (error: any) {

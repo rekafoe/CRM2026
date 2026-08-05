@@ -10,6 +10,7 @@ interface MaterialsManagementProps {
   onMaterialSelect: (id: number) => void;
   onSelectAll: () => void;
   onRefresh: () => void;
+  onOpenInventory?: () => void;
 }
 
 export const MaterialsManagement: React.FC<MaterialsManagementProps> = ({
@@ -17,7 +18,8 @@ export const MaterialsManagement: React.FC<MaterialsManagementProps> = ({
   selectedMaterials,
   onMaterialSelect,
   onSelectAll,
-  onRefresh
+  onRefresh,
+  onOpenInventory,
 }) => {
   return (
     <MaterialsManagementRefactored
@@ -26,6 +28,7 @@ export const MaterialsManagement: React.FC<MaterialsManagementProps> = ({
       onMaterialSelect={onMaterialSelect}
       onSelectAll={onSelectAll}
       onRefresh={onRefresh}
+      onOpenInventory={onOpenInventory}
     />
   );
 };

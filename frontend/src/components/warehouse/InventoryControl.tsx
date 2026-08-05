@@ -1,31 +1,47 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Material, InventoryTransaction } from '../../types/shared';
+import { Material } from '../../types/shared';
 import { useUIStore } from '../../stores/uiStore';
 import { EnhancedMaterialTransactionModal } from './EnhancedMaterialTransactionModal';
-import { getMaterialMoves, getAutoOrderRules, checkMaterialsForAutoOrder, deleteAutoOrderRule, getSuppliers, createAutoOrderRule, updateAutoOrderRule, getMaterialCategories, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory } from '../../api';
+import { getMaterialMoves, getAutoOrderRules, checkMaterialsForAutoOrder, deleteAutoOrderRule, getSuppliers, createAutoOrderRule, updateAutoOrderRule } from '../../api';
+import { getSuggestedReplenishQty } from '../../utils/materialStockOps';
 import './InventoryControl.css';
-import { MaterialsTab, TransactionsTab, AlertsTab, MovementsTab } from './inventory-control';
+import { MaterialsTab, TransactionsTab, AlertsTab } from './inventory-control';
+
+type TransactionType = 'in' | 'out' | 'adjustment' | 'transfer';
+type ViewMode = 'stock' | 'history' | 'deficit' | 'auto-order';
 
 interface InventoryControlProps {
   materials: Material[];
   onRefresh: () => void;
+  initialView?: ViewMode;
+  onOpenCatalog?: () => void;
 }
 
-type TransactionType = 'in' | 'out' | 'adjustment' | 'transfer';
-type ViewMode = 'materials' | 'transactions' | 'alerts' | 'movements' | 'auto-order' | 'categories';
+function getMaterialStockStatus(material: Material): 'ok' | 'low' | 'out_of_stock' {
+  const qty = material.quantity || 0;
+  const minStock = material.min_stock_level || (material as any).min_quantity || 10;
+  if (qty <= 0) return 'out_of_stock';
+  if (qty <= minStock) return 'low';
+  return 'ok';
+}
 
 export const InventoryControl: React.FC<InventoryControlProps> = ({
   materials,
-  onRefresh
+  onRefresh,
+  initialView = 'stock',
+  onOpenCatalog,
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('materials');
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [transactionType, setTransactionType] = useState<TransactionType>('in');
-  const [transactionQuantity, setTransactionQuantity] = useState<number>(0);
-  const [transactionReason, setTransactionReason] = useState<string>('');
+  const [initialQuantity, setInitialQuantity] = useState<number | null>(null);
 
   const { showToast } = useUIStore();
+
+  useEffect(() => {
+    setViewMode(initialView);
+  }, [initialView]);
 
   // Фильтры материалов
   const [search, setSearch] = useState<string>('');
@@ -48,21 +64,6 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
     { from: undefined, to: undefined, user: '', order: '', materialId: null }
   );
 
-  const transactions: InventoryTransaction[] = useMemo(() => {
-    // Приводим moves к интерфейсу для отображения
-    return (moves || []).map((mm: any, idx: number) => ({
-      id: mm.id || idx,
-      material_id: mm.materialId,
-      transaction_type: (mm.delta || 0) > 0 ? 'in' : 'out',
-      quantity: mm.delta,
-      reason: mm.reason,
-      user_id: mm.user_id,
-      created_at: mm.created_at,
-      updated_at: mm.created_at,
-      material: materials.find(m => m.id === mm.materialId)
-    }));
-  }, [moves, materials]);
-
   const loadMoves = useCallback(async () => {
     try {
       setMovesLoading(true);
@@ -82,7 +83,7 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
   }, [moveFilters, showToast]);
 
   useEffect(() => {
-    if (viewMode === 'transactions') {
+    if (viewMode === 'history') {
       loadMoves();
     }
   }, [viewMode, loadMoves]);
@@ -175,64 +176,6 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
     }
   }, [ruleForm, editingRule, loadAutoRules, showToast]);
 
-  // Категории состояние и логика
-  const [categoriesState, setCategoriesState] = useState<Array<{ id: number; name: string; color?: string; description?: string; created_at?: string }>>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [categorySearch, setCategorySearch] = useState('');
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<{ id?: number; name: string; color?: string; description?: string } | null>(null);
-  const [categoryForm, setCategoryForm] = useState<{ name: string; color?: string; description?: string }>({ name: '', color: '', description: '' });
-
-  const loadCategories = useCallback(async () => {
-    try {
-      setCategoriesLoading(true);
-      const res = await getMaterialCategories();
-      setCategoriesState(res.data || []);
-    } catch {
-      showToast('Ошибка загрузки категорий', 'error');
-    } finally {
-      setCategoriesLoading(false);
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    if (viewMode === 'categories') {
-      loadCategories();
-    }
-  }, [viewMode, loadCategories]);
-
-  const openCreateCategory = useCallback(() => {
-    setEditingCategory(null);
-    setCategoryForm({ name: '', color: '', description: '' });
-    setShowCategoryModal(true);
-  }, []);
-
-  const openEditCategory = useCallback((c: any) => {
-    setEditingCategory(c);
-    setCategoryForm({ name: c.name || '', color: c.color || '', description: c.description || '' });
-    setShowCategoryModal(true);
-  }, []);
-
-  const saveCategory = useCallback(async () => {
-    if (!categoryForm.name.trim()) {
-      showToast('Введите имя категории', 'warning');
-      return;
-    }
-    try {
-      if (editingCategory && editingCategory.id) {
-        await updateMaterialCategory(editingCategory.id, categoryForm);
-        showToast('Категория обновлена', 'success');
-      } else {
-        await createMaterialCategory(categoryForm);
-        showToast('Категория создана', 'success');
-      }
-      setShowCategoryModal(false);
-      await loadCategories();
-    } catch {
-      showToast('Ошибка сохранения категории', 'error');
-    }
-  }, [categoryForm, editingCategory, loadCategories, showToast]);
-
   // Алерты о низких остатках
   const alerts = useMemo(() => {
     return materials
@@ -249,101 +192,89 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
       }));
   }, [materials]);
 
-  // Отфильтрованные материалы
   const filteredMaterials = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (materials || []).filter(m => {
       const nameOk = !q || (m.name || '').toLowerCase().includes(q) || ((m as any).description || '').toLowerCase().includes(q);
       const catOk = !categoryFilter || ((m as any).category_name || '') === categoryFilter;
-      const status: string = (m as any).status || '';
-      const statusOk = !statusFilter || status === statusFilter;
+      const statusOk = !statusFilter || getMaterialStockStatus(m) === statusFilter;
       return nameOk && catOk && statusOk;
     });
   }, [materials, search, categoryFilter, statusFilter]);
 
-  // Обработчики
-  const handleAddTransaction = useCallback(async () => {
-    if (!selectedMaterial || transactionQuantity === 0 || !transactionReason.trim()) {
-      showToast('Заполните все поля', 'warning');
-      return;
-    }
-
-    try {
-      // Здесь будет API вызов для создания транзакции
-      showToast('Транзакция добавлена', 'success');
-      setShowAddTransaction(false);
-      setSelectedMaterial(null);
-      setTransactionQuantity(0);
-      setTransactionReason('');
-      onRefresh();
-    } catch (error) {
-      showToast('Ошибка при добавлении транзакции', 'error');
-    }
-  }, [selectedMaterial, transactionQuantity, transactionReason, showToast, onRefresh]);
-
-  const handleAdjustStock = useCallback((material: Material, newQuantity: number) => {
+  const openMaterialOp = useCallback((
+    material: Material,
+    action: 'in' | 'out' | 'adjustment',
+    options?: { suggestQty?: boolean }
+  ) => {
     setSelectedMaterial(material);
-    setTransactionType('adjustment');
-    setTransactionQuantity(newQuantity - (material.quantity || 0));
-    setTransactionReason('Корректировка остатков');
+    setTransactionType(action);
+    setInitialQuantity(
+      action === 'in' && options?.suggestQty
+        ? getSuggestedReplenishQty(material)
+        : null
+    );
     setShowAddTransaction(true);
   }, []);
 
-  // Убрали статистику - не несёт полезной информации
+  const openMaterialHistory = useCallback((materialId: number) => {
+    setMoveFilters(prev => ({ ...prev, materialId }));
+    setViewMode('history');
+  }, []);
 
   return (
     <div className="inventory-control">
-      {/* Заголовок */}
       <div className="inventory-header">
-        <h2>📋 Управление инвентарем</h2>
-        <div className="header-actions" />
+        <div>
+          <h2>Остатки</h2>
+          <p className="inv-header-sub">
+            Операции со складом: приход, списание, история.
+            {onOpenCatalog ? ' Карточки и цены — в справочнике.' : ''}
+          </p>
+        </div>
+        <div className="header-actions">
+          {onOpenCatalog ? (
+            <button type="button" className="action-btn action-btn--text" onClick={onOpenCatalog}>
+              К справочнику
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {/* Убрали статистику */}
-
-      {/* Вкладки */}
       <div className="inventory-tabs">
         <div className="tabs-header">
-          <button 
-            className={`tab-btn ${viewMode === 'materials' ? 'active' : ''}`}
-            onClick={() => setViewMode('materials')}
+          <button
+            type="button"
+            className={`tab-btn ${viewMode === 'stock' ? 'active' : ''}`}
+            onClick={() => setViewMode('stock')}
           >
-            📦 Материалы
+            Остатки и операции
           </button>
-          <button 
-            className={`tab-btn ${viewMode === 'transactions' ? 'active' : ''}`}
-            onClick={() => setViewMode('transactions')}
+          <button
+            type="button"
+            className={`tab-btn ${viewMode === 'history' ? 'active' : ''}`}
+            onClick={() => setViewMode('history')}
           >
-            📊 Транзакции
+            История движений
           </button>
-          <button 
-            className={`tab-btn ${viewMode === 'alerts' ? 'active' : ''}`}
-            onClick={() => setViewMode('alerts')}
+          <button
+            type="button"
+            className={`tab-btn ${viewMode === 'deficit' ? 'active' : ''}`}
+            onClick={() => setViewMode('deficit')}
           >
-            ⚠️ Алерты ({alerts.length})
+            Дефицит{alerts.length ? ` (${alerts.length})` : ''}
           </button>
-          <button 
-            className={`tab-btn ${viewMode === 'movements' ? 'active' : ''}`}
-            onClick={() => setViewMode('movements')}
-          >
-            🔄 Движения
-          </button>
-          <button 
-            className={`tab-btn ${viewMode === 'categories' ? 'active' : ''}`}
-            onClick={() => setViewMode('categories')}
-          >
-            🗂️ Категории
-          </button>
-          <button 
+          <button
+            type="button"
             className={`tab-btn ${viewMode === 'auto-order' ? 'active' : ''}`}
             onClick={() => setViewMode('auto-order')}
           >
-            🤖 Автозаказ
+            Автозаказ
           </button>
         </div>
 
         <div className="tabs-content">
-          {viewMode === 'materials' && (
+          {viewMode === 'stock' && (
             <MaterialsTab
               materials={filteredMaterials}
               search={search}
@@ -355,21 +286,15 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
               onStatusFilterChange={setStatusFilter}
               onMaterialAction={(material, action) => {
                 if (action === 'history') {
-                  setViewMode('transactions');
-                  setMoveFilters(prev => ({ ...prev, materialId: material.id }));
+                  openMaterialHistory(material.id!);
                 } else {
-                  setSelectedMaterial(material);
-                  setTransactionType(action as 'in' | 'out' | 'adjustment');
-                  setShowAddTransaction(true);
+                  openMaterialOp(material, action as 'in' | 'out' | 'adjustment');
                 }
               }}
-              onViewTransactions={(materialId) => {
-                setViewMode('transactions');
-                setMoveFilters(prev => ({ ...prev, materialId }));
-              }}
+              onViewTransactions={openMaterialHistory}
             />
           )}
-          {viewMode === 'transactions' && (
+          {viewMode === 'history' && (
             <TransactionsTab
               moves={moves}
               materials={materials}
@@ -380,112 +305,105 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
             />
           )}
 
-          {viewMode === 'alerts' && (
+          {viewMode === 'deficit' && (
             <AlertsTab
               alerts={alerts}
-              onAdjustStock={handleAdjustStock}
-              onMaterialAction={(material) => {
-                setSelectedMaterial(material);
-                setTransactionType('out');
-                setShowAddTransaction(true);
-              }}
-            />
-          )}
-
-          {viewMode === 'movements' && (
-            <MovementsTab
-              materials={materials}
-              onMaterialAction={(material, action) => {
-                if (action === 'adjustment') {
-                  handleAdjustStock(material, material.quantity || 0);
-                } else {
-                  setSelectedMaterial(material);
-                  setTransactionType(action);
-                  setShowAddTransaction(true);
-                }
-              }}
+              onReceive={(material) => openMaterialOp(material, 'in', { suggestQty: true })}
+              onViewHistory={(material) => openMaterialHistory(material.id!)}
+              onOpenAutoOrder={() => setViewMode('auto-order')}
             />
           )}
 
           {viewMode === 'auto-order' && (
             <div className="auto-order-view">
               <div className="materials-table-wrapper">
-                <div className="inv-actions" style={{ marginBottom: 8 }}>
-                  <button className="action-btn" onClick={openCreateRule}>➕ Добавить правило</button>
-                  <button className="action-btn" onClick={async () => {
-                    try {
-                      await checkMaterialsForAutoOrder();
-                      showToast('Проверка выполнена', 'success');
-                    } catch {
-                      showToast('Ошибка проверки', 'error');
-                    }
-                  }}>🔍 Проверить сейчас</button>
+                <p className="inv-section-hint">Правила: когда остаток ниже порога — система предлагает заказ поставщику.</p>
+                <div className="inv-actions inv-actions--toolbar">
+                  <button type="button" className="action-btn action-btn--text primary" onClick={openCreateRule}>
+                    Добавить правило
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn action-btn--text"
+                    onClick={async () => {
+                      try {
+                        await checkMaterialsForAutoOrder();
+                        showToast('Проверка выполнена', 'success');
+                      } catch {
+                        showToast('Ошибка проверки', 'error');
+                      }
+                    }}
+                  >
+                    Проверить сейчас
+                  </button>
                 </div>
                 <table className="inv-table">
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Материал</th>
+                      <th className="col-name">Материал</th>
                       <th>Поставщик</th>
                       <th>Порог</th>
                       <th>Заказ</th>
-                      <th>Активно</th>
-                      <th>Действия</th>
+                      <th>Статус</th>
+                      <th className="col-actions">Действия</th>
                     </tr>
                   </thead>
                   <tbody>
                     {autoLoading ? (
-                      <tr><td colSpan={7}>Загрузка...</td></tr>
+                      <tr><td colSpan={6}>Загрузка...</td></tr>
                     ) : autoRules.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>Правила не настроены</td>
+                        <td colSpan={6} className="inv-empty-cell">Правила не настроены</td>
                       </tr>
                     ) : (
                       autoRules.map((r: any) => (
                         <tr key={r.id}>
-                          <td>{r.id}</td>
-                          <td style={{ textAlign: 'left' }}>{r.material_name || r.material_id}</td>
-                          <td style={{ textAlign: 'left' }}>{r.supplier_name || r.supplier_id}</td>
+                          <td className="col-name">{r.material_name || r.material_id}</td>
+                          <td>{r.supplier_name || r.supplier_id}</td>
                           <td>{r.threshold_quantity}</td>
                           <td>{r.order_quantity}</td>
-                          <td>{r.is_active ? '✅' : '⏸️'}</td>
                           <td>
-                            <div className="inv-actions">
-                              <button className="action-btn small" onClick={() => openEditRule(r)}>✏️</button>
-                              <button className="action-btn small" onClick={async () => {
-                                try {
-                                  await checkMaterialsForAutoOrder();
-                                  showToast('Проверка выполнена', 'success');
-                                } catch {
-                                  showToast('Ошибка проверки', 'error');
-                                }
-                              }}>🔍</button>
-                              <button className="action-btn small danger" onClick={async () => {
-                                if (!window.confirm('Удалить правило?')) return;
-                                try {
-                                  await deleteAutoOrderRule(r.id);
-                                  await loadAutoRules();
-                                  showToast('Правило удалено', 'success');
-                                } catch {
-                                  showToast('Ошибка удаления', 'error');
-                                }
-                              }}>🗑️</button>
-        </div>
+                            <span className={`inv-badge ${r.is_active ? 'status-ok' : 'status-out_of_stock'}`}>
+                              {r.is_active ? 'Активно' : 'Выкл.'}
+                            </span>
+                          </td>
+                          <td className="col-actions">
+                            <div className="inv-actions inv-actions--labeled">
+                              <button type="button" className="action-btn action-btn--text" onClick={() => openEditRule(r)}>
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                className="action-btn action-btn--text danger"
+                                onClick={async () => {
+                                  if (!window.confirm('Удалить правило?')) return;
+                                  try {
+                                    await deleteAutoOrderRule(r.id);
+                                    await loadAutoRules();
+                                    showToast('Правило удалено', 'success');
+                                  } catch {
+                                    showToast('Ошибка удаления', 'error');
+                                  }
+                                }}
+                              >
+                                Удалить
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
-      </div>
+              </div>
 
               {showRuleModal && (
                 <div className="modal-backdrop">
                   <div className="modal">
-            <div className="modal-header">
+                    <div className="modal-header">
                       <h3>{editingRule ? 'Редактировать правило' : 'Новое правило'}</h3>
-                      <button className="action-btn small" onClick={() => setShowRuleModal(false)}>✖</button>
-            </div>
+                      <button type="button" className="action-btn small" onClick={() => setShowRuleModal(false)}>×</button>
+                    </div>
             <div className="modal-body">
                       <div className="form-row">
               <div className="form-group">
@@ -542,10 +460,10 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
                         </div>
               </div>
             </div>
-            <div className="modal-footer">
-                      <button className="action-btn" onClick={saveRule}>💾 Сохранить</button>
-                      <button className="action-btn" onClick={() => setShowRuleModal(false)}>Отмена</button>
-            </div>
+                    <div className="modal-footer">
+                      <button type="button" className="action-btn action-btn--text primary" onClick={saveRule}>Сохранить</button>
+                      <button type="button" className="action-btn action-btn--text" onClick={() => setShowRuleModal(false)}>Отмена</button>
+                    </div>
           </div>
         </div>
       )}
@@ -557,9 +475,13 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
       {/* Единое модальное окно транзакций склада */}
       <EnhancedMaterialTransactionModal
         isOpen={showAddTransaction}
-        onClose={() => setShowAddTransaction(false)}
+        onClose={() => {
+          setShowAddTransaction(false);
+          setInitialQuantity(null);
+        }}
         material={selectedMaterial}
         transactionType={transactionType}
+        initialQuantity={initialQuantity}
         onSuccess={onRefresh}
       />
     </div>

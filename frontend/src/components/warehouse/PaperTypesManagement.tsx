@@ -33,13 +33,13 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
             className={`tab-button ${activeTab === 'types' ? 'active' : ''}`}
             onClick={() => setActiveTab('types')}
           >
-            📄 Типы бумаги ({paperTypes.length})
+            Типы бумаги ({paperTypes.length})
           </button>
           <button 
             className={`tab-button ${activeTab === 'materials' ? 'active' : ''}`}
             onClick={() => setActiveTab('materials')}
           >
-            📦 Материалы
+            Материалы
           </button>
         </div>
         
@@ -49,18 +49,17 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
               className="btn btn-primary"
               onClick={() => updateModal('showAdd', true)}
             >
-              ➕ Добавить тип
+              Добавить тип
             </button>
           )}
           {activeTab === 'materials' && (
             <div className="info-text">
-              💡 Материалы связываются с типами бумаги через форму добавления материалов
+              Материалы связываются с типами бумаги через форму материала
               <button 
-                className="btn btn-primary"
+                className="btn btn-primary paper-actions__price-btn"
                 onClick={() => updateModal('showPrice', true)}
-                style={{ marginLeft: '10px' }}
               >
-                💰 Добавить цену
+                Добавить цену
               </button>
             </div>
           )}

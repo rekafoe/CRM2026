@@ -10,11 +10,44 @@
   justify-content: space-between;
 }
 
+.inv-header-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.inv-section-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.inv-empty-hint,
+.inv-empty-cell {
+  text-align: center;
+  padding: 28px 16px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
 .inv-filters {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+  align-items: flex-end;
+}
+
+.inv-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .inv-filters input,
@@ -64,6 +97,96 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.inv-actions--toolbar {
+  margin-bottom: 12px;
+}
+
+.inv-actions--labeled {
+  justify-content: flex-end;
+}
+
+.inv-table .col-name {
+  text-align: left;
+  min-width: 160px;
+}
+
+.inv-table .col-actions {
+  min-width: 220px;
+}
+
+.inv-material-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.inv-material-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.action-btn {
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #f8f9fa;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.action-btn:hover {
+  background: #e9ecef;
+}
+
+.action-btn--text {
+  background: transparent;
+  border-color: transparent;
+  color: #1d4ed8;
+  font-weight: 600;
+  padding: 6px 8px;
+}
+
+.action-btn--text:hover {
+  background: #eff6ff;
+}
+
+.action-btn--text.primary {
+  color: #047857;
+}
+
+.action-btn--text.primary:hover {
+  background: #ecfdf5;
+}
+
+.action-btn--text.danger {
+  color: #b91c1c;
+}
+
+.action-btn--text.danger:hover {
+  background: #fef2f2;
+}
+
+.inv-optional-block {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.inv-optional-block summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.inv-link-btn {
+  margin: 4px 0 12px;
+  padding-left: 0;
 }
 
 .inv-badge {

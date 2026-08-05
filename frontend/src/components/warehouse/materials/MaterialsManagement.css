@@ -1,10 +1,11 @@
 /* Materials Management Styles */
 
 .materials-management {
-  padding: 20px;
+  padding: 0;
   min-height: auto;
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
 .materials-list-grid {
@@ -17,14 +18,10 @@
   flex-direction: column;
 }
 
-/* Панель инструментов - фиксированная */
+/* Панель инструментов */
 .materials-management .materials-toolbar {
   flex-shrink: 0;
   z-index: 10;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
-  padding: 16px 20px;
-  margin: -20px -20px 0 -20px;
 }
 
 /* Область контента - растягивается */

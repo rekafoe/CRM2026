@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Material } from '../../types/shared';
 import { api } from '../../api/client';
 import { ENDPOINTS } from '../../api/endpoints';
+import { spendMaterial } from '../../api';
+import { formatRollStockLabel, isRollMaterial } from '../../utils/materialRollLabels';
+import { getMaterialMinStock, getSuggestedReplenishQty } from '../../utils/materialStockOps';
+import './EnhancedMaterialTransactionModal.css';
 
 interface Supplier {
   id: number;
@@ -19,6 +23,32 @@ interface EnhancedMaterialTransactionModalProps {
   material: Material | null;
   transactionType: 'in' | 'out' | 'adjustment' | 'transfer';
   onSuccess: () => void;
+  /** Предзаполнить количество (напр. «до минимума» из дефицита) */
+  initialQuantity?: number | null;
+}
+
+const TITLE_BY_TYPE: Record<string, string> = {
+  in: 'Приход материала',
+  out: 'Списание материала',
+  adjustment: 'Корректировка остатка',
+  transfer: 'Перемещение материала',
+};
+
+const REASON_BY_TYPE: Record<string, string> = {
+  in: 'Поступление материалов',
+  out: 'Списание материалов',
+  adjustment: 'Корректировка остатков',
+  transfer: 'Перемещение материалов',
+};
+
+function formatQtyHint(value: number, material: Material | null): string {
+  if (!material || !isRollMaterial(material as any)) {
+    return String(value);
+  }
+  return formatRollStockLabel({
+    sheet_width: (material as any).sheet_width,
+    quantity: value,
+  });
 }
 
 export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransactionModalProps> = ({
@@ -26,7 +56,8 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
   onClose,
   material,
   transactionType,
-  onSuccess
+  onSuccess,
+  initialQuantity = null,
 }) => {
   const [formData, setFormData] = useState({
     quantity: '',
@@ -36,53 +67,74 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
     supplier_id: '',
     delivery_number: '',
     invoice_number: '',
-    delivery_date: new Date().toISOString().split('T')[0], // Сегодняшняя дата
+    delivery_date: new Date().toISOString().split('T')[0],
     delivery_notes: ''
   });
-
+  const [showNotes, setShowNotes] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const qtyInputRef = useRef<HTMLInputElement>(null);
 
-  // Загружаем поставщиков при открытии модального окна
   useEffect(() => {
     if (isOpen) {
       loadSuppliers();
     }
   }, [isOpen]);
 
-  // Сбрасываем форму при изменении материала или типа транзакции
   useEffect(() => {
-    if (isOpen) {
-      setFormData({
-        quantity: '',
-        reason: transactionType === 'in' ? 'Поступление материалов' : 
-                transactionType === 'out' ? 'Списание материалов' :
-                transactionType === 'adjustment' ? 'Корректировка остатков' : 'Перемещение материалов',
-        notes: '',
-        orderId: '',
-        supplier_id: material?.supplier_id?.toString() || '',
-        delivery_number: '',
-        invoice_number: '',
-        delivery_date: new Date().toISOString().split('T')[0],
-        delivery_notes: ''
-      });
-      setError(null);
-    }
-  }, [isOpen, material, transactionType]);
+    if (!isOpen) return;
+
+    const prefill =
+      initialQuantity != null && Number.isFinite(initialQuantity) && initialQuantity > 0
+        ? String(initialQuantity)
+        : '';
+
+    setFormData({
+      quantity: prefill,
+      reason: REASON_BY_TYPE[transactionType] || '',
+      notes: '',
+      orderId: '',
+      supplier_id: material?.supplier_id?.toString() || '',
+      delivery_number: '',
+      invoice_number: '',
+      delivery_date: new Date().toISOString().split('T')[0],
+      delivery_notes: ''
+    });
+    setShowNotes(false);
+    setError(null);
+
+    const t = window.setTimeout(() => {
+      qtyInputRef.current?.focus();
+      qtyInputRef.current?.select();
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [isOpen, material, transactionType, initialQuantity]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, loading, onClose]);
 
   const loadSuppliers = async () => {
     try {
       const response = await api.get<Supplier[]>(ENDPOINTS.SUPPLIERS.LIST);
       setSuppliers(response.data.filter(s => s.is_active));
-    } catch (error) {
-      console.error('Ошибка загрузки поставщиков:', error);
+    } catch {
       setError('Ошибка загрузки списка поставщиков');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
 
@@ -96,25 +148,42 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
         throw new Error('Материал не выбран');
       }
 
-      // Подготавливаем данные для API
-      const transactionData = {
-        materialId: material.id,
-        delta: transactionType === 'out' ? -quantity : quantity,
+      const delta = transactionType === 'out' ? -quantity : quantity;
+      const payload: Parameters<typeof spendMaterial>[0] = {
+        materialId: material.id!,
+        delta,
         reason: formData.reason,
-        orderId: formData.orderId ? parseInt(formData.orderId) : undefined
+        orderId: formData.orderId ? parseInt(formData.orderId, 10) : undefined,
       };
 
-      console.log('=== ОТПРАВКА ТРАНЗАКЦИИ ===');
-      console.log('transactionData:', transactionData);
+      if (delta > 0) {
+        if (formData.supplier_id) {
+          payload.supplier_id = Number(formData.supplier_id);
+        }
+        if (formData.delivery_number.trim()) {
+          payload.delivery_number = formData.delivery_number.trim();
+        }
+        if (formData.invoice_number.trim()) {
+          payload.invoice_number = formData.invoice_number.trim();
+        }
+        if (formData.delivery_date.trim()) {
+          payload.delivery_date = formData.delivery_date.trim();
+        }
+        if (formData.delivery_notes.trim()) {
+          payload.delivery_notes = formData.delivery_notes.trim();
+        }
+      }
+      if (formData.notes.trim()) {
+        payload.notes = formData.notes.trim();
+      }
 
-      // Отправляем транзакцию
-      await api.post('/materials/spend', transactionData);
+      await spendMaterial(payload);
 
       onSuccess();
       onClose();
-    } catch (error: any) {
-      console.error('Ошибка создания транзакции:', error);
-      setError(error.message || 'Ошибка создания транзакции');
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message;
+      setError(apiMessage || 'Ошибка создания операции');
     } finally {
       setLoading(false);
     }
@@ -130,78 +199,122 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
   if (!isOpen) return null;
 
   const isDeliveryTransaction = transactionType === 'in';
+  const isRoll = material ? isRollMaterial(material as any) : false;
   const selectedSupplier = suppliers.find(s => s.id.toString() === formData.supplier_id);
+  const stockLabel = material
+    ? (isRoll
+      ? formatRollStockLabel(material as any)
+      : `${material.quantity || 0} ${material.unit || ''}`.trim())
+    : '';
+
+  const suggestedInQty = material ? getSuggestedReplenishQty(material) : 0;
+  const minStock = material ? getMaterialMinStock(material) : 0;
+
+  const qtyNum = parseFloat(formData.quantity);
+  const previewQty = material && !isNaN(qtyNum)
+    ? (transactionType === 'in'
+      ? (material.quantity || 0) + qtyNum
+      : transactionType === 'out'
+        ? Math.max(0, (material.quantity || 0) - qtyNum)
+        : qtyNum)
+    : null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content enhanced-transaction-modal">
+    <div className="modal-overlay" onMouseDown={(e) => {
+      if (e.target === e.currentTarget && !loading) onClose();
+    }}>
+      <div className="modal-content enhanced-transaction-modal" role="dialog" aria-modal="true">
         <div className="modal-header">
-          <h3>
-            {transactionType === 'in' && '📥 Поступление материалов'}
-            {transactionType === 'out' && '📤 Списание материалов'}
-            {transactionType === 'adjustment' && '🔧 Корректировка остатков'}
-            {transactionType === 'transfer' && '🔄 Перемещение материалов'}
-          </h3>
-          <button 
-            className="modal-close"
-            onClick={onClose}
-          >
-            ✕
-          </button>
+          <h3>{TITLE_BY_TYPE[transactionType] || 'Операция со складом'}</h3>
+          <button type="button" className="modal-close" onClick={onClose}>×</button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="modal-body">
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
 
-          {/* Информация о материале */}
+        <form onSubmit={handleSubmit} className="modal-body">
+          {error && <div className="error-message">{error}</div>}
+
           {material && (
             <div className="material-info">
-              <h4>Материал: {material.name}</h4>
-              <p>Текущий остаток: <strong>{material.quantity || 0} {material.unit}</strong></p>
-              {material.supplier && (
-                <p>Поставщик: <strong>{material.supplier.name}</strong></p>
+              <h4>{material.name}</h4>
+              <p>Текущий остаток: <strong>{stockLabel}</strong></p>
+              {transactionType === 'in' && (
+                <p>Мин. остаток: <strong>{formatQtyHint(minStock, material)}</strong></p>
               )}
             </div>
           )}
 
-          {/* Основные поля */}
           <div className="form-row">
             <div className="form-group">
-              <label>Количество *</label>
-              <input 
+              <label>{isRoll && transactionType !== 'adjustment' ? 'Намотка, м *' : 'Количество *'}</label>
+              <input
+                ref={qtyInputRef}
                 type="number"
                 step="0.01"
                 min="0"
                 value={formData.quantity}
                 onChange={(e) => handleChange('quantity', e.target.value)}
-                placeholder="Введите количество"
+                placeholder={isRoll ? 'Метры намотки' : 'Сколько'}
                 required
+                autoFocus
               />
+              {isRoll && (
+                <p className="qty-field-hint">
+                  Вводите метры — на экране будет как{' '}
+                  <strong>
+                    {formatRollStockLabel({
+                      sheet_width: (material as any)?.sheet_width,
+                      quantity: !isNaN(qtyNum) && qtyNum > 0 ? qtyNum : 50,
+                    })}
+                  </strong>
+                </p>
+              )}
+              {transactionType === 'in' && material && suggestedInQty > 0 && (
+                <div className="qty-quick-actions">
+                  <button
+                    type="button"
+                    className="qty-chip"
+                    onClick={() => handleChange('quantity', String(suggestedInQty))}
+                  >
+                    До минимума (+{formatQtyHint(suggestedInQty, material)})
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="form-group">
               <label>Причина *</label>
-              <input 
+              <input
                 type="text"
                 value={formData.reason}
                 onChange={(e) => handleChange('reason', e.target.value)}
-                placeholder="Причина операции"
+                placeholder="Зачем эта операция"
                 required
               />
             </div>
           </div>
 
-          {/* Поля для поставок (только для поступлений) */}
+          {previewQty !== null && material && (
+            <div className="preview-info">
+              <p>
+                После операции остаток:{' '}
+                <strong>
+                  {isRoll
+                    ? formatRollStockLabel({
+                        sheet_width: (material as any).sheet_width,
+                        quantity: previewQty,
+                      })
+                    : `${previewQty} ${material.unit || ''}`.trim()}
+                </strong>
+              </p>
+            </div>
+          )}
+
           {isDeliveryTransaction && (
-            <>
+            <details className="inv-optional-block">
+              <summary>Документы поставки — сохраняются в историю</summary>
               <div className="form-row">
                 <div className="form-group">
                   <label>Поставщик</label>
-                  <select 
+                  <select
                     value={formData.supplier_id}
                     onChange={(e) => handleChange('supplier_id', e.target.value)}
                   >
@@ -213,31 +326,28 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
                     ))}
                   </select>
                 </div>
-
                 <div className="form-group">
                   <label>Дата поставки</label>
-                  <input 
+                  <input
                     type="date"
                     value={formData.delivery_date}
                     onChange={(e) => handleChange('delivery_date', e.target.value)}
                   />
                 </div>
               </div>
-
               <div className="form-row">
                 <div className="form-group">
                   <label>Номер поставки</label>
-                  <input 
+                  <input
                     type="text"
                     value={formData.delivery_number}
                     onChange={(e) => handleChange('delivery_number', e.target.value)}
                     placeholder="Номер поставки"
                   />
                 </div>
-
                 <div className="form-group">
                   <label>Номер накладной</label>
-                  <input 
+                  <input
                     type="text"
                     value={formData.invoice_number}
                     onChange={(e) => handleChange('invoice_number', e.target.value)}
@@ -245,70 +355,63 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
                   />
                 </div>
               </div>
-
+              {selectedSupplier && (
+                <p className="inv-material-meta">Выбран: {selectedSupplier.name}</p>
+              )}
               <div className="form-group">
                 <label>Примечания к поставке</label>
-                <textarea 
+                <textarea
                   value={formData.delivery_notes}
                   onChange={(e) => handleChange('delivery_notes', e.target.value)}
-                  placeholder="Дополнительная информация о поставке"
-                  rows={3}
+                  placeholder="Дополнительно о поставке"
+                  rows={2}
                 />
               </div>
-            </>
+            </details>
           )}
 
-          {/* Общие примечания */}
-          <div className="form-group">
-            <label>Примечания</label>
-            <textarea 
-              value={formData.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
-              placeholder="Дополнительная информация"
-              rows={2}
-            />
-          </div>
-
-          {/* Предварительный просмотр */}
-          {formData.quantity && material && (
-            <div className="preview-info">
-              <h4>Предварительный просмотр:</h4>
-              <p>
-                <strong>Новый остаток:</strong> {
-                  transactionType === 'in' ? 
-                    (material.quantity || 0) + parseFloat(formData.quantity) :
-                    transactionType === 'out' ?
-                      Math.max(0, (material.quantity || 0) - parseFloat(formData.quantity)) :
-                      parseFloat(formData.quantity)
-                } {material.unit}
-              </p>
-              {isDeliveryTransaction && selectedSupplier && (
-                <p><strong>Поставщик:</strong> {selectedSupplier.name}</p>
-              )}
+          {!showNotes ? (
+            <button
+              type="button"
+              className="action-btn action-btn--text inv-link-btn"
+              onClick={() => setShowNotes(true)}
+            >
+              + Примечание
+            </button>
+          ) : (
+            <div className="form-group">
+              <label>Примечание</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => handleChange('notes', e.target.value)}
+                placeholder="Дополнительная информация"
+                rows={2}
+              />
             </div>
           )}
 
-          {/* Кнопки */}
           <div className="modal-actions">
-            <button 
-              type="button" 
-              className="btn btn-secondary"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Отмена
-            </button>
-            <button 
-              type="submit" 
-              className="btn btn-primary"
-              disabled={loading || !formData.quantity || !formData.reason}
-            >
-              {loading ? 'Сохранение...' : 'Сохранить'}
-            </button>
+            <p className="modal-kbd-hint">Enter — провести · Esc — закрыть</p>
+            <div className="modal-actions__btns">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onClose}
+                disabled={loading}
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading || !formData.quantity || !formData.reason}
+              >
+                {loading ? 'Сохранение...' : 'Провести'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
     </div>
   );
 };
-

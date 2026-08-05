@@ -12,23 +12,25 @@ interface Alert {
 
 interface AlertsTabProps {
   alerts: Alert[];
-  onAdjustStock: (material: Material, newQuantity: number) => void;
-  onMaterialAction: (material: Material, action: 'out') => void;
+  onReceive: (material: Material) => void;
+  onViewHistory: (material: Material) => void;
+  onOpenAutoOrder?: () => void;
 }
 
 export const AlertsTab: React.FC<AlertsTabProps> = React.memo(({
   alerts,
-  onAdjustStock,
-  onMaterialAction,
+  onReceive,
+  onViewHistory,
+  onOpenAutoOrder,
 }) => {
   return (
     <div className="alerts-view">
       <AlertsTable
         alerts={alerts}
-        onAdjustStock={onAdjustStock}
-        onMaterialAction={onMaterialAction}
+        onReceive={onReceive}
+        onViewHistory={onViewHistory}
+        onOpenAutoOrder={onOpenAutoOrder}
       />
     </div>
   );
 });
-

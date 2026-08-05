@@ -222,7 +222,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
     <div className="suppliers-management">
       {/* Заголовок */}
       <div className="suppliers-header">
-        <h2>🏭 Управление поставщиками</h2>
+        <h2>Поставщики</h2>
         <div className="header-actions">
           <button 
             className="action-btn primary"

@@ -28,32 +28,25 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
   onSearchChange,
 }) => {
   return (
-    <div className="materials-toolbar flex items-center justify-between p-4 bg-secondary rounded shadow mb-4">
-      {/* Поиск */}
-      <div className="flex items-center gap-4 flex-grow">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Поиск материалов..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="px-4 py-2 border border-primary rounded-lg bg-primary text-primary placeholder-text-secondary focus:border-accent-primary focus:outline-none"
-          />
-          <span
-            className="absolute right-3 top-1/2 flex -translate-y-1/2 transform text-text-secondary pointer-events-none"
-            aria-hidden
-          >
-            <AppIcon name="search" size="sm" />
-          </span>
-        </div>
+    <div className="materials-toolbar bg-secondary rounded border border-primary">
+      <div className="materials-toolbar__search">
+        <input
+          type="text"
+          placeholder="Поиск материалов..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="materials-toolbar__search-input"
+        />
+        <span className="materials-toolbar__search-icon" aria-hidden>
+          <AppIcon name="search" size="sm" />
+        </span>
       </div>
 
-      {/* Режимы просмотра */}
-      <div className="flex items-center gap-2" role="group" aria-label="Вид списка материалов">
+      <div className="flex items-center gap-1" role="group" aria-label="Вид списка материалов">
         <button
           type="button"
           onClick={() => onViewModeChange('grid')}
-          className={`inline-flex h-9 w-9 items-center justify-center rounded ${viewMode === 'grid' ? 'bg-accent-primary text-white' : 'bg-tertiary text-text-primary'}`}
+          className={`action-btn small ${viewMode === 'grid' ? 'primary' : ''}`}
           title="Сетка"
           aria-pressed={viewMode === 'grid'}
         >
@@ -62,7 +55,7 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
         <button
           type="button"
           onClick={() => onViewModeChange('cards')}
-          className={`inline-flex h-9 w-9 items-center justify-center rounded ${viewMode === 'cards' ? 'bg-accent-primary text-white' : 'bg-tertiary text-text-primary'}`}
+          className={`action-btn small ${viewMode === 'cards' ? 'primary' : ''}`}
           title="Строки"
           aria-pressed={viewMode === 'cards'}
         >
@@ -70,10 +63,10 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
         </button>
       </div>
 
-      {/* Действия */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <WarehouseButton
           variant="secondary"
+          size="sm"
           icon={<AppIcon name="filter" size="sm" />}
           onClick={onToggleFilters}
           className={showFilters ? 'active' : ''}
@@ -84,6 +77,7 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
 
         <WarehouseButton
           variant="secondary"
+          size="sm"
           icon={<AppIcon name="refresh" size="sm" />}
           onClick={onRefresh}
           title="Обновить"
@@ -93,6 +87,7 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
 
         <WarehouseButton
           variant="primary"
+          size="sm"
           icon={<AppIcon name="plus" size="sm" />}
           onClick={onAddMaterial}
           title="Добавить материал"
@@ -101,9 +96,8 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
         </WarehouseButton>
       </div>
 
-      {/* Массовые действия */}
       {selectedCount > 0 && (
-        <div className="flex items-center gap-2 ml-4 p-2 bg-warning-light border border-warning-border rounded">
+        <div className="flex items-center gap-2 flex-wrap ml-auto p-2 bg-warning-light border border-warning-border rounded">
           <span className="text-sm text-warning">
             Выбрано: {selectedCount}
           </span>

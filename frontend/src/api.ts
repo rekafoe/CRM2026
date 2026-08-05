@@ -259,7 +259,21 @@ export const findPaperTypeByMaterial = (materialName: string) =>
 export const getPrintingPrice = (paperTypeId: number, density: number) => 
   api.get(`/paper-types/prices/lookup?paper_type_id=${paperTypeId}&density=${density}`);
 export const deleteMaterial = (id: number) => api.delete(`/materials/${id}`);
-export const spendMaterial = (payload: { materialId: number; delta: number; reason?: string; orderId?: number }) => api.post<Material>('/materials/spend', payload);
+export type SpendMaterialPayload = {
+  materialId: number;
+  delta: number;
+  reason?: string;
+  orderId?: number;
+  supplier_id?: number;
+  delivery_number?: string;
+  invoice_number?: string;
+  delivery_date?: string;
+  delivery_notes?: string;
+  notes?: string;
+};
+
+export const spendMaterial = (payload: SpendMaterialPayload) =>
+  api.post<Material>('/materials/spend', payload);
 export const getMaterialMoves = (params?: { materialId?: number; orderId?: number; user_id?: number; from?: string; to?: string }) =>
   api.get('/materials/moves', { params });
 export const getLowStock = () => api.get<Material[]>('/materials/low-stock');

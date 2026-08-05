@@ -572,12 +572,19 @@ export class MaterialService {
         mm.user_id,
         u.name as user_name,
         mm.created_at,
-        c.name as category_name, s.name as supplier_name
+        c.name as category_name,
+        COALESCE(ms.name, s.name) as supplier_name,
+        mm.supplier_id,
+        mm.delivery_number,
+        mm.invoice_number,
+        mm.delivery_date,
+        mm.delivery_notes
        FROM material_moves mm
        JOIN materials m ON m.id = mm.material_id
        LEFT JOIN users u ON u.id = mm.user_id
        LEFT JOIN material_categories c ON c.id = m.category_id
        LEFT JOIN suppliers s ON s.id = m.supplier_id
+       LEFT JOIN suppliers ms ON ms.id = mm.supplier_id
       ${whereSql}
       ORDER BY mm.created_at DESC, mm.id DESC
       ${limitSql} ${offsetSql}`,

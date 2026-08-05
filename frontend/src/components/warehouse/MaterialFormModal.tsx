@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Material, MaterialKind } from '../../types/shared';
-import { api } from '../../api';
+import { api, createMaterialType } from '../../api';
 import { materialPriceFieldLabel, materialPurchasePriceFieldLabel } from '../../utils/materialPriceLabels';
 import { formatRollStockLabel } from '../../utils/materialRollLabels';
 import { BynSymbol } from '../ui';
+import { AppIcon } from '../ui/AppIcon';
+import { useUIStore } from '../../stores/uiStore';
 import './MaterialFormModal.css';
 
 interface PaperType {
@@ -99,6 +101,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   // 🆕 Состояние для типов материалов (внутри категорий)
   const [materialTypes, setMaterialTypes] = useState<MaterialTypeOption[]>([]);
   const [loadingMaterialTypes, setLoadingMaterialTypes] = useState(false);
+  const [showQuickTypeModal, setShowQuickTypeModal] = useState(false);
+  const [quickTypeName, setQuickTypeName] = useState('');
+  const [creatingType, setCreatingType] = useState(false);
+  const { showToast } = useUIStore();
 
   const inferredKind = React.useMemo<MaterialKind>(() => {
     const explicitKind = formData.material_kind;
@@ -385,20 +391,37 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             </div>
             <div className="form-group">
               <label>Тип материала</label>
-              <select
-                value={formData.material_type_id || ''}
-                onChange={(e) => handleChange('material_type_id', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                disabled={!formData.category_id || loadingMaterialTypes}
-              >
-                <option value="">{formData.category_id ? 'Выберите тип' : 'Сначала выберите категорию'}</option>
-                {materialTypes
-                  .filter((type) => Number(type.is_active ?? 1) !== 0)
-                  .map((type) => (
-                    <option key={`material-type-${type.id}`} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-              </select>
+              <div className="material-type-select-row">
+                <select
+                  value={formData.material_type_id || ''}
+                  onChange={(e) => handleChange('material_type_id', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                  disabled={!formData.category_id || loadingMaterialTypes}
+                >
+                  <option value="">{formData.category_id ? 'Выберите тип' : 'Сначала выберите категорию'}</option>
+                  {materialTypes
+                    .filter((type) => Number(type.is_active ?? 1) !== 0)
+                    .map((type) => (
+                      <option key={`material-type-${type.id}`} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  className="material-type-add-btn"
+                  disabled={!formData.category_id || creatingType}
+                  title="Создать новый тип в этой категории"
+                  onClick={() => {
+                    setQuickTypeName('');
+                    setShowQuickTypeModal(true);
+                  }}
+                >
+                  <AppIcon name="plus" size="xs" />
+                </button>
+              </div>
+              <small className="form-hint">
+                Полный список типов: вкладка «Категории и типы».
+              </small>
               {loadingMaterialTypes && <div className="loading-text">Загрузка типов...</div>}
             </div>
           </div>
@@ -774,6 +797,66 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
           </div>
         </form>
       </div>
+
+      {showQuickTypeModal && (
+        <div className="modal-overlay material-type-quick-overlay" onClick={() => !creatingType && setShowQuickTypeModal(false)}>
+          <div className="modal-content material-type-quick-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Новый тип материала</h3>
+            <p className="form-hint">
+              Тип будет создан в выбранной категории и сразу выбран в форме.
+            </p>
+            <div className="form-group">
+              <label>Название типа *</label>
+              <input
+                type="text"
+                value={quickTypeName}
+                onChange={(e) => setQuickTypeName(e.target.value)}
+                placeholder="Например, Плёнка глянец"
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={creatingType}
+                onClick={() => setShowQuickTypeModal(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={creatingType || !quickTypeName.trim() || !formData.category_id}
+                onClick={async () => {
+                  if (!formData.category_id || !quickTypeName.trim()) return;
+                  try {
+                    setCreatingType(true);
+                    const res = await createMaterialType({
+                      category_id: formData.category_id,
+                      name: quickTypeName.trim(),
+                      is_active: true,
+                    });
+                    const created = res.data;
+                    await loadMaterialTypes(formData.category_id);
+                    if (created?.id) {
+                      handleChange('material_type_id', created.id);
+                    }
+                    setShowQuickTypeModal(false);
+                    showToast('Тип материала создан', 'success');
+                  } catch (error: any) {
+                    showToast(error?.response?.data?.error || error?.message || 'Не удалось создать тип', 'error');
+                  } finally {
+                    setCreatingType(false);
+                  }
+                }}
+              >
+                {creatingType ? 'Создание...' : 'Создать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

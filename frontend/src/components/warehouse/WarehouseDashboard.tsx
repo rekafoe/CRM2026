@@ -6,6 +6,7 @@ import { useMaterialStore } from '../../stores/materialStore';
 import { AppIcon, type IconName } from '../ui/AppIcon';
 import { BynSymbol } from '../ui/BynSymbol';
 import { LoadingState } from '../common';
+import { WarehouseButton } from './common/WarehouseButton';
 import '../../components/admin/ProductManagement.css';
 import '../../styles/warehouse-embedded.css';
 
@@ -29,6 +30,7 @@ interface WarehouseDashboardProps {
 
 export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
   const [activeTab, setActiveTab] = useState<WarehouseTab>('materials');
+  const [inventoryInitialView, setInventoryInitialView] = useState<'stock' | 'history' | 'deficit' | 'auto-order'>('stock');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMaterials, setSelectedMaterials] = useState<number[]>([]);
   
@@ -79,8 +81,8 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
       lowStock,
       outOfStock,
       totalValue,
-      categories: 4, // Mock data
-      suppliers: 3, // Mock data
+      categories: new Set(materials.map((m) => m.category_id).filter(Boolean)).size,
+      suppliers: new Set(materials.map((m) => m.supplier_id).filter(Boolean)).size,
       alerts: lowStock + outOfStock
     };
   }, [materials]);
@@ -112,6 +114,20 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
   // Обработчики
   const handleTabChange = useCallback((tab: WarehouseTab) => {
     setActiveTab(tab);
+    setSelectedMaterials([]);
+    if (tab === 'inventory') {
+      setInventoryInitialView('stock');
+    }
+  }, []);
+
+  const openInventory = useCallback((view: 'stock' | 'history' | 'deficit' | 'auto-order' = 'stock') => {
+    setInventoryInitialView(view);
+    setActiveTab('inventory');
+    setSelectedMaterials([]);
+  }, []);
+
+  const openCatalog = useCallback(() => {
+    setActiveTab('materials');
     setSelectedMaterials([]);
   }, []);
 
@@ -155,19 +171,57 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
   const tabs: Array<{
     id: WarehouseTab;
     title: string;
+    hint: string;
     icon: IconName;
     count?: number;
   }> = useMemo(
     () => [
-      { id: 'materials', title: 'Материалы', icon: 'package' as const, count: materials?.length },
-      { id: 'paper-types', title: 'Типы бумаги', icon: 'document' as const },
-      { id: 'inventory', title: 'Инвентарь', icon: 'clipboard' as const },
-      { id: 'suppliers', title: 'Поставщики', icon: 'building' as const },
-      { id: 'categories', title: 'Категории', icon: 'tag' as const },
-      { id: 'reports', title: 'Отчёты', icon: 'chart-bar' as const },
-      { id: 'settings', title: 'Настройки', icon: 'settings' as const },
+      {
+        id: 'materials',
+        title: 'Справочник',
+        hint: 'Карточки материалов: цены, типы, редактирование',
+        icon: 'package' as const,
+        count: materials?.length,
+      },
+      {
+        id: 'inventory',
+        title: 'Остатки',
+        hint: 'Приход, списание, история и дефицит',
+        icon: 'clipboard' as const,
+        count: warehouseStats.alerts || undefined,
+      },
+      {
+        id: 'categories',
+        title: 'Категории и типы',
+        hint: 'Структура каталога',
+        icon: 'tag' as const,
+      },
+      {
+        id: 'suppliers',
+        title: 'Поставщики',
+        hint: 'Контакты и связи с материалами',
+        icon: 'building' as const,
+      },
+      {
+        id: 'paper-types',
+        title: 'Типы бумаги',
+        hint: 'Справочник бумаги для печати',
+        icon: 'document' as const,
+      },
+      {
+        id: 'reports',
+        title: 'Отчёты',
+        hint: 'Сводка и аналитика склада',
+        icon: 'chart-bar' as const,
+      },
+      {
+        id: 'settings',
+        title: 'Настройки',
+        hint: 'Параметры склада',
+        icon: 'settings' as const,
+      },
     ],
-    [materials?.length],
+    [materials?.length, warehouseStats.alerts],
   );
 
   if (isLoading) {
@@ -200,47 +254,81 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
       <div className="product-controls">
         <div className="product-controls__main-row">
           <div className="compact-stats" aria-label="Краткая сводка по складу">
-            <div className="compact-stat success" title="В наличии (запас больше 10)">
+            <button
+              type="button"
+              className="compact-stat success"
+              title="В наличии — открыть остатки"
+              onClick={() => openInventory('stock')}
+            >
               <AppIcon name="check" size="xs" />
               <span className="compact-value">{warehouseStats.inStock}</span>
-            </div>
-            <div className="compact-stat warning" title="Низкий запас (1…10)">
+            </button>
+            <button
+              type="button"
+              className="compact-stat warning"
+              title="Низкий запас — открыть дефицит"
+              onClick={() => openInventory('deficit')}
+            >
               <AppIcon name="info" size="xs" />
               <span className="compact-value">{warehouseStats.lowStock}</span>
-            </div>
-            <div className="compact-stat danger" title="Нет в наличии">
+            </button>
+            <button
+              type="button"
+              className="compact-stat danger"
+              title="Нет в наличии — открыть дефицит"
+              onClick={() => openInventory('deficit')}
+            >
               <AppIcon name="x" size="xs" />
               <span className="compact-value">{warehouseStats.outOfStock}</span>
-            </div>
-            <div className="compact-stat info" title="Оценка остатка по цене">
+            </button>
+            <button
+              type="button"
+              className="compact-stat info"
+              title="Оценка остатка по закупу — отчёты"
+              onClick={() => handleTabChange('reports')}
+            >
               <AppIcon name="wallet" size="xs" />
               <span className="compact-value">
                 {warehouseStats.totalValue.toFixed(0)} <BynSymbol />
               </span>
-            </div>
+            </button>
           </div>
         </div>
 
         {selectedMaterials.length > 0 && (
           <div className="bulk-actions-bar warehouse-pm-bulk">
             <span className="bulk-count">Выбрано: {selectedMaterials.length}</span>
-            <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-              <button type="button" className="lg-btn" onClick={() => handleBulkAction('delete')}>
+            <div className="warehouse-pm-bulk__actions">
+              <WarehouseButton
+                variant="danger"
+                size="sm"
+                icon={<AppIcon name="trash" size="xs" />}
+                onClick={() => handleBulkAction('delete')}
+              >
                 Удалить
-              </button>
-              <button type="button" className="lg-btn" onClick={() => handleBulkAction('export')}>
+              </WarehouseButton>
+              <WarehouseButton
+                variant="secondary"
+                size="sm"
+                icon={<AppIcon name="download" size="xs" />}
+                onClick={() => handleBulkAction('export')}
+              >
                 Экспорт
-              </button>
-              <button type="button" className="lg-btn" onClick={() => handleBulkAction('update')}>
+              </WarehouseButton>
+              <WarehouseButton
+                variant="secondary"
+                size="sm"
+                icon={<AppIcon name="refresh" size="xs" />}
+                onClick={() => handleBulkAction('update')}
+              >
                 Обновить
-              </button>
+              </WarehouseButton>
             </div>
           </div>
         )}
 
         <div
-          className="product-quick-filters"
-          style={{ borderTop: selectedMaterials.length > 0 ? undefined : 'none', paddingTop: 12 }}
+          className={`product-quick-filters${selectedMaterials.length > 0 ? '' : ' product-quick-filters--flush-top'}`}
           role="tablist"
           aria-label="Разделы склада"
         >
@@ -250,6 +338,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
               type="button"
               role="tab"
               aria-selected={activeTab === tab.id}
+              title={tab.hint}
               className={`product-filter-chip ${activeTab === tab.id ? 'product-filter-chip--active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
@@ -271,16 +360,26 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
             onMaterialSelect={handleMaterialSelect}
             onSelectAll={handleSelectAll}
             onRefresh={refetch}
+            onOpenInventory={() => openInventory('stock')}
           />
         )}
         {activeTab === 'paper-types' && <PaperTypesManagement onRefresh={refetch} />}
         {activeTab === 'inventory' && (
-          <InventoryControl materials={filteredMaterials} onRefresh={refetch} />
+          <InventoryControl
+            materials={filteredMaterials}
+            onRefresh={refetch}
+            initialView={inventoryInitialView}
+            onOpenCatalog={openCatalog}
+          />
         )}
         {activeTab === 'suppliers' && <SuppliersManagement onRefresh={refetch} />}
         {activeTab === 'categories' && <CategoriesManagement onRefresh={refetch} />}
         {activeTab === 'reports' && (
-          <WarehouseReports materials={materials || []} stats={warehouseStats} />
+          <WarehouseReports
+            materials={materials || []}
+            stats={warehouseStats}
+            onOpenDeficitOps={() => openInventory('deficit')}
+          />
         )}
         {activeTab === 'settings' && <WarehouseSettings onRefresh={refetch} />}
       </div>

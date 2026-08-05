@@ -1,25 +1,54 @@
 import React from 'react';
-import { getMaterialCategories, getMaterialCategoryStats, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory } from '../../api';
-import './InventoryControl.css';
+import {
+  getMaterialCategories,
+  getMaterialCategoryStats,
+  createMaterialCategory,
+  updateMaterialCategory,
+  deleteMaterialCategory,
+} from '../../api';
+import { useUIStore } from '../../stores/uiStore';
+import { EmptyState, ConfirmDialog, LoadingState } from '../common';
+import { AppIcon } from '../ui/AppIcon';
+import { WarehouseButton } from './common/WarehouseButton';
+import { WarehouseModal } from './common/WarehouseModal';
+import { MaterialTypesPanel } from './MaterialTypesPanel';
+import './CategoriesManagement.css';
 
 interface CategoriesManagementProps {
   onRefresh?: () => void;
 }
 
+type CategoryRow = {
+  id: number;
+  name: string;
+  color?: string;
+  description?: string;
+  created_at?: string;
+};
+
 export const CategoriesManagement: React.FC<CategoriesManagementProps> = ({ onRefresh }) => {
-  const [categories, setCategories] = React.useState<Array<{ id: number; name: string; color?: string; description?: string; created_at?: string }>>([]);
+  const { showToast } = useUIStore();
+  const [categories, setCategories] = React.useState<CategoryRow[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [showModal, setShowModal] = React.useState(false);
-  const [editing, setEditing] = React.useState<{ id?: number; name: string; color?: string; description?: string } | null>(null);
-  const [form, setForm] = React.useState<{ name: string; color?: string; description?: string }>({ name: '', color: '', description: '' });
+  const [editing, setEditing] = React.useState<CategoryRow | null>(null);
+  const [form, setForm] = React.useState<{ name: string; color?: string; description?: string }>({
+    name: '',
+    color: '',
+    description: '',
+  });
   const [materialsCount, setMaterialsCount] = React.useState<Record<number, number>>({});
+  const [selectedCategoryId, setSelectedCategoryId] = React.useState<number | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = React.useState<CategoryRow | null>(null);
+  const [saving, setSaving] = React.useState(false);
+
   const palette = React.useMemo(() => [
     '#F1F5F9', '#E2E8F0', '#CBD5E1', '#94A3B8', '#64748B', '#475569',
     '#E3F2FD', '#BBDEFB', '#90CAF9', '#64B5F6', '#42A5F5', '#1E88E5',
     '#E8F5E9', '#C8E6C9', '#A5D6A7', '#81C784', '#66BB6A', '#43A047',
     '#FFF3E0', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726', '#FB8C00',
-    '#FFEBEE', '#FFCDD2', '#EF9A9A', '#E57373', '#EF5350', '#E53935'
+    '#FFEBEE', '#FFCDD2', '#EF9A9A', '#E57373', '#EF5350', '#E53935',
   ], []);
 
   const load = React.useCallback(async () => {
@@ -27,11 +56,11 @@ export const CategoriesManagement: React.FC<CategoriesManagementProps> = ({ onRe
       setLoading(true);
       const [categoriesRes, statsRes] = await Promise.all([
         getMaterialCategories(),
-        getMaterialCategoryStats()
+        getMaterialCategoryStats(),
       ]);
-      setCategories(categoriesRes.data || []);
-      
-      // Создаем мапу количества материалов по категориям
+      const rows = (categoriesRes.data || []) as CategoryRow[];
+      setCategories(rows);
+
       const countMap: Record<number, number> = {};
       if (statsRes.data) {
         statsRes.data.forEach((stat: any) => {
@@ -39,189 +68,285 @@ export const CategoriesManagement: React.FC<CategoriesManagementProps> = ({ onRe
         });
       }
       setMaterialsCount(countMap);
+
+      setSelectedCategoryId((prev) => {
+        if (prev && rows.some((c) => c.id === prev)) return prev;
+        return rows[0]?.id ?? null;
+      });
+    } catch (error: any) {
+      showToast(error?.message || 'Ошибка загрузки категорий', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    load();
+  }, [load]);
 
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
-    const allCategories = categories || [];
-    
-    // Дедупликация по id - оставляем только первое вхождение каждого id
-    const uniqueCategories = allCategories.reduce((acc, category) => {
-      if (!acc.find(c => c.id === category.id)) {
-        acc.push(category);
-      }
+    const unique = (categories || []).reduce((acc, category) => {
+      if (!acc.find((c) => c.id === category.id)) acc.push(category);
       return acc;
-    }, [] as any[]);
-    
-    return uniqueCategories.filter(c => !q || (c.name || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
+    }, [] as CategoryRow[]);
+    return unique.filter(
+      (c) => !q
+        || (c.name || '').toLowerCase().includes(q)
+        || (c.description || '').toLowerCase().includes(q),
+    );
   }, [categories, search]);
 
-  const openCreate = () => { setEditing(null); setForm({ name: '', color: '', description: '' }); setShowModal(true); };
-  const openEdit = (c: any) => { setEditing(c); setForm({ name: c.name || '', color: c.color || '', description: c.description || '' }); setShowModal(true); };
+  const selectedCategory = React.useMemo(
+    () => categories.find((c) => c.id === selectedCategoryId) || null,
+    [categories, selectedCategoryId],
+  );
 
-  const save = async () => {
-    if (!form.name.trim()) return alert('Введите название');
-    if (editing && editing.id) {
-      await updateMaterialCategory(editing.id, form);
-    } else {
-      await createMaterialCategory(form);
-    }
-    setShowModal(false);
-    await load();
-    onRefresh?.();
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ name: '', color: '', description: '' });
+    setShowModal(true);
   };
 
-  const remove = async (id: number) => {
-    if (!confirm('Удалить категорию?')) return;
+  const openEdit = (c: CategoryRow) => {
+    setEditing(c);
+    setForm({ name: c.name || '', color: c.color || '', description: c.description || '' });
+    setShowModal(true);
+  };
+
+  const save = async () => {
+    if (!form.name.trim()) {
+      showToast('Введите название категории', 'warning');
+      return;
+    }
     try {
-      await deleteMaterialCategory(id);
+      setSaving(true);
+      if (editing?.id) {
+        await updateMaterialCategory(editing.id, form);
+        showToast('Категория обновлена', 'success');
+      } else {
+        await createMaterialCategory(form);
+        showToast('Категория создана', 'success');
+      }
+      setShowModal(false);
       await load();
       onRefresh?.();
     } catch (error: any) {
-      if (error.message?.includes('Нельзя удалить категорию, в которой есть материалы')) {
-        alert('Нельзя удалить категорию, в которой есть материалы. Сначала переместите или удалите все материалы из этой категории.');
-      } else {
-        alert('Ошибка удаления категории: ' + (error.message || 'Неизвестная ошибка'));
-      }
+      showToast(error?.message || 'Ошибка сохранения категории', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!categoryToDelete) return;
+    try {
+      await deleteMaterialCategory(categoryToDelete.id);
+      showToast('Категория удалена', 'success');
+      setCategoryToDelete(null);
+      await load();
+      onRefresh?.();
+    } catch (error: any) {
+      const msg = error?.response?.data?.error || error?.message || 'Ошибка удаления';
+      showToast(msg, 'error');
+      setCategoryToDelete(null);
     }
   };
 
   return (
     <div className="categories-management">
-      <div className="inventory-header">
-        <h2>🗂️ Категории материалов</h2>
-        <div className="header-actions">
-          <button className="action-btn" onClick={openCreate}>➕ Добавить категорию</button>
-        </div>
+      <div className="categories-management__header">
+        <h2 className="categories-management__title">Категории и типы материалов</h2>
+        <WarehouseButton
+          variant="primary"
+          size="sm"
+          icon={<AppIcon name="plus" size="xs" />}
+          onClick={openCreate}
+        >
+          Добавить категорию
+        </WarehouseButton>
       </div>
 
-      <div className="inv-filters">
-        <input placeholder="Поиск по названию/описанию" value={search} onChange={e => setSearch(e.target.value)} />
-        <button className="action-btn" onClick={load}>Обновить</button>
+      <div className="categories-management__toolbar">
+        <input
+          className="categories-management__search"
+          placeholder="Поиск категории..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <WarehouseButton
+          variant="secondary"
+          size="sm"
+          icon={<AppIcon name="refresh" size="xs" />}
+          onClick={load}
+        >
+          Обновить
+        </WarehouseButton>
       </div>
 
-      <div className="materials-table-wrapper">
-        <table className="inv-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Название</th>
-              <th>Цвет</th>
-              <th>Описание</th>
-              <th>Материалы</th>
-              <th>Создано</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7}>Загрузка...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: '#666' }}>Категории не найдены</td></tr>
-            ) : filtered.map(c => (
-              <tr key={c.id}>
-                <td>{c.id}</td>
-                <td style={{ textAlign: 'left' }}>{c.name}</td>
-                <td>{c.color ? (<span style={{ display: 'inline-block', width: 16, height: 16, background: c.color, border: '1px solid #ddd', borderRadius: 3 }} />) : '—'}</td>
-                <td style={{ textAlign: 'left' }}>{c.description || '—'}</td>
-                <td>
-                  <span style={{ 
-                    color: materialsCount[c.id] > 0 ? '#e74c3c' : '#27ae60',
-                    fontWeight: 'bold'
-                  }}>
-                    {materialsCount[c.id] || 0}
-                  </span>
-                </td>
-                <td>{c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}</td>
-                <td>
-                  <div className="inv-actions">
-                    <button className="action-btn small" onClick={() => openEdit(c)}>✏️</button>
-                    <button 
-                      className="action-btn small danger" 
-                      onClick={() => remove(c.id)}
-                      disabled={materialsCount[c.id] > 0}
-                      title={materialsCount[c.id] > 0 ? 'Нельзя удалить категорию с материалами' : 'Удалить категорию'}
-                      style={{
-                        opacity: materialsCount[c.id] > 0 ? 0.5 : 1,
-                        cursor: materialsCount[c.id] > 0 ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>{editing ? 'Редактировать категорию' : 'Новая категория'}</h3>
-              <button className="action-btn small" onClick={() => setShowModal(false)}>✖</button>
+      <div className="categories-management__layout">
+        <section className="categories-management__panel">
+          <h3 className="categories-management__panel-title">Категории</h3>
+          {loading ? (
+            <LoadingState message="Загрузка категорий..." />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title="Нет категорий"
+              description="Создайте категорию, затем добавьте в неё типы материалов"
+              action={{ label: 'Добавить категорию', onClick: openCreate }}
+            />
+          ) : (
+            <div className="categories-management__table-wrap">
+              <table className="inv-table">
+                <thead>
+                  <tr>
+                    <th>Название</th>
+                    <th>Цвет</th>
+                    <th>Материалы</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((c) => {
+                    const count = materialsCount[c.id] || 0;
+                    return (
+                      <tr
+                        key={c.id}
+                        className={`categories-management__row ${selectedCategoryId === c.id ? 'is-selected' : ''}`}
+                        onClick={() => setSelectedCategoryId(c.id)}
+                      >
+                        <td>
+                          <div className="font-medium">{c.name}</div>
+                          {c.description ? (
+                            <div className="text-xs text-text-secondary">{c.description}</div>
+                          ) : null}
+                        </td>
+                        <td>
+                          {c.color ? (
+                            <span
+                              className="categories-management__color"
+                              style={{ background: c.color }}
+                              title={c.color}
+                            />
+                          ) : '—'}
+                        </td>
+                        <td>
+                          <span className={`categories-management__count ${count > 0 ? 'categories-management__count--has' : 'categories-management__count--empty'}`}>
+                            {count}
+                          </span>
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div className="inv-actions">
+                            <WarehouseButton
+                              variant="secondary"
+                              size="sm"
+                              icon={<AppIcon name="pencil" size="xs" />}
+                              onClick={() => openEdit(c)}
+                              className="icon-only"
+                              title="Изменить"
+                            />
+                            <WarehouseButton
+                              variant="danger"
+                              size="sm"
+                              icon={<AppIcon name="trash" size="xs" />}
+                              onClick={() => setCategoryToDelete(c)}
+                              className="icon-only"
+                              title={count > 0 ? 'Нельзя удалить категорию с материалами' : 'Удалить'}
+                              disabled={count > 0}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <div className="modal-body">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Название</label>
-                  <input value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} />
-                </div>
-                <div className="form-row" style={{ gridTemplateColumns: '1fr' }}>
-                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label>Цвет</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="color" value={form.color || '#FFFFFF'} onChange={e => setForm(prev => ({ ...prev, color: e.target.value }))} />
-                      <input value={form.color || ''} onChange={e => setForm(prev => ({ ...prev, color: e.target.value }))} placeholder="#DDEEFF" style={{ flex: 1 }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="form-row" style={{ gridTemplateColumns: '1fr' }}>
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Палитра</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 6 }}>
-                    {palette.map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        className="action-btn small"
-                        onClick={() => setForm(prev => ({ ...prev, color: c }))}
-                        title={c}
-                        style={{
-                          background: c,
-                          border: '1px solid #d0d0d0',
-                          width: 24,
-                          height: 24,
-                          padding: 0,
-                          borderRadius: 4
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Описание</label>
-                  <input value={form.description || ''} onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="action-btn" onClick={save}>💾 Сохранить</button>
-              <button className="action-btn" onClick={() => setShowModal(false)}>Отмена</button>
+          )}
+        </section>
+
+        <section className="categories-management__panel">
+          <MaterialTypesPanel
+            categoryId={selectedCategoryId}
+            categoryName={selectedCategory?.name}
+          />
+        </section>
+      </div>
+
+      <WarehouseModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? 'Редактировать категорию' : 'Новая категория'}
+        footer={(
+          <>
+            <WarehouseButton variant="secondary" onClick={() => setShowModal(false)}>
+              Отмена
+            </WarehouseButton>
+            <WarehouseButton variant="primary" onClick={save} loading={saving}>
+              Сохранить
+            </WarehouseButton>
+          </>
+        )}
+      >
+        <div className="categories-form">
+          <div className="form-group">
+            <label>Название *</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label>Цвет</label>
+            <div className="categories-management__color-inputs">
+              <input
+                type="color"
+                value={form.color || '#FFFFFF'}
+                onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
+              />
+              <input
+                type="text"
+                value={form.color || ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
+                placeholder="#DDEEFF"
+              />
             </div>
           </div>
+          <div className="form-group">
+            <label>Палитра</label>
+            <div className="categories-management__palette">
+              {palette.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="categories-management__swatch"
+                  onClick={() => setForm((prev) => ({ ...prev, color: c }))}
+                  title={c}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Описание</label>
+            <input
+              value={form.description || ''}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+            />
+          </div>
         </div>
-      )}
+      </WarehouseModal>
+
+      <ConfirmDialog
+        isOpen={Boolean(categoryToDelete)}
+        onClose={() => setCategoryToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Удаление категории"
+        message={categoryToDelete ? `Удалить категорию «${categoryToDelete.name}»?` : ''}
+        confirmText="Удалить"
+        cancelText="Отмена"
+        variant="danger"
+      />
     </div>
   );
 };

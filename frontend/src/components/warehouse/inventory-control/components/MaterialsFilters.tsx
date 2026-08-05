@@ -22,24 +22,22 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = React.memo(({
   return (
     <div className="inv-filters">
       <input
-        placeholder="Поиск по названию"
+        placeholder="Найти материал..."
         value={search}
         onChange={e => onSearchChange(e.target.value)}
       />
+      <select value={statusFilter} onChange={e => onStatusFilterChange(e.target.value)}>
+        <option value="">Все остатки</option>
+        <option value="ok">В норме</option>
+        <option value="low">Мало</option>
+        <option value="out_of_stock">Нет в наличии</option>
+      </select>
       <select value={categoryFilter} onChange={e => onCategoryFilterChange(e.target.value)}>
         <option value="">Все категории</option>
         {categories.map(c => (
           <option key={c} value={c}>{c}</option>
         ))}
       </select>
-      <select value={statusFilter} onChange={e => onStatusFilterChange(e.target.value)}>
-        <option value="">Все статусы</option>
-        <option value="ok">OK</option>
-        <option value="low">Low</option>
-        <option value="critical">Critical</option>
-        <option value="out_of_stock">Out of stock</option>
-      </select>
     </div>
   );
 });
-
