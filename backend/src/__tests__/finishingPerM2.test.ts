@@ -24,6 +24,7 @@ describe('finishingPerM2', () => {
     });
     expect(q.usedRollLayout).toBe(true);
     expect(q.rawUnits).toBeCloseTo(2.54, 4);
+    expect(q.feedMeters).toBeCloseTo(2, 4);
     expect(q.servicePrice).toBeCloseTo(25.4, 4);
     expect(q.warning).toBeUndefined();
   });
@@ -37,6 +38,7 @@ describe('finishingPerM2', () => {
     });
     expect(q.usedRollLayout).toBe(false);
     expect(q.rawUnits).toBeCloseTo(2, 4);
+    expect(q.feedMeters).toBeCloseTo(2, 4);
     expect(q.warning).toMatch(/без ширины рулона/);
   });
 
@@ -47,6 +49,20 @@ describe('finishingPerM2', () => {
     });
     expect(w.usedRollLayout).toBe(true);
     expect(w.feedMeters).toBeCloseTo(2, 4);
+  });
+
+  it('A1×2 on 630 mm roll → ~1.682 feed m (lamination per_meter)', () => {
+    const w = resolveWarehouseFeedMeters({
+      rollWidthMm: 630,
+      layout: {
+        trimMm: { width: 594, height: 841 },
+        bleedMm: 0,
+        quantity: 2,
+        margins: { edgeMm: 0, gapMm: 0 },
+      },
+    });
+    expect(w.usedRollLayout).toBe(true);
+    expect(w.feedMeters).toBeCloseTo(1.682, 3);
   });
 
   it('billedM2ForQuantity and finishingFinKey helpers', () => {

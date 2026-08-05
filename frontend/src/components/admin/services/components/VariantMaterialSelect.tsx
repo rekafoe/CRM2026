@@ -43,7 +43,7 @@ export const VariantMaterialSelect: React.FC<VariantMaterialSelectProps> = ({
         Number.isFinite(Number(mat.sheet_width)) &&
         Number(mat.sheet_width) > 0;
       const nextMode: 'fixed' | 'roll_feed' =
-        val != null && (pu === 'per_m2' || hasRollWidth)
+        val != null && (pu === 'per_m2' || pu === 'per_meter' || hasRollWidth)
           ? 'roll_feed'
           : ((variant.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed');
       onUpdate(variant.id, {
@@ -68,7 +68,7 @@ export const VariantMaterialSelect: React.FC<VariantMaterialSelectProps> = ({
         className="variant-material-select__control"
         value={variant.material_id ?? ''}
         onChange={handleChange}
-        title="Материал для списания и ширины биллинга per_m2"
+        title="Материал для списания и ширины рулона (раскладка подачи)"
       >
         <option value="">— Без списания</option>
         {materials.map((m) => (

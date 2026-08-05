@@ -15,6 +15,8 @@ interface Operation {
   parameters?: string | any; // JSON строка или объект
   linked_parameter_name?: string;
   operation_type?: string; // Тип операции (например, 'laminate')
+  price_unit?: string;
+  priceUnit?: string;
   min_quantity?: number;
   max_quantity?: number;
 }
@@ -31,7 +33,56 @@ interface SelectedOperation {
   operationId: number;
   subtype?: string; // Подтип (например, "глянец 32 мк")
   variantId?: number; // ID варианта (типа) для услуг с вариантами (например, ламинация)
+  /** per_m2 / feed — пог. м; per_sheet — листы; иначе шт */
   quantity?: number;
+  /** м² биллинга при price_unit=per_m2 */
+  billedM2?: number;
+}
+
+function getOperationPriceUnit(operation: Operation): string {
+  return String(operation.price_unit ?? operation.priceUnit ?? '').trim().toLowerCase();
+}
+
+function formatQtyHint(n: number): string {
+  return String(Math.round(n * 100000) / 100000).replace('.', ',');
+}
+
+function quantityFieldMeta(operation: Operation): {
+  label: string;
+  step: number;
+  min: number;
+  hint?: string;
+} {
+  const priceUnit = getOperationPriceUnit(operation);
+  const opType = String(operation.operation_type ?? '').toLowerCase();
+  const isLaminate = opType === 'laminate';
+  if (priceUnit === 'per_m2') {
+    return {
+      label: 'Количество (пог. м):',
+      step: 0.001,
+      min: 0.001,
+      hint: 'Цена услуги — за м² рулона (ширина × подача). Ниже показано и то, и другое после расчёта.',
+    };
+  }
+  if (priceUnit === 'per_meter' || (isLaminate && priceUnit === 'per_meter')) {
+    return {
+      label: 'Количество (пог. м):',
+      step: 0.001,
+      min: 0.001,
+    };
+  }
+  if (priceUnit === 'per_sheet' || (isLaminate && !priceUnit)) {
+    return {
+      label: 'Количество (листов):',
+      step: 1,
+      min: 1,
+    };
+  }
+  return {
+    label: 'Количество:',
+    step: 1,
+    min: 1,
+  };
 }
 
 /** Учитываем parentVariantId из колонки и из JSON (строка/число). */
@@ -614,18 +665,24 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       )}
 
                       {/* Поле количества */}
+                      {(() => {
+                        const qtyMeta = quantityFieldMeta(operation);
+                        const step = qtyMeta.step;
+                        const fieldMin = Math.min(qtyMeta.min, limits?.min ?? qtyMeta.min);
+                        const billedM2 = selectedData?.billedM2;
+                        return (
                       <div className="param-group">
-                        <label className="operation-field-label">Количество:</label>
+                        <label className="operation-field-label">{qtyMeta.label}</label>
                     <div className="quantity-controls">
                       <button
                         type="button"
                         className="quantity-btn quantity-btn-minus"
                         onClick={() => {
-                          const minQty = limits?.min ?? 1;
+                          const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)
                             : minQty;
-                          updateOperationQuantity(operationId, currentQty - 1);
+                          updateOperationQuantity(operationId, Math.max(minQty, currentQty - step));
                         }}
                       >
                         −
@@ -637,25 +694,33 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           const raw = e.target.value;
                           updateOperationQuantity(operationId, raw === '' ? undefined : Number(raw));
                         }}
-                        min={limits?.min ?? 1}
+                        min={fieldMin}
                         max={limits?.max}
+                        step={step}
                         className="quantity-input"
                       />
                       <button
                         type="button"
                         className="quantity-btn quantity-btn-plus"
                         onClick={() => {
-                          const minQty = limits?.min ?? 1;
+                          const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)
                             : minQty;
-                          updateOperationQuantity(operationId, currentQty + 1);
+                          updateOperationQuantity(operationId, currentQty + step);
                         }}
                       >
                         +
                       </button>
                     </div>
+                    {billedM2 != null && Number.isFinite(billedM2) && (
+                      <div className="operation-qty-hint">
+                        В цене: {formatQtyHint(Number(billedM2))} м² (ставка за м² рулона)
+                      </div>
+                    )}
                   </div>
+                        );
+                      })()}
                     </div>
                   );
                 }
@@ -682,48 +747,62 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                     )}
 
                     {/* Поле количества */}
+                    {(() => {
+                      const qtyMeta = quantityFieldMeta(operation);
+                      const step = qtyMeta.step;
+                      const fieldMin = Math.min(qtyMeta.min, limits?.min ?? qtyMeta.min);
+                      const billedM2 = selectedData?.billedM2;
+                      return (
                     <div className="param-group">
-                      <label className="operation-field-label">Количество:</label>
+                      <label className="operation-field-label">{qtyMeta.label}</label>
                       <div className="quantity-controls">
                         <button
                           type="button"
                           className="quantity-btn quantity-btn-minus"
                           onClick={() => {
-                          const minQty = limits?.min ?? 1;
+                          const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)
                             : minQty;
-                          updateOperationQuantity(operationId, currentQty - 1);
+                          updateOperationQuantity(operationId, Math.max(minQty, currentQty - step));
                           }}
                         >
                           −
                         </button>
                         <input
                           type="number"
-                        value={selectedData?.quantity ?? ''}
+                          value={selectedData?.quantity ?? ''}
                           onChange={(e) => {
-                          const raw = e.target.value;
-                          updateOperationQuantity(operationId, raw === '' ? undefined : Number(raw));
+                            const raw = e.target.value;
+                            updateOperationQuantity(operationId, raw === '' ? undefined : Number(raw));
                           }}
-                          min={limits?.min ?? 1}
+                          min={fieldMin}
                           max={limits?.max}
+                          step={step}
                           className="quantity-input"
                         />
                         <button
                           type="button"
                           className="quantity-btn quantity-btn-plus"
                           onClick={() => {
-                          const minQty = limits?.min ?? 1;
+                          const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)
                             : minQty;
-                          updateOperationQuantity(operationId, currentQty + 1);
+                          updateOperationQuantity(operationId, currentQty + step);
                           }}
                         >
                           +
                         </button>
                       </div>
+                      {billedM2 != null && Number.isFinite(billedM2) && (
+                        <div className="operation-qty-hint">
+                          В цене: {formatQtyHint(Number(billedM2))} м² (ставка за м² рулона)
+                        </div>
+                      )}
                     </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}

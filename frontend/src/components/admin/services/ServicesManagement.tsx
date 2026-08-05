@@ -71,7 +71,7 @@ const wideFormatServiceForm = (categoryId: number | '' = ''): ServiceFormState =
   ...emptyServiceForm,
   type: 'postprint',
   operationType: 'laminate',
-  unit: 'per_m2',
+  unit: 'per_meter',
   hasVariants: true,
   consumptionMode: 'roll_feed',
   meterBasis: 'feed',
@@ -335,7 +335,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       }
       const unit =
         createMode === 'wideformat'
-          ? state.newServiceForm.unit || 'per_m2'
+          ? state.newServiceForm.unit || 'per_meter'
           : state.newServiceForm.unit || 'item';
       const payload = {
         name: state.newServiceForm.name.trim(),
@@ -489,12 +489,12 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     if (workspaceTab === 'wideformat') {
       return {
         title: 'ШФП послепечатка',
-        lead: 'Широкоформатная послепечатка: тариф per_m2 (ширина рулона × подача). Варианты — разные ширины рулонов со склада.',
+        lead: 'Широкоформатная послепечатка: ламинация — тариф за пог. м подачи (per_meter). Варианты — разные ширины рулонов со склада.',
         createLabel: '+ Добавить ШФП',
         createMode: 'wideformat' as CreateMode,
         emptyTitle: 'Нет услуг ШФП',
         emptyHint: 'Добавьте ламинацию, резку или другую рулонную послепечатку',
-        hint: 'Создайте услугу → варианты по ширинам → привяжите рулон (в селекте видна ширина мм).',
+        hint: 'Создайте услугу → варианты по ширинам → привяжите рулон. Цена ламинации — за пог. м; печать считается отдельно в м².',
       };
     }
     return {
@@ -811,7 +811,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             {createMode === 'binding'
               ? 'Переплёт попадает во вкладку «Переплёты», операция на бэкенде — bind. Варианты настраиваются после создания.'
               : createMode === 'wideformat'
-                ? 'Услуга ШФП: единица per_m2, расход roll_feed. После создания добавьте варианты по ширинам рулонов и привяжите материалы.'
+                ? 'Услуга ШФП: ламинация — per_meter (пог. м подачи), расход roll_feed. После создания добавьте варианты по ширинам и привяжите рулоны.'
                 : 'Укажите название, единицу и цену. После создания привяжите услугу к продукту в карточке продукта.'}
           </p>
           <form

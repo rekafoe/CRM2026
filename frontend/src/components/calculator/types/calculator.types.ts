@@ -62,7 +62,10 @@ export interface ProductSpecs {
     subtype?: string;
     /** Вариант услуги (ламинация и др.) — уходит в finishing.variant_id на бэкенде */
     variantId?: number;
+    /** Для per_m2 / feed — пог. м; для per_sheet — листы; иначе шт */
     quantity?: number;
+    /** м² биллинга (per_m2), отдельно от quantity в пог. м */
+    billedM2?: number;
   }>;
   [key: string]: any;
 }
@@ -89,6 +92,9 @@ export interface CalculationResult {
     operationType?: string;
     priceUnit?: string;
     quantity?: number;
+    /** м² биллинга для per_m2 */
+    billedM2?: number;
+    feedMeters?: number;
     unit?: string;
     unitPrice?: number;
     totalCost?: number;

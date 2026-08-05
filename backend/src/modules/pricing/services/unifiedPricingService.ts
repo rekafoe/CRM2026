@@ -293,20 +293,40 @@ export class UnifiedPricingService {
               technologyCode: undefined,
             }]
           : []),
-        ...(result.finishingDetails?.map(f => ({
-          operationId: f.service_id,
-          operationName: f.service_name,
-          operationType: ((f as any).operation_type || 'other') as any,
-          priceUnit: ((f as any).price_unit ?? result.selectedFinishing?.find((sf: any) => sf.service_id === f.service_id)?.price_unit) || 'per_item' as const,
-          unitPrice: f.tier.price,
-          quantity: f.units_needed,
-          setupCost: 0,
-          totalCost: f.priceForQuantity,
-          appliedRules: undefined,
-          pricingSource: 'simplified',
-          pricingKey: `service:${f.service_id}`,
-          technologyCode: undefined,
-        })) || []),
+        ...(result.finishingDetails?.map(f => {
+          const priceUnit =
+            ((f as any).price_unit ??
+              result.selectedFinishing?.find((sf: any) => sf.service_id === f.service_id)?.price_unit) ||
+            'per_item';
+          const feedMeters =
+            f.feed_meters != null && Number.isFinite(Number(f.feed_meters))
+              ? Number(f.feed_meters)
+              : undefined;
+          // Для per_m2 в quantity отдаём пог. м (оператору понятнее); м² — в billedM2
+          const isPerM2 = String(priceUnit).toLowerCase() === 'per_m2';
+          return {
+            operationId: f.service_id,
+            operationName: f.service_name,
+            operationType: ((f as any).operation_type || 'other') as any,
+            priceUnit: priceUnit as any,
+            unitPrice: f.tier.price,
+            quantity: isPerM2 && feedMeters != null ? feedMeters : f.units_needed,
+            ...(isPerM2
+              ? {
+                  billedM2: f.units_needed,
+                  feedMeters: feedMeters ?? f.units_needed,
+                }
+              : feedMeters != null
+                ? { feedMeters }
+                : {}),
+            setupCost: 0,
+            totalCost: f.priceForQuantity,
+            appliedRules: undefined,
+            pricingSource: 'simplified',
+            pricingKey: `service:${f.service_id}`,
+            technologyCode: undefined,
+          };
+        }) || []),
       ],
       materialCost: result.materialPrice,
       operationsCost: result.printPrice + result.finishingPrice,

@@ -129,8 +129,8 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         <div className="service-form-binding-hint service-form__full" role="status">
           <strong>ШФП послепечатка</strong>
           <span className="service-form-binding-hint__muted">
-            Тариф за м² рулона (ширина × подача). После создания добавьте варианты по ширинам и привяжите рулоны
-            со склада — в селекте материала видна ширина в мм.
+            Ламинация: тариф за пог. м подачи рулона (per_meter). После создания добавьте варианты по ширинам и
+            привяжите рулоны со склада — в селекте материала видна ширина в мм. Печать считается отдельно в м².
           </span>
         </div>
       )}
@@ -224,7 +224,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
             isBinding
               ? 'Часто: per_item или fixed'
               : isWideFormat
-                ? 'Для ШФП: per_m2 — м² по ширине рулона × подаче'
+                ? 'Для ШФП-ламинации: per_meter — за пог. м подачи; печать — отдельно в м²'
                 : 'per_item, per_sheet, per_cut, fixed…'
           }
         >

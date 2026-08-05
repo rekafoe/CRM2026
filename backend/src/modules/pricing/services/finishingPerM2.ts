@@ -34,9 +34,12 @@ export type PerM2LayoutContext = {
 };
 
 export type PerM2QuoteResult = {
+  /** м² для биллинга (ставка × м²) */
   rawUnits: number;
   totalUnits: number;
   servicePrice: number;
+  /** пог. м подачи рулона (для склада и отображения оператору) */
+  feedMeters: number;
   usedRollLayout: boolean;
   warning?: string;
 };
@@ -66,6 +69,7 @@ export function quotePerM2Finishing(params: {
     rawUnits,
     totalUnits,
     servicePrice,
+    feedMeters: Math.max(0, consumed.feedMeters),
     usedRollLayout: consumed.usedRollLayout,
     warning,
   };

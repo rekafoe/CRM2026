@@ -271,7 +271,14 @@ export function useCalculatorPricingActions({
         // selectedOperations (фронтенд) -> finishing (бэкенд, simplified-конфиг)
         type FinishingCalcEntry = {
           service_id: number;
-          price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order' | 'per_meter';
+          price_unit:
+            | 'per_sheet'
+            | 'per_cut'
+            | 'per_item'
+            | 'fixed'
+            | 'per_order'
+            | 'per_meter'
+            | 'per_m2';
           units_per_item: number;
           variant_id?: number;
         };
@@ -303,7 +310,15 @@ export function useCalculatorPricingActions({
                 return null;
               }
 
-              const KNOWN_UNITS = ['per_sheet', 'per_cut', 'per_item', 'fixed', 'per_order'] as const;
+              const KNOWN_UNITS = [
+                'per_sheet',
+                'per_cut',
+                'per_item',
+                'fixed',
+                'per_order',
+                'per_meter',
+                'per_m2',
+              ] as const;
               type KnownPu = (typeof KNOWN_UNITS)[number];
               let priceUnit: KnownPu = 'per_item';
               if (op) {
@@ -1040,6 +1055,8 @@ export function useCalculatorPricingActions({
           priceUnit: s.priceUnit ?? s.price_unit ?? s.unit,
           service: s.operationName ?? s.operation_name ?? s.name,
           quantity: s.quantity,
+          billedM2: s.billedM2 ?? s.billed_m2,
+          feedMeters: s.feedMeters ?? s.feed_meters,
           unit: s.priceUnit ?? s.price_unit ?? s.unit,
           price: s.unitPrice ?? s.unit_price ?? s.price,
           unitPrice: s.unitPrice ?? s.unit_price ?? s.price,
@@ -1050,13 +1067,14 @@ export function useCalculatorPricingActions({
           technologyCode: s.technologyCode ?? s.technology_code,
         }));
 
-        // 🆕 Синхронизируем quantity операций per_sheet (ламинация и т.д.) с бэкендом
-        // Бэкенд считает по листам печати, фронт должен показывать это значение
+        // Синхронизируем quantity отделки с бэкендом:
+        // per_m2 → пог. м (+ billedM2), per_sheet/ламинация листовая → листы, per_meter → п.м.
         if (setSpecsFromParent && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0 && services.length > 0) {
           const backendByOpId = new Map(
             services.map((s: any) => [(s.operationId ?? s.operation_id ?? s.id) as number, s])
           );
           let hasChanges = false;
+          const roundQty = (n: number) => Math.round(n * 100000) / 100000;
           const updatedOps = specs.selectedOperations.map((sel: any) => {
             const backendOp = backendByOpId.get(sel.operationId);
             if (!backendOp || backendOp.quantity == null || !Number.isFinite(Number(backendOp.quantity))) return sel;
@@ -1064,21 +1082,30 @@ export function useCalculatorPricingActions({
             const opType = String(backendOp.operationType ?? backendOp.operation_type ?? '').toLowerCase();
             const opName = String(backendOp.operationName ?? backendOp.operation_name ?? backendOp.service ?? '').toLowerCase();
             const isLaminate = opType === 'laminate' || opName.includes('ламин') || opName.includes('lamination');
-            // per_sheet: всегда берём quantity с бэкенда (листы печати)
-            // laminate: ламинация обычно per_sheet — берём quantity с бэкенда (кол-во листов)
-            const isPerSheet = priceUnit === 'per_sheet' || isLaminate;
-            if (isPerSheet) {
-              const backendQty = Number(backendOp.quantity);
-              if (sel.quantity !== backendQty) {
-                hasChanges = true;
-                return { ...sel, quantity: backendQty };
-              }
-            }
-            return sel;
+            const isPerM2 = priceUnit === 'per_m2';
+            const isPerMeter = priceUnit === 'per_meter';
+            const isPerSheet = priceUnit === 'per_sheet' || (isLaminate && !isPerM2 && !isPerMeter);
+            if (!isPerM2 && !isPerSheet && !isPerMeter) return sel;
+
+            const backendQty = roundQty(Number(backendOp.quantity));
+            const billedM2Raw = backendOp.billedM2 ?? backendOp.billed_m2;
+            const billedM2 =
+              billedM2Raw != null && Number.isFinite(Number(billedM2Raw))
+                ? roundQty(Number(billedM2Raw))
+                : undefined;
+            const qtyChanged = sel.quantity !== backendQty;
+            const m2Changed = isPerM2 && sel.billedM2 !== billedM2;
+            if (!qtyChanged && !m2Changed) return sel;
+            hasChanges = true;
+            return {
+              ...sel,
+              quantity: backendQty,
+              ...(isPerM2 && billedM2 != null ? { billedM2 } : {}),
+            };
           });
           if (hasChanges) {
             setSpecsFromParent((prev) => ({ ...prev, selectedOperations: updatedOps }));
-            logger.info('🔄 Синхронизированы quantity операций per_sheet с бэкендом', {
+            logger.info('🔄 Синхронизированы quantity операций отделки с бэкендом', {
               updated: updatedOps.filter((o: any, i: number) => (specs.selectedOperations?.[i]?.quantity ?? null) !== (o.quantity ?? null)),
             });
           }

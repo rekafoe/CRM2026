@@ -20,10 +20,13 @@ export function findWideFormatCategory(categories: ServiceCategory[]): ServiceCa
  * Услуга относится к ШФП-послепечатке:
  * — категория «ШФП…» / «широкоформат…»
  * — или единица тарифа per_m2 (рулонная площадь)
+ * — или ламинация за пог. м подачи (per_meter + roll_feed)
  */
 export function isWideFormatService(service: PricingService): boolean {
   const pu = String(service.priceUnit || service.unit || '').toLowerCase();
+  const op = String(service.operationType || '').toLowerCase();
   if (pu === 'per_m2') return true;
+  if (op === 'laminate' && pu === 'per_meter') return true;
   if (isWideFormatCategoryName(service.categoryName)) return true;
   return false;
 }

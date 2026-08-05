@@ -189,6 +189,8 @@ export interface SimplifiedPricingResult {
     tier: { min_qty: number; max_qty?: number; price: number };
     units_needed: number;
     raw_units_needed?: number;
+    /** Погонные метры подачи (для per_m2 / roll_feed) — отдельно от units_needed в м² */
+    feed_meters?: number;
     priceForQuantity: number;
     price_unit?: string;
     operation_type?: string;
@@ -1743,12 +1745,36 @@ export class SimplifiedPricingService {
             variantId != null
               ? variantMeterBasisMap.get(variantId) ?? serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path'
               : serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path';
-          const meterUnits =
-            isPerMeterOp && meterBasis === 'feed'
-              ? materialMetersNeeded
-              : isPerMeterOp
-                ? knifePathMetersTotal
-                : 0;
+          // per_meter + feed: подача по ширине плёнки варианта/услуги (не материала печати)
+          let meterUnits = 0;
+          if (isPerMeterOp) {
+            if (meterBasis === 'feed') {
+              const filmFeed = resolveWarehouseFeedMeters({
+                rollWidthMm: finishingRollWidthMmMap.get(mapKey) ?? null,
+                layout: {
+                  trimMm: layoutTrim,
+                  bleedMm: resolvedBleedMm,
+                  quantity,
+                  margins: {
+                    edgeMm:
+                      customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+                        ? Number(customMarginMm)
+                        : 0,
+                    gapMm:
+                      customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+                        ? Number(customGapMm)
+                        : 0,
+                  },
+                },
+                fallbackMeters: materialMetersNeeded,
+                materialId: undefined,
+              });
+              meterUnits = filmFeed.feedMeters;
+              if (filmFeed.warning) pricingWarnings.push(filmFeed.warning);
+            } else {
+              meterUnits = knifePathMetersTotal;
+            }
+          }
           const perSheetUnits = isPerSheetOp
             ? (isMaterialMeterBased ? materialMetersNeeded : sheetsNeeded)
             : 0;
@@ -1909,6 +1935,34 @@ export class SimplifiedPricingService {
             rawUnits = quoted.rawUnits;
             totalUnits = quoted.totalUnits;
             servicePrice = quoted.servicePrice;
+            finishingDetails.push({
+              service_id: finConfig.service_id,
+              variant_id: variantId,
+              service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
+              tier: { ...tier, price: effectivePriceForTier },
+              units_needed: totalUnits,
+              raw_units_needed: rawUnits,
+              feed_meters: quoted.feedMeters,
+              priceForQuantity: servicePrice,
+              price_unit: priceUnit,
+              operation_type: operationType,
+              consumption_mode: effectiveConsumptionMode,
+              meter_basis: meterBasis,
+            });
+            finishingPrice += servicePrice;
+            logger.info('💰 [SimplifiedPricingService] Рассчитана цена услуги отделки', {
+              productId,
+              service_id: finConfig.service_id,
+              operationType,
+              priceUnit,
+              unitsPerItem,
+              quantity,
+              totalUnits,
+              feedMeters: quoted.feedMeters,
+              priceForTier: effectivePriceForTier,
+              servicePrice,
+            });
+            continue;
           } else {
             rawUnits = quantity * (unitsPerItem ?? 1);
             totalUnits = rawUnits;
@@ -1939,6 +1993,7 @@ export class SimplifiedPricingService {
             tier: { ...tier, price: effectivePriceForTier },
             units_needed: totalUnits,
             raw_units_needed: rawUnits,
+            ...(isPerMeterOp && meterBasis === 'feed' ? { feed_meters: totalUnits } : {}),
             priceForQuantity: servicePrice,
             price_unit: priceUnit,
             operation_type: operationType,
@@ -2357,6 +2412,7 @@ export class SimplifiedPricingService {
       serviceTypesMap: serviceTypesMap ?? new Map(),
       servicePriceUnitMap: servicePriceUnitMap ?? new Map(),
       serviceMeterBasisMap: serviceMeterBasisMap ?? new Map(),
+      variantMeterBasisMap: variantMeterBasisMap ?? new Map(),
       currentQuantity: quantity,
       isRollPrint,
       isRollMeterage: isMaterialMeterBased,
@@ -2668,6 +2724,7 @@ export class SimplifiedPricingService {
     serviceTypesMap: Map<number, string>;
     servicePriceUnitMap?: Map<number, string>;
     serviceMeterBasisMap?: Map<number, 'knife_path' | 'feed'>;
+    variantMeterBasisMap?: Map<number, 'knife_path' | 'feed'>;
     /** Текущее количество — добавляем в boundaries, чтобы «Цена» для выбранного тиража совпадала с итогом */
     currentQuantity?: number;
     isRollPrint?: boolean;
@@ -2804,29 +2861,46 @@ export class SimplifiedPricingService {
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
         const isPerMeterOp = priceUnitFromDb === 'per_meter';
         const isPerM2Op = priceUnitFromDb === 'per_m2';
-        const meterBasis = ctx.serviceMeterBasisMap?.get(finConfig.service_id) ?? 'knife_path';
+        const meterBasis =
+          (finConfig.variant_id != null
+            ? ctx.variantMeterBasisMap?.get(finConfig.variant_id)
+            : undefined) ??
+          ctx.serviceMeterBasisMap?.get(finConfig.service_id) ??
+          'knife_path';
+        const finKey = finishingFinKey(finConfig.service_id, finConfig.variant_id);
+        const rca = ctx.rollConsumedAreaCtx;
+        const trimForFin = rca?.trimMm ?? {
+          width: Number(ctx.selectedSize?.width_mm) || 0,
+          height: Number(ctx.selectedSize?.height_mm) || 0,
+        };
+        const bleedForFin = rca?.bleedMm ?? 0;
+        const marginsForFin = rca?.margins ?? { edgeMm: 0, gapMm: 0 };
         const meterUnits =
           isPerMeterOp && meterBasis === 'feed'
-            ? metersForQ
+            ? resolveWarehouseFeedMeters({
+                rollWidthMm: rca?.rollWidthByFinKey.get(finKey) ?? null,
+                layout: {
+                  trimMm: trimForFin,
+                  bleedMm: bleedForFin,
+                  quantity: q,
+                  margins: marginsForFin,
+                },
+                fallbackMeters: metersForQ,
+              }).feedMeters
             : isPerMeterOp
               ? ctx.knifePathByQty?.(q) ?? 0
               : 0;
         const perSheetUnits = isPerSheetOp ? (ctx.isRollMeterage ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
         const totalCutsForOrder = Math.max(unitsPerItem, 1);
-        const finKey = finishingFinKey(finConfig.service_id, finConfig.variant_id);
         let m2Units = 0;
         if (isPerM2Op) {
-          const rca = ctx.rollConsumedAreaCtx;
           m2Units = billedM2ForQuantity({
             rollWidthMm: rca?.rollWidthByFinKey.get(finKey),
-            trimMm: rca?.trimMm ?? {
-              width: Number(ctx.selectedSize?.width_mm) || 0,
-              height: Number(ctx.selectedSize?.height_mm) || 0,
-            },
-            bleedMm: rca?.bleedMm ?? 0,
+            trimMm: trimForFin,
+            bleedMm: bleedForFin,
             quantity: q,
-            margins: rca?.margins ?? { edgeMm: 0, gapMm: 0 },
+            margins: marginsForFin,
           });
         }
         const limitsFin = ctx.serviceLimitsMap?.get(finConfig.service_id);
