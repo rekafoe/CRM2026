@@ -16,6 +16,7 @@ import { useLogger } from '../../../utils/logger';
 import { useToastNotifications } from '../../Toast';
 import { AppIcon } from '../../ui/AppIcon';
 import { getProductIconName } from '../utils/productIcons';
+import { productMatchesSearchQuery } from '../utils/productSearch';
 
 export const CUSTOM_PRODUCT_ID = -1000;
 export const POSTPRINT_PRODUCT_ID = -1001;
@@ -127,16 +128,26 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- только debouncedSearchQuery, иначе бесконечные запросы
   }, [debouncedSearchQuery]);
 
-  // Фильтрованные продукты
+  // Фильтрованные продукты.
+  // Локальный фильтр обязателен: SQLite LIKE ломает кириллицу («УФ-печать» / «Печать»),
+  // а уже загруженный список products как раз содержит калькуляторные продукты.
   const filteredProducts = useMemo(() => {
-    if (searchQuery.trim()) {
-      return searchResults;
+    const q = searchQuery.trim();
+    if (q) {
+      const localMatches = products.filter((p) => productMatchesSearchQuery(p, q));
+      const apiMatches = searchResults.filter((p) => productMatchesSearchQuery(p, q));
+      const byId = new Map<number, Product>();
+      for (const p of localMatches) byId.set(p.id, p);
+      for (const p of apiMatches) byId.set(p.id, p);
+      return Array.from(byId.values()).sort((a, b) =>
+        String(a.name || '').localeCompare(String(b.name || ''), 'ru')
+      );
     }
-    
+
     if (selectedCategoryId) {
       return getProductsByCategoryId(selectedCategoryId);
     }
-    
+
     return products;
   }, [searchQuery, searchResults, selectedCategoryId, getProductsByCategoryId, products]);
   const hasFilteredProducts = filteredProducts.length > 0;

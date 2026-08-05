@@ -105,6 +105,8 @@ export interface ServiceVariantDTO {
   updatedAt?: string;
   material_id?: number | null;
   qty_per_item?: number | null;
+  /** Ширина рулона мм из материала варианта (sheet_width / printable_width) — для UI калькулятора и сайта */
+  roll_width_mm?: number | null;
   /** Родитель в дереве вариантов (уровень 2 → уровень 1); дублируется в parameters.parentVariantId для совместимости */
   parentVariantId?: number | null;
   consumption_mode?: ServiceConsumptionMode | null;

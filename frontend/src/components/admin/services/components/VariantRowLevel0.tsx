@@ -5,6 +5,7 @@
 import React, { memo, useCallback, useRef } from 'react';
 import { PriceRangeCells } from './PriceRangeCells';
 import { VariantRowActions } from './VariantRowActions';
+import { VariantMaterialSelect } from './VariantMaterialSelect';
 import { VariantRowLevel0Props } from './ServiceVariantsTable.types';
 
 const NOOP_PRICE = (_minQty: number, _newPrice: number) => {};
@@ -24,6 +25,9 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
   onCreateSibling,
   onDelete,
   onPriceChange,
+  materials = [],
+  priceUnit,
+  onUpdateMaterial,
 }) => {
   const allRef = useRef(allTypeVariants);
   allRef.current = allTypeVariants;
@@ -58,36 +62,46 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
     <tr className="el-table__row expanded">
       <td className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
         <div className="cell">
-          <div className="variant-name-row">
-            <div className="el-input el-input--small" style={{ flex: 1, marginRight: '8px', minWidth: 0 }}>
-              {isEditingName ? (
-                <input
-                  type="text"
-                  className="el-input__inner"
-                  value={editingNameValue}
-                  onChange={(e) => onNameChange(e.target.value)}
-                  onBlur={handleNameSave}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleNameSave();
-                    } else if (e.key === 'Escape') {
-                      onNameEditCancel();
-                    }
-                  }}
-                  autoFocus
-                />
-              ) : (
-                <input
-                  type="text"
-                  className="el-input__inner"
-                  value={typeName}
-                  onClick={handleNameEditStart}
-                  readOnly
-                  style={{ cursor: 'pointer' }}
-                />
-              )}
+          <div className="variant-name-stack">
+            <div className="variant-name-row">
+              <div className="el-input el-input--small" style={{ flex: 1, marginRight: '8px', minWidth: 0 }}>
+                {isEditingName ? (
+                  <input
+                    type="text"
+                    className="el-input__inner"
+                    value={editingNameValue}
+                    onChange={(e) => onNameChange(e.target.value)}
+                    onBlur={handleNameSave}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNameSave();
+                      } else if (e.key === 'Escape') {
+                        onNameEditCancel();
+                      }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    className="el-input__inner"
+                    value={typeName}
+                    onClick={handleNameEditStart}
+                    readOnly
+                    style={{ cursor: 'pointer' }}
+                  />
+                )}
+              </div>
             </div>
+            {isLeaf && onUpdateMaterial && materials.length > 0 && (
+              <VariantMaterialSelect
+                variant={variant}
+                materials={materials}
+                priceUnit={priceUnit}
+                onUpdate={onUpdateMaterial}
+              />
+            )}
           </div>
         </div>
       </td>

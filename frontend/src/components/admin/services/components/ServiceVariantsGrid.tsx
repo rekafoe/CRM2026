@@ -25,6 +25,17 @@ export interface ServiceVariantsGridProps {
   onEditRange: (rangeIndex: number, minQty: number) => void;
   hoveredRangeIndex: number | null;
   onRangeHover: (index: number | null) => void;
+  materials?: Array<{ id: number; name: string; sheet_width?: number | null }>;
+  priceUnit?: string;
+  onUpdateMaterial?: (
+    variantId: number,
+    patch: {
+      material_id: number | null;
+      qty_per_item: number;
+      consumption_mode?: 'fixed' | 'roll_feed';
+      meter_basis?: 'knife_path' | 'feed';
+    }
+  ) => void;
 }
 
 export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
@@ -39,6 +50,9 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
   onEditRange,
   hoveredRangeIndex,
   onRangeHover,
+  materials = [],
+  priceUnit,
+  onUpdateMaterial,
 }) => {
   const actions = useVariantGridStableActions(localChanges, editing, setError, getNextTypeName);
   const noPriceColumns = commonRangesAsPriceRanges.length === 0;
@@ -48,8 +62,8 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
       {noPriceColumns && (
         <div className="service-variants-ranges-hint">
           Столбцы с ценами появятся после добавления диапазона тиража. Нажмите <strong>«Диапазон»</strong> справа
-          (например, граница <strong>1</strong>). Цены вводятся в <strong>конечных</strong> строках (тип без
-          подтипов или сам подтип).
+          (например, граница <strong>1</strong>). Цены и материал списания — в <strong>конечных</strong> строках
+          (тип без подтипов или сам подтип). Удаление строки — красный <strong>×</strong> в колонке «Действия».
         </div>
       )}
       <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small service-variants-grid">
@@ -132,6 +146,9 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                       onCreateSibling={actions.level0CreateSibling}
                       onDelete={actions.level0Delete}
                       onPriceChange={actions.level2PriceChange}
+                      materials={materials}
+                      priceUnit={priceUnit}
+                      onUpdateMaterial={onUpdateMaterial}
                     />
 
                     {Array.from(typeGroup.level1.entries()).map(([, level1Variants]) =>
@@ -154,6 +171,9 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                               onCreateSibling={actions.level1CreateSibling}
                               onDelete={actions.level1Delete}
                               onPriceChange={actions.level2PriceChange}
+                              materials={materials}
+                              priceUnit={priceUnit}
+                              onUpdateMaterial={onUpdateMaterial}
                             />
 
                             {level2Variants.map((level2Variant) => (
@@ -173,6 +193,9 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                                 onDelete={actions.level2Delete}
                                 hoveredRangeIndex={hoveredRangeIndex}
                                 onRangeHover={onRangeHover}
+                                materials={materials}
+                                priceUnit={priceUnit}
+                                onUpdateMaterial={onUpdateMaterial}
                               />
                             ))}
                           </React.Fragment>

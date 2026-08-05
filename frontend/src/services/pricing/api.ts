@@ -457,6 +457,10 @@ const mapVariant = (data: any): ServiceVariant => {
     updatedAt: data.updatedAt ?? data.updated_at,
     material_id: data.material_id != null ? Number(data.material_id) : undefined,
     qty_per_item: data.qty_per_item != null ? Number(data.qty_per_item) : undefined,
+    roll_width_mm:
+      data.roll_width_mm != null && Number.isFinite(Number(data.roll_width_mm))
+        ? Number(data.roll_width_mm)
+        : undefined,
     consumption_mode: data.consumption_mode ?? data.consumptionMode ?? undefined,
     meter_basis: data.meter_basis ?? data.meterBasis ?? undefined,
     ...(parentFinal !== undefined ? { parentVariantId: parentFinal } : {}),

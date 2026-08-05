@@ -12,6 +12,36 @@ function isAnonymousCatalogRequest(req: Request): boolean {
   return !(req as AuthenticatedRequest).user;
 }
 
+/** Нормализация для поиска: кириллица, ё→е, дефисы/тире → пробел (УФ-печать ≈ уф печать). */
+function normalizeProductSearchText(value: unknown): string {
+  return String(value ?? '')
+    .toLocaleLowerCase('ru-RU')
+    .replace(/ё/g, 'е')
+    .replace(/[\u2010-\u2015\u2212\-_/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function productMatchesSearchQuery(
+  product: { name?: unknown; description?: unknown; category_name?: unknown; route_key?: unknown },
+  rawQuery: string
+): boolean {
+  const needle = normalizeProductSearchText(rawQuery);
+  if (!needle) return true;
+  const haystack = [
+    product.name,
+    product.description,
+    product.category_name,
+    product.route_key,
+  ]
+    .map(normalizeProductSearchText)
+    .filter(Boolean)
+    .join(' ');
+  // Все токены запроса должны встретиться (порядок не важен)
+  const tokens = needle.split(' ').filter(Boolean);
+  return tokens.every((token) => haystack.includes(token));
+}
+
 router.get('/debug', async (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(404).json({ error: 'Not Found' });
@@ -131,27 +161,22 @@ router.get('/', async (req, res) => {
         conditions.push('COALESCE(p.active_for_site, 0) = 1');
       }
     }
-    if (searchValue) {
-      const lowerSearch = searchValue.toLowerCase();
-      const cappedSearch = lowerSearch.charAt(0).toUpperCase() + lowerSearch.slice(1);
-      const patternLower = `%${lowerSearch}%`;
-      const patternCapped = `%${cappedSearch}%`;
-      conditions.push(`(
-        p.name LIKE ? OR p.name LIKE ? OR
-        COALESCE(p.description, '') LIKE ? OR COALESCE(p.description, '') LIKE ? OR
-        COALESCE(pc.name, '') LIKE ? OR COALESCE(pc.name, '') LIKE ?
-      )`);
-      params.push(patternLower, patternCapped, patternLower, patternCapped, patternLower, patternCapped);
-    }
+    // Поиск по кириллице нельзя делать через SQLite LIKE/lower():
+    // lower('Печать') остаётся 'Печать', а 'Печать' LIKE '%печать%' = 0.
+    // Поэтому фильтр is_active/forSite — в SQL, текст — в JS (toLocaleLowerCase).
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE 1=1';
 
-    const products = await db.all(`
+    let products = await db.all(`
       SELECT p.*, pc.name as category_name, pc.icon as category_icon
       FROM products p
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       ${whereClause}
       ORDER BY pc.sort_order, p.name
     `, params);
+
+    if (searchValue) {
+      products = products.filter((p: any) => productMatchesSearchQuery(p, searchValue));
+    }
 
     if (wantMinPrice) {
       const productIds = products.map((p: any) => p.id);

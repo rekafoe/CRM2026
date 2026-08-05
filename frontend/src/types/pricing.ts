@@ -72,6 +72,8 @@ export interface ServiceVariant {
   updatedAt?: string;
   material_id?: number | null;
   qty_per_item?: number | null;
+  /** Ширина рулона мм из материала варианта — для подписей в калькуляторе/на сайте */
+  roll_width_mm?: number | null;
   /** Родитель в дереве вариантов (дублируется в parameters.parentVariantId для совместимости) */
   parentVariantId?: number | null;
   consumption_mode?: ServiceConsumptionMode | null;

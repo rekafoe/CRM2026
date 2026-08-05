@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
 import { getAllVariantTiers, getPricingServices, getServiceVariants, getServiceVolumeTiers } from '../../../services/pricing';
+import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantLabels';
 import { ServiceVolumeTier } from '../../../types/pricing';
 import type { ServiceVariant } from '../../../types/pricing';
 import { getParentVariantId } from '../../../utils/serviceVariantParent';
@@ -117,15 +118,20 @@ export function usePostprintServices({
       const servicesList: PostprintServiceOption[] = [];
       const normalizeLabel = (value: unknown) => String(value ?? '').trim();
       const isNumericLabel = (value: string) => value.length > 0 && !Number.isNaN(Number(value));
-      const getVariantLabel = (variant: { variantName?: string; parameters?: Record<string, any> }) => {
+      const getVariantLabel = (variant: {
+        variantName?: string;
+        parameters?: Record<string, any>;
+        roll_width_mm?: number | null;
+      }) => {
         const params = variant.parameters || {};
-        return normalizeLabel(
+        const base = normalizeLabel(
           params.subType ??
             params.type ??
             params.density ??
             variant.variantName ??
             ''
         );
+        return formatServiceVariantDisplayLabel(variant, base);
       };
       const isDisplayableVariant = (variant: { variantName?: string; parameters?: Record<string, any> }) => {
         const label = getVariantLabel(variant);

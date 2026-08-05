@@ -1696,6 +1696,7 @@ const toVariantResponse = (variant: any) => ({
   updated_at: variant.updatedAt,
   material_id: variant.material_id ?? null,
   qty_per_item: variant.qty_per_item != null ? Number(variant.qty_per_item) : null,
+  roll_width_mm: variant.roll_width_mm != null ? Number(variant.roll_width_mm) : null,
   consumption_mode: variant.consumption_mode ?? null,
   meter_basis: variant.meter_basis ?? null,
   parentVariantId: variant.parentVariantId ?? null,

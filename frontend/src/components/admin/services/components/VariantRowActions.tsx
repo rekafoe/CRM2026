@@ -54,7 +54,8 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 type="button"
                 className="el-button el-button--danger el-button--small is-plain variant-delete-btn"
                 onClick={onDelete}
-                title="Удалить тип"
+                title="Удалить вариант (и все дочерние)"
+                aria-label="Удалить вариант"
               >
                 <span style={{ fontSize: '14px' }}>×</span>
               </button>
@@ -86,9 +87,10 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
             <Slot>
               <button
                 type="button"
-                className="el-button el-button--danger el-button--small"
+                className="el-button el-button--danger el-button--small variant-delete-btn"
                 onClick={onDelete}
-                title="Удалить строку"
+                title="Удалить вариант (и дочерние)"
+                aria-label="Удалить вариант"
               >
                 <span style={{ fontSize: '14px' }}>×</span>
               </button>
@@ -111,9 +113,10 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
             <Slot>
               <button
                 type="button"
-                className="el-button el-button--danger el-button--small"
+                className="el-button el-button--danger el-button--small variant-delete-btn"
                 onClick={onDelete}
-                title="Удалить строку"
+                title="Удалить вариант"
+                aria-label="Удалить вариант"
               >
                 <span style={{ fontSize: '14px' }}>×</span>
               </button>

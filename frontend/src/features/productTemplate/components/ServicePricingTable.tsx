@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { FormField, Button } from '../../../components/common'
 import { getPricingServicesBundle } from '../../../services/pricing/api'
 import type { ServiceVolumeTier, ServiceVariant } from '../../../types/pricing'
+import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantLabels'
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../hooks/useTierRangeFloating'
 
 // Типы для работы с диапазонами
@@ -500,7 +501,8 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                 const type = v.parameters?.type || ''
                 const density = v.parameters?.density || ''
                 const suffix = type && density ? `${type} ${density}` : type || density || ''
-                const label = suffix ? `${v.variantName}, ${suffix}` : v.variantName
+                const baseLabel = suffix ? `${v.variantName}, ${suffix}` : v.variantName
+                const label = formatServiceVariantDisplayLabel(v, baseLabel)
                 return { id: v.id, label, variantName: v.variantName, subtype: suffix, density }
               })
 

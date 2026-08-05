@@ -4,6 +4,7 @@
 import React, { memo, useCallback } from 'react';
 import { PriceRangeCells } from './PriceRangeCells';
 import { VariantRowActions } from './VariantRowActions';
+import { VariantMaterialSelect } from './VariantMaterialSelect';
 import { getParentVariantId } from '../../../../utils/serviceVariantParent';
 import { VariantRowLevel2Props } from './ServiceVariantsTable.types';
 
@@ -22,6 +23,9 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
   onDelete,
   hoveredRangeIndex,
   onRangeHover,
+  materials = [],
+  priceUnit,
+  onUpdateMaterial,
 }) => {
   const handleParamsEditStart = useCallback(() => {
     onParamsEditStart(variant.id, variant.parameters?.subType || '');
@@ -82,6 +86,14 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
                 />
               )}
             </div>
+            {onUpdateMaterial && materials.length > 0 && (
+              <VariantMaterialSelect
+                variant={variant}
+                materials={materials}
+                priceUnit={priceUnit}
+                onUpdate={onUpdateMaterial}
+              />
+            )}
           </div>
         </div>
       </td>

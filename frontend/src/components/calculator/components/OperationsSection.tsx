@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { getServiceVariants } from '../../../services/pricing/api';
 import type { ServiceVariant } from '../../../types/pricing';
 import { getParentVariantId } from '../../../utils/serviceVariantParent';
+import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantLabels';
 
 interface Operation {
   id?: number;
@@ -482,12 +483,14 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       return v.parameters?.subType || v.parameters?.density || v.parameters?.type;
                     })
                     .map(v => {
-                      const subtypeLabel =
+                      const subtypeBase =
                         v.parameters?.subType ||
                         v.parameters?.density ||
                         v.parameters?.type ||
                         `Вариант ${v.id}`;
-                      const subtypeValue = subtypeLabel; // Используем label как value
+                      const subtypeLabel = formatServiceVariantDisplayLabel(v, String(subtypeBase));
+                      // value оставляем стабильным (без мм), чтобы не ломать выбор при обогащении подписи
+                      const subtypeValue = String(subtypeBase);
                       
                       return {
                         value: subtypeValue,
@@ -557,11 +560,12 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           className="form-control operation-select"
                         >
                           {uniqueTypes.map((variant) => {
-                            const label = hasTypeHierarchy
+                            const baseLabel = hasTypeHierarchy
                               ? variant.parameters?.type || variant.variantName
                               : variant.variantName;
+                            const label = formatServiceVariantDisplayLabel(variant, String(baseLabel || ''));
                             return (
-                              <option key={variant.id} value={label}>
+                              <option key={variant.id} value={baseLabel}>
                                 {label}
                               </option>
                             );

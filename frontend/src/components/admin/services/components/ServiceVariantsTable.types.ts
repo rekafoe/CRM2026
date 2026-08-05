@@ -73,6 +73,18 @@ export interface VariantRowLevel0Props {
   onCreateSibling: () => void;
   onPriceChange?: (variantId: number, minQty: number, newPrice: number) => void;
   serviceId?: number;
+  /** Материалы склада — линковка только на листе (где цена) */
+  materials?: Array<{ id: number; name: string; sheet_width?: number | null }>;
+  priceUnit?: string;
+  onUpdateMaterial?: (
+    variantId: number,
+    patch: {
+      material_id: number | null;
+      qty_per_item: number;
+      consumption_mode?: 'fixed' | 'roll_feed';
+      meter_basis?: 'knife_path' | 'feed';
+    }
+  ) => void;
 }
 
 /**
@@ -93,6 +105,17 @@ export interface VariantRowLevel1Props {
   onCreateChild: (typeName: string, parentId: number) => void;
   onCreateSibling: (typeName: string) => void;
   onPriceChange?: (variantId: number, minQty: number, newPrice: number) => void;
+  materials?: Array<{ id: number; name: string; sheet_width?: number | null }>;
+  priceUnit?: string;
+  onUpdateMaterial?: (
+    variantId: number,
+    patch: {
+      material_id: number | null;
+      qty_per_item: number;
+      consumption_mode?: 'fixed' | 'roll_feed';
+      meter_basis?: 'knife_path' | 'feed';
+    }
+  ) => void;
 }
 
 /**
@@ -114,4 +137,15 @@ export interface VariantRowLevel2Props {
   serviceId?: number;
   hoveredRangeIndex?: number | null;
   onRangeHover?: (index: number | null) => void;
+  materials?: Array<{ id: number; name: string; sheet_width?: number | null }>;
+  priceUnit?: string;
+  onUpdateMaterial?: (
+    variantId: number,
+    patch: {
+      material_id: number | null;
+      qty_per_item: number;
+      consumption_mode?: 'fixed' | 'roll_feed';
+      meter_basis?: 'knife_path' | 'feed';
+    }
+  ) => void;
 }

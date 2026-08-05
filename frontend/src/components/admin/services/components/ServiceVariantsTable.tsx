@@ -10,7 +10,6 @@ import { useVariantsTable } from './hooks/useVariantsTable';
 import { useVariantEditing } from './hooks/useVariantEditing';
 import { useTierModal } from './hooks/useTierModal';
 import { ServiceVariantsTableProps } from './ServiceVariantsTable.types';
-import { ServiceVariantsMaterialsSection } from './ServiceVariantsMaterialsSection';
 import { ServiceVariantsToolbar } from './ServiceVariantsToolbar';
 import { ServiceVariantsGrid } from './ServiceVariantsGrid';
 import { BindingPagesLimitsSection } from './BindingPagesLimitsSection';
@@ -109,17 +108,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         <BindingPagesLimitsSection variants={variants} operations={operations} />
       )}
 
-      {variants.length > 0 && materials.length > 0 && (
-        <ServiceVariantsMaterialsSection
-          typeNames={typeNames}
-          groupedVariants={groupedVariants}
-          materials={materials}
-          priceUnit={priceUnit}
-          operationType={operationType}
-          onUpdateMaterial={operations.updateVariantMaterial}
-        />
-      )}
-
       {variants.length === 0 ? (
         <div className="service-variants-empty">
           <p>Нет вариантов. Нажмите "Добавить тип" для создания первого варианта.</p>
@@ -137,6 +125,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           onEditRange={handleEditRange}
           hoveredRangeIndex={hoveredRangeIndex}
           onRangeHover={setHoveredRangeIndex}
+          materials={materials}
+          priceUnit={priceUnit}
+          onUpdateMaterial={operations.updateVariantMaterial}
         />
       )}
 

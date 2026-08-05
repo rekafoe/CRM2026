@@ -38,6 +38,11 @@ function normalizeParentVariantId(value: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function parsePositiveRollWidthMm(sheetWidth?: unknown, printableWidth?: unknown): number | null {
+  const w = Number(sheetWidth ?? printableWidth ?? 0);
+  return Number.isFinite(w) && w > 0 ? w : null;
+}
+
 function parametersWithParentSync(
   parameters: Record<string, any>,
   parentId: number | null
@@ -49,6 +54,42 @@ function parametersWithParentSync(
     delete out.parentVariantId;
   }
   return out;
+}
+
+function mapServiceVariantRow(
+  row: any,
+  opts: {
+    hasParentVariantId: boolean;
+    hasMaterialId: boolean;
+    hasQtyPerItem: boolean;
+    hasConsumptionMode: boolean;
+    hasMeterBasis: boolean;
+  }
+): ServiceVariantDTO {
+  const paramsRaw = parseServiceVariantParameters(row.parameters);
+  const parentColVal = opts.hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
+  const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
+  const parentResolved = parentColVal !== null ? parentColVal : parentFromJson;
+  const parameters = parametersWithParentSync(paramsRaw, parentResolved);
+  const rollWidthMm = parsePositiveRollWidthMm(row.material_sheet_width, row.material_printable_width);
+  return {
+    id: row.id,
+    serviceId: row.service_id,
+    variantName: row.variant_name,
+    parameters,
+    sortOrder: row.sort_order || 0,
+    isActive: row.is_active !== undefined ? !!row.is_active : true,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    ...(opts.hasParentVariantId ? { parentVariantId: parentResolved } : {}),
+    ...(opts.hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
+    ...(opts.hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
+    ...(rollWidthMm != null ? { roll_width_mm: rollWidthMm } : {}),
+    ...(opts.hasConsumptionMode
+      ? { consumption_mode: normalizeConsumptionMode(row.consumption_mode ?? 'fixed') }
+      : {}),
+    ...(opts.hasMeterBasis ? { meter_basis: normalizeMeterBasis(row.meter_basis, null) } : {}),
+  };
 }
 
 // post_processing_services.operation_type имеет CHECK constraint на фиксированный список значений.
@@ -1129,42 +1170,36 @@ export class PricingServiceRepository {
     } catch {
       /* ignore */
     }
-    const materialCols = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
-    const parentCol = hasParentVariantId ? ', parent_variant_id' : '';
-    const consumptionCol = hasConsumptionMode ? ', consumption_mode' : '';
-    const meterBasisCol = hasMeterBasis ? ', meter_basis' : '';
+    const materialCols = hasMaterialId && hasQtyPerItem ? ', sv.material_id, sv.qty_per_item' : '';
+    const parentCol = hasParentVariantId ? ', sv.parent_variant_id' : '';
+    const consumptionCol = hasConsumptionMode ? ', sv.consumption_mode' : '';
+    const meterBasisCol = hasMeterBasis ? ', sv.meter_basis' : '';
+    const rollWidthCols = hasMaterialId
+      ? ', m.sheet_width as material_sheet_width, m.printable_width as material_printable_width'
+      : '';
+    const materialJoin = hasMaterialId ? 'LEFT JOIN materials m ON m.id = sv.material_id' : '';
     const placeholders = uniq.map(() => '?').join(',');
 
     const vRows = await db.all<any[]>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}${consumptionCol}${meterBasisCol}
-       FROM service_variants
-       WHERE service_id IN (${placeholders})
-       ORDER BY service_id, sort_order, id`,
+      `SELECT sv.id, sv.service_id, sv.variant_name, sv.parameters, sv.sort_order, sv.is_active, sv.created_at, sv.updated_at${parentCol}${materialCols}${consumptionCol}${meterBasisCol}${rollWidthCols}
+       FROM service_variants sv
+       ${materialJoin}
+       WHERE sv.service_id IN (${placeholders})
+       ORDER BY sv.service_id, sv.sort_order, sv.id`,
       ...uniq,
     );
     for (const row of vRows) {
       const sid = Number(row.service_id);
       if (!out[sid]) continue;
-      const paramsRaw = parseServiceVariantParameters(row.parameters);
-      const parentColVal = hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
-      const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
-      const parentResolved = parentColVal !== null ? parentColVal : parentFromJson;
-      const parameters = parametersWithParentSync(paramsRaw, parentResolved);
-      out[sid].variants.push({
-        id: row.id,
-        serviceId: row.service_id,
-        variantName: row.variant_name,
-        parameters,
-        sortOrder: row.sort_order || 0,
-        isActive: row.is_active !== undefined ? !!row.is_active : true,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
-        ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
-        ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
-        ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(row.consumption_mode ?? 'fixed') } : {}),
-        ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(row.meter_basis, null) } : {}),
-      });
+      out[sid].variants.push(
+        mapServiceVariantRow(row, {
+          hasParentVariantId,
+          hasMaterialId,
+          hasQtyPerItem,
+          hasConsumptionMode,
+          hasMeterBasis,
+        })
+      );
     }
 
     const bRows = await db.all<RawTierRow[]>(
@@ -1322,39 +1357,31 @@ export class PricingServiceRepository {
     try { hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id'); } catch { /* ignore */ }
     try { hasConsumptionMode = await hasColumn('service_variants', 'consumption_mode'); } catch { /* ignore */ }
     try { hasMeterBasis = await hasColumn('service_variants', 'meter_basis'); } catch { /* ignore */ }
-    const materialCols = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
-    const parentCol = hasParentVariantId ? ', parent_variant_id' : '';
-    const consumptionCol = hasConsumptionMode ? ', consumption_mode' : '';
-    const meterBasisCol = hasMeterBasis ? ', meter_basis' : '';
+    const materialCols = hasMaterialId && hasQtyPerItem ? ', sv.material_id, sv.qty_per_item' : '';
+    const parentCol = hasParentVariantId ? ', sv.parent_variant_id' : '';
+    const consumptionCol = hasConsumptionMode ? ', sv.consumption_mode' : '';
+    const meterBasisCol = hasMeterBasis ? ', sv.meter_basis' : '';
+    const rollWidthCols = hasMaterialId
+      ? ', m.sheet_width as material_sheet_width, m.printable_width as material_printable_width'
+      : '';
+    const materialJoin = hasMaterialId ? 'LEFT JOIN materials m ON m.id = sv.material_id' : '';
     const rows = await db.all<any[]>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}${consumptionCol}${meterBasisCol}
-       FROM service_variants 
-       WHERE service_id = ? 
-       ORDER BY sort_order, id`,
+      `SELECT sv.id, sv.service_id, sv.variant_name, sv.parameters, sv.sort_order, sv.is_active, sv.created_at, sv.updated_at${parentCol}${materialCols}${consumptionCol}${meterBasisCol}${rollWidthCols}
+       FROM service_variants sv
+       ${materialJoin}
+       WHERE sv.service_id = ?
+       ORDER BY sv.sort_order, sv.id`,
       serviceId,
     );
-    return rows.map((row) => {
-      const paramsRaw = parseServiceVariantParameters(row.parameters);
-      const parentColVal = hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
-      const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
-      const parentResolved = parentColVal !== null ? parentColVal : parentFromJson;
-      const parameters = parametersWithParentSync(paramsRaw, parentResolved);
-      return {
-        id: row.id,
-        serviceId: row.service_id,
-        variantName: row.variant_name,
-        parameters,
-        sortOrder: row.sort_order || 0,
-        isActive: row.is_active !== undefined ? !!row.is_active : true,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
-        ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
-        ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
-        ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(row.consumption_mode ?? 'fixed') } : {}),
-        ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(row.meter_basis, null) } : {}),
-      };
-    });
+    return rows.map((row) =>
+      mapServiceVariantRow(row, {
+        hasParentVariantId,
+        hasMaterialId,
+        hasQtyPerItem,
+        hasConsumptionMode,
+        hasMeterBasis,
+      })
+    );
   }
 
   static async createServiceVariant(serviceId: number, payload: CreateServiceVariantDTO): Promise<ServiceVariantDTO> {
@@ -1455,26 +1482,30 @@ export class PricingServiceRepository {
       console.warn('createServiceVariant: не удалось привязать цены к диапазонам', attachErr);
     }
 
-    const paramsRaw = parseServiceVariantParameters(row.parameters);
-    const parentColVal = hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
-    const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
-    const parentResolved = parentColVal !== null ? parentColVal : parentFromJson;
-    const parameters = parametersWithParentSync(paramsRaw, parentResolved);
-    return {
-      id: row.id,
-      serviceId: row.service_id,
-      variantName: row.variant_name,
-      parameters,
-      sortOrder: row.sort_order || 0,
-      isActive: row.is_active !== undefined ? !!row.is_active : true,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
-      ...(row.material_id != null ? { material_id: row.material_id } : {}),
-      ...(row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
-      ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(row.consumption_mode ?? 'fixed') } : {}),
-      ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(row.meter_basis, null) } : {}),
-    };
+    let material_sheet_width: number | null = null;
+    let material_printable_width: number | null = null;
+    if (row.material_id != null) {
+      try {
+        const mat = await db.get<{ sheet_width?: number | null; printable_width?: number | null }>(
+          `SELECT sheet_width, printable_width FROM materials WHERE id = ?`,
+          row.material_id
+        );
+        material_sheet_width = mat?.sheet_width ?? null;
+        material_printable_width = mat?.printable_width ?? null;
+      } catch {
+        /* ignore */
+      }
+    }
+    return mapServiceVariantRow(
+      { ...row, material_sheet_width, material_printable_width },
+      {
+        hasParentVariantId,
+        hasMaterialId,
+        hasQtyPerItem,
+        hasConsumptionMode,
+        hasMeterBasis,
+      }
+    );
   }
 
   static async updateServiceVariant(variantId: number, payload: UpdateServiceVariantDTO): Promise<ServiceVariantDTO | null> {
@@ -1557,40 +1588,31 @@ export class PricingServiceRepository {
 
     await db.run(`UPDATE service_variants SET ${setSql} WHERE id = ?`, ...updateParams);
 
-    const parentSel = hasParentVariantId ? ', parent_variant_id' : '';
-    const materialSel = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
-    const consumptionSel = hasConsumptionMode ? ', consumption_mode' : '';
-    const meterBasisSel = hasMeterBasis ? ', meter_basis' : '';
+    const parentSel = hasParentVariantId ? ', sv.parent_variant_id' : '';
+    const materialSel = hasMaterialId && hasQtyPerItem ? ', sv.material_id, sv.qty_per_item' : '';
+    const consumptionSel = hasConsumptionMode ? ', sv.consumption_mode' : '';
+    const meterBasisSel = hasMeterBasis ? ', sv.meter_basis' : '';
+    const rollWidthCols = hasMaterialId
+      ? ', m.sheet_width as material_sheet_width, m.printable_width as material_printable_width'
+      : '';
+    const materialJoin = hasMaterialId ? 'LEFT JOIN materials m ON m.id = sv.material_id' : '';
     const updated = await db.get<any>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentSel}${materialSel}${consumptionSel}${meterBasisSel}
-       FROM service_variants 
-       WHERE id = ?`,
+      `SELECT sv.id, sv.service_id, sv.variant_name, sv.parameters, sv.sort_order, sv.is_active, sv.created_at, sv.updated_at${parentSel}${materialSel}${consumptionSel}${meterBasisSel}${rollWidthCols}
+       FROM service_variants sv
+       ${materialJoin}
+       WHERE sv.id = ?`,
       variantId,
     );
     if (!updated) {
       return null;
     }
-    const paramsRaw = parseServiceVariantParameters(updated.parameters);
-    const parentColVal = hasParentVariantId ? normalizeParentVariantId(updated.parent_variant_id) : null;
-    const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
-    const parentResolvedOut = parentColVal !== null ? parentColVal : parentFromJson;
-    const parameters = parametersWithParentSync(paramsRaw, parentResolvedOut);
-
-    return {
-      id: updated.id,
-      serviceId: updated.service_id,
-      variantName: updated.variant_name,
-      parameters,
-      sortOrder: updated.sort_order || 0,
-      isActive: updated.is_active !== undefined ? !!updated.is_active : true,
-      createdAt: updated.created_at,
-      updatedAt: updated.updated_at,
-      ...(hasParentVariantId ? { parentVariantId: parentResolvedOut } : {}),
-      ...(updated.material_id != null ? { material_id: updated.material_id } : {}),
-      ...(updated.qty_per_item != null ? { qty_per_item: Number(updated.qty_per_item) } : {}),
-      ...(hasConsumptionMode ? { consumption_mode: normalizeConsumptionMode(updated.consumption_mode ?? 'fixed') } : {}),
-      ...(hasMeterBasis ? { meter_basis: normalizeMeterBasis(updated.meter_basis, null) } : {}),
-    };
+    return mapServiceVariantRow(updated, {
+      hasParentVariantId,
+      hasMaterialId,
+      hasQtyPerItem,
+      hasConsumptionMode,
+      hasMeterBasis,
+    });
   }
 
   static async deleteServiceVariant(variantId: number): Promise<void> {

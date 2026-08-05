@@ -5,6 +5,7 @@
 import React, { memo, useCallback, useRef } from 'react';
 import { PriceRangeCells } from './PriceRangeCells';
 import { VariantRowActions } from './VariantRowActions';
+import { VariantMaterialSelect } from './VariantMaterialSelect';
 import { VariantRowLevel1Props } from './ServiceVariantsTable.types';
 
 const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
@@ -22,6 +23,9 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
   onCreateSibling,
   onDelete,
   onPriceChange,
+  materials = [],
+  priceUnit,
+  onUpdateMaterial,
 }) => {
   const l2Ref = useRef(level2Variants);
   l2Ref.current = level2Variants;
@@ -103,6 +107,14 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
                 />
               )}
             </div>
+            {isLeaf && onUpdateMaterial && materials.length > 0 && (
+              <VariantMaterialSelect
+                variant={variant}
+                materials={materials}
+                priceUnit={priceUnit}
+                onUpdate={onUpdateMaterial}
+              />
+            )}
           </div>
         </div>
       </td>

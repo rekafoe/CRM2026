@@ -520,6 +520,8 @@ router.get('/:productId/schema', async (req, res) => {
         }));
       }
       const serviceIds = collectServiceIdsFromSimplified(schema.template.simplified);
+      // На сайт клиенту — только клиентские варианты (напр. матовая/глянцевая).
+      // Ширину рулона в compact не отдаём: она для оператора в CRM и для биллинга на бэкенде.
       let serviceVariants: Record<string, Array<{ id: number; variantName: string; parameters?: Record<string, unknown>; sortOrder?: number }>> = {};
       if (serviceIds.length > 0) {
         try {
