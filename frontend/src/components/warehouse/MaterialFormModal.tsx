@@ -1,12 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Material, MaterialKind } from '../../types/shared';
 import { api, createMaterialType } from '../../api';
 import { materialPriceFieldLabel, materialPurchasePriceFieldLabel } from '../../utils/materialPriceLabels';
 import { formatRollStockLabel } from '../../utils/materialRollLabels';
 import { BynSymbol } from '../ui';
 import { AppIcon } from '../ui/AppIcon';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useUIStore } from '../../stores/uiStore';
 import './MaterialFormModal.css';
+
+/** Отображение числа в input: 0 не превращается в пустую строку. */
+function numberInputValue(value: unknown): string | number {
+  if (value === '' || value === null || value === undefined) return '';
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : '';
+}
+
+/** Парсинг числа: пусто → fallback, «0» остаётся 0 (не через ||). */
+function parseNumberInput(raw: string, fallback: number, asInt = false): number {
+  const trimmed = raw.trim();
+  if (trimmed === '') return fallback;
+  const n = asInt ? parseInt(trimmed, 10) : parseFloat(trimmed);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parseOptionalNumberInput(raw: string, asInt = false): number | undefined {
+  const trimmed = raw.trim();
+  if (trimmed === '') return undefined;
+  const n = asInt ? parseInt(trimmed, 10) : parseFloat(trimmed);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 interface PaperType {
   id: number;
@@ -104,7 +127,25 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   const [showQuickTypeModal, setShowQuickTypeModal] = useState(false);
   const [quickTypeName, setQuickTypeName] = useState('');
   const [creatingType, setCreatingType] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const initialSnapshotRef = useRef('');
   const { showToast } = useUIStore();
+
+  const formSnapshot = useCallback((data: MaterialFormData) => JSON.stringify(data), []);
+
+  const isDirty = useCallback(() => {
+    if (!initialSnapshotRef.current) return false;
+    return formSnapshot(formData) !== initialSnapshotRef.current;
+  }, [formData, formSnapshot]);
+
+  const requestClose = useCallback(() => {
+    if (showQuickTypeModal) return;
+    if (isDirty()) {
+      setShowCloseConfirm(true);
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose, showQuickTypeModal]);
 
   const inferredKind = React.useMemo<MaterialKind>(() => {
     const explicitKind = formData.material_kind;
@@ -236,38 +277,48 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isOpen) {
+      setShowCloseConfirm(false);
+      initialSnapshotRef.current = '';
+      return;
+    }
+
+    let next: MaterialFormData;
     if (material) {
       const price = material.sheet_price_single ?? material.price ?? 0;
-      const purchasePrice = material.purchase_price != null ? Number(material.purchase_price) : undefined;
-      
-      setFormData({
+      const purchaseRaw = material.purchase_price;
+      const purchasePrice =
+        purchaseRaw === null || purchaseRaw === undefined
+          ? undefined
+          : Number(purchaseRaw);
+
+      next = {
         name: material.name || '',
         description: material.description || '',
         category_id: material.category_id || undefined,
-        quantity: material.quantity || 0,
+        quantity: material.quantity ?? 0,
         unit: material.unit || 'шт',
-        price: price,
-        sheet_price_single: price,
-        purchase_price: purchasePrice,
+        price: Number.isFinite(Number(price)) ? Number(price) : 0,
+        sheet_price_single: Number.isFinite(Number(price)) ? Number(price) : 0,
+        purchase_price: purchasePrice !== undefined && Number.isFinite(purchasePrice) ? purchasePrice : undefined,
         supplier_id: material.supplier_id,
-        min_stock_level: material.min_stock_level || 0,
-        max_stock_level: material.max_stock_level || 100,
+        min_stock_level: material.min_stock_level ?? 0,
+        max_stock_level: material.max_stock_level ?? 100,
         location: material.location || '',
         barcode: material.barcode || '',
         sku: material.sku || '',
         notes: material.notes || '',
         is_active: material.is_active !== undefined ? material.is_active : true,
-        paper_type_id: (material as any).paper_type_id || undefined, // 🆕 Добавляем поле типа бумаги
+        paper_type_id: (material as any).paper_type_id || undefined,
         material_type_id: (material as any).material_type_id || undefined,
         material_kind: (material as any).material_kind || undefined,
-        density: (material as any).density || undefined, // 🆕 Добавляем поле плотности
-        finish: (material as any).finish || '', // 🆕 Отделка (для ламинации)
+        density: (material as any).density ?? undefined,
+        finish: (material as any).finish || '',
         sheet_width: (material as any).sheet_width ?? '',
         sheet_height: (material as any).sheet_height ?? ''
-      });
+      };
     } else {
-      // При создании нового материала сбрасываем форму
-      setFormData({
+      next = {
         name: '',
         description: '',
         category_id: undefined,
@@ -291,9 +342,33 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         finish: '',
         sheet_width: '',
         sheet_height: ''
-      });
+      };
     }
-  }, [material]);
+
+    setFormData(next);
+    initialSnapshotRef.current = formSnapshot(next);
+    setShowCloseConfirm(false);
+  }, [material, isOpen, formSnapshot]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (showQuickTypeModal) {
+          if (!creatingType) setShowQuickTypeModal(false);
+          return;
+        }
+        if (showCloseConfirm) {
+          setShowCloseConfirm(false);
+          return;
+        }
+        requestClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, requestClose, showQuickTypeModal, creatingType, showCloseConfirm]);
 
   useEffect(() => {
     const categoryId = formData.category_id;
@@ -321,6 +396,12 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       material_kind: inferredKind,
       material_type_id: formData.material_type_id || undefined,
       unit: formData.unit || KIND_DEFAULT_UNITS[inferredKind],
+      quantity: formData.quantity ?? 0,
+      price: formData.price ?? 0,
+      sheet_price_single: formData.sheet_price_single ?? formData.price ?? 0,
+      purchase_price: formData.purchase_price,
+      min_stock_level: formData.min_stock_level ?? 0,
+      max_stock_level: formData.max_stock_level ?? 100,
     };
     onSave(payload);
   };
@@ -337,14 +418,15 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="modal-overlay material-form-modal-overlay" onClick={requestClose}>
+      <div className="modal-content material-form-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header material-form-modal__header">
           <h2>{material ? 'Редактировать материал' : 'Добавить материал'}</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="modal-close" onClick={requestClose} aria-label="Закрыть">×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="material-form">
+          <div className="material-form__body">
           <div className="form-row">
             <div className="form-group">
               <label>Название *</label>
@@ -397,7 +479,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   onChange={(e) => handleChange('material_type_id', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                   disabled={!formData.category_id || loadingMaterialTypes}
                 >
-                  <option value="">{formData.category_id ? 'Выберите тип' : 'Сначала выберите категорию'}</option>
+                  <option value="">{formData.category_id ? 'Выберите тип' : 'Сначала категория'}</option>
                   {materialTypes
                     .filter((type) => Number(type.is_active ?? 1) !== 0)
                     .map((type) => (
@@ -495,10 +577,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 <label>Плотность (г/м²)</label>
                 <input
                   type="number"
-                  value={(formData as any).density ?? ''}
+                  value={numberInputValue((formData as any).density)}
                   onChange={(e) => {
-                    const value = e.target.value;
-                    handleChange('density' as any, value === '' ? undefined : parseInt(value, 10));
+                    handleChange('density' as any, parseOptionalNumberInput(e.target.value, true));
                   }}
                   placeholder="120, 150, 200..."
                   min="50"
@@ -533,10 +614,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 <label>Толщина пленки (мк)</label>
                 <input
                   type="number"
-                  value={(formData as any).density ?? ''}
+                  value={numberInputValue((formData as any).density)}
                   onChange={(e) => {
-                    const value = e.target.value;
-                    handleChange('density' as any, value === '' ? undefined : parseInt(value, 10));
+                    handleChange('density' as any, parseOptionalNumberInput(e.target.value, true));
                   }}
                   placeholder="25, 32, 42..."
                   min="10"
@@ -560,8 +640,11 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   <label>{isRollKind ? 'Ширина рулона (мм) *' : 'Ширина листа (мм)'}</label>
                   <input
                     type="number"
-                    value={formData.sheet_width ?? ''}
-                    onChange={(e) => handleChange('sheet_width' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
+                    value={numberInputValue(formData.sheet_width === '' ? undefined : formData.sheet_width)}
+                    onChange={(e) => {
+                      const next = parseOptionalNumberInput(e.target.value);
+                      handleChange('sheet_width' as any, next === undefined ? '' : next);
+                    }}
                     placeholder={isRollKind ? '630 (это 63 см)' : '210 (A4), 320 (SRA3)'}
                     min="1"
                     max={isRollKind ? undefined : '2000'}
@@ -578,15 +661,18 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   <label>{isRollKind ? 'Остаток намотки (пог. м) *' : 'Высота листа (мм) *'}</label>
                   <input
                     type="number"
-                    value={isRollKind ? (formData.quantity ?? '') : (formData.sheet_height ?? '')}
+                    value={
+                      isRollKind
+                        ? numberInputValue(formData.quantity)
+                        : numberInputValue(formData.sheet_height === '' ? undefined : formData.sheet_height)
+                    }
                     onChange={(e) => {
                       if (isRollKind) {
-                        const raw = e.target.value;
-                        const num = raw === '' ? 0 : parseFloat(raw);
-                        handleChange('quantity', Number.isFinite(num) ? num : 0);
+                        handleChange('quantity', parseNumberInput(e.target.value, 0));
                         return;
                       }
-                      handleChange('sheet_height' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined));
+                      const next = parseOptionalNumberInput(e.target.value);
+                      handleChange('sheet_height' as any, next === undefined ? '' : next);
                     }}
                     placeholder={isRollKind ? '50' : '297 (A4), 450 (SRA3)'}
                     min={isRollKind ? '0' : '1'}
@@ -599,7 +685,12 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                       Складской остаток рулона в погонных метрах (не число рулонов).
                       {' '}
                       Сейчас: <strong>{formatRollStockLabel({
-                        sheet_width: typeof formData.sheet_width === 'number' ? formData.sheet_width : Number(formData.sheet_width) || null,
+                        sheet_width: (() => {
+                          const raw = formData.sheet_width;
+                          if (raw === '' || raw === null || raw === undefined) return null;
+                          const w = Number(raw);
+                          return Number.isFinite(w) ? w : null;
+                        })(),
                         quantity: formData.quantity,
                       })}</strong>
                     </small>
@@ -615,11 +706,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 <label>Количество *</label>
                 <input
                   type="number"
-                  value={formData.quantity ?? ''}
+                  value={numberInputValue(formData.quantity)}
                   onChange={(e) => {
-                    const v = e.target.value;
-                    const num = v === '' ? 0 : (parseInt(v, 10) ?? 0);
-                    handleChange('quantity', num);
+                    handleChange('quantity', parseNumberInput(e.target.value, 0, true));
                   }}
                   required
                   min="0"
@@ -631,17 +720,16 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
           <div className="form-row">
             <div className="form-group">
-              <label>{materialPurchasePriceFieldLabel(formData.unit)} (<BynSymbol />) *</label>
+              <label>
+                <span>{materialPurchasePriceFieldLabel(formData.unit)}</span>
+                <span className="material-form__currency"> (<BynSymbol />)</span>
+                <span className="material-form__required" aria-hidden="true"> *</span>
+              </label>
               <input
                 type="number"
-                value={(formData as any).purchase_price ?? ''}
+                value={numberInputValue((formData as any).purchase_price)}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === '') {
-                    handleChange('purchase_price', undefined);
-                    return;
-                  }
-                  handleChange('purchase_price', parseFloat(v) || 0);
+                  handleChange('purchase_price', parseOptionalNumberInput(e.target.value));
                 }}
                 required
                 min="0"
@@ -652,13 +740,16 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               </small>
             </div>
             <div className="form-group">
-              <label>{materialPriceFieldLabel(formData.unit)} (<BynSymbol />) *</label>
+              <label>
+                <span>{materialPriceFieldLabel(formData.unit)}</span>
+                <span className="material-form__currency"> (<BynSymbol />)</span>
+                <span className="material-form__required" aria-hidden="true"> *</span>
+              </label>
               <input
                 type="number"
-                value={formData.price ?? ''}
+                value={numberInputValue(formData.price)}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  const price = v === '' ? 0 : (parseFloat(v) ?? 0);
+                  const price = parseNumberInput(e.target.value, 0);
                   handleChange('price', price);
                   handleChange('sheet_price_single', price);
                 }}
@@ -683,15 +774,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>{isRollKind ? 'Мин. остаток намотки (пог. м)' : 'Минимальный запас'}</label>
               <input
                 type="number"
-                value={formData.min_stock_level ?? ''}
+                value={numberInputValue(formData.min_stock_level)}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === '') {
-                    handleChange('min_stock_level', 0);
-                    return;
-                  }
-                  const parsed = isRollKind ? parseFloat(v) : parseInt(v, 10);
-                  handleChange('min_stock_level', Number.isFinite(parsed) ? parsed : 0);
+                  handleChange('min_stock_level', parseNumberInput(e.target.value, 0, !isRollKind));
                 }}
                 min="0"
                 step={isRollKind ? '0.01' : '1'}
@@ -701,15 +786,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>{isRollKind ? 'Макс. намотка (пог. м)' : 'Максимальный запас'}</label>
               <input
                 type="number"
-                value={formData.max_stock_level ?? ''}
+                value={numberInputValue(formData.max_stock_level)}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === '') {
-                    handleChange('max_stock_level', 0);
-                    return;
-                  }
-                  const parsed = isRollKind ? parseFloat(v) : parseInt(v, 10);
-                  handleChange('max_stock_level', Number.isFinite(parsed) ? parsed : 100);
+                  handleChange('max_stock_level', parseNumberInput(e.target.value, 100, !isRollKind));
                 }}
                 min="0"
                 step={isRollKind ? '0.01' : '1'}
@@ -786,9 +865,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               Материал активен
             </label>
           </div>
+          </div>
 
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <div className="modal-actions material-form-modal__actions">
+            <button type="button" className="btn btn-secondary" onClick={requestClose}>
               Отмена
             </button>
             <button type="submit" className="btn btn-primary">
@@ -797,6 +877,17 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
           </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        isOpen={showCloseConfirm}
+        onClose={() => setShowCloseConfirm(false)}
+        onConfirm={onClose}
+        title="Закрыть форму?"
+        message="Есть несохранённые изменения. Закрыть без сохранения?"
+        confirmText="Закрыть"
+        cancelText="Остаться"
+        variant="warning"
+      />
 
       {showQuickTypeModal && (
         <div className="modal-overlay material-type-quick-overlay" onClick={() => !creatingType && setShowQuickTypeModal(false)}>

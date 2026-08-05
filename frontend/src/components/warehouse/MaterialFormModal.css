@@ -1,50 +1,311 @@
-.help-muted { color: #666; font-size: 12px; }
+/* Модалка материала — изолированные стили (не зависят от чужих .modal-content) */
 
-.form-hint {
-  color: #666;
-  font-size: 12px;
+.material-form-modal-overlay {
+  z-index: 2100;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.material-form-modal.modal-content,
+.modal-content.material-form-modal {
+  max-width: 760px !important;
+  width: min(760px, calc(100vw - 32px)) !important;
+  max-height: min(90vh, 920px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18) !important;
+}
+
+.material-form-modal__header,
+.material-form-modal .modal-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  padding: 18px 24px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.material-form-modal__header h2,
+.material-form-modal .modal-header h2 {
+  margin: 0 !important;
+  font-size: 1.2rem !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+  color: #0f172a !important;
+}
+
+.material-form-modal .modal-close {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 8px !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  color: #64748b !important;
+  flex-shrink: 0 !important;
+}
+
+.material-form-modal .modal-close:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.material-form-modal .material-form {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.material-form-modal .material-form__body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding: 20px 24px !important;
+  box-sizing: border-box !important;
+}
+
+.material-form-modal .form-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 16px 20px !important;
+  margin: 0 0 18px !important;
+  align-items: start !important;
+}
+
+.material-form-modal .form-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+}
+
+.material-form-modal .form-group label {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: baseline !important;
+  gap: 0 4px !important;
+  margin: 0 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  color: #334155 !important;
+}
+
+.material-form-modal .material-form__required {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.material-form-modal .material-form__currency {
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.material-form-modal .form-group input,
+.material-form-modal .form-group select,
+.material-form-modal .form-group textarea {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 40px !important;
+  padding: 10px 12px !important;
+  border: 1px solid #d0d7e2 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+  box-sizing: border-box !important;
+}
+
+.material-form-modal .form-group textarea {
+  min-height: 88px !important;
+  resize: vertical;
+}
+
+.material-form-modal .form-group input:focus,
+.material-form-modal .form-group select:focus,
+.material-form-modal .form-group textarea:focus {
+  outline: none !important;
+  border-color: #64748b !important;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.15) !important;
+}
+
+.material-form-modal .form-hint,
+.material-form-modal .help-muted {
   display: block;
-  margin-top: 4px;
+  margin: 2px 0 0 !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
 }
 
-.form-section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary, #222);
-  margin: 8px 0 4px;
+.material-form-modal .form-section-title {
+  grid-column: 1 / -1;
+  margin: 4px 0 0 !important;
+  padding-top: 4px;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  color: #0f172a !important;
 }
 
-.material-type-select-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.material-form-modal .material-type-select-row {
+  display: flex !important;
+  gap: 10px !important;
+  align-items: center !important;
+  min-width: 0 !important;
 }
 
-.material-type-select-row select {
-  flex: 1;
+.material-form-modal .material-type-select-row select {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
 }
 
-.material-type-add-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border-color, #ddd);
-  border-radius: 6px;
-  background: var(--bg-tertiary, #f3f3f3);
+.material-form-modal .material-type-add-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+  border: 1px solid #d0d7e2 !important;
+  border-radius: 8px !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
   cursor: pointer;
 }
 
-.material-type-add-btn:disabled {
+.material-form-modal .material-type-add-btn:hover:not(:disabled) {
+  background: #eef2f7 !important;
+  border-color: #94a3b8 !important;
+}
+
+.material-form-modal .material-type-add-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.material-type-quick-overlay {
-  z-index: 1100;
+.material-form-modal .checkbox-group {
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 8px !important;
 }
 
-.material-type-quick-modal {
-  max-width: 420px;
+.material-form-modal .checkbox-group input[type='checkbox'] {
+  width: 16px !important;
+  height: 16px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+}
+
+.material-form-modal__actions,
+.material-form-modal .modal-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  padding: 16px 24px 20px !important;
+  border-top: 1px solid #e2e8f0 !important;
+  background: #fff !important;
+}
+
+.material-form-modal .modal-actions .btn {
+  min-height: 40px !important;
+  padding: 10px 18px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.material-form-modal .loading-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.material-type-quick-overlay {
+  z-index: 2200;
+  padding: 24px;
+}
+
+.material-type-quick-modal.modal-content,
+.modal-content.material-type-quick-modal {
+  max-width: 440px !important;
+  width: min(440px, calc(100vw - 32px)) !important;
+  padding: 20px 22px !important;
+  border-radius: 12px !important;
+  overflow: auto !important;
+}
+
+.material-type-quick-modal h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.material-type-quick-modal .form-group {
+  margin: 12px 0 16px;
+}
+
+.material-type-quick-modal .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.material-type-quick-modal .form-group input {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #d0d7e2;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.material-type-quick-modal .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (max-width: 720px) {
+  .material-form-modal-overlay {
+    padding: 12px;
+  }
+
+  .material-form-modal .material-form__body {
+    padding: 16px !important;
+  }
+
+  .material-form-modal__header,
+  .material-form-modal .modal-header,
+  .material-form-modal__actions,
+  .material-form-modal .modal-actions {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .material-form-modal .form-row {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    margin-bottom: 14px !important;
+  }
 }
