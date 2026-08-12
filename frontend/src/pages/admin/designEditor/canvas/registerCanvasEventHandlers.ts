@@ -20,7 +20,11 @@ import {
   updatePhotoFieldDropHighlight,
 } from '../photoFieldDropHighlight';
 import { finishTextEditOnObject } from '../textStyleRuns';
-import { createSmartGuideSession, resolveSmartGuideSnapAtPointer } from '../smartGuides/snapSession';
+import {
+  createSmartGuideSession,
+  resolveSmartGuideHaptic,
+  resolveSmartGuideSnapAtPointer,
+} from '../smartGuides/snapSession';
 import type { SmartGuidePointer, SmartGuideSession } from '../smartGuides/types';
 import {
   getFilledPhotoCropContext,
@@ -65,6 +69,10 @@ import {
 import { deleteCanvasSelection } from './deleteCanvasSelection';
 import { DESIGN_EDITOR_DELETE_REQUEST } from '../designEditorDeleteControl';
 import type { AnyObj } from './canvasUtils';
+import { getFabricCanvasEditScale } from './mobileEditorPixelBudget';
+
+const MOBILE_SNAP_OVERLAY_INTERVAL_MS = 1000 / 30;
+const MOBILE_SNAP_HAPTIC_MS = 8;
 
 export type CropModalState = {
   fieldId: string;
@@ -204,6 +212,37 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
         };
 
         let objectDragActive = false;
+        let mobileSnapOverlayRaf = 0;
+        let mobileSnapOverlayLastAt = 0;
+        let pendingMobileSnapOverlay: {
+          key: string;
+          lines: { axis: 'h' | 'v'; pos: number }[];
+        } | null = null;
+        let mobileSnapHapticSignature = '';
+
+        const flushMobileSnapOverlay = (frameAt: number) => {
+          mobileSnapOverlayRaf = 0;
+          if (frameAt - mobileSnapOverlayLastAt < MOBILE_SNAP_OVERLAY_INTERVAL_MS) {
+            mobileSnapOverlayRaf = requestAnimationFrame(flushMobileSnapOverlay);
+            return;
+          }
+          const pending = pendingMobileSnapOverlay;
+          pendingMobileSnapOverlay = null;
+          if (!pending || pending.key === snapOverlayKeyRef.current) return;
+          mobileSnapOverlayLastAt = frameAt;
+          snapOverlayKeyRef.current = pending.key;
+          setLocalSnapLines(pending.lines);
+          snapLinesRef.current?.(pending.lines);
+        };
+
+        const scheduleMobileSnapOverlay = (lines: { axis: 'h' | 'v'; pos: number }[]) => {
+          const key = snapLinesSignature(lines);
+          if (key === snapOverlayKeyRef.current && !pendingMobileSnapOverlay) return;
+          pendingMobileSnapOverlay = { key, lines };
+          if (!mobileSnapOverlayRaf) {
+            mobileSnapOverlayRaf = requestAnimationFrame(flushMobileSnapOverlay);
+          }
+        };
 
         const scheduleTextAnchor = () => {
           if (!onTextFloatingAnchorRef.current) return;
@@ -430,7 +469,8 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
         // Smart guides: targets are fixed for one drag, hysteresis keeps snapping stable.
         canvas.on('object:moving', (opt) => {
           objectDragActive = true;
-          if (isCoarsePointerEnvironment()) {
+          const useMobileSmartGuides = isCoarsePointerEnvironment();
+          if (useMobileSmartGuides) {
             enforceSingleObjectSelectionOnCoarse(canvas);
           }
           const movingField = resolvePhotoFieldTarget(opt.target);
@@ -457,10 +497,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           if (!smartGuideSessionRef.current) {
             const excludePeerSnap =
               !!(asAny(target).isPhotoField || (target.group && asAny(target.group).isPhotoField));
-            const skipPeerSnapOnCoarse =
-              isCoarsePointerEnvironment()
-              && isTextLikeObject(target);
-            const others = excludePeerSnap || skipPeerSnapOnCoarse
+            const others = excludePeerSnap
               ? []
               : canvas
                   .getObjects()
@@ -488,6 +525,9 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
               canvasH: pageHeightPx,
               safeZonePx,
               spreadHalfWidthPx: spreadPairPagesRef.current ? pageWidthRef.current : undefined,
+              mode: useMobileSmartGuides ? 'mobile' : 'desktop',
+              sceneToDisplayScale:
+                selectionDisplayScaleRef.current * getFabricCanvasEditScale(canvas),
             });
           }
           const snap = resolveSmartGuideSnapAtPointer(
@@ -501,22 +541,47 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
             snapPointer,
           );
           smartGuideSessionRef.current = snap.session;
+          if (useMobileSmartGuides) {
+            const haptic = resolveSmartGuideHaptic(mobileSnapHapticSignature, snap.session);
+            mobileSnapHapticSignature = haptic.signature;
+            if (
+              haptic.shouldVibrate
+              && typeof navigator !== 'undefined'
+              && typeof navigator.vibrate === 'function'
+            ) {
+              try {
+                navigator.vibrate(MOBILE_SNAP_HAPTIC_MS);
+              } catch {
+                /* unsupported or blocked */
+              }
+            }
+          }
           if (snap.dx !== 0) target.set('left', (target.left ?? 0) + snap.dx);
           if (snap.dy !== 0) target.set('top', (target.top ?? 0) + snap.dy);
           if (snap.dx !== 0 || snap.dy !== 0) {
             keepGrabPointAlignedWithSnap(opt, snap.dx, snap.dy);
             target.setCoords();
           }
-          const sig = snapLinesSignature(snap.lines);
-          if (sig !== snapOverlayKeyRef.current) {
-            snapOverlayKeyRef.current = sig;
-            setLocalSnapLines(snap.lines);
-            snapLinesRef.current?.(snap.lines);
+          if (useMobileSmartGuides) {
+            scheduleMobileSnapOverlay(snap.lines);
+          } else {
+            const sig = snapLinesSignature(snap.lines);
+            if (sig !== snapOverlayKeyRef.current) {
+              snapOverlayKeyRef.current = sig;
+              setLocalSnapLines(snap.lines);
+              snapLinesRef.current?.(snap.lines);
+            }
           }
         });
         const clearSnaps = () => {
           objectDragActive = false;
           smartGuideSessionRef.current = null;
+          mobileSnapHapticSignature = '';
+          pendingMobileSnapOverlay = null;
+          if (mobileSnapOverlayRaf) {
+            cancelAnimationFrame(mobileSnapOverlayRaf);
+            mobileSnapOverlayRaf = 0;
+          }
           snapOverlayKeyRef.current = '';
           setLocalSnapLines([]);
           snapLinesRef.current?.([]);
@@ -1012,6 +1077,8 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
     restoreBasicTextClickLock();
     removeCanvasDropListeners?.();
     cancelAnimationFrame(textAnchorRafRef.current);
+    if (mobileSnapOverlayRaf) cancelAnimationFrame(mobileSnapOverlayRaf);
+    pendingMobileSnapOverlay = null;
     scheduleTextAnchorRef.current = null;
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('paste', onPaste);

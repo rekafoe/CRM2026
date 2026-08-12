@@ -139,7 +139,10 @@
 }
 
 .design-editor-snap-line {
-  stroke: #f43f5e;
-  stroke-width: 0.8;
-  stroke-dasharray: 3 3;
+  stroke: #ff2d68;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.92));
 }

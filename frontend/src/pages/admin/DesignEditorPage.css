@@ -233,6 +233,23 @@
   background: #f43f5e;
 }
 
+.design-editor-snap-overlay {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 20;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.design-editor-snap-line {
+  stroke: #ff2d68;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.92));
+}
+
 .design-editor-fit-scaler {
   --de-fit-zoom: 1;
   --de-content-w: 1;

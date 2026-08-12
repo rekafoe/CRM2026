@@ -1,5 +1,6 @@
 export type SmartGuideAxis = 'x' | 'y';
 export type SmartGuideAnchorKind = 'start' | 'center' | 'end';
+export type SmartGuideMode = 'desktop' | 'mobile';
 
 export interface SmartGuideLine {
   axis: 'h' | 'v';
@@ -37,6 +38,8 @@ export interface SmartGuideSession {
   activeX: SmartGuideActiveSnap | null;
   activeY: SmartGuideActiveSnap | null;
   startRect: SmartGuideRect;
+  mode: SmartGuideMode;
+  sceneToDisplayScale: number;
   lastPointer: SmartGuidePointer | null;
   lastPointerAt: number | null;
 }

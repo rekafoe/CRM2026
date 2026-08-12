@@ -1063,6 +1063,40 @@ async function renderFabricPageToPng(
             /* системный шрифт */
           }
         }
+        const centerTextboxContentInLayoutFrame = (obj: any): void => {
+          if (String(obj?.type ?? '').toLowerCase() !== 'textbox') return
+          const layoutHeight = Number(obj.textFieldLayoutHeight)
+          if (!Number.isFinite(layoutHeight) || layoutHeight <= 0) return
+          if (typeof obj.set === 'function') obj.set({ height: layoutHeight })
+          else obj.height = layoutHeight
+          if (
+            obj._productionVerticalCenterVersion === 1
+            || typeof obj._getTopOffset !== 'function'
+          ) return
+          const originalGetTopOffset = obj._getTopOffset
+          obj._getTopOffset = function centeredProductionTextTopOffset(this: any): number {
+            const frameHeight = Number(this.height)
+            let contentHeight = Number.NaN
+            try {
+              contentHeight = typeof this.calcTextHeight === 'function'
+                ? Number(this.calcTextHeight())
+                : Number.NaN
+            } catch {
+              contentHeight = Number.NaN
+            }
+            if (
+              Number.isFinite(frameHeight)
+              && frameHeight > 0
+              && Number.isFinite(contentHeight)
+              && contentHeight > 0
+              && contentHeight <= frameHeight
+            ) {
+              return -contentHeight / 2
+            }
+            return originalGetTopOffset.call(this)
+          }
+          obj._productionVerticalCenterVersion = 1
+        }
         const refreshTextObjects = (objects: any[]): void => {
           for (const obj of objects) {
             const type = String(obj?.type ?? '').toLowerCase()
@@ -1113,6 +1147,7 @@ async function renderFabricPageToPng(
                 }
                 if (typeof obj.set === 'function') obj.set('dirty', true)
               }
+              centerTextboxContentInLayoutFrame(obj)
             }
             const children = typeof obj.getObjects === 'function'
               ? obj.getObjects()
