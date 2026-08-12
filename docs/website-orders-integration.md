@@ -79,6 +79,43 @@
 - Заказ создаётся с **`source = 'website'`**, **`userId = null`** и попадает в пул заказов (unassigned).
 - **Номер заказа:** в ответе API возвращается **`order.number`** в формате **`ORD-XXXX`** (порядковый номер по id, например ORD-0897). Сайт **обязан показывать пользователю именно этот номер** из ответа, а не генерировать свой (например `ORD-` + Date.now()) — иначе в CRM заказ будет под другим номером и возникнет путаница.
 
+### Безналичный checkout по УНП
+
+Backend сайта может проверить плательщика до checkout:
+
+- **`GET /api/orders/from-website/taxpayers/{unp}`**
+- Авторизация: `X-API-Key` или `Authorization: Bearer <WEBSITE_ORDER_API_KEY>`.
+- `unp` — строго 9 цифр.
+- Ответ `200`: `unp`, `fullName`, `shortName`, `address`, `registrationDate`, `taxOfficeCode`, `taxOfficeName`, `statusCode`, `statusLabel`, `isActive`.
+- Источник — официальный ГРП МНС. CRM считает плательщика действующим, только если `VKODS.trim().toLowerCase() === "действующий"`.
+- Ошибки: `400` — неверный формат УНП; `404` — плательщик не найден; `502` — некорректный/ошибочный ответ ГРП; `504` — таймаут.
+
+Для оформления безналичного заказа используйте только JSON endpoint `POST /api/orders/from-website`:
+
+```json
+{
+  "paymentMethod": "corporate",
+  "legalCustomer": {
+    "company_name": "МНС",
+    "legal_name": "Министерство по налогам и сборам Республики Беларусь",
+    "tax_id": "100582333",
+    "address": "г. Минск, ул. Советская, 9",
+    "bank_details": "IBAN: BY86AKBB36429000000000000000\nБанк: ОАО АСБ Беларусбанк\nБИК: AKBBBY2X\nАдрес банка: г. Минск",
+    "authorized_person": "Иванов Иван Иванович, действует на основании: Устава",
+    "phone": "+375 29 123-45-67",
+    "email": "accounting@example.by",
+    "authority_confirmed": true
+  },
+  "items": []
+}
+```
+
+Все поля `legalCustomer` обязательны. `bank_details` должен содержать отдельные строки `IBAN`, `Банк`, `БИК` и `Адрес банка`; `authorized_person` — ФИО и основание полномочий; `authority_confirmed` принимается только со значением `true`. CRM повторно проверяет УНП при создании заказа, требует статус `isActive=true` и точное официальное полное/краткое наименование (без учёта регистра и повторных пробелов). Если краткого наименования в ГРП нет, `company_name` должно совпадать с `fullName`. Адрес не сверяется с ГРП, поэтому ИП может передать адрес для документов вручную.
+
+Юридический клиент ищется только среди `type=legal` по точному `TRIM(tax_id)`. Телефон и email не используются для связывания, поэтому карточка физлица не будет превращена в юрлицо. Переданные реквизиты обновляют существующую legal-карточку; новая создаётся с `source=website`.
+
+Corporate-заказ всегда создаётся с названием `company_name`, `customer_id` legal-карточки, `payment_channel=invoice`, `prepaymentAmount=0` и без online-оплаты. Переданные клиентом `customer_id`, `prepaymentAmount` и произвольный `payment_channel` для corporate игнорируются. `payment_channel=invoice` нельзя запросить без успешно проверенного `paymentMethod=corporate` + `legalCustomer`.
+
 **Откуда брать номер заказа на клиентской стороне (сайт):**
 
 После успешного создания заказа API возвращает **201** и тело вида:
@@ -465,6 +502,7 @@ Production export должен уметь вернуть ZIP с общей па�
 
 - **`POST /api/orders/from-website/with-files`** — создание заказа с сайта и прикрепление файлов в одном запросе.
 - **Авторизация:** тот же **`X-API-Key`** или **`Authorization: Bearer <WEBSITE_ORDER_API_KEY>`**.
+- Multipart-путь сохранён для обратной совместимости обычных заказов. Corporate checkout выполняется через JSON `POST /api/orders/from-website`, после чего файлы загружаются отдельными запросами по `order.id`.
 - **Тело запроса:** **`multipart/form-data`**.
   - Поля: `customerName`, `customerPhone`, `customerEmail` (опционально), `prepaymentAmount`, `customer_id`, `items` (опционально; если есть — JSON-строка массива позиций, как в `from-website`).
   - Файлы: поле **`file`** (можно несколько полей с именем `file`; до 20 файлов).

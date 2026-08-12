@@ -71,6 +71,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/orders\/from-website\/confirm-prepayment$/ },
   { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/confirm-prepayment$/ },
   { method: 'GET', path: /^\/api\/orders\/from-website\/[0-9]+\/status$/ },
+  { method: 'GET', path: /^\/api\/orders\/from-website\/taxpayers\/[^/]+$/ },
   // Только timestamp в памяти — без SQLite. Иначе poll CRM (5с) встаёт в очередь auth при нагрузке.
   { method: 'GET', path: /^\/api\/orders\/pool-sync\/?$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/items$/ },

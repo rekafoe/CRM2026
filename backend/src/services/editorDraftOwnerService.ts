@@ -2,6 +2,7 @@ import { getDb } from '../config/database'
 import { CustomerService } from '../modules/customers/services/customerService'
 import { logger } from '../utils/logger'
 import { cleanupExpiredEditorDrafts } from './publicEditorDraftService'
+import type { WebsiteLegalCustomerInput } from './websiteCorporateCheckoutService'
 
 function digitsOnlyPhone(phone: string): string {
   return phone.replace(/\D/g, '')
@@ -55,6 +56,51 @@ export async function ensureWebsiteCustomer(input: {
     last_name: nameParts.slice(1).join(' ') || undefined,
     phone: phone || undefined,
     email: email || undefined,
+    source: 'website',
+  })
+  return { id: created.id }
+}
+
+/**
+ * Найти или создать юрлицо сайта строго по УНП.
+ * Телефон и email намеренно не участвуют в поиске, чтобы не связать юрлицо с физлицом.
+ */
+export async function ensureWebsiteLegalCustomer(
+  input: WebsiteLegalCustomerInput,
+): Promise<{ id: number }> {
+  const taxId = input.tax_id.trim()
+  if (!/^\d{9}$/.test(taxId)) {
+    throw new Error('УНП должен содержать ровно 9 цифр')
+  }
+
+  const db = await getDb()
+  const existing = await db.get<{ id: number }>(
+    `SELECT id FROM customers
+     WHERE type = 'legal' AND TRIM(tax_id) = ?
+     ORDER BY id DESC
+     LIMIT 1`,
+    [taxId],
+  )
+
+  const customerData = {
+    type: 'legal' as const,
+    company_name: input.company_name.trim(),
+    legal_name: input.legal_name.trim(),
+    tax_id: taxId,
+    address: input.address.trim(),
+    bank_details: input.bank_details.trim(),
+    authorized_person: input.authorized_person.trim(),
+    phone: input.phone.trim(),
+    email: input.email.trim().toLowerCase(),
+  }
+
+  if (existing?.id) {
+    const updated = await CustomerService.updateCustomer(existing.id, customerData)
+    return { id: updated.id }
+  }
+
+  const created = await CustomerService.createCustomer({
+    ...customerData,
     source: 'website',
   })
   return { id: created.id }

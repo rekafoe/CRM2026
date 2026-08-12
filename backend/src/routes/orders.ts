@@ -113,7 +113,13 @@ function orderForApi(order: any): any {
  *                 example: 0
  *               customer_id:
  *                 type: integer
- *                 description: ID клиента в CRM (опционально)
+ *                 description: ID клиента в CRM (опционально; игнорируется для corporate)
+ *               paymentMethod:
+ *                 type: string
+ *                 enum: [online, offline, cash-on-delivery, corporate]
+ *                 description: corporate создаёт неоплаченный заказ по безналичному расчёту
+ *               legalCustomer:
+ *                 $ref: '#/components/schemas/WebsiteLegalCustomer'
  *               delivery:
  *                 $ref: '#/components/schemas/WebsiteOrderDelivery'
  *               items:
@@ -166,14 +172,64 @@ function orderForApi(order: any): any {
  *                 message:
  *                   type: string
  *       400:
- *         description: Не указано имя или телефон клиента
+ *         description: Некорректный checkout или legalCustomer
  *       401:
  *         description: Неверный или отсутствующий API-ключ
+ *       404:
+ *         description: УНП не найден в ГРП МНС
+ *       422:
+ *         description: Плательщик не действует
+ *       502:
+ *         description: Ошибка ответа ГРП МНС
+ *       504:
+ *         description: Таймаут ГРП МНС
  *       503:
  *         description: WEBSITE_ORDER_API_KEY не настроен
  */
 // Публичный эндпоинт для заказов с сайта (без авторизации CRM, проверка по X-API-Key)
 router.post('/from-website', requireWebsiteOrderApiKey, asyncHandler(OrderController.createOrderFromWebsite))
+
+/**
+ * @swagger
+ * /api/orders/from-website/taxpayers/{unp}:
+ *   get:
+ *     summary: Проверить УНП в официальном ГРП МНС
+ *     tags: [Orders]
+ *     security:
+ *       - websiteApiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: unp
+ *         required: true
+ *         schema:
+ *           type: string
+ *           pattern: '^\d{9}$'
+ *           example: '100582333'
+ *     responses:
+ *       200:
+ *         description: Нормализованные сведения ГРП МНС
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TaxpayerRegistry'
+ *       400:
+ *         description: УНП не содержит ровно 9 цифр
+ *       401:
+ *         description: Неверный или отсутствующий API-ключ
+ *       404:
+ *         description: Плательщик не найден
+ *       502:
+ *         description: Ошибка ответа ГРП МНС
+ *       504:
+ *         description: Таймаут ГРП МНС
+ *       503:
+ *         description: WEBSITE_ORDER_API_KEY не настроен
+ */
+router.get(
+  '/from-website/taxpayers/:unp',
+  requireWebsiteOrderApiKey,
+  asyncHandler(OrderController.lookupWebsiteTaxpayer),
+)
 
 // Создание заказа с сайта + файлы в одном запросе (multipart/form-data; файлы опциональны).
 // Используем uploadMemory + ручная запись буфера, чтобы файлы не сохранялись как 0 КБ.

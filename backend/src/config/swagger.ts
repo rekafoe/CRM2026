@@ -290,6 +290,47 @@ const options: swaggerJsdoc.Options = {
             organizationName: { type: 'string', nullable: true },
           },
         },
+        TaxpayerRegistry: {
+          type: 'object',
+          required: ['unp', 'fullName', 'shortName', 'address', 'registrationDate', 'taxOfficeCode', 'taxOfficeName', 'statusCode', 'statusLabel', 'isActive'],
+          properties: {
+            unp: { type: 'string', pattern: '^\\d{9}$', example: '100582333' },
+            fullName: { type: 'string', nullable: true },
+            shortName: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+            registrationDate: { type: 'string', nullable: true, example: '30.06.1994' },
+            taxOfficeCode: { type: 'string', nullable: true, example: '104' },
+            taxOfficeName: { type: 'string', nullable: true },
+            statusCode: { type: 'string', nullable: true, example: '1' },
+            statusLabel: { type: 'string', nullable: true, example: 'Действующий' },
+            isActive: { type: 'boolean' },
+          },
+        },
+        WebsiteLegalCustomer: {
+          type: 'object',
+          required: ['company_name', 'legal_name', 'tax_id', 'address', 'bank_details', 'authorized_person', 'phone', 'email', 'authority_confirmed'],
+          properties: {
+            company_name: { type: 'string', description: 'Официальное краткое наименование из ГРП МНС' },
+            legal_name: { type: 'string', description: 'Официальное полное наименование из ГРП МНС' },
+            tax_id: { type: 'string', pattern: '^\\d{9}$', example: '100582333' },
+            address: { type: 'string', description: 'Адрес для реквизитов; для ИП может быть введён вручную' },
+            bank_details: {
+              type: 'string',
+              description: 'Строки IBAN, Банк, БИК и Адрес банка',
+            },
+            authorized_person: {
+              type: 'string',
+              description: 'ФИО, действует на основании: Устав/доверенность',
+            },
+            phone: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+            authority_confirmed: {
+              type: 'boolean',
+              enum: [true],
+              description: 'Пользователь подтвердил право действовать от имени плательщика',
+            },
+          },
+        },
         WebsiteOrderDelivery: {
           type: 'object',
           description:

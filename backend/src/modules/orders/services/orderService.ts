@@ -776,6 +776,7 @@ export class OrderService {
       miniappDesignHelpRequested?: boolean;
       delivery?: WebsiteOrderDelivery | null;
       paymentMethod?: 'online' | 'offline' | null;
+      paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal';
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -795,7 +796,7 @@ export class OrderService {
       undefined,
       source,
       orderData.customer_id,
-      undefined,
+      orderData.paymentChannel,
       orderData.paymentMethod ?? null,
     );
     await this.applyMiniappOrderMetadata(db, {
@@ -845,6 +846,7 @@ export class OrderService {
       miniappDesignHelpRequested?: boolean;
       delivery?: WebsiteOrderDelivery | null;
       paymentMethod?: 'online' | 'offline' | null;
+      paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal';
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -915,6 +917,7 @@ export class OrderService {
       telegramChatId?: string;
       delivery?: WebsiteOrderDelivery | null;
       paymentMethod?: 'online' | 'offline' | null;
+      paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal';
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;

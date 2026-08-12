@@ -11,10 +11,21 @@ import {
   prepareWebsiteItemsWithEditorDrafts,
 } from '../../../services/editorDraftWebsitePrepare'
 import { completeEditorOrderIntake } from '../../../services/editorOrderIntakeService'
-import { ensureWebsiteCustomer } from '../../../services/editorDraftOwnerService'
+import {
+  ensureWebsiteCustomer,
+  ensureWebsiteLegalCustomer,
+} from '../../../services/editorDraftOwnerService'
 import { mapCrmStatusToWebsiteStatus } from '../../../services/websiteOrderStatusSyncService'
 import { parseWebsiteOrderDelivery } from '../../../types/websiteOrderDelivery'
 import { hasColumn } from '../../../utils/tableSchemaCache'
+import {
+  TaxpayerRegistryError,
+  taxpayerRegistryService,
+} from '../../../services/taxpayerRegistryService'
+import {
+  WebsiteCorporateCheckoutError,
+  validateWebsiteCorporateCheckout,
+} from '../../../services/websiteCorporateCheckoutService'
 
 function readWebsiteDeliveryFromBody(body: Record<string, unknown>) {
   if (!Object.prototype.hasOwnProperty.call(body, 'delivery')) {
@@ -164,11 +175,32 @@ export class OrderController {
       const body = req.body || {}
       const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = body
       const paymentMethodRaw = body.paymentMethod ?? body.payment_method
+      const isCorporate = paymentMethodRaw === 'corporate'
+      let resolvedCustomerName = customerName
+      let resolvedCustomerPhone = customerPhone
+      let resolvedCustomerEmail = customerEmail
+      let resolvedPrepaymentAmount = prepaymentAmount
+      let resolvedCustomerId =
+        customer_id != null && Number.isFinite(Number(customer_id)) ? Number(customer_id) : null
+      let paymentChannel: 'invoice' | undefined
+
+      if (isCorporate) {
+        const { legalCustomer } = await validateWebsiteCorporateCheckout(body.legalCustomer)
+        const ensured = await ensureWebsiteLegalCustomer(legalCustomer)
+        resolvedCustomerName = legalCustomer.company_name
+        resolvedCustomerPhone = legalCustomer.phone
+        resolvedCustomerEmail = legalCustomer.email
+        resolvedPrepaymentAmount = 0
+        resolvedCustomerId = ensured.id
+        paymentChannel = 'invoice'
+      }
       // online → BePaid pending; cash-on-delivery/offline → явно не online (иначе DEFAULT 'online' в SQLite)
       const paymentMethodHint =
         paymentMethodRaw === 'online'
           ? ('online' as const)
-          : paymentMethodRaw === 'cash-on-delivery' || paymentMethodRaw === 'offline'
+          : paymentMethodRaw === 'cash-on-delivery' ||
+              paymentMethodRaw === 'offline' ||
+              paymentMethodRaw === 'corporate'
             ? ('offline' as const)
             : null
       const { delivery, error: deliveryError } = readWebsiteDeliveryFromBody(body)
@@ -182,19 +214,13 @@ export class OrderController {
         bodyKeys: Object.keys(body),
         deliveryKind: delivery?.kind ?? null,
         deliveryProviderId: delivery?.providerId ?? null,
-        customerName: customerName ?? null,
-        customerPhone: customerPhone ?? null,
-        customerEmail: customerEmail ?? null,
-        prepaymentAmount: prepaymentAmount ?? null,
         paymentMethod: paymentMethodHint,
-        customer_id: customer_id ?? null,
         itemsCount: Array.isArray(items) ? items.length : 0,
         items: Array.isArray(items)
           ? items.map((it: any, i: number) => ({
               index: i,
               type: it?.type ?? null,
               paramsKeys: it?.params && typeof it.params === 'object' ? Object.keys(it.params) : (typeof it?.params === 'string' ? ['string'] : []),
-              params: typeof it?.params === 'object' ? it.params : (typeof it?.params === 'string' ? '(string)' : null),
               price: it?.price ?? null,
               quantity: it?.quantity ?? null,
               priceType: it?.priceType ?? it?.price_type ?? (it?.params && typeof it.params === 'object' ? (it.params.priceType ?? it.params.price_type) : null),
@@ -202,7 +228,7 @@ export class OrderController {
           : null,
       })
 
-      if (!customerName && !customerPhone) {
+      if (!resolvedCustomerName && !resolvedCustomerPhone) {
         res.status(400).json({
           error: 'Необходимо указать имя или телефон клиента',
           message: 'customerName or customerPhone is required'
@@ -213,14 +239,12 @@ export class OrderController {
       if (items != null && Array.isArray(items) && items.length > 0) {
         const normalizedItems = normalizeWebsiteItems(items)
         const editorDraftPrepared = await prepareWebsiteItemsWithEditorDrafts(normalizedItems)
-        let resolvedCustomerId =
-          customer_id != null && Number.isFinite(Number(customer_id)) ? Number(customer_id) : null
-        if (!resolvedCustomerId && (customerPhone || customerEmail)) {
+        if (!isCorporate && !resolvedCustomerId && (resolvedCustomerPhone || resolvedCustomerEmail)) {
           try {
             const ensured = await ensureWebsiteCustomer({
-              phone: customerPhone,
-              email: customerEmail,
-              name: customerName,
+              phone: resolvedCustomerPhone,
+              email: resolvedCustomerEmail,
+              name: resolvedCustomerName,
             })
             resolvedCustomerId = ensured.id
           } catch (err: unknown) {
@@ -230,15 +254,16 @@ export class OrderController {
           }
         }
         const result = await OrderService.createOrderWithAutoDeduction({
-          customerName: customerName || undefined,
-          customerPhone: customerPhone || undefined,
-          customerEmail: customerEmail || undefined,
-          prepaymentAmount,
+          customerName: resolvedCustomerName || undefined,
+          customerPhone: resolvedCustomerPhone || undefined,
+          customerEmail: resolvedCustomerEmail || undefined,
+          prepaymentAmount: resolvedPrepaymentAmount,
           userId: undefined,
           customer_id: resolvedCustomerId ?? undefined,
           source: 'website',
           delivery,
           paymentMethod: paymentMethodHint,
+          paymentChannel,
           items: editorDraftPrepared.items
         })
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
@@ -259,15 +284,15 @@ export class OrderController {
       }
 
       const order = await OrderService.createOrder(
-        customerName || undefined,
-        customerPhone || undefined,
-        customerEmail || undefined,
-        prepaymentAmount,
+        resolvedCustomerName || undefined,
+        resolvedCustomerPhone || undefined,
+        resolvedCustomerEmail || undefined,
+        resolvedPrepaymentAmount,
         undefined,
         undefined,
         'website',
-        customer_id,
-        undefined,
+        resolvedCustomerId ?? undefined,
+        paymentChannel,
         paymentMethodHint,
       )
       if (delivery) {
@@ -282,6 +307,10 @@ export class OrderController {
       })
     } catch (error: any) {
       logger.error('createOrderFromWebsite error', { error: error?.message, stack: error?.stack })
+      if (error instanceof WebsiteCorporateCheckoutError) {
+        res.status(error.status).json({ error: error.message, message: 'Invalid legalCustomer' })
+        return
+      }
       if (isEditorDraftOrderError(error)) {
         res.status(400).json({
           error: getSafeServerErrorMessage('Ошибка editor draft', error),
@@ -293,6 +322,20 @@ export class OrderController {
         error: getSafeServerErrorMessage('Ошибка создания заказа', error),
         message: 'Internal server error'
       })
+    }
+  }
+
+  /** GET /api/orders/from-website/taxpayers/:unp — lookup официального ГРП МНС. */
+  static async lookupWebsiteTaxpayer(req: Request, res: Response) {
+    try {
+      const taxpayer = await taxpayerRegistryService.lookup(req.params.unp)
+      res.json(taxpayer)
+    } catch (error) {
+      if (error instanceof TaxpayerRegistryError) {
+        res.status(error.status).json({ error: error.message, code: error.code })
+        return
+      }
+      res.status(502).json({ error: 'Сервис ГРП МНС временно недоступен' })
     }
   }
 
@@ -438,11 +481,6 @@ export class OrderController {
       // Логируем входящие данные с сайта для отладки (без файлов)
       logger.info('createOrderFromWebsiteWithFiles: входящий запрос', {
         bodyKeys: Object.keys(body),
-        customerName: body.customerName ?? null,
-        customerPhone: body.customerPhone ?? null,
-        customerEmail: body.customerEmail ?? null,
-        prepaymentAmount: body.prepaymentAmount ?? null,
-        customer_id: body.customer_id ?? null,
         itemsRawType: typeof items,
         itemsCount: Array.isArray(items) ? items.length : (typeof items === 'string' ? '(JSON string)' : 0),
         items: Array.isArray(items)
@@ -469,7 +507,6 @@ export class OrderController {
             index: i,
             type: it?.type ?? null,
             paramsKeys: it?.params && typeof it.params === 'object' ? Object.keys(it.params) : [],
-            params: typeof it?.params === 'object' ? it.params : null,
             priceType: it?.priceType ?? it?.price_type ?? (it?.params && typeof it.params === 'object' ? (it.params.priceType ?? it.params.price_type) : null),
           })),
         })
