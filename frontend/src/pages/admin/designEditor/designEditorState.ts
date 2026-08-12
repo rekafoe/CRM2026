@@ -64,6 +64,22 @@ export function resolveDesignSceneScale(
   return 1;
 }
 
+/**
+ * Для preview/production-like render явный scale не должен побеждать координаты сцены:
+ * это та же политика разрешения mismatch, которую применяет backend production PDF.
+ */
+export function resolveDesignRenderSceneScale(
+  designState: Pick<DesignState, 'sceneScale' | 'pages' | 'pageWidth' | 'pageHeight'> | null | undefined,
+): number {
+  const explicit = Number(designState?.sceneScale);
+  const validExplicit = Number.isFinite(explicit) && explicit > 0 ? explicit : null;
+  const inferred = inferSceneScaleFromPageExtents(designState);
+  if (validExplicit != null && inferred != null && Math.abs(validExplicit - inferred) > 0.01) {
+    return inferred;
+  }
+  return validExplicit ?? inferred ?? 1;
+}
+
 export function buildEmptyDesignState(input: {
   pageWidth?: number;
   pageHeight?: number;

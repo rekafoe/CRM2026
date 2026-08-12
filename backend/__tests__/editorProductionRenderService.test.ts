@@ -2,6 +2,11 @@ import fs from 'fs'
 import path from 'path'
 import { __editorProductionRenderInternals } from '../src/services/editorProductionRenderService'
 import { orderFilesDir } from '../src/config/upload'
+import {
+  captureProductionTextLayoutSnapshots,
+  restoreProductionTextLayoutSnapshots,
+} from '../src/utils/fabricTextLayoutPreservation'
+import { prepareFabricJsonTextForProduction } from '../src/utils/fabricTextProductionPrepare'
 
 describe('editorProductionRenderService internals', () => {
   const transparentPng =
@@ -245,6 +250,127 @@ describe('editorProductionRenderService internals', () => {
     expect(html).toContain('width:92mm')
     expect(html).toContain('height:54mm')
     expect(html).toContain('data:image/png;base64,YWJj')
+  })
+
+  it('restores client textbox layout after simulated font dimension refresh', () => {
+    const source = {
+      objects: [{
+        type: 'textbox',
+        id: 'text-client-1',
+        textFieldClientAdded: true,
+        left: 120,
+        top: 48,
+        width: 220,
+        originX: 'center',
+        originY: 'top',
+        text: 'Исходный текст',
+        fill: '#111111',
+      }],
+    }
+    const snapshots = captureProductionTextLayoutSnapshots(source)
+    const live = {
+      ...source.objects[0],
+      top: 12,
+      width: 180,
+      text: 'Текст после refresh',
+      fill: '#ff0000',
+    }
+
+    expect(restoreProductionTextLayoutSnapshots([live], snapshots)).toBe(1)
+    expect(live).toMatchObject({
+      left: 120,
+      top: 48,
+      width: 220,
+      originX: 'center',
+      originY: 'top',
+      text: 'Текст после refresh',
+      fill: '#ff0000',
+    })
+  })
+
+  it('restores nested text by stable id even when sibling indexes change', () => {
+    const source = {
+      objects: [{
+        type: 'group',
+        objects: [
+          { type: 'rect', id: 'decor', width: 10, height: 10 },
+          {
+            type: 'i-text',
+            customId: 'nested-client-text',
+            textFieldClientAdded: true,
+            left: -30,
+            top: 48,
+            width: 140,
+            originX: 'left',
+            originY: 'top',
+          },
+        ],
+      }],
+    }
+    const nestedText = {
+      type: 'i-text',
+      customId: 'nested-client-text',
+      textFieldClientAdded: true,
+      left: 5,
+      top: 12,
+      width: 90,
+      originX: 'center',
+      originY: 'center',
+    }
+    const liveGroup = {
+      type: 'group',
+      objects: [nestedText, { type: 'rect', id: 'decor', width: 10, height: 10 }],
+    }
+
+    const restored = restoreProductionTextLayoutSnapshots(
+      [liveGroup],
+      captureProductionTextLayoutSnapshots(source),
+    )
+
+    expect(restored).toBe(1)
+    expect(nestedText).toMatchObject({
+      left: -30,
+      top: 48,
+      width: 140,
+      originX: 'left',
+      originY: 'top',
+    })
+  })
+
+  it('preserves production width expansion for ordinary text', () => {
+    const source = {
+      objects: [{
+        type: 'textbox',
+        id: 'template-text-1',
+        left: 20,
+        top: 48,
+        width: 20,
+        originX: 'left',
+        originY: 'top',
+        fontSize: 20,
+        text: 'Длинный обычный текст',
+      }],
+    }
+    const prepared = prepareFabricJsonTextForProduction(source) as typeof source
+    const preparedWidth = prepared.objects[0].width
+    expect(preparedWidth).toBeGreaterThan(20)
+
+    const measuredWidth = preparedWidth + 50
+    const measuredLeft = prepared.objects[0].left - 25
+    const live = {
+      ...prepared.objects[0],
+      left: measuredLeft,
+      top: 12,
+      width: measuredWidth,
+    }
+    restoreProductionTextLayoutSnapshots(
+      [live],
+      captureProductionTextLayoutSnapshots(prepared),
+    )
+
+    expect(live.top).toBe(48)
+    expect(live.left).toBe(measuredLeft)
+    expect(live.width).toBe(measuredWidth)
   })
 
   it('renders a Fabric page through the headless browser bridge', async () => {

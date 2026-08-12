@@ -19,6 +19,7 @@ import {
 } from './designFontService'
 import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
 import { prepareFabricJsonTextForProduction } from '../utils/fabricTextProductionPrepare'
+import { captureProductionTextLayoutSnapshots } from '../utils/fabricTextLayoutPreservation'
 import { resolveProductionSceneScale } from '../utils/productionSceneScale'
 import { extractUsedFontFamiliesFromDesignState } from '../utils/extractDesignStateFonts'
 import { getDesignTemplate } from './designTemplateService'
@@ -879,6 +880,7 @@ async function renderFabricPageToPng(
   const heightMm = pageHeightMm
   const renderPayload = {
     fabricJSON: normalizedFabricJSON,
+    textLayoutSnapshots: captureProductionTextLayoutSnapshots(normalizedFabricJSON),
     pageWidthPx: Math.max(1, Math.round(pageWidthMm * PX_PER_MM_AT_96 * normalizedSceneScale)),
     pageHeightPx: Math.max(1, Math.round(pageHeightMm * PX_PER_MM_AT_96 * normalizedSceneScale)),
     bleedPx: 0,
@@ -1125,6 +1127,112 @@ async function renderFabricPageToPng(
         }
         await document.fonts.ready
         refreshTextObjects(canvas.getObjects())
+        const restoreTextLayouts = (): void => {
+          const stableIdFields = ['id', 'objectId', 'objectID', 'stableId', 'customId', 'uuid', 'uid']
+          const stableKeys = (obj: any): string[] => stableIdFields.flatMap((field) => {
+            const value = obj?.[field]
+            if (typeof value !== 'string' && typeof value !== 'number') return []
+            const normalized = String(value).trim()
+            return normalized ? [`${field}:${normalized}`] : []
+          })
+          const normalizeTextType = (value: unknown): string => {
+            const type = String(value ?? '').trim().toLowerCase()
+            return type === 'itext' ? 'i-text' : type
+          }
+          const isTextType = (value: unknown): boolean => {
+            const type = normalizeTextType(value)
+            return type === 'text' || type === 'i-text' || type === 'textbox'
+          }
+          const entries: Array<{
+            obj: any
+            path: number[]
+            type: string
+            stableKeys: string[]
+          }> = []
+          const walk = (objects: any[], parentPath: number[] = []) => {
+            objects.forEach((obj, index) => {
+              if (!obj || typeof obj !== 'object') return
+              const path = [...parentPath, index]
+              const type = normalizeTextType(obj.type)
+              if (isTextType(type)) entries.push({ obj, path, type, stableKeys: stableKeys(obj) })
+              const children = typeof obj.getObjects === 'function'
+                ? obj.getObjects()
+                : Array.isArray(obj._objects)
+                  ? obj._objects
+                  : Array.isArray(obj.objects)
+                    ? obj.objects
+                    : []
+              if (Array.isArray(children) && children.length > 0) walk(children, path)
+            })
+          }
+          walk(canvas.getObjects())
+
+          const entriesByStableKey = new Map<string, typeof entries>()
+          const entriesByPath = new Map<string, typeof entries[number]>()
+          const snapshotStableKeyCounts = new Map<string, number>()
+          for (const entry of entries) {
+            entriesByPath.set(entry.path.join('.'), entry)
+            for (const key of entry.stableKeys) {
+              const matches = entriesByStableKey.get(key) ?? []
+              matches.push(entry)
+              entriesByStableKey.set(key, matches)
+            }
+          }
+          for (const snapshot of payload.textLayoutSnapshots) {
+            for (const key of snapshot.stableKeys) {
+              snapshotStableKeyCounts.set(key, (snapshotStableKeyCounts.get(key) ?? 0) + 1)
+            }
+          }
+
+          const claimed = new Set<any>()
+          for (const snapshot of payload.textLayoutSnapshots) {
+            let matched: typeof entries[number] | undefined
+            for (const key of snapshot.stableKeys) {
+              if (snapshotStableKeyCounts.get(key) !== 1) continue
+              const candidates = entriesByStableKey.get(key)
+              if (candidates?.length === 1 && !claimed.has(candidates[0].obj)) {
+                matched = candidates[0]
+                break
+              }
+            }
+            if (!matched) {
+              const byPath = entriesByPath.get(snapshot.path.join('.'))
+              if (byPath && !claimed.has(byPath.obj) && byPath.type === snapshot.type) {
+                const hasConflictingIds = snapshot.stableKeys.length > 0
+                  && byPath.stableKeys.length > 0
+                  && !snapshot.stableKeys.some((key) => byPath.stableKeys.includes(key))
+                if (!hasConflictingIds) matched = byPath
+              }
+            }
+            if (!matched) continue
+
+            const patch: Record<string, unknown> = {}
+            const currentWidth = Number(matched.obj.width)
+            const keepOrdinaryTextExpansion = !snapshot.clientAdded
+              && snapshot.width != null
+              && Number.isFinite(currentWidth)
+              && currentWidth > snapshot.width + 0.5
+            if (!keepOrdinaryTextExpansion && snapshot.left != null && Number.isFinite(snapshot.left)) {
+              patch.left = snapshot.left
+            }
+            if (snapshot.top != null && Number.isFinite(snapshot.top)) patch.top = snapshot.top
+            if (snapshot.originX) patch.originX = snapshot.originX
+            if (snapshot.originY) patch.originY = snapshot.originY
+            if (
+              !keepOrdinaryTextExpansion
+              && snapshot.width != null
+              && Number.isFinite(snapshot.width)
+              && snapshot.width > 0
+            ) {
+              patch.width = snapshot.width
+            }
+            if (typeof matched.obj.set === 'function') matched.obj.set(patch)
+            else Object.assign(matched.obj, patch)
+            if (typeof matched.obj.setCoords === 'function') matched.obj.setCoords()
+            claimed.add(matched.obj)
+          }
+        }
+        restoreTextLayouts()
         canvas.renderAll()
         await new Promise((resolve) => requestAnimationFrame(resolve))
         await document.fonts.ready

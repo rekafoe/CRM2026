@@ -10,6 +10,7 @@ import {
 } from '../../api';
 import { API_BASE_URL } from '../../config/constants';
 import { createDesignSceneGeometry } from '../../pages/admin/designEditor/designGeometry';
+import { resolveDesignRenderSceneScale } from '../../pages/admin/designEditor/designEditorState';
 import { loadDesignPageScene, type ResolveEditorImageSrc } from '../../pages/admin/designEditor/designPageLoader';
 import type { DesignPage, DesignState } from '../../pages/admin/designEditor/types';
 import {
@@ -77,7 +78,7 @@ async function renderDesignPageToDataUrl(
     pageHeightMm: designState.pageHeight,
     safeZoneMm: designState.prepress?.safeZoneMm ?? 0,
     bleedMm: designState.prepress?.bleedMm ?? 0,
-    scale: designState.sceneScale ?? 1,
+    scale: resolveDesignRenderSceneScale(designState),
   });
   const element = document.createElement('canvas');
   const canvas = new Canvas(element, {
