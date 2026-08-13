@@ -88,19 +88,19 @@ function materialOptionLabel(material: WarehouseMaterialOption): string {
   if (isRollMaterialOption(material)) {
     const width = finitePositive(material.sheet_width)
     return width != null
-      ? `${formatNumber(width)} мм — ${material.name}`
-      : `Ширина не указана — ${material.name}`
+      ? `${formatNumber(width)} мм`
+      : 'Ширина не указана'
   }
 
   const density = finitePositive(material.density)
   if (density != null) {
-    return `${formatNumber(density)} г/м² — ${material.name}`
+    return `${formatNumber(density)} г/м²`
   }
 
   const width = finitePositive(material.sheet_width)
   const height = finitePositive(material.sheet_height)
   if (width != null && height != null) {
-    return `${formatNumber(width)}×${formatNumber(height)} мм — ${material.name}`
+    return `${formatNumber(width)}×${formatNumber(height)} мм`
   }
 
   return material.name
