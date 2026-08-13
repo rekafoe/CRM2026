@@ -428,17 +428,24 @@ router.get('/:productId/schema', async (req, res) => {
       }
     }
 
-    // Для simplified с typeConfigs: подгружаем материалы из allowed_material_ids с density и paper_type_name.
-    // Иначе на фронте приходят тип материала, но не плотности (подтип «Дизайнерские открытки» и др.).
+    // Для full schema CRM подгружаем полную складскую иерархию:
+    // категория → тип материала → SKU. Для рулонов ширина нужна оператору в калькуляторе.
+    // Compact schema ниже собирается отдельно и по-прежнему не содержит ширину рулона.
     const simplified = normalizedSimplified;
     let schemaMaterials = productMaterials;
-    if (simplified?.typeConfigs && typeof simplified.typeConfigs === 'object') {
+    if (simplified && typeof simplified === 'object') {
       const materialIds = collectMaterialIdsFromSimplified(simplified);
       if (materialIds.length > 0) {
         const placeholders = materialIds.map(() => '?').join(',');
         const rows = await db.all<any>(
-          `SELECT m.id, m.name, m.density, m.unit, m.sheet_price_single as price, m.paper_type_id, pt.display_name as paper_type_name
+          `SELECT m.id, m.name, m.density, m.unit, m.sheet_price_single as price,
+                  m.category_id, c.name as category_name, c.color as category_color,
+                  m.material_type_id, mt.name as material_type_name, m.material_kind,
+                  m.paper_type_id, pt.display_name as paper_type_name,
+                  m.sheet_width, m.sheet_height, m.printable_width
            FROM materials m
+           LEFT JOIN material_categories c ON c.id = m.category_id
+           LEFT JOIN material_types mt ON mt.id = m.material_type_id
            LEFT JOIN paper_types pt ON pt.id = m.paper_type_id
            WHERE m.id IN (${placeholders}) AND m.is_active = 1`,
           materialIds
@@ -447,12 +454,21 @@ router.get('/:productId/schema', async (req, res) => {
           id: r.id,
           name: r.name,
           density: r.density,
+          category_id: r.category_id,
+          category_name: r.category_name,
+          category_color: r.category_color,
+          material_type_id: r.material_type_id,
+          material_type_name: r.material_type_name,
+          material_kind: r.material_kind,
           paper_type_name: r.paper_type_name,
           paper_type_id: r.paper_type_id,
+          sheet_width: r.sheet_width,
+          sheet_height: r.sheet_height,
+          printable_width: r.printable_width,
           price: r.price ?? 0,
           unit: r.unit ?? 'лист',
         }));
-        logger.info('[schema] Материалы из typeConfigs для simplified (с density)', { productId, count: schemaMaterials.length });
+        logger.info('[schema] Материалы из typeConfigs для simplified (полная складская иерархия)', { productId, count: schemaMaterials.length });
       }
     }
 

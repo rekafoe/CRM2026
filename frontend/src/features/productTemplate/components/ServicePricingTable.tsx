@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { FormField, Button } from '../../../components/common'
+import { AppIcon } from '../../../components/ui/AppIcon'
 import { getPricingServicesBundle } from '../../../services/pricing/api'
 import type { ServiceVolumeTier, ServiceVariant } from '../../../types/pricing'
 import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantLabels'
@@ -59,6 +60,12 @@ type TierRangeModalState = {
   boundary: string
   anchorElement?: HTMLElement
 }
+
+const normalizeServiceSearch = (value: unknown): string =>
+  String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('ru-RU')
+    .replace(/ё/g, 'е')
 
 // Утилиты для работы с диапазонами
 const defaultTiers = (): Tier[] => [
@@ -226,6 +233,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
   )
   const [servicesWithTiers, setServicesWithTiers] = useState<ServiceWithTiers[]>([])
   const [loadingTiers, setLoadingTiers] = useState(false)
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('')
   // Варианты услуг (любая услуга с вариантами — не привязываем к типу)
   const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map())
   const [variantTiersByService, setVariantTiersByService] = useState<Map<number, Record<number, ServiceVolumeTier[]>>>(new Map())
@@ -409,9 +417,20 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
     }
   }
 
+  const normalizedServiceSearchQuery = normalizeServiceSearch(serviceSearchQuery)
+  const filteredServicesWithTiers = useMemo(() => {
+    if (!normalizedServiceSearchQuery) return servicesWithTiers
+    return servicesWithTiers.filter((service) => normalizeServiceSearch([
+      service.id,
+      service.name,
+      service.categoryName,
+      service.operation_type,
+    ].join(' ')).includes(normalizedServiceSearchQuery))
+  }, [normalizedServiceSearchQuery, servicesWithTiers])
+
   const servicesByCategory = useMemo(() => {
     const groups = new Map<string, { categoryId: number | null; categoryName: string; services: ServiceWithTiers[] }>()
-    for (const service of servicesWithTiers) {
+    for (const service of filteredServicesWithTiers) {
       const categoryId = service.categoryId ?? null
       const categoryName = (service.categoryName ?? '').trim() || 'Без категории'
       const key = categoryId !== null ? `id:${categoryId}` : `name:${categoryName}`
@@ -430,13 +449,28 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
         if (b.categoryName === 'Без категории') return -1
         return a.categoryName.localeCompare(b.categoryName, 'ru')
       })
-  }, [servicesWithTiers])
+  }, [filteredServicesWithTiers])
 
   const tableColSpan = commonRanges.length + (rangesEditable ? 2 : 1) + 1
 
   return (
     <div className="simplified-tiers-table">
       {description && <div className="text-muted text-sm" style={{ marginBottom: '12px' }}>{description}</div>}
+      <label className="service-pricing-search">
+        <AppIcon name="search" size="xs" />
+        <input
+          type="search"
+          value={serviceSearchQuery}
+          onChange={(event) => setServiceSearchQuery(event.target.value)}
+          placeholder="Поиск по услуге, категории, типу или ID"
+        />
+        {serviceSearchQuery && (
+          <button type="button" onClick={() => setServiceSearchQuery('')} aria-label="Очистить поиск услуг">
+            <AppIcon name="x" size="xs" />
+          </button>
+        )}
+        <span>{filteredServicesWithTiers.length} из {servicesWithTiers.length}</span>
+      </label>
       <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
         <thead>
           <tr>
@@ -706,7 +740,9 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
             )) : (
               <tr>
                 <td colSpan={tableColSpan}>
-                  <div className="text-muted">Нет доступных услуг</div>
+                  <div className="text-muted">
+                    {serviceSearchQuery ? 'По запросу услуги не найдены' : 'Нет доступных услуг'}
+                  </div>
                 </td>
               </tr>
             )

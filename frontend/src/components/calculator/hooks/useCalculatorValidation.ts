@@ -96,7 +96,7 @@ function computeErrors(params: {
     if (Array.isArray(allowed) && allowed.length > 0) {
       const mid = specs.material_id;
       if (mid == null || mid === '' || Number.isNaN(Number(mid))) {
-        errors.material_id = 'Выберите тип и плотность материала';
+        errors.material_id = 'Выберите материал';
       }
     }
     const coverCfg = simplified?.multiPageStructure?.cover;

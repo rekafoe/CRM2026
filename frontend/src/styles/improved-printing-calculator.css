@@ -1067,7 +1067,7 @@
   text-overflow: ellipsis;
 }
 
-/* Тип материала + Плотность рядом друг с другом в одну строку */
+/* Категория → тип материала → вариант (плотность, ширина рулона или SKU). */
 .material-type-density-row {
   display: flex !important;
   flex-direction: row !important;
@@ -1076,23 +1076,10 @@
   align-items: flex-end;
   grid-column: 1 / -1; /* если попал в grid — занять всю строку */
 }
-/* Первый блок (Тип материала) — может растягиваться под длинные названия */
-.material-type-density-row > .param-group:first-child {
+.material-type-density-row > .param-group:nth-child(-n + 3) {
   flex: 1 1 auto;
-  min-width: 140px;
-  max-width: 280px;
-}
-/* Второй блок (Плотность) — компактный */
-.material-type-density-row > .param-group:nth-child(2) {
-  flex: 0 0 auto;
-  min-width: 100px;
-  max-width: 160px;
-}
-/* Третий блок (Имя материала) — читаемый, может растягиваться */
-.material-type-density-row > .param-group:nth-child(3) {
-  flex: 1 1 auto;
-  min-width: 120px;
-  max-width: 240px;
+  min-width: 150px;
+  max-width: 300px;
 }
 /* Длинные названия в селекте: обрезка с многоточием, полный текст при открытии списка */
 .material-type-density-row select.form-control {
@@ -1100,6 +1087,18 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .material-type-density-row {
+    flex-wrap: wrap;
+  }
+
+  .material-type-density-row > .param-group {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 /* Формы */

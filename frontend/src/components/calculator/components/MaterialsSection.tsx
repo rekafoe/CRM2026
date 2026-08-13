@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { AppIcon, MoneyAmount } from '../../ui';
 import { checkMaterialAvailability, calculateMaterialCost } from '../../../services/calculatorMaterialService';
 import type { CalculationResult } from '../types/calculator.types';
 import { getMaterials } from '../../../api';
+import {
+  buildMaterialSelectionTree,
+  findMaterialSelectionPath,
+  type WarehouseMaterialOption,
+} from '../utils/materialSelectionTree';
 
-  /**
-   * Плотность только из явных полей (без парсинга названия).
-   * Поддерживаем варианты имён с бэкенда/форм.
-   */
 function sameMaterialId(a: unknown, b: unknown): boolean {
   if (a == null || b == null || a === '' || b === '') return false;
   const na = Number(a);
@@ -20,20 +21,6 @@ function materialRowTotal(m: { total?: number; totalCost?: number } | undefined)
   if (!m) return 0;
   const v = m.totalCost ?? m.total;
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-}
-
-function getMaterialDensity(m: any): number | null {
-  const raw =
-    m?.density ??
-    m?.density_g_sm ??
-    m?.densityGsm ??
-    m?.grams_per_sqm ??
-    m?.gramsPerSqm ??
-    m?.paper_density ??
-    m?.paperDensity;
-  if (raw == null || raw === '') return null;
-  const d = Number(raw);
-  return Number.isFinite(d) && d > 0 ? d : null;
 }
 
 interface MaterialsSectionProps {
@@ -81,8 +68,8 @@ interface MaterialsSectionProps {
         }> 
       } | null;
     } | null;
-    /** Материалы из схемы (с density, paper_type_name) — для simplified с подтипами */
-    materials?: Array<{ id: number; name: string; density?: number; paper_type_name?: string; paper_type_id?: number; price?: number; unit?: string }>;
+    /** Полная складская иерархия для CRM: категория → тип → SKU/ширина/плотность. */
+    materials?: WarehouseMaterialOption[];
   } | null;
   // Результат расчета
   result?: CalculationResult | null;
@@ -163,19 +150,15 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     base_material_cost?: number;
   } | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  const [allMaterials, setAllMaterials] = useState<Array<{ id: number; name: string; unit?: string; price?: number; paper_type_id?: number; paper_type_name?: string; density?: number }>>([]);
+  const [allMaterials, setAllMaterials] = useState<WarehouseMaterialOption[]>([]);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
-  /** Выбранный тип материала (paper_type_name) — из разрешённых на складе */
-  const [selectedMaterialType, setSelectedMaterialType] = useState<string>('');
-  /** Выбранная плотность (г/м²) для выбранного типа */
-  const [selectedDensity, setSelectedDensity] = useState<number | ''>('');
-  /** Флаг: пользователь вручную выбрал тип — не перезаписывать из specs (избегаем рекурсии) */
-  const userChoseTypeRef = useRef(false);
+  const [selectedMaterialCategoryKey, setSelectedMaterialCategoryKey] = useState('');
+  const [selectedWarehouseTypeKey, setSelectedWarehouseTypeKey] = useState('');
   /** Порядковый номер запроса /materials — отбрасываем устаревший ответ при быстрой смене подтипа */
   const materialsFetchGenerationRef = useRef(0);
   const prevMaterialSelectionKeyRef = useRef<string | null>(null);
 
-  // Смена продукта / подтипа упрощённого продукта: сброс локального UI материала (иначе selectedMaterialType «прилипает» к прошлому табу).
+  // Смена продукта / подтипа: сбрасываем локальный путь по складской иерархии.
   useEffect(() => {
     if (!materialSelectionResetKey) return;
     if (prevMaterialSelectionKeyRef.current === null) {
@@ -184,9 +167,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     }
     if (prevMaterialSelectionKeyRef.current === materialSelectionResetKey) return;
     prevMaterialSelectionKeyRef.current = materialSelectionResetKey;
-    setSelectedMaterialType('');
-    setSelectedDensity('');
-    userChoseTypeRef.current = false;
+    setSelectedMaterialCategoryKey('');
+    setSelectedWarehouseTypeKey('');
   }, [materialSelectionResetKey]);
 
   // Упрощённые продукты: тянем актуальный список с GET /materials при смене набора размеров/материалов (подтип и т.д.).
@@ -224,14 +206,27 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             byId.set(id, { ...sm });
             continue;
           }
-          const dSchema = getMaterialDensity(sm);
-          const dApi = getMaterialDensity(cur);
-          if (dSchema != null && dApi == null) {
-            byId.set(id, {
-              ...cur,
-              density: (sm as any).density ?? (sm as any).density_g_sm ?? dSchema,
-            });
+          const merged = { ...cur };
+          for (const key of [
+            'density',
+            'category_id',
+            'category_name',
+            'category_color',
+            'material_type_id',
+            'material_type_name',
+            'material_kind',
+            'paper_type_id',
+            'paper_type_name',
+            'sheet_width',
+            'sheet_height',
+            'printable_width',
+            'unit',
+          ]) {
+            if ((merged[key] == null || merged[key] === '') && (sm as any)[key] != null) {
+              merged[key] = (sm as any)[key];
+            }
           }
+          byId.set(id, merged);
         }
         setAllMaterials(Array.from(byId.values()));
       })
@@ -503,78 +498,86 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return ordered;
   }, [isSimplifiedProduct, sizeIdForMaterials, simplifiedSizesSource, allMaterials]);
 
-  // Нормализация для сравнения (без учёта регистра и пробелов)
-  const normalizeForCompare = (s: string | null | undefined) =>
-    (s ?? '').toString().trim().toLowerCase();
+  const materialSelectionTree = useMemo(
+    () => buildMaterialSelectionTree(allowedMaterialsForSize),
+    [allowedMaterialsForSize],
+  );
+  const currentMaterialPath = useMemo(
+    () => findMaterialSelectionPath(materialSelectionTree, specs.material_id),
+    [materialSelectionTree, specs.material_id],
+  );
+  const selectedMaterialCategory = useMemo(
+    () => materialSelectionTree.find((category) => category.key === selectedMaterialCategoryKey)
+      ?? materialSelectionTree.find((category) => category.key === currentMaterialPath?.categoryKey)
+      ?? materialSelectionTree[0],
+    [currentMaterialPath?.categoryKey, materialSelectionTree, selectedMaterialCategoryKey],
+  );
+  const selectedWarehouseType = useMemo(
+    () => selectedMaterialCategory?.types.find((type) => type.key === selectedWarehouseTypeKey)
+      ?? selectedMaterialCategory?.types.find((type) => type.key === currentMaterialPath?.typeKey)
+      ?? selectedMaterialCategory?.types[0],
+    [currentMaterialPath?.typeKey, selectedMaterialCategory, selectedWarehouseTypeKey],
+  );
+  const resolveSpecsMaterialType = useCallback((material: WarehouseMaterialOption): string | undefined => {
+    const paperTypeName = String(material.paper_type_name || '').trim();
+    const paperType = paperTypeName
+      ? warehousePaperTypes.find((item) => (
+        item.display_name === paperTypeName || item.name === paperTypeName
+      ))
+      : undefined;
+    return paperType?.name
+      || String(material.material_type_name || '').trim()
+      || paperTypeName
+      || undefined;
+  }, [warehousePaperTypes]);
+  const applyWarehouseMaterial = useCallback((material: WarehouseMaterialOption) => {
+    const materialType = resolveSpecsMaterialType(material);
+    updateSpecs({
+      material_id: Number(material.id),
+      materialType: materialType as any,
+    }, true);
+  }, [resolveSpecsMaterialType, updateSpecs]);
 
-  // Уникальные типы материала (paper_type_name) из разрешённых материалов — для фильтра
-  // Порядок типов — по появлению в списке материалов размера (allowed_material_ids), не по алфавиту,
-  // чтобы «первый по умолчанию» был из продукта, а не «Dtf» из-за localeCompare.
-  const materialTypesFromMaterials = useMemo(() => {
-    const seen = new Set<string>();
-    const order: string[] = [];
-    const norm = (s: string) => (s ?? '').toString().trim().toLowerCase();
-    allowedMaterialsForSize.forEach(m => {
-      const name = (m as any).paper_type_name;
-      if (name && !seen.has(norm(name))) {
-        seen.add(norm(name));
-        order.push(name);
-      }
-    });
-    return order;
-  }, [allowedMaterialsForSize]);
-
-  // Материалы «текущего» типа для расчётов (плотности, material_id).
-  // Важно: при пустом selectedMaterialType (сброс подтипа / первый кадр) НЕ подмешивать все типы разом —
-  // иначе densitiesForSelectedType = объединение плотностей всех типов, эффект ниже берёт min по всем,
-  // а другой эффект ставит первый тип из списка → разные материалы и бесконечные перезаписи material_id.
-  const allowedMaterialsByType = useMemo(() => {
-    let typeToUse: string | undefined;
-    if (selectedMaterialType && String(selectedMaterialType).trim() !== '') {
-      typeToUse = selectedMaterialType;
-    } else if (specs.material_id != null) {
-      const row = allowedMaterialsForSize.find(m => Number(m.id) === Number(specs.material_id));
-      const raw = row ? String((row as any).paper_type_name ?? '').trim() : '';
-      typeToUse = raw || undefined;
-    }
-    if (!typeToUse) {
-      typeToUse = materialTypesFromMaterials[0];
-    }
-    if (!typeToUse) {
-      return allowedMaterialsForSize;
-    }
-    const normSelected = normalizeForCompare(typeToUse);
-    return allowedMaterialsForSize.filter(m => {
-      const ptName = (m as any).paper_type_name;
-      return normSelected && normalizeForCompare(ptName) === normSelected;
-    });
-  }, [allowedMaterialsForSize, selectedMaterialType, specs.material_id, materialTypesFromMaterials]);
-
-  // Плотности для выбранного типа — только из разрешённых материалов продукта (явные поля плотности)
-  const densitiesForSelectedType = useMemo(() => {
-    const values = allowedMaterialsByType
-      .map(m => getMaterialDensity(m))
-      .filter((d): d is number => d != null && d > 0);
-    return [...new Set(values)].sort((a, b) => a - b);
-  }, [allowedMaterialsByType]);
-
-  // По выбранному типу + плотности находим материал из разрешённых для продукта
-  const materialByTypeAndDensity = useMemo(() => {
-    if (selectedDensity === '') return undefined;
-    const targetDensity = Number(selectedDensity);
-    return allowedMaterialsByType.find(m => getMaterialDensity(m) === targetDensity);
-  }, [allowedMaterialsByType, selectedDensity]);
-
-  // Сбрасываем material_id, если он не входит в разрешённые для выбранного размера
+  // Единственная синхронизация внешнего material_id с локальным путём выбора.
+  // Если сохранённый материал больше не разрешён, выбираем первый доступный SKU.
   useEffect(() => {
-    if (isSimplifiedProduct && sizeIdForMaterials && specs.material_id) {
-      const isMaterialAllowed = allowedMaterialsForSize.some(m => Number(m.id) === specs.material_id);
-      if (!isMaterialAllowed && allowedMaterialsForSize.length > 0) {
-        // Материал больше не разрешён - сбрасываем
-        updateSpecs({ material_id: undefined }, true);
+    if (!isSimplifiedProduct || !sizeIdForMaterials || materialSelectionTree.length === 0) return;
+    const path = findMaterialSelectionPath(materialSelectionTree, specs.material_id);
+    if (path) {
+      setSelectedMaterialCategoryKey((current) => (
+        current === path.categoryKey ? current : path.categoryKey
+      ));
+      setSelectedWarehouseTypeKey((current) => (
+        current === path.typeKey ? current : path.typeKey
+      ));
+      const currentMaterial = allowedMaterialsForSize.find((material) => Number(material.id) === path.materialId);
+      const materialType = currentMaterial ? resolveSpecsMaterialType(currentMaterial) : undefined;
+      if (specs.materialType !== materialType) {
+        updateSpecs({ materialType: materialType as any }, true);
       }
+      return;
     }
-  }, [isSimplifiedProduct, sizeIdForMaterials, specs.material_id, allowedMaterialsForSize, updateSpecs]);
+
+    const firstCategory = materialSelectionTree[0];
+    const firstType = firstCategory?.types[0];
+    const firstMaterial = firstType?.materials[0];
+    if (!firstCategory || !firstType || !firstMaterial) return;
+    setSelectedMaterialCategoryKey(firstCategory.key);
+    setSelectedWarehouseTypeKey(firstType.key);
+    if (Number(specs.material_id) !== Number(firstMaterial.id)) {
+      applyWarehouseMaterial(firstMaterial);
+    }
+  }, [
+    allowedMaterialsForSize,
+    applyWarehouseMaterial,
+    isSimplifiedProduct,
+    materialSelectionTree,
+    resolveSpecsMaterialType,
+    sizeIdForMaterials,
+    specs.material_id,
+    specs.materialType,
+    updateSpecs,
+  ]);
 
   // Сбрасываем base_material_id, если он не входит в разрешённые для выбранного размера
   useEffect(() => {
@@ -585,99 +588,6 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       }
     }
   }, [isSimplifiedProduct, sizeIdForMaterials, specs.base_material_id, allowedBaseMaterialsForSize, updateSpecs]);
-
-  // Инициализация типа и плотности по текущему материалу (из разрешённых для продукта)
-  // Не перезаписываем, если пользователь выбрал тип без плотностей — иначе «не даёт выбрать»
-  useEffect(() => {
-    if (!isSimplifiedProduct || !sizeIdForMaterials || materialTypesFromMaterials.length === 0) return;
-    // Если пользователь вручную выбрал тип, у которого нет плотностей — не перезаписывать из specs
-    if (selectedMaterialType && densitiesForSelectedType.length === 0) {
-      userChoseTypeRef.current = false;
-      return;
-    }
-    const currentMaterial = allowedMaterialsForSize.find(m => Number(m.id) === specs.material_id);
-    const typeFromCurrent = currentMaterial ? (currentMaterial as any).paper_type_name : undefined;
-    const densityFromCurrent = currentMaterial ? getMaterialDensity(currentMaterial) : undefined;
-    const typeMatches = typeFromCurrent && materialTypesFromMaterials.some(t => normalizeForCompare(t) === normalizeForCompare(typeFromCurrent));
-    if (typeFromCurrent && typeMatches) {
-      if (!userChoseTypeRef.current) {
-        setSelectedMaterialType(prev => (prev !== typeFromCurrent ? typeFromCurrent : prev));
-        if (densityFromCurrent != null) {
-          setSelectedDensity(prev => (prev !== densityFromCurrent ? densityFromCurrent : prev));
-        }
-      }
-      // Не сбрасываем userChoseTypeRef здесь — иначе следующий эффект (376–396) решит, что пользователь не выбирал тип,
-      // и выйдет по guard, не вызвав updateSpecs. Сброс делается в эффекте 376–396 после успешного updateSpecs.
-    } else if (materialTypesFromMaterials.length > 0 && !selectedMaterialType) {
-      setSelectedMaterialType(materialTypesFromMaterials[0]);
-    }
-  }, [isSimplifiedProduct, sizeIdForMaterials, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType, densitiesForSelectedType]);
-
-  // При смене типа — ставим первую плотность этого типа (или сбрасываем, если у типа нет плотностей).
-  // Если плотность та же и подходит для нового типа — сразу синхронизируем material_id (пересчёт при смене типа при той же плотности).
-  useEffect(() => {
-    if (!isSimplifiedProduct || !sizeIdForMaterials) return;
-    if (densitiesForSelectedType.length === 0) {
-      setSelectedDensity('');
-      if (specs.material_id != null && allowedMaterialsForSize.length > 0) {
-        updateSpecs({ material_id: undefined }, true);
-      }
-      return;
-    }
-    const firstDensity = densitiesForSelectedType[0];
-    const needResetDensity = !selectedDensity || !densitiesForSelectedType.includes(selectedDensity as number);
-    if (needResetDensity) {
-      setSelectedDensity(firstDensity);
-      const materialForFirstDensity = allowedMaterialsByType.find(m => getMaterialDensity(m) === firstDensity);
-      if (materialForFirstDensity && Number(specs.material_id) !== Number(materialForFirstDensity.id)) {
-        const paperType = warehousePaperTypes.length > 0 && (materialForFirstDensity as any).paper_type_name
-          ? warehousePaperTypes.find(pt => pt.display_name === (materialForFirstDensity as any).paper_type_name)
-          : null;
-        const nextMaterialType = paperType ? paperType.name : undefined;
-        updateSpecs({
-          material_id: materialForFirstDensity.id,
-          ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
-        }, true);
-      }
-    } else {
-      // Плотность не менялась (та же для нового типа) — всё равно синхронизируем material_id по (тип + плотность)
-      const densityNum = Number(selectedDensity);
-      const materialForCurrentDensity = allowedMaterialsByType.find(m => getMaterialDensity(m) === densityNum);
-      if (materialForCurrentDensity && Number(specs.material_id) !== Number(materialForCurrentDensity.id)) {
-        const paperType = warehousePaperTypes.length > 0 && (materialForCurrentDensity as any).paper_type_name
-          ? warehousePaperTypes.find(pt => pt.display_name === (materialForCurrentDensity as any).paper_type_name)
-          : null;
-        const nextMaterialType = paperType ? paperType.name : undefined;
-        updateSpecs({
-          material_id: materialForCurrentDensity.id,
-          ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
-        }, true);
-      }
-    }
-  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, sizeIdForMaterials, specs.material_id, allowedMaterialsForSize.length, allowedMaterialsByType, warehousePaperTypes, updateSpecs]);
-
-  // По выбранным типу и плотности выставляем material_id и materialType (только при изменении — иначе рекурсия)
-  // Не перезаписываем material_id, если он задан из initial и материал в разрешённых — ждём синхронизацию selectedMaterialType/selectedDensity из effect выше
-  useEffect(() => {
-    if (!isSimplifiedProduct || !sizeIdForMaterials) return;
-    const material = materialByTypeAndDensity;
-    if (!material) return;
-    const paperType = warehousePaperTypes.length > 0 && (material as any).paper_type_name
-      ? warehousePaperTypes.find(pt => pt.display_name === (material as any).paper_type_name)
-      : null;
-    const nextMaterialType = paperType ? paperType.name : undefined;
-    const alreadyEqual = Number(specs.material_id) === Number(material.id) && (!nextMaterialType || specs.materialType === nextMaterialType);
-    if (alreadyEqual) return;
-    if (!userChoseTypeRef.current && specs.material_id != null && Number(material.id) !== Number(specs.material_id) && allowedMaterialsForSize.some(m => Number(m.id) === specs.material_id)) {
-      return;
-    }
-    userChoseTypeRef.current = false;
-    updateSpecs({
-      material_id: material.id,
-      ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
-    }, true);
-  }, [materialByTypeAndDensity, isSimplifiedProduct, sizeIdForMaterials, specs.material_id, specs.materialType, allowedMaterialsForSize, warehousePaperTypes, updateSpecs]);
-
 
   // Продукт без материалов (нет paperType в схеме и не упрощённый с размерами/материалами) — не показываем секцию
   const usesMaterials = hasField('paperType') || isSimplifiedProduct;
@@ -703,64 +613,88 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     </div>
   ) : null;
 
-  // Блок «Тип материала» + «Плотность» + «Имя материала» в одну строку
+  // Упрощённые продукты: категория склада → тип материала → конкретный вариант.
+  // Для рулона вариантом является ширина, для бумаги — плотность.
   const materialBlock = isSimplifiedProduct && sizeIdForMaterials ? (
     <div className="material-type-density-row">
+      <div className="param-group param-group--narrow">
+        <label>Категория материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
+        {loadingMaterials ? (
+          <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
+        ) : materialSelectionTree.length === 0 ? (
+          <div className="form-control" style={{ color: '#666' }}>Нет разрешённых материалов</div>
+        ) : (
+          <select
+            value={selectedMaterialCategory?.key ?? ''}
+            onChange={(e) => {
+              const category = materialSelectionTree.find((item) => item.key === e.target.value);
+              const type = category?.types[0];
+              const material = type?.materials[0];
+              if (!category || !type || !material) return;
+              setSelectedMaterialCategoryKey(category.key);
+              setSelectedWarehouseTypeKey(type.key);
+              applyWarehouseMaterial(material);
+            }}
+            className="form-control"
+            required
+          >
+            {materialSelectionTree.map((category) => (
+              <option key={category.key} value={category.key}>{category.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
       <div className="param-group param-group--narrow">
         <label>Тип материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
         {loadingMaterials ? (
           <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
-        ) : materialTypesFromMaterials.length === 0 ? (
-          <div className="form-control" style={{ color: '#666' }}>Нет разрешённых материалов</div>
+        ) : !selectedMaterialCategory || selectedMaterialCategory.types.length === 0 ? (
+          <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов. Добавьте материалы в шаблоне продукта (редактор шаблона → Материалы).</small></div>
         ) : (
           <select
-            value={selectedMaterialType}
+            value={selectedWarehouseType?.key ?? ''}
             onChange={(e) => {
-              userChoseTypeRef.current = true;
-              setSelectedMaterialType(e.target.value);
+              const type = selectedMaterialCategory.types.find((item) => item.key === e.target.value);
+              const material = type?.materials[0];
+              if (!type || !material) return;
+              setSelectedWarehouseTypeKey(type.key);
+              applyWarehouseMaterial(material);
             }}
             className="form-control"
             required
-            title={selectedMaterialType || undefined}
           >
-            {materialTypesFromMaterials.map(typeName => (
-              <option key={typeName} value={typeName}>{typeName}</option>
+            {selectedMaterialCategory.types.map((type) => (
+              <option key={type.key} value={type.key}>{type.label}</option>
             ))}
           </select>
         )}
       </div>
+
       <div className="param-group param-group--narrow">
-        <label>Плотность <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
+        <label>
+          {selectedWarehouseType?.variantLabel ?? 'Материал'}
+          <span style={{ color: 'var(--danger, #c53030)' }}> *</span>
+        </label>
         {loadingMaterials ? (
           <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
-        ) : allowedMaterialsForSize.length === 0 ? (
-          <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов. Добавьте материалы в шаблоне продукта (редактор шаблона → Материалы).</small></div>
-        ) : densitiesForSelectedType.length === 0 ? (
-          <div className="alert alert-warning" style={{ margin: 0 }}>
-            <small><AppIcon name="warning" size="xs" /> У разрешённых для этого размера материалов не заполнено числовое поле «Плотность» (г/м²) в карточке материала на складе. Обновите карточку и перезагрузите калькулятор при необходимости.</small>
-          </div>
+        ) : !selectedWarehouseType || selectedWarehouseType.materials.length === 0 ? (
+          <div className="form-control" style={{ color: '#666' }}>Нет вариантов материала</div>
         ) : (
           <select
-            value={selectedDensity}
+            value={currentMaterialPath?.typeKey === selectedWarehouseType.key ? Number(specs.material_id) : Number(selectedWarehouseType.materials[0].id)}
             onChange={(e) => {
-              userChoseTypeRef.current = true;
-              setSelectedDensity(e.target.value ? Number(e.target.value) : '');
+              const material = selectedWarehouseType.materials.find((item) => Number(item.id) === Number(e.target.value));
+              if (material) applyWarehouseMaterial(material);
             }}
             className="form-control"
             required
-            title={selectedDensity ? `${selectedDensity} г/м²` : undefined}
           >
-            {densitiesForSelectedType.map(d => (
-              <option key={d} value={d}>{d} г/м²</option>
+            {selectedWarehouseType.materials.map((material) => (
+              <option key={material.id} value={material.id}>{material.optionLabel}</option>
             ))}
           </select>
         )}
-      </div>
-      <div className="param-group param-group--narrow">
-        <label>Материал</label>
-        <div className="form-control form-control--readonly" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
-          {materialByTypeAndDensity ? (materialByTypeAndDensity as any).name : '—'}
-        </div>
       </div>
       {baseMaterialBlock}
     </div>
@@ -882,82 +816,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         </div>
         )}
 
-        {/* Материал-основа (заготовка) — для продуктов с allowed_base_material_ids */}
-        {hasBaseMaterials && isSimplifiedProduct && sizeIdForMaterials && (
-          <div className="param-group param-group--narrow">
-            <label>Материал-основа (заготовка)</label>
-            <select
-              value={specs.base_material_id ?? ''}
-              onChange={(e) => updateSpecs({ base_material_id: e.target.value ? Number(e.target.value) : undefined }, true)}
-              className="form-control"
-            >
-              <option value="">— Не выбрано —</option>
-              {allowedBaseMaterialsForSize.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Тип материала + Плотность + Имя материала в одну строку (из разрешённых для продукта материалов) */}
+        {/* Универсальная складская иерархия для упрощённых продуктов. */}
         {isSimplifiedProduct && sizeIdForMaterials && (
-          <div className="material-type-density-row" style={{ gridColumn: '1 / -1' }}>
-            <div className="param-group param-group--narrow">
-              <label>Тип материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
-              {loadingMaterials ? (
-                <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
-              ) : materialTypesFromMaterials.length === 0 ? (
-                <div className="form-control" style={{ color: '#666' }}>Нет разрешённых материалов</div>
-              ) : (
-                <select
-                  value={selectedMaterialType}
-                  onChange={(e) => {
-                    userChoseTypeRef.current = true;
-                    setSelectedMaterialType(e.target.value);
-                  }}
-                  className="form-control"
-                  required
-                  title={selectedMaterialType || undefined}
-                >
-                  {materialTypesFromMaterials.map(typeName => (
-                    <option key={typeName} value={typeName}>{typeName}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className="param-group param-group--narrow param-group--material-under-print">
-            <label>Плотность <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
-            {loadingMaterials ? (
-              <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
-            ) : allowedMaterialsForSize.length === 0 ? (
-              <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов. Добавьте материалы в шаблоне продукта (редактор шаблона → Материалы).</small></div>
-            ) : densitiesForSelectedType.length === 0 ? (
-              <div className="alert alert-warning" style={{ margin: 0 }}>
-                <small><AppIcon name="warning" size="xs" /> У разрешённых для этого размера материалов не заполнено числовое поле «Плотность» (г/м²) в карточке материала на складе. Обновите карточку и перезагрузите калькулятор при необходимости.</small>
-              </div>
-            ) : (
-              <select
-                value={selectedDensity}
-                onChange={(e) => {
-                  userChoseTypeRef.current = true;
-                  setSelectedDensity(e.target.value ? Number(e.target.value) : '');
-                }}
-                className="form-control"
-                required
-                title={selectedDensity ? `${selectedDensity} г/м²` : undefined}
-              >
-                {densitiesForSelectedType.map(d => (
-                  <option key={d} value={d}>{d} г/м²</option>
-                ))}
-              </select>
-            )}
-            </div>
-            <div className="param-group param-group--narrow">
-              <label>Материал</label>
-              <div className="form-control form-control--readonly" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
-                {materialByTypeAndDensity ? (materialByTypeAndDensity as any).name : '—'}
-              </div>
-            </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            {materialBlock}
           </div>
         )}
 

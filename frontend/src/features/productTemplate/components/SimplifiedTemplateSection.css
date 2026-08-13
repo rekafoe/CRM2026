@@ -1375,6 +1375,66 @@
   margin-top: 8px;
 }
 
+.service-pricing-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  margin-bottom: 12px;
+  padding: 0 12px;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.service-pricing-search:focus-within {
+  background: #fff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.service-pricing-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  color: #0f172a;
+  font: inherit;
+  font-size: 14px;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.service-pricing-search button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.service-pricing-search button:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.service-pricing-search > span:last-child {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .simplified-tiers-table {
   margin-top: 10px;
   overflow-x: auto;
