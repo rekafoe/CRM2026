@@ -1,12 +1,24 @@
 import { useState, useCallback, useMemo } from 'react';
 import { VariantWithTiers } from '../ServiceVariantsTable.types';
 import { PriceRange, PriceRangeUtils } from '../../../../../hooks/usePriceRanges';
-import { calculateCommonRanges } from '../ServiceVariantsTable.utils';
+import {
+  calculateCommonRanges,
+  collectPricingLeafVariantIds,
+} from '../ServiceVariantsTable.utils';
 
 // Локальное определение defaultTiers для создания новых вариантов
 const defaultTiers = () => [
   { min_qty: 1, max_qty: undefined, unit_price: 0 },
 ];
+
+function clearNonLeafTiers(variants: VariantWithTiers[]): VariantWithTiers[] {
+  const leafIds = collectPricingLeafVariantIds(variants);
+  return variants.map((variant) => (
+    leafIds.has(Number(variant.id))
+      ? variant
+      : { ...variant, tiers: [] }
+  ));
+}
 
 /**
  * Тип для отслеживания изменений диапазонов
@@ -107,9 +119,11 @@ export function useLocalRangeChanges(
   // Локальное добавление диапазона
   const addRangeBoundary = useCallback((boundary: number) => {
     const currentVariants = [...localVariants];
+    const leafIds = collectPricingLeafVariantIds(currentVariants);
 
-    // Создаем новые диапазоны для всех вариантов
+    // Создаём цены только на последнем уровне дерева.
     const updatedVariants = currentVariants.map((variant) => {
+      if (!leafIds.has(Number(variant.id))) return { ...variant, tiers: [] };
       const currentRanges = variant.tiers.map((t) => ({
         minQty: t.minQuantity,
         price: t.rate,
@@ -156,6 +170,7 @@ export function useLocalRangeChanges(
   // Локальное редактирование диапазона
   const editRangeBoundary = useCallback((rangeIndex: number, newBoundary: number) => {
     const currentVariants = [...localVariants];
+    const leafIds = collectPricingLeafVariantIds(currentVariants);
 
     // Находим текущую границу диапазона
     const allMinQtys = new Set<number>();
@@ -169,6 +184,7 @@ export function useLocalRangeChanges(
 
     // Создаем новые диапазоны для всех вариантов
     const updatedVariants = currentVariants.map((variant) => {
+      if (!leafIds.has(Number(variant.id))) return { ...variant, tiers: [] };
       const currentRanges = variant.tiers.map((t) => ({
         minQty: t.minQuantity,
         price: t.rate,
@@ -211,6 +227,7 @@ export function useLocalRangeChanges(
   // Локальное удаление диапазона
   const removeRange = useCallback((rangeIndex: number) => {
     const currentVariants = [...localVariants];
+    const leafIds = collectPricingLeafVariantIds(currentVariants);
 
     // Находим границу для удаления
     const allMinQtys = new Set<number>();
@@ -224,6 +241,7 @@ export function useLocalRangeChanges(
 
     // Создаем новые диапазоны для всех вариантов
     const updatedVariants = currentVariants.map((variant) => {
+      if (!leafIds.has(Number(variant.id))) return { ...variant, tiers: [] };
       const currentRanges = variant.tiers.map((t) => ({
         minQty: t.minQuantity,
         price: t.rate,
@@ -265,6 +283,7 @@ export function useLocalRangeChanges(
 
   // Локальное изменение цены (для конкретного варианта)
   const changePrice = useCallback((variantId: number, minQty: number, newPrice: number) => {
+    if (!collectPricingLeafVariantIds(localVariants).has(Number(variantId))) return;
     setLocalVariants(prev => {
       const updated = prev.map(variant => {
         if (variant.id !== variantId) return variant;
@@ -307,7 +326,7 @@ export function useLocalRangeChanges(
     });
 
     setHasUnsavedChanges(true);
-  }, []);
+  }, [localVariants]);
 
   // Локальное создание варианта
   const createVariant = useCallback((variantName: string, parameters: Record<string, any> = {}) => {
@@ -331,7 +350,10 @@ export function useLocalRangeChanges(
       })),
     };
 
-    setLocalVariants(prev => [...prev, newVariant]);
+    const nextVariants = clearNonLeafTiers([...localVariants, newVariant]);
+    const nextLeafIds = collectPricingLeafVariantIds(nextVariants);
+    setLocalVariants(nextVariants);
+    setPriceChanges((prev) => prev.filter((change) => nextLeafIds.has(Number(change.variantId))));
     setVariantChanges(prev => [...prev, {
       type: 'create',
       variantId: newVariantId,
@@ -343,12 +365,28 @@ export function useLocalRangeChanges(
     return newVariant;
   }, [localVariants, nextVariantId]);
 
-  // Локальное удаление варианта
-  const deleteVariant = useCallback((variantId: number) => {
-    setLocalVariants(prev => prev.filter(v => v.id !== variantId));
-    setVariantChanges(prev => [...prev, { type: 'delete', variantId }]);
+  // Локальное удаление вариантов одним state-переходом (важно для каскадного удаления).
+  const deleteVariants = useCallback((variantIds: number[]) => {
+    const ids = new Set(variantIds.map(Number));
+    const previousLeafIds = collectPricingLeafVariantIds(localVariants);
+    const remaining = localVariants.filter((variant) => !ids.has(Number(variant.id)));
+    const nextLeafIds = collectPricingLeafVariantIds(remaining);
+    setLocalVariants(remaining.map((variant) => (
+      previousLeafIds.has(Number(variant.id)) && nextLeafIds.has(Number(variant.id))
+        ? variant
+        : { ...variant, tiers: [] }
+    )));
+    setPriceChanges((prev) => prev.filter((change) => nextLeafIds.has(Number(change.variantId))));
+    setVariantChanges((prev) => [
+      ...prev,
+      ...variantIds.map((variantId) => ({ type: 'delete' as const, variantId })),
+    ]);
     setHasUnsavedChanges(true);
-  }, []);
+  }, [localVariants]);
+  const deleteVariant = useCallback(
+    (variantId: number) => deleteVariants([variantId]),
+    [deleteVariants],
+  );
 
   // 🆕 Локальное обновление имени варианта (для новых и существующих вариантов)
   const updateVariantName = useCallback((variantId: number, newName: string) => {
@@ -492,6 +530,7 @@ export function useLocalRangeChanges(
     changePrice,
     createVariant,
     deleteVariant,
+    deleteVariants,
     updateVariantName, // 🆕
     updateVariantParams, // 🆕
 

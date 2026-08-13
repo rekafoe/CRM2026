@@ -40,6 +40,7 @@ import campaignsRoutes from './campaigns'
 import expensesRoutes from './expenses'
 import publicEditorRoutes from './publicEditor'
 import webhooksRoutes from './webhooks'
+import { knowledgeBaseRoutes } from '../modules/knowledge-base'
 
 const router = Router()
 
@@ -82,6 +83,7 @@ router.use('/miniapp', miniappRoutes)
 router.use('/campaigns', campaignsRoutes)
 router.use('/expenses', expensesRoutes)
 router.use('/public-editor', publicEditorRoutes)
+router.use('/knowledge', knowledgeBaseRoutes)
 router.use('/products/:productId/subtype-designs', subtypeDesignsRoutes)
 
 console.log('Routes setup complete')

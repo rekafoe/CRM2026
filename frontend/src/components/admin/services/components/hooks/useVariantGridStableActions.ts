@@ -74,8 +74,7 @@ export function useVariantGridStableActions(
 
   const level0Delete = useCallback((typeName: string, variantIds: number[]) => {
     if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) return;
-    const lc = ctxRef.current.localChanges;
-    variantIds.forEach((id) => lc.deleteVariant(id));
+    ctxRef.current.localChanges.deleteVariants(variantIds);
   }, []);
 
   const level1ParamsEditStart = useCallback((variantId: number, initialType: string) => {
@@ -115,9 +114,7 @@ export function useVariantGridStableActions(
 
   const level1Delete = useCallback((variantId: number, level2ChildIds: number[]) => {
     if (!confirm('Удалить этот вариант и все его дочерние варианты?')) return;
-    const lc = ctxRef.current.localChanges;
-    lc.deleteVariant(variantId);
-    level2ChildIds.forEach((id) => lc.deleteVariant(id));
+    ctxRef.current.localChanges.deleteVariants([variantId, ...level2ChildIds]);
   }, []);
 
   const level2ParamsEditStart = useCallback((variantId: number, initialSubType: string) => {

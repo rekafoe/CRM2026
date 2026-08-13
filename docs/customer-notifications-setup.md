@@ -77,6 +77,49 @@ const transporter = nodemailer.createTransport({
 5. Переведите заказ с email клиента в этот статус.
 6. Проверьте карточку заказа: блок «Почта по заказу» должен показать `mail_jobs` по этому заказу.
 
+### 2.4. Transactional gateway для подтверждения email сайта
+
+Backend сайта ставит verification-письмо в общую очередь CRM:
+
+```http
+POST /api/mail/website/email-verification
+Content-Type: application/json
+X-API-Key: <AUTH_MAIL_API_KEY>
+```
+
+```json
+{
+  "to": "user@example.com",
+  "userName": "Иван",
+  "verificationUrl": "https://printcore.by/verify-email?token=opaque-token",
+  "idempotencyKey": "verify-user-123"
+}
+```
+
+Body должен содержать ровно эти четыре поля. `subject`, `html`, `text`, `content`, `from`, `cc`, `bcc` и любые другие поля запрещены: тема и HTML/text шаблон зафиксированы в CRM, поэтому endpoint нельзя использовать как open relay. `idempotencyKey` содержит 8–128 символов (`A-Z`, `a-z`, цифры, `.`, `_`, `:`, `-`) и получает внутренний namespace `website-email-verification:`.
+
+Успешный ответ — `202`:
+
+```json
+{
+  "ok": true,
+  "jobId": 123,
+  "duplicate": false,
+  "queued": true
+}
+```
+
+Повтор с тем же `idempotencyKey` возвращает существующий `jobId` и `duplicate: true`. Письмо отправляет существующий worker `mail_jobs`; его retry/backoff и SMTP-настройки общие с остальной transactional почтой.
+
+Безопасность:
+
+- используется только отдельный `AUTH_MAIL_API_KEY` в `X-API-Key`; CRM admin JWT и `WEBSITE_ORDER_API_KEY` не подходят;
+- если `AUTH_MAIL_API_KEY` не задан, endpoint отключён и возвращает `503`; неверный/отсутствующий ключ даёт `401`;
+- ключ сравнивается timing-safe и не пишется в лог;
+- production URL разрешён только вида `https://printcore.by/verify-email?token=...`: без userinfo, нестандартного порта, fragment, другого path/origin и дополнительных query-параметров;
+- `AUTH_MAIL_VERIFICATION_DEV_ORIGINS` можно задать только для локальной разработки. Принимаются явные `http(s)` loopback origins (`localhost`, `127.0.0.1`, `::1`), а при `NODE_ENV=production` переменная игнорируется;
+- отдельный лимит задают `AUTH_MAIL_RATE_LIMIT_MAX` (по умолчанию `20`) и `AUTH_MAIL_RATE_LIMIT_WINDOW_MS` (по умолчанию `60000`).
+
 ---
 
 ## 3. SMS-оповещения

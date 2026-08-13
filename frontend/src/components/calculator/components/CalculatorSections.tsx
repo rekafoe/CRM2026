@@ -61,6 +61,8 @@ interface CalculatorSectionsProps {
     id: number;
     variantName?: string;
     variant_name?: string;
+    parentVariantId?: number | string | null;
+    isActive?: boolean;
     parameters?: unknown;
   }>;
   bindingVariantId?: number;

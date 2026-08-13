@@ -2897,6 +2897,26 @@
   min-width: 0;
 }
 
+.binding-variant-selector {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.binding-variant-selector .param-group--binding {
+  max-width: none;
+}
+
+.binding-variant-selector__messages {
+  grid-column: 1 / -1;
+}
+
+.binding-variant-selector__messages p {
+  margin: 0;
+}
+
 /* Чекбоксы (магнитные, резка и т.д.) — на всю ширину строки */
 .calculator-section-unified .section-group-content .advanced-grid .param-group.checkbox-group {
   grid-column: 1 / -1;

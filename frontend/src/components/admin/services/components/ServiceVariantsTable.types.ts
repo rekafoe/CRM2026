@@ -85,6 +85,8 @@ export interface VariantRowLevel0Props {
       meter_basis?: 'knife_path' | 'feed';
     }
   ) => void;
+  isBindService?: boolean;
+  onUpdateBindingPages?: (variantId: number, params: Record<string, unknown>) => void | Promise<void>;
 }
 
 /**
@@ -116,6 +118,8 @@ export interface VariantRowLevel1Props {
       meter_basis?: 'knife_path' | 'feed';
     }
   ) => void;
+  isBindService?: boolean;
+  onUpdateBindingPages?: (variantId: number, params: Record<string, unknown>) => void | Promise<void>;
 }
 
 /**
@@ -148,4 +152,6 @@ export interface VariantRowLevel2Props {
       meter_basis?: 'knife_path' | 'feed';
     }
   ) => void;
+  isBindService?: boolean;
+  onUpdateBindingPages?: (variantId: number, params: Record<string, unknown>) => void | Promise<void>;
 }

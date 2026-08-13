@@ -6,6 +6,7 @@ import {
   resolveCalculatorPagesBounds,
   resolveMultipageMinQty,
 } from '../../../utils/multipageProduct';
+import { BindingVariantSelector } from './BindingVariantSelector';
 import { CustomPagesField } from './CustomPagesField';
 
 export interface ParamsSectionSpecs {
@@ -51,6 +52,8 @@ interface ParamsSectionProps {
     id: number;
     variantName?: string;
     variant_name?: string;
+    parentVariantId?: number | string | null;
+    isActive?: boolean;
     parameters?: unknown;
   }>;
   bindingVariantLocked?: boolean;
@@ -577,31 +580,14 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         })()}
 
         {bindingServiceId != null && bindingVariants.length > 0 && (
-          <div className="param-group param-group--binding">
-            <label>Переплёт</label>
-            <select
-              className="form-control"
-              disabled={bindingVariantLocked}
-              value={bindingVariantId != null && Number.isFinite(bindingVariantId) ? String(bindingVariantId) : ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                onBindingVariantChange?.(v === '' ? undefined : Number(v));
-              }}
-            >
-              <option value="">— Выберите вариант —</option>
-              {bindingVariants.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.variantName ?? (v as any).variant_name ?? `Вариант #${v.id}`}
-                </option>
-              ))}
-            </select>
-            {bindingPagesHint && (
-              <p className="param-hint param-hint--binding">{bindingPagesHint}</p>
-            )}
-            {validationErrors.binding && (
-              <p className="param-error">{validationErrors.binding}</p>
-            )}
-          </div>
+          <BindingVariantSelector
+            variants={bindingVariants}
+            value={bindingVariantId}
+            disabled={bindingVariantLocked}
+            onChange={(variantId) => onBindingVariantChange?.(variantId)}
+            pagesHint={bindingPagesHint}
+            error={validationErrors.binding}
+          />
         )}
 
         {/* Магнитные (для визиток) */}

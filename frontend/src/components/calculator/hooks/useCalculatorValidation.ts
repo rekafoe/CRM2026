@@ -38,6 +38,7 @@ interface UseCalculatorValidationParams {
   isMultiPageProduct?: boolean;
   bindingPagesLimits?: BindingPagesLimits | null;
   bindingLabel?: string;
+  bindingVariantIsLeaf?: boolean;
 }
 
 function computeErrors(params: {
@@ -57,6 +58,7 @@ function computeErrors(params: {
   isMultiPageProduct?: boolean;
   bindingPagesLimits?: BindingPagesLimits | null;
   bindingLabel?: string;
+  bindingVariantIsLeaf?: boolean;
 }): Record<string, string> {
   const {
     specs,
@@ -74,6 +76,7 @@ function computeErrors(params: {
     isMultiPageProduct,
     bindingPagesLimits,
     bindingLabel,
+    bindingVariantIsLeaf,
   } = params;
   const errors: Record<string, string> = {};
 
@@ -166,6 +169,9 @@ function computeErrors(params: {
       errors.binding = bindErr;
     }
   }
+  if (bindingVariantIsLeaf === false) {
+    errors.binding = 'Выберите последний уровень варианта переплёта';
+  }
 
   if (sizeLimits || operationLimits) {
     const minQty = Math.max(sizeLimits?.min ?? 1, operationLimits?.min ?? 1);
@@ -220,6 +226,7 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     isMultiPageProduct,
     bindingPagesLimits,
     bindingLabel,
+    bindingVariantIsLeaf,
   } = params;
 
   const schemaPagesEnum = useMemo(() => {
@@ -287,6 +294,7 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
         isMultiPageProduct,
         bindingPagesLimits,
         bindingLabel,
+        bindingVariantIsLeaf,
       });
       return { errors, isValid: Object.keys(errors).length === 0 };
     },
@@ -305,6 +313,7 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
       isMultiPageProduct,
       bindingPagesLimits,
       bindingLabel,
+      bindingVariantIsLeaf,
     ],
   );
 

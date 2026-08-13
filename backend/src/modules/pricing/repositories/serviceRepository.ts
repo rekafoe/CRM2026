@@ -3,6 +3,12 @@ import { getDb } from '../../../db';
 import { hasColumn, invalidateTableSchemaCache } from '../../../utils/tableSchemaCache';
 import { defaultRollFeedForPriceUnit } from '../services/finishingPerM2';
 import {
+  collectLeafVariantIds,
+  collectNonLeafVariantIds,
+  resolveServiceVariantParentId,
+  type ServiceVariantTreeRow,
+} from '../utils/serviceVariantTree';
+import {
   CreatePricingServiceDTO,
   PricingServiceDTO,
   ServiceVolumeTierDTO,
@@ -36,6 +42,57 @@ function normalizeParentVariantId(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+async function loadServiceVariantTreeRows(
+  db: Database,
+  serviceId: number,
+): Promise<ServiceVariantTreeRow[]> {
+  return db.all<ServiceVariantTreeRow[]>(
+    `SELECT id, variant_name, parameters, parent_variant_id
+     FROM service_variants
+     WHERE service_id = ?
+     ORDER BY sort_order, id`,
+    serviceId,
+  );
+}
+
+async function serviceVariantLeafIds(db: Database, serviceId: number): Promise<number[]> {
+  return collectLeafVariantIds(await loadServiceVariantTreeRows(db, serviceId));
+}
+
+async function assertServiceVariantPricingLeaf(
+  db: Database,
+  serviceId: number,
+  variantId: number,
+): Promise<void> {
+  const rows = await loadServiceVariantTreeRows(db, serviceId);
+  const variantExists = rows.some((row) => Number(row.id) === Number(variantId));
+  if (!variantExists) {
+    const err: any = new Error(`Variant with id ${variantId} not found for service ${serviceId}`);
+    err.status = 404;
+    throw err;
+  }
+  if (!collectLeafVariantIds(rows).includes(Number(variantId))) {
+    const err: any = new Error('Цена доступна только для последнего уровня варианта');
+    err.status = 400;
+    throw err;
+  }
+}
+
+async function clearNonLeafVariantPrices(db: Database, serviceId: number): Promise<void> {
+  const nonLeafIds = [...collectNonLeafVariantIds(await loadServiceVariantTreeRows(db, serviceId))];
+  if (nonLeafIds.length === 0) return;
+  const placeholders = nonLeafIds.map(() => '?').join(',');
+  await db.run(
+    `DELETE FROM service_variant_prices WHERE variant_id IN (${placeholders})`,
+    ...nonLeafIds,
+  );
+  await db.run(
+    `DELETE FROM service_volume_prices WHERE service_id = ? AND variant_id IN (${placeholders})`,
+    serviceId,
+    ...nonLeafIds,
+  );
 }
 
 function parsePositiveRollWidthMm(sheetWidth?: unknown, printableWidth?: unknown): number | null {
@@ -989,6 +1046,11 @@ export class PricingServiceRepository {
   static async listServiceTiers(serviceId: number, variantId?: number): Promise<ServiceVolumeTierDTO[]> {
     const db = await this.getConnection();
     await this.ensureSchema(db);
+    // Новая матрица — источник истины для вариантов. Legacy используется только как fallback.
+    if (variantId != null && Number.isFinite(variantId)) {
+      const fromNew = await this.listServiceTiersFromVariantPrices(serviceId, variantId);
+      if (fromNew.length > 0) return fromNew;
+    }
     
     let query = `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE service_id = ?`;
     const params: any[] = [serviceId];
@@ -1005,11 +1067,6 @@ export class PricingServiceRepository {
     try {
       const rows = await db.all<RawTierRow[]>(query, ...params);
       const result = rows.map(this.mapTier);
-      // Если для варианта нет цен в service_volume_prices — пробуем service_variant_prices (новая структура)
-      if (result.length === 0 && variantId != null && Number.isFinite(variantId)) {
-        const fromNew = await this.listServiceTiersFromVariantPrices(serviceId, variantId);
-        if (fromNew.length > 0) return fromNew;
-      }
       return result;
     } catch (error: any) {
       console.error('Error in listServiceTiers:', error);
@@ -1289,6 +1346,7 @@ export class PricingServiceRepository {
         err.status = 404;
         throw err;
       }
+      await assertServiceVariantPricingLeaf(db, serviceId, Number(payload.variantId));
     }
     
     const result = await db.run(
@@ -1311,6 +1369,15 @@ export class PricingServiceRepository {
     const current = await db.get<RawTierRow>(`SELECT * FROM service_volume_prices WHERE id = ?`, tierId);
     if (!current) {
       return null;
+    }
+    const targetVariantId =
+      payload.variantId !== undefined ? payload.variantId : current.variant_id;
+    if (targetVariantId != null) {
+      await assertServiceVariantPricingLeaf(
+        db,
+        Number(current.service_id),
+        Number(targetVariantId),
+      );
     }
     await db.run(
       `UPDATE service_volume_prices SET min_quantity = ?, price_per_unit = ?, is_active = ?, variant_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -1344,6 +1411,12 @@ export class PricingServiceRepository {
   }
 
   // Методы для работы с вариантами услуг
+  static async assertVariantPricingLeaf(serviceId: number, variantId: number): Promise<void> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    await assertServiceVariantPricingLeaf(db, serviceId, variantId);
+  }
+
   static async listServiceVariants(serviceId: number): Promise<ServiceVariantDTO[]> {
     const db = await this.getConnection();
     await this.ensureSchema(db);
@@ -1481,6 +1554,8 @@ export class PricingServiceRepository {
     } catch (attachErr) {
       console.warn('createServiceVariant: не удалось привязать цены к диапазонам', attachErr);
     }
+    // Как только появляется следующий уровень, цена родителя больше недействительна.
+    await clearNonLeafVariantPrices(db, serviceId);
 
     let material_sheet_width: number | null = null;
     let material_printable_width: number | null = null;
@@ -1587,6 +1662,7 @@ export class PricingServiceRepository {
     updateParams.push(variantId);
 
     await db.run(`UPDATE service_variants SET ${setSql} WHERE id = ?`, ...updateParams);
+    await clearNonLeafVariantPrices(db, Number(current.service_id));
 
     const parentSel = hasParentVariantId ? ', sv.parent_variant_id' : '';
     const materialSel = hasMaterialId && hasQtyPerItem ? ', sv.material_id, sv.qty_per_item' : '';
@@ -1618,23 +1694,34 @@ export class PricingServiceRepository {
   static async deleteServiceVariant(variantId: number): Promise<void> {
     const db = await this.getConnection();
     await this.ensureSchema(db);
-    
-    // Проверяем, используем ли мы новую структуру
-    const hasNewStructure = await db.get(`
-      SELECT name FROM sqlite_master 
-      WHERE type='table' AND name='service_variant_prices'
-    `);
-    
-    if (hasNewStructure) {
-      // Новая структура: удаляем цены варианта
-      await db.run(`DELETE FROM service_variant_prices WHERE variant_id = ?`, variantId);
-    } else {
-      // Старая структура: удаляем tiers варианта
-      await db.run(`DELETE FROM service_volume_prices WHERE variant_id = ?`, variantId);
+    const variant = await db.get<{ service_id: number }>(
+      `SELECT service_id FROM service_variants WHERE id = ?`,
+      variantId,
+    );
+    if (!variant) return;
+    const variants = await loadServiceVariantTreeRows(db, Number(variant.service_id));
+    const idsToDelete = new Set<number>([variantId]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const item of variants) {
+        const parentId = resolveServiceVariantParentId(item);
+        if (parentId != null && idsToDelete.has(parentId) && !idsToDelete.has(Number(item.id))) {
+          idsToDelete.add(Number(item.id));
+          changed = true;
+        }
+      }
     }
+    const ids = [...idsToDelete];
+    const placeholders = ids.map(() => '?').join(',');
+
+    // Удаляем цены из обеих структур, чтобы legacy tiers не могли «воскреснуть».
+    await db.run(`DELETE FROM service_variant_prices WHERE variant_id IN (${placeholders})`, ...ids);
+    await db.run(`DELETE FROM service_volume_prices WHERE variant_id IN (${placeholders})`, ...ids);
     
-    // Удаляем вариант
-    await db.run(`DELETE FROM service_variants WHERE id = ?`, variantId);
+    // Явно удаляем потомков: parent_variant_id исторически не имеет FK CASCADE.
+    await db.run(`DELETE FROM service_variants WHERE id IN (${placeholders})`, ...ids);
+    await clearNonLeafVariantPrices(db, Number(variant.service_id));
   }
 
   // ========== Новые методы для работы с оптимизированной структурой ==========
@@ -1696,17 +1783,28 @@ export class PricingServiceRepository {
     );
     if (existingRange?.id) {
       // Досоздаём нулевые цены для вариантов без строки по этой границе
-      const variants = await db.all<{ id: number }[]>(
-        `SELECT id FROM service_variants WHERE service_id = ?`,
-        serviceId
-      );
-      for (const variant of variants || []) {
+      const leafVariantIds = await serviceVariantLeafIds(db, serviceId);
+      for (const variantId of leafVariantIds) {
         try {
           await db.run(
             `INSERT INTO service_variant_prices (variant_id, range_id, price_per_unit, is_active)
-             VALUES (?, ?, 0, 1)`,
-            variant.id,
-            existingRange.id
+             VALUES (
+               ?,
+               ?,
+               COALESCE((
+                 SELECT price_per_unit
+                 FROM service_volume_prices
+                 WHERE service_id = ? AND variant_id = ? AND min_quantity = ? AND is_active = 1
+                 ORDER BY id DESC
+                 LIMIT 1
+               ), 0),
+               1
+             )`,
+            variantId,
+            existingRange.id,
+            serviceId,
+            variantId,
+            minQuantity,
           );
         } catch (err: any) {
           if (!String(err?.message || '').includes('UNIQUE constraint')) throw err;
@@ -1730,16 +1828,25 @@ export class PricingServiceRepository {
     const rangeId = result.lastID;
     
     // Создаем цены для всех существующих вариантов с ценой 0
-    const variants = await db.all<{ id: number }[]>(`
-      SELECT id FROM service_variants WHERE service_id = ?
-    `, serviceId);
+    const leafVariantIds = await serviceVariantLeafIds(db, serviceId);
     
-    for (const variant of variants) {
+    for (const variantId of leafVariantIds) {
       try {
         await db.run(`
           INSERT INTO service_variant_prices (variant_id, range_id, price_per_unit, is_active)
-          VALUES (?, ?, 0, 1)
-        `, variant.id, rangeId);
+          VALUES (
+            ?,
+            ?,
+            COALESCE((
+              SELECT price_per_unit
+              FROM service_volume_prices
+              WHERE service_id = ? AND variant_id = ? AND min_quantity = ? AND is_active = 1
+              ORDER BY id DESC
+              LIMIT 1
+            ), 0),
+            1
+          )
+        `, variantId, rangeId, serviceId, variantId, minQuantity);
       } catch (err: any) {
         // Игнорируем ошибки UNIQUE constraint
         if (!err.message?.includes('UNIQUE constraint')) {
@@ -1822,6 +1929,7 @@ export class PricingServiceRepository {
       err.status = 404;
       throw err;
     }
+    await assertServiceVariantPricingLeaf(db, Number(variant.service_id), variantId);
     
     const range = await db.get<{ id: number }>(`
       SELECT id FROM service_range_boundaries 

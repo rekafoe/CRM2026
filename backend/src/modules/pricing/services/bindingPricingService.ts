@@ -92,6 +92,7 @@ export class BindingPricingService {
         err.status = 404;
         throw err;
       }
+      await PricingServiceRepository.assertVariantPricingLeaf(serviceId, variantId);
       variantName = variant.variantName;
     }
 

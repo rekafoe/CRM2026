@@ -29,8 +29,11 @@ import { enqueueMarketingTemplateBroadcast } from '../services/mailMarketingBroa
 import { getTrackingPixelResponse, recordMailOpenByToken } from '../services/mailOpenTrackingService';
 import { isValidEmailAddress } from '../utils/isValidEmail';
 import { logger } from '../utils/logger';
+import websiteMailRoutes from './websiteMail';
 
 const router = Router();
+
+router.use('/website', websiteMailRoutes);
 
 type DiagnosticStep = {
   ok: boolean;

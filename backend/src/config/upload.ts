@@ -19,7 +19,11 @@ export const designFontsDir = path.join(uploadsDir, 'design-fonts')
 /** Изображения шаблонов design_templates — отдаются через /api/design-templates/public/:id/assets/:fileId/content */
 export const designTemplateAssetsDir = path.join(uploadsDir, 'design-template-assets')
 
+/** Изображения статей базы знаний — отдаются только через авторизованный API. */
+export const knowledgeBaseAssetsDir = path.join(uploadsDir, 'knowledge-base')
+
 const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.ttf', '.otf'])
+export const MAX_KNOWLEDGE_BASE_ASSET_BYTES = 10 * 1024 * 1024
 
 /** Лимит тела для multer (и согласованная проверка в handlers после приёма файла) */
 export const MAX_UPLOAD_FILE_SIZE_BYTES = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || 25 * 1024 * 1024)
@@ -30,6 +34,7 @@ const allowedUploadMimes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
+  'image/gif',
   'image/svg+xml',
   'image/tiff',
   'application/pdf',
@@ -45,6 +50,7 @@ try {
   fs.mkdirSync(orderFilesDir, { recursive: true })
   fs.mkdirSync(designFontsDir, { recursive: true })
   fs.mkdirSync(designTemplateAssetsDir, { recursive: true })
+  fs.mkdirSync(knowledgeBaseAssetsDir, { recursive: true })
 } catch {}
 
 export const storage = multer.diskStorage({
@@ -59,7 +65,7 @@ export const storage = multer.diskStorage({
 function defaultFileFilter(_req: any, file: any, cb: (error: Error | null, acceptFile: boolean) => void): void {
   const mime = String(file?.mimetype || '').toLowerCase()
   const ext = path.extname(String(file?.originalname || '')).toLowerCase()
-  const extAllowed = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.tif', '.tiff', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
+  const extAllowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.tif', '.tiff', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
   const accepted = allowedUploadMimes.has(mime) && extAllowed.includes(ext)
   if (!accepted) {
     cb(new Error('Unsupported file type'), false)
@@ -81,6 +87,28 @@ export const upload = multer({ storage, ...multerCommonOptions })
 
 /** Multer в памяти — тело не пишется на диск до явной записи. Исправляет случай, когда файлы сохранялись 0 КБ (stream уже прочитан до multer). */
 export const uploadMemory = multer({ storage: multer.memoryStorage(), ...multerCommonOptions })
+
+const knowledgeBaseImageMimes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const knowledgeBaseImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
+
+/** Изображения базы знаний: память, строгий allowlist и лимит 10 МБ. */
+export const uploadKnowledgeBaseAssetMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_KNOWLEDGE_BASE_ASSET_BYTES, files: 1, fields: MAX_UPLOAD_FIELDS },
+  fileFilter: (_req: any, file: any, cb: (error: Error | null, acceptFile: boolean) => void) => {
+    const mime = String(file?.mimetype || '').toLowerCase()
+    const ext = path.extname(String(file?.originalname || '')).toLowerCase()
+    if (!knowledgeBaseImageMimes.has(mime) || !knowledgeBaseImageExtensions.has(ext)) {
+      const error: any = new Error('Разрешены только изображения JPG, PNG, WebP и GIF')
+      error.name = 'ValidationError'
+      error.status = 400
+      error.code = 'INVALID_IMAGE_TYPE'
+      cb(error, false)
+      return
+    }
+    cb(null, true)
+  },
+})
 
 /**
  * Загрузка файлов макетов заказа (website/CRM):
@@ -221,6 +249,21 @@ export function saveBufferToDesignTemplateAssets(
   fs.writeFileSync(filePath, buffer)
   const displayName = raw || (ext ? `document${ext}` : `file-${unique}`)
   return { filename: unique, size: buffer.length, originalName: displayName }
+}
+
+export function saveBufferToKnowledgeBaseAssets(
+  buffer: Buffer | undefined,
+  originalName?: string,
+): { filename: string; size: number; originalName: string } | null {
+  if (!buffer || buffer.length === 0 || buffer.length > MAX_KNOWLEDGE_BASE_ASSET_BYTES) return null
+  const raw = (originalName || '').trim()
+  const ext = path.extname(raw).toLowerCase()
+  if (!knowledgeBaseImageExtensions.has(ext)) return null
+  const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
+  const filePath = resolveSafeFilePath(knowledgeBaseAssetsDir, unique)
+  if (!filePath) return null
+  fs.writeFileSync(filePath, buffer)
+  return { filename: unique, size: buffer.length, originalName: raw || unique }
 }
 
 export function saveBufferToOrderFiles(

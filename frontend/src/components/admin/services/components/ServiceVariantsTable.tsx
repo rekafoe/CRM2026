@@ -12,7 +12,6 @@ import { useTierModal } from './hooks/useTierModal';
 import { ServiceVariantsTableProps } from './ServiceVariantsTable.types';
 import { ServiceVariantsToolbar } from './ServiceVariantsToolbar';
 import { ServiceVariantsGrid } from './ServiceVariantsGrid';
-import { BindingPagesLimitsSection } from './BindingPagesLimitsSection';
 import '../../../../features/productTemplate/components/SimplifiedTemplateSection.css';
 import './ServiceVariantsTable.css';
 
@@ -104,10 +103,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         onAddRangeClick={(e) => tierModal.openAddModal(e.currentTarget)}
       />
 
-      {isBindService && variants.length > 0 && (
-        <BindingPagesLimitsSection variants={variants} operations={operations} />
-      )}
-
       {variants.length === 0 ? (
         <div className="service-variants-empty">
           <p>Нет вариантов. Нажмите "Добавить тип" для создания первого варианта.</p>
@@ -128,6 +123,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           materials={materials}
           priceUnit={priceUnit}
           onUpdateMaterial={operations.updateVariantMaterial}
+          isBindService={isBindService}
+          onUpdateBindingPages={localChanges.updateVariantParams}
         />
       )}
 

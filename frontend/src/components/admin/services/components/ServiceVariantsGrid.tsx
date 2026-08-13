@@ -36,6 +36,11 @@ export interface ServiceVariantsGridProps {
       meter_basis?: 'knife_path' | 'feed';
     }
   ) => void;
+  isBindService?: boolean;
+  onUpdateBindingPages?: (
+    variantId: number,
+    params: Record<string, unknown>,
+  ) => void | Promise<void>;
 }
 
 export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
@@ -53,6 +58,8 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
   materials = [],
   priceUnit,
   onUpdateMaterial,
+  isBindService,
+  onUpdateBindingPages,
 }) => {
   const actions = useVariantGridStableActions(localChanges, editing, setError, getNextTypeName);
   const noPriceColumns = commonRangesAsPriceRanges.length === 0;
@@ -80,7 +87,7 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
               <tr>
                 <th
                   className="variant-name-cell"
-                  style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}
+                  style={{ padding: 0 }}
                 >
                   <div className="cell">
                     <div className="variant-name-header">
@@ -149,6 +156,8 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                       materials={materials}
                       priceUnit={priceUnit}
                       onUpdateMaterial={onUpdateMaterial}
+                      isBindService={isBindService}
+                      onUpdateBindingPages={onUpdateBindingPages}
                     />
 
                     {Array.from(typeGroup.level1.entries()).map(([, level1Variants]) =>
@@ -174,6 +183,8 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                               materials={materials}
                               priceUnit={priceUnit}
                               onUpdateMaterial={onUpdateMaterial}
+                              isBindService={isBindService}
+                              onUpdateBindingPages={onUpdateBindingPages}
                             />
 
                             {level2Variants.map((level2Variant) => (
@@ -196,6 +207,8 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                                 materials={materials}
                                 priceUnit={priceUnit}
                                 onUpdateMaterial={onUpdateMaterial}
+                                isBindService={isBindService}
+                                onUpdateBindingPages={onUpdateBindingPages}
                               />
                             ))}
                           </React.Fragment>

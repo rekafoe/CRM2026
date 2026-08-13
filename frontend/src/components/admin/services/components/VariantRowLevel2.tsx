@@ -5,6 +5,7 @@ import React, { memo, useCallback } from 'react';
 import { PriceRangeCells } from './PriceRangeCells';
 import { VariantRowActions } from './VariantRowActions';
 import { VariantMaterialSelect } from './VariantMaterialSelect';
+import { VariantBindingPagesLimits } from './VariantBindingPagesLimits';
 import { getParentVariantId } from '../../../../utils/serviceVariantParent';
 import { VariantRowLevel2Props } from './ServiceVariantsTable.types';
 
@@ -26,6 +27,8 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
   materials = [],
   priceUnit,
   onUpdateMaterial,
+  isBindService,
+  onUpdateBindingPages,
 }) => {
   const handleParamsEditStart = useCallback(() => {
     onParamsEditStart(variant.id, variant.parameters?.subType || '');
@@ -52,7 +55,7 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
 
   return (
     <tr className="el-table__row el-table__row--level-2">
-      <td className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
+      <td className="variant-name-cell" style={{ padding: 0 }}>
         <div className="cell">
           <span className="el-table__indent" style={{ paddingLeft: '32px' }}></span>
           <span className="el-table__placeholder"></span>
@@ -93,6 +96,9 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
                 priceUnit={priceUnit}
                 onUpdate={onUpdateMaterial}
               />
+            )}
+            {isBindService && onUpdateBindingPages && (
+              <VariantBindingPagesLimits variant={variant} onUpdate={onUpdateBindingPages} />
             )}
           </div>
         </div>

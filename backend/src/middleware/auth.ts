@@ -31,6 +31,8 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/favicon\.ico$/ },
   { method: 'GET', path: /^\/api\/mail\/unsubscribe\/?$/ },
   { method: 'GET', path: /^\/api\/mail\/track\/open\/[^/]+\/?$/ },
+  // Service-to-service: собственная авторизация по AUTH_MAIL_API_KEY внутри mail route.
+  { method: 'POST', path: /^\/api\/mail\/website\/email-verification\/?$/ },
   // auth
   { method: 'POST', path: /^\/api\/auth\/login$/ },
   { method: 'GET', path: /^\/api\/auth\/me$/ },

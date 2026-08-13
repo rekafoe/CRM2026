@@ -29,6 +29,7 @@ import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
 import { isMultipageLikeProduct, resolveCalculatorPagesBounds } from '../../utils/multipageProduct';
 import { CalculatorSections } from './components/CalculatorSections';
+import { isBindingVariantPricingLeaf } from './components/BindingVariantSelector';
 import { CustomProductForm } from './components/CustomProductForm';
 import { PostprintServicesForm } from './components/PostprintServicesForm';
 import { usePostprintServices } from './hooks/usePostprintServices';
@@ -209,7 +210,14 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const effectivePagesConfig = effectiveConfig.pages;
 
   const [bindingVariants, setBindingVariants] = useState<
-    Array<{ id: number; variantName?: string; variant_name?: string; parameters?: unknown }>
+    Array<{
+      id: number;
+      variantName?: string;
+      variant_name?: string;
+      parentVariantId?: number | string | null;
+      isActive?: boolean;
+      parameters?: unknown;
+    }>
   >([]);
   const bindingTemplate = simplified?.multiPageStructure?.binding;
 
@@ -238,9 +246,17 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       setBindingVariants([]);
       return;
     }
+    let cancelled = false;
     getServiceVariants(Number(sid))
-      .then((list) => setBindingVariants(Array.isArray(list) ? list : []))
-      .catch(() => setBindingVariants([]));
+      .then((list) => {
+        if (!cancelled) setBindingVariants(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setBindingVariants([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [bindingTemplate?.service_id, selectedProduct?.id, isCustomProduct, isPostprintProduct]);
 
   type SizeWithPrices = { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> };
@@ -518,6 +534,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     const variant = bindingVariants.find((v) => v.id === activeBindingVariantId);
     return variant?.variantName ?? variant?.variant_name;
   }, [activeBindingVariantId, bindingVariants]);
+  const activeBindingVariantIsLeaf = useMemo(
+    () => isBindingVariantPricingLeaf(bindingVariants, activeBindingVariantId),
+    [activeBindingVariantId, bindingVariants],
+  );
 
   const pagesAllowCustom = isMultiPageProduct || effectivePagesConfig?.allowCustom !== false;
   const calculatorPagesBounds = useMemo(
@@ -549,6 +569,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     isMultiPageProduct,
     bindingPagesLimits: activeBindingLimits,
     bindingLabel: activeBindingLabel,
+    bindingVariantIsLeaf: activeBindingVariantIsLeaf,
   });
 
   const getProductionTime = useCallback(() => {
@@ -1273,7 +1294,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                     : undefined
                 }
                 bindingVariants={bindingVariants}
-                bindingVariantId={(specs as any).binding_variant_id}
+                bindingVariantId={activeBindingVariantId}
                 onBindingVariantChange={(variantId) =>
                   setSpecs((s) => ({ ...s, binding_variant_id: variantId }))
                 }

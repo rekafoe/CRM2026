@@ -6,6 +6,7 @@ import React, { memo, useCallback, useRef } from 'react';
 import { PriceRangeCells } from './PriceRangeCells';
 import { VariantRowActions } from './VariantRowActions';
 import { VariantMaterialSelect } from './VariantMaterialSelect';
+import { VariantBindingPagesLimits } from './VariantBindingPagesLimits';
 import { VariantRowLevel0Props } from './ServiceVariantsTable.types';
 
 const NOOP_PRICE = (_minQty: number, _newPrice: number) => {};
@@ -28,6 +29,8 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
   materials = [],
   priceUnit,
   onUpdateMaterial,
+  isBindService,
+  onUpdateBindingPages,
 }) => {
   const allRef = useRef(allTypeVariants);
   allRef.current = allTypeVariants;
@@ -60,7 +63,7 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
 
   return (
     <tr className="el-table__row expanded">
-      <td className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
+      <td className="variant-name-cell" style={{ padding: 0 }}>
         <div className="cell">
           <div className="variant-name-stack">
             <div className="variant-name-row">
@@ -101,6 +104,9 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
                 priceUnit={priceUnit}
                 onUpdate={onUpdateMaterial}
               />
+            )}
+            {isLeaf && isBindService && onUpdateBindingPages && (
+              <VariantBindingPagesLimits variant={variant} onUpdate={onUpdateBindingPages} />
             )}
           </div>
         </div>

@@ -49,6 +49,13 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar-actions::-webkit-scrollbar {
+  display: none;
 }
 
 .chip {
@@ -104,8 +111,24 @@
   font-weight: 400;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1400px) {
   .app-icon-btn__label {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-topbar {
+    padding-inline: 10px;
+    gap: 8px;
+  }
+
+  .topbar-logo {
+    margin-right: 0;
+  }
+
+  .topbar-org-name,
+  .topbar-info {
     display: none;
   }
 }

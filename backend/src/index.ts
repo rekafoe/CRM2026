@@ -135,10 +135,13 @@ try {
 }
 
 // Статика картинок ДО compression — иначе у части клиентов/HTTP2 прокси возможны ERR_HTTP2_PROTOCOL_ERROR на PNG.
-// Файлы заказов (orders/) НЕ отдаются — только через GET /api/orders/:id/files/:fileId/download
-const blockOrdersPath = (_req: express.Request, res: express.Response, next: express.NextFunction) => {
+// Защищённые файлы НЕ отдаются общей статикой: только через их авторизованные API.
+const blockProtectedUploadPath = (_req: express.Request, res: express.Response, next: express.NextFunction) => {
   const p = (_req.path || '').replace(/^\/+/, '')
-  if (p.startsWith('orders/') || p.startsWith('orders\\')) {
+  if (
+    p.startsWith('orders/') || p.startsWith('orders\\')
+    || p.startsWith('knowledge-base/') || p.startsWith('knowledge-base\\')
+  ) {
     res.status(404).json({ error: 'Not Found' })
     return
   }
@@ -146,7 +149,7 @@ const blockOrdersPath = (_req: express.Request, res: express.Response, next: exp
 }
 app.use(
   '/uploads',
-  blockOrdersPath,
+  blockProtectedUploadPath,
   blockSensitiveStaticPath,
   asyncHandler(uploadsApiKeyMiddleware),
   express.static(uploadsDir)
@@ -165,7 +168,7 @@ app.get('/api/uploads/', (req, res) => {
 })
 app.use(
   '/api/uploads',
-  blockOrdersPath,
+  blockProtectedUploadPath,
   blockSensitiveStaticPath,
   asyncHandler(uploadsApiKeyMiddleware),
   express.static(uploadsDir)

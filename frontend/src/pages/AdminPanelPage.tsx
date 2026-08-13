@@ -210,6 +210,9 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/inbox-plan')} className="nav-btn">
             <AppIcon name="bell" size="xs" /> Воронка чатов
           </button>
+          <button onClick={() => navigate('/knowledge')} className="nav-btn">
+            <AppIcon name="document" size="xs" /> База знаний
+          </button>
           <button onClick={() => navigate('/adminpanel/design-templates')} className="nav-btn">
             <AppIcon name="image" size="xs" /> Шаблоны дизайна
           </button>
@@ -349,6 +352,15 @@ const AdminPanelHome: React.FC = () => {
               <span className="link-icon"><AppIcon name="bell" size="md" circle /></span>
               <span className="link-title">Воронка чатов</span>
               <span className="link-desc">План единого inbox + security hotfix (TG / Viber / Instagram / сайт)</span>
+            </button>
+            <button
+              type="button"
+              className="admin-link-card"
+              onClick={() => navigate('/knowledge')}
+            >
+              <span className="link-icon"><AppIcon name="document" size="md" circle /></span>
+              <span className="link-title">База знаний</span>
+              <span className="link-desc">Инструкции, регламенты и предложения команды</span>
             </button>
             <button 
               className="admin-link-card"

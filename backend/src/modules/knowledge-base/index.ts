@@ -1,0 +1,5 @@
+export { default as knowledgeBaseRoutes } from './routes'
+export { KnowledgeBaseService, KnowledgeBaseError } from './knowledgeBaseService'
+export * from './types'
+export * from './content'
+export * from './access'

@@ -104,20 +104,19 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     }
   }, [loadOrders]);
 
+  const handleInboxPath = useCallback((path: string) => {
+    navigate(path);
+  }, [navigate]);
+
   const inbox = useInboxNotifications({
     enabled: Boolean(currentUser?.id),
     onExecutorAssigned: handleExecutorAssignedNotification,
+    onOpenPath: handleInboxPath,
   });
 
   const handleInboxOpenNotification = useCallback((notification: InboxNotification) => {
-    inbox.markOneRead(notification.id);
-    inbox.setOpen(false);
-    const orderId = Number(notification.payload?.orderId);
-    if (Number.isFinite(orderId) && orderId > 0) {
-      loadOrders(undefined, true);
-      setSelectedId(orderId);
-    }
-  }, [inbox.markOneRead, inbox.setOpen, loadOrders]);
+    void inbox.openNotification(notification);
+  }, [inbox.openNotification]);
 
   // Хук для состояния модальных окон
   const modalState = useModalState();

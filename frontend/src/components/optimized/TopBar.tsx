@@ -134,6 +134,15 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="users" size="sm" /></span>
           <span className="app-icon-btn__label">Клиенты</span>
         </button>
+        <button
+          onClick={() => navigate('/knowledge')}
+          title="База знаний"
+          aria-label="База знаний"
+          className="app-icon-btn app-icon-btn--with-label"
+        >
+          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="document" size="sm" /></span>
+          <span className="app-icon-btn__label">База знаний</span>
+        </button>
         {isAdmin && (
           <>
             <button 

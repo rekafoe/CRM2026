@@ -39,6 +39,18 @@ const LazyEarningsPage = React.lazy(() =>
 const LazyCustomersPage = React.lazy(() =>
   import('./pages/admin/CustomersAdminPage').then((m) => ({ default: m.default }))
 );
+const LazyKnowledgeCatalogPage = React.lazy(() =>
+  import('./features/knowledgeBase').then((m) => ({ default: m.KnowledgeCatalogPage }))
+);
+const LazyKnowledgeArticlePage = React.lazy(() =>
+  import('./features/knowledgeBase').then((m) => ({ default: m.KnowledgeArticlePage }))
+);
+const LazyKnowledgeEditorPage = React.lazy(() =>
+  import('./features/knowledgeBase').then((m) => ({ default: m.KnowledgeEditorPage }))
+);
+const LazyKnowledgeProposalPage = React.lazy(() =>
+  import('./features/knowledgeBase').then((m) => ({ default: m.KnowledgeProposalPage }))
+);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(APP_CONFIG.storage.token) : null;
@@ -114,6 +126,11 @@ root.render(
             }
           />
           <Route path="/order-pool" element={<RequireAuth><OrderPoolPageWrapper /></RequireAuth>} />
+          <Route path="/knowledge" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeCatalogPage /></React.Suspense></RequireAuth>} />
+          <Route path="/knowledge/new" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeEditorPage /></React.Suspense></RequireAuth>} />
+          <Route path="/knowledge/articles/:id" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeArticlePage /></React.Suspense></RequireAuth>} />
+          <Route path="/knowledge/articles/:id/edit" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeEditorPage /></React.Suspense></RequireAuth>} />
+          <Route path="/knowledge/proposals/:id" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeProposalPage /></React.Suspense></RequireAuth>} />
           <Route
             path="/reports"
             element={

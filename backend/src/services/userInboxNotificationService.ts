@@ -71,6 +71,30 @@ export class UserInboxNotificationService {
     }
   }
 
+  static async createMany(params: {
+    userIds: Array<number | null | undefined>
+    type: string
+    title: string
+    message: string
+    payload?: Record<string, unknown> | null
+    actorUserId?: number | null
+  }): Promise<void> {
+    const actorId = params.actorUserId != null ? Number(params.actorUserId) : null
+    const recipients = [...new Set(
+      params.userIds
+        .map(Number)
+        .filter((id) => Number.isFinite(id) && id > 0 && id !== actorId),
+    )]
+    await Promise.all(recipients.map((userId) => this.create({
+      userId,
+      type: params.type,
+      title: params.title,
+      message: params.message,
+      payload: params.payload,
+      actorUserId: actorId,
+    })))
+  }
+
   static async listForUser(userId: number, opts?: { unreadOnly?: boolean; limit?: number }) {
     try {
       const db = await getDb()

@@ -8,9 +8,15 @@ import { useToastNotifications } from '../components/Toast';
 
 const POLL_MS = 45000;
 
+export function getInboxNotificationPath(notification: InboxNotification): string | null {
+  const path = notification.payload?.path;
+  return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') ? path : null;
+}
+
 export function useInboxNotifications(opts?: {
   enabled?: boolean;
   onExecutorAssigned?: (notification: InboxNotification) => void;
+  onOpenPath?: (path: string, notification: InboxNotification) => void;
 }) {
   const enabled = opts?.enabled !== false;
   const toast = useToastNotifications();
@@ -24,6 +30,8 @@ export function useInboxNotifications(opts?: {
   const refreshInFlightRef = useRef(false);
   const onExecutorAssignedRef = useRef(opts?.onExecutorAssigned);
   onExecutorAssignedRef.current = opts?.onExecutorAssigned;
+  const onOpenPathRef = useRef(opts?.onOpenPath);
+  onOpenPathRef.current = opts?.onOpenPath;
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
@@ -86,6 +94,19 @@ export function useInboxNotifications(opts?: {
     }
   }, []);
 
+  const openNotification = useCallback(async (notification: InboxNotification) => {
+    await markOneRead(notification.id);
+    setOpen(false);
+    const path = getInboxNotificationPath(notification);
+    if (path) {
+      onOpenPathRef.current?.(path, notification);
+      return;
+    }
+    if (notification.type === 'executor_assigned') {
+      onExecutorAssignedRef.current?.(notification);
+    }
+  }, [markOneRead]);
+
   return {
     items,
     unreadCount,
@@ -94,5 +115,6 @@ export function useInboxNotifications(opts?: {
     refresh,
     markAllRead,
     markOneRead,
+    openNotification,
   };
 }

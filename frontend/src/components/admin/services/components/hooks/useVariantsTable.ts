@@ -62,6 +62,7 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
       isSavingRef.current = true;
       try {
         const { variantChanges, rangeChanges, priceChanges } = pending;
+        const createdVariantIds = new Map<number, number>();
 
         for (const change of variantChanges) {
           switch (change.type) {
@@ -72,27 +73,43 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
                     ? localChangesRef.current?.localVariants.find((v) => v.id === change.variantId)
                     : undefined;
                 const params = { ...(change.parameters ?? {}), ...(local?.parameters ?? {}) };
-                await operations.createVariant(change.variantName, params);
+                const localParentId = Number(params.parentVariantId);
+                if (Number.isFinite(localParentId) && createdVariantIds.has(localParentId)) {
+                  params.parentVariantId = createdVariantIds.get(localParentId);
+                }
+                const created = await operations.createVariant(change.variantName, params);
+                if (change.variantId !== undefined) {
+                  createdVariantIds.set(change.variantId, created.id);
+                }
               }
               break;
             case 'update':
               if (change.variantId) {
+                const serverVariantId = createdVariantIds.get(change.variantId) ?? change.variantId;
                 // Имя: не требуем oldVariantName — операция сама берёт текущее имя из состояния сервера.
                 // Иначе при undefined в очереди API не вызывался, reload() подтягивал старое «Новый тип».
                 if (change.variantName != null) {
-                  await operations.updateVariantName(change.variantId, change.variantName);
+                  await operations.updateVariantName(serverVariantId, change.variantName);
                 }
                 if (change.parameters) {
                   if (change.variantName != null) {
                     await staggerMs(BATCH_STAGGER_MS);
                   }
-                  await operations.updateVariantParams(change.variantId, change.parameters);
+                  const params = { ...change.parameters };
+                  const localParentId = Number(params.parentVariantId);
+                  if (Number.isFinite(localParentId) && createdVariantIds.has(localParentId)) {
+                    params.parentVariantId = createdVariantIds.get(localParentId);
+                  }
+                  await operations.updateVariantParams(serverVariantId, params);
                 }
               }
               break;
             case 'delete':
               if (change.variantId) {
-                await operations.deleteVariant(change.variantId, true);
+                await operations.deleteVariant(
+                  createdVariantIds.get(change.variantId) ?? change.variantId,
+                  true,
+                );
               }
               break;
           }
@@ -119,7 +136,11 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
 
         if (priceChanges.length > 0) {
           for (const c of priceChanges) {
-            await operations.savePriceImmediate(c.variantId, c.minQty, c.newPrice);
+            await operations.savePriceImmediate(
+              createdVariantIds.get(c.variantId) ?? c.variantId,
+              c.minQty,
+              c.newPrice,
+            );
             await staggerMs(BATCH_STAGGER_MS);
           }
         }

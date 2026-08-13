@@ -260,4 +260,12 @@ export const mailBroadcastRateLimit = rateLimiter.middleware({
   keyPrefix: 'mail-broadcast',
 })
 
+/** Отдельный лимит service-to-service запросов verification-писем. */
+export const mailVerificationRateLimit = rateLimiter.middleware({
+  windowMs: envPositiveInt('AUTH_MAIL_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: envPositiveInt('AUTH_MAIL_RATE_LIMIT_MAX', 20),
+  message: 'Too many email verification requests, please try again later',
+  keyPrefix: 'mail-verification',
+})
+
 export { rateLimiter }

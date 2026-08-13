@@ -82,6 +82,32 @@ export function groupVariantsByType(variants: VariantWithTiers[]): VariantsByTyp
   return grouped;
 }
 
+/** ID вариантов, которые являются последним уровнем и поэтому могут хранить цену. */
+export function collectPricingLeafVariantIds(variants: VariantWithTiers[]): Set<number> {
+  const leafIds = new Set<number>();
+  const grouped = groupVariantsByType(variants);
+
+  for (const group of Object.values(grouped)) {
+    const level0 = group.level0[0];
+    const level1Variants = [...group.level1.values()].flat();
+    const level2Variants = [...group.level2.values()].flat();
+    const totalVariants = group.level0.length + level1Variants.length + level2Variants.length;
+
+    if (level0 && totalVariants === 1) {
+      leafIds.add(Number(level0.id));
+    }
+    for (const variant of level1Variants) {
+      const children = group.level2.get(variantParentMapKey(variant.id)) || [];
+      if (children.length === 0) leafIds.add(Number(variant.id));
+    }
+    for (const variant of level2Variants) {
+      leafIds.add(Number(variant.id));
+    }
+  }
+
+  return leafIds;
+}
+
 /**
  * Вычисляет общие диапазоны для всех вариантов
  */
@@ -89,8 +115,10 @@ export function calculateCommonRanges(
   variants: VariantWithTiers[]
 ): Array<{ min_qty: number; max_qty?: number; unit_price: number }> {
   const allMinQtys = new Set<number>();
+  const leafIds = collectPricingLeafVariantIds(variants);
   
   variants.forEach((v) => {
+    if (!leafIds.has(Number(v.id))) return;
     v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
   });
   
