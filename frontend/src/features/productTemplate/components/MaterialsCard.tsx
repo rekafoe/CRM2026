@@ -1,17 +1,14 @@
 import React, { useState } from 'react'
 import { Alert } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
-import type { PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import type { SimplifiedSizeConfig } from '../hooks/useProductTemplate'
-import { PaperTypeDensitiesAllowedEditor } from '../../../components/multipage/PaperTypeDensitiesAllowedEditor'
+import { WarehouseMaterialsAllowedEditor } from './WarehouseMaterialsAllowedEditor'
 
 interface MaterialsCardProps {
   selected: SimplifiedSizeConfig
   loadingLists: boolean
-  paperTypes: PaperTypeForCalculator[]
-  allMaterialsFromAllPaperTypes: CalculatorMaterial[]
-  /** Все материалы (для выбора материалов-основ: заготовки, футболки, кружки) */
-  allMaterials?: CalculatorMaterial[]
+  /** Полный справочник материалов склада, включая все категории. */
+  allMaterials: CalculatorMaterial[]
   hasUserInteractedWithMaterialsRef: React.MutableRefObject<boolean>
   updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
   /** Есть типы продуктов: показываем общие материалы типа и флаг «свои материалы» у размера */
@@ -25,9 +22,7 @@ interface MaterialsCardProps {
 export const MaterialsCard: React.FC<MaterialsCardProps> = ({
   selected,
   loadingLists,
-  paperTypes,
-  allMaterialsFromAllPaperTypes,
-  allMaterials = [],
+  allMaterials,
   hasUserInteractedWithMaterialsRef,
   updateSize,
   hasCommonMaterialsFeature = false,
@@ -44,7 +39,6 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
   )
 
   const allowedBaseIds = selected.allowed_base_material_ids ?? []
-  const baseMaterialsList = allMaterials.length > 0 ? allMaterials : allMaterialsFromAllPaperTypes
   const effectiveIds = effectiveAllowedMaterialIds ?? selected.allowed_material_ids ?? []
   const setEffectiveIds = updateEffectiveMaterials ?? ((ids: number[]) => updateSize(selected.id, { allowed_material_ids: ids }))
 
@@ -59,7 +53,7 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
       <div>
         {titleWithHint(
           'Материалы (разрешённые)',
-          'Отметьте типы бумаги и плотности. В калькуляторе клиент выберет тип и плотность из этого списка. Цены — со склада.',
+          'Отметьте разрешённые материалы из любых категорий склада. В калькулятор попадут только выбранные позиции. Цены — со склада.',
         )}
       </div>
     </div>
@@ -80,26 +74,26 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
         </div>
       )}
 
-      <PaperTypeDensitiesAllowedEditor
+      <WarehouseMaterialsAllowedEditor
+        materials={allMaterials}
         allowedIds={effectiveIds}
         onAllowedChange={onAllowedChange}
-        paperTypes={paperTypes}
-        loading={loadingLists}
+        loading={loadingLists && allMaterials.length === 0}
         title={
           hasCommonMaterialsFeature && !useOwnMaterials
-            ? 'Общие типы и плотности для типа продукта'
-            : 'Типы бумаги и плотности'
+            ? 'Общие материалы для типа продукта'
+            : 'Материалы для выбранного размера'
         }
       />
 
       {effectiveIds.length === 0 && !loadingLists && (
         <Alert type="info" className="mt-3">
-          Отметьте хотя бы одну плотность — иначе в калькуляторе не будет бумаги.
+          Отметьте хотя бы один материал — иначе в калькуляторе не будет выбора материала.
         </Alert>
       )}
 
       <BaseMaterialsCollapsible
-        baseMaterialsList={baseMaterialsList}
+        baseMaterialsList={allMaterials}
         allowedBaseIds={allowedBaseIds}
         selected={selected}
         updateSize={updateSize}
@@ -137,35 +131,13 @@ const BaseMaterialsCollapsible: React.FC<{
         <span className="simplified-subsection__header-toggle">{expanded ? 'Свернуть' : 'Развернуть'}</span>
       </div>
       <div className="simplified-subsection__content">
-        {baseMaterialsList.length === 0 ? (
-          <div className="text-muted text-sm">Нет материалов на складе.</div>
-        ) : (
-          <div className="materials-card__base-list">
-            {baseMaterialsList.map(m => {
-              const isAllowed = allowedBaseIds.includes(Number(m.id))
-              return (
-                <label
-                  key={m.id}
-                  className={`materials-card__base-item${isAllowed ? ' materials-card__base-item--checked' : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isAllowed}
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      updateSize(selected.id, {
-                        allowed_base_material_ids: checked
-                          ? [...allowedBaseIds, Number(m.id)]
-                          : allowedBaseIds.filter(id => id !== Number(m.id))
-                      })
-                    }}
-                  />
-                  <span>{m.name}</span>
-                </label>
-              )
-            })}
-          </div>
-        )}
+        <WarehouseMaterialsAllowedEditor
+          materials={baseMaterialsList}
+          allowedIds={allowedBaseIds}
+          onAllowedChange={(ids) => updateSize(selected.id, { allowed_base_material_ids: ids })}
+          title="Выбор материалов-основ"
+          emptyMessage="На складе пока нет материалов для выбора."
+        />
       </div>
     </div>
   )

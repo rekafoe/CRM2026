@@ -631,44 +631,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     updateSize(sizeId, { print_prices: updatedPrintPrices })
   }, [sizes, updateSize])
 
-  // Все материалы из всех типов бумаги (для отображения в таблице)
-  const allMaterialsFromAllPaperTypes = useMemo(() => {
-    if (!paperTypes.length) return []
-    
-    const allMaterialIds = new Set<number>()
-    paperTypes.forEach(pt => {
-      pt.densities?.forEach(d => {
-        if (d.material_id && d.material_id > 0) {
-          allMaterialIds.add(d.material_id)
-        }
-      })
-    })
-    
-    if (allMaterials && allMaterials.length > 0) {
-      return allMaterials.filter(m => allMaterialIds.has(Number(m.id)))
-    }
-    
-    // Создаем материалы из всех типов бумаги
-    const materialsMap = new Map<number, CalculatorMaterial>()
-    paperTypes.forEach(pt => {
-      pt.densities?.forEach(d => {
-        if (d.material_id && d.material_id > 0 && !materialsMap.has(d.material_id)) {
-          materialsMap.set(d.material_id, {
-            id: d.material_id,
-            name: `${pt.display_name || pt.name} ${d.value} г/м²`,
-            price: d.price || 0,
-            unit: 'лист',
-            quantity: d.available_quantity || 0,
-            is_active: d.is_available ? 1 : 0,
-            category_name: pt.display_name || pt.name,
-          } as any as CalculatorMaterial)
-        }
-      })
-    })
-    
-    return Array.from(materialsMap.values())
-  }, [paperTypes, allMaterials])
-
   // Отслеживание взаимодействия пользователя с материалами
   const hasUserInteractedWithMaterialsRef = useRef(false)
 
@@ -1186,8 +1148,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   <MaterialsCard
                     selected={selected}
                     loadingLists={loadingLists}
-                    paperTypes={paperTypes}
-                    allMaterialsFromAllPaperTypes={allMaterialsFromAllPaperTypes}
                     allMaterials={allMaterials}
                     hasUserInteractedWithMaterialsRef={hasUserInteractedWithMaterialsRef}
                     updateSize={updateSize}
