@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Product,
   deleteProduct,
   clearProductCache,
   updateProduct,
+  uploadProductImage,
 } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -24,6 +25,9 @@ const ProductManagement: React.FC = () => {
   const [showCategoryModal, setShowCategoryModal] = React.useState(false);
   const [duplicateSource, setDuplicateSource] = useState<Product | null>(null);
   const [togglingSiteProductId, setTogglingSiteProductId] = React.useState<number | null>(null);
+  const [uploadingImageProductId, setUploadingImageProductId] = useState<number | null>(null);
+  const productImageInputRef = useRef<HTMLInputElement>(null);
+  const productImageTargetRef = useRef<Product | null>(null);
   const categories = useProductDirectoryStore((state) => state.categories);
   const products = useProductDirectoryStore((state) => state.products);
   const directoryLoading = useProductDirectoryStore((state) => state.loading);
@@ -76,6 +80,39 @@ const ProductManagement: React.FC = () => {
       showToast(getAxiosErrorMessage(e, 'Не удалось изменить видимость на сайте'), 'error');
     } finally {
       setTogglingSiteProductId(null);
+    }
+  };
+
+  const openProductImagePicker = (product: Product) => {
+    if (uploadingImageProductId !== null) return;
+    productImageTargetRef.current = product;
+    productImageInputRef.current?.click();
+  };
+
+  const handleProductImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const product = productImageTargetRef.current;
+    event.target.value = '';
+    if (!file || !product) return;
+
+    try {
+      setUploadingImageProductId(product.id);
+      const uploaded = await uploadProductImage(file);
+      await updateProduct(product.id, { image_url: uploaded.image_url });
+      await fetchProducts(true);
+      showToast(
+        `Изображение продукта «${product.name}» ${product.image_url ? 'заменено' : 'загружено'}`,
+        'success'
+      );
+    } catch (error: unknown) {
+      console.error('Ошибка быстрой загрузки изображения продукта:', error);
+      showToast(
+        getAxiosErrorMessage(error, 'Не удалось загрузить изображение продукта'),
+        'error'
+      );
+    } finally {
+      productImageTargetRef.current = null;
+      setUploadingImageProductId(null);
     }
   };
 
@@ -226,6 +263,13 @@ const ProductManagement: React.FC = () => {
 
   return (
     <div className="product-management">
+      <input
+        ref={productImageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+        onChange={handleProductImageUpload}
+        hidden
+      />
       {/* Заголовок */}
       <div className="product-management__header">
         <div className="product-management__header-left">
@@ -426,6 +470,16 @@ const ProductManagement: React.FC = () => {
                         )}
                         <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}>
                           <AppIcon name="clipboard" size="xs" /> Инфо
+                        </button>
+                        <button
+                          type="button"
+                          className="lg-btn"
+                          onClick={() => openProductImagePicker(product)}
+                          disabled={uploadingImageProductId !== null}
+                          title={product.image_url ? 'Заменить изображение продукта' : 'Загрузить изображение продукта'}
+                        >
+                          <AppIcon name="camera" size="xs" />
+                          {uploadingImageProductId === product.id ? 'Загрузка…' : 'Фото'}
                         </button>
                         <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}>
                           <AppIcon name="edit" size="xs" /> Шаблон
