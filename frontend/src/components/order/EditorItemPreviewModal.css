@@ -207,6 +207,7 @@
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 12px;
   background: var(--bg-secondary, #f8fafc);
+  overflow-y: auto;
 }
 
 .editor-preview-modal__placement-title {

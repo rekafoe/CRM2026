@@ -21,6 +21,22 @@ function readProductionDesignState(payload: Record<string, unknown>): Record<str
   return parseDesignState(payload.productionDesignState) ?? parseDesignState(payload.designState)
 }
 
+function readSouvenirDraftMeta(payload: Record<string, unknown>): Record<string, unknown> {
+  const state = readProductionDesignState(payload)
+  const editorKind = state?.editorKind ?? payload.editorKind
+  if (editorKind !== 'souvenir_3d') return {}
+  const usedRaw = state?.usedPrintAreaIds ?? payload.usedPrintAreaIds
+  const usedPrintAreaIds = Array.isArray(usedRaw)
+    ? usedRaw.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+    : []
+  return {
+    editorKind: 'souvenir_3d',
+    activePrintAreaId: state?.activePrintAreaId ?? payload.activePrintAreaId,
+    usedPrintAreaIds,
+    printAreas: payload.printAreas,
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
@@ -202,6 +218,7 @@ export async function prepareWebsiteItemsWithEditorDrafts<
         photoBatch: primaryDraft?.payloadParsed.photoBatch,
         selectedEditorParams: primaryDraft?.payloadParsed.selectedParams,
         editorDraftMode: primaryDraft?.mode ?? 'single',
+        ...(primaryDraft ? readSouvenirDraftMeta(primaryDraft.payloadParsed) : {}),
       }, mergedDesignState)
 
       nextItems.push({ ...item, params: mergedParams })
@@ -225,6 +242,7 @@ export async function prepareWebsiteItemsWithEditorDrafts<
       photoBatch: payload.photoBatch,
       selectedEditorParams: payload.selectedParams,
       editorDraftMode: loaded.draft.mode,
+      ...readSouvenirDraftMeta(payload),
     }, readProductionDesignState(payload))
 
     nextItems.push({ ...item, params: itemParams })

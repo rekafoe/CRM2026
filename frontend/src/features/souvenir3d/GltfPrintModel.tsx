@@ -1,15 +1,32 @@
 import React, { useEffect, useMemo } from 'react';
+import type { ThreeEvent } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { printAreaSceneSize } from './scale';
-import type { PrintAreaConfig } from './types';
+import type { PrintAreaConfig, SouvenirSurfacePointerHandler } from './types';
 import { isTshirtBackPrintArea } from './types';
 
 type GltfPrintModelProps = {
   url: string;
   printArea: PrintAreaConfig;
   printTexture: THREE.Texture | null;
+  onSurfacePointer?: SouvenirSurfacePointerHandler;
 };
+
+function forwardSurfacePointer(
+  phase: 'down' | 'move' | 'up',
+  event: ThreeEvent<PointerEvent>,
+  handler?: SouvenirSurfacePointerHandler,
+): void {
+  if (!handler || !event.uv) return;
+  const handled = handler(phase, {
+    uv: { u: event.uv.x, v: event.uv.y },
+    clientX: event.nativeEvent.clientX,
+    clientY: event.nativeEvent.clientY,
+    pointerId: event.nativeEvent.pointerId,
+  });
+  if (handled) event.stopPropagation();
+}
 
 function parentNameChain(obj: THREE.Object3D): string {
   const parts: string[] = [];
@@ -218,7 +235,12 @@ function usePrintMaterial(printTexture: THREE.Texture | null) {
 /**
  * GLB-майка + макет, лежащий на реальной геометрии груди/спины (не отдельный цилиндр).
  */
-export const GltfPrintModel: React.FC<GltfPrintModelProps> = ({ url, printArea, printTexture }) => {
+export const GltfPrintModel: React.FC<GltfPrintModelProps> = ({
+  url,
+  printArea,
+  printTexture,
+  onSurfacePointer,
+}) => {
   const { scene } = useGLTF(url);
   const fitted = useMemo(() => fitCloneToStudio(scene), [scene]);
   const isBack = isTshirtBackPrintArea(printArea);
@@ -255,7 +277,7 @@ export const GltfPrintModel: React.FC<GltfPrintModelProps> = ({ url, printArea, 
   }, [printMat, printMap]);
 
   return (
-    <group>
+    <group rotation={[0, isBack ? Math.PI : 0, 0]}>
       <primitive object={fitted} />
 
       {printGeometry ? (
@@ -264,6 +286,11 @@ export const GltfPrintModel: React.FC<GltfPrintModelProps> = ({ url, printArea, 
           geometry={printGeometry}
           material={printMat}
           renderOrder={4}
+          onPointerDown={(event) => forwardSurfacePointer('down', event, onSurfacePointer)}
+          onPointerMove={(event) => forwardSurfacePointer('move', event, onSurfacePointer)}
+          onPointerUp={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+          onPointerCancel={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+          onPointerOut={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
         />
       ) : null}
     </group>

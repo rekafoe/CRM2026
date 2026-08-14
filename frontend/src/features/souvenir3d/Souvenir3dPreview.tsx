@@ -4,7 +4,7 @@ import { ContactShadows, Environment, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GltfPrintModel } from './GltfPrintModel';
 import { ProceduralProduct } from './ProceduralProduct';
-import type { PrintAreaConfig } from './types';
+import type { PrintAreaConfig, SouvenirSurfacePointerHandler } from './types';
 import './souvenir3dPreview.css';
 
 export type Souvenir3dPreviewProps = {
@@ -16,6 +16,8 @@ export type Souvenir3dPreviewProps = {
   className?: string;
   /** Подпись для оператора / клиента. */
   caption?: string;
+  onSurfacePointer?: SouvenirSurfacePointerHandler;
+  orbitEnabled?: boolean;
 };
 
 function textureFromSource(source: string | HTMLCanvasElement | null): THREE.CanvasTexture | THREE.Texture | null {
@@ -45,7 +47,9 @@ function textureFromSource(source: string | HTMLCanvasElement | null): THREE.Can
 const SceneBody: React.FC<{
   printArea: PrintAreaConfig;
   printTexture: THREE.Texture | null;
-}> = ({ printArea, printTexture }) => {
+  onSurfacePointer?: SouvenirSurfacePointerHandler;
+  orbitEnabled: boolean;
+}> = ({ printArea, printTexture, onSurfacePointer, orbitEnabled }) => {
   const hasGltf = Boolean(printArea.modelUrl);
   const isMug = printArea.procedural === 'mug' || printArea.id === 'wrap';
   return (
@@ -71,11 +75,16 @@ const SceneBody: React.FC<{
             url={printArea.modelUrl}
             printArea={printArea}
             printTexture={printTexture}
+            onSurfacePointer={onSurfacePointer}
           />
         </Suspense>
       ) : (
         <group position={[0, isMug ? 0.05 : 0.02, 0]}>
-          <ProceduralProduct printArea={printArea} printTexture={printTexture} />
+          <ProceduralProduct
+            printArea={printArea}
+            printTexture={printTexture}
+            onSurfacePointer={onSurfacePointer}
+          />
         </group>
       )}
       <ContactShadows
@@ -90,6 +99,7 @@ const SceneBody: React.FC<{
         <meshStandardMaterial color="#d8e0ea" roughness={0.95} metalness={0} />
       </mesh>
       <OrbitControls
+        enabled={orbitEnabled}
         enablePan={false}
         minPolarAngle={Math.PI / 6}
         maxPolarAngle={Math.PI / 1.7}
@@ -110,6 +120,8 @@ export const Souvenir3dPreview: React.FC<Souvenir3dPreviewProps> = ({
   textureRevision = 0,
   className,
   caption,
+  onSurfacePointer,
+  orbitEnabled = true,
 }) => {
   const [printTexture, setPrintTexture] = useState<THREE.Texture | null>(null);
 
@@ -144,7 +156,12 @@ export const Souvenir3dPreview: React.FC<Souvenir3dPreviewProps> = ({
             toneMappingExposure: 1.05,
           }}
         >
-          <SceneBody printArea={printArea} printTexture={printTexture} />
+          <SceneBody
+            printArea={printArea}
+            printTexture={printTexture}
+            onSurfacePointer={onSurfacePointer}
+            orbitEnabled={orbitEnabled}
+          />
         </Canvas>
       </div>
       <p className="souvenir3d-preview__caption">{label}</p>

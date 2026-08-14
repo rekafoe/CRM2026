@@ -48,10 +48,16 @@ type PagePreview = {
   page: number;
   url: string;
   source?: 'client_png' | 'fabric';
+  printAreaId?: string;
+  printAreaLabel?: string;
 };
 
 function readDesignStatePages(designState: DesignState): DesignPage[] {
   if (Array.isArray(designState.pages) && designState.pages.length > 0) {
+    if (designState.editorKind === 'souvenir_3d' && Array.isArray(designState.usedPrintAreaIds)) {
+      const used = new Set(designState.usedPrintAreaIds);
+      return designState.pages.filter((page) => page.printAreaId && used.has(page.printAreaId));
+    }
     return designState.pages;
   }
   const pageCount = Math.max(1, Number(designState.pageCount) || 1);
@@ -73,9 +79,11 @@ async function renderDesignPageToDataUrl(
   multiplier = 1,
   resolveImageSrc?: ResolveEditorImageSrc,
 ): Promise<string> {
+  const widthMm = Number(page.widthMm) > 0 ? Number(page.widthMm) : designState.pageWidth;
+  const heightMm = Number(page.heightMm) > 0 ? Number(page.heightMm) : designState.pageHeight;
   const geometry = createDesignSceneGeometry({
-    pageWidthMm: designState.pageWidth,
-    pageHeightMm: designState.pageHeight,
+    pageWidthMm: widthMm,
+    pageHeightMm: heightMm,
     safeZoneMm: designState.prepress?.safeZoneMm ?? 0,
     bleedMm: designState.prepress?.bleedMm ?? 0,
     scale: resolveDesignRenderSceneScale(designState),
@@ -111,17 +119,22 @@ async function exportDesignStatePdf(
   resolveImageSrc?: ResolveEditorImageSrc,
 ): Promise<void> {
   const pages = readDesignStatePages(designState);
+  if (pages.length === 0) return;
+  const firstWidth = Number(pages[0].widthMm) > 0 ? Number(pages[0].widthMm) : designState.pageWidth;
+  const firstHeight = Number(pages[0].heightMm) > 0 ? Number(pages[0].heightMm) : designState.pageHeight;
   const doc = new jsPDF({
-    orientation: designState.pageWidth > designState.pageHeight ? 'landscape' : 'portrait',
+    orientation: firstWidth > firstHeight ? 'landscape' : 'portrait',
     unit: 'mm',
-    format: [designState.pageWidth, designState.pageHeight],
+    format: [firstWidth, firstHeight],
     compress: true,
   });
 
   for (let i = 0; i < pages.length; i += 1) {
-    if (i > 0) doc.addPage([designState.pageWidth, designState.pageHeight], designState.pageWidth > designState.pageHeight ? 'landscape' : 'portrait');
+    const widthMm = Number(pages[i].widthMm) > 0 ? Number(pages[i].widthMm) : designState.pageWidth;
+    const heightMm = Number(pages[i].heightMm) > 0 ? Number(pages[i].heightMm) : designState.pageHeight;
+    if (i > 0) doc.addPage([widthMm, heightMm], widthMm > heightMm ? 'landscape' : 'portrait');
     const dataUrl = await renderDesignPageToDataUrl(pages[i], designState, i, 2, resolveImageSrc);
-    doc.addImage(dataUrl, 'PNG', 0, 0, designState.pageWidth, designState.pageHeight);
+    doc.addImage(dataUrl, 'PNG', 0, 0, widthMm, heightMm);
   }
 
   doc.save(`order-item-${designState.templateId ?? 'design'}-pages.pdf`);
@@ -217,6 +230,8 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
               setPagePreviews(clientPreviews.map((preview) => ({
                 ...preview,
                 source: 'client_png' as const,
+                printAreaId: designPages[preview.page - 1]?.printAreaId,
+                printAreaLabel: designPages[preview.page - 1]?.printAreaLabel,
               })));
               setPreviewSource('client_png');
             }
@@ -235,6 +250,8 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
             page: index + 1,
             url: await renderDesignPageToDataUrl(page, designState, index, 1, resolveImageSrc),
             source: 'fabric' as const,
+            printAreaId: page.printAreaId,
+            printAreaLabel: page.printAreaLabel,
           })),
         );
         if (!cancelled) {
@@ -299,6 +316,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
   const latestProductionFile = productionFiles[0] ?? null;
   const productionStatus = latestJob?.status ?? (latestProductionFile ? 'done' : null);
   const showPlacement = summary.kind === 'souvenir3d' && Boolean(designState);
+  const souvenirPrintAreas = parsePrintAreas(item.params.printAreas);
   const previewNote =
     previewSource === 'client_png'
       ? 'client PNG с сайта'
@@ -407,19 +425,28 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
               <p className="editor-preview-modal__placement-hint">
                 Схема для оператора. В печать идёт плоский макет справа.
               </p>
-              <SouvenirPlacementPreview
-                compact
-                printArea={
-                  parsePrintAreas(item.params.printAreas)[0]
-                  ?? {
-                    ...DEFAULT_PRINT_AREA_TSHIRT,
-                    widthMm: Number(designState.pageWidth) || DEFAULT_PRINT_AREA_TSHIRT.widthMm,
-                    heightMm: Number(designState.pageHeight) || DEFAULT_PRINT_AREA_TSHIRT.heightMm,
-                    label: summary.printAreaLabel || DEFAULT_PRINT_AREA_TSHIRT.label,
-                  }
-                }
-                printImageUrl={pagePreviews[0]?.url ?? null}
-              />
+              {pagePreviews.map((preview, index) => {
+                const page = designPages[index];
+                const configured = souvenirPrintAreas.find((area) => area.id === preview.printAreaId)
+                  ?? souvenirPrintAreas[index];
+                return (
+                  <SouvenirPlacementPreview
+                    key={preview.printAreaId ?? preview.page}
+                    compact
+                    printArea={
+                      configured
+                      ?? {
+                        ...DEFAULT_PRINT_AREA_TSHIRT,
+                        id: page?.printAreaId ?? `area-${preview.page}`,
+                        widthMm: Number(page?.widthMm ?? designState.pageWidth) || DEFAULT_PRINT_AREA_TSHIRT.widthMm,
+                        heightMm: Number(page?.heightMm ?? designState.pageHeight) || DEFAULT_PRINT_AREA_TSHIRT.heightMm,
+                        label: preview.printAreaLabel || page?.printAreaLabel || summary.printAreaLabel || DEFAULT_PRINT_AREA_TSHIRT.label,
+                      }
+                    }
+                    printImageUrl={preview.url}
+                  />
+                );
+              })}
             </aside>
           )}
 
@@ -441,8 +468,8 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
                 >
                   {pagePreviews.map((preview) => (
                     <figure key={preview.page} className="editor-preview-modal__page">
-                      <img src={preview.url} alt={`Страница ${preview.page}`} />
-                      <figcaption>Страница {preview.page}</figcaption>
+                      <img src={preview.url} alt={preview.printAreaLabel ?? `Страница ${preview.page}`} />
+                      <figcaption>{preview.printAreaLabel ?? `Страница ${preview.page}`}</figcaption>
                     </figure>
                   ))}
                 </div>

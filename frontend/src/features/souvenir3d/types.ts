@@ -38,6 +38,27 @@ export type SouvenirProductMeta = {
 export type SouvenirDraftMeta = {
   editorKind: 'souvenir_3d';
   activePrintAreaId?: string;
+  usedPrintAreaIds: string[];
+};
+
+export type SouvenirSurfacePointer = {
+  uv: { u: number; v: number };
+  clientX: number;
+  clientY: number;
+  pointerId: number;
+};
+
+export type SouvenirSurfacePointerHandler = (
+  phase: 'down' | 'move' | 'up',
+  pointer: SouvenirSurfacePointer,
+) => boolean;
+
+export type SouvenirSelectedObject = {
+  kind: 'text' | 'image' | 'other';
+  text?: string;
+  fill?: string;
+  fontSize?: number;
+  opacity: number;
 };
 
 export const DEFAULT_PRINT_AREA_TSHIRT: PrintAreaConfig = {

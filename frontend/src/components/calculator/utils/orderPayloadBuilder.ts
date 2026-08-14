@@ -152,6 +152,7 @@ export function buildOrderPayload({
     editorDraftMode === 'souvenir_3d'
       ? {
           editorKind: 'souvenir_3d' as const,
+          usedPrintAreaIds: [] as string[],
           ...(Array.isArray(printAreasRaw) ? { printAreas: printAreasRaw } : {}),
         }
       : {};

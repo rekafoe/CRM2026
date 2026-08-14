@@ -241,6 +241,11 @@ const options: swaggerJsdoc.Options = {
           description: 'Состояние черновика редактора',
           properties: {
             designState: { type: 'object', additionalProperties: true, description: 'Fabric document (pages, pageWidth, …)' },
+            productionDesignState: { type: 'object', additionalProperties: true },
+            editorKind: { type: 'string', enum: ['flat', 'souvenir_3d'] },
+            activePrintAreaId: { type: 'string', nullable: true },
+            usedPrintAreaIds: { type: 'array', items: { type: 'string' } },
+            printAreas: { type: 'array', items: { type: 'object', additionalProperties: true } },
             photoBatch: { type: 'object', nullable: true, additionalProperties: true },
             selectedParams: { type: 'object', additionalProperties: true },
           },

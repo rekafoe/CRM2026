@@ -58,7 +58,12 @@ export function getEditorItemSummary(
   }
 
   if (designState) {
-    const pageCount = Number((designState as { pageCount?: unknown }).pageCount) || 1;
+    const usedPrintAreaIds = Array.isArray((designState as { usedPrintAreaIds?: unknown }).usedPrintAreaIds)
+      ? (designState as { usedPrintAreaIds: unknown[] }).usedPrintAreaIds.filter((id) => typeof id === 'string')
+      : null;
+    const pageCount = usedPrintAreaIds
+      ? usedPrintAreaIds.length
+      : Number((designState as { pageCount?: unknown }).pageCount) || 1;
     const layoutIncomplete = params.layoutIncomplete === true;
     const layoutIssues = Array.isArray(params.layoutIssues)
       ? params.layoutIssues as EditorLayoutIssue[]
@@ -80,7 +85,7 @@ export function getEditorItemSummary(
       detail: layoutIncomplete
         ? `${pageCount} стр. · макет неполный${royaltySuffix}`
         : souvenir
-          ? `${pageCount} стр. · зона печати${royaltySuffix}`
+          ? `${pageCount} ${pageCount === 1 ? 'область' : 'области'} печати${royaltySuffix}`
           : `${pageCount} стр. · шаблон ${params.designTemplateId ?? '—'}${royaltySuffix}`,
       pages: pageCount,
       layoutIncomplete,

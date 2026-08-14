@@ -192,6 +192,50 @@ describe('editorProductionRenderService internals', () => {
     }, 'Page 2')).not.toThrow()
   })
 
+  it('renders only used souvenir print areas and keeps per-area dimensions', () => {
+    const pages = __editorProductionRenderInternals.resolveProductionPages({
+      editorKind: 'souvenir_3d',
+      usedPrintAreaIds: ['back'],
+      pages: [
+        {
+          printAreaId: 'front',
+          printAreaLabel: 'Грудь',
+          widthMm: 300,
+          heightMm: 400,
+          fabricJSON: { objects: [{ type: 'text', text: 'front' }] },
+        },
+        {
+          printAreaId: 'back',
+          printAreaLabel: 'Спина',
+          widthMm: 280,
+          heightMm: 380,
+          fabricJSON: { objects: [{ type: 'text', text: 'back' }] },
+        },
+      ],
+    }, 90, 50)
+
+    expect(pages).toHaveLength(1)
+    expect(pages[0]).toMatchObject({
+      originalIndex: 1,
+      printAreaId: 'back',
+      printAreaLabel: 'Спина',
+      widthMm: 280,
+      heightMm: 380,
+    })
+  })
+
+  it('keeps all legacy pages when usedPrintAreaIds contract is absent', () => {
+    const pages = __editorProductionRenderInternals.resolveProductionPages({
+      pages: [
+        { fabricJSON: { objects: [{ type: 'text', text: 'front' }] } },
+        { fabricJSON: { objects: [] } },
+      ],
+    }, 90, 50)
+
+    expect(pages).toHaveLength(2)
+    expect(pages.map((page) => page.originalIndex)).toEqual([0, 1])
+  })
+
   it('computes cover placement without white bleed margins', () => {
     const placement = __editorProductionRenderInternals.computeCoverPlacementMm(
       900,

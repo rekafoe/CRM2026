@@ -1,12 +1,29 @@
 import React, { useMemo } from 'react';
+import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { PrintAreaConfig } from './types';
+import { isTshirtBackPrintArea, type PrintAreaConfig, type SouvenirSurfacePointerHandler } from './types';
 
 type ProceduralProductProps = {
   printArea: PrintAreaConfig;
   printTexture: THREE.Texture | null;
   bodyColor?: string;
+  onSurfacePointer?: SouvenirSurfacePointerHandler;
 };
+
+function forwardSurfacePointer(
+  phase: 'down' | 'move' | 'up',
+  event: ThreeEvent<PointerEvent>,
+  handler?: SouvenirSurfacePointerHandler,
+): void {
+  if (!handler || !event.uv) return;
+  const handled = handler(phase, {
+    uv: { u: event.uv.x, v: event.uv.y },
+    clientX: event.nativeEvent.clientX,
+    clientY: event.nativeEvent.clientY,
+    pointerId: event.nativeEvent.pointerId,
+  });
+  if (handled) event.stopPropagation();
+}
 
 /** Лёгкий шум для ткани / микрорельефа керамики. */
 function makeNoiseMap(size = 128, contrast = 0.35): THREE.CanvasTexture {
@@ -161,6 +178,7 @@ export const ProceduralTshirt: React.FC<ProceduralProductProps> = ({
   printArea,
   printTexture,
   bodyColor = '#e8eef6',
+  onSurfacePointer,
 }) => {
   const printMat = usePrintMaterial(printTexture);
   const bodyMat = useFabricMaterial(bodyColor);
@@ -234,7 +252,17 @@ export const ProceduralTshirt: React.FC<ProceduralProductProps> = ({
           <planeGeometry args={[printW + 0.04, printH + 0.04]} />
           <meshPhysicalMaterial color="#f8fafc" roughness={0.9} sheen={0.45} sheenRoughness={0.7} />
         </mesh>
-        <mesh name={printArea.meshName || 'print_front'} material={printMat} castShadow renderOrder={3}>
+        <mesh
+          name={printArea.meshName || 'print_front'}
+          material={printMat}
+          castShadow
+          renderOrder={3}
+          onPointerDown={(event) => forwardSurfacePointer('down', event, onSurfacePointer)}
+          onPointerMove={(event) => forwardSurfacePointer('move', event, onSurfacePointer)}
+          onPointerUp={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+          onPointerCancel={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+          onPointerOut={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+        >
           <planeGeometry args={[printW, printH]} />
         </mesh>
       </group>
@@ -247,6 +275,7 @@ export const ProceduralMug: React.FC<ProceduralProductProps> = ({
   printArea,
   printTexture,
   bodyColor = '#f5f7fa',
+  onSurfacePointer,
 }) => {
   const printMat = usePrintMaterial(printTexture, '#eef2f7');
   const bodyMat = useCeramicMaterial(bodyColor, { gloss: 0.9 });
@@ -302,7 +331,16 @@ export const ProceduralMug: React.FC<ProceduralProductProps> = ({
       </mesh>
 
       {/* Печатный пояс */}
-      <mesh name={printArea.meshName || 'print_wrap'} material={printMat} castShadow>
+      <mesh
+        name={printArea.meshName || 'print_wrap'}
+        material={printMat}
+        castShadow
+        onPointerDown={(event) => forwardSurfacePointer('down', event, onSurfacePointer)}
+        onPointerMove={(event) => forwardSurfacePointer('move', event, onSurfacePointer)}
+        onPointerUp={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+        onPointerCancel={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+        onPointerOut={(event) => forwardSurfacePointer('up', event, onSurfacePointer)}
+      >
         <cylinderGeometry args={[0.552, 0.528, 0.56, 128, 1, true]} />
       </mesh>
 
@@ -322,5 +360,9 @@ export const ProceduralMug: React.FC<ProceduralProductProps> = ({
 export const ProceduralProduct: React.FC<ProceduralProductProps> = (props) => {
   const kind = props.printArea.procedural ?? (props.printArea.id === 'wrap' ? 'mug' : 'tshirt');
   if (kind === 'mug') return <ProceduralMug {...props} />;
-  return <ProceduralTshirt {...props} />;
+  return (
+    <group rotation={[0, isTshirtBackPrintArea(props.printArea) ? Math.PI : 0, 0]}>
+      <ProceduralTshirt {...props} />
+    </group>
+  );
 };

@@ -1,6 +1,11 @@
 /** Данные одной страницы макета (Fabric.js JSON snapshot) */
 export interface DesignPage {
   fabricJSON: Record<string, unknown>;
+  /** Идентификатор области нанесения для сувенирного редактора. */
+  printAreaId?: string;
+  printAreaLabel?: string;
+  widthMm?: number;
+  heightMm?: number;
 }
 
 /** Настройки допечатной подготовки, которые приходят из продукта/шаблона. */
@@ -84,7 +89,11 @@ export interface DesignState {
   pageCount: number;
   sceneScale?: number;
   prepress?: DesignPrepressConfig;
-  pages: Array<{ fabricJSON: Record<string, unknown> }>;
+  pages: DesignPage[];
   spread_mode?: boolean;
   cover_pages?: number;
+  /** Метаданные независимых областей сувенирного макета. */
+  editorKind?: 'flat' | 'souvenir_3d';
+  activePrintAreaId?: string;
+  usedPrintAreaIds?: string[];
 }

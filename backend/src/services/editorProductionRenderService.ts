@@ -190,6 +190,49 @@ function isBlankEditorPage(fabricJSON: unknown): boolean {
   return objects.length === 0
 }
 
+type ProductionPageDescriptor = {
+  page: Record<string, unknown>
+  originalIndex: number
+  printAreaId?: string
+  printAreaLabel?: string
+  widthMm: number
+  heightMm: number
+}
+
+function resolveProductionPages(
+  state: Record<string, unknown>,
+  fallbackWidthMm: number,
+  fallbackHeightMm: number,
+): ProductionPageDescriptor[] {
+  const pages = Array.isArray(state.pages)
+    ? state.pages.filter((page): page is Record<string, unknown> => (
+      Boolean(page) && typeof page === 'object' && !Array.isArray(page)
+    ))
+    : []
+  const souvenir = state.editorKind === 'souvenir_3d'
+  const hasUsedContract = souvenir && Array.isArray(state.usedPrintAreaIds)
+  const used = new Set(
+    hasUsedContract
+      ? (state.usedPrintAreaIds as unknown[])
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      : [],
+  )
+  return pages.flatMap((page, originalIndex) => {
+    const fabricJSON = parseJsonObject(page).fabricJSON ?? page
+    const printAreaId = typeof page.printAreaId === 'string' ? page.printAreaId : undefined
+    if (hasUsedContract && (!printAreaId || !used.has(printAreaId))) return []
+    return [{
+      page,
+      originalIndex,
+      printAreaId,
+      printAreaLabel: typeof page.printAreaLabel === 'string' ? page.printAreaLabel : undefined,
+      widthMm: Number(page.widthMm) > 0 ? Number(page.widthMm) : fallbackWidthMm,
+      heightMm: Number(page.heightMm) > 0 ? Number(page.heightMm) : fallbackHeightMm,
+      fabricJSON,
+    }]
+  })
+}
+
 function getFabricChildren(obj: FabricObj): FabricObj[] {
   const objects = Array.isArray(obj.objects)
     ? obj.objects
@@ -1500,8 +1543,12 @@ export async function renderDesignStateProductionPdf(
       textSamples: scaleDiagnostics.textSamples.slice(0, 3),
     })
   }
-  const pages = Array.isArray(state.pages) ? state.pages : []
-  if (pages.length === 0) throw new Error('В designState нет страниц')
+  const pages = resolveProductionPages(state, pageWidthMm, pageHeightMm)
+  if (pages.length === 0) throw new Error(
+    state.editorKind === 'souvenir_3d'
+      ? 'В сувенирном макете нет используемых областей печати'
+      : 'В designState нет страниц',
+  )
 
   const templateId = Number(state.templateId)
   const fileNameByUrl = await loadOrderFileUrlMap(orderId, orderItemId)
@@ -1510,7 +1557,7 @@ export async function renderDesignStateProductionPdf(
 
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index]
-    const fabricJSON = parseJsonObject(page).fabricJSON ?? page
+    const fabricJSON = parseJsonObject(page.page).fabricJSON ?? page.page
     const diagnostics = collectProductionPageDiagnostics(fabricJSON, fileNameByUrl)
     if (diagnostics.unresolvedImages.length > 0 || diagnostics.groups > 0 || diagnostics.clipPaths > 0) {
       logger.info('Editor production page diagnostics', {
@@ -1529,18 +1576,20 @@ export async function renderDesignStateProductionPdf(
     const rendered = await renderFabricPageToPng(
       fabricJSON,
       fileNameByUrl,
-      pageWidthMm,
-      pageHeightMm,
+      page.widthMm,
+      page.heightMm,
       bleedMm,
       fontFaceCss,
       resolvedFonts.map((font) => font.family),
-      index,
+      page.originalIndex,
       sceneScale,
     )
     logger.info('Editor production Fabric page rendered', {
       orderId,
       orderItemId,
       page: index + 1,
+      printAreaId: page.printAreaId ?? null,
+      printAreaLabel: page.printAreaLabel ?? null,
       widthMm: rendered.widthMm,
       heightMm: rendered.heightMm,
       pixelStats: rendered.pixelStats,
@@ -1581,6 +1630,12 @@ export async function renderDesignStateProductionPdf(
         renderSource: 'fabric_legacy',
         dpi: EXPORT_DPI,
         pageCount: pages.length,
+        printAreas: pages.map((page) => ({
+          id: page.printAreaId ?? null,
+          label: page.printAreaLabel ?? null,
+          widthMm: page.widthMm,
+          heightMm: page.heightMm,
+        })),
         colorSpace: 'rgb',
         resolvedFonts: resolvedFonts.map((font) => font.family),
         missingFonts,
@@ -1605,6 +1660,7 @@ export const __editorProductionRenderInternals = {
   computeCoverPlacementMm,
   computeTrimInsetPlacementMm,
   isBlankEditorPage,
+  resolveProductionPages,
   remapFabricImageSources,
   renderFabricPageToPng,
   resolveImageSrc,

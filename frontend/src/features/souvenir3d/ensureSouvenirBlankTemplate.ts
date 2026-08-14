@@ -48,6 +48,26 @@ function resolvePrintArea(simplified: SimplifiedConfig): ProductPrintAreaConfig 
   };
 }
 
+function resolveAllPrintAreas(simplified: SimplifiedConfig): ProductPrintAreaConfig[] {
+  const configured = Array.isArray(simplified.printAreas)
+    ? simplified.printAreas.filter((area) => Number(area.widthMm) > 0 && Number(area.heightMm) > 0)
+    : [];
+  if (configured.length > 0) return configured;
+  const parsed = parsePrintAreas(simplified.printAreas);
+  if (parsed.length > 0) {
+    return parsed.map((area) => ({
+      id: area.id,
+      label: area.label,
+      widthMm: area.widthMm,
+      heightMm: area.heightMm,
+      meshName: area.meshName,
+      modelUrl: area.modelUrl,
+      procedural: area.procedural,
+    }));
+  }
+  return [resolvePrintArea(simplified)];
+}
+
 function sizeMatchesArea(size: SimplifiedSizeConfig, area: ProductPrintAreaConfig): boolean {
   return Math.abs(Number(size.width_mm) - area.widthMm) <= 1
     && Math.abs(Number(size.height_mm) - area.heightMm) <= 1;
@@ -211,7 +231,8 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
     }
   }
 
-  const area = resolvePrintArea(simplified);
+  const areas = resolveAllPrintAreas(simplified);
+  const area = areas[0];
   if (!simplified.printAreas?.length) {
     simplified = { ...simplified, printAreas: [area] };
   }
@@ -286,11 +307,21 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
   const designState = buildEmptyDesignState({
     pageWidth: area.widthMm,
     pageHeight: area.heightMm,
-    pageCount: 1,
+    pageCount: areas.length,
     // Явный scale=1: координаты объектов и production PDF в одном пространстве.
     // Не угадываем 3/6 — иначе макет в PDF уезжает вверх-влево.
     sceneScale: 1,
   });
+  designState.editorKind = 'souvenir_3d';
+  designState.activePrintAreaId = area.id;
+  designState.usedPrintAreaIds = [];
+  designState.pages = areas.map((printArea) => ({
+    fabricJSON: { version: '7.2.0', objects: [] },
+    printAreaId: printArea.id,
+    printAreaLabel: printArea.label,
+    widthMm: printArea.widthMm,
+    heightMm: printArea.heightMm,
+  }));
 
   const nameBase = (productName || 'Сувенир').trim() || 'Сувенир';
   const createdRes = await createDesignTemplate({
@@ -300,8 +331,9 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
     spec: {
       width_mm: area.widthMm,
       height_mm: area.heightMm,
-      page_count: 1,
+      page_count: areas.length,
       editorKind: 'souvenir_3d',
+      printAreas: areas,
       productId,
       typeId,
       sizeId,
