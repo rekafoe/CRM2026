@@ -35,8 +35,14 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
   const allRef = useRef(allTypeVariants);
   allRef.current = allTypeVariants;
 
-  // Только сам корень — лист, цены вводим здесь; иначе цены у дочерних строк
-  const isLeaf = (allTypeVariants?.length ?? 1) <= 1;
+  // Явный заголовок без type/density — не лист при наличии детей.
+  // Flat typed peer, поставленный в level0 для рендера группы, остаётся листом.
+  const params = variant.parameters || {};
+  const hasTypeOrDensity = Boolean(
+    (typeof params.type === 'string' && params.type.trim())
+    || (typeof params.density === 'string' && params.density.trim())
+  );
+  const isLeaf = (allTypeVariants?.length ?? 1) <= 1 || hasTypeOrDensity;
 
   const handleNameEditStart = useCallback(() => {
     onNameEditStart(variant.id, typeName);

@@ -63,9 +63,13 @@ export function collectNonLeafVariantIds(rows: ServiceVariantTreeRow[]): Set<num
     if (group.length <= 1) continue;
     const roots = group.filter((row) => resolveServiceVariantParentId(row) == null);
     if (roots.length === 0) continue;
+    // Только явный заголовок группы (без type/density) — non-leaf.
+    // Плоские peers с type/density без заголовка — все листья с ценой.
+    // Иначе миграция/clearNonLeafVariantPrices стирают тарифы у реального
+    // продаваемого варианта, а калькулятор падает на base rate услуги.
     const explicitRoots = roots.filter((row) => !hasLevelParameters(row));
-    const candidates = explicitRoots.length > 0 ? explicitRoots : roots;
-    const root = [...candidates].sort((left, right) => Number(left.id) - Number(right.id))[0];
+    if (explicitRoots.length === 0) continue;
+    const root = [...explicitRoots].sort((left, right) => Number(left.id) - Number(right.id))[0];
     if (root) nonLeaf.add(Number(root.id));
   }
 
