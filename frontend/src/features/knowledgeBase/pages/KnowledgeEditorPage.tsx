@@ -45,8 +45,18 @@ export const KnowledgeEditorPage: React.FC = () => {
   const draftCreationRef = useRef<Promise<number> | null>(null);
   const uploadPromiseRef = useRef<Promise<void> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceImagePositionRef = useRef<number | null>(null);
   const uploadFilesRef = useRef<(files: File[]) => void>(() => undefined);
-  const extensions = useMemo(() => createKnowledgeExtensions('Расскажите всё, что важно знать команде…'), []);
+  const extensions = useMemo(() => createKnowledgeExtensions(
+    'Расскажите всё, что важно знать команде…',
+    {
+      editableControls: true,
+      onReplaceImage: (position) => {
+        replaceImagePositionRef.current = position;
+        fileInputRef.current?.click();
+      },
+    },
+  ), []);
 
   const editor = useEditor({
     extensions,
@@ -57,6 +67,7 @@ export const KnowledgeEditorPage: React.FC = () => {
         const files = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'));
         if (!files.length) return false;
         event.preventDefault();
+        replaceImagePositionRef.current = null;
         uploadFilesRef.current(files);
         return true;
       },
@@ -64,6 +75,7 @@ export const KnowledgeEditorPage: React.FC = () => {
         const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file.type.startsWith('image/'));
         if (!files.length) return false;
         event.preventDefault();
+        replaceImagePositionRef.current = null;
         uploadFilesRef.current(files);
         return true;
       },
@@ -123,10 +135,24 @@ export const KnowledgeEditorPage: React.FC = () => {
       if (previousUpload) await previousUpload;
       setUploading(true);
       const id = await ensureArticleId();
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
         const asset = await knowledgeApi.uploadAsset(id, file);
         if (!asset.id) throw new Error('Сервер не вернул ID файла');
-        editor.chain().focus().setImage({ src: `kb-asset://${asset.id}`, alt: file.name }).run();
+        const replacementPosition = replaceImagePositionRef.current;
+        const replacementNode = replacementPosition == null ? null : editor.state.doc.nodeAt(replacementPosition);
+        if (index === 0 && replacementPosition != null && replacementNode?.type.name === 'image') {
+          editor.view.dispatch(editor.state.tr.setNodeMarkup(replacementPosition, undefined, {
+            ...replacementNode.attrs,
+            src: `kb-asset://${asset.id}`,
+            alt: file.name,
+          }));
+          replaceImagePositionRef.current = null;
+        } else {
+          editor.chain().focus().setImage({
+            src: `kb-asset://${asset.id}`,
+            alt: file.name,
+          }).run();
+        }
       }
       toast.success(files.length > 1 ? 'Изображения добавлены' : 'Изображение добавлено');
     })();
@@ -141,6 +167,7 @@ export const KnowledgeEditorPage: React.FC = () => {
         setUploading(false);
       }
       if (fileInputRef.current) fileInputRef.current.value = '';
+      replaceImagePositionRef.current = null;
     }
   }, [editor, ensureArticleId, toast]);
   uploadFilesRef.current = (files) => void uploadFiles(files);
@@ -242,13 +269,27 @@ export const KnowledgeEditorPage: React.FC = () => {
                 <ToolbarButton title="По левому краю" active={editor?.isActive({ textAlign: 'left' })} onClick={() => editor?.chain().focus().setTextAlign('left').run()}>≡</ToolbarButton>
                 <ToolbarButton title="По центру" active={editor?.isActive({ textAlign: 'center' })} onClick={() => editor?.chain().focus().setTextAlign('center').run()}>≡</ToolbarButton>
                 <ToolbarButton title="Таблица" onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>▦</ToolbarButton>
-                <ToolbarButton title="Изображение" disabled={uploading} onClick={() => fileInputRef.current?.click()}><AppIcon name="image" size="xs" /></ToolbarButton>
+                <ToolbarButton title="Изображение" disabled={uploading} onClick={() => {
+                  replaceImagePositionRef.current = null;
+                  fileInputRef.current?.click();
+                }}><AppIcon name="image" size="xs" /></ToolbarButton>
               </span>
               <span className="kb-toolbar-group">
                 <ToolbarButton title="Отменить" onClick={() => editor?.chain().focus().undo().run()}>↶</ToolbarButton>
                 <ToolbarButton title="Повторить" onClick={() => editor?.chain().focus().redo().run()}>↷</ToolbarButton>
               </span>
-              <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={(event) => void uploadFiles(Array.from(event.target.files ?? []))} />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(event) => {
+                  const files = Array.from(event.target.files ?? []);
+                  if (!files.length) replaceImagePositionRef.current = null;
+                  else void uploadFiles(files);
+                }}
+              />
             </div>
             {uploading && <div className="kb-uploading"><span className="kb-spinner" /> Загружаем изображение…</div>}
             <EditorContent editor={editor} className="kb-editor-content" />

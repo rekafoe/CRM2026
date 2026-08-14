@@ -55,6 +55,33 @@ export async function postMultipartUpload<T>(relativePath: string, formData: For
   return ((response.data as any)?.data ?? response.data) as T;
 }
 
+/** Получить защищённый файл с того же API, куда отправляются multipart-загрузки. */
+export async function getAuthenticatedBlob(relativePath: string): Promise<Blob> {
+  const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  const base = resolveDirectApiBaseForMultipart();
+  if (!base) {
+    const response = await apiClient.get(path, { responseType: 'blob' });
+    return response.data as Blob;
+  }
+
+  const token = localStorage.getItem('crmToken');
+  const response = await fetch(`${base}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (response.status === 401) {
+    localStorage.removeItem('crmToken');
+    localStorage.removeItem('crmRole');
+    localStorage.removeItem('crmSessionDate');
+    localStorage.removeItem('crmUserId');
+    window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
+  if (!response.ok) {
+    throw new Error(`${response.status}: ${response.statusText}`);
+  }
+  return response.blob();
+}
+
 // Создаем базовый HTTP клиент (без дефолтного Content-Type — для JSON axios выставит сам)
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

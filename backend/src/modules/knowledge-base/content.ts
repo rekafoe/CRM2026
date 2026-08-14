@@ -51,7 +51,7 @@ const allowedTextAlign = new Set(['left', 'center', 'right', 'justify'])
 const allowedAttrsByNode: Record<string, Set<string>> = {
   paragraph: new Set(['textAlign']),
   heading: new Set(['level', 'textAlign']),
-  image: new Set(['src', 'alt', 'title']),
+  image: new Set(['src', 'alt', 'title', 'alignment', 'width', 'wrap', 'caption']),
   orderedList: new Set(['start', 'type']),
   taskItem: new Set(['checked']),
   tableHeader: new Set(['colspan', 'rowspan', 'colwidth']),
@@ -80,7 +80,7 @@ function assertSafeUrl(value: unknown, kind: 'link' | 'image'): void {
   if (typeof value !== 'string' || value.length > 2048) fail('Некорректный URL в содержимом')
   const trimmed = value.trim()
   if (!trimmed) fail('Пустой URL в содержимом')
-  if (kind === 'image' && /^kb-asset:\/\/[1-9]\d*$/.test(trimmed)) return
+  if (kind === 'image' && /^kb-asset:(?:\/\/)?\/?[1-9]\d*\/?$/i.test(trimmed)) return
   if (trimmed.startsWith('/') || trimmed.startsWith('#') || trimmed.startsWith('./') || trimmed.startsWith('../')) {
     return
   }
@@ -117,6 +117,19 @@ function validateAttrs(nodeType: string, attrs: unknown): void {
     }
     if ((key === 'alt' || key === 'title') && value != null && typeof value !== 'string') {
       fail(`Атрибут ${key} изображения должен быть строкой`)
+    }
+    if (key === 'alignment' && value != null && !['left', 'center', 'right'].includes(String(value))) {
+      fail('Некорректное выравнивание изображения')
+    }
+    if (key === 'wrap' && value != null && !['none', 'left', 'right'].includes(String(value))) {
+      fail('Некорректное обтекание изображения')
+    }
+    if (key === 'width' && value != null) {
+      const width = Number(value)
+      if (!Number.isFinite(width) || width < 20 || width > 100) fail('Некорректная ширина изображения')
+    }
+    if (key === 'caption' && value != null) {
+      if (typeof value !== 'string' || value.length > 500) fail('Некорректная подпись изображения')
     }
     if (key === 'checked' && typeof value !== 'boolean') fail('Некорректное состояние пункта задачи')
     if ((key === 'colspan' || key === 'rowspan' || key === 'start') && value != null) {
@@ -199,6 +212,9 @@ function extractPlainText(root: Record<string, unknown>): string {
     if (type === 'hardBreak') parts.push('\n')
     if (type === 'image' && isRecord(node.attrs) && typeof node.attrs.alt === 'string') {
       parts.push(node.attrs.alt)
+    }
+    if (type === 'image' && isRecord(node.attrs) && typeof node.attrs.caption === 'string') {
+      parts.push(` ${node.attrs.caption}`)
     }
     if (Array.isArray(node.content)) {
       for (const child of node.content) walk(child as Record<string, unknown>)

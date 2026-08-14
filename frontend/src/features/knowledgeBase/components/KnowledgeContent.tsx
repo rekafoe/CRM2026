@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, type NodeViewProps } from '@tiptap/react';
+import React, { useEffect, useMemo } from 'react';
+import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
@@ -19,60 +19,251 @@ import type { KnowledgeContent as KnowledgeContentValue } from '../types';
 
 export function assetIdFromSrc(src: unknown): number | null {
   if (typeof src !== 'string') return null;
-  const match = /^kb-asset:\/\/(\d+)$/.exec(src);
+  const normalized = src.trim();
+  const match = /^kb-asset:(?:\/\/)?\/?(\d+)\/?$/i.exec(normalized)
+    ?? /\/knowledge\/assets\/(\d+)\/content(?:[?#].*)?$/i.exec(normalized);
   return match ? Number(match[1]) : null;
 }
 
-const AuthenticatedImageView: React.FC<NodeViewProps> = ({ node, selected }) => {
-  const canonicalSrc = String(node.attrs.src ?? '');
-  const assetId = assetIdFromSrc(canonicalSrc);
-  const [resolvedSrc, setResolvedSrc] = useState(assetId ? '' : canonicalSrc);
-  const [failed, setFailed] = useState(false);
+interface KnowledgeImageOptions {
+  editableControls?: boolean;
+  onReplaceImage?: (position: number) => void;
+}
 
-  useEffect(() => {
-    if (!assetId) {
-      setResolvedSrc(canonicalSrc);
-      return;
-    }
-    let objectUrl = '';
-    let active = true;
-    setFailed(false);
-    knowledgeApi.getAssetContent(assetId)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setResolvedSrc(objectUrl);
-      })
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+function createAuthenticatedImage(options: KnowledgeImageOptions = {}) {
+  return Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      alignment: { default: 'center' },
+      width: { default: 100 },
+      wrap: { default: 'none' },
+      caption: { default: '' },
     };
-  }, [assetId, canonicalSrc]);
-
-  return (
-    <NodeViewWrapper className={`kb-image-node${selected ? ' is-selected' : ''}`}>
-      {failed ? (
-        <span className="kb-image-error">Изображение недоступно</span>
-      ) : resolvedSrc ? (
-        <img src={resolvedSrc} alt={String(node.attrs.alt ?? '')} title={String(node.attrs.title ?? '')} />
-      ) : (
-        <span className="kb-image-loading">Загрузка изображения…</span>
-      )}
-    </NodeViewWrapper>
-  );
-};
-
-export const AuthenticatedImage = Image.extend({
-  addNodeView() {
-    return ReactNodeViewRenderer(AuthenticatedImageView);
   },
-});
+  addNodeView() {
+    return ({ node, editor, getPos }) => {
+      const dom = document.createElement('div');
+      dom.className = 'kb-image-node';
+      dom.contentEditable = 'false';
+      const media = document.createElement('div');
+      media.className = 'kb-image-media';
+      const caption = document.createElement('div');
+      caption.className = 'kb-image-caption';
+      const controls = document.createElement('div');
+      controls.className = 'kb-image-controls';
+      const resizeHandle = document.createElement('button');
+      resizeHandle.type = 'button';
+      resizeHandle.className = 'kb-image-resize-handle';
+      resizeHandle.title = 'Потяните, чтобы изменить размер';
+      resizeHandle.setAttribute('aria-label', 'Изменить размер изображения');
+      dom.append(media, caption);
+      if (options.editableControls) dom.append(controls, resizeHandle);
 
-export function createKnowledgeExtensions(placeholder?: string) {
+      let active = true;
+      let generation = 0;
+      let objectUrl = '';
+      let lastSignature = '';
+      let currentNode = node;
+
+      const revokeObjectUrl = () => {
+        if (!objectUrl) return;
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = '';
+      };
+
+      const showStatus = (text: string, failed = false) => {
+        const status = document.createElement('span');
+        status.className = failed ? 'kb-image-error' : 'kb-image-loading';
+        status.textContent = text;
+        media.replaceChildren(status);
+      };
+
+      const showImage = (src: string, alt: string, title: string) => {
+        const image = document.createElement('img');
+        image.src = src;
+        image.alt = alt;
+        image.title = title;
+        image.draggable = true;
+        image.addEventListener('error', () => showStatus('Изображение недоступно', true), { once: true });
+        media.replaceChildren(image);
+      };
+
+      const nodePosition = (): number | null => {
+        const position = typeof getPos === 'function' ? getPos() : undefined;
+        return typeof position === 'number' ? position : null;
+      };
+
+      const updateAttributes = (patch: Record<string, unknown>) => {
+        const position = nodePosition();
+        if (position == null) return;
+        const actualNode = editor.state.doc.nodeAt(position);
+        if (!actualNode) return;
+        editor.view.dispatch(editor.state.tr.setNodeMarkup(position, undefined, {
+          ...actualNode.attrs,
+          ...patch,
+        }));
+      };
+
+      const createControl = (
+        text: string,
+        title: string,
+        patch: Record<string, unknown> | (() => void),
+        activeWhen?: () => boolean,
+      ) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = text;
+        button.title = title;
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof patch === 'function') patch();
+          else updateAttributes(patch);
+          editor.commands.focus();
+        });
+        controls.append(button);
+        return { button, activeWhen };
+      };
+
+      const controlEntries = options.editableControls ? [
+        createControl('←', 'По левому краю', { alignment: 'left', wrap: 'none' }, () => currentNode.attrs.wrap === 'none' && currentNode.attrs.alignment === 'left'),
+        createControl('↔', 'По центру', { alignment: 'center', wrap: 'none' }, () => currentNode.attrs.wrap === 'none' && currentNode.attrs.alignment === 'center'),
+        createControl('→', 'По правому краю', { alignment: 'right', wrap: 'none' }, () => currentNode.attrs.wrap === 'none' && currentNode.attrs.alignment === 'right'),
+        createControl('▧L', 'Изображение слева, текст справа', { wrap: 'left', width: 50 }, () => currentNode.attrs.wrap === 'left'),
+        createControl('R▧', 'Изображение справа, текст слева', { wrap: 'right', width: 50 }, () => currentNode.attrs.wrap === 'right'),
+        ...[25, 50, 75, 100].map((width) =>
+          createControl(`${width}%`, `Ширина ${width}%`, { width }, () => Number(currentNode.attrs.width) === width)),
+      ] : [];
+
+      let captionInput: HTMLInputElement | null = null;
+      if (options.editableControls) {
+        captionInput = document.createElement('input');
+        captionInput.type = 'text';
+        captionInput.className = 'kb-image-caption-input';
+        captionInput.placeholder = 'Подпись к изображению';
+        captionInput.maxLength = 500;
+        captionInput.addEventListener('click', (event) => event.stopPropagation());
+        captionInput.addEventListener('change', () => updateAttributes({ caption: captionInput?.value.trim() ?? '' }));
+        controls.append(captionInput);
+        createControl('Заменить', 'Заменить изображение', () => {
+          const position = nodePosition();
+          if (position != null) options.onReplaceImage?.(position);
+        });
+        createControl('Удалить', 'Удалить изображение', () => {
+          const position = nodePosition();
+          if (position == null) return;
+          editor.view.dispatch(editor.state.tr.delete(position, position + currentNode.nodeSize));
+        });
+      }
+
+      const applyLayout = () => {
+        const width = Math.min(100, Math.max(20, Number(currentNode.attrs.width) || 100));
+        const alignment = ['left', 'center', 'right'].includes(currentNode.attrs.alignment)
+          ? currentNode.attrs.alignment
+          : 'center';
+        const wrap = ['none', 'left', 'right'].includes(currentNode.attrs.wrap)
+          ? currentNode.attrs.wrap
+          : 'none';
+        dom.style.width = `${width}%`;
+        dom.dataset.alignment = alignment;
+        dom.dataset.wrap = wrap;
+        const captionText = String(currentNode.attrs.caption ?? '').trim();
+        caption.textContent = captionText;
+        caption.hidden = !captionText;
+        if (captionInput && captionInput !== document.activeElement) captionInput.value = captionText;
+        controlEntries.forEach(({ button, activeWhen }) => button.classList.toggle('active', Boolean(activeWhen?.())));
+      };
+
+      const render = (updatedNode: typeof node) => {
+        currentNode = updatedNode;
+        applyLayout();
+        const canonicalSrc = String(updatedNode.attrs.src ?? '').trim();
+        const alt = String(updatedNode.attrs.alt ?? '');
+        const title = String(updatedNode.attrs.title ?? '');
+        const signature = JSON.stringify([canonicalSrc, alt, title]);
+        if (signature === lastSignature) return;
+        lastSignature = signature;
+        const currentGeneration = ++generation;
+        revokeObjectUrl();
+        const assetId = assetIdFromSrc(canonicalSrc);
+        if (!assetId) {
+          showImage(canonicalSrc, alt, title);
+          return;
+        }
+
+        showStatus('Загрузка изображения…');
+        knowledgeApi.getAssetContent(assetId)
+          .then((blob) => {
+            if (!active || currentGeneration !== generation) return;
+            if (!blob.type.startsWith('image/')) throw new Error('Некорректный тип изображения');
+            objectUrl = URL.createObjectURL(blob);
+            showImage(objectUrl, alt, title);
+          })
+          .catch(() => {
+            if (active && currentGeneration === generation) {
+              showStatus('Изображение недоступно', true);
+            }
+          });
+      };
+
+      if (options.editableControls) {
+        resizeHandle.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const parentWidth = dom.parentElement?.clientWidth || dom.getBoundingClientRect().width;
+          const startX = event.clientX;
+          const startWidth = dom.getBoundingClientRect().width;
+          const onMove = (moveEvent: PointerEvent) => {
+            const width = Math.min(100, Math.max(20, ((startWidth + moveEvent.clientX - startX) / parentWidth) * 100));
+            dom.style.width = `${width}%`;
+          };
+          const onUp = (upEvent: PointerEvent) => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            const width = Math.round(Math.min(100, Math.max(20, ((startWidth + upEvent.clientX - startX) / parentWidth) * 100)));
+            updateAttributes({ width });
+          };
+          window.addEventListener('pointermove', onMove);
+          window.addEventListener('pointerup', onUp, { once: true });
+        });
+      }
+
+      render(node);
+      return {
+        dom,
+        update(updatedNode) {
+          if (updatedNode.type !== node.type) return false;
+          render(updatedNode);
+          return true;
+        },
+        selectNode() {
+          dom.classList.add('is-selected');
+        },
+        deselectNode() {
+          dom.classList.remove('is-selected');
+        },
+        destroy() {
+          active = false;
+          generation += 1;
+          revokeObjectUrl();
+        },
+        stopEvent(event) {
+          return controls.contains(event.target as Node) || resizeHandle.contains(event.target as Node);
+        },
+        ignoreMutation() {
+          return true;
+        },
+      };
+    };
+  },
+  });
+}
+
+export function createKnowledgeExtensions(placeholder?: string, imageOptions: KnowledgeImageOptions = {}) {
   return [
     StarterKit.configure({ link: false, underline: false }),
-    AuthenticatedImage.configure({ allowBase64: false }),
+    createAuthenticatedImage(imageOptions).configure({ allowBase64: false }),
     Link.configure({ openOnClick: true, autolink: true, defaultProtocol: 'https' }),
     Underline,
     Highlight,

@@ -1,4 +1,4 @@
-import { apiClient, postMultipartUpload } from '../../api/client';
+import { apiClient, getAuthenticatedBlob, postMultipartUpload } from '../../api/client';
 import { parseKnowledgeContent } from './content';
 import type {
   KnowledgeArticle,
@@ -295,7 +295,6 @@ export const knowledgeApi = {
   },
 
   async getAssetContent(assetId: number): Promise<Blob> {
-    const response = await apiClient.get(`${base}/assets/${assetId}/content`, { responseType: 'blob' });
-    return response.data as Blob;
+    return getAuthenticatedBlob(`${base}/assets/${assetId}/content`);
   },
 };

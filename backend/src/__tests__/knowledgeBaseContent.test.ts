@@ -24,11 +24,22 @@ describe('knowledge base TipTap content', () => {
             },
           ],
         },
-        { type: 'image', attrs: { src: 'kb-asset://7', alt: 'Схема станка' } },
+        {
+          type: 'image',
+          attrs: {
+            src: 'kb-asset://7',
+            alt: 'Схема станка',
+            alignment: 'center',
+            width: 75,
+            wrap: 'none',
+            caption: 'Панель управления',
+          },
+        },
+        { type: 'image', attrs: { src: 'kb-asset://8/' } },
       ],
     })
 
-    expect(result.plain).toBe('Резка\nОткройте инструкцию\nСхема станка')
+    expect(result.plain).toBe('Резка\nОткройте инструкцию\nСхема станка Панель управления')
     expect(JSON.parse(result.json)).toMatchObject({ type: 'doc' })
   })
 
@@ -53,6 +64,10 @@ describe('knowledge base TipTap content', () => {
         attrs: { textAlign: 'left; position: fixed' },
         content: [{ type: 'text', text: 'опасный стиль' }],
       }],
+    },
+    {
+      type: 'doc',
+      content: [{ type: 'image', attrs: { src: 'kb-asset://7', width: 150, wrap: 'around' } }],
     },
   ])('rejects unsafe or arbitrary content %#', (content) => {
     expect(() => normalizeTipTapContent(content)).toThrow(KnowledgeContentValidationError)
