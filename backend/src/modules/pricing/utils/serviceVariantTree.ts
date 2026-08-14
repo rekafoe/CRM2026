@@ -36,11 +36,12 @@ function hasLevelParameters(row: ServiceVariantTreeRow): boolean {
 
 /**
  * Повторяет модель CRM-редактора:
- * - level 0 — один корень группы variant_name;
- * - level 1 — остальные варианты группы без parent_variant_id;
+ * - level 0 — явный корень группы variant_name (без type/density и без parent);
+ * - level 1 — варианты группы с type/density без parent_variant_id;
  * - level 2 — варианты с parent_variant_id.
  *
  * Цену может иметь только лист: узел без более глубокого варианта.
+ * Плоские peers с type/density без явного корня — все листья (не синтетический non-leaf).
  */
 export function collectNonLeafVariantIds(rows: ServiceVariantTreeRow[]): Set<number> {
   const nonLeaf = new Set<number>();
