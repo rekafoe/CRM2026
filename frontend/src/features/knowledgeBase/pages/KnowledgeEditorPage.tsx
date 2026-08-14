@@ -7,7 +7,11 @@ import { useCurrentUser } from '../../../hooks/useCurrentUser';
 import { knowledgeApi } from '../api';
 import { EMPTY_KNOWLEDGE_CONTENT } from '../content';
 import { knowledgeKeys, useKnowledgeArticle, useKnowledgeCategories } from '../hooks';
-import { createKnowledgeExtensions, KnowledgeContent } from '../components/KnowledgeContent';
+import {
+  createKnowledgeExtensions,
+  KnowledgeContent,
+  primeKnowledgeAssetBlob,
+} from '../components/KnowledgeContent';
 import { KnowledgeShell } from '../components/KnowledgeShell';
 import type { KnowledgeArticleInput, KnowledgeContent as KnowledgeContentValue } from '../types';
 import { useQueryClient } from '@tanstack/react-query';
@@ -138,6 +142,7 @@ export const KnowledgeEditorPage: React.FC = () => {
       for (const [index, file] of files.entries()) {
         const asset = await knowledgeApi.uploadAsset(id, file);
         if (!asset.id) throw new Error('Сервер не вернул ID файла');
+        primeKnowledgeAssetBlob(asset.id, file);
         const replacementPosition = replaceImagePositionRef.current;
         const replacementNode = replacementPosition == null ? null : editor.state.doc.nodeAt(replacementPosition);
         if (index === 0 && replacementPosition != null && replacementNode?.type.name === 'image') {

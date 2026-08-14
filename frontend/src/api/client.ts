@@ -65,21 +65,24 @@ export async function getAuthenticatedBlob(relativePath: string): Promise<Blob> 
   }
 
   const token = localStorage.getItem('crmToken');
-  const response = await fetch(`${base}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (response.status === 401) {
-    localStorage.removeItem('crmToken');
-    localStorage.removeItem('crmRole');
-    localStorage.removeItem('crmSessionDate');
-    localStorage.removeItem('crmUserId');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
+  try {
+    const response = await fetch(`${base}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      throw new Error(`${response.status}: ${response.statusText}`);
+    }
+    return response.blob();
+  } catch (directError) {
+    // Некоторые production-прокси пропускают multipart POST напрямую, но
+    // блокируют защищённый GET. Повторяем чтение через основной API/rewrite.
+    try {
+      const response = await apiClient.get(path, { responseType: 'blob' });
+      return response.data as Blob;
+    } catch {
+      throw directError;
+    }
   }
-  if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
-  }
-  return response.blob();
 }
 
 // Создаем базовый HTTP клиент (без дефолтного Content-Type — для JSON axios выставит сам)

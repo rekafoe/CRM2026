@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getDefaultOrganization, type Organization } from '../../../api';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { InboxNotifications } from '../../../components/notifications/InboxNotifications';
 import { useCurrentUser } from '../../../hooks/useCurrentUser';
@@ -14,17 +15,40 @@ export const KnowledgeShell: React.FC<KnowledgeShellProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useCurrentUser();
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [logoError, setLogoError] = useState(false);
   const inbox = useInboxNotifications({
     enabled: Boolean(user?.id),
     onOpenPath: (path) => navigate(path),
   });
+  const rawLogoUrl = organization?.logo_url;
+  const logoUrl = rawLogoUrl && rawLogoUrl.length > 10
+    ? (rawLogoUrl.startsWith('/') ? `${window.location.origin}${rawLogoUrl}` : rawLogoUrl)
+    : null;
+  const hasLogo = Boolean(
+    logoUrl
+    && !logoError
+    && (logoUrl.startsWith('data:') || logoUrl.startsWith('http') || logoUrl.startsWith('blob:')),
+  );
+
+  useEffect(() => {
+    getDefaultOrganization()
+      .then((response) => setOrganization(response.data ?? null))
+      .catch(() => setOrganization(null));
+  }, []);
+
+  useEffect(() => setLogoError(false), [rawLogoUrl]);
 
   return (
     <div className="kb-app">
       <header className="kb-topbar">
         <button type="button" className="kb-brand" onClick={() => navigate('/knowledge')}>
-          <span className="kb-brand-mark"><AppIcon name="document" size="md" /></span>
-          <span><strong>База знаний</strong><small>PRINT CORE</small></span>
+          <span className={`kb-brand-mark${hasLogo ? ' kb-brand-mark--logo' : ''}`}>
+            {hasLogo
+              ? <img src={logoUrl!} alt={organization?.name || 'Логотип организации'} onError={() => setLogoError(true)} />
+              : <AppIcon name="document" size="md" />}
+          </span>
+          <span><strong>База знаний</strong><small>{organization?.name || 'PRINT CORE'}</small></span>
         </button>
         <nav className="kb-topnav" aria-label="Навигация базы знаний">
           <Link className={location.pathname === '/knowledge' ? 'active' : ''} to="/knowledge">Каталог</Link>

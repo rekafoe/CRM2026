@@ -17,6 +17,20 @@ import { knowledgeApi } from '../api';
 import { getTableOfContents } from '../content';
 import type { KnowledgeContent as KnowledgeContentValue } from '../types';
 
+const assetBlobCache = new Map<number, Blob>();
+const MAX_CACHED_ASSETS = 20;
+
+export function primeKnowledgeAssetBlob(assetId: number, blob: Blob): void {
+  if (!Number.isInteger(assetId) || assetId <= 0 || !blob.type.startsWith('image/')) return;
+  assetBlobCache.delete(assetId);
+  assetBlobCache.set(assetId, blob);
+  while (assetBlobCache.size > MAX_CACHED_ASSETS) {
+    const oldestId = assetBlobCache.keys().next().value;
+    if (typeof oldestId !== 'number') break;
+    assetBlobCache.delete(oldestId);
+  }
+}
+
 export function assetIdFromSrc(src: unknown): number | null {
   if (typeof src !== 'string') return null;
   const normalized = src.trim();
@@ -193,7 +207,14 @@ function createAuthenticatedImage(options: KnowledgeImageOptions = {}) {
         }
 
         showStatus('Загрузка изображения…');
-        knowledgeApi.getAssetContent(assetId)
+        const cachedBlob = assetBlobCache.get(assetId);
+        const blobPromise = cachedBlob
+          ? Promise.resolve(cachedBlob)
+          : knowledgeApi.getAssetContent(assetId).then((blob) => {
+            primeKnowledgeAssetBlob(assetId, blob);
+            return blob;
+          });
+        blobPromise
           .then((blob) => {
             if (!active || currentGeneration !== generation) return;
             if (!blob.type.startsWith('image/')) throw new Error('Некорректный тип изображения');
