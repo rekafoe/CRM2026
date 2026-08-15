@@ -12,6 +12,8 @@ export type DesignStateScaleInput = {
   pageWidth?: number
   pageHeight?: number
   sceneScale?: number
+  editorKind?: string
+  fabricCoordSpace?: string
   pages?: Array<{ fabricJSON?: { objects?: unknown[] } | null } | null>
 }
 
@@ -142,6 +144,9 @@ function collectTextSamples(
 /**
  * Scale для production: явный из designState, но при конфликте с extents объектов —
  * берём inferred (иначе макет уезжает в левый верхний угол).
+ *
+ * Legacy souvenir_3d без fabricCoordSpace='css_px' писал Fabric в 1px=1mm —
+ * компенсируем sceneScale = 1/MM_TO_PX, чтобы pageWidthPx совпал с координатами.
  */
 export function resolveProductionSceneScale(designState: DesignStateScaleInput | null | undefined): {
   scale: number
@@ -152,7 +157,15 @@ export function resolveProductionSceneScale(designState: DesignStateScaleInput |
   const inferred = inferSceneScaleFromPageExtents(designState)
   let resolved = 1
   let mismatched = false
-  if (inferred != null && explicit != null && Math.abs(inferred - explicit) > 0.01) {
+
+  const isLegacySouvenirMmAsPx =
+    designState?.editorKind === 'souvenir_3d'
+    && designState?.fabricCoordSpace !== 'css_px'
+
+  if (isLegacySouvenirMmAsPx) {
+    resolved = 1 / MM_TO_PX
+    mismatched = explicit != null && Math.abs(explicit - resolved) > 0.01
+  } else if (inferred != null && explicit != null && Math.abs(inferred - explicit) > 0.01) {
     mismatched = true
     resolved = inferred
   } else if (explicit != null) {
@@ -165,7 +178,7 @@ export function resolveProductionSceneScale(designState: DesignStateScaleInput |
   const pageHeightMm = Number(designState?.pageHeight) || 0
   const diagnostics: ProductionSceneScaleDiagnostics = {
     explicit,
-    inferred,
+    inferred: isLegacySouvenirMmAsPx ? resolved : inferred,
     resolved,
     mismatched,
     pageWidthMm,
