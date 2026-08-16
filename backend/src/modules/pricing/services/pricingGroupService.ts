@@ -121,6 +121,26 @@ export function isGroupableLine(line: PricingLineInput): boolean {
   return buildGroupKey(line.configuration) != null;
 }
 
+/**
+ * Нормализует объём для тиражной группировки.
+ * Целые значения (листы / qty / пог. м) — floor ≥ 1.
+ * Дробные (м² для roll_wide_m2) сохраняем с точностью до 0.001 — иначе Math.floor
+ * превращает 0.4+0.4 в 1+1=2 и ломает ступени по total_m2.
+ */
+export function normalizeTierVolumeForGrouping(
+  tierRaw: unknown,
+  sheetsFallback: number
+): number {
+  const fallback = Math.max(1, Math.floor(Number(sheetsFallback) || 1));
+  const value = Number(tierRaw);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  const roundedToMilli = Math.round(value * 1000) / 1000;
+  if (Math.abs(roundedToMilli - Math.round(roundedToMilli)) > 1e-9) {
+    return Math.max(0.001, roundedToMilli);
+  }
+  return Math.max(1, Math.floor(roundedToMilli));
+}
+
 export function buildPricingGroups(
   lines: Array<PricingLineInput & { sheetsNeeded: number; tierVolume: number }>
 ): Map<string, { lineIds: Array<string | number>; totalSheets: number; totalTierVolume: number }> {
@@ -132,7 +152,7 @@ export function buildPricingGroups(
     const key = buildGroupKey(line.configuration);
     if (!key) continue;
     const sheets = Math.max(1, Math.floor(line.sheetsNeeded));
-    const tierVol = Math.max(1, Math.floor(line.tierVolume));
+    const tierVol = normalizeTierVolumeForGrouping(line.tierVolume, sheets);
     const existing = groups.get(key);
     if (existing) {
       existing.lineIds.push(line.lineId);
@@ -165,10 +185,7 @@ async function resolveLinePricingVolumes(
         ? Math.max(1, Math.floor(Number(sheets)))
         : 1;
     const tierRaw = result.tierVolumeForGrouping ?? sheetsNeeded;
-    const tierVolume =
-      Number.isFinite(Number(tierRaw)) && Number(tierRaw) > 0
-        ? Math.max(1, Math.floor(Number(tierRaw)))
-        : sheetsNeeded;
+    const tierVolume = normalizeTierVolumeForGrouping(tierRaw, sheetsNeeded);
     return { sheetsNeeded, tierVolume };
   } catch (error) {
     logger.warn('[PricingGroupService] не удалось получить объёмы для группировки', {
