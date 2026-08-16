@@ -499,11 +499,15 @@ export class SimplifiedPricingService {
     const orderPricingContext = (configuration as {
       orderPricingContext?: { tierSheetsOverride?: number };
     }).orderPricingContext;
+    const overrideRaw = Number(orderPricingContext?.tierSheetsOverride);
+    // Листовые тиражи — целые; м² (roll_wide_m2) могут быть дробными — Math.floor их портит.
     const tierSheetsOverride =
       orderPricingContext?.tierSheetsOverride != null &&
-      Number.isFinite(Number(orderPricingContext.tierSheetsOverride)) &&
-      Number(orderPricingContext.tierSheetsOverride) > 0
-        ? Math.floor(Number(orderPricingContext.tierSheetsOverride))
+      Number.isFinite(overrideRaw) &&
+      overrideRaw > 0
+        ? Math.abs(overrideRaw - Math.round(overrideRaw)) > 1e-9
+          ? Math.round(overrideRaw * 1000) / 1000
+          : Math.floor(overrideRaw)
         : undefined;
 
     // 2.5. Нормализуем конфигурацию: преобразуем sides в print_sides_mode и находим material_id
@@ -992,6 +996,7 @@ export class SimplifiedPricingService {
         trimHeightMm: layoutTrim.height,
         quantity,
         colorMode: normalizedConfig.print_color_mode,
+        tierM2Override: tierSheetsOverride,
       });
       printPrice = rollWideM2Details.printPrice;
       printDetails = {
@@ -1007,6 +1012,7 @@ export class SimplifiedPricingService {
         technology: normalizedConfig.print_technology,
         totalM2: rollWideM2Details.totalM2,
         ratePerM2: rollWideM2Details.ratePerM2,
+        tierM2Override: tierSheetsOverride ?? null,
         minChargeApplied: rollWideM2Details.minChargeApplied,
       });
     } else if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {

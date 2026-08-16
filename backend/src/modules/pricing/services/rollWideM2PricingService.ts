@@ -55,11 +55,16 @@ export function calculateRollWideM2Price(params: {
   trimHeightMm: number
   quantity: number
   rates: RollWideM2Rates
+  /** Суммарные м² группы корзины/заказа — только для выбора ступени; биллинг остаётся по totalM2 позиции. */
+  tierM2Override?: number | null
 }): RollWideM2PricingResult {
   const area = pieceAreaM2(params.trimWidthMm, params.trimHeightMm)
   const quantity = Math.max(1, Math.floor(Number(params.quantity) || 0))
   const totalM2 = area * quantity
-  const matchedTier = lookupRollWideM2Tier(params.rates.tiers, totalM2)
+  const overrideRaw = Number(params.tierM2Override)
+  const tierLookupM2 =
+    Number.isFinite(overrideRaw) && overrideRaw > 0 ? overrideRaw : totalM2
+  const matchedTier = lookupRollWideM2Tier(params.rates.tiers, tierLookupM2)
   const baseRate = Number(params.rates.price_color_per_m2 ?? 0)
   const ratePerM2 = Number(matchedTier?.price_per_m2 ?? 0) > 0 ? Number(matchedTier?.price_per_m2 ?? 0) : baseRate
   const subtotal = Math.round(ratePerM2 * totalM2 * 100) / 100
@@ -236,6 +241,8 @@ export class RollWideM2PricingService {
     trimHeightMm: number
     quantity: number
     colorMode?: 'color' | 'bw'
+    /** Суммарные м² группы — только lookup ступени (см. calculateRollWideM2Price). */
+    tierM2Override?: number | null
   }): Promise<RollWideM2PricingResult> {
     const rates = await this.loadRatesByTechnology(params.technologyCode)
     if (!rates || rates.m2PricingKind !== 'roll_wide') {
@@ -264,6 +271,7 @@ export class RollWideM2PricingService {
       trimHeightMm: params.trimHeightMm,
       quantity: params.quantity,
       rates,
+      tierM2Override: params.tierM2Override,
     })
     if (!Number.isFinite(result.ratePerM2) || result.ratePerM2 <= 0) {
       const err: Error & { status?: number } = new Error(
