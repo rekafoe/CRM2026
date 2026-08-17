@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { AppIcon } from '../../../../components/ui/AppIcon';
 import { BG_PATTERNS, svgToDataUrl } from '../bgPatterns';
+import { useCrmDesignAssets } from '../../../../hooks/useCrmDesignAssets';
 
-type Tab = 'color' | 'pattern' | 'custom';
+type Tab = 'color' | 'pattern' | 'library' | 'custom';
 
 interface BackgroundPanelProps {
   /** Установить сплошной цвет фона */
@@ -47,6 +48,7 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
   const [uploadError, setUploadError] = useState('');
   const svgInputRef = useRef<HTMLInputElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
+  const { assets: libraryBackgrounds, ready: libraryReady } = useCrmDesignAssets('background');
 
   const applyPattern = async (patternId: string) => {
     const pat = BG_PATTERNS.find((p) => p.id === patternId);
@@ -106,14 +108,14 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
 
       {/* Вкладки */}
       <div className="design-editor-bg-tabs">
-        {(['color', 'pattern', 'custom'] as Tab[]).map((t) => (
+        {(['color', 'pattern', 'library', 'custom'] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={`design-editor-bg-tab${tab === t ? ' is-active' : ''}`}
             onClick={() => setTab(t)}
           >
-            {t === 'color' ? 'Цвет' : t === 'pattern' ? 'Паттерн' : 'Свой файл'}
+            {t === 'color' ? 'Цвет' : t === 'pattern' ? 'Паттерн' : t === 'library' ? 'Библиотека' : 'Свой файл'}
           </button>
         ))}
       </div>
@@ -227,6 +229,34 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
       )}
 
       {/* ── Свой файл ── */}
+      {tab === 'library' && (
+        <div className="design-editor-panel-field">
+          {!libraryReady ? (
+            <p className="design-editor-panel-placeholder">Загрузка библиотеки…</p>
+          ) : libraryBackgrounds.length === 0 ? (
+            <p className="design-editor-panel-placeholder">В библиотеке пока нет фонов.</p>
+          ) : (
+            <div className="design-editor-patterns-grid">
+              {libraryBackgrounds.map((asset) => (
+                <button
+                  key={asset.id}
+                  type="button"
+                  className="design-editor-bg-preset"
+                  title={asset.label}
+                  disabled={applying}
+                  onClick={() => {
+                    setApplying(true);
+                    void onSetBackgroundImage(asset.url).finally(() => setApplying(false));
+                  }}
+                >
+                  <img src={asset.thumbUrl || asset.url} alt={asset.label} style={{ width: '100%', height: 52, objectFit: 'cover' }} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === 'custom' && (
         <div className="design-editor-panel-field">
           <p className="design-editor-panel-url-hint" style={{ marginBottom: 12 }}>

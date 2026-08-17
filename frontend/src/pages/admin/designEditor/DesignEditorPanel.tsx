@@ -1,5 +1,5 @@
 import React from 'react';
-import type { CollageLayout } from '../../../api';
+import type { CollageLayout, DesignAsset } from '../../../api';
 import { SIDEBAR_ITEMS } from './constants';
 import type { TextBlockPresetKind } from './constants';
 import type { SidebarSection, SelectedObjProps, SidebarPhotoItem, TextEffectsValues } from './types';
@@ -10,6 +10,7 @@ import { BackgroundPanel } from './panels/BackgroundPanel';
 import { ObjectPropsPanel } from './panels/ObjectPropsPanel';
 import { CollagesPanel } from './panels/CollagesPanel';
 import { PlaceholderPanel } from './panels/PlaceholderPanel';
+import { ClipartsPanel } from './panels/ClipartsPanel';
 
 interface DesignEditorPanelProps {
   section: SidebarSection;
@@ -63,6 +64,7 @@ interface DesignEditorPanelProps {
   collageSelectedTemplateId?: number | null;
   onCollageSelectTemplate?: (id: number | null) => void;
   onCollageApplyTemplate?: (layout: CollageLayout) => void;
+  onAddClipart?: (asset: DesignAsset) => void | Promise<void>;
 }
 
 export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
@@ -110,6 +112,7 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
   collageSelectedTemplateId = null,
   onCollageSelectTemplate,
   onCollageApplyTemplate,
+  onAddClipart,
 }) => {
   const title = SIDEBAR_ITEMS.find((i) => i.id === section)?.label ?? '';
 
@@ -181,6 +184,10 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
     return <ShapesPanel onAddShape={onAddShape} onClose={onClose} />;
   }
 
+  if (section === 'cliparts' && onAddClipart) {
+    return <ClipartsPanel onClose={onClose} onAddClipart={onAddClipart} />;
+  }
+
   if (section === 'background') {
     return (
       <BackgroundPanel
@@ -215,7 +222,6 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
   const placeholderSections: SidebarSection[] = [
     'templates',
     'stickers',
-    'cliparts',
     'frames',
   ];
   if (placeholderSections.includes(section)) {

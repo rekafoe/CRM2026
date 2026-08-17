@@ -19,10 +19,14 @@ export const designFontsDir = path.join(uploadsDir, 'design-fonts')
 /** Изображения шаблонов design_templates — отдаются через /api/design-templates/public/:id/assets/:fileId/content */
 export const designTemplateAssetsDir = path.join(uploadsDir, 'design-template-assets')
 
+/** Клипарты и фоны библиотеки — отдаются через /api/design-assets/public/:id/content */
+export const designAssetsDir = path.join(uploadsDir, 'design-assets')
+
 /** Изображения статей базы знаний — отдаются только через авторизованный API. */
 export const knowledgeBaseAssetsDir = path.join(uploadsDir, 'knowledge-base')
 
 const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.ttf', '.otf'])
+const DESIGN_ASSET_EXTENSIONS = new Set(['.svg', '.png', '.webp'])
 export const MAX_KNOWLEDGE_BASE_ASSET_BYTES = 10 * 1024 * 1024
 
 /** Лимит тела для multer (и согласованная проверка в handlers после приёма файла) */
@@ -50,6 +54,7 @@ try {
   fs.mkdirSync(orderFilesDir, { recursive: true })
   fs.mkdirSync(designFontsDir, { recursive: true })
   fs.mkdirSync(designTemplateAssetsDir, { recursive: true })
+  fs.mkdirSync(designAssetsDir, { recursive: true })
   fs.mkdirSync(knowledgeBaseAssetsDir, { recursive: true })
 } catch {}
 
@@ -211,6 +216,38 @@ export function detectFontFormat(originalName?: string): 'woff2' | 'woff' | 'ttf
 
 export function isFontUploadExtension(ext: string): boolean {
   return FONT_EXTENSIONS.has(ext.toLowerCase())
+}
+
+export function isDesignAssetUploadExtension(ext: string): boolean {
+  return DESIGN_ASSET_EXTENSIONS.has(ext.toLowerCase())
+}
+
+export function detectDesignAssetFormat(originalName?: string): 'svg' | 'png' | 'webp' {
+  const ext = path.extname(originalName || '').toLowerCase()
+  if (ext === '.png') return 'png'
+  if (ext === '.webp') return 'webp'
+  return 'svg'
+}
+
+export function saveBufferToDesignAssets(
+  buffer: Buffer | undefined,
+  originalName?: string,
+  prefix?: string,
+): { filename: string; size: number; originalName: string; format: 'svg' | 'png' | 'webp' } | null {
+  if (!buffer || buffer.length === 0) return null
+  const raw = (originalName || '').trim()
+  const ext = path.extname(raw).toLowerCase()
+  if (!DESIGN_ASSET_EXTENSIONS.has(ext)) return null
+  const base = prefix ? toSlug(prefix) : 'asset'
+  const unique = `${base}-${shortId(4)}${ext}`
+  const filePath = path.join(designAssetsDir, unique)
+  fs.writeFileSync(filePath, buffer)
+  return {
+    filename: unique,
+    size: buffer.length,
+    originalName: raw || unique,
+    format: detectDesignAssetFormat(raw),
+  }
 }
 
 /**

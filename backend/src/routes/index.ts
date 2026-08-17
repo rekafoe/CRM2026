@@ -30,6 +30,7 @@ import departmentsRoutes from './departments'
 import organizationsRoutes from './organizations'
 import designTemplatesRoutes from './designTemplates'
 import designFontsRoutes from './designFonts'
+import designAssetsRoutes from './designAssets'
 import collageTemplatesRoutes from './collageTemplates'
 import subtypeDesignsRoutes from './subtypeDesigns'
 import imageUrlFetchRoutes from './imageUrlFetch'
@@ -75,6 +76,7 @@ router.use('/departments', departmentsRoutes)
 router.use('/organizations', organizationsRoutes)
 router.use('/design-templates', designTemplatesRoutes)
 router.use('/design-fonts', designFontsRoutes)
+router.use('/design-assets', designAssetsRoutes)
 router.use('/collage-templates', collageTemplatesRoutes)
 router.use('/images', imageUrlFetchRoutes)
 router.use('/mail', mailRoutes)

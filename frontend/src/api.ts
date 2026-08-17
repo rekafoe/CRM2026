@@ -1604,6 +1604,90 @@ export const updateDesignFont = (
 
 export const deactivateDesignFont = (id: number) => api.delete(`/design-fonts/${id}`);
 
+export type DesignAssetKind = 'clipart' | 'background';
+
+export interface DesignAsset {
+  id: number;
+  label: string;
+  kind: DesignAssetKind;
+  filename: string;
+  mime: string | null;
+  format: 'svg' | 'png' | 'webp';
+  width: number | null;
+  height: number | null;
+  thumb_filename: string | null;
+  category: string | null;
+  sort_order: number;
+  is_active: boolean;
+  url: string;
+  thumbUrl: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const getDesignAssets = (kind?: DesignAssetKind) =>
+  api.get<DesignAsset[]>('/design-assets', { params: kind ? { kind } : undefined });
+
+export const getPublicDesignAssets = (kind?: DesignAssetKind) =>
+  api.get<DesignAsset[]>('/design-assets/public/list', { params: kind ? { kind } : undefined });
+
+export const createDesignAsset = (payload: {
+  file: File;
+  label?: string;
+  kind?: DesignAssetKind;
+  category?: string;
+}) => {
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  if (payload.label) formData.append('label', payload.label);
+  if (payload.kind) formData.append('kind', payload.kind);
+  if (payload.category) formData.append('category', payload.category);
+  return api.post<DesignAsset>('/design-assets', formData);
+};
+
+export type DesignAssetBatchItemResult =
+  | { status: 'created'; filename: string; asset: DesignAsset }
+  | { status: 'error'; filename: string; error: string };
+
+export interface DesignAssetBatchResult {
+  results: DesignAssetBatchItemResult[];
+  created: number;
+  failed: number;
+}
+
+export const createDesignAssetsBatch = (
+  files: File[],
+  payload?: { kind?: DesignAssetKind; category?: string },
+) => {
+  const formData = new FormData();
+  for (const file of files) formData.append('files', file);
+  if (payload?.kind) formData.append('kind', payload.kind);
+  if (payload?.category) formData.append('category', payload.category);
+  return api.post<DesignAssetBatchResult>('/design-assets/batch', formData);
+};
+
+export const updateDesignAsset = (
+  id: number,
+  payload: {
+    label?: string;
+    kind?: DesignAssetKind;
+    category?: string;
+    file?: File;
+    is_active?: boolean;
+  },
+) => {
+  const formData = new FormData();
+  if (payload.label != null) formData.append('label', payload.label);
+  if (payload.kind) formData.append('kind', payload.kind);
+  if (payload.category != null) formData.append('category', payload.category);
+  if (payload.is_active === false) formData.append('is_active', 'false');
+  if (payload.is_active === true) formData.append('is_active', 'true');
+  if (payload.file) formData.append('file', payload.file);
+  return api.put<DesignAsset>(`/design-assets/${id}`, formData);
+};
+
+export const deactivateDesignAsset = (id: number) => api.delete(`/design-assets/${id}`);
+
 export const getDesignTemplates = () => api.get<DesignTemplate[]>('/design-templates');
 export const getDesignTemplatesByCategory = (category: string) =>
   api.get<DesignTemplate[]>(`/design-templates/category/${encodeURIComponent(category)}`);

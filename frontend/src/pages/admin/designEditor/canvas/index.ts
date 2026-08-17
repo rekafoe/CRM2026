@@ -14,6 +14,8 @@ export {
 export {
   addImageFileToCanvas,
   addImageUrlToCanvas,
+  addSvgUrlToCanvas,
+  addDesignAssetToCanvas,
   fillPhotoField,
   wrapLegacyFilledPhotoImage,
 } from './canvasCommands';

@@ -38,6 +38,7 @@ import type { EditorMode, ResolveImageFileUrl } from './types';
 import {
   addImageFileToCanvas,
   addImageUrlToCanvas,
+  addDesignAssetToCanvas,
 } from './canvasCommands';
 import {
   applyBasicModeConstraints,
@@ -548,6 +549,14 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         const canvas = await getCanvasForEdit();
         if (!canvas) return;
         await addImageUrlToCanvas(canvas, url);
+      },
+      addDesignAsset: async (asset, options) => {
+        const canvas = await getCanvasForEdit();
+        if (!canvas) return;
+        await addDesignAssetToCanvas(canvas, asset, options);
+        const active = canvas.getActiveObject();
+        if (active) d.onSelectionChange(getObjProps(active));
+        d.saveSnapshot();
       },
       setTextProp: (key: string, value: unknown) => {
         const canvas = d.fabricRef.current;

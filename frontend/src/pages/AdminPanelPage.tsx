@@ -71,6 +71,9 @@ const DesignTemplatesPage = lazy(() =>
 const DesignFontsPage = lazy(() =>
   import('./admin/DesignFontsPage').then((m) => ({ default: m.DesignFontsPage }))
 );
+const DesignAssetsPage = lazy(() =>
+  import('./admin/DesignAssetsPage').then((m) => ({ default: m.DesignAssetsPage }))
+);
 const DesignEditorPage = lazy(() =>
   import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
 );
@@ -426,6 +429,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/inbox-plan" element={<InboxFunnelPlanPage />} />
           <Route path="/design-templates" element={<DesignTemplatesPage />} />
           <Route path="/design-fonts" element={<DesignFontsPage />} />
+          <Route path="/design-assets" element={<DesignAssetsPage />} />
           <Route path="/design-editor/:templateId" element={<DesignEditorPage />} />
           <Route
             path="/public-design-editor-preview/:templateId"

@@ -915,6 +915,9 @@ export const DesignTemplatesPage: React.FC = () => {
           <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/design-fonts')}>
             <AppIcon name="document" size="xs" /> Шрифты
           </button>
+          <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/design-assets')}>
+            <AppIcon name="puzzle" size="xs" /> Клипарты
+          </button>
           <input
             type="search"
             className="design-templates-search"

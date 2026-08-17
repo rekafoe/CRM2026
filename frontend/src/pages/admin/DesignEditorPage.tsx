@@ -1018,6 +1018,7 @@ export const DesignEditorPage: React.FC = () => {
               section={sidebarSection}
               onClose={() => setUi((u) => ({ ...u, sidebarSection: null }))}
               onAddImage={() => openImagePicker()}
+              onAddClipart={(asset) => activeCanvas()?.addDesignAsset(asset) ?? Promise.resolve()}
               onAddPhotoField={() => activeCanvas()?.addPhotoField()}
               onAddShape={(type) => activeCanvas()?.addShape(type)}
               onSetBackground={(c) => activeCanvas()?.setCanvasBackground(c)}

@@ -93,6 +93,10 @@ export interface DesignEditorCanvasHandle {
   addTextPreset: (kind: TextBlockPresetKind) => Promise<void>;
   addImageFromFile: (file: File) => Promise<void>;
   addImageFromUrl: (url: string) => Promise<void>;
+  addDesignAsset: (
+    asset: { id: number; url: string; format: string; label?: string },
+    options?: { asBackground?: boolean },
+  ) => Promise<void>;
   fillPhotoFieldFromFile: (id: string, file: File) => Promise<boolean>;
   fillPhotoFieldFromUrl: (id: string, url: string, originalName?: string) => Promise<boolean>;
   addPhotoField: (options?: {

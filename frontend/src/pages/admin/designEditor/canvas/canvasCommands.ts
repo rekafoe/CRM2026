@@ -1,4 +1,4 @@
-import { FabricImage, Group, type Canvas, type FabricObject } from 'fabric';
+import { FabricImage, Group, loadSVGFromString, util, type Canvas, type FabricObject } from 'fabric';
 import {
   applyPhotoFieldPanToGroup,
   buildFilledPhotoFieldGroup,
@@ -223,6 +223,111 @@ export async function addImageUrlToCanvas(canvas: Canvas, url: string): Promise<
       setTimeout(() => URL.revokeObjectURL(prepared.revokeUrl!), 750);
     }
   }
+}
+
+export type DesignAssetInsert = {
+  id: number;
+  url: string;
+  format: string;
+  label?: string;
+};
+
+function removeLibraryBackgrounds(canvas: Canvas): void {
+  for (const object of [...canvas.getObjects()]) {
+    const id = String((object as FabricObject & { id?: string }).id || '');
+    if (id.startsWith('decor_background_')) canvas.remove(object);
+  }
+}
+
+function markDesignAssetObject(
+  object: FabricObject,
+  asset: { id?: number; label?: string; asBackground?: boolean },
+): void {
+  const prefix = asset.asBackground ? 'decor_background' : 'decor_clipart';
+  object.set({
+    isDecorElement: true,
+    id: asset.id ? `${prefix}_${asset.id}_${Date.now().toString(36)}` : `${prefix}_${Date.now()}`,
+    souvenirLayerName: asset.label || (asset.asBackground ? 'Фон' : 'Клипарт'),
+  });
+}
+
+export async function addSvgUrlToCanvas(
+  canvas: Canvas,
+  url: string,
+  options?: { assetId?: number; label?: string; asBackground?: boolean },
+): Promise<FabricObject> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Не удалось загрузить SVG');
+  const svgText = await response.text();
+  if (!/<svg[\s>]/i.test(svgText)) throw new Error('Файл не похож на SVG');
+  const parsed = await loadSVGFromString(svgText);
+  const objects = parsed.objects.filter((object): object is FabricObject => object != null);
+  if (!objects.length) throw new Error('SVG пустой');
+  const group = util.groupSVGElements(objects, parsed.options);
+  const maxW = Math.max(1, Number(canvas.width) * (options?.asBackground ? 1 : 0.6));
+  const maxH = Math.max(1, Number(canvas.height) * (options?.asBackground ? 1 : 0.6));
+  const width = Math.max(1, Number(group.width || maxW));
+  const height = Math.max(1, Number(group.height || maxH));
+  const scale = options?.asBackground
+    ? Math.max(maxW / width, maxH / height)
+    : Math.min(maxW / width, maxH / height, 1);
+  group.set({
+    left: Number(canvas.width) / 2,
+    top: Number(canvas.height) / 2,
+    originX: 'center',
+    originY: 'center',
+    scaleX: scale,
+    scaleY: scale,
+  });
+  markDesignAssetObject(group, {
+    id: options?.assetId,
+    label: options?.label,
+    asBackground: options?.asBackground,
+  });
+  if (options?.asBackground) removeLibraryBackgrounds(canvas);
+  canvas.add(group);
+  if (options?.asBackground) canvas.sendObjectToBack(group);
+  canvas.setActiveObject(group);
+  canvas.requestRenderAll();
+  return group;
+}
+
+export async function addDesignAssetToCanvas(
+  canvas: Canvas,
+  asset: DesignAssetInsert,
+  options?: { asBackground?: boolean },
+): Promise<void> {
+  const label = asset.label || (options?.asBackground ? 'Фон' : 'Клипарт');
+  if (asset.format === 'svg') {
+    await addSvgUrlToCanvas(canvas, asset.url, {
+      assetId: asset.id,
+      label,
+      asBackground: options?.asBackground,
+    });
+    return;
+  }
+  if (options?.asBackground) removeLibraryBackgrounds(canvas);
+  await addImageUrlToCanvas(canvas, asset.url);
+  const object = canvas.getActiveObject();
+  if (!object) return;
+  markDesignAssetObject(object, { id: asset.id, label, asBackground: options?.asBackground });
+  if (options?.asBackground) {
+    const maxW = Math.max(1, Number(canvas.width));
+    const maxH = Math.max(1, Number(canvas.height));
+    const width = Math.max(1, Number(object.width || maxW));
+    const height = Math.max(1, Number(object.height || maxH));
+    const scale = Math.max(maxW / width, maxH / height);
+    object.set({
+      left: maxW / 2,
+      top: maxH / 2,
+      originX: 'center',
+      originY: 'center',
+      scaleX: scale,
+      scaleY: scale,
+    });
+    canvas.sendObjectToBack(object);
+  }
+  canvas.requestRenderAll();
 }
 
 export type AddClientPhotoFieldToCanvasInput = {
