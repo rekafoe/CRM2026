@@ -1138,8 +1138,9 @@ export class SimplifiedPricingService {
           [normalizedConfig.material_id]
         );
         const pricePerMaterialUnit = material?.sheet_price_single ?? 0;
+        // duplex_as_single_x2 удваивает только печать; материал — по фактическому sheetsNeeded/метрам.
         const baseMaterialPrice = effectiveMaterialQuantity * pricePerMaterialUnit;
-        materialPrice = baseMaterialPrice * billingModeMultiplier;
+        materialPrice = baseMaterialPrice;
         materialDetails = {
           tier: { min_qty: 1, max_qty: undefined, price: pricePerMaterialUnit },
           priceForQuantity: materialPrice,
@@ -2832,14 +2833,15 @@ export class SimplifiedPricingService {
 
       let materialPrice = 0;
       if (ctx.materialPricePerSheet > 0) {
+        // Не умножаем на billingModeMultiplier: он только для печати (duplex_as_single_x2).
         if (ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0) {
           const metersForQ = ctx.metersPerItem! * q;
-          materialPrice = metersForQ * ctx.materialPricePerSheet * ctx.billingModeMultiplier;
+          materialPrice = metersForQ * ctx.materialPricePerSheet;
         } else {
           const sheetsNeeded = ctx.usePagesMultiplier
             ? Math.max(1, q * ctx.sheetsPerItem)
             : Math.ceil(q / ctx.itemsPerSheet);
-          materialPrice = sheetsNeeded * ctx.materialPricePerSheet * ctx.billingModeMultiplier;
+          materialPrice = sheetsNeeded * ctx.materialPricePerSheet;
         }
       }
       if (ctx.baseMaterialPricePerItem > 0) {
