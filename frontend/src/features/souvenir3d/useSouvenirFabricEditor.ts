@@ -20,7 +20,9 @@ import {
   getUsedPrintAreaIds,
   isUsedSouvenirPage,
   normalizeSouvenirPages,
+  resolveSouvenirFabricCoordSpace,
 } from './souvenirDesignState';
+import { printAreaFabricPx } from './scale';
 import type {
   PrintAreaConfig,
   SouvenirSelectedObject,
@@ -125,7 +127,7 @@ export function useSouvenirFabricEditor({
   const canvasElementRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<Canvas | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const pagesRef = useRef<DesignPage[]>(normalizeSouvenirPages([], areas));
+  const pagesRef = useRef<DesignPage[]>(normalizeSouvenirPages([], areas, 'css_px'));
   const activeAreaIdRef = useRef(areas[0]?.id ?? 'front');
   const draftTokenRef = useRef<string | null>(initialDraftToken ?? null);
   const draftVersionRef = useRef<number | null>(null);
@@ -210,11 +212,16 @@ export function useSouvenirFabricEditor({
     const area = activeArea();
     if (!canvas || !area) return pagesRef.current;
     const serialized = canvas.toJSON() as unknown as Record<string, unknown>;
+    const fabricSize = printAreaFabricPx(area.widthMm, area.heightMm, 1);
     pagesRef.current = pagesRef.current.map((page) => (
       page.printAreaId === area.id
         ? {
             ...page,
-            fabricJSON: serialized,
+            fabricJSON: {
+              ...serialized,
+              width: fabricSize.widthPx,
+              height: fabricSize.heightPx,
+            },
             printAreaId: area.id,
             printAreaLabel: area.label,
             widthMm: area.widthMm,
@@ -239,13 +246,14 @@ export function useSouvenirFabricEditor({
     const area = areas.find((candidate) => candidate.id === areaId) ?? areas[0];
     if (!canvas || !area) return;
     const page = pagesRef.current.find((candidate) => candidate.printAreaId === area.id)
-      ?? normalizeSouvenirPages([], [area])[0];
+      ?? normalizeSouvenirPages([], [area], 'css_px')[0];
+    const fabricSize = printAreaFabricPx(area.widthMm, area.heightMm, 1);
     suppressEventsRef.current = true;
     try {
       canvas.discardActiveObject();
       canvas.setDimensions({
-        width: Math.max(1, Math.round(area.widthMm)),
-        height: Math.max(1, Math.round(area.heightMm)),
+        width: fabricSize.widthPx,
+        height: fabricSize.heightPx,
       });
       await canvas.loadFromJSON(page.fabricJSON ?? {});
       canvas.getObjects().forEach((object) => {
@@ -267,9 +275,10 @@ export function useSouvenirFabricEditor({
     const element = canvasElementRef.current;
     if (!element || areas.length === 0) return undefined;
     const first = areas[0];
+    const fabricSize = printAreaFabricPx(first.widthMm, first.heightMm, 1);
     const canvas = new Canvas(element, {
-      width: Math.max(1, Math.round(first.widthMm)),
-      height: Math.max(1, Math.round(first.heightMm)),
+      width: fabricSize.widthPx,
+      height: fabricSize.heightPx,
       backgroundColor: 'transparent',
       preserveObjectStacking: true,
       selection: false,
@@ -302,7 +311,8 @@ export function useSouvenirFabricEditor({
         }
         const state = readDraftDesignState(draftResponse?.payloadParsed)
           ?? readTemplateDesignState(templateResponse);
-        pagesRef.current = normalizeSouvenirPages(state?.pages, areas);
+        const coordSpace = resolveSouvenirFabricCoordSpace(state);
+        pagesRef.current = normalizeSouvenirPages(state?.pages, areas, coordSpace);
         const preferredAreaId = state?.activePrintAreaId;
         const initialArea = areas.some((area) => area.id === preferredAreaId)
           ? preferredAreaId!
