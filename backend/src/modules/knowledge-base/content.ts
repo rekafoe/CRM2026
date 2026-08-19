@@ -48,15 +48,19 @@ const blockNodeTypes = new Set([
 const safeLinkProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 const safeImageProtocols = new Set(['http:', 'https:'])
 const allowedTextAlign = new Set(['left', 'center', 'right', 'justify'])
+const allowedCellAlign = new Set(['left', 'center', 'right', 'justify'])
 const allowedAttrsByNode: Record<string, Set<string>> = {
   paragraph: new Set(['textAlign']),
   heading: new Set(['level', 'textAlign']),
   image: new Set(['src', 'alt', 'title', 'alignment', 'width', 'wrap', 'caption']),
   orderedList: new Set(['start', 'type']),
   taskItem: new Set(['checked']),
-  tableHeader: new Set(['colspan', 'rowspan', 'colwidth']),
-  tableCell: new Set(['colspan', 'rowspan', 'colwidth']),
+  codeBlock: new Set(['language']),
+  tableHeader: new Set(['colspan', 'rowspan', 'colwidth', 'align']),
+  tableCell: new Set(['colspan', 'rowspan', 'colwidth', 'align']),
 }
+
+const dangerousAttrNames = new Set(['style', 'innerHTML', 'html', 'srcdoc'])
 
 export class KnowledgeContentValidationError extends Error {
   status = 400
@@ -74,6 +78,10 @@ function fail(message: string): never {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isAbsent(value: unknown): boolean {
+  return value == null || value === ''
 }
 
 function assertSafeUrl(value: unknown, kind: 'link' | 'image'): void {
@@ -96,8 +104,16 @@ function assertSafeUrl(value: unknown, kind: 'link' | 'image'): void {
   }
 }
 
-function validateAttrs(nodeType: string, attrs: unknown): void {
-  if (attrs == null) return
+function assertSafeAttrName(key: string): void {
+  const lower = key.toLowerCase()
+  if (lower.startsWith('on')) fail('Обработчики событий запрещены')
+  if (dangerousAttrNames.has(key) || dangerousAttrNames.has(lower)) {
+    fail('HTML и произвольные стили запрещены')
+  }
+}
+
+function sanitizeAttrs(nodeType: string, attrs: unknown): Record<string, unknown> | undefined {
+  if (attrs == null) return undefined
   if (!isRecord(attrs)) fail('Атрибуты узла должны быть объектом')
 
   if (nodeType === 'heading' && attrs.level != null) {
@@ -107,79 +123,131 @@ function validateAttrs(nodeType: string, attrs: unknown): void {
   if (nodeType === 'image') assertSafeUrl(attrs.src, 'image')
 
   const allowedAttrs = allowedAttrsByNode[nodeType] ?? new Set<string>()
+  const next: Record<string, unknown> = {}
+
   for (const [key, value] of Object.entries(attrs)) {
-    if (!allowedAttrs.has(key)) fail(`Недопустимый атрибут ${key} узла ${nodeType}`)
-    if (key.toLowerCase().startsWith('on')) fail('Обработчики событий запрещены')
+    assertSafeAttrName(key)
     if (typeof value === 'string' && value.length > 4096) fail('Слишком длинный атрибут узла')
-    if (key === 'style' || key === 'innerHTML' || key === 'html') fail('HTML и произвольные стили запрещены')
-    if (key === 'textAlign' && value != null && !allowedTextAlign.has(String(value))) {
-      fail('Некорректное выравнивание текста')
+    if (isAbsent(value)) continue
+    if (!allowedAttrs.has(key)) continue
+
+    if (key === 'textAlign') {
+      if (!allowedTextAlign.has(String(value))) fail('Некорректное выравнивание текста')
+      next[key] = String(value)
+      continue
     }
-    if ((key === 'alt' || key === 'title') && value != null && typeof value !== 'string') {
+    if ((key === 'alt' || key === 'title') && typeof value !== 'string') {
       fail(`Атрибут ${key} изображения должен быть строкой`)
     }
-    if (key === 'alignment' && value != null && !['left', 'center', 'right'].includes(String(value))) {
-      fail('Некорректное выравнивание изображения')
+    if (key === 'alignment') {
+      if (!['left', 'center', 'right'].includes(String(value))) fail('Некорректное выравнивание изображения')
+      next[key] = String(value)
+      continue
     }
-    if (key === 'wrap' && value != null && !['none', 'left', 'right'].includes(String(value))) {
-      fail('Некорректное обтекание изображения')
+    if (key === 'wrap') {
+      if (!['none', 'left', 'right'].includes(String(value))) fail('Некорректное обтекание изображения')
+      next[key] = String(value)
+      continue
     }
-    if (key === 'width' && value != null) {
+    if (key === 'width') {
       const width = Number(value)
-      if (!Number.isFinite(width) || width < 20 || width > 100) fail('Некорректная ширина изображения')
+      if (!Number.isFinite(width)) fail('Некорректная ширина изображения')
+      next[key] = Math.min(100, Math.max(20, width))
+      continue
     }
-    if (key === 'caption' && value != null) {
+    if (key === 'caption') {
       if (typeof value !== 'string' || value.length > 500) fail('Некорректная подпись изображения')
+      next[key] = value
+      continue
     }
-    if (key === 'checked' && typeof value !== 'boolean') fail('Некорректное состояние пункта задачи')
-    if ((key === 'colspan' || key === 'rowspan' || key === 'start') && value != null) {
+    if (key === 'checked') {
+      if (typeof value !== 'boolean') fail('Некорректное состояние пункта задачи')
+      next[key] = value
+      continue
+    }
+    if (key === 'colspan' || key === 'rowspan' || key === 'start') {
       const number = Number(value)
       if (!Number.isInteger(number) || number < 1 || number > 1000) fail(`Некорректный атрибут ${key}`)
+      next[key] = number
+      continue
     }
-    if (key === 'colwidth' && value != null) {
+    if (key === 'colwidth') {
       if (!Array.isArray(value)
         || value.length > 100
         || value.some((width) => !Number.isInteger(Number(width)) || Number(width) < 1 || Number(width) > 10000)) {
         fail('Некорректная ширина столбца')
       }
+      next[key] = value.map((width) => Number(width))
+      continue
     }
+    if (key === 'align') {
+      if (!allowedCellAlign.has(String(value))) fail('Некорректное выравнивание ячейки')
+      next[key] = String(value)
+      continue
+    }
+    if (key === 'language') {
+      const language = String(value)
+      if (!/^[a-z0-9+#._-]{1,40}$/i.test(language)) continue
+      next[key] = language
+      continue
+    }
+    next[key] = value
   }
+
+  return Object.keys(next).length ? next : undefined
 }
 
-function validateMarks(marks: unknown): void {
-  if (marks == null) return
+function sanitizeMarks(marks: unknown): Array<Record<string, unknown>> | undefined {
+  if (marks == null) return undefined
   if (!Array.isArray(marks)) fail('Список форматирования должен быть массивом')
   if (marks.length > 20) fail('Слишком много отметок форматирования')
+  const result: Array<Record<string, unknown>> = []
   for (const mark of marks) {
     if (!isRecord(mark) || typeof mark.type !== 'string' || !allowedMarkTypes.has(mark.type)) {
       fail('Недопустимый тип форматирования')
     }
+    const next: Record<string, unknown> = { type: mark.type }
     if (mark.type === 'link') {
       const attrs = mark.attrs
       if (!isRecord(attrs)) fail('У ссылки отсутствуют атрибуты')
       assertSafeUrl(attrs.href, 'link')
-      const allowedLinkAttrs = new Set(['href', 'target', 'rel', 'class'])
+      const allowedLinkAttrs = new Set(['href', 'target', 'rel', 'class', 'title'])
+      const nextAttrs: Record<string, unknown> = {}
       for (const [key, value] of Object.entries(attrs)) {
-        if (!allowedLinkAttrs.has(key)) fail('Недопустимый атрибут ссылки')
-        if (key.toLowerCase().startsWith('on') || key === 'style' || key === 'html') {
-          fail('Недопустимый атрибут ссылки')
-        }
-        if (key === 'target' && value != null && value !== '_blank' && value !== '_self') {
+        assertSafeAttrName(key)
+        if (key === 'style' || key === 'html') fail('Недопустимый атрибут ссылки')
+        if (isAbsent(value)) continue
+        if (!allowedLinkAttrs.has(key)) continue
+        if (key === 'target' && value !== '_blank' && value !== '_self') {
           fail('Недопустимая цель ссылки')
         }
-        if ((key === 'rel' || key === 'class') && value != null && typeof value !== 'string') {
+        if ((key === 'rel' || key === 'class' || key === 'title') && typeof value !== 'string') {
           fail('Некорректный атрибут ссылки')
         }
+        if (typeof value === 'string' && value.length > 4096) fail('Слишком длинный атрибут узла')
+        nextAttrs[key] = value
       }
+      next.attrs = nextAttrs
+    } else if (isRecord(mark.attrs)) {
+      const extra: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(mark.attrs)) {
+        assertSafeAttrName(key)
+        if (isAbsent(value)) continue
+        if (typeof value === 'string' && value.length > 4096) fail('Слишком длинный атрибут узла')
+        extra[key] = value
+      }
+      if (Object.keys(extra).length) next.attrs = extra
     }
+    result.push(next)
   }
+  return result.length ? result : undefined
 }
 
-function validateNode(
+function sanitizeNode(
   node: unknown,
   depth: number,
   counters: { nodes: number; textBytes: number },
-): void {
+): Record<string, unknown> {
   if (!isRecord(node)) fail('Узел содержимого должен быть объектом')
   if (depth > 64) fail('Содержимое имеет слишком большую глубину')
   if (++counters.nodes > 10_000) fail('Содержимое содержит слишком много узлов')
@@ -188,20 +256,26 @@ function validateNode(
   if (typeof type !== 'string' || !allowedNodeTypes.has(type)) {
     fail(`Недопустимый тип узла: ${String(type || 'не указан')}`)
   }
+
+  const result: Record<string, unknown> = { type }
   if (type === 'text') {
     if (typeof node.text !== 'string') fail('Текстовый узел не содержит текст')
     counters.textBytes += Buffer.byteLength(node.text, 'utf8')
+    result.text = node.text
   } else if (node.text != null) {
     fail('Поле text разрешено только текстовому узлу')
   }
 
-  validateAttrs(type, node.attrs)
-  validateMarks(node.marks)
+  const attrs = sanitizeAttrs(type, node.attrs)
+  if (attrs) result.attrs = attrs
+  const marks = sanitizeMarks(node.marks)
+  if (marks) result.marks = marks
 
   if (node.content != null) {
     if (!Array.isArray(node.content)) fail('Дочерние узлы должны быть массивом')
-    for (const child of node.content) validateNode(child, depth + 1, counters)
+    result.content = node.content.map((child) => sanitizeNode(child, depth + 1, counters))
   }
+  return result
 }
 
 function extractPlainText(root: Record<string, unknown>): string {
@@ -244,6 +318,6 @@ export function normalizeTipTapContent(
     fail(`Содержимое превышает лимит ${maxBytes} байт`)
   }
   if (value.type !== 'doc') fail('Корневой узел TipTap должен иметь тип doc')
-  validateNode(value, 0, { nodes: 0, textBytes: 0 })
-  return { value, json, plain: extractPlainText(value) }
+  const sanitized = sanitizeNode(value, 0, { nodes: 0, textBytes: 0 })
+  return { value: sanitized, json: JSON.stringify(sanitized), plain: extractPlainText(sanitized) }
 }

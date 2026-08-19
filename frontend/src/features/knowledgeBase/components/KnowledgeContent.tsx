@@ -283,7 +283,7 @@ function createAuthenticatedImage(options: KnowledgeImageOptions = {}) {
 
 export function createKnowledgeExtensions(placeholder?: string, imageOptions: KnowledgeImageOptions = {}) {
   return [
-    StarterKit.configure({ link: false, underline: false }),
+    StarterKit.configure({ link: false, underline: false, trailingNode: false }),
     createAuthenticatedImage(imageOptions).configure({ allowBase64: false }),
     Link.configure({ openOnClick: true, autolink: true, defaultProtocol: 'https' }),
     Underline,
@@ -312,6 +312,7 @@ export const KnowledgeContent: React.FC<KnowledgeContentProps> = ({ content, cla
     extensions,
     content,
     editable: false,
+    immediatelyRender: false,
     editorProps: { attributes: { class: 'kb-prose' } },
   });
 

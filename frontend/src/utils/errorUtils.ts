@@ -23,14 +23,11 @@ interface AxiosErrorResponse {
  * @returns строковое сообщение об ошибке
  */
 export function getErrorMessage(error: unknown, fallback = 'Неизвестная ошибка'): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
   if (typeof error === 'string') {
     return error;
   }
-  
-  // Обработка Axios ошибок
+
+  // AxiosError наследует Error, поэтому сначала читаем тело ответа API.
   if (error && typeof error === 'object') {
     const axiosError = error as AxiosErrorResponse;
     if (axiosError.response?.data?.error) {
@@ -51,7 +48,11 @@ export function getErrorMessage(error: unknown, fallback = 'Неизвестна
       }
     }
   }
-  
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
   return fallback;
 }
 

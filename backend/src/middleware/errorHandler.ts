@@ -74,6 +74,7 @@ export const errorHandler = (err: ApiError, req: Request, res: Response, _next: 
   
   const payload: any = { 
     error: message,
+    message,
     code,
     timestamp,
     path: req.path,

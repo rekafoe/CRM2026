@@ -5,7 +5,8 @@ import { AppIcon } from '../../../components/ui/AppIcon';
 import { useToastNotifications } from '../../../components/Toast';
 import { useCurrentUser } from '../../../hooks/useCurrentUser';
 import { knowledgeApi } from '../api';
-import { EMPTY_KNOWLEDGE_CONTENT } from '../content';
+import { EMPTY_KNOWLEDGE_CONTENT, sanitizeKnowledgeContentForApi } from '../content';
+import { getAxiosErrorMessage } from '../../../utils/errorUtils';
 import { knowledgeKeys, useKnowledgeArticle, useKnowledgeCategories } from '../hooks';
 import {
   createKnowledgeExtensions,
@@ -65,6 +66,7 @@ export const KnowledgeEditorPage: React.FC = () => {
   const editor = useEditor({
     extensions,
     content: EMPTY_KNOWLEDGE_CONTENT,
+    immediatelyRender: false,
     editorProps: {
       attributes: { class: 'kb-prose kb-prose--editable' },
       handlePaste: (_view, event) => {
@@ -105,7 +107,7 @@ export const KnowledgeEditorPage: React.FC = () => {
     excerpt: excerpt.trim(),
     categoryId,
     tags: parseTags(),
-    contentJson: (editor?.getJSON() ?? EMPTY_KNOWLEDGE_CONTENT) as KnowledgeContentValue,
+    contentJson: sanitizeKnowledgeContentForApi(editor?.getJSON() ?? EMPTY_KNOWLEDGE_CONTENT),
     contentPlain: editor?.getText({ blockSeparator: '\n\n' }) ?? '',
     status: article?.status ?? 'draft',
     baseRevisionId: article?.currentRevisionId ?? undefined,
@@ -165,7 +167,7 @@ export const KnowledgeEditorPage: React.FC = () => {
     try {
       await uploadTask;
     } catch (error: any) {
-      toast.error('Не удалось загрузить изображение', error?.response?.data?.message ?? error?.message);
+      toast.error('Не удалось загрузить изображение', getAxiosErrorMessage(error, error?.message));
     } finally {
       if (uploadPromiseRef.current === uploadTask) {
         uploadPromiseRef.current = null;
@@ -202,7 +204,7 @@ export const KnowledgeEditorPage: React.FC = () => {
       toast.success(publish ? 'Статья опубликована' : 'Черновик сохранён');
       navigate(`/knowledge/articles/${savedId}`);
     } catch (error: any) {
-      toast.error('Не удалось сохранить статью', error?.response?.data?.message ?? error?.message);
+      toast.error('Не удалось сохранить статью', getAxiosErrorMessage(error, error?.message));
     } finally {
       setSaving(false);
     }
