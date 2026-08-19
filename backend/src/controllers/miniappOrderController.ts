@@ -6,6 +6,7 @@ import {
   listMiniappOrders,
 } from '../services/miniappOrderService';
 import { getMiniappOrderFileForDownload } from '../services/miniappOrderFileDownloadService';
+import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition';
 
 function miniChatId(req: Request): string | null {
   return (req as AuthenticatedRequest).miniApp?.telegramUserId?.trim() || null;
@@ -47,10 +48,7 @@ export class MiniappOrderController {
       return;
     }
     const displayName = result.displayName;
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${String(displayName).replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`
-    );
+    res.setHeader('Content-Disposition', buildAttachmentContentDisposition(displayName));
     res.setHeader('Content-Length', String(result.buffer.length));
     if (result.mime) {
       res.setHeader('Content-Type', result.mime);

@@ -29,6 +29,7 @@ import {
   requestManualProductionRegeneration,
 } from '../services/editorProductionJobService'
 import { logger } from '../utils/logger'
+import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition'
 import { Readable } from 'stream'
 
 const router = Router()
@@ -956,15 +957,24 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
   const orderId = Number(req.params.id)
   const fileId = Number(req.params.fileId)
   const db = await getDb()
-  const row = await db.get<any>(
-    'SELECT filename, originalName, mime, storage, externalUrl, externalKey FROM order_files WHERE id = ? AND orderId = ?',
-    fileId,
-    orderId
-  )
+  const hasStorage = await hasColumn('order_files', 'storage').catch(() => false)
+  const row = hasStorage
+    ? await db.get<any>(
+      'SELECT filename, originalName, mime, storage, externalUrl, externalKey FROM order_files WHERE id = ? AND orderId = ?',
+      fileId,
+      orderId,
+    )
+    : await db.get<any>(
+      'SELECT filename, originalName, mime FROM order_files WHERE id = ? AND orderId = ?',
+      fileId,
+      orderId,
+    )
   if (!row || !row.filename) {
     res.status(404).json({ message: 'Файл не найден' })
     return
   }
+  const displayName = (row.originalName || row.filename).trim() || row.filename
+  const disposition = buildAttachmentContentDisposition(displayName)
   if (row.storage && row.storage !== 'local') {
     if (row.externalUrl) {
       let externalResponse: Response
@@ -985,17 +995,18 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
         })
         return
       }
-      const displayName = (row.originalName || row.filename).trim() || row.filename
-      const contentDisposition =
-        externalResponse.headers.get('content-disposition') ||
-        `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`
       const contentType = externalResponse.headers.get('content-type') || row.mime || 'application/octet-stream'
       const contentLength = externalResponse.headers.get('content-length')
-      res.setHeader('Content-Disposition', contentDisposition)
+      res.setHeader('Content-Disposition', disposition)
       res.setHeader('Content-Type', contentType)
       if (contentLength) res.setHeader('Content-Length', contentLength)
       await logOrderFileAccess(db, req, { orderId, fileId, action: 'download', storage: row.storage })
-      Readable.fromWeb(externalResponse.body as any).pipe(res)
+      try {
+        Readable.fromWeb(externalResponse.body as any).pipe(res)
+      } catch {
+        const buffer = Buffer.from(await externalResponse.arrayBuffer())
+        res.send(buffer)
+      }
       return
     }
     res.status(409).json({
@@ -1010,9 +1021,14 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
     return
   }
   const fs = await import('fs')
-  const buffer = fs.readFileSync(filePath)
-  const displayName = (row.originalName || row.filename).trim() || row.filename
-  res.setHeader('Content-Disposition', `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`)
+  let buffer: Buffer
+  try {
+    buffer = fs.readFileSync(filePath)
+  } catch {
+    res.status(404).json({ message: 'Не удалось прочитать файл на диске' })
+    return
+  }
+  res.setHeader('Content-Disposition', disposition)
   res.setHeader('Content-Length', String(buffer.length))
   if (row.mime) res.setHeader('Content-Type', row.mime)
   await logOrderFileAccess(db, req, { orderId, fileId, action: 'download', storage: 'local' })
