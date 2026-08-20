@@ -71,7 +71,7 @@ describe('fixed/per_order finishing billing', () => {
       layoutMock(1, quantity),
     );
     mockedListTiers.mockResolvedValue([
-      { min_qty: 1, max_qty: null, unit_price: packageRate } as any,
+      { minQuantity: 1, rate: packageRate } as any,
     ]);
 
     mockedGetDb.mockResolvedValue({
