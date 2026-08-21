@@ -3,8 +3,10 @@ import {
   defaultRollFeedForPriceUnit,
   finishingFinKey,
   quotePerM2Finishing,
+  resolvePerMeterFeedFixedWarehouseMeters,
   resolveWarehouseFeedMeters,
 } from '../modules/pricing/services/finishingPerM2';
+import { resolveRollConsumedArea } from '../modules/pricing/services/rollConsumedArea';
 
 describe('finishingPerM2', () => {
   const layout = {
@@ -82,5 +84,35 @@ describe('finishingPerM2', () => {
     expect(defaultRollFeedForPriceUnit('per_m2')).toBe(true);
     expect(defaultRollFeedForPriceUnit('per_meter', 'laminate')).toBe(true);
     expect(defaultRollFeedForPriceUnit('per_item', 'laminate')).toBe(false);
+  });
+
+  it('per_meter+feed fixed: warehouse uses film feed, not max with print meters', () => {
+    const trimMm = { width: 500, height: 500 };
+    const quantity = 4;
+    const print = resolveRollConsumedArea({
+      rollWidthMm: 600,
+      trimMm,
+      bleedMm: 0,
+      quantity,
+      margins: { edgeMm: 0, gapMm: 0 },
+    });
+    const film = resolveWarehouseFeedMeters({
+      rollWidthMm: 1200,
+      layout: {
+        trimMm,
+        bleedMm: 0,
+        quantity,
+        margins: { edgeMm: 0, gapMm: 0 },
+      },
+    });
+
+    expect(print.usedRollLayout).toBe(true);
+    expect(film.usedRollLayout).toBe(true);
+    // На более широкой плёнке подача короче, чем на узком печатном рулоне.
+    expect(film.feedMeters).toBeLessThan(print.feedMeters);
+    // Старый баг: Math.max(film, print) раздувал списание плёнки до метров печати.
+    expect(Math.max(film.feedMeters, print.feedMeters)).toBeCloseTo(print.feedMeters, 4);
+    expect(resolvePerMeterFeedFixedWarehouseMeters(film.feedMeters)).toBeCloseTo(film.feedMeters, 4);
+    expect(resolvePerMeterFeedFixedWarehouseMeters(Number.NaN)).toBe(0);
   });
 });
