@@ -1,5 +1,6 @@
 import { getDb } from '../../../config/database'
 import { logger } from '../../../utils/logger'
+import { MaterialTransactionService } from './materialTransactionService'
 import { WarehouseTransactionService } from './warehouseTransactionService'
 
 export interface MaterialRequirement {
@@ -121,6 +122,7 @@ export class AutoMaterialDeductionService {
           })
         } catch (error: any) {
           logger.error('Ошибка списания материала', error)
+          result.success = false
           result.errors.push(`Ошибка списания материала ID ${requirement.materialId}: ${error.message}`)
         }
       }
@@ -209,7 +211,8 @@ export class AutoMaterialDeductionService {
   }
 
   /**
-   * Проверить доступность материалов
+   * Проверить доступность материалов с учётом активных (не истёкших) резервов.
+   * Иначе website/miniapp checkout списывает reserved stock другого CRM-заказа.
    */
   private static async checkMaterialAvailability(
     requirements: MaterialRequirement[]
@@ -220,28 +223,27 @@ export class AutoMaterialDeductionService {
 
     for (const req of requirements) {
       try {
-        const material = await db.get(`
-          SELECT name, quantity, min_quantity 
-          FROM materials 
-          WHERE id = ?
-        `, req.materialId)
+        const availability = await MaterialTransactionService.checkAvailability(
+          req.materialId,
+          req.quantity
+        )
+        const material = await db.get<{ min_quantity: number | null }>(
+          'SELECT min_quantity FROM materials WHERE id = ?',
+          req.materialId
+        )
+        const minQuantity = material?.min_quantity || 0
+        const remainingAfterDeduction = availability.availableQuantity - req.quantity
 
-        if (!material) {
-          errors.push(`Материал с ID ${req.materialId} не найден`)
-          continue
-        }
-
-        const availableQuantity = material.quantity
-        const minQuantity = material.min_quantity || 0
-        const remainingAfterDeduction = availableQuantity - req.quantity
-
-        if (remainingAfterDeduction < 0) {
+        if (!availability.available) {
           errors.push(
-            `Недостаточно материала "${material.name}". Доступно: ${availableQuantity}, требуется: ${req.quantity}`
+            `Недостаточно материала "${availability.materialName}". Доступно: ${availability.availableQuantity}, требуется: ${req.quantity}` +
+              (availability.reservedQuantity > 0
+                ? ` (в резерве: ${availability.reservedQuantity})`
+                : '')
           )
         } else if (remainingAfterDeduction < minQuantity) {
           warnings.push(
-            `После списания материала "${material.name}" остаток будет ниже минимального (${minQuantity})`
+            `После списания материала "${availability.materialName}" остаток будет ниже минимального (${minQuantity})`
           )
         }
       } catch (error: any) {
