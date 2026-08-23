@@ -7,7 +7,7 @@
 | Поле | Назначение |
 |------|------------|
 | `name` | Отображаемое имя |
-| `code` | Стабильный id (= `OFFICE_PICKUP_POINTS.id` на сайте, напр. `pickup-gikalo`) |
+| `code` | Стабильный id (= `pickupId` филиала на сайте: `pickup-dzerzhinskogo-3b`, `pickup-dzerzhinskogo-104`) |
 | `address` | Адрес точки |
 | `is_pickup_point` | Точка самовывоза |
 | `is_active` | Активна |
@@ -39,4 +39,5 @@
 
 ## Сайт
 
-Новая точка самовывоза = запись в CRM (`departments.code`) + строка в `OFFICE_PICKUP_POINTS` на сайте.
+Новая точка самовывоза = запись в CRM (`departments.code`) + филиал в `lib/site/branches.ts` на сайте.
+Канонические коды: `pickup-dzerzhinskogo-3b` (бывший `pickup-gikalo`) и `pickup-dzerzhinskogo-104`.

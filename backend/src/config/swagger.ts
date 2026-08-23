@@ -349,12 +349,12 @@ const options: swaggerJsdoc.Options = {
             },
             providerId: {
               type: 'string',
-              description: 'ID варианта на сайте (например pickup-dzerzhinsky-3b, belpochta)',
-              example: 'pickup-dzerzhinsky-3b',
+              description: 'ID варианта на сайте (например pickup-dzerzhinskogo-3b, pickup-dzerzhinskogo-104, belpochta)',
+              example: 'pickup-dzerzhinskogo-3b',
             },
             label: {
               type: 'string',
-              example: 'Проспект Дзержинского 3б',
+              example: 'Проспект Дзержинского 3Б',
             },
             description: { type: 'string', nullable: true, example: 'Время согласовывается по телефону' },
             cost: { type: 'number', nullable: true, example: 0 },

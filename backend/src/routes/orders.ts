@@ -146,8 +146,8 @@ function orderForApi(order: any): any {
  *               customerPhone: "+375 29 123 45 67"
  *               delivery:
  *                 kind: pickup
- *                 providerId: pickup-dzerzhinsky-3b
- *                 label: Проспект Дзержинского 3б
+ *                 providerId: pickup-dzerzhinskogo-3b
+ *                 label: Проспект Дзержинского 3Б
  *                 cost: 0
  *               items:
  *                 - type: "58"

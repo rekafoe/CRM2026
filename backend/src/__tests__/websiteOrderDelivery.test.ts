@@ -8,14 +8,14 @@ describe('websiteOrderDelivery', () => {
   it('parses valid delivery', () => {
     const d = parseWebsiteOrderDelivery({
       kind: 'pickup',
-      providerId: 'pickup-dzerzhinsky-3b',
-      label: 'Проспект Дзержинского 3б',
-      address: 'г. Минск, пр. Дзержинского 3б',
+      providerId: 'pickup-dzerzhinskogo-3b',
+      label: 'Проспект Дзержинского 3Б',
+      address: 'г. Минск, пр. Дзержинского 3Б',
       cost: 0,
     })
-    expect(d?.providerId).toBe('pickup-dzerzhinsky-3b')
+    expect(d?.providerId).toBe('pickup-dzerzhinskogo-3b')
     expect(formatWebsiteDeliverySummary(d!)).toContain('Самовывоз')
-    expect(formatWebsiteDeliverySummary(d!)).toContain('пр. Дзержинского 3б')
+    expect(formatWebsiteDeliverySummary(d!)).toContain('пр. Дзержинского 3Б')
   })
 
   it('includes courier destination in summary', () => {

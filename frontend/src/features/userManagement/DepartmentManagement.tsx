@@ -81,7 +81,7 @@ export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBa
           <div>
             <h1 className="user-management-title">Точки / департаменты</h1>
             <p className="user-management-description">
-              Точки самовывоза и орг. подразделения. Код точки = id на сайте (OFFICE_PICKUP_POINTS).
+              Точки самовывоза и орг. подразделения. Код точки = pickupId филиала на сайте (сейчас pickup-dzerzhinskogo-3b и pickup-dzerzhinskogo-104).
             </p>
           </div>
         </div>
@@ -181,8 +181,8 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({ department, o
             <input type="text" value={name} onChange={e => setName(e.target.value)} required className="user-form-input" />
           </div>
           <div className="user-form-group">
-            <label className="user-form-label">Код (сайт / OFFICE_PICKUP_POINTS.id):</label>
-            <input type="text" value={code} onChange={e => setCode(e.target.value)} className="user-form-input" placeholder="pickup-gikalo" />
+            <label className="user-form-label">Код (сайт / pickupId филиала):</label>
+            <input type="text" value={code} onChange={e => setCode(e.target.value)} className="user-form-input" placeholder="pickup-dzerzhinskogo-3b" />
           </div>
           <div className="user-form-group">
             <label className="user-form-label">Адрес:</label>
