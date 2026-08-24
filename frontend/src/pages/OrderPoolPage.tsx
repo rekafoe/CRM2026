@@ -84,6 +84,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [departments, setDepartments] = useState<Department[]>([]);
   const [poolDepartmentId, setPoolDepartmentId] = useState<number | ''>('');
   const [poolDeptDefaultApplied, setPoolDeptDefaultApplied] = useState(false);
+  const poolDepartmentIdRef = useRef<number | ''>('');
   const [orderActivity, setOrderActivity] = useState<OrderActivityEvent[]>([]);
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -92,8 +93,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [filters, dispatchFilters] = useReducer(orderPoolFiltersReducer, initialOrderPoolFilters);
   const orderIdsRef = useRef<Set<number>>(new Set());
   const searchRequestSeqRef = useRef(0);
+  const fullLoadsInFlightRef = useRef(0);
   const activityRequestSeqRef = useRef(0);
   const activityOrderIdRef = useRef<number | null>(null);
+
+  poolDepartmentIdRef.current = poolDepartmentId;
 
   const getOrderTotal = useCallback((order: Order) => {
     return typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
@@ -131,16 +135,19 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         setOrders([]);
         setError(null);
         setSearchLoading(false);
+        setLoading(false);
         return;
       }
       try {
         if (useSoftLoading) {
           setSearchLoading(true);
         } else {
+          fullLoadsInFlightRef.current += 1;
           setLoading(true);
         }
+        const deptId = poolDepartmentIdRef.current;
         const deptParam =
-          poolDepartmentId === '' ? undefined : { department_id: poolDepartmentId };
+          deptId === '' ? undefined : { department_id: deptId };
         const res = canSearch
           ? await api.get<Order[]>('/orders/search', {
               params: { all: '1', light: '1', query, limit: '100', ...deptParam },
@@ -167,21 +174,26 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         logger.error('Failed to load orders for pool', err);
         setError('Не удалось загрузить заказы.');
       } finally {
-        if (requestSeq !== searchRequestSeqRef.current) return;
         if (useSoftLoading) {
-          setSearchLoading(false);
+          if (requestSeq === searchRequestSeqRef.current) {
+            setSearchLoading(false);
+          }
         } else {
-          setLoading(false);
+          fullLoadsInFlightRef.current = Math.max(0, fullLoadsInFlightRef.current - 1);
+          if (fullLoadsInFlightRef.current === 0) {
+            setLoading(false);
+          }
         }
       }
     },
-    [logger, poolDepartmentId],
+    [logger],
   );
 
   const refreshOrdersInBackground = useCallback(async () => {
     try {
+      const deptId = poolDepartmentIdRef.current;
       const deptParam =
-        poolDepartmentId === '' ? undefined : { department_id: poolDepartmentId };
+        deptId === '' ? undefined : { department_id: deptId };
       const res = await getOrders({ all: true, poolActiveOnly: true, light: true, limit: 150, ...deptParam });
       const list = res.data as Order[];
       const prevIds = orderIdsRef.current;
@@ -199,21 +211,41 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     } catch (err) {
       logger.error('Background refresh orders failed', err);
     }
-  }, [logger, toast, poolDepartmentId]);
+  }, [logger, toast]);
 
   useEffect(() => {
-    if (isInitialized) return;
-    loadOrders().then(() => setIsInitialized(true));
+    let cancelled = false;
+    (async () => {
+      let deptId: number | '' = '';
+      try {
+        const res = await getCurrentUser();
+        const raw = res.data?.department_id;
+        if (raw != null && Number(raw) > 0) {
+          deptId = Number(raw);
+        }
+      } catch {
+        // без отдела показываем все точки
+      }
+      if (cancelled) return;
+      poolDepartmentIdRef.current = deptId;
+      setPoolDepartmentId(deptId);
+      setPoolDeptDefaultApplied(true);
+      await loadOrders();
+      if (!cancelled) setIsInitialized(true);
+    })();
     getUsers()
       .then((res) => setAllUsers(res.data))
       .catch((err) => logger.error('Failed to load users', err));
     getDepartments()
       .then((res) => setDepartments(res.data ?? []))
       .catch(() => setDepartments([]));
-  }, [isInitialized, loadOrders, logger]);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadOrders, logger]);
 
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || !poolDeptDefaultApplied) return;
     void loadOrders({ activeOnly: true, soft: true });
   }, [poolDepartmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -236,19 +268,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         setAssignableAll([]);
       });
   }, [today]);
-
-  useEffect(() => {
-    if (poolDeptDefaultApplied) return;
-    getCurrentUser()
-      .then((res) => {
-        const deptId = res.data?.department_id;
-        if (deptId != null && Number(deptId) > 0) {
-          setPoolDepartmentId(Number(deptId));
-        }
-      })
-      .catch(() => undefined)
-      .finally(() => setPoolDeptDefaultApplied(true));
-  }, [poolDeptDefaultApplied]);
 
   const handleExecutorChange = useCallback(
     async (orderId: number, itemId: number, executor_user_id: number | null) => {
