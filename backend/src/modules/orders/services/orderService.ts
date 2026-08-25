@@ -936,9 +936,9 @@ export class OrderService {
       await db.run('BEGIN');
       const { order, itemIds } = await this.createOrderWithItemsTx(db, orderData);
       const deductionResult = await this.deductMaterialsForExistingOrder(order.id, orderData.userId);
-      if (!deductionResult.success) {
+      if (!deductionResult.success || deductionResult.errors.length > 0) {
         const err = new Error(
-          `Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`
+          `Ошибка автоматического списания: ${deductionResult.errors.join(', ') || 'неизвестная ошибка'}`
         );
         (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
         throw err;
