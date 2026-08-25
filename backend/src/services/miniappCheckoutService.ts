@@ -391,8 +391,10 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
   try {
     await db.run('BEGIN');
     const deductionResult = await OrderService.deductMaterialsForExistingOrder(orderId, undefined);
-    if (!deductionResult.success) {
-      const err = new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);
+    if (!deductionResult.success || deductionResult.errors.length > 0) {
+      const err = new Error(
+        `Ошибка автоматического списания: ${deductionResult.errors.join(', ') || 'неизвестная ошибка'}`,
+      );
       (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
       throw err;
     }
