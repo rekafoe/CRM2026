@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { logger } from '../utils/logger'
+import { isBePaidBasicAuthValid, mapBePaidStatus } from '../services/bepaidWebhookAuth'
 
 const router = Router()
 
@@ -23,18 +24,16 @@ type BePaidWebhookBody = {
   }
 }
 
-function mapBePaidStatus(raw: string): 'paid' | 'failed' | 'pending' | null {
-  const s = raw.toLowerCase()
-  if (s === 'successful' || s === 'paid' || s === 'success') return 'paid'
-  if (s === 'failed' || s === 'error' || s === 'declined' || s === 'expired') return 'failed'
-  if (s === 'pending' || s === 'incomplete' || s === 'in_progress') return 'pending'
-  return null
-}
-
 // POST /api/webhooks/bepaid — статус оплаты BePaid (checkout notification)
 router.post(
   '/bepaid',
   asyncHandler(async (req, res) => {
+    if (!isBePaidBasicAuthValid(req)) {
+      logger.warn('BePaid webhook: invalid or missing Basic Auth')
+      res.status(401).json({ message: 'Unauthorized' })
+      return
+    }
+
     const body = (req.body || {}) as BePaidWebhookBody
     const tx = body.transaction
     const gatewayPayment = body.checkout?.gateway_response?.payment
@@ -62,25 +61,42 @@ router.post(
 
     const db = await getDb()
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
-          paymentId,
-        )
+      ? await db.get<{
+          id: number
+          prepaymentAmount?: number | string | null
+          prepaymentStatus?: string | null
+        }>('SELECT id, prepaymentAmount, prepaymentStatus FROM orders WHERE paymentId = ?', paymentId)
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
-        trackingId,
-      )
+      order = await db.get<{
+        id: number
+        prepaymentAmount?: number | string | null
+        prepaymentStatus?: string | null
+      }>('SELECT id, prepaymentAmount, prepaymentStatus FROM orders WHERE number = ?', trackingId)
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
-          Number(trackingId),
-        )
+        order = await db.get<{
+          id: number
+          prepaymentAmount?: number | string | null
+          prepaymentStatus?: string | null
+        }>('SELECT id, prepaymentAmount, prepaymentStatus FROM orders WHERE id = ?', Number(trackingId))
       }
     }
     if (!order) {
       logger.warn('BePaid webhook: order not found', { paymentId, trackingId, statusRaw })
+      res.status(204).end()
+      return
+    }
+
+    const existingStatus = String(order.prepaymentStatus || '').toLowerCase()
+    const alreadyPaid = existingStatus === 'paid' || existingStatus === 'successful'
+
+    // Never downgrade a confirmed payment (expired/failed retries / replay must not wipe paid).
+    if (alreadyPaid && prepaymentStatus !== 'paid') {
+      logger.info('BePaid webhook: ignore non-paid status for already-paid order', {
+        orderId: order.id,
+        prepaymentStatus,
+        paymentId: paymentId || undefined,
+      })
       res.status(204).end()
       return
     }
@@ -121,13 +137,16 @@ router.post(
     } else if (prepaymentStatus === 'failed') {
       const sql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
-           paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
+           paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime')
+           WHERE id = ? AND LOWER(COALESCE(prepaymentStatus, '')) NOT IN ('paid', 'successful')`
         : `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
-           paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
+           paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime')
+           WHERE id = ? AND LOWER(COALESCE(prepaymentStatus, '')) NOT IN ('paid', 'successful')`
       await db.run(sql, paymentId || null, order.id)
     } else {
       const sql = `UPDATE orders SET prepaymentStatus = 'pending', paymentMethod = 'online',
-         paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
+         paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime')
+         WHERE id = ? AND LOWER(COALESCE(prepaymentStatus, '')) NOT IN ('paid', 'successful')`
       await db.run(sql, paymentId || null, order.id)
     }
 
