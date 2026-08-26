@@ -240,6 +240,56 @@ interface SimplifiedQtyTier {
   tier_prices?: number[];
 }
 
+/**
+ * Объёмная ступень: наибольший min_qty с quantity >= min_qty.
+ * Не опирается на max_qty = next.min - 1 — иначе дробные пог.м/м² (49.5) проваливаются
+ * в дыру между 49 и 50 и получают самую дорогую ставку.
+ */
+export function findSimplifiedVolumeTier(
+  tiers: SimplifiedQtyTier[],
+  quantity: number
+): SimplifiedQtyTier | null {
+  if (!tiers || tiers.length === 0) {
+    logger.warn('findTierForQuantity: tiers пустой', { quantity });
+    return null;
+  }
+
+  const qty = Number(quantity);
+  if (!Number.isFinite(qty)) {
+    return null;
+  }
+
+  const sortedTiers = [...tiers].sort((a, b) => {
+    if (b.min_qty !== a.min_qty) {
+      return b.min_qty - a.min_qty;
+    }
+    if (a.max_qty === undefined && b.max_qty === undefined) return 0;
+    if (a.max_qty === undefined) return 1;
+    if (b.max_qty === undefined) return -1;
+    return a.max_qty - b.max_qty;
+  });
+
+  for (const tier of sortedTiers) {
+    if (qty >= tier.min_qty) {
+      logger.debug('findTierForQuantity: найден диапазон', {
+        quantity: qty,
+        tier: { min_qty: tier.min_qty, max_qty: tier.max_qty, unit_price: tier.unit_price },
+      });
+      return tier;
+    }
+  }
+
+  // Ниже всех min — самая «стартовая» ступень (наименьший min_qty)
+  const lowest = [...tiers].sort((a, b) => a.min_qty - b.min_qty)[0] ?? null;
+  if (lowest) {
+    logger.warn('findTierForQuantity: quantity ниже всех min_qty, берём стартовую ступень', {
+      quantity: qty,
+      tier: { min_qty: lowest.min_qty, max_qty: lowest.max_qty, unit_price: lowest.unit_price },
+    });
+  }
+  return lowest;
+}
+
 function plotterRollFinItemTiersToSimplifiedQty(
   rows: Array<{ min_quantity: number; price_per_unit: number }> | undefined | null,
   legacyScalar: number | null | undefined,
@@ -1741,6 +1791,17 @@ export class SimplifiedPricingService {
           // Операции с price_unit=per_sheet: считаем по листам печати (или пог. м для рулонной). До резки обрабатываем целые листы.
           const isPerSheetOp = priceUnitFromDb === 'per_sheet';
           const isPerMeterOp = priceUnitFromDb === 'per_meter';
+          const isPerM2Op = priceUnitFromDb === 'per_m2';
+          const finishingLayoutMargins = {
+            edgeMm:
+              customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+                ? Number(customMarginMm)
+                : 0,
+            gapMm:
+              customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+                ? Number(customGapMm)
+                : 0,
+          };
           const meterBasis =
             variantId != null
               ? variantMeterBasisMap.get(variantId) ?? serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path'
@@ -1755,16 +1816,7 @@ export class SimplifiedPricingService {
                   trimMm: layoutTrim,
                   bleedMm: resolvedBleedMm,
                   quantity,
-                  margins: {
-                    edgeMm:
-                      customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
-                        ? Number(customMarginMm)
-                        : 0,
-                    gapMm:
-                      customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
-                        ? Number(customGapMm)
-                        : 0,
-                  },
+                  margins: finishingLayoutMargins,
                 },
                 fallbackMeters: materialMetersNeeded,
                 materialId: undefined,
@@ -1775,6 +1827,15 @@ export class SimplifiedPricingService {
               meterUnits = knifePathMetersTotal;
             }
           }
+          const m2Units = isPerM2Op
+            ? billedM2ForQuantity({
+                rollWidthMm: finishingRollWidthMmMap.get(mapKey),
+                trimMm: layoutTrim,
+                bleedMm: resolvedBleedMm,
+                quantity,
+                margins: finishingLayoutMargins,
+              })
+            : 0;
           const perSheetUnits = isPerSheetOp
             ? (isMaterialMeterBased ? materialMetersNeeded : sheetsNeeded)
             : 0;
@@ -1848,13 +1909,18 @@ export class SimplifiedPricingService {
             isPerMeterOp && limits ? Math.max(meterUnits, limits.min ?? 1) : meterUnits;
           const billedCutsForTier =
             priceUnit === 'per_cut' && limits ? Math.max(totalCutsForOrder, limits.min ?? 1) : totalCutsForOrder;
+          const billedM2ForTier =
+            isPerM2Op && limits ? Math.max(m2Units, limits.min ?? 0) : m2Units;
+          // per_m2: ступени в м² (как в превью), не по числу изделий
           const tierQty = isPerSheetOp
             ? billedPerSheetForTier
             : isPerMeterOp
               ? billedMeterForTier
               : priceUnit === 'per_cut'
                 ? billedCutsForTier
-                : quantity;
+                : isPerM2Op
+                  ? billedM2ForTier
+                  : quantity;
           const sidNum = Number(finConfig.service_id);
           const isPlotterMainCutSynthetic = sidNum === PLOTTER_FIN_ROLL || sidNum === PLOTTER_FIN_SHEET;
           const tierBracketQty =
@@ -1915,16 +1981,7 @@ export class SimplifiedPricingService {
                 trimMm: layoutTrim,
                 bleedMm: resolvedBleedMm,
                 quantity,
-                margins: {
-                  edgeMm:
-                    customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
-                      ? Number(customMarginMm)
-                      : 0,
-                  gapMm:
-                    customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
-                      ? Number(customGapMm)
-                      : 0,
-                },
+                margins: finishingLayoutMargins,
               },
               rate: effectivePriceForTier,
               serviceMinQty,
@@ -3093,57 +3150,16 @@ export class SimplifiedPricingService {
   }
 
   /**
-   * Находит подходящий диапазон тиража для заданного количества
+   * Находит подходящий диапазон тиража для заданного количества.
+   * Объёмные ступени: наибольший min_qty с quantity >= min_qty.
+   * max_qty из (next.min - 1) оставляем для UI; при дробных м/м² он даёт дыры
+   * (например 49.5 между 49 и 50) — на выбор ставки не опираемся.
    */
   private static findTierForQuantity(
     tiers: SimplifiedQtyTier[],
     quantity: number
   ): SimplifiedQtyTier | null {
-    if (!tiers || tiers.length === 0) {
-      logger.warn('findTierForQuantity: tiers пустой', { quantity });
-      return null;
-    }
-    
-    // Сортируем по min_qty (от большего к меньшему)
-    const sortedTiers = [...tiers].sort((a, b) => {
-      if (b.min_qty !== a.min_qty) {
-        return b.min_qty - a.min_qty;
-      }
-      // Если min_qty одинаковые, приоритет тем, у кого меньше max_qty
-      if (a.max_qty === undefined && b.max_qty === undefined) return 0;
-      if (a.max_qty === undefined) return 1;
-      if (b.max_qty === undefined) return -1;
-      return a.max_qty - b.max_qty;
-    });
-    
-    logger.debug('findTierForQuantity: поиск диапазона', {
-      quantity,
-      tiersCount: sortedTiers.length,
-      tiers: sortedTiers.map(t => ({ min_qty: t.min_qty, max_qty: t.max_qty, unit_price: t.unit_price }))
-    });
-    
-    for (const tier of sortedTiers) {
-      if (quantity >= tier.min_qty) {
-        if (tier.max_qty === undefined || quantity <= tier.max_qty) {
-          logger.debug('findTierForQuantity: найден диапазон', {
-            quantity,
-            tier: { min_qty: tier.min_qty, max_qty: tier.max_qty, unit_price: tier.unit_price }
-          });
-          return tier;
-        }
-      }
-    }
-    
-    // Если не нашли, возвращаем первый (самый дешёвый)
-    if (tiers.length > 0) {
-      logger.warn('findTierForQuantity: не найден подходящий диапазон, возвращаем первый', {
-        quantity,
-        firstTier: { min_qty: tiers[0].min_qty, max_qty: tiers[0].max_qty, unit_price: tiers[0].unit_price }
-      });
-      return tiers[0];
-    }
-    
-    return null;
+    return findSimplifiedVolumeTier(tiers, quantity);
   }
   
   /**

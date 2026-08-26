@@ -16,6 +16,7 @@ import {
 } from '../utils/miniappOrderNotes';
 import {
   MINIAPP_CHECKOUT_STATE_DRAFT,
+  MINIAPP_CHECKOUT_STATE_FINALIZING,
   MINIAPP_CHECKOUT_STATE_FINALIZED,
 } from '../utils/miniappCheckoutState';
 
@@ -390,6 +391,18 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
 
   try {
     await db.run('BEGIN');
+    // Atomic claim: only one concurrent finalize may proceed past this point.
+    const claim = await db.run(
+      `UPDATE orders SET miniapp_checkout_state = ?
+       WHERE id = ? AND telegram_chat_id = ?
+         AND (miniapp_checkout_state IS NULL OR miniapp_checkout_state = ?)`,
+      [MINIAPP_CHECKOUT_STATE_FINALIZING, orderId, telegramChatId, MINIAPP_CHECKOUT_STATE_DRAFT]
+    );
+    if (!claim || Number(claim.changes || 0) === 0) {
+      const err = new Error('Этот заказ уже оформлен');
+      (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_DRAFT';
+      throw err;
+    }
     const deductionResult = await OrderService.deductMaterialsForExistingOrder(orderId, undefined);
     if (!deductionResult.success) {
       const err = new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);

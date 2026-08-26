@@ -379,6 +379,12 @@ export async function claimEditorDraftsForCustomer(input: {
 export async function cleanupExpiredEditorDrafts(): Promise<{ deleted: number }> {
   await ensureEditorDraftOwnerColumns()
   const db = await getDb()
+  // Release crash-stuck finalize claims so the client can retry.
+  await db.run(
+    `UPDATE editor_drafts SET status = 'draft', updated_at = datetime('now')
+     WHERE status = 'finalizing'
+       AND datetime(updated_at) <= datetime('now', '-10 minutes')`,
+  )
   const expired = (await db.all(
     `SELECT id FROM editor_drafts
      WHERE status = 'draft'
@@ -572,6 +578,17 @@ export async function finalizeEditorDraft(
     throw new Error('customerName или customerPhone обязательны')
   }
 
+  const db = await getDb()
+  // Claim before createOrder so concurrent finalize cannot create two orders / double-spend.
+  const claim = await db.run(
+    `UPDATE editor_drafts SET status = 'finalizing', updated_at = datetime('now')
+     WHERE token = ? AND status = 'draft'`,
+    [token],
+  )
+  if (!claim || Number(claim.changes || 0) === 0) {
+    throw new Error('Draft уже финализирован')
+  }
+
   const draftPayload = draft.payloadParsed
   const draftMode = typeof draft.mode === 'string' ? draft.mode : 'single'
   const orderDesignState = readProductionDesignState(draftPayload)
@@ -615,17 +632,26 @@ export async function finalizeEditorDraft(
       },
     }]
 
-  const result = await OrderService.createOrderWithAutoDeduction({
-    customerName: input.customerName,
-    customerPhone: input.customerPhone,
-    customerEmail: input.customerEmail,
-    prepaymentAmount: input.prepaymentAmount,
-    customer_id: input.customer_id,
-    source: 'website',
-    items,
-  })
+  let result: Awaited<ReturnType<typeof OrderService.createOrderWithAutoDeduction>>
+  try {
+    result = await OrderService.createOrderWithAutoDeduction({
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      customerEmail: input.customerEmail,
+      prepaymentAmount: input.prepaymentAmount,
+      customer_id: input.customer_id,
+      source: 'website',
+      items,
+    })
+  } catch (err) {
+    await db.run(
+      `UPDATE editor_drafts SET status = 'draft', updated_at = datetime('now')
+       WHERE token = ? AND status = 'finalizing'`,
+      [token],
+    )
+    throw err
+  }
 
-  const db = await getDb()
   const draftFiles = await db.all<Array<{ filename: string; originalName: string | null; mime: string | null; size: number | null }>>(
     'SELECT filename, originalName, mime, size FROM editor_draft_files WHERE draft_id = ? ORDER BY id ASC',
     [draft.id],

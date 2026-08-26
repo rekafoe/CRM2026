@@ -170,6 +170,12 @@ function isPoolSyncPath(req: Request): boolean {
   return /\/orders\/pool-sync\/?$/.test(pathname)
 }
 
+/** Mini App session (mapp1.*) is only valid under /api/miniapp — never elevates to CRM routes. */
+function isMiniAppApiPath(req: Request): boolean {
+  const pathname = getAuthPathname(req)
+  return pathname === '/api/miniapp' || pathname.startsWith('/api/miniapp/')
+}
+
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   // Пересчёт ЗП: всегда пропускаем запрос в обработчик (авторизация там: admin или secret)
   const isRecalcPath = req.path.endsWith('/earnings/recalculate') || req.path === '/earnings/recalculate'
@@ -202,9 +208,12 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     if (token) {
       try {
         if (isMiniAppBearerToken(token)) {
-          const p = verifyMiniAppSession(token)
-          if (p) {
-            ;(req as AuthenticatedRequest).miniApp = { telegramUserId: p.sub }
+          // Не поднимаем miniApp-сессию на публичных CRM/сайт путях — только /api/miniapp/*.
+          if (isMiniAppApiPath(req)) {
+            const p = verifyMiniAppSession(token)
+            if (p) {
+              ;(req as AuthenticatedRequest).miniApp = { telegramUserId: p.sub }
+            }
           }
         } else {
           const user = await resolveUserByApiToken(token)
@@ -228,6 +237,10 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   }
 
   if (isMiniAppBearerToken(token)) {
+    if (!isMiniAppApiPath(req)) {
+      res.status(401).json({ message: 'Unauthorized' })
+      return
+    }
     const p = verifyMiniAppSession(token)
     if (p) {
       ;(req as AuthenticatedRequest).miniApp = { telegramUserId: p.sub }

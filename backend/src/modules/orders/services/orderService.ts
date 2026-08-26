@@ -434,18 +434,29 @@ export class OrderService {
       ['customerEmail', customerEmail || null],
       ['prepaymentAmount', initialPrepay],
     ]
-    if (initialPrepay > 0) {
-      insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', paymentMethodHint === 'online' ? 'online' : 'offline'])
-    } else if (paymentMethodHint === 'online') {
+    const remoteCheckout = source === 'website' || source === 'mini_app'
+    // Website/miniapp: prepaymentAmount is expected/cart total, NOT proof of payment.
+    // Online always stays pending until BePaid webhook / confirm-prepayment.
+    // CRM: positive prepaymentAmount means cash already taken → paid.
+    if (paymentMethodHint === 'online' || (remoteCheckout && initialPrepay > 0 && paymentMethodHint !== 'offline')) {
       insertFields.push(['prepaymentStatus', 'pending'], ['paymentMethod', 'online'])
+    } else if (initialPrepay > 0 && !remoteCheckout) {
+      insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', 'offline'])
     } else if (paymentMethodHint === 'offline') {
       // Явно NULL: колонка orders.paymentMethod имеет DEFAULT 'online'
+      insertFields.push(['paymentMethod', null])
+    } else if (remoteCheckout && initialPrepay > 0) {
+      // COD / offline remote: keep amount, never mark paid at create
       insertFields.push(['paymentMethod', null])
     }
     if (hasPrepaymentUpdatedAt) {
       insertFields.push([
         'prepaymentUpdatedAt',
-        initialPrepay > 0 || paymentMethodHint === 'online' ? createdAt : null,
+        paymentMethodHint === 'online' || (remoteCheckout && initialPrepay > 0)
+          ? createdAt
+          : initialPrepay > 0 && !remoteCheckout
+            ? createdAt
+            : null,
       ])
     }
     insertFields.push(
@@ -1865,6 +1876,26 @@ export class OrderService {
         reason: reasonText,
         userId
       })
+      // Restore net auto-deduction write-offs (website/miniapp spend-at-create).
+      // Use material_moves so we reverse what was actually spent, not product_materials guesses.
+      const netMoves = (await db.all(
+        `SELECT material_id AS materialId, COALESCE(SUM(delta), 0) AS net
+         FROM material_moves
+         WHERE order_id = ?
+         GROUP BY material_id`,
+        [id]
+      )) as Array<{ materialId: number; net: number }>
+      for (const row of Array.isArray(netMoves) ? netMoves : []) {
+        const net = Number(row.net) || 0
+        if (net >= 0) continue
+        await MaterialTransactionService.addInTransaction(db, {
+          materialId: Number(row.materialId),
+          quantity: Math.abs(net),
+          reason: `Отмена списания при soft-cancel заказа ${id}`,
+          orderId: id,
+          userId,
+        })
+      }
       if (hasIsCancelled) {
         try {
           await db.run(
@@ -1942,52 +1973,18 @@ export class OrderService {
       throw new Error('Удалить из базы можно только отменённый заказ. Сначала отмените заказ.')
     }
 
-    const items = (await db.all<{
-      id: number
-      type: string
-      params: string
-      quantity: number
-    }>(
-      'SELECT id, type, params, quantity FROM items WHERE orderId = ?',
-      [id]
-    )) as unknown as Array<{ id: number; type: string; params: string; quantity: number }>
-
     const returns: Record<number, number> = {}
-    const hasRulesTable = !!(await db.get(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'"
-    ))
-    const hasLegacyPresetSchema = await hasColumn('product_materials', 'presetCategory')
-    for (const item of items) {
-      const paramsObj = JSON.parse(item.params || '{}') as { description?: string }
-      let composition: Array<{ materialId: number; qtyPerItem: number; unit?: string | null }> = []
-      if (hasRulesTable) {
-        composition = (await db.all<{
-          materialId: number
-          qtyPerItem: number
-          unit?: string | null
-        }>(
-          `SELECT pmr.material_id as materialId, pmr.qty_per_item as qtyPerItem, m.unit
-           FROM product_material_rules
-           JOIN materials m ON m.id = pmr.material_id
-           WHERE product_type = ? AND product_name = ?`,
-          [item.type, paramsObj.description || '']
-        )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
-      } else if (hasLegacyPresetSchema) {
-        composition = (await db.all<{
-          materialId: number
-          qtyPerItem: number
-          unit?: string | null
-        }>(
-          `SELECT pm.materialId, pm.qtyPerItem, m.unit
-           FROM product_materials pm
-           JOIN materials m ON m.id = pm.materialId
-           WHERE pm.presetCategory = ? AND pm.presetDescription = ?`,
-          [item.type, paramsObj.description || '']
-        )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
-      }
-      for (const c of composition) {
-        const add = OrderService.computeRequiredQty(c.qtyPerItem || 0, Math.max(1, Number(item.quantity) || 1), c.unit)
-        returns[c.materialId] = (returns[c.materialId] || 0) + add
+    const netMoves = (await db.all(
+      `SELECT material_id AS materialId, COALESCE(SUM(delta), 0) AS net
+       FROM material_moves
+       WHERE order_id = ?
+       GROUP BY material_id`,
+      [id]
+    )) as Array<{ materialId: number; net: number }>
+    for (const row of Array.isArray(netMoves) ? netMoves : []) {
+      const net = Number(row.net) || 0
+      if (net < 0) {
+        returns[Number(row.materialId)] = Math.abs(net)
       }
     }
 

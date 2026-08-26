@@ -425,6 +425,11 @@ export class OrderController {
       return
     }
 
+    if (String(row.source || '') !== 'website') {
+      res.status(403).json({ error: 'confirm-prepayment разрешён только для заказов source=website' })
+      return
+    }
+
     const orderId = row.id
 
     let hasPrepaymentUpdatedAt = false
@@ -433,6 +438,13 @@ export class OrderController {
     } catch {
       hasPrepaymentUpdatedAt = false
     }
+
+    const current = await db.get<{
+      prepaymentStatus?: string | null
+      prepaymentAmount?: number | string | null
+    }>('SELECT prepaymentStatus, prepaymentAmount FROM orders WHERE id = ?', orderId)
+    const existingStatus = String(current?.prepaymentStatus || '').toLowerCase()
+    const alreadyPaid = existingStatus === 'paid' || existingStatus === 'successful'
 
     const isSuccessful = paymentStatus === 'successful' || paymentStatus === 'paid'
 
@@ -455,11 +467,24 @@ export class OrderController {
     }
 
     if (paymentStatus === 'failed') {
+      // Do not wipe a confirmed payment (late failed / duplicate webhook).
+      if (alreadyPaid) {
+        res.json({
+          ok: true,
+          skipped: true,
+          paymentStatus: 'failed',
+          reason: 'already_paid',
+          prepaymentAmount: current?.prepaymentAmount ?? null,
+        })
+        return
+      }
       const updateSql = hasPrepaymentUpdatedAt
-        ? `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
-           paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-        : `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
-           paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+        ? `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
+           paymentId = ?, updated_at = datetime('now','localtime')
+           WHERE id = ? AND LOWER(COALESCE(prepaymentStatus, '')) NOT IN ('paid', 'successful')`
+        : `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
+           paymentId = ?, updated_at = datetime('now','localtime')
+           WHERE id = ? AND LOWER(COALESCE(prepaymentStatus, '')) NOT IN ('paid', 'successful')`
       await db.run(updateSql, paymentId, orderId)
       res.json({ ok: true, skipped: false, paymentStatus: 'failed' })
       return
