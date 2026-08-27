@@ -13,25 +13,10 @@ import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
-
-function isMeterUnit(unitRaw: unknown): boolean {
-  const unit = String(unitRaw || '').trim().toLowerCase();
-  return unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
-}
-
-function computeRequiredQuantityForReservation(
-  qtyPerItemRaw: unknown,
-  orderQtyRaw: unknown,
-  unitRaw?: unknown
-): number {
-  const qtyPerItem = Math.max(0, Number(qtyPerItemRaw) || 0);
-  const orderQty = Math.max(1, Number(orderQtyRaw) || 1);
-  const total = qtyPerItem * orderQty;
-  if (isMeterUnit(unitRaw)) {
-    return Math.round(total * 100) / 100;
-  }
-  return Math.ceil(total);
-}
+import {
+  computeRequiredQuantityForReservation,
+  syncItemReservationsForQuantity,
+} from '../services/orderItemReservationSync'
 
 export class OrderItemController {
   static async addItem(req: Request, res: Response) {
@@ -718,49 +703,21 @@ export class OrderItemController {
 
       await db.run('BEGIN')
       try {
+        let syncedComponents: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> | null = null
         if (deltaQty !== 0) {
           const paramsObj = JSON.parse(existing.params || '{}') as { description?: string; components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> }
           const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
 
           if (components.length > 0) {
-            if (deltaQty > 0) {
-              // Дозарезервировать недостающий объём
-              const componentMaterialIds = components
-                .map((c) => Number(c.materialId))
-                .filter((id) => Number.isFinite(id) && id > 0);
-              let componentUnitsMap = new Map<number, string | null>();
-              if (componentMaterialIds.length > 0) {
-                const unitRows = await db.all<Array<{ id: number; unit?: string | null }>>(
-                  `SELECT id, unit FROM materials WHERE id IN (${componentMaterialIds.map(() => '?').join(',')})`,
-                  componentMaterialIds
-                );
-                unitRows.forEach((row) => componentUnitsMap.set(Number(row.id), row.unit ?? null));
-              }
-              const reservationsPayload = components.map(c => ({
-                material_id: Number(c.materialId),
-                quantity: computeRequiredQuantityForReservation(
-                  Math.max(0, Number(c.qtyPerItem) || 0),
-                  deltaQty,
-                  componentUnitsMap.get(Number(c.materialId))
-                ),
-                order_id: orderId,
-                reason: 'order update qty +'
-              })).filter(r => r.quantity > 0)
-              if (reservationsPayload.length > 0) {
-                const newReservations = await UnifiedWarehouseService.reserveMaterials(reservationsPayload)
-                // дописывать reservationId не требуется для существующей позиции; подтверждение произойдёт по id из components + новые вернутся отдельно при дальнейшем апдейте
-                // опционально можно хранить массив reservationIds на уровне позиции в будущем
-              }
-            } else {
-              // Снизили количество — отменяем часть резервов пропорционально
-              const toCancel: number[] = []
-              for (const c of components) {
-                if (c.reservationId) toCancel.push(c.reservationId)
-              }
-              if (toCancel.length > 0) {
-                await UnifiedWarehouseService.cancelReservations(toCancel)
-              }
-            }
+            // Полная пересинхронизация холдов на newQuantity (и +, и −).
+            // Раньше при снижении qty отменялись ВСЕ резервы без нового холда →
+            // «Принят в работу» ничего не списывал.
+            syncedComponents = await syncItemReservationsForQuantity(db, {
+              orderId,
+              components,
+              newQuantity,
+              reason: deltaQty > 0 ? 'order update qty +' : 'order update qty -',
+            })
           } else {
             // Старые записи без компонентов/резервов — fallback к прежней логике движений склада
             const composition = (await db.all<{
@@ -860,6 +817,9 @@ export class OrderItemController {
         if (totalCostFromClient != null) {
           paramsPatch.storedTotalCost = totalCostFromClient
           paramsPatch.priceLockedByCalculator = true
+        }
+        if (syncedComponents != null) {
+          paramsPatch.components = syncedComponents
         }
         if (Object.keys(paramsPatch).length > 0) {
           paramsJson = JSON.stringify({ ...existingParams, ...paramsPatch })
