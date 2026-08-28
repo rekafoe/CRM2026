@@ -13,6 +13,7 @@ import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
+import { releaseItemReservationsOnDelete } from '../services/orderItemReservationRelease'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -531,14 +532,19 @@ export class OrderItemController {
 
       await db.run('BEGIN')
       try {
-        // Если у компонентов есть reservationId — отменяем резервы
+        // Резервы/возврат — только внутри этой транзакции (без вложенного BEGIN).
         const reservationIds = components
           .map(c => c.reservationId)
           .filter((id): id is number => typeof id === 'number' && id > 0)
         if (reservationIds.length > 0) {
-          await UnifiedWarehouseService.cancelReservations(reservationIds)
+          await releaseItemReservationsOnDelete(db, {
+            orderId,
+            reservationIds,
+            userId: authUser?.id,
+            reason: 'order delete item',
+          })
         } else if ((paramsObj as any).description) {
-          // Старые записи без резервов — выполняем возврат на склад по составу из product_materials
+          // Старые записи без резервов — возврат на склад по составу из product_materials
           const composition = (await db.all<{
             materialId: number
             qtyPerItem: number
@@ -559,7 +565,7 @@ export class OrderItemController {
               c.unit
             )
             if (returnQty > 0) {
-              await MaterialTransactionService.return({
+              await MaterialTransactionService.addInTransaction(db, {
                 materialId: c.materialId,
                 quantity: returnQty,
                 reason: 'order delete item',
