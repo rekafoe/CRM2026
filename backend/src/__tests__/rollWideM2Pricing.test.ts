@@ -43,6 +43,28 @@ describe('rollWideM2PricingService helpers', () => {
     expect(result.minChargeApplied).toBe(false)
   })
 
+  it('tierM2Override выбирает ступень по группе, а биллит только м² позиции', () => {
+    const alone = calculateRollWideM2Price({
+      trimWidthMm: 1000,
+      trimHeightMm: 1000,
+      quantity: 1,
+      rates: { ...baseRates, min_charge: 0 },
+    })
+    expect(alone.ratePerM2).toBe(20)
+    expect(alone.printPrice).toBeCloseTo(20, 2)
+
+    const grouped = calculateRollWideM2Price({
+      trimWidthMm: 1000,
+      trimHeightMm: 1000,
+      quantity: 1,
+      rates: { ...baseRates, min_charge: 0 },
+      tierM2Override: 2.4,
+    })
+    expect(grouped.totalM2).toBeCloseTo(1, 5)
+    expect(grouped.ratePerM2).toBe(18)
+    expect(grouped.printPrice).toBeCloseTo(18, 2)
+  })
+
   it('calculateRollWideM2Price falls back to base color rate when tiers are absent', () => {
     const result = calculateRollWideM2Price({
       trimWidthMm: 1000,
