@@ -1614,24 +1614,33 @@ export class OrderService {
         const oldStatusId = Number(prevRow?.status ?? 0);
         // Статус 5 в order_statuses = «Передан в ПВЗ», не отмена. Запись в order_cancellation_events
         // только при deleteOrder (handleDeleteOrder). Отмена через статус не используется.
+
+        // Резервы подтверждаем ДО смены статуса: иначе при ошибке списания заказ
+        // остаётся «Принят в работу» без write-off (и просроченный hold нельзя списывать).
+        const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
+        if (inWorkId != null && targetStatus === Number(inWorkId)) {
+          const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
+          const nowIso = new Date().toISOString()
+          const held = reservations.filter((r) => r.status === 'reserved')
+          const reservationIds = held
+            .filter((r) => !UnifiedWarehouseService.isReservationExpired(r.expires_at, nowIso))
+            .map((r) => r.id)
+          if (held.length > 0 && reservationIds.length === 0) {
+            throw new Error(
+              'Резерв материалов по заказу истёк. Создайте новый резерв перед принятием в работу.'
+            )
+          }
+          if (reservationIds.length > 0) {
+            await UnifiedWarehouseService.confirmReservations(reservationIds)
+          }
+        }
+
         // Обновляем обычный заказ
         try {
           await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [targetStatus, id])
         } catch {
           // На некоторых схемах есть только updated_at
           await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [targetStatus, id])
-        }
-
-        // Если статус "Принят в работу", подтверждаем резервы по заказу
-        const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
-        if (inWorkId != null && targetStatus === Number(inWorkId)) {
-          const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
-          const reservationIds = reservations
-            .filter(r => r.status === 'reserved')
-            .map(r => r.id)
-          if (reservationIds.length > 0) {
-            await UnifiedWarehouseService.confirmReservations(reservationIds)
-          }
         }
 
         const newStatusId = targetStatus;
