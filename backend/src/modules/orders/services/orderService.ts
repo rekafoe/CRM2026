@@ -2067,35 +2067,54 @@ export class OrderService {
     // Создаём новый заказ
     const newOrderNumber = `${originalOrder.number}-COPY-${Date.now()}`
     const createdAt = getCurrentTimestamp()
-    
-    const newOrderResult = await db.run(
-      'INSERT INTO orders (number, status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentStatus, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [newOrderNumber, 1, createdAt, originalOrder.customerName, originalOrder.customerPhone, originalOrder.customerEmail, null, null, (originalOrder as any).source || 'crm']
-    )
+    const { rebindDuplicatedItemReservations } = await import('./orderDuplicateReservations')
 
-    const newOrderId = (newOrderResult as any).lastID
-
-    // Копируем позиции
-    const originalItems = await db.all<any>('SELECT * FROM items WHERE orderId = ?', [originalOrderId])
-    for (const item of originalItems) {
-      await db.run(
-        'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [newOrderId, item.type, typeof item.params === 'string' ? item.params : JSON.stringify(item.params), item.price, item.quantity, item.printerId, item.sides, item.sheets, item.waste, item.clicks]
+    await db.run('BEGIN')
+    try {
+      const newOrderResult = await db.run(
+        'INSERT INTO orders (number, status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentStatus, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [newOrderNumber, 1, createdAt, originalOrder.customerName, originalOrder.customerPhone, originalOrder.customerEmail, null, null, (originalOrder as any).source || 'crm']
       )
-    }
 
-    // Получаем созданный заказ с позициями
-    const newOrder = await db.get<any>('SELECT * FROM orders WHERE id = ?', [newOrderId])
-    const newItems = await db.all<any>('SELECT * FROM items WHERE orderId = ?', [newOrderId])
+      const newOrderId = (newOrderResult as any).lastID
 
-    if (newOrder) {
-      newOrder.items = newItems.map((item: any) => ({
-        ...item,
-        params: typeof item.params === 'string' ? JSON.parse(item.params) : item.params
-      }))
-      return OrderService.orderForApi(newOrder)
+      // Копируем позиции; reservationId оригинала не переносим — создаём свежие холды на копию.
+      const originalItems = await db.all<any>('SELECT * FROM items WHERE orderId = ?', [originalOrderId])
+      for (const item of originalItems) {
+        const reboundParams = await rebindDuplicatedItemReservations(db, {
+          orderId: newOrderId,
+          paramsRaw: item.params,
+          quantity: Number(item.quantity) || 1,
+          reason: 'reserve for duplicated order',
+        })
+        await db.run(
+          'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [newOrderId, item.type, reboundParams, item.price, item.quantity, item.printerId, item.sides, item.sheets, item.waste, item.clicks]
+        )
+      }
+
+      await db.run('COMMIT')
+
+      // Получаем созданный заказ с позициями
+      const newOrder = await db.get<any>('SELECT * FROM orders WHERE id = ?', [newOrderId])
+      const newItems = await db.all<any>('SELECT * FROM items WHERE orderId = ?', [newOrderId])
+
+      if (newOrder) {
+        newOrder.items = newItems.map((item: any) => ({
+          ...item,
+          params: typeof item.params === 'string' ? JSON.parse(item.params) : item.params
+        }))
+        return OrderService.orderForApi(newOrder)
+      }
+      return newOrder
+    } catch (error) {
+      try {
+        await db.run('ROLLBACK')
+      } catch {
+        // ignore
+      }
+      throw error
     }
-    return newOrder
   }
 
   static async addOrderItem(orderId: number, itemData: any) {
