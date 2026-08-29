@@ -133,6 +133,16 @@ export function resolveWarehouseFeedMeters(params: {
   };
 }
 
+/**
+ * Склад для отделки price_unit=per_meter + meter_basis=feed при consumption_mode=fixed.
+ * filmFeedMeters уже посчитан по ширине плёнки отделки — нельзя раздувать до метров
+ * материала печати (иначе при более широкой плёнке склад списывает лишнее).
+ */
+export function resolvePerMeterFeedFixedWarehouseMeters(filmFeedMeters: number): number {
+  const meters = Number(filmFeedMeters);
+  return Number.isFinite(meters) && meters > 0 ? meters : 0;
+}
+
 function parsePositiveWidth(sheetWidth?: number | null, printableWidth?: number | null): number | null {
   const w = Number(sheetWidth ?? printableWidth ?? 0);
   return Number.isFinite(w) && w > 0 ? w : null;
