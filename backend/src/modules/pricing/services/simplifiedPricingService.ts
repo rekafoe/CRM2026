@@ -110,6 +110,27 @@ function normalizeFinishingPriceUnit(raw: unknown, fallback: string = 'per_item'
   return ALLOWED_FINISHING_PRICE_UNITS.has(v) ? v : fallback;
 }
 
+/** fixed / per_order — разовая цена за заказ (упаковка, доставка, дизайн), не × тираж. */
+export function isOncePerOrderFinishingPriceUnit(priceUnit: string): boolean {
+  return priceUnit === 'fixed' || priceUnit === 'per_order';
+}
+
+/**
+ * Биллируемые единицы отделки для price_unit без специальной ветки (не per_sheet/meter/cut/m2).
+ * per_item: тираж × units_per_item; fixed/per_order: только units_per_item (обычно 1).
+ */
+export function resolveFinishingOrderRawUnits(
+  priceUnit: string,
+  quantity: number,
+  unitsPerItem?: number | null,
+): number {
+  const units = unitsPerItem ?? 1;
+  if (isOncePerOrderFinishingPriceUnit(priceUnit)) {
+    return Math.max(Number(units) || 1, 1);
+  }
+  return quantity * (Number.isFinite(Number(units)) ? Number(units) : 1);
+}
+
 export interface SimplifiedPricingResult {
   productId: number;
   productName: string;
@@ -1891,7 +1912,8 @@ export class SimplifiedPricingService {
             Number(finConfig.service_id) === PLOTTER_FIN_ROLL ? rollPlotterCutLevelMultiplier : 1;
           const effectivePriceForTier = priceForTier * plotterRollMul;
           const serviceMinQty = limits?.min ?? 0;
-          // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на позицию (units_per_item); иначе — тираж × units_per_item (per_item и др.)
+          // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на позицию (units_per_item);
+          // fixed/per_order: разовая цена за заказ; иначе (per_item) — тираж × units_per_item
 
           let servicePrice = 0;
           let totalUnits: number;
@@ -1963,8 +1985,13 @@ export class SimplifiedPricingService {
               servicePrice,
             });
             continue;
+          } else if (isOncePerOrderFinishingPriceUnit(priceUnit)) {
+            rawUnits = resolveFinishingOrderRawUnits(priceUnit, quantity, unitsPerItem);
+            totalUnits = Math.max(rawUnits, serviceMinQty);
+            servicePrice = effectivePriceForTier * totalUnits;
           } else {
-            rawUnits = quantity * (unitsPerItem ?? 1);
+            // per_item (и неизвестные → per_item): тираж × units_per_item
+            rawUnits = resolveFinishingOrderRawUnits(priceUnit, quantity, unitsPerItem);
             totalUnits = rawUnits;
             servicePrice = effectivePriceForTier * totalUnits;
           }
@@ -2956,8 +2983,11 @@ export class SimplifiedPricingService {
           finishingPrice += effectiveTierPrice * Math.max(totalCutsForOrder, serviceMinQty);
         } else if (priceUnit === 'per_m2') {
           finishingPrice += effectiveTierPrice * Math.max(m2Units, serviceMinQty);
+        } else if (isOncePerOrderFinishingPriceUnit(priceUnit)) {
+          const onceUnits = resolveFinishingOrderRawUnits(priceUnit, q, unitsPerItem);
+          finishingPrice += effectiveTierPrice * Math.max(onceUnits, serviceMinQty);
         } else {
-          finishingPrice += effectiveTierPrice * (q * (unitsPerItem ?? 1));
+          finishingPrice += effectiveTierPrice * resolveFinishingOrderRawUnits(priceUnit, q, unitsPerItem);
         }
       }
 
