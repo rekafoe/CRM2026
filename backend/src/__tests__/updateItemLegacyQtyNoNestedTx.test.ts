@@ -30,7 +30,12 @@ describe('updateItem legacy path nested transaction guard', () => {
         reason: 'nested spend should fail',
       }),
     ).rejects.toThrow(/transaction within a transaction/i)
-    await db.run('ROLLBACK')
+    // withTransaction ROLLBACK on nested BEGIN also aborts the outer tx
+    try {
+      await db.run('ROLLBACK')
+    } catch {
+      /* no active transaction */
+    }
 
     await db.run('BEGIN')
     await MaterialTransactionService.spendInTransaction(db, {
