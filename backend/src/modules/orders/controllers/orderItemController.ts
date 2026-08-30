@@ -200,6 +200,31 @@ export class OrderItemController {
               reason: payload.reason
             })
           }
+
+          // Заказ уже «Принят в работу»: confirmReservations вызывается только при смене статуса,
+          // поэтому новые холды иначе никогда не списываются. Списываем в той же транзакции.
+          const inWorkRow = await db.get<{ id: number }>(
+            `SELECT id FROM order_statuses WHERE lower(trim(name)) = lower(trim(?)) LIMIT 1`,
+            ['Принят в работу']
+          )
+          const inWorkId = inWorkRow?.id != null ? Number(inWorkRow.id) : null
+          if (inWorkId != null && orderStatus === inWorkId && reservations.length > 0) {
+            for (const r of reservations) {
+              if (!(Number(r.quantity) > 0) || !(Number(r.material_id) > 0)) continue
+              await MaterialTransactionService.spendInTransaction(db, {
+                materialId: Number(r.material_id),
+                quantity: Number(r.quantity),
+                reason: 'Списание по заказу (позиция добавлена в работу)',
+                orderId,
+                userId: authUser?.id
+              })
+              await db.run(
+                `UPDATE material_reservations SET status = 'fulfilled' WHERE id = ?`,
+                [r.id]
+              )
+              r.status = 'confirmed'
+            }
+          }
         }
 
         const clicks = computeClicks(sheets, sides)
@@ -724,7 +749,7 @@ export class OrderItemController {
 
           if (components.length > 0) {
             if (deltaQty > 0) {
-              // Дозарезервировать недостающий объём
+              // Дозарезервировать недостающий объём (inline — без nested BEGIN из reserveMaterials)
               const componentMaterialIds = components
                 .map((c) => Number(c.materialId))
                 .filter((id) => Number.isFinite(id) && id > 0);
@@ -746,10 +771,41 @@ export class OrderItemController {
                 order_id: orderId,
                 reason: 'order update qty +'
               })).filter(r => r.quantity > 0)
-              if (reservationsPayload.length > 0) {
-                const newReservations = await UnifiedWarehouseService.reserveMaterials(reservationsPayload)
-                // дописывать reservationId не требуется для существующей позиции; подтверждение произойдёт по id из components + новые вернутся отдельно при дальнейшем апдейте
-                // опционально можно хранить массив reservationIds на уровне позиции в будущем
+              for (const payload of reservationsPayload) {
+                const material = await db.get<{ quantity: number; name: string }>(
+                  'SELECT quantity, name FROM materials WHERE id = ?',
+                  [payload.material_id]
+                )
+                if (!material) {
+                  throw new Error(`Материал с ID ${payload.material_id} не найден`)
+                }
+                const now = new Date().toISOString()
+                const existingHold = await db.get<{ reserved: number }>(`
+                  SELECT COALESCE(SUM(quantity_reserved), 0) as reserved
+                  FROM material_reservations
+                  WHERE material_id = ? AND status = 'active'
+                    AND (expires_at IS NULL OR expires_at > ?)
+                `, [payload.material_id, now])
+                const reserved = existingHold?.reserved || 0
+                const available = material.quantity - reserved
+                if (available < payload.quantity) {
+                  throw new Error(
+                    `Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${payload.quantity}`
+                  )
+                }
+                const expiresAt = new Date()
+                expiresAt.setHours(expiresAt.getHours() + 24)
+                await db.run(`
+                  INSERT INTO material_reservations
+                  (material_id, order_id, quantity_reserved, status, notes, expires_at)
+                  VALUES (?, ?, ?, 'active', ?, ?)
+                `,
+                  payload.material_id,
+                  payload.order_id || null,
+                  payload.quantity,
+                  payload.reason || 'Резерв для заказа',
+                  expiresAt.toISOString()
+                )
               }
             } else {
               // Снизили количество — отменяем часть резервов пропорционально
@@ -758,6 +814,7 @@ export class OrderItemController {
                 if (c.reservationId) toCancel.push(c.reservationId)
               }
               if (toCancel.length > 0) {
+                // cancelReservations не открывает BEGIN — безопасно внутри нашей tx
                 await UnifiedWarehouseService.cancelReservations(toCancel)
               }
             }
@@ -785,7 +842,8 @@ export class OrderItemController {
                   c.unit
                 )
                 if (need > 0) {
-                  await MaterialTransactionService.spend({
+                  // Внутри уже открытого BEGIN — без withTransaction/spend()
+                  await MaterialTransactionService.spendInTransaction(db, {
                     materialId: c.materialId,
                     quantity: need,
                     reason: 'order update qty +',
@@ -802,7 +860,7 @@ export class OrderItemController {
                   c.unit
                 )
                 if (back > 0) {
-                  await MaterialTransactionService.return({
+                  await MaterialTransactionService.addInTransaction(db, {
                     materialId: c.materialId,
                     quantity: back,
                     reason: 'order update qty -',
