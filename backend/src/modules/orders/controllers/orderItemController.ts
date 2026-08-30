@@ -728,6 +728,18 @@ export class OrderItemController {
       )
       if (!existing) { res.status(404).json({ message: 'Позиция не найдена' }); return }
 
+      const orderMeta = await db.get<{ status: number }>(
+        'SELECT status FROM orders WHERE id = ?',
+        [orderId]
+      )
+      const orderStatus = Number(orderMeta?.status)
+      const inWorkRow = await db.get<{ id: number }>(
+        `SELECT id FROM order_statuses WHERE lower(trim(name)) = lower(trim(?)) LIMIT 1`,
+        ['Принят в работу']
+      )
+      const inWorkId = inWorkRow?.id != null ? Number(inWorkRow.id) : null
+      const orderAlreadyInWork = inWorkId != null && orderStatus === inWorkId
+
       let previousExecutorUserId: number | null = null
       if (hasExecutorUserIdEarly) {
         const rawPrev = (existing as any).executor_user_id
@@ -740,6 +752,7 @@ export class OrderItemController {
         body.price = Math.round((totalCostFromClient / newQuantity) * 100) / 100
       }
       const deltaQty = newQuantity - (existing.quantity ?? 1)
+      const authUser = (req as AuthenticatedRequest).user
 
       await db.run('BEGIN')
       try {
@@ -771,6 +784,7 @@ export class OrderItemController {
                 order_id: orderId,
                 reason: 'order update qty +'
               })).filter(r => r.quantity > 0)
+              const createdHolds: Array<{ id: number; material_id: number; quantity: number }> = []
               for (const payload of reservationsPayload) {
                 const material = await db.get<{ quantity: number; name: string }>(
                   'SELECT quantity, name FROM materials WHERE id = ?',
@@ -795,7 +809,7 @@ export class OrderItemController {
                 }
                 const expiresAt = new Date()
                 expiresAt.setHours(expiresAt.getHours() + 24)
-                await db.run(`
+                const insertResult = await db.run(`
                   INSERT INTO material_reservations
                   (material_id, order_id, quantity_reserved, status, notes, expires_at)
                   VALUES (?, ?, ?, 'active', ?, ?)
@@ -806,16 +820,74 @@ export class OrderItemController {
                   payload.reason || 'Резерв для заказа',
                   expiresAt.toISOString()
                 )
+                createdHolds.push({
+                  id: Number(insertResult.lastID) || 0,
+                  material_id: payload.material_id,
+                  quantity: payload.quantity,
+                })
+              }
+              // Как addItem: после «Принят в работу» confirmReservations уже не вызовется —
+              // списываем дельту сразу, иначе тираж вырос, а склад нет.
+              if (orderAlreadyInWork && createdHolds.length > 0) {
+                for (const r of createdHolds) {
+                  if (!(Number(r.quantity) > 0) || !(Number(r.material_id) > 0)) continue
+                  await MaterialTransactionService.spendInTransaction(db, {
+                    materialId: Number(r.material_id),
+                    quantity: Number(r.quantity),
+                    reason: 'Списание по заказу (увеличение тиража в работе)',
+                    orderId,
+                    userId: authUser?.id
+                  })
+                  if (r.id > 0) {
+                    await db.run(
+                      `UPDATE material_reservations SET status = 'fulfilled' WHERE id = ?`,
+                      [r.id]
+                    )
+                  }
+                }
               }
             } else {
-              // Снизили количество — отменяем часть резервов пропорционально
-              const toCancel: number[] = []
-              for (const c of components) {
-                if (c.reservationId) toCancel.push(c.reservationId)
-              }
-              if (toCancel.length > 0) {
-                // cancelReservations не открывает BEGIN — безопасно внутри нашей tx
-                await UnifiedWarehouseService.cancelReservations(toCancel)
+              // Снизили количество
+              if (orderAlreadyInWork) {
+                // Материалы уже списаны при принятии — вернуть дельту на склад.
+                // cancelReservations только меняет status и не восстанавливает quantity.
+                const componentMaterialIds = components
+                  .map((c) => Number(c.materialId))
+                  .filter((id) => Number.isFinite(id) && id > 0)
+                const componentUnitsMap = new Map<number, string | null>()
+                if (componentMaterialIds.length > 0) {
+                  const unitRows = await db.all<Array<{ id: number; unit?: string | null }>>(
+                    `SELECT id, unit FROM materials WHERE id IN (${componentMaterialIds.map(() => '?').join(',')})`,
+                    componentMaterialIds
+                  )
+                  unitRows.forEach((row) => componentUnitsMap.set(Number(row.id), row.unit ?? null))
+                }
+                for (const c of components) {
+                  const back = computeRequiredQuantityForReservation(
+                    Math.max(0, Number(c.qtyPerItem) || 0),
+                    Math.abs(deltaQty),
+                    componentUnitsMap.get(Number(c.materialId))
+                  )
+                  if (back > 0) {
+                    await MaterialTransactionService.addInTransaction(db, {
+                      materialId: Number(c.materialId),
+                      quantity: back,
+                      reason: 'Возврат на склад (уменьшение тиража в работе)',
+                      orderId,
+                      userId: authUser?.id
+                    })
+                  }
+                }
+              } else {
+                // До принятия: отменяем холды (re-hold оставшегося — отдельный tracked fix #15)
+                const toCancel: number[] = []
+                for (const c of components) {
+                  if (c.reservationId) toCancel.push(c.reservationId)
+                }
+                if (toCancel.length > 0) {
+                  // cancelReservations не открывает BEGIN — безопасно внутри нашей tx
+                  await UnifiedWarehouseService.cancelReservations(toCancel)
+                }
               }
             }
           } else {
