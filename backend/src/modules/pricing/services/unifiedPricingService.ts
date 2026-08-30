@@ -240,8 +240,19 @@ export class UnifiedPricingService {
             const meters = result.layout?.metersNeeded;
             if (meters != null && Number(meters) > 0) return Number(meters);
             const sheets = result.layout?.sheetsNeeded;
-            if (sheets != null && Number(sheets) > 0) return Number(sheets);
-            return result.quantity;
+            let sheetQty =
+              sheets != null && Number(sheets) > 0 ? Number(sheets) : result.quantity;
+            // Обложка на том же материале: листы блока + листы обложки в одной строке склада
+            const cover = result.coverMaterialDetails;
+            if (
+              cover &&
+              Number(cover.material_id) === Number(result.selectedMaterial.material_id) &&
+              Number(cover.sheets) > 0 &&
+              !(meters != null && Number(meters) > 0)
+            ) {
+              sheetQty += Number(cover.sheets);
+            }
+            return sheetQty;
           })(),
           unit: (() => {
             const meters = result.layout?.metersNeeded;
@@ -262,6 +273,19 @@ export class UnifiedPricingService {
           unitPrice: result.baseMaterialDetails?.tier.price || 0,
           totalCost: result.baseMaterialDetails?.priceForQuantity ?? 0,
         }] : []),
+        // Отдельная бумага обложки (другой material_id) — отдельная строка склада
+        ...(result.coverMaterialDetails &&
+        (!result.selectedMaterial ||
+          Number(result.coverMaterialDetails.material_id) !== Number(result.selectedMaterial.material_id))
+          ? [{
+              materialId: result.coverMaterialDetails.material_id,
+              materialName: result.coverMaterialDetails.material_name,
+              quantity: result.coverMaterialDetails.sheets,
+              unit: 'лист',
+              unitPrice: 0,
+              totalCost: 0,
+            }]
+          : []),
         ...(result.operationMaterials?.map((om) => ({
           materialId: om.material_id,
           materialName: om.material_name,
