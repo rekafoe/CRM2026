@@ -2218,68 +2218,35 @@ export class OrderService {
     if (await this.isCancellationStatusId(db, targetStatus)) {
       throw new Error('Статус отмены назначается только через отмену заказа')
     }
-    
-    const placeholders = orderIds.map(() => '?').join(',')
-    const before = (await db.all(
-      `SELECT id, status, source FROM orders WHERE id IN (${placeholders})`,
-      orderIds
-    )) as { id: number; status: number; source?: Order['source'] | null }[];
-    const params = [targetStatus, ...orderIds]
-    
-    await db.run(
-      `UPDATE orders SET status = ? WHERE id IN (${placeholders})`,
-      ...params
-    )
-    const n = targetStatus;
-    for (const row of before) {
-      const old = Number(row.status);
-      if (old !== n) {
-        void tryEnqueueOrderStatusEmail({
-          orderId: row.id,
-          oldStatusId: old,
-          newStatusId: n,
-          source: row.source ?? 'crm',
-        });
-        void tryScheduleOrderStatusSms({ orderId: row.id, newStatusId: n });
-        void tryNotifyTelegramOrderStatusForMiniappOrder({
-          orderId: row.id,
-          oldStatusId: old,
-          newStatusId: n,
-        });
-        void trySyncWebsiteOrderStatusFromCrm(db, row.id);
-        void EarningsService.recalculateEarningsForOrderDays({ orderId: row.id }).catch((e) => {
-          logger.error('Earnings recalc after bulk status change failed', {
-            orderId: row.id,
-            message: (e as Error)?.message,
-          });
-        });
+
+    // Тот же путь, что и одиночный updateOrderStatus: при «Принят в работу»
+    // должны подтвердиться резервы (иначе массовое принятие не списывает склад).
+    let updatedCount = 0
+    for (const orderId of orderIds) {
+      const id = Number(orderId)
+      if (!Number.isFinite(id) || id <= 0) {
+        throw new Error('Некорректный ID заказа')
       }
+      await this.updateOrderStatus(id, targetStatus, userId)
+      updatedCount++
     }
-    
-    return { updatedCount: orderIds.length, newStatus: targetStatus }
+
+    return { updatedCount, newStatus: targetStatus }
   }
 
   static async bulkDeleteOrders(orderIds: number[], userId?: number, reason?: string) {
-    const db = await getDb()
-    
     if (orderIds.length === 0) {
       throw new Error('Не выбрано ни одного заказа')
     }
-    
+
+    // permanentDeleteOrder открывает свою транзакцию — нельзя оборачивать в внешний BEGIN
+    // (SQLite: cannot start a transaction within a transaction).
     let deletedCount = 0
-    
-    await db.run('BEGIN')
-    try {
-      for (const orderId of orderIds) {
-        await OrderService.permanentDeleteOrder(orderId, userId, reason)
-        deletedCount++
-      }
-      await db.run('COMMIT')
-    } catch (e) {
-      await db.run('ROLLBACK')
-      throw e
+    for (const orderId of orderIds) {
+      await OrderService.permanentDeleteOrder(orderId, userId, reason)
+      deletedCount++
     }
-    
+
     return { deletedCount }
   }
 
