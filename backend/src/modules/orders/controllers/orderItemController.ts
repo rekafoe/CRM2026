@@ -516,7 +516,11 @@ export class OrderItemController {
         return
       }
 
-      let paramsObj: { description?: string; components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> }
+      let paramsObj: {
+        description?: string
+        components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }>
+        _miniappComponents?: Array<{ materialId: number; qtyPerItem: number }>
+      }
       try {
         paramsObj = JSON.parse(it.params || '{}')
       } catch (parseError) {
@@ -528,6 +532,9 @@ export class OrderItemController {
         paramsObj = {}
       }
       const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
+      const miniappComponents = Array.isArray(paramsObj._miniappComponents)
+        ? paramsObj._miniappComponents
+        : []
 
       await db.run('BEGIN')
       try {
@@ -537,6 +544,26 @@ export class OrderItemController {
           .filter((id): id is number => typeof id === 'number' && id > 0)
         if (reservationIds.length > 0) {
           await UnifiedWarehouseService.cancelReservations(reservationIds)
+        } else if (miniappComponents.length > 0) {
+          // Website/miniapp: материалы уже списаны auto-deduction при создании.
+          // Возвращаем склад по _miniappComponents (inline — без nested BEGIN).
+          const itemQty = Math.max(1, Number(it.quantity) || 1)
+          for (const c of miniappComponents) {
+            const materialId = Number(c.materialId)
+            const qtyPerItem = Number(c.qtyPerItem)
+            if (!Number.isFinite(materialId) || materialId <= 0 || !Number.isFinite(qtyPerItem)) continue
+            // Та же формула, что AutoMaterialDeductionService: qtyPerItem * quantity
+            const returnQty = qtyPerItem * itemQty
+            if (returnQty > 0) {
+              await MaterialTransactionService.addInTransaction(db, {
+                materialId,
+                quantity: returnQty,
+                reason: 'order delete item (miniapp/website)',
+                orderId,
+                userId: authUser?.id,
+              })
+            }
+          }
         } else if ((paramsObj as any).description) {
           // Старые записи без резервов — выполняем возврат на склад по составу из product_materials
           const composition = (await db.all<{
