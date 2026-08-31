@@ -178,6 +178,38 @@ export class OrderService {
     }
   }
 
+  /**
+   * Подтверждать резервы не только при точном «Принят в работу», но и при прыжке
+   * ProgressBar мимо него (Ожидает → Готов / ПВЗ): иначе склад не списывается.
+   */
+  private static async shouldConfirmReservationsOnStatusChange(
+    db: any,
+    oldStatusId: number,
+    targetStatusId: number,
+    inWorkStatusId: number
+  ): Promise<boolean> {
+    if (Number(targetStatusId) === Number(inWorkStatusId)) return true
+    try {
+      const rows = (await db.all(
+        `SELECT id, sort_order FROM order_statuses WHERE id IN (?, ?, ?)`,
+        [oldStatusId, targetStatusId, inWorkStatusId]
+      )) as Array<{ id: number; sort_order: number }>
+      const sortOf = (id: number): number | null => {
+        const row = (Array.isArray(rows) ? rows : []).find((r) => Number(r.id) === Number(id))
+        return row == null ? null : Number(row.sort_order)
+      }
+      const oldSort = sortOf(oldStatusId)
+      const targetSort = sortOf(targetStatusId)
+      const inWorkSort = sortOf(inWorkStatusId)
+      if (oldSort == null || targetSort == null || inWorkSort == null) return false
+      // Уже были «в работе» или дальше — повторно не подтверждаем
+      if (oldSort >= inWorkSort) return false
+      return targetSort >= inWorkSort
+    } catch {
+      return Number(targetStatusId) === Number(inWorkStatusId)
+    }
+  }
+
   private static async isCancellationStatusId(db: any, statusId: number): Promise<boolean> {
     if (!Number.isFinite(statusId)) return false
     try {
@@ -1622,9 +1654,12 @@ export class OrderService {
           await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [targetStatus, id])
         }
 
-        // Если статус "Принят в работу", подтверждаем резервы по заказу
+        // «Принят в работу» или прыжок мимо него (Готов/ПВЗ) — подтверждаем активные резервы
         const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
-        if (inWorkId != null && targetStatus === Number(inWorkId)) {
+        if (
+          inWorkId != null &&
+          (await this.shouldConfirmReservationsOnStatusChange(db, oldStatusId, targetStatus, inWorkId))
+        ) {
           const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
           const reservationIds = reservations
             .filter(r => r.status === 'reserved')
