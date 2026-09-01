@@ -719,8 +719,16 @@ export class OrderItemController {
       await db.run('BEGIN')
       try {
         if (deltaQty !== 0) {
-          const paramsObj = JSON.parse(existing.params || '{}') as { description?: string; components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> }
+          const paramsObj = JSON.parse(existing.params || '{}') as {
+            description?: string
+            components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }>
+            _miniappComponents?: Array<{ materialId: number; qtyPerItem: number }>
+          }
           const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
+          const miniappComponents = Array.isArray(paramsObj._miniappComponents)
+            ? paramsObj._miniappComponents
+            : []
+          const authUserId = (req as AuthenticatedRequest).user?.id
 
           if (components.length > 0) {
             if (deltaQty > 0) {
@@ -761,6 +769,34 @@ export class OrderItemController {
                 await UnifiedWarehouseService.cancelReservations(toCancel)
               }
             }
+          } else if (miniappComponents.length > 0) {
+            // Website/miniapp: материалы уже списаны auto-deduction при создании.
+            // Корректируем склад по дельте тиража (та же формула qtyPerItem * qty).
+            const absDelta = Math.abs(deltaQty)
+            for (const c of miniappComponents) {
+              const materialId = Number(c.materialId)
+              const qtyPerItem = Number(c.qtyPerItem)
+              if (!Number.isFinite(materialId) || materialId <= 0 || !Number.isFinite(qtyPerItem)) continue
+              const adjQty = qtyPerItem * absDelta
+              if (adjQty <= 0) continue
+              if (deltaQty > 0) {
+                await MaterialTransactionService.spendInTransaction(db, {
+                  materialId,
+                  quantity: adjQty,
+                  reason: 'order update qty + (miniapp/website)',
+                  orderId,
+                  userId: authUserId,
+                })
+              } else {
+                await MaterialTransactionService.addInTransaction(db, {
+                  materialId,
+                  quantity: adjQty,
+                  reason: 'order update qty - (miniapp/website)',
+                  orderId,
+                  userId: authUserId,
+                })
+              }
+            }
           } else {
             // Старые записи без компонентов/резервов — fallback к прежней логике движений склада
             const composition = (await db.all<{
@@ -790,7 +826,7 @@ export class OrderItemController {
                     quantity: need,
                     reason: 'order update qty +',
                     orderId,
-                    userId: (req as AuthenticatedRequest).user?.id
+                    userId: authUserId
                   })
                 }
               }
@@ -807,7 +843,7 @@ export class OrderItemController {
                     quantity: back,
                     reason: 'order update qty -',
                     orderId,
-                    userId: (req as AuthenticatedRequest).user?.id
+                    userId: authUserId
                   })
                 }
               }
