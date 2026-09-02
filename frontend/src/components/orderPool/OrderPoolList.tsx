@@ -93,9 +93,20 @@ const OrderCard = React.memo<{
             <time className="order-pool-card__date" dateTime={createdAt} title="Дата оформления">
               {formatPoolDateTime(createdAt)}
             </time>
-            <span className="order-pool-card__ready" title={`Готовность: ${formatPoolDateTimeFull(readiness.readyAt?.toISOString())}`}>
+            <span
+              className={[
+                'order-pool-card__ready',
+                readiness.isHourSla ? 'is-hour-sla' : '',
+              ].filter(Boolean).join(' ')}
+              title={`Готовность: ${formatPoolDateTimeFull(readiness.readyAt?.toISOString())}${readiness.label ? ` · ${readiness.label}` : ''}`}
+            >
               до {readiness.readyAtLabel}
             </span>
+            {readiness.label ? (
+              <span className={['order-pool-card__ready-sla', readiness.isHourSla ? 'is-hour-sla' : ''].filter(Boolean).join(' ')}>
+                {readiness.label}
+              </span>
+            ) : null}
           </div>
         </div>
 

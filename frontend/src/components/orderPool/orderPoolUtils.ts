@@ -1,4 +1,10 @@
 import { Order } from '../../types';
+import {
+  getOrderGoverningSla,
+  HOUR_SLA_MS,
+  isHourSlaLabel,
+  resolveOrderReadyAtMs,
+} from '../../utils/orderReadySla';
 
 /** Ответственный в пуле: приоритет responsible_user_id, иначе legacy userId */
 export function getEffectiveResponsibleUserId(order: Order): number | null {
@@ -120,82 +126,10 @@ export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null
   return null;
 }
 
-const READY_LABELS: Record<string, string> = {
-  urgent: 'В течение 3 часов',
-  promo: '48 часов',
-  special: '4–5 дней',
-  standard: '24 часа',
-  online: '24 часа',
-};
-
-/** Смещение от оформления до готовности, если в позициях нет readyDate. */
-const READY_OFFSET_MS: Record<string, number> = {
-  urgent: 3 * 60 * 60 * 1000,
-  promo: 48 * 60 * 60 * 1000,
-  special: 5 * 24 * 60 * 60 * 1000,
-  standard: 24 * 60 * 60 * 1000,
-  online: 24 * 60 * 60 * 1000,
-};
-
-function getOrderPriceType(order: Order): string {
-  const firstItem = (order.items ?? [])[0];
-  const params = firstItem?.params as { priceType?: string; price_type?: string } | undefined;
-  return String(params?.priceType ?? params?.price_type ?? 'standard').toLowerCase();
-}
-
-function getOrderCreatedAt(order: Order): string | undefined {
-  return order.created_at ?? (order as { createdAt?: string }).createdAt;
-}
-
-/**
- * Парсит readyDate из params.
- * Строки без таймзоны (YYYY-MM-DDTHH:mm) раньше писались в UTC сервера —
- * интерпретируем их как UTC, иначе в UTC+3 готовность «уезжает» назад.
- */
-function parseItemReadyDateMs(raw: string): number {
-  const s = String(raw).trim();
-  if (!s) return NaN;
-  // datetime-local / без Z: считаем UTC (как писал Railway)
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(s)) {
-    const utc = Date.parse(s.length === 16 ? `${s}:00Z` : `${s}Z`);
-    if (Number.isFinite(utc)) return utc;
-  }
-  const t = new Date(s).getTime();
-  return Number.isFinite(t) ? t : NaN;
-}
-
-/** Макс. readyDate из позиций или расчёт от даты оформления по SLA. */
+/** Макс. readyDate из позиций или расчёт от даты оформления по SLA сайта/CRM. */
 export function resolveOrderReadyAt(order: Order): Date | null {
-  const created = getOrderCreatedAt(order);
-  const createdMs = created ? new Date(created).getTime() : NaN;
-  const priceType = getOrderPriceType(order);
-  const offset = READY_OFFSET_MS[priceType] ?? READY_OFFSET_MS.standard;
-  const fromSla =
-    Number.isFinite(createdMs) ? new Date(createdMs + offset) : null;
-
-  const fromItems = (order.items ?? [])
-    .map((item) => {
-      const raw = (item.params as { readyDate?: string } | undefined)?.readyDate;
-      if (!raw) return NaN;
-      return parseItemReadyDateMs(raw);
-    })
-    .filter((t) => Number.isFinite(t));
-
-  if (fromItems.length > 0) {
-    const maxReadyMs = Math.max(...fromItems);
-    if (Number.isFinite(createdMs) && fromSla) {
-      // Готовность раньше оформления (частый баг TZ без Z)
-      if (maxReadyMs < createdMs) return fromSla;
-      // Старый бэкенд писал +1ч без таймзоны при подписи «24 часа»
-      const TWO_H = 2 * 60 * 60 * 1000;
-      if (offset >= 24 * 60 * 60 * 1000 && maxReadyMs - createdMs < TWO_H) {
-        return fromSla;
-      }
-    }
-    return new Date(maxReadyMs);
-  }
-
-  return fromSla;
+  const ms = resolveOrderReadyAtMs(order);
+  return ms != null ? new Date(ms) : null;
 }
 
 export function getOrderReadyLabel(order: Order): {
@@ -203,12 +137,17 @@ export function getOrderReadyLabel(order: Order): {
   hint?: string;
   readyAt: Date | null;
   readyAtLabel: string;
+  isHourSla: boolean;
 } {
-  const priceType = getOrderPriceType(order);
-  const label = READY_LABELS[priceType] ?? READY_LABELS.standard;
+  const sla = getOrderGoverningSla(order.items, order.source);
   const readyAt = resolveOrderReadyAt(order);
   const readyAtLabel = formatPoolDateTimeFull(readyAt?.toISOString());
-  return { label, readyAt, readyAtLabel };
+  return {
+    label: sla.label,
+    readyAt,
+    readyAtLabel,
+    isHourSla: sla.offsetMs <= HOUR_SLA_MS || isHourSlaLabel(sla.label),
+  };
 }
 
 export function formatShortDate(value?: string): string {

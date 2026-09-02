@@ -13,6 +13,7 @@ export function getProductionDaysByPriceType(priceType: PriceType): number {
 }
 
 export function getProductionTimeLabel(priceType: PriceType): string {
+  if (priceType === 'urgent') return '1–3 часа';
   const days = getProductionDaysByPriceType(priceType);
   return getProductionTimeLabelFromDays(days);
 }

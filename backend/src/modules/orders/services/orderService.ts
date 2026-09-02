@@ -27,6 +27,7 @@ import {
   type WebsiteOrderDelivery,
 } from '../../../types/websiteOrderDelivery'
 import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
+import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
 
 export class OrderService {
   private static isMeterUnit(unitRaw: unknown): boolean {
@@ -131,28 +132,18 @@ export class OrderService {
     );
   }
 
-  /** Смещение готовности от оформления по типу цены (как в Order Pool). */
-  private static readonly READY_OFFSET_MS: Record<string, number> = {
-    urgent: 3 * 60 * 60 * 1000,
-    promo: 48 * 60 * 60 * 1000,
-    special: 5 * 24 * 60 * 60 * 1000,
-    standard: 24 * 60 * 60 * 1000,
-    online: 24 * 60 * 60 * 1000,
-  }
-
   /**
    * Дата готовности в ISO (UTC, с Z).
    * Раньше писали «локальные» часы сервера без таймзоны (+1ч) — на Railway (UTC)
    * в UI (UTC+3) готовность оказывалась раньше «Оформлен».
+   * Для сайта «Срочно» (часто ключ standard) — +3 часа, как в Order Pool.
    */
-  private static buildDefaultReadyDate(baseDate?: string, priceType?: string) {
-    const date = baseDate ? new Date(baseDate) : new Date()
-    if (isNaN(date.getTime())) {
-      return null
-    }
-    const key = String(priceType || 'standard').toLowerCase().trim()
-    const offset = this.READY_OFFSET_MS[key] ?? this.READY_OFFSET_MS.standard
-    return new Date(date.getTime() + offset).toISOString()
+  private static buildDefaultReadyDate(
+    baseDate: string | undefined,
+    item: { type?: string; params?: unknown; priceType?: unknown; price_type?: string },
+    source?: string,
+  ) {
+    return buildDefaultReadyDateIso(baseDate, item, source)
   }
   private static async getAllStatuses(): Promise<Array<{ id: number; name: string }>> {
     return getCachedData<Array<{ id: number; name: string }>>(
@@ -555,11 +546,14 @@ export class OrderService {
           paramsObj = {}
         }
         if (!paramsObj.readyDate) {
-          const priceType =
-            paramsObj.priceType ?? paramsObj.price_type ?? (item as { priceType?: string }).priceType
           const defaultReadyDate = this.buildDefaultReadyDate(
             orderCreatedAt,
-            typeof priceType === 'string' ? priceType : undefined,
+            {
+              type: item.type,
+              params: paramsObj,
+              priceType: (item as { priceType?: string }).priceType,
+            },
+            'crm',
           )
           if (defaultReadyDate) {
             paramsObj.readyDate = defaultReadyDate
@@ -684,21 +678,27 @@ export class OrderService {
               ? Math.round(Number(paramsObj.storedTotalCost) * 100) / 100
               : null);
       let finalPrice = effectiveTotal != null ? effectiveTotal / qty : (Number(item.price) || 0);
-      const priceType =
-        (item as { priceType?: unknown; price_type?: unknown }).priceType ??
-        (item as { priceType?: unknown; price_type?: unknown }).price_type ??
-        paramsObj.priceType ??
-        paramsObj.price_type;
+      const priceTypeRaw = extractRawPriceType({
+        type: item.type,
+        params: paramsObj,
+        priceType: (item as { priceType?: unknown }).priceType,
+        price_type: (item as { price_type?: string }).price_type,
+      });
       if (effectiveTotal != null) {
         paramsObj.storedTotalCost = effectiveTotal;
       }
-      if (priceType && typeof priceType === 'string') {
-        paramsObj.priceType = priceType.toLowerCase().trim();
+      if (priceTypeRaw) {
+        paramsObj.priceType = normalizePriceTypeKey(priceTypeRaw);
       }
       if (!paramsObj.readyDate) {
         const defaultReadyDate = this.buildDefaultReadyDate(
           payload.orderCreatedAt || undefined,
-          typeof priceType === 'string' ? priceType : paramsObj.priceType,
+          {
+            type: item.type,
+            params: paramsObj,
+            priceType: paramsObj.priceType,
+          },
+          payload.source,
         );
         if (defaultReadyDate) {
           paramsObj.readyDate = defaultReadyDate;
@@ -2143,10 +2143,14 @@ export class OrderService {
       formatInfo
     }
     if (!params.readyDate) {
-      const priceType = params.priceType ?? params.price_type ?? urgency
       const defaultReadyDate = this.buildDefaultReadyDate(
         order.created_at || order.createdAt,
-        typeof priceType === 'string' ? priceType : undefined,
+        {
+          type: name || 'Товар из калькулятора',
+          params: { ...params, urgency },
+          priceType: params.priceType ?? params.price_type ?? urgency,
+        },
+        'crm',
       )
       if (defaultReadyDate) {
         params.readyDate = defaultReadyDate

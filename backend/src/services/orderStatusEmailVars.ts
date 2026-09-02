@@ -6,22 +6,11 @@ import {
 } from '../types/websiteOrderDelivery'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { getDb } from '../config/database'
-
-const READY_LABELS: Record<string, string> = {
-  urgent: 'В течение 3 часов',
-  promo: '48 часов',
-  special: '4–5 дней',
-  standard: '24 часа',
-  online: '24 часа',
-}
-
-const READY_OFFSET_MS: Record<string, number> = {
-  urgent: 3 * 60 * 60 * 1000,
-  promo: 48 * 60 * 60 * 1000,
-  special: 5 * 24 * 60 * 60 * 1000,
-  standard: 24 * 60 * 60 * 1000,
-  online: 24 * 60 * 60 * 1000,
-}
+import {
+  getItemReadyLabel,
+  getOrderGoverningSla,
+  resolveOrderReadyAtMs,
+} from '../utils/orderReadySla'
 
 function formatMoneyByn(n: number): string {
   return `${n.toFixed(2).replace('.', ',')} BYN`
@@ -44,11 +33,6 @@ function formatDateTimeRu(d: Date): string {
   return `${day}.${month}.${year} ${hours}:${minutes}`
 }
 
-function getPriceType(params: Record<string, unknown> | null | undefined): string {
-  const raw = params?.priceType ?? params?.price_type ?? 'standard'
-  return String(raw || 'standard').toLowerCase().trim()
-}
-
 function getItemLineTotal(item: {
   price?: number
   quantity?: number
@@ -58,18 +42,6 @@ function getItemLineTotal(item: {
   if (typeof stored === 'number' && Number.isFinite(stored)) return stored
   const q = Math.max(1, Number(item.quantity) || 1)
   return Math.round((Number(item.price) || 0) * q * 100) / 100
-}
-
-function parseReadyDateMs(raw: unknown): number {
-  if (raw == null) return NaN
-  const s = String(raw).trim()
-  if (!s) return NaN
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(s)) {
-    const utc = Date.parse(s.length === 16 ? `${s}:00Z` : `${s}Z`)
-    if (Number.isFinite(utc)) return utc
-  }
-  const t = new Date(s).getTime()
-  return Number.isFinite(t) ? t : NaN
 }
 
 /** Краткая фраза статуса для темы/первого абзаца. */
@@ -141,9 +113,18 @@ export async function buildOrderStatusEmailVars(params: {
   const statusPhrase = buildStatusPhrase(statusName)
 
   const createdMs = order?.created_at ? new Date(order.created_at).getTime() : NaN
-  let maxReadyMs = NaN
-  let maxSlaLabel = READY_LABELS.standard
-  let maxOffset = READY_OFFSET_MS.standard
+  const source = order?.source
+  const slaItems = items.map((item) => ({
+    type: item.type,
+    params: item.params,
+  }))
+  const governing = getOrderGoverningSla(slaItems, source)
+  const readyMs = resolveOrderReadyAtMs({
+    created_at: order?.created_at,
+    source,
+    items: slaItems,
+  })
+  const maxSlaLabel = governing.label
 
   const itemLines: string[] = []
   for (const item of items) {
@@ -155,24 +136,12 @@ export async function buildOrderStatusEmailVars(params: {
       quantity: item.quantity,
       params: paramsObj,
     })
-    const priceType = getPriceType(paramsObj)
-    const sla = READY_LABELS[priceType] ?? READY_LABELS.standard
-    const offset = READY_OFFSET_MS[priceType] ?? READY_OFFSET_MS.standard
-    if (offset >= maxOffset) {
-      maxOffset = offset
-      maxSlaLabel = sla
-    }
-    const readyRaw = paramsObj.readyDate
-    const readyMs = parseReadyDateMs(readyRaw)
-    if (Number.isFinite(readyMs) && (!Number.isFinite(maxReadyMs) || readyMs > maxReadyMs)) {
-      maxReadyMs = readyMs
-    }
+    const slaItem = { type: item.type, params: paramsObj }
+    const sla = getItemReadyLabel(slaItem, source)
     itemLines.push(`${qty} × ${title} = ${formatMoneyByn(lineTotal)}, ${sla}`)
   }
 
-  if (!Number.isFinite(maxReadyMs) && Number.isFinite(createdMs)) {
-    maxReadyMs = createdMs + maxOffset
-  }
+  const maxReadyMs = readyMs ?? (Number.isFinite(createdMs) ? createdMs + governing.offsetMs : NaN)
 
   const itemsText = itemLines.length ? itemLines.join('\n') : '—'
   const itemsHtml = itemLines.length

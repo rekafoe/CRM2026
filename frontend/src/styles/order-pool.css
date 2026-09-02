@@ -483,6 +483,21 @@
   white-space: nowrap;
 }
 
+.order-pool-card__ready.is-hour-sla {
+  color: #9a3412;
+}
+
+.order-pool-card__ready-sla {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted, #6c757d);
+  white-space: nowrap;
+}
+
+.order-pool-card__ready-sla.is-hour-sla {
+  color: #b45309;
+}
+
 .order-pool-card__client {
   display: flex;
   flex-direction: column;
@@ -999,6 +1014,11 @@
 .order-pool-detail-header__ready-hint {
   font-weight: 500;
   color: var(--text-muted, #6c757d);
+}
+
+.order-pool-detail-header__ready-hint.is-hour-sla {
+  color: #b45309;
+  font-weight: 700;
 }
 
 .order-pool-detail-header__take-primary {

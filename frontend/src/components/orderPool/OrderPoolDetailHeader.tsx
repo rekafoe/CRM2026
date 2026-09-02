@@ -110,7 +110,11 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             </p>
             <p className="order-pool-detail-header__date-row order-pool-detail-header__readiness">
               Готовность: <strong>{readiness.readyAtLabel}</strong>
-              {readiness.label ? <span className="order-pool-detail-header__ready-hint"> · {readiness.label}</span> : null}
+              {readiness.label ? (
+                <span className={['order-pool-detail-header__ready-hint', readiness.isHourSla ? 'is-hour-sla' : ''].filter(Boolean).join(' ')}>
+                  {' '}· {readiness.label}
+                </span>
+              ) : null}
             </p>
           </div>
         </div>

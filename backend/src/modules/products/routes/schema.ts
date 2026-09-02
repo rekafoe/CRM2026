@@ -513,14 +513,18 @@ router.get('/:productId/schema', async (req, res) => {
         density?: number;
         paper_type_id?: number;
         paper_type_name?: string;
+        material_type_id?: number;
+        material_type_name?: string;
         unit?: string;
       }> = [];
       if (materialIds.length > 0) {
         const placeholders = materialIds.map(() => '?').join(',');
         const rows = await db.all<any>(
-          `SELECT m.id, m.name, m.density, m.unit, m.paper_type_id, pt.display_name as paper_type_name
+          `SELECT m.id, m.name, m.density, m.unit, m.paper_type_id, pt.display_name as paper_type_name,
+                  m.material_type_id, mt.name as material_type_name
            FROM materials m
            LEFT JOIN paper_types pt ON pt.id = m.paper_type_id
+           LEFT JOIN material_types mt ON mt.id = m.material_type_id
            WHERE m.id IN (${placeholders}) AND m.is_active = 1`,
           materialIds
         );
@@ -532,6 +536,10 @@ router.get('/:productId/schema', async (req, res) => {
             ? { paper_type_id: Number(r.paper_type_id) }
             : {}),
           ...(r.paper_type_name ? { paper_type_name: r.paper_type_name } : {}),
+          ...(r.material_type_id != null && Number.isFinite(Number(r.material_type_id))
+            ? { material_type_id: Number(r.material_type_id) }
+            : {}),
+          ...(r.material_type_name ? { material_type_name: r.material_type_name } : {}),
           ...(r.unit ? { unit: r.unit } : {}),
         }));
       }
