@@ -1578,6 +1578,22 @@ export class OrderService {
     ) as Order
   }
 
+  /**
+   * Списать активные холды заказа (active/reserved → fulfilled + spend).
+   * Нужен для issue/выдачи и других путей, которые ставят финальный статус
+   * минуя updateOrderStatus / «Принят в работу».
+   */
+  static async confirmActiveReservationsForOrder(orderId: number): Promise<void> {
+    const reservations = await UnifiedWarehouseService.getReservationsByOrder(orderId)
+    const reservationIds = reservations
+      .filter((r) => r.status === 'reserved')
+      .map((r) => r.id)
+      .filter((id) => Number.isFinite(id) && id > 0)
+    if (reservationIds.length > 0) {
+      await UnifiedWarehouseService.confirmReservations(reservationIds)
+    }
+  }
+
   static async updateOrderStatus(id: number, status: number, userId?: number, cancelReason?: string) {
     const db = await getDb()
     const targetStatus = Number(status)
@@ -1625,13 +1641,7 @@ export class OrderService {
         // Если статус "Принят в работу", подтверждаем резервы по заказу
         const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
         if (inWorkId != null && targetStatus === Number(inWorkId)) {
-          const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
-          const reservationIds = reservations
-            .filter(r => r.status === 'reserved')
-            .map(r => r.id)
-          if (reservationIds.length > 0) {
-            await UnifiedWarehouseService.confirmReservations(reservationIds)
-          }
+          await this.confirmActiveReservationsForOrder(id)
         }
 
         const newStatusId = targetStatus;
