@@ -103,6 +103,7 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
           </div>
         </div>
       </td>
+      <VariantRowActions layout="leaf" onAddSibling={handleCreateSibling} onDelete={handleDelete} />
       <PriceRangeCells
         tiers={variant.tiers}
         commonRanges={commonRangesAsPriceRanges}
@@ -111,7 +112,6 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
         hoveredRangeIndex={hoveredRangeIndex}
         onRangeHover={onRangeHover}
       />
-      <VariantRowActions layout="leaf" onAddSibling={handleCreateSibling} onDelete={handleDelete} />
     </tr>
   );
 };

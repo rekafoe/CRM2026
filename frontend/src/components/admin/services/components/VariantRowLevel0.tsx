@@ -111,17 +111,17 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
           </div>
         </div>
       </td>
-      <PriceRangeCells
-        tiers={isLeaf ? variant.tiers : []}
-        commonRanges={commonRangesAsPriceRanges}
-        onPriceChange={isLeaf && onPriceChange ? handlePriceChange : NOOP_PRICE}
-        editable={isLeaf && Boolean(onPriceChange)}
-      />
       <VariantRowActions
         layout="root"
         onAddChild={handleCreateChild}
         onAddSibling={onCreateSibling}
         onDelete={handleDelete}
+      />
+      <PriceRangeCells
+        tiers={isLeaf ? variant.tiers : []}
+        commonRanges={commonRangesAsPriceRanges}
+        onPriceChange={isLeaf && onPriceChange ? handlePriceChange : NOOP_PRICE}
+        editable={isLeaf && Boolean(onPriceChange)}
       />
     </tr>
   );

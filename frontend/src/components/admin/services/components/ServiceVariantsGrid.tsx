@@ -68,63 +68,48 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
     <div className="table-container">
       {noPriceColumns && (
         <div className="service-variants-ranges-hint">
-          Столбцы с ценами появятся после добавления диапазона тиража. Нажмите <strong>«Диапазон»</strong> справа
-          (например, граница <strong>1</strong>). Цены и материал — в конечных строках. Удаление — красный{' '}
-          <strong>×</strong> справа в колонке «Действия» (затем сохраните изменения).
+          Столбцы с ценами появятся после добавления диапазона тиража. Нажмите <strong>«Диапазон»</strong> над
+          таблицей (например, граница <strong>1</strong>). Кнопки ↘ / ↓ / × закреплены слева и не уезжают за
+          диапазоны. Цены и материал — в конечных строках.
         </div>
       )}
       <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small service-variants-grid">
-        <div className="el-table__header-wrapper">
-          <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header">
-            <colgroup>
-              <col className="variant-name-col" />
-              {commonRangesAsPriceRanges.map((range) => (
-                <col key={`range-${range.minQty}`} className="range-col" />
-              ))}
-              <col className="actions-col" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th
-                  className="variant-name-cell"
-                  style={{ padding: 0 }}
-                >
-                  <div className="cell">
-                    <div className="variant-name-header">
-                      <div className="variant-name-header__title" title={serviceName}>
-                        {serviceName}
-                      </div>
+        <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header service-variants-unified-table">
+          <colgroup>
+            <col className="variant-name-col" />
+            <col className="actions-col" />
+            {commonRangesAsPriceRanges.map((range) => (
+              <col key={`range-${range.minQty}`} className="range-col" />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="variant-name-cell" style={{ padding: 0 }}>
+                <div className="cell">
+                  <div className="variant-name-header">
+                    <div className="variant-name-header__title" title={serviceName}>
+                      {serviceName}
                     </div>
                   </div>
-                </th>
-                <PriceRangeHeaders
-                  commonRanges={commonRangesAsPriceRanges}
-                  onEditRange={onEditRange}
-                  onRemoveRange={actions.removeRange}
-                  hoveredRangeIndex={hoveredRangeIndex}
-                  onRangeHover={onRangeHover}
-                />
-                <th className="variant-actions-th">
-                  <div className="cell">
-                    <div className="active-panel variant-actions-header">
-                      <span className="variant-actions-label">Действия</span>
-                    </div>
+                </div>
+              </th>
+              <th className="variant-actions-th">
+                <div className="cell">
+                  <div className="active-panel variant-actions-header">
+                    <span className="variant-actions-label">Действия</span>
                   </div>
-                </th>
-              </tr>
-            </thead>
-          </table>
-        </div>
-        <div className="el-table__body-wrapper is-scrolling-none">
-          <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body">
-            <colgroup>
-              <col className="variant-name-col" />
-              {commonRangesAsPriceRanges.map((range) => (
-                <col key={`body-range-${range.minQty}`} className="range-col" />
-              ))}
-              <col className="actions-col" />
-            </colgroup>
-            <tbody>
+                </div>
+              </th>
+              <PriceRangeHeaders
+                commonRanges={commonRangesAsPriceRanges}
+                onEditRange={onEditRange}
+                onRemoveRange={actions.removeRange}
+                hoveredRangeIndex={hoveredRangeIndex}
+                onRangeHover={onRangeHover}
+              />
+            </tr>
+          </thead>
+          <tbody>
               {typeNames.map((typeName) => {
                 const typeGroup = groupedVariants[typeName];
                 const firstVariant = typeGroup.level0[0];
@@ -218,9 +203,8 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
                   </React.Fragment>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+          </tbody>
+        </table>
       </div>
     </div>
   );

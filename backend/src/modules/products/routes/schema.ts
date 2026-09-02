@@ -8,6 +8,7 @@ import {
   sortSimplifiedTypesStable,
   simplifiedHasRollPlotterSubtype,
   compactSimplifiedForSite,
+  compactServiceVariantParametersForSite,
   collectMaterialIdsFromSimplified,
   collectServiceIdsFromSimplified,
   collectTierBoundariesFromSimplified,
@@ -549,9 +550,11 @@ router.get('/:productId/schema', async (req, res) => {
       let serviceVariants: Record<string, Array<{ id: number; variantName: string; parameters?: Record<string, unknown>; sortOrder?: number }>> = {};
       if (serviceIds.length > 0) {
         try {
+          const variantCols = await getTableColumns('service_variants');
+          const hasParentCol = variantCols.has('parent_variant_id');
           const placeholders = serviceIds.map(() => '?').join(',');
           const variantRows = await db.all<any>(
-            `SELECT id, service_id, variant_name, parameters, sort_order
+            `SELECT id, service_id, variant_name, parameters, sort_order${hasParentCol ? ', parent_variant_id' : ''}
              FROM service_variants
              WHERE service_id IN (${placeholders}) AND (is_active = 1 OR is_active IS NULL)
              ORDER BY sort_order, id`,
@@ -560,10 +563,15 @@ router.get('/:productId/schema', async (req, res) => {
           for (const row of variantRows) {
             const sid = String(row.service_id);
             if (!serviceVariants[sid]) serviceVariants[sid] = [];
+            const parentId = hasParentCol ? Number(row.parent_variant_id) : null;
+            const parameters = compactServiceVariantParametersForSite(
+              row.parameters,
+              Number.isFinite(parentId) ? parentId : null
+            );
             serviceVariants[sid].push({
               id: row.id,
               variantName: row.variant_name,
-              ...(row.parameters ? { parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : row.parameters } : {}),
+              ...(parameters ? { parameters } : {}),
               ...(row.sort_order != null ? { sortOrder: row.sort_order } : {}),
             });
           }

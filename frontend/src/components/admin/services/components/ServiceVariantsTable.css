@@ -116,26 +116,35 @@
 }
 
 .table-container .el-table {
-  width: 100%;
+  width: max-content;
   min-width: 100%;
   margin: 0;
   border: none;
 }
 
 .service-variants-grid {
-  width: 100%;
+  --sv-name-col: 220px;
+  --sv-actions-col: 148px;
+  width: max-content;
   min-width: 100%;
 }
 
-/* Таблица растёт по колонкам — скролл у .table-container, а не сжатие «Действий» */
-.service-variants-grid .el-table__header,
-.service-variants-grid .el-table__body {
+/* Одна таблица: скролл у .table-container, имя и действия закреплены слева */
+.service-variants-grid .service-variants-unified-table {
   width: max-content;
   min-width: 100%;
   table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
-/* Закрепленный заголовок диапазонов */
+.service-variants-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg-secondary, #f8fafc);
+}
+
 .table-container .el-table__header-wrapper {
   position: sticky;
   top: 0;
@@ -143,7 +152,7 @@
   background: var(--bg-secondary);
 }
 
-/* Скролл принадлежит внешнему контейнеру: внутренние wrapper'ы не должны обрезать правые колонки. */
+/* Скролл принадлежит внешнему контейнеру: внутренние wrapper'ы не должны обрезать колонки. */
 .table-container .el-table__header-wrapper,
 .table-container .el-table__body-wrapper {
   width: max-content;
@@ -284,7 +293,8 @@
 }
 
 .variant-name-col {
-  width: 180px;
+  width: 220px;
+  min-width: 220px;
 }
 
 .actions-col {
@@ -462,6 +472,42 @@
   z-index: 1;
 }
 
+/* Имя и действия всегда в кадре: диапазоны тиража скроллятся справа */
+.service-variants-grid .variant-name-cell,
+.service-variants-grid .variant-actions-th,
+.service-variants-grid .variant-actions-cell {
+  position: sticky;
+  z-index: 4;
+  overflow: visible !important;
+  background: var(--bg-primary, #fff);
+}
+
+.service-variants-grid .variant-name-cell {
+  left: 0;
+  width: var(--sv-name-col);
+  min-width: var(--sv-name-col);
+  max-width: var(--sv-name-col);
+}
+
+.service-variants-grid .variant-actions-th,
+.service-variants-grid .variant-actions-cell {
+  left: var(--sv-name-col);
+  z-index: 5;
+  width: var(--sv-actions-col);
+  min-width: var(--sv-actions-col);
+  max-width: var(--sv-actions-col);
+  padding: 0;
+  vertical-align: middle;
+  box-shadow: 6px 0 10px rgba(15, 23, 42, 0.08);
+}
+
+.service-variants-grid thead .variant-name-cell,
+.service-variants-grid thead .variant-actions-th {
+  top: 0;
+  z-index: 7;
+  background: var(--bg-secondary, #f8fafc);
+}
+
 .variant-actions-header {
   width: 100%;
   justify-content: center;
@@ -498,33 +544,33 @@
   padding-right: 4px;
 }
 
-/* Колонка действий всегда справа поверх диапазонов цен */
-.variant-actions-th,
-.variant-actions-cell {
-  position: sticky;
-  right: 0;
-  z-index: 4;
-  width: 148px;
-  min-width: 148px;
-  max-width: 148px;
-  padding: 0;
-  vertical-align: middle;
-  overflow: visible !important;
-  background: var(--bg-primary, #fff);
-  box-shadow: -6px 0 10px rgba(15, 23, 42, 0.08);
-}
-
-.variant-actions-th {
-  z-index: 5;
-  background: var(--bg-secondary, #f8fafc);
-}
-
+.el-table__body tr:nth-child(odd) > .variant-name-cell,
 .el-table__body tr:nth-child(odd) > .variant-actions-cell {
   background: var(--bg-secondary, #f8fafc);
 }
 
+.el-table__body tr:nth-child(even) > .variant-name-cell,
 .el-table__body tr:nth-child(even) > .variant-actions-cell {
   background: var(--bg-primary, #fff);
+}
+
+.el-table__row:hover > .variant-name-cell,
+.el-table__row:hover > .variant-actions-cell {
+  background: var(--bg-secondary);
+}
+
+.el-table__row--level-0 > .variant-name-cell,
+.el-table__row--level-0 > .variant-actions-cell,
+.el-table__row.expanded > .variant-name-cell,
+.el-table__row.expanded > .variant-actions-cell {
+  background: var(--bg-primary);
+}
+
+.el-table__row--level-0:hover > .variant-name-cell,
+.el-table__row--level-0:hover > .variant-actions-cell,
+.el-table__row.expanded:hover > .variant-name-cell,
+.el-table__row.expanded:hover > .variant-actions-cell {
+  background: var(--bg-secondary);
 }
 
 .variant-actions-cell {

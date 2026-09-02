@@ -695,3 +695,54 @@ export function collectServiceIdsFromSimplified(simplified: any): number[] {
 
   return Array.from(ids);
 }
+
+const ROLL_PARAM_KEYS = new Set([
+  'roll_width',
+  'roll_width_mm',
+  'rollWidth',
+  'rollWidthMm',
+  'sheet_width',
+  'printable_width',
+  'material_sheet_width',
+]);
+
+function parseVariantParameters(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return { ...(raw as Record<string, unknown>) };
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function normalizeCompactParentVariantId(raw: unknown): number | null {
+  const n = Number(raw);
+  return raw != null && raw !== '' && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Compact для сайта: дерево type/subType/parent, без ширины рулона. */
+export function compactServiceVariantParametersForSite(
+  raw: unknown,
+  parentVariantId?: number | null
+): Record<string, unknown> | undefined {
+  const parsed = parseVariantParameters(raw);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (ROLL_PARAM_KEYS.has(key)) continue;
+    out[key] = value;
+  }
+  const parent =
+    normalizeCompactParentVariantId(parentVariantId) ??
+    normalizeCompactParentVariantId(out.parentVariantId);
+  if (parent != null) out.parentVariantId = parent;
+  else delete out.parentVariantId;
+  return Object.keys(out).length > 0 ? out : undefined;
+}

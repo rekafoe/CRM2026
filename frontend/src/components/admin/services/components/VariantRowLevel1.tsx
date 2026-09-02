@@ -124,6 +124,12 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
           </div>
         </div>
       </td>
+      <VariantRowActions
+        layout="branch"
+        onAddChild={handleCreateChild}
+        onAddSibling={handleCreateSibling}
+        onDelete={handleDelete}
+      />
       {isLeaf ? (
         <PriceRangeCells
           tiers={variant.tiers}
@@ -138,12 +144,6 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
           </td>
         ))
       )}
-      <VariantRowActions
-        layout="branch"
-        onAddChild={handleCreateChild}
-        onAddSibling={handleCreateSibling}
-        onDelete={handleDelete}
-      />
     </tr>
   );
 };
