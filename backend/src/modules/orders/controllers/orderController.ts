@@ -516,6 +516,16 @@ export class OrderController {
       const customerEmail = body.customerEmail != null ? String(body.customerEmail) : undefined
       const prepaymentAmount = body.prepaymentAmount != null ? Number(body.prepaymentAmount) : undefined
       const customer_id = body.customer_id != null ? Number(body.customer_id) : undefined
+      // Паритет с createOrderFromWebsite: иначе SQLite DEFAULT paymentMethod='online'
+      const paymentMethodRaw = body.paymentMethod ?? body.payment_method
+      const paymentMethodHint =
+        paymentMethodRaw === 'online'
+          ? ('online' as const)
+          : paymentMethodRaw === 'cash-on-delivery' ||
+              paymentMethodRaw === 'offline' ||
+              paymentMethodRaw === 'corporate'
+            ? ('offline' as const)
+            : null
       const { delivery, error: deliveryError } = readWebsiteDeliveryFromBody(body)
       if (deliveryError) {
         res.status(400).json({ error: deliveryError, message: deliveryError })
@@ -545,6 +555,7 @@ export class OrderController {
           customer_id,
           source: 'website',
           delivery,
+          paymentMethod: paymentMethodHint,
           items: editorDraftPrepared.items
         })
         order = result.order as any
@@ -565,7 +576,9 @@ export class OrderController {
           undefined,
           undefined,
           'website',
-          customer_id
+          customer_id,
+          undefined,
+          paymentMethodHint,
         ) as any
         if (delivery) {
           await OrderService.persistOrderDelivery(order.id, delivery)
