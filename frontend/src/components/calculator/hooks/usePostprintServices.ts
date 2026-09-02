@@ -71,6 +71,7 @@ export function usePostprintServices({
   const [postprintLoading, setPostprintLoading] = useState(false);
   const [postprintError, setPostprintError] = useState<string | null>(null);
   const loadedRef = useRef(false);
+  const hydratedEditKeyRef = useRef<string | null>(null);
 
   const getOperationUnitPrice = useCallback((operation: PostprintOperation, quantity: number) => {
     if (!operation.tiers || operation.tiers.length === 0) {
@@ -283,9 +284,18 @@ export function usePostprintServices({
   }, [isOpen, isPostprintProduct, loadPostprintOperations]);
 
   useEffect(() => {
-    if (!isOpen || !editContext?.item) return;
+    if (!isOpen) {
+      hydratedEditKeyRef.current = null;
+      return;
+    }
+    if (!editContext?.item) return;
     const params = (editContext.item as any).params || {};
     if (!params?.postprintProduct) return;
+
+    const hydrateKey = `${editContext.orderId}:${editContext.item.id}`;
+    if (hydratedEditKeyRef.current === hydrateKey) return;
+    hydratedEditKeyRef.current = hydrateKey;
+
     setSelectedProduct(buildPostprintProduct() as Product & { resolvedProductType?: string });
     const savedOperations = Array.isArray(params.postprintOperations) ? params.postprintOperations : [];
     const selections: Record<string, number> = {};
@@ -296,7 +306,7 @@ export function usePostprintServices({
     });
     setPostprintSelections(selections);
     setSpecs((prev: any) => ({ ...prev, productType: 'universal' }));
-  }, [editContext, isOpen, setSelectedProduct, setSpecs]);
+  }, [editContext?.item?.id, editContext?.orderId, isOpen, setSelectedProduct, setSpecs]);
 
   const selectedPostprintOperations = useMemo(() => {
     return postprintOperations
@@ -345,10 +355,13 @@ export function usePostprintServices({
     const serviceNames = selectedPostprintOperations.map((op) => op.name).filter(Boolean);
     const concreteName = serviceNames.length > 0 ? serviceNames.join(', ') : 'Послепечатные услуги';
 
+    const storedTotal = Math.round(postprintTotal * 100) / 100;
     const paramsPayload = {
       postprintProduct: true,
       productName: concreteName,
       name: concreteName,
+      storedTotalCost: storedTotal,
+      priceLockedByCalculator: true,
       postprintOperations: selectedPostprintOperations.map((operation) => ({
         key: operation.key,
         serviceId: operation.serviceId,
@@ -367,6 +380,7 @@ export function usePostprintServices({
       name: concreteName,
       params: paramsPayload,
       price: postprintTotal,
+      totalCost: storedTotal,
       quantity: 1,
       sides: 1,
       sheets: 0,

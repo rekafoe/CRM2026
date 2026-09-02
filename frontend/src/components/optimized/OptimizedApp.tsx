@@ -323,6 +323,14 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     return orders.find((o) => o.id === selectedId) || null;
   }, [orders, selectedId]);
 
+  const calculatorEditContext = useMemo(
+    () =>
+      calculatorContext.mode === 'edit' && calculatorContext.item && calculatorContext.orderId
+        ? { orderId: calculatorContext.orderId, item: calculatorContext.item }
+        : undefined,
+    [calculatorContext.mode, calculatorContext.item, calculatorContext.orderId],
+  );
+
   const lowStockCount = useMemo(() => {
     return lowStock.length;
   }, [lowStock]);
@@ -601,11 +609,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         onAddToOrder={orderHandlers.handleAddToOrder}
         initialProductType={calculatorContext.initialProductType}
         initialProductId={calculatorContext.initialProductId}
-        editContext={
-          calculatorContext.mode === 'edit' && calculatorContext.item && calculatorContext.orderId
-            ? { orderId: calculatorContext.orderId, item: calculatorContext.item }
-            : undefined
-        }
+        editContext={calculatorEditContext}
         onSubmitExisting={calculatorContext.mode === 'edit' ? orderHandlers.handleReplaceOrderItem : undefined}
       />
 

@@ -37,6 +37,10 @@ export class OrderPricingService {
       return null;
     }
 
+    if (params.customProduct === true || params.postprintProduct === true || params.productType === 'custom') {
+      return null;
+    }
+
     const { productId, configuration, sheetsNeeded } = configurationFromItemParams(params);
     if (productId == null) return null;
 

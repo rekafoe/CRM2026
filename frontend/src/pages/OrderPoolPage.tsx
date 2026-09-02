@@ -26,6 +26,7 @@ import { useOrderStatuses } from '../hooks/useOrderStatuses';
 import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
 import { isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
+import { mergeSelectedOrderFromList } from '../utils/orderNotes';
 import { OrderContent } from '../components/optimized/OrderContent';
 import { OrderStatusTimeline } from '../components/order/OrderStatusTimeline';
 import { OrderTotal } from '../components/order/OrderTotal';
@@ -88,6 +89,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [orderActivity, setOrderActivity] = useState<OrderActivityEvent[]>([]);
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
+  const notesDirtyRef = useRef(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const { statuses: orderStatuses } = useOrderStatuses();
   const [filters, dispatchFilters] = useReducer(orderPoolFiltersReducer, initialOrderPoolFilters);
@@ -164,11 +166,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         orderIdsRef.current = new Set(list.map((o) => o.id));
         setOrders(list);
         setError(null);
-        setSelectedOrder((prev) => {
-          if (!prev) return prev;
-          const next = list.find((o) => o.id === prev!.id);
-          return next ?? prev;
-        });
+        setSelectedOrder((prev) => mergeSelectedOrderFromList(prev, list));
       } catch (err) {
         if (requestSeq !== searchRequestSeqRef.current) return;
         logger.error('Failed to load orders for pool', err);
@@ -200,11 +198,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       const newCount = list.filter((o) => !prevIds.has(o.id)).length;
       orderIdsRef.current = new Set(list.map((o) => o.id));
       setOrders(list);
-      setSelectedOrder((prev) => {
-        if (!prev) return prev;
-        const next = list.find((o) => o.id === prev!.id);
-        return next ?? prev;
-      });
+      setSelectedOrder((prev) => mergeSelectedOrderFromList(prev, list));
       if (newCount > 0) {
         toast.info(`Обновлён пул заказов: ${newCount} новых`);
       }
@@ -303,12 +297,18 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         const res = await getOrderActivity(orderId);
         if (requestSeq !== activityRequestSeqRef.current) return;
         setOrderActivity(Array.isArray(res.data?.events) ? res.data.events : []);
-        setNotesDraft(typeof res.data?.notes === 'string' ? res.data.notes : '');
+        setNotesDraft((prev) => {
+          if (notesDirtyRef.current && activityOrderIdRef.current === orderId) return prev;
+          return typeof res.data?.notes === 'string' ? res.data.notes : '';
+        });
       } catch (err) {
         if (requestSeq !== activityRequestSeqRef.current) return;
         logger.error('Failed to load order activity', err);
         setOrderActivity([]);
-        setNotesDraft(fallbackNotes);
+        setNotesDraft((prev) => {
+          if (notesDirtyRef.current && activityOrderIdRef.current === orderId) return prev;
+          return fallbackNotes;
+        });
       } finally {
         if (requestSeq === activityRequestSeqRef.current) {
           setActivityLoading(false);
@@ -322,12 +322,15 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     if (!selectedOrder?.id) {
       activityRequestSeqRef.current += 1;
       activityOrderIdRef.current = null;
+      notesDirtyRef.current = false;
       setOrderActivity([]);
       setNotesDraft('');
       return;
     }
     const orderId = selectedOrder.id;
     const fallbackNotes = selectedOrder.notes ?? '';
+    notesDirtyRef.current = false;
+    setNotesDraft(fallbackNotes);
     if (activityLoading && activityOrderIdRef.current === orderId) return;
     void loadSelectedOrderActivity(orderId, fallbackNotes);
   }, [selectedOrder?.id]);
@@ -734,6 +737,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     try {
       setNotesSaving(true);
       await updateOrderNotes(selectedOrder.id, notesDraft.trim() ? notesDraft : null);
+      notesDirtyRef.current = false;
       updateOrderInList(selectedOrder.id, { notes: notesDraft.trim() ? notesDraft : '' });
       await loadSelectedOrderActivity(selectedOrder.id, notesDraft.trim() ? notesDraft : '');
       toast.success('Сохранено', 'Примечания обновлены');
@@ -960,7 +964,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               <textarea
                 className="order-activity-panel__notes"
                 value={notesDraft}
-                onChange={(e) => setNotesDraft(e.target.value)}
+                onChange={(e) => {
+                  notesDirtyRef.current = true;
+                  setNotesDraft(e.target.value);
+                }}
                 placeholder="Добавьте примечание по заказу..."
                 rows={3}
               />

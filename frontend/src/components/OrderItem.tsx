@@ -183,6 +183,9 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   const [showEditorPreview, setShowEditorPreview] = useState(false);
 
   useEffect(() => {
+    if (editing) {
+      return;
+    }
     setQty(item.quantity ?? 1);
     setPrice(item.price);
     setSides(item.sides ?? 1);
@@ -219,7 +222,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
       // Иначе сохраняем локальный выбор, чтобы он не "слетал" визуально
       return prev;
     });
-  }, [item.id, item.printerId, item.price, item.quantity, item.sides, item.sheets, item.waste, item.params?.description, item.params?.sheetsNeeded]);
+  }, [editing, item.id, item.printerId, item.price, item.quantity, item.sides, item.sheets, item.waste, item.params?.description, item.params?.sheetsNeeded]);
 
   const specsAny = (item.params as any)?.specifications || {};
   const printTech: string | null =

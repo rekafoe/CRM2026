@@ -648,14 +648,19 @@ export const OrderRepository = {
   async listAssignedOrdersForUser(userId: number, options?: { date?: string }): Promise<any[]> {
     const db = await getDb()
     let hasDeliveryJson = false
+    let hasNotes = false
     try {
       hasDeliveryJson = await hasColumn('orders', 'delivery_json')
+      hasNotes = await hasColumn('orders', 'notes')
     } catch {
       hasDeliveryJson = false
     }
     const deliverySel = hasDeliveryJson
       ? `CASE WHEN uopo.order_type = 'website' THEN o.delivery_json ELSE NULL END as delivery_json`
       : `NULL as delivery_json`
+    const notesSel = hasNotes
+      ? `CASE WHEN uopo.order_type = 'website' THEN o.notes ELSE NULL END as notes`
+      : 'NULL as notes'
     const day = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date.slice(0, 10))
       ? options.date.slice(0, 10)
       : null
@@ -731,6 +736,7 @@ export const OrderRepository = {
             ELSE 'telegram'
           END as paymentMethod,
           ${deliverySel},
+          ${notesSel},
           uop.user_id as userId
         FROM user_order_page_orders uopo
         JOIN user_order_pages uop ON uop.id = uopo.page_id

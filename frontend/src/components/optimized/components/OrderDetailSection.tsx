@@ -257,18 +257,46 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
 
   const [notesValue, setNotesValue] = useState(selectedOrder.notes ?? '');
   const notesSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notesDirtyRef = useRef(false);
+  const notesValueRef = useRef(notesValue);
+  const notesSaveGenRef = useRef(0);
+  const notesOrderIdRef = useRef(selectedOrder.id);
+  notesValueRef.current = notesValue;
+
   useEffect(() => {
+    if (notesOrderIdRef.current !== selectedOrder.id) {
+      notesOrderIdRef.current = selectedOrder.id;
+      notesDirtyRef.current = false;
+      notesSaveGenRef.current += 1;
+      if (notesSaveRef.current) {
+        clearTimeout(notesSaveRef.current);
+        notesSaveRef.current = null;
+      }
+      setNotesValue(selectedOrder.notes ?? '');
+      return;
+    }
+    if (notesDirtyRef.current) return;
     setNotesValue(selectedOrder.notes ?? '');
   }, [selectedOrder.id, selectedOrder.notes]);
+
   const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value;
+    notesDirtyRef.current = true;
     setNotesValue(v);
     if (notesSaveRef.current) clearTimeout(notesSaveRef.current);
+    const gen = ++notesSaveGenRef.current;
+    const orderId = selectedOrder.id;
     notesSaveRef.current = setTimeout(async () => {
       notesSaveRef.current = null;
+      if (gen !== notesSaveGenRef.current || notesOrderIdRef.current !== orderId) return;
+      const toSave = notesValueRef.current;
       try {
-        await updateOrderNotes(selectedOrder.id, v.trim() || null);
-        onOrderPatch?.(selectedOrder.id, { notes: v.trim() || undefined });
+        await updateOrderNotes(orderId, toSave.trim() || null);
+        if (gen !== notesSaveGenRef.current || notesOrderIdRef.current !== orderId) return;
+        onOrderPatch?.(orderId, { notes: toSave.trim() });
+        if (notesValueRef.current === toSave) {
+          notesDirtyRef.current = false;
+        }
       } catch (err: any) {
         addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось сохранить примечания' });
       }

@@ -4,6 +4,7 @@ import { getOrders, getOrderStatuses, getCurrentUser, getUsers, getLowStock, lis
 import { APP_CONFIG } from '../../../types';
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
+import { preserveOrderNotes } from '../../../utils/orderNotes';
 
 const extractDate = (dateString: string | null | undefined): string | null => {
   if (!dateString) return null;
@@ -183,7 +184,7 @@ export const useOptimizedAppData = (
         ) {
           return prevOrders;
         }
-        return uniqueOrders;
+        return preserveOrderNotes(prevOrders, uniqueOrders);
       });
     }).catch((error) => {
       if (cancelled) return;
@@ -266,7 +267,7 @@ export const useOptimizedAppData = (
         );
         
         setOrders(prevOrders => {
-          if (force) return uniqueOrders;
+          if (force) return preserveOrderNotes(prevOrders, uniqueOrders);
           if (prevOrders.length === uniqueOrders.length && 
               prevOrders.every((o, i) => {
                 const newOrder = uniqueOrders[i];
@@ -294,7 +295,7 @@ export const useOptimizedAppData = (
               })) {
             return prevOrders;
           }
-          return uniqueOrders;
+          return preserveOrderNotes(prevOrders, uniqueOrders);
         });
       }).catch((error) => {
         logger.error('Failed to load orders', error);
