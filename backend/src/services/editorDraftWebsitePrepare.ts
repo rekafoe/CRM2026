@@ -5,6 +5,7 @@ import {
 } from './editorDesignPreflight'
 import { getEditorDraft, type EditorDraftRow } from './publicEditorDraftService'
 import { readEditorDraftMode, readOrderItemPagesParam } from '../utils/multipagePagesConsistency'
+import { copyEditorDraftFilesToOrderItem } from './editorDraftFileCopy'
 
 type FabricPage = { fabricJSON?: unknown }
 
@@ -299,17 +300,8 @@ export async function attachEditorDraftsToOrderItems(
       if (!draft) throw new Error('Draft не найден')
       if (draft.status !== 'draft') throw new Error('Draft уже финализирован')
 
-      const draftFiles = await db.all<Array<{ id: number; filename: string; originalName: string | null; mime: string | null; size: number | null }>>(
-        'SELECT id, filename, originalName, mime, size FROM editor_draft_files WHERE draft_id = ? ORDER BY id ASC',
-        [draft.id],
-      )
-      for (const file of draftFiles ?? []) {
-        fileNameByDraftFileId.set(Number(file.id), file.filename)
-        await db.run(
-          'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
-          [orderId, orderItemId, file.filename, file.originalName, file.mime, file.size],
-        )
-      }
+      const copied = await copyEditorDraftFilesToOrderItem(draft.id, orderId, orderItemId)
+      for (const [fileId, filename] of copied) fileNameByDraftFileId.set(fileId, filename)
 
       await db.run(
         `UPDATE editor_drafts SET status = 'finalized', order_id = ?, updated_at = datetime('now') WHERE token = ?`,

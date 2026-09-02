@@ -3,6 +3,7 @@ import { getDb } from '../config/database'
 import { orderFilesDir, resolveSafeExistingPath, uploadOrderFilesMemory } from '../config/upload'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
+import { isClientRenderedPageFileName } from '../utils/clientRenderedPageFile'
 import {
   addEditorDraftFile,
   EditorDraftRateLimitError,
@@ -464,7 +465,11 @@ router.get('/drafts/:token', asyncHandler(async (req: Request, res: Response) =>
  */
 router.get('/drafts/:token/files', asyncHandler(async (req: Request, res: Response) => {
   const files = await listEditorDraftFiles(req.params.token)
-  res.json(files.map((file) => withDraftFileUrl(req, req.params.token, file)))
+  res.json(
+    files
+      .filter((file) => !isClientRenderedPageFileName(file.originalName))
+      .map((file) => withDraftFileUrl(req, req.params.token, file)),
+  )
 }))
 
 /** PATCH /api/public-editor/drafts/:token — сохранить состояние редактора */

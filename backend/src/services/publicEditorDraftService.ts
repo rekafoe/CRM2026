@@ -9,6 +9,7 @@ import {
   listEditorDraftAssets,
   type EditorDraftFileRecord,
 } from './publicEditorAssetService'
+import { copyEditorDraftFilesToOrderItem } from './editorDraftFileCopy'
 import {
   assertMultipagePagesConsistency,
   readOrderItemPagesParam,
@@ -625,19 +626,10 @@ export async function finalizeEditorDraft(
     items,
   })
 
-  const db = await getDb()
-  const draftFiles = await db.all<Array<{ filename: string; originalName: string | null; mime: string | null; size: number | null }>>(
-    'SELECT filename, originalName, mime, size FROM editor_draft_files WHERE draft_id = ? ORDER BY id ASC',
-    [draft.id],
-  )
   const primaryOrderItemId = Array.isArray(result.itemIds) && result.itemIds.length > 0 ? Number(result.itemIds[0]) : null
-  for (const file of draftFiles ?? []) {
-    await db.run(
-      'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
-      [result.order.id, primaryOrderItemId, file.filename, file.originalName, file.mime, file.size],
-    )
-  }
+  await copyEditorDraftFilesToOrderItem(draft.id, result.order.id, primaryOrderItemId)
 
+  const db = await getDb()
   await db.run(
     `UPDATE editor_drafts SET status = 'finalized', order_id = ?, updated_at = datetime('now') WHERE token = ?`,
     [result.order.id, token],
