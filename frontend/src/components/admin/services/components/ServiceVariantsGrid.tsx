@@ -65,7 +65,7 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
   const noPriceColumns = commonRangesAsPriceRanges.length === 0;
 
   return (
-    <div className="table-container">
+    <div className="table-container service-variants-scroll">
       {noPriceColumns && (
         <div className="service-variants-ranges-hint">
           Столбцы с ценами появятся после добавления диапазона тиража. Нажмите <strong>«Диапазон»</strong> над

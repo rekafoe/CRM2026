@@ -1,14 +1,19 @@
-/* Обертка для центрирования и полной ширины */
+/* Grid minmax(0,1fr): дочерняя max-content таблица не раздувает карточку услуг */
 .service-variants-table-wrapper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
-  display: flex;
-  justify-content: center;
+  max-width: 100%;
+  min-width: 0;
   padding: 0;
 }
 
 .service-variants-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   margin-top: 12px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -104,20 +109,52 @@
   border-radius: 8px;
 }
 
-/* Контейнер для таблицы с фиксированной шириной */
-.table-container {
+/* Скролл только у диапазонов. Родитель уже ограничен grid minmax(0,1fr). */
+.table-container,
+.service-variants-scroll {
+  min-width: 0;
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   display: block;
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--bg-primary);
-  padding: 0;
+  padding: 0 0 4px;
+  box-sizing: border-box;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
 }
 
-.table-container .el-table {
-  width: max-content;
+.service-variants-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+
+.service-variants-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 0 0 11px 12px;
+}
+
+.service-variants-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 8px;
+  border: 2px solid #f1f5f9;
+}
+
+.service-variants-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.table-container .el-table,
+.service-variants-grid,
+.service-variants-grid .service-variants-unified-table,
+.service-variants-grid table.el-table__header {
+  width: max-content !important;
   min-width: 100%;
+  max-width: none !important;
   margin: 0;
   border: none;
 }
@@ -125,14 +162,10 @@
 .service-variants-grid {
   --sv-name-col: 220px;
   --sv-actions-col: 148px;
-  width: max-content;
-  min-width: 100%;
 }
 
 /* Одна таблица: скролл у .table-container, имя и действия закреплены слева */
 .service-variants-grid .service-variants-unified-table {
-  width: max-content;
-  min-width: 100%;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -351,6 +384,13 @@
 .el-table__body {
   width: 100%;
   table-layout: fixed;
+}
+
+.service-variants-grid.el-table,
+.service-variants-grid .el-table__header,
+.service-variants-grid .el-table__body {
+  width: max-content !important;
+  max-width: none !important;
 }
 
 .el-table th,

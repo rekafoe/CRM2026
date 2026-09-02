@@ -13,7 +13,13 @@
   background: transparent;
   min-height: auto;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
+}
+
+.cnt-page:has(.services-management) {
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ——— Компоновка страницы ——— */
@@ -68,6 +74,7 @@
   border-radius: 16px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   overflow: hidden;
+  min-width: 0;
 }
 
 .sm-list-panel__head {
@@ -186,6 +193,9 @@
   background: #fff;
   padding: 0 12px 16px;
   box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .sm-list-panel .services-table-footer.sm-table-footer,
@@ -552,6 +562,8 @@
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 6px 20px rgba(15, 23, 42, 0.05);
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
   transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 .services-category-group:hover {
@@ -671,10 +683,14 @@
   margin: 0;
   padding: 0 2px 2px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(248, 250, 252, 0.9) 100%);
+  min-width: 0;
 }
 .services-category-group__panel .services-table {
   border-radius: 0 0 12px 12px;
   overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
 }
 @media (max-width: 520px) {
@@ -695,15 +711,18 @@
   border-radius: 16px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  overflow: visible;
+  overflow-x: hidden;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* 🆕 Стили для развернутых строк с ServiceVariantsTable */
 .services-table-container td[colspan] {
   width: 100% !important;
-  max-width: 100% !important;
-  padding: 0 !important; /* Убираем padding для развернутых строк */
+  max-width: 0 !important;
+  padding: 0 !important;
   display: table-cell !important;
+  overflow: hidden;
 }
 
 .services-table-container td[colspan].bg-gray-50 {
@@ -713,20 +732,25 @@
 .services-table-container td[colspan] .service-variants-table-wrapper {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   padding: 16px;
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   box-sizing: border-box;
 }
 
 .services-table-container td[colspan] .service-variants-table {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
 .services-table-container td[colspan] .table-container {
   width: 100%;
+  min-width: 0;
   max-width: 100%;
+  overflow-x: auto;
   box-sizing: border-box;
 }
 
@@ -740,6 +764,8 @@
 
 .services-table {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -761,6 +787,7 @@
 
 .services-table__head th:first-child {
   padding-left: 24px;
+  width: 26%;
 }
 
 .services-table__head th::after {
@@ -780,6 +807,7 @@
 .services-table__head th:last-child {
   text-align: right;
   padding-right: 24px;
+  width: 24%;
 }
 
 .services-table__body tr {
@@ -850,6 +878,7 @@
 
 .services-table__actions-cell {
   text-align: right;
+  overflow: visible;
 }
 
 .services-table__action-btn {
@@ -1227,6 +1256,9 @@
   -webkit-backdrop-filter: blur(6px);
   padding: 0 12px 16px;
   box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .services-management .sm-list-panel .services-table-footer {
