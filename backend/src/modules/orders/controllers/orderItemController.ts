@@ -88,7 +88,8 @@ export class OrderItemController {
         return
       }
       const orderStatus = Number(orderRow.status)
-      // Узнаём материалы и остатки (либо из переданных components, либо по пресету)
+      const skipPresetLookup =
+        paramsObjForTotal?.customProduct === true || paramsObjForTotal?.postprintProduct === true
       let needed = [] as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null; unit?: string | null }>
       if (Array.isArray(components) && components.length > 0) {
         const ids = components.map(c => Number(c.materialId)).filter(Boolean)
@@ -111,7 +112,7 @@ export class OrderItemController {
             unit: byId[Number(c.materialId)]?.unit ?? null,
           }))
         }
-      } else if (params?.description && type) {
+      } else if (!skipPresetLookup && params?.description && type) {
         needed = (await db.all<{
           materialId: number
           qtyPerItem: number
@@ -535,9 +536,11 @@ export class OrderItemController {
         const reservationIds = components
           .map(c => c.reservationId)
           .filter((id): id is number => typeof id === 'number' && id > 0)
+        const skipPresetLookup =
+          (paramsObj as any).customProduct === true || (paramsObj as any).postprintProduct === true
         if (reservationIds.length > 0) {
           await UnifiedWarehouseService.cancelReservations(reservationIds)
-        } else if ((paramsObj as any).description) {
+        } else if (!skipPresetLookup && (paramsObj as any).description) {
           // Старые записи без резервов — выполняем возврат на склад по составу из product_materials
           const composition = (await db.all<{
             materialId: number
@@ -761,7 +764,10 @@ export class OrderItemController {
                 await UnifiedWarehouseService.cancelReservations(toCancel)
               }
             }
-          } else {
+          } else if (
+            (paramsObj as any).customProduct !== true &&
+            (paramsObj as any).postprintProduct !== true
+          ) {
             // Старые записи без компонентов/резервов — fallback к прежней логике движений склада
             const composition = (await db.all<{
               materialId: number

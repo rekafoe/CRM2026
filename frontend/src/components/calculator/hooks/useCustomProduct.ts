@@ -2,32 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
 import { CUSTOM_PRODUCT_ID } from '../components/DynamicProductSelector';
 
-/** Поля обычного калькулятора — при сохранении произвольного продукта не тащим их обратно в форму. */
-const CALCULATOR_ARTIFACT_KEYS = [
-  'productId',
-  'product_id',
-  'specifications',
-  'materials',
-  'services',
-  'selectedOperations',
-  'layout',
-  'customFormat',
-  'formatInfo',
-  'postprintProduct',
-  'postprintOperations',
-] as const;
-
-function mergeCustomProductParams(
-  existing: Record<string, unknown> | undefined,
-  patch: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...(existing || {}) };
-  for (const key of CALCULATOR_ARTIFACT_KEYS) {
-    delete merged[key];
-  }
-  return { ...merged, ...patch };
-}
-
 interface UseCustomProductParams {
   isOpen: boolean;
   editContext?: any;
@@ -89,7 +63,7 @@ export function useCustomProduct({
       hydratedEditKeyRef.current = null;
       return;
     }
-    if (!editContext?.item) return;
+    if (!isEditMode || !editContext?.item) return;
     const params = (editContext.item as any).params || {};
     if (!params?.customProduct) return;
 
@@ -106,7 +80,7 @@ export function useCustomProduct({
       pricePerItem: String(editContext.item.price ?? ''),
     });
     setSpecs((prev: any) => ({ ...prev, productType: 'universal' }));
-  }, [editContext?.item?.id, editContext?.orderId, isOpen, setSelectedProduct, setSpecs]);
+  }, [editContext?.item?.id, editContext?.orderId, isEditMode, isOpen, setSelectedProduct, setSpecs]);
 
   const customResult = useMemo(() => {
     if (!(customQuantity > 0 && customPrice > 0)) return null;
@@ -137,26 +111,17 @@ export function useCustomProduct({
     const name = customProductForm.name.trim();
     const characteristics = customProductForm.characteristics.trim();
     const storedTotal = Math.round(customPrice * customQuantity * 100) / 100;
-    const existingParams =
-      isEditMode && editContext?.item?.params && typeof editContext.item.params === 'object'
-        ? (editContext.item.params as Record<string, unknown>)
-        : undefined;
-    const paramsPayload = mergeCustomProductParams(existingParams, {
+    const paramsPayload = {
       customProduct: true,
       customName: name,
+      characteristics: characteristics || undefined,
       productionDays: customProductionDays > 0 ? customProductionDays : undefined,
-      operator_percent: existingParams?.operator_percent ?? 10,
+      operator_percent: 10,
       productType: 'custom',
       productName: name,
-      description: name,
       storedTotalCost: storedTotal,
       priceLockedByCalculator: true,
-    });
-    if (characteristics) {
-      paramsPayload.characteristics = characteristics;
-    } else {
-      delete paramsPayload.characteristics;
-    }
+    };
 
     const apiItem = {
       type: 'custom',
