@@ -38,19 +38,21 @@ export type OrderCashInput = {
   cash_from_issue_today?: number | null
 }
 
-/** Оплата для кассы: paid/successful, офлайн, предоплата в день отчёта (CRM), без online/telegram. */
+/** Оплата для кассы: paid/successful офлайн, предоплата в день отчёта (CRM), без online/telegram. */
 export function countsAsPaidForCashReport(order: OrderCashInput, reportDate?: string): boolean {
+  const method = String(order.paymentMethod ?? '').toLowerCase()
+  // BePaid / Mini App: paid+online не должны попадать в кассу как наличные.
+  if (method === 'online' || method === 'telegram') return false
   if (isPaidPrepaymentStatus(order.prepaymentStatus)) return true
   const prepayment = Number(order.prepaymentAmount ?? 0)
   if (!Number.isFinite(prepayment) || prepayment <= 0) return false
-  const method = String(order.paymentMethod ?? '').toLowerCase()
   if (method === 'offline') return true
   const rd = reportDate?.slice(0, 10)
   if (rd) {
     const prepayDay = sliceReportDateLocal(order.prepaymentUpdatedAt)
-    if (prepayDay === rd && method !== 'online' && method !== 'telegram') return true
+    if (prepayDay === rd) return true
   }
-  if (!order.prepaymentStatus && method !== 'online' && method !== 'telegram') return true
+  if (!order.prepaymentStatus) return true
   return false
 }
 
@@ -77,6 +79,11 @@ export function computeCashForReportDate(order: OrderCashInput, reportDate: stri
   if (hasIssue && Number.isFinite(issueAmt) && issueAmt > 0) {
     const prepayment = Number(order.prepaymentAmount ?? 0)
     const created = sliceReportDateLocal(order.created_at ?? order.createdAt)
+    const method = String(order.paymentMethod ?? '').toLowerCase()
+    // Частичный online + остаток наличными в день оформления: в кассу только remainder.
+    if (method === 'online' || method === 'telegram') {
+      return Math.max(0, issueAmt)
+    }
     if (created === rd && Number.isFinite(prepayment) && prepayment > 0) {
       if (issueAmt < prepayment) return prepayment
       if (issueAmt === 0 && prepayment > 0) return prepayment
