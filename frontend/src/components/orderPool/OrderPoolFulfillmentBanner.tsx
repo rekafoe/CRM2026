@@ -8,6 +8,7 @@ import {
 type Props = {
   chip: PoolFulfillmentChip | null;
   size?: 'card' | 'detail';
+  showHint?: boolean;
 };
 
 function bannerHint(chip: PoolFulfillmentChip): string | null {
@@ -17,9 +18,13 @@ function bannerHint(chip: PoolFulfillmentChip): string | null {
   return chip.title;
 }
 
-export const OrderPoolFulfillmentBanner: React.FC<Props> = ({ chip, size = 'card' }) => {
+export const OrderPoolFulfillmentBanner: React.FC<Props> = ({
+  chip,
+  size = 'card',
+  showHint = true,
+}) => {
   if (!poolFulfillmentShowsBanner(chip)) return null;
-  const hint = size === 'detail' ? bannerHint(chip) : null;
+  const hint = size === 'detail' && showHint ? bannerHint(chip) : null;
   const icon = chip.variant === 'pickup' ? 'building' : 'package';
 
   return (

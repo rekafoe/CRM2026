@@ -11,8 +11,10 @@ import {
   getOrderReadyLabel,
   getPoolFulfillmentChip,
   getSourceLabel,
+  poolFulfillmentShowsBanner,
 } from './orderPoolUtils';
 import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
+import { OrderDeliveryBlock } from '../orders/OrderDeliveryBlock';
 
 interface OrderPoolDetailHeaderProps {
   order: Order;
@@ -78,6 +80,9 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const roleOnShift = assignableOnShift.length > 0 ? assignableOnShift : allUsers;
   const roleAll = assignableAll.length > 0 ? assignableAll : allUsers;
   const fulfillmentChip = getPoolFulfillmentChip(order);
+  const showFulfillmentBanner = poolFulfillmentShowsBanner(fulfillmentChip);
+  const showDeliveryDetails = Boolean(order.delivery);
+  const showFulfillmentPoint = !showDeliveryDetails && Boolean(order.fulfillment_department_name);
 
   return (
     <div className="order-pool-detail-header">
@@ -134,7 +139,26 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
         )}
       </div>
 
-      <OrderPoolFulfillmentBanner chip={fulfillmentChip} size="detail" />
+      {(showFulfillmentBanner || showDeliveryDetails || showFulfillmentPoint) ? (
+        <div className="order-pool-fulfillment-row">
+          <OrderPoolFulfillmentBanner
+            chip={fulfillmentChip}
+            size="detail"
+            showHint={!showDeliveryDetails}
+          />
+          {showDeliveryDetails && order.delivery ? (
+            <OrderDeliveryBlock delivery={order.delivery} />
+          ) : null}
+          {showFulfillmentPoint ? (
+            <div className="order-pool-fulfillment__point">
+              Точка выдачи: <strong>{order.fulfillment_department_name}</strong>
+              {order.fulfillment_department_code
+                ? ` (${order.fulfillment_department_code})`
+                : ''}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="order-detail-responsible order-detail-responsible--with-transfer">
         <label htmlFor="order-pool-responsible">
