@@ -9,8 +9,10 @@ import {
   formatPoolDateTimeFull,
   getEffectiveResponsibleUserId,
   getOrderReadyLabel,
+  getPoolFulfillmentChip,
   getSourceLabel,
 } from './orderPoolUtils';
+import { AppIcon } from '../ui';
 
 interface OrderPoolDetailHeaderProps {
   order: Order;
@@ -75,6 +77,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const createdLabel = formatPoolDateTimeFull(createdAt);
   const roleOnShift = assignableOnShift.length > 0 ? assignableOnShift : allUsers;
   const roleAll = assignableAll.length > 0 ? assignableAll : allUsers;
+  const fulfillmentChip = getPoolFulfillmentChip(order);
 
   return (
     <div className="order-pool-detail-header">
@@ -131,6 +134,21 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
         )}
       </div>
 
+      {fulfillmentChip?.variant === 'pickup' ? (
+        <div className="order-pool-pickup-banner" title={fulfillmentChip.title}>
+          <AppIcon name="building" size="sm" />
+          <div className="order-pool-pickup-banner__text">
+            <span className="order-pool-pickup-banner__kicker">Клиент заберёт сам</span>
+            <strong className="order-pool-pickup-banner__point">{fulfillmentChip.pointName}</strong>
+            {fulfillmentChip.title &&
+            fulfillmentChip.title !== fulfillmentChip.pointName &&
+            fulfillmentChip.title !== 'Способ получения' ? (
+              <span className="order-pool-pickup-banner__hint">{fulfillmentChip.title}</span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="order-detail-responsible order-detail-responsible--with-transfer">
         <label htmlFor="order-pool-responsible">
           Ответственный
@@ -158,12 +176,19 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
         </label>
         <Button
           type="button"
-          variant="secondary"
+          variant={fulfillmentChip?.variant === 'pickup' ? 'primary' : 'secondary'}
           size="sm"
+          className={fulfillmentChip?.variant === 'pickup' ? 'order-pool-transfer-btn--pickup' : undefined}
           onClick={() => setTransferOpen(true)}
-          title="Передать коллеге или в другой павильон"
+          title={
+            fulfillmentChip?.variant === 'pickup'
+              ? `Передать заказ на точку «${fulfillmentChip.pointName}»`
+              : 'Передать коллеге или в другой павильон'
+          }
         >
-          Передать
+          {fulfillmentChip?.variant === 'pickup'
+            ? `Передать на ${fulfillmentChip.pointName}`
+            : 'Передать'}
         </Button>
       </div>
 

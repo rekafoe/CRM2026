@@ -32,6 +32,10 @@ export function getSourceLabel(source?: string): string {
 export type PoolFulfillmentChip = {
   label: string;
   title: string;
+  /** pickup — клиент заберёт в павильоне, нужен трансфер на точку. */
+  variant: 'pickup' | 'shipping' | 'other';
+  /** Короткое имя точки: Океан, Титан или название департамента. */
+  pointName: string;
 };
 
 function sanitizeDeliveryLabel(value: string | null | undefined): string {
@@ -45,9 +49,41 @@ function sanitizeDeliveryLabel(value: string | null | undefined): string {
   return raw;
 }
 
+function shortPavilionName(...candidates: Array<string | null | undefined>): string | null {
+  for (const raw of candidates) {
+    const lower = String(raw || '').trim().toLowerCase();
+    if (!lower) continue;
+    if (
+      lower.includes('океан') ||
+      lower === 'ocean' ||
+      lower.includes('pickup-dzerzhinskogo-3b')
+    ) {
+      return 'Океан';
+    }
+    if (
+      lower.includes('титан') ||
+      lower === 'titan' ||
+      lower.includes('pickup-dzerzhinskogo-104')
+    ) {
+      return 'Титан';
+    }
+  }
+  return null;
+}
+
+function chip(
+  label: string,
+  title: string,
+  variant: PoolFulfillmentChip['variant'],
+  pointName: string,
+): PoolFulfillmentChip {
+  return { label, title, variant, pointName };
+}
+
 /**
- * Компактная сноска способа выдачи на закрытой карточке пула.
- * Павильоны: Океан / Титан (и др. departments) — не конкуренты.
+ * Способ выдачи для карточки пула.
+ * Самовывоз павильона определяем по delivery.kind/лейблу, а не по коду точки
+ * (у курьерских заказов код тоже может быть pickup-…).
  */
 export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null {
   const delivery = order.delivery;
@@ -57,71 +93,69 @@ export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null
   const labelRaw = String(delivery?.label || '').trim();
   const labelDisplay = sanitizeDeliveryLabel(labelRaw);
   const providerId = String(delivery?.providerId || '').trim();
-  const haystack = `${kind} ${labelRaw} ${providerId} ${deptName} ${deptCode}`.toLowerCase();
-
+  const address = typeof delivery?.address === 'string' ? delivery.address.trim() : '';
+  const deliveryHaystack = `${kind} ${labelRaw} ${providerId}`.toLowerCase();
+  const haystack = `${deliveryHaystack} ${deptName} ${deptCode}`.toLowerCase();
+  const pavilion = shortPavilionName(deptName, deptCode, labelDisplay, providerId, address);
+  const pickupPointName = pavilion || deptName || labelDisplay || address;
   const title =
+    address ||
     labelDisplay ||
     deptName ||
     (delivery?.description ? String(delivery.description) : '') ||
     'Способ получения';
-
-  const pavilionMatch = (): string | null => {
-    const candidates = [deptName, deptCode, labelDisplay, providerId]
-      .map((s) => s.trim())
-      .filter(Boolean);
-    for (const c of candidates) {
-      const lower = c.toLowerCase();
-      if (lower.includes('океан') || lower === 'ocean') return 'Самовывоз Океан';
-      if (lower.includes('титан') || lower === 'titan') return 'Самовывоз Титан';
-    }
-    if (kind === 'pickup' || haystack.includes('самовывоз') || haystack.includes('pickup')) {
-      if (deptName) return `Самовывоз ${deptName}`;
-      return 'Самовывоз';
-    }
-    return null;
-  };
 
   if (
     haystack.includes('европочт') ||
     haystack.includes('evropocht') ||
     providerId.toLowerCase().includes('euro')
   ) {
-    return { label: 'Европочта', title };
+    return chip('Европочта', title, 'shipping', labelDisplay || 'Европочта');
   }
   if (
     haystack.includes('белпочт') ||
     haystack.includes('belpoch') ||
     providerId.toLowerCase().includes('belpost')
   ) {
-    return { label: 'Белпочта', title };
+    return chip('Белпочта', title, 'shipping', labelDisplay || 'Белпочта');
   }
-  if (kind === 'courier_minsk' || (haystack.includes('курьер') && haystack.includes('минск'))) {
-    return { label: 'Курьер Минск', title };
+  if (kind === 'courier_minsk' || (deliveryHaystack.includes('курьер') && deliveryHaystack.includes('минск'))) {
+    return chip('Курьер Минск', title, 'shipping', labelDisplay || 'Курьер Минск');
   }
   if (
     kind === 'courier_country' ||
-    haystack.includes('курьер') ||
-    haystack.includes('courier')
+    deliveryHaystack.includes('курьер') ||
+    deliveryHaystack.includes('courier')
   ) {
-    return { label: 'Курьер РБ', title };
+    return chip('Курьер РБ', title, 'shipping', labelDisplay || 'Курьер РБ');
   }
-  if (kind === 'pickup_point' || haystack.includes('пункт выдачи')) {
-    if (haystack.includes('европочт')) return { label: 'Европочта', title };
-    if (haystack.includes('белпочт')) return { label: 'Белпочта', title };
-    return { label: labelDisplay || 'Пункт выдачи', title };
+  if (kind === 'pickup_point' || deliveryHaystack.includes('пункт выдачи')) {
+    return chip(labelDisplay || 'Пункт выдачи', title, 'shipping', labelDisplay || 'Пункт выдачи');
   }
 
-  const pickup = pavilionMatch();
-  if (pickup) return { label: pickup, title };
+  const isStorePickup =
+    kind === 'pickup' ||
+    deliveryHaystack.includes('самовывоз') ||
+    (String(order.source) === 'website' && Boolean(deptName) && (!kind || kind === 'pickup'));
+
+  if (isStorePickup) {
+    const pointName = pickupPointName || 'точка не указана';
+    const label = pavilion
+      ? `Самовывоз ${pavilion}`
+      : deptName
+        ? `Самовывоз ${deptName}`
+        : 'Самовывоз';
+    return chip(label, title, 'pickup', pointName);
+  }
 
   if (labelDisplay) {
-    return { label: labelDisplay, title };
+    return chip(labelDisplay, title, 'other', labelDisplay);
   }
   if (deptName) {
-    return { label: deptName, title: deptName };
+    return chip(deptName, deptName, 'other', deptName);
   }
   if (delivery) {
-    return { label: 'Доставка', title };
+    return chip('Доставка', title, 'other', labelDisplay || 'Доставка');
   }
   return null;
 }

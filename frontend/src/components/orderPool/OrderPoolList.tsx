@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order } from '../../types';
-import { MoneyAmount } from '../ui';
+import { AppIcon, MoneyAmount } from '../ui';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 import {
   formatPoolDateTime,
@@ -59,6 +59,7 @@ const OrderCard = React.memo<{
         isMine ? 'is-mine' : '',
         payment.tone === 'pending' ? 'has-awaiting-pay' : '',
         debt > 0 ? 'has-debt' : '',
+        fulfillmentChip?.variant === 'pickup' ? 'has-pickup' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -78,7 +79,7 @@ const OrderCard = React.memo<{
             {order.source ? (
               <span className="order-pool-card__source">{getSourceLabel(order.source)}</span>
             ) : null}
-            {fulfillmentChip ? (
+            {fulfillmentChip && fulfillmentChip.variant !== 'pickup' ? (
               <span className="order-pool-card__fulfillment" title={fulfillmentChip.title}>
                 {fulfillmentChip.label}
               </span>
@@ -109,6 +110,16 @@ const OrderCard = React.memo<{
             ) : null}
           </div>
         </div>
+
+        {fulfillmentChip?.variant === 'pickup' ? (
+          <div className="order-pool-card__pickup" title={fulfillmentChip.title}>
+            <AppIcon name="building" size="xs" />
+            <div className="order-pool-card__pickup-text">
+              <span className="order-pool-card__pickup-kicker">Клиент заберёт</span>
+              <strong className="order-pool-card__pickup-point">{fulfillmentChip.pointName}</strong>
+            </div>
+          </div>
+        ) : null}
 
         <div className="order-pool-card__client">
           <span className="order-pool-card__name" title={order.customerName || undefined}>

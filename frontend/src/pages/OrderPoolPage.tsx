@@ -45,6 +45,7 @@ import {
   OrderPoolDetailHeader,
   OrderPoolPaymentSummary,
   getEffectiveResponsibleUserId,
+  getPoolFulfillmentChip,
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
   ORDER_POOL_SEARCH_LIMIT,
@@ -909,10 +910,20 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             />
 
             {selectedOrder.fulfillment_department_name || selectedOrder.delivery ? (
-              <div className="order-pool-fulfillment">
+              <div
+                className={[
+                  'order-pool-fulfillment',
+                  getPoolFulfillmentChip(selectedOrder)?.variant === 'pickup'
+                    ? 'order-pool-fulfillment--pickup'
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
                 {selectedOrder.fulfillment_department_name ? (
                   <div className="order-pool-fulfillment__point">
-                    Точка: <strong>{selectedOrder.fulfillment_department_name}</strong>
+                    Точка выдачи:{' '}
+                    <strong>{selectedOrder.fulfillment_department_name}</strong>
                     {selectedOrder.fulfillment_department_code
                       ? ` (${selectedOrder.fulfillment_department_code})`
                       : ''}

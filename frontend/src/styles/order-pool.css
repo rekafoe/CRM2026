@@ -349,6 +349,10 @@
   box-shadow: 0 0 0 1px var(--accent-primary, #6c8eb8);
 }
 
+.order-pool-card.has-pickup:not(.is-selected) {
+  border-color: #fdba74;
+}
+
 .order-pool-card.is-cancelled {
   opacity: 0.72;
 }
@@ -424,7 +428,47 @@
   padding: 2px 7px;
 }
 
-.order-pool-card__fulfillment {
+.order-pool-card__pickup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+}
+
+.order-pool-card__pickup-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.order-pool-card__pickup-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #c2410c;
+}
+
+.order-pool-card__pickup-point {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #9a3412;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-pool-card.is-selected .order-pool-card__pickup {
+  background: #ffedd5;
+  border-color: #fb923c;
+}
   font-size: 10px;
   font-weight: 600;
   color: var(--text-secondary, #495057);
@@ -1532,6 +1576,50 @@
   font-weight: 500;
 }
 
+.order-pool-pickup-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 2px solid #ea580c;
+  color: #9a3412;
+}
+
+.order-pool-pickup-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.order-pool-pickup-banner__kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #c2410c;
+}
+
+.order-pool-pickup-banner__point {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #9a3412;
+}
+
+.order-pool-pickup-banner__hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c2410c;
+}
+
+.order-pool-transfer-btn--pickup {
+  font-weight: 800;
+}
+
 .order-pool-fulfillment {
   margin: 0 0 12px;
 }
@@ -1540,4 +1628,29 @@
   margin-bottom: 8px;
   font-size: 13px;
   color: var(--text-secondary, #475569);
+}
+
+.order-pool-fulfillment--pickup {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+}
+
+.order-pool-fulfillment--pickup .order-pool-fulfillment__point {
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #9a3412;
+}
+
+.order-pool-fulfillment--pickup .order-pool-fulfillment__point strong {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.order-pool-fulfillment--pickup .order-delivery-block {
+  background: #fff;
+  border-color: #fdba74;
+  margin-bottom: 0;
 }
