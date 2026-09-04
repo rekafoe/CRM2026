@@ -13,5 +13,6 @@ export {
   getPoolFulfillmentChip,
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
+  ORDER_POOL_SEARCH_LIMIT,
 } from './orderPoolUtils';
 export type { FilterState, FilterAction, OrderPoolFilterCounts, PoolFulfillmentChip } from './orderPoolUtils';

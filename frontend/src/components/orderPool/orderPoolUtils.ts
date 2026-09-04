@@ -186,6 +186,8 @@ export function formatPoolDateTime(value?: string): string {
   return formatPoolDateTimeFull(value);
 }
 
+export const ORDER_POOL_SEARCH_LIMIT = 500;
+
 export type OrderPoolFilterCounts = {
   notAssigned: number;
   assigned: number;

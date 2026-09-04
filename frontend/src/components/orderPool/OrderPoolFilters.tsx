@@ -116,7 +116,7 @@ export const OrderPoolFilters: React.FC<OrderPoolFiltersProps> = ({
         </span>
         <input
           type="text"
-          placeholder="Номер, клиент, телефон…"
+          placeholder="Номер, клиент, телефон, УНП…"
           value={filters.searchInput}
           onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
         />

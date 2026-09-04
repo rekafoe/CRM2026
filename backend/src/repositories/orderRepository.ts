@@ -7,6 +7,15 @@ import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 import { parseWebsiteOrderDeliveryJson } from '../types/websiteOrderDelivery'
 import { SQL_ITEMS_SUBTOTAL_BY_ORDER } from '../utils/orderAmountsSql'
 import { getTodayString } from '../utils/date'
+import {
+  buildOrderQuerySearchClause,
+  clampOrderSearchLimit,
+  escapeLikePattern,
+  isExactOrderNumberSearch,
+  isIdentifierQuery,
+  orderLookupSortSql,
+  parseOrderLookupId,
+} from '../modules/orders/utils/orderSearchQuery'
 
 function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(order: T): T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> } {
   const delivery = parseWebsiteOrderDeliveryJson(order.delivery_json ?? null)
@@ -863,7 +872,15 @@ export const OrderRepository = {
       whereConditions.push(`(${accessParts.join(' OR ')})`)
     }
 
-    if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {
+    const rawQuery = String(searchParams.query || '').trim()
+    const exactOrderSearch = isExactOrderNumberSearch(rawQuery)
+    const orderLookup = parseOrderLookupId(rawQuery)
+
+    if (
+      !exactOrderSearch &&
+      searchParams.department_id != null &&
+      Number.isFinite(searchParams.department_id)
+    ) {
       let hasFulfillment = false
       let hasUsersDept = false
       try {
@@ -881,40 +898,24 @@ export const OrderRepository = {
       }
     }
 
-    const rawQuery = String(searchParams.query || '').trim()
     if (rawQuery) {
-      const normalizedQuery = rawQuery.replace(/^#/, '')
-      const orderLookupMatch = normalizedQuery.match(/^(?:ORD-|site-ord-|tg-ord-)?(\d+)$/i)
-
-      if (orderLookupMatch) {
-        const numericId = Number(orderLookupMatch[1])
-        const candidates = [
-          normalizedQuery,
-          orderLookupMatch[1],
-          `ORD-${orderLookupMatch[1]}`,
-          `site-ord-${orderLookupMatch[1]}`,
-        ]
-        const placeholders = candidates.map(() => '?').join(', ')
-        whereConditions.push(`(o.id = ? OR o.number IN (${placeholders}))`)
-        params.push(numericId, ...candidates)
-      } else {
-        const textConditions = [
-          'o.number LIKE ?',
-          'o.customerName LIKE ?',
-          'o.customerPhone LIKE ?',
-          'o.customerEmail LIKE ?',
-        ]
-        const s = `%${rawQuery}%`
-        params.push(s, s, s, s)
-        if (!searchParams.light) {
-          textConditions.push(`EXISTS (
-            SELECT 1 FROM items i 
-            WHERE i.orderId = o.id 
-            AND (i.type LIKE ? OR i.params LIKE ?)
-          )`)
-          params.push(s, s)
+      const clause = buildOrderQuerySearchClause(rawQuery)
+      if (clause) {
+        if (
+          !searchParams.light &&
+          !isIdentifierQuery(rawQuery) &&
+          !exactOrderSearch
+        ) {
+          const itemPattern = `%${escapeLikePattern(rawQuery)}%`
+          clause.sql = `(${clause.sql} OR EXISTS (
+            SELECT 1 FROM items i
+            WHERE i.orderId = o.id
+            AND (i.type LIKE ? ESCAPE '#' OR i.params LIKE ? ESCAPE '#')
+          ))`
+          clause.params.push(itemPattern, itemPattern)
         }
-        whereConditions.push(`(${textConditions.join(' OR ')})`)
+        whereConditions.push(clause.sql)
+        params.push(...clause.params)
       }
     }
 
@@ -956,7 +957,24 @@ export const OrderRepository = {
 
     const whereClause = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1'
     const hasAmountFilter = searchParams.minAmount !== undefined || searchParams.maxAmount !== undefined
-    const hasPagination = searchParams.limit !== undefined || searchParams.offset !== undefined
+    const searchLimit = clampOrderSearchLimit(searchParams.limit)
+    const searchOffset =
+      searchParams.offset != null && Number.isFinite(searchParams.offset)
+        ? Math.max(Math.floor(searchParams.offset), 0)
+        : 0
+    const hasPagination = searchLimit !== undefined || searchParams.offset !== undefined
+    const applyListLimit = hasPagination && !exactOrderSearch
+    const customerJoin = 'LEFT JOIN customers c ON c.id = o.customer_id'
+    const createdAtOrder = (alias: string) =>
+      alias ? `COALESCE(${alias}.created_at, ${alias}.createdAt) DESC` : 'COALESCE(created_at, createdAt) DESC'
+    const sortFor = (alias: string) => {
+      if (!orderLookup) return { sql: createdAtOrder(alias), params: [] as unknown[] }
+      const sort = orderLookupSortSql(orderLookup, alias)
+      return { sql: `${sort.sql}, ${createdAtOrder(alias)}`, params: sort.params }
+    }
+    const innerSort = sortFor('o')
+    const outerSort = sortFor('p')
+    const plainSort = sortFor('')
 
     let query = ''
     if (!hasAmountFilter && hasPagination) {
@@ -967,9 +985,10 @@ export const OrderRepository = {
         WITH paged_orders AS (
           SELECT o.*
           FROM orders o
+          ${customerJoin}
           WHERE ${whereClause}
-          ORDER BY COALESCE(o.created_at, o.createdAt) DESC
-          LIMIT ? OFFSET ?
+          ORDER BY ${innerSort.sql}
+          ${applyListLimit ? 'LIMIT ? OFFSET ?' : ''}
         ),
         order_totals AS (
           SELECT i.orderId, SUM(i.price * i.quantity) as totalAmount
@@ -980,9 +999,13 @@ export const OrderRepository = {
         SELECT p.*, COALESCE(t.totalAmount, 0) as totalAmount
         FROM paged_orders p
         LEFT JOIN order_totals t ON t.orderId = p.id
-        ORDER BY COALESCE(p.created_at, p.createdAt) DESC
+        ORDER BY ${outerSort.sql}
       `
-      params.push(searchParams.limit ?? 100, searchParams.offset ?? 0)
+      params.push(...innerSort.params)
+      if (applyListLimit) {
+        params.push(searchLimit ?? 500, searchOffset)
+      }
+      params.push(...outerSort.params)
     } else {
       // Общий путь: один запрос с агрегацией totalAmount.
       query = `
@@ -990,6 +1013,7 @@ export const OrderRepository = {
           o.*,
           COALESCE(agg.totalAmount, 0) as totalAmount
         FROM orders o
+        ${customerJoin}
         LEFT JOIN (
           ${SQL_ITEMS_SUBTOTAL_BY_ORDER}
         ) agg ON agg.orderId = o.id
@@ -1011,14 +1035,15 @@ export const OrderRepository = {
         }
       }
 
-      query += ' ORDER BY COALESCE(created_at, createdAt) DESC'
-      if (searchParams.limit) {
+      query += ` ORDER BY ${plainSort.sql}`
+      params.push(...plainSort.params)
+      if (applyListLimit && searchLimit) {
         query += ' LIMIT ?'
-        params.push(searchParams.limit)
+        params.push(searchLimit)
       }
-      if (searchParams.offset) {
+      if (applyListLimit && searchParams.offset) {
         query += ' OFFSET ?'
-        params.push(searchParams.offset)
+        params.push(searchOffset)
       }
     }
 
