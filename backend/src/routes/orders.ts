@@ -1269,6 +1269,10 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
     ? String(bodyDate).slice(0, 10)
     : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
 
+  // Issue ставит status=7 напрямую (минуя updateOrderStatus) — подтвердить холды до UPDATE,
+  // иначе «выдать» из «Ожидает» оставляет склад без списания.
+  await OrderService.confirmActiveReservationsForOrder(id)
+
   let hasPrepaymentUpdatedAt = false
   try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
   const paymentId = `ISSUE-${Date.now()}-${id}`

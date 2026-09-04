@@ -1578,6 +1578,22 @@ export class OrderService {
     ) as Order
   }
 
+  /**
+   * Списать активные холды заказа (active/reserved → fulfilled + spend).
+   * Нужен для issue/выдачи и других путей, которые ставят финальный статус
+   * минуя updateOrderStatus / «Принят в работу».
+   */
+  static async confirmActiveReservationsForOrder(orderId: number): Promise<void> {
+    const reservations = await UnifiedWarehouseService.getReservationsByOrder(orderId)
+    const reservationIds = reservations
+      .filter((r) => r.status === 'reserved')
+      .map((r) => r.id)
+      .filter((id) => Number.isFinite(id) && id > 0)
+    if (reservationIds.length > 0) {
+      await UnifiedWarehouseService.confirmReservations(reservationIds)
+    }
+  }
+
   static async updateOrderStatus(id: number, status: number, userId?: number, cancelReason?: string) {
     const db = await getDb()
     const targetStatus = Number(status)
@@ -1625,13 +1641,7 @@ export class OrderService {
         // Если статус "Принят в работу", подтверждаем резервы по заказу
         const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
         if (inWorkId != null && targetStatus === Number(inWorkId)) {
-          const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
-          const reservationIds = reservations
-            .filter(r => r.status === 'reserved')
-            .map(r => r.id)
-          if (reservationIds.length > 0) {
-            await UnifiedWarehouseService.confirmReservations(reservationIds)
-          }
+          await this.confirmActiveReservationsForOrder(id)
         }
 
         const newStatusId = targetStatus;
@@ -1967,42 +1977,102 @@ export class OrderService {
       [id]
     )) as unknown as Array<{ id: number; type: string; params: string; quantity: number }>
 
+    // Восстанавливаем только реально списанное (material_moves), не холды и не rules/_miniapp guess.
+    // softCancel удаляет холды без spend; ADD по rules/components после этого раздувал бы склад.
     const returns: Record<number, number> = {}
-    const hasRulesTable = !!(await db.get(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'"
-    ))
-    const hasLegacyPresetSchema = await hasColumn('product_materials', 'presetCategory')
-    for (const item of items) {
-      const paramsObj = JSON.parse(item.params || '{}') as { description?: string }
-      let composition: Array<{ materialId: number; qtyPerItem: number; unit?: string | null }> = []
-      if (hasRulesTable) {
-        composition = (await db.all<{
-          materialId: number
-          qtyPerItem: number
-          unit?: string | null
-        }>(
-          `SELECT pmr.material_id as materialId, pmr.qty_per_item as qtyPerItem, m.unit
-           FROM product_material_rules
-           JOIN materials m ON m.id = pmr.material_id
-           WHERE product_type = ? AND product_name = ?`,
-          [item.type, paramsObj.description || '']
-        )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
-      } else if (hasLegacyPresetSchema) {
-        composition = (await db.all<{
-          materialId: number
-          qtyPerItem: number
-          unit?: string | null
-        }>(
-          `SELECT pm.materialId, pm.qtyPerItem, m.unit
-           FROM product_materials pm
-           JOIN materials m ON m.id = pm.materialId
-           WHERE pm.presetCategory = ? AND pm.presetDescription = ?`,
-          [item.type, paramsObj.description || '']
-        )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
+    let movesLookupOk = false
+    try {
+      const table = await db.get(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='material_moves'",
+      )
+      if (table) {
+        movesLookupOk = true
+        const spendRows = (await db.all<{ material_id: number; spent: number }>(
+          `SELECT material_id, SUM(CASE
+             WHEN delta IS NOT NULL THEN -delta
+             WHEN type = 'spend' THEN quantity
+             WHEN type IN ('add', 'return') THEN -quantity
+             ELSE 0
+           END) as spent
+           FROM material_moves
+           WHERE order_id = ?
+           GROUP BY material_id`,
+          [id],
+        )) as unknown as Array<{ material_id: number; spent: number }>
+        for (const row of Array.isArray(spendRows) ? spendRows : []) {
+          const materialId = Number(row.material_id)
+          const spent = Number(row.spent)
+          if (Number.isFinite(materialId) && materialId > 0 && Number.isFinite(spent) && spent > 0) {
+            returns[materialId] = spent
+          }
+        }
       }
-      for (const c of composition) {
-        const add = OrderService.computeRequiredQty(c.qtyPerItem || 0, Math.max(1, Number(item.quantity) || 1), c.unit)
-        returns[c.materialId] = (returns[c.materialId] || 0) + add
+    } catch {
+      movesLookupOk = false
+    }
+
+    // Legacy fallback only when material_moves отсутствует — иначе пустой net spend = ничего не возвращать.
+    if (!movesLookupOk) {
+      const hasRulesTable = !!(await db.get(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'",
+      ))
+      const hasLegacyPresetSchema = await hasColumn('product_materials', 'presetCategory')
+      for (const item of items) {
+        const paramsObj = JSON.parse(item.params || '{}') as {
+          description?: string
+          _miniappComponents?: Array<{ materialId?: number; qtyPerItem?: number }>
+        }
+        let composition: Array<{ materialId: number; qtyPerItem: number; unit?: string | null }> = []
+        const storedComponents = Array.isArray(paramsObj._miniappComponents)
+          ? paramsObj._miniappComponents
+          : []
+        if (storedComponents.length > 0) {
+          composition = storedComponents
+            .map((c) => ({
+              materialId: Number(c.materialId),
+              qtyPerItem: Number(c.qtyPerItem),
+              unit: null as string | null,
+            }))
+            .filter(
+              (c) =>
+                Number.isFinite(c.materialId) &&
+                c.materialId > 0 &&
+                Number.isFinite(c.qtyPerItem) &&
+                c.qtyPerItem > 0,
+            )
+        } else if (hasRulesTable) {
+          composition = (await db.all<{
+            materialId: number
+            qtyPerItem: number
+            unit?: string | null
+          }>(
+            `SELECT pmr.material_id as materialId, pmr.qty_per_item as qtyPerItem, m.unit
+             FROM product_material_rules
+             JOIN materials m ON m.id = pmr.material_id
+             WHERE product_type = ? AND product_name = ?`,
+            [item.type, paramsObj.description || ''],
+          )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
+        } else if (hasLegacyPresetSchema) {
+          composition = (await db.all<{
+            materialId: number
+            qtyPerItem: number
+            unit?: string | null
+          }>(
+            `SELECT pm.materialId, pm.qtyPerItem, m.unit
+             FROM product_materials pm
+             JOIN materials m ON m.id = pm.materialId
+             WHERE pm.presetCategory = ? AND pm.presetDescription = ?`,
+            [item.type, paramsObj.description || ''],
+          )) as unknown as Array<{ materialId: number; qtyPerItem: number; unit?: string | null }>
+        }
+        for (const c of composition) {
+          const add = OrderService.computeRequiredQty(
+            c.qtyPerItem || 0,
+            Math.max(1, Number(item.quantity) || 1),
+            c.unit,
+          )
+          returns[c.materialId] = (returns[c.materialId] || 0) + add
+        }
       }
     }
 
