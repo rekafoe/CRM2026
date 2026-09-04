@@ -17,8 +17,7 @@ const extractDate = (dateString: string | null | undefined): string | null => {
 };
 
 function isCancelledOrder(order: Order): boolean {
-  const flag = (order as Order & { is_cancelled?: number | boolean }).is_cancelled;
-  return flag === 1 || flag === true;
+  return Number(order.is_cancelled) === 1;
 }
 
 export type OrdersListTab = 'orders' | 'issued';
