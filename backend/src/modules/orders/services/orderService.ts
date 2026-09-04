@@ -1895,12 +1895,27 @@ export class OrderService {
       try {
         await db.run(
           `DELETE FROM user_order_page_orders
-           WHERE order_id = ? AND order_type IN ('website', 'manual', 'crm') AND status != 'completed'`,
+           WHERE order_id = ? AND order_type IN ('website', 'manual', 'crm')`,
           [id]
         )
       } catch {
         // Таблицы страниц заказов может не быть в старых схемах.
       }
+      try {
+        await db.run('UPDATE items SET executor_user_id = NULL WHERE orderId = ?', [id])
+      } catch {
+        // колонки executor_user_id может не быть
+      }
+      try {
+        if (await hasColumn('orders', 'contact_user_id')) {
+          await db.run('UPDATE orders SET contact_user_id = NULL WHERE id = ?', [id])
+        }
+      } catch { /* ignore */ }
+      try {
+        if (await hasColumn('orders', 'responsible_user_id')) {
+          await db.run('UPDATE orders SET responsible_user_id = NULL WHERE id = ?', [id])
+        }
+      } catch { /* ignore */ }
       await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
       await db.run('COMMIT')
       if (ord?.created_date) {

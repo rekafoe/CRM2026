@@ -209,6 +209,10 @@ export const OrderRepository = {
     const execIds = executorOrderIds.size > 0 ? Array.from(executorOrderIds) : []
     const execInSql = execIds.length > 0 ? `o.id IN (${execIds.map(() => '?').join(',')})` : null
     const createdDateSql = `date(COALESCE(o.created_at, o.createdAt))`
+    // Отменённые не должны всплывать на главной как «исполнитель»: cancel обнуляет userId, но не executor_user_id.
+    if (hasIsCancelled) {
+      whereParts.push('COALESCE(o.is_cancelled, 0) = 0')
+    }
 
     if (day && execInSql && day === todayLocal) {
       // Свои за сегодня
@@ -266,6 +270,7 @@ export const OrderRepository = {
         ${paymentChannelSel},
         ${notesSel},
         ${deliverySel},
+        ${hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'},
         0 as assigned_as_executor,
         c.id as customer__id,
         c.first_name as customer__first_name,
@@ -649,9 +654,11 @@ export const OrderRepository = {
     const db = await getDb()
     let hasDeliveryJson = false
     let hasNotes = false
+    let hasIsCancelled = false
     try {
       hasDeliveryJson = await hasColumn('orders', 'delivery_json')
       hasNotes = await hasColumn('orders', 'notes')
+      hasIsCancelled = await hasColumn('orders', 'is_cancelled')
     } catch {
       hasDeliveryJson = false
     }
@@ -673,6 +680,9 @@ export const OrderRepository = {
       : ''
     const params: Array<string | number> = [userId]
     if (day) params.push(day)
+    const cancelledWhere = hasIsCancelled
+      ? ` AND (uopo.order_type != 'website' OR (o.id IS NOT NULL AND COALESCE(o.is_cancelled, 0) = 0))`
+      : ` AND (uopo.order_type != 'website' OR o.id IS NOT NULL)`
     try {
       const assignedOrders = await db.all(
         `SELECT 
@@ -742,7 +752,7 @@ export const OrderRepository = {
         JOIN user_order_pages uop ON uop.id = uopo.page_id
         LEFT JOIN orders o ON uopo.order_type = 'website' AND uopo.order_id = o.id
         LEFT JOIN photo_orders po ON uopo.order_type = 'telegram' AND uopo.order_id = po.id
-        WHERE uop.user_id = ?${dateWhere}
+        WHERE uop.user_id = ?${dateWhere}${cancelledWhere}
         ORDER BY uopo.assigned_at DESC`,
         params
       )

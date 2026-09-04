@@ -16,6 +16,11 @@ const extractDate = (dateString: string | null | undefined): string | null => {
   return date.toISOString().split('T')[0];
 };
 
+function isCancelledOrder(order: Order): boolean {
+  const flag = (order as Order & { is_cancelled?: number | boolean }).is_cancelled;
+  return flag === 1 || flag === true;
+}
+
 export type OrdersListTab = 'orders' | 'issued';
 
 export const useOptimizedAppData = (
@@ -124,14 +129,14 @@ export const useOptimizedAppData = (
       let list = Array.isArray(res.data) ? res.data : [];
       if (ordersListTab === 'orders') {
         list = list
+          .filter(o => !isCancelledOrder(o))
           .filter(o => {
             const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
             const rawDate = (o as any).created_at ?? (o as any).createdAt;
             const onDay = !rawDate || extractDate(rawDate) === targetDate;
             if (!assigned) return onDay;
-            // Чужой executor-заказ другого дня: не тащим завершённые/отменённые
+            // Чужой executor-заказ другого дня: не тащим завершённые
             if (onDay) return true;
-            if ((o as any).is_cancelled === 1) return false;
             const st = Number((o as any).status);
             if (st === 7) return false;
             const name = String((o as any).status_name || '').toLowerCase();
@@ -240,13 +245,13 @@ export const useOptimizedAppData = (
         let list = Array.isArray(res.data) ? res.data : [];
         if (ordersListTab === 'orders') {
           list = list
+            .filter(o => !isCancelledOrder(o))
             .filter(o => {
               const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
               const rawDate = (o as any).created_at ?? (o as any).createdAt;
               const onDay = !rawDate || extractDate(rawDate) === targetDate;
               if (!assigned) return onDay;
               if (onDay) return true;
-              if ((o as any).is_cancelled === 1) return false;
               const st = Number((o as any).status);
               if (st === 7) return false;
               const name = String((o as any).status_name || '').toLowerCase();
