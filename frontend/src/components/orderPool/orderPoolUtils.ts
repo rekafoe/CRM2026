@@ -39,7 +39,9 @@ export type PoolFulfillmentChip = {
   kicker: string;
 };
 
-export function poolFulfillmentShowsBanner(chip: PoolFulfillmentChip | null | undefined): chip is PoolFulfillmentChip {
+export function poolFulfillmentShowsBanner(
+  chip: PoolFulfillmentChip | null | undefined,
+): chip is PoolFulfillmentChip & { variant: 'pickup' | 'shipping' } {
   return chip != null && (chip.variant === 'pickup' || chip.variant === 'shipping');
 }
 
