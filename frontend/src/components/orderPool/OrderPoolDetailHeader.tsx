@@ -70,7 +70,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const canReassign = Number(order.status) === 0 || Number(order.status) === 1;
   const showCancelled = order.is_cancelled === 1;
   const readiness = getOrderReadyLabel(order);
-  const needsAssign = canReassign && responsibleId !== currentUserId;
+  const needsAssign = canReassign && responsibleId == null;
   const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
   const createdLabel = formatPoolDateTimeFull(createdAt);
   const roleOnShift = assignableOnShift.length > 0 ? assignableOnShift : allUsers;

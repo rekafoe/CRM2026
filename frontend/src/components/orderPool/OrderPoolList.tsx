@@ -41,8 +41,8 @@ const OrderCard = React.memo<{
   const isCancelled = order.is_cancelled === 1;
   const canTake =
     !isCancelled
-    && (Number(order.status) === 0 || Number(order.status) === 1)
-    && responsibleId !== currentUserId;
+    && !isAssigned
+    && (Number(order.status) === 0 || Number(order.status) === 1);
   const readiness = getOrderReadyLabel(order);
   const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
   const fulfillmentChip = getPoolFulfillmentChip(order);
