@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Customer } from '../../types';
+import { Customer, Order } from '../../types';
 import { getCustomers, updateOrderCustomer, createCustomer, updateOrderPaymentChannel } from '../../api';
 import { useToast } from '../Toast';
 import './CustomerSelector.css';
@@ -8,10 +8,7 @@ interface CustomerSelectorProps {
   orderId: number;
   currentCustomerId?: number | null;
   onCustomerChange?: () => void;
-  onOrderPatch?: (
-    orderId: number,
-    patch: { customer_id?: number | null; payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal' },
-  ) => void;
+  onOrderPatch?: (orderId: number, patch: Partial<Order>) => void;
   /** Inline: без лейбла, в одну строку с кнопками (Создать | Селект 160px | Поиск) */
   inline?: boolean;
 }

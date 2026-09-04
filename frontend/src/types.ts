@@ -151,7 +151,7 @@ export interface Order {
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
-  customer_id?: number;
+  customer_id?: number | null;
   customer?: Customer;
   // Payment information
   prepaymentAmount?: number;
