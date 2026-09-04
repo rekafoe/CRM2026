@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
 import { AppIcon, MoneyAmount, BynSymbol } from '../../components/ui';
-import { getUsers, getPrinterCountersByDate, getPrinterCountersByMonth, getDailyCashByMonth, getCashRegisterDay, getDepartments, type Department } from '../../api';
+import { getPrinterCountersByDate, getPrinterCountersByMonth, getDailyCashByMonth, getCashRegisterDay, getDepartments, type Department } from '../../api';
 import { addCalendarDaysLocal, todayCalendarLocal } from '../../utils/numberInput';
 import './CountersServicePage.css';
 
@@ -42,7 +42,6 @@ export const CountersServicePage: React.FC = () => {
   const [printerCounters, setPrinterCounters] = useState<PrinterCounter[]>([]);
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashTotal, setCashTotal] = useState(0);
-  const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined);
   const [monthData, setMonthData] = useState<DayCardData[]>([]);
@@ -53,9 +52,6 @@ export const CountersServicePage: React.FC = () => {
   );
 
   useEffect(() => {
-    getUsers()
-      .then((res) => setUsers(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setUsers([]));
     getDepartments()
       .then((res) => setDepartments(Array.isArray(res.data) ? res.data : []))
       .catch(() => setDepartments([]));
@@ -66,9 +62,14 @@ export const CountersServicePage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const countersResponse = await getPrinterCountersByDate(selectedDate, {
-        department_id: selectedDepartmentId,
-      });
+      const [countersResponse, cashRegisterRes] = await Promise.all([
+        getPrinterCountersByDate(selectedDate, {
+          department_id: selectedDepartmentId,
+        }),
+        getCashRegisterDay(selectedDate, {
+          department_id: selectedDepartmentId,
+        }),
+      ]);
       const counters = Array.isArray(countersResponse.data)
         ? countersResponse.data.map((counter: any) => ({
             ...counter,
@@ -80,20 +81,10 @@ export const CountersServicePage: React.FC = () => {
         : [];
       setPrinterCounters(counters);
 
-      const userNameById = new Map<number, string>(
-        users.map((u) => [Number(u.id), u.name])
-      );
-      const idNameById = new Map<number, string>(
-        users.map((u) => [Number(u.id), `ID ${u.id}`])
-      );
-
-      const cashRegisterRes = await getCashRegisterDay(selectedDate, {
-        department_id: selectedDepartmentId,
-      });
       const reg = cashRegisterRes.data;
       const contributions = (reg.contributions_by_user ?? []).map((c) => ({
         user_id: c.user_id,
-        user_name: userNameById.get(c.user_id) || idNameById.get(c.user_id),
+        user_name: c.user_name || `ID ${c.user_id}`,
         amount: c.amount,
       }));
       setCashContributions(contributions);
@@ -106,7 +97,7 @@ export const CountersServicePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, users, selectedDepartmentId]);
+  }, [selectedDate, selectedDepartmentId]);
 
   const loadMonthData = useCallback(async () => {
     try {

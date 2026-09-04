@@ -4,6 +4,7 @@ import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { resolveDepartmentScope } from '../utils/resolveDepartmentScope'
+import { loadPrinterExpectedClicksForDay } from '../services/loadDailyOrdersForCashReport'
 
 const router = Router()
 const VALID_COUNTER_UNITS = new Set(['sheets', 'meters', 'm2'])
@@ -410,7 +411,18 @@ router.get('/counters', asyncHandler(async (req, res) => {
     date,
     ...deptParams
   )
-  res.json(rows)
+  const clickDepartmentId =
+    departmentId === 'empty' || departmentId == null ? undefined : Number(departmentId)
+  const expectedClicks =
+    departmentId === 'empty'
+      ? {}
+      : await loadPrinterExpectedClicksForDay(date, Number.isFinite(clickDepartmentId) ? clickDepartmentId : undefined)
+  res.json(
+    rows.map((r: any) => ({
+      ...r,
+      expected_clicks: Number(expectedClicks[Number(r.id)] ?? 0),
+    })),
+  )
 }))
 
 // POST /api/printers/:id/counters — добавить счётчик принтера (доступно всем авторизованным пользователям)

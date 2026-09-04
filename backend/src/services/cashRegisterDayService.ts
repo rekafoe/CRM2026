@@ -146,18 +146,45 @@ async function loadOrderVolumeWorkDay(reportDate: string, departmentId?: number)
   return Math.round(Number(row?.s ?? 0) * 100) / 100
 }
 
+async function attachContributionNames(
+  rows: CashRegisterContribution[],
+): Promise<CashRegisterContribution[]> {
+  if (rows.length === 0) return rows
+  const db = await getDb()
+  const ids = [...new Set(rows.map((r) => r.user_id).filter((id) => Number.isFinite(id) && id > 0))]
+  if (ids.length === 0) return rows.map((r) => ({ ...r, user_name: r.user_name || `ID ${r.user_id}` }))
+  try {
+    const placeholders = ids.map(() => '?').join(',')
+    const users = (await db.all(
+      `SELECT id, name, email FROM users WHERE id IN (${placeholders})`,
+      ...ids,
+    )) as Array<{ id: number; name: string | null; email: string | null }>
+    const nameById = new Map(
+      users.map((u) => [Number(u.id), String(u.name || u.email || '').trim() || `ID ${u.id}`]),
+    )
+    return rows.map((r) => ({
+      ...r,
+      user_name: nameById.get(r.user_id) || `ID ${r.user_id}`,
+    }))
+  } catch {
+    return rows.map((r) => ({ ...r, user_name: r.user_name || `ID ${r.user_id}` }))
+  }
+}
+
 export async function getCashRegisterDay(reportDate: string, departmentId?: number): Promise<CashRegisterDayPayload> {
-  await backfillPaymentMetadataForCashDay(reportDate)
-  const loaded = await loadDailyOrdersForCashReport(reportDate, departmentId)
+  const loaded = await loadDailyOrdersForCashReport(reportDate, departmentId, { includeItems: false })
   const agg = aggregateCashFromOrders(loaded.orders, loaded.date)
-  const order_volume_work_day = await loadOrderVolumeWorkDay(loaded.date, departmentId)
+  const [order_volume_work_day, contributions_by_user] = await Promise.all([
+    loadOrderVolumeWorkDay(loaded.date, departmentId),
+    attachContributionNames(agg.contributions_by_user),
+  ])
 
   return {
     date: loaded.date,
     cash_in_today: agg.cash_in_today,
     issued_today: loaded.issued_orders_total,
     issued_by_operators: loaded.issued_by_operators,
-    contributions_by_user: agg.contributions_by_user,
+    contributions_by_user,
     order_volume_work_day,
     orders_included_count: agg.orders_included.length,
     orders_zero_cash: agg.orders_zero_cash,

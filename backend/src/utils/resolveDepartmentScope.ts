@@ -29,7 +29,7 @@ export async function resolveDepartmentScope(opts: {
   queryDepartmentId?: unknown
 }): Promise<number | undefined | 'empty'> {
   const requested = parsePositiveDepartmentId(opts.queryDepartmentId)
-  const isAdmin = opts.user?.role === 'admin'
+  const isAdmin = String(opts.user?.role || '').toLowerCase() === 'admin'
   if (!opts.user?.id) return requested
   if (isAdmin) return requested
   const own = await getUserDepartmentId(opts.user.id)

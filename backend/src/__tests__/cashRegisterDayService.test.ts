@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { getCashRegisterDay, backfillPaymentMetadataForCashDay } from '../services/cashRegisterDayService'
+import { getCashRegisterDay, recalculateCashRegisterDay } from '../services/cashRegisterDayService'
 import { initDB, getDb } from '../config/database'
 
 describe('cashRegisterDayService', () => {
@@ -60,8 +60,9 @@ describe('cashRegisterDayService', () => {
       `${workDay} 12:00:00`,
     )
 
-    const payload = await getCashRegisterDay(workDay)
+    const payload = await recalculateCashRegisterDay(workDay)
     expect(payload.cash_in_today).toBeGreaterThanOrEqual(55)
+    expect(payload.backfill_updated).toBeGreaterThanOrEqual(1)
 
     const row = await db.get<{ prepaymentUpdatedAt: string; prepaymentStatus: string }>(
       'SELECT prepaymentUpdatedAt, prepaymentStatus FROM orders WHERE number = ?',
@@ -69,5 +70,35 @@ describe('cashRegisterDayService', () => {
     )
     expect(String(row?.prepaymentStatus)).toBe('paid')
     expect(String(row?.prepaymentUpdatedAt ?? '').slice(0, 10)).toBe(workDay)
+  })
+
+  it('GET cash register does not backfill payment metadata', async () => {
+    const db = await getDb()
+    let hasPrepayCol = false
+    try {
+      const col = await db.get("SELECT 1 FROM pragma_table_info('orders') WHERE name = 'prepaymentUpdatedAt'")
+      hasPrepayCol = !!col
+    } catch {
+      hasPrepayCol = false
+    }
+    if (!hasPrepayCol) return
+
+    const workDay = '2026-06-12'
+    const orderNumber = `GETBF-${Date.now()}`
+    await db.run(
+      `INSERT INTO orders (number, status, createdAt, created_at, customerName, prepaymentAmount, prepaymentStatus, paymentMethod)
+       VALUES (?, 1, ?, ?, 'get no backfill', 40, NULL, NULL)`,
+      orderNumber,
+      `${workDay} 12:00:00`,
+      `${workDay} 12:00:00`,
+    )
+
+    await getCashRegisterDay(workDay)
+    const row = await db.get<{ prepaymentUpdatedAt: string | null; prepaymentStatus: string | null }>(
+      'SELECT prepaymentUpdatedAt, prepaymentStatus FROM orders WHERE number = ?',
+      orderNumber,
+    )
+    expect(row?.prepaymentUpdatedAt == null || String(row.prepaymentUpdatedAt).trim() === '').toBe(true)
+    expect(row?.prepaymentStatus == null || String(row.prepaymentStatus).trim() === '').toBe(true)
   })
 })

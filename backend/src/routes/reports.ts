@@ -289,7 +289,9 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     return
   }
 
-  const { orders, issued_orders_total, issued_by_operators } = await loadDailyOrdersForCashReport(d, departmentId)
+  const { orders, issued_orders_total, issued_by_operators } = await loadDailyOrdersForCashReport(d, departmentId, {
+    includeItems: true,
+  })
   res.json({ date: d, department_id: departmentId ?? null, orders, issued_orders_total, issued_by_operators })
 }))
 

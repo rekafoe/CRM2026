@@ -37,9 +37,105 @@ export type LoadDailyOrdersResult = {
   issued_by_operators: IssuedByOperatorRow[]
 }
 
+export type LoadDailyOrdersOptions = {
+  /** Позиции нужны только для UI заказов/кликов. Касса считает суммы без items. */
+  includeItems?: boolean
+}
+
+async function resolveItemsPrinterColumn(): Promise<string> {
+  try {
+    if (await hasColumn('items', 'printerId')) return 'printerId'
+    if (await hasColumn('items', 'printer_id')) return 'printer_id'
+  } catch {
+    /* ignore */
+  }
+  return 'printerId'
+}
+
+/**
+ * Ожидаемые клики по принтерам за день отчёта (без выгрузки всех позиций).
+ * Как в UI: не считаем клики у заказов, выданных сегодня, но оформленных в другой день.
+ */
+export async function loadPrinterExpectedClicksForDay(
+  reportDate: string,
+  departmentId?: number,
+): Promise<Record<number, number>> {
+  const d = String(reportDate || '').slice(0, 10)
+  if (!d) return {}
+
+  const db = await getDb()
+  const printerCol = await resolveItemsPrinterColumn()
+  if (printerCol !== 'printerId' && printerCol !== 'printer_id') return {}
+
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })
+
+  let hasPrepaymentUpdatedAt = false
+  try {
+    hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+  } catch {
+    hasPrepaymentUpdatedAt = false
+  }
+
+  let hasDebtClosed = false
+  try {
+    hasDebtClosed = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
+  } catch {
+    hasDebtClosed = false
+  }
+
+  const dayFilter = sqlDailyOrderDayFilter(d, {
+    hasPrepaymentUpdatedAt,
+    hasDebtClosed,
+    tableAlias: 'o',
+  })
+
+  const skipIssuedOtherDaySql = hasDebtClosed
+    ? `AND NOT (
+         EXISTS (SELECT 1 FROM debt_closed_events dce WHERE dce.order_id = o.id AND dce.closed_date = ?)
+         AND substr(COALESCE(o.created_at, o.createdAt), 1, 10) != ?
+       )`
+    : ''
+  const skipIssuedOtherDayParams = hasDebtClosed ? [d, d] : []
+
+  const clickExpr = `CASE
+    WHEN COALESCE(i.clicks, 0) > 0 THEN COALESCE(i.clicks, 0)
+    ELSE CASE WHEN COALESCE(i.sheets, 0) < 0 THEN 0 ELSE COALESCE(i.sheets, 0) END
+         * ((CASE WHEN COALESCE(i.sides, 1) < 1 THEN 1 ELSE COALESCE(i.sides, 1) END) * 2)
+  END`
+
+  try {
+    const rows = (await db.all(
+      `SELECT i.${printerCol} as printer_id, COALESCE(SUM(${clickExpr}), 0) as clicks
+         FROM items i
+         JOIN orders o ON o.id = i.orderId
+        WHERE ${dayFilter.whereSql}
+          ${fulfillmentScope.clause}
+          AND i.${printerCol} IS NOT NULL
+          AND CAST(i.${printerCol} AS INTEGER) != 0
+          ${skipIssuedOtherDaySql}
+        GROUP BY i.${printerCol}`,
+      ...dayFilter.params,
+      ...fulfillmentScope.params,
+      ...skipIssuedOtherDayParams,
+    )) as Array<{ printer_id: number; clicks: number }>
+
+    const out: Record<number, number> = {}
+    for (const row of rows) {
+      const id = Number(row.printer_id)
+      if (!Number.isFinite(id) || id <= 0) continue
+      out[id] = Number(row.clicks ?? 0)
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
 export async function loadDailyOrdersForCashReport(
   reportDate: string,
   departmentId?: number,
+  options?: LoadDailyOrdersOptions,
 ): Promise<LoadDailyOrdersResult> {
   const d = String(reportDate || '').slice(0, 10)
   const db = await getDb()
@@ -100,14 +196,16 @@ export async function loadDailyOrdersForCashReport(
     ...fulfillmentScope.params,
   )) as DailyOrderForCashReport[]
 
-  const orderIds = orders.map((o) => o.id)
-  const itemsByOrderId = await OrderRepository.getItemsByOrderIds(orderIds)
-  for (const order of orders) {
-    const items = itemsByOrderId.get(order.id) ?? []
-    order.items = items.map((item: { params?: unknown }) => ({
-      ...item,
-      params: item.params && typeof item.params === 'object' ? item.params : {},
-    }))
+  if (options?.includeItems) {
+    const orderIds = orders.map((o) => o.id)
+    const itemsByOrderId = await OrderRepository.getItemsByOrderIds(orderIds)
+    for (const order of orders) {
+      const items = itemsByOrderId.get(order.id) ?? []
+      order.items = items.map((item: { params?: unknown }) => ({
+        ...item,
+        params: item.params && typeof item.params === 'object' ? item.params : {},
+      }))
+    }
   }
 
   if (hasDebtClosed) {

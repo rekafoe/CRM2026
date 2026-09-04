@@ -1103,7 +1103,7 @@ export type CashRegisterDayPayload = {
   cash_in_today: number;
   issued_today: number;
   issued_by_operators: Array<{ user_id: number; user_name: string; amount: number }>;
-  contributions_by_user: Array<{ user_id: number; amount: number }>;
+  contributions_by_user: Array<{ user_id: number; user_name?: string; amount: number }>;
   order_volume_work_day: number;
   orders_included_count: number;
   orders_zero_cash: Array<{
@@ -1120,6 +1120,9 @@ export type CashRegisterDayPayload = {
 
 export const getCashRegisterDay = (date: string, params?: { department_id?: number }) =>
   api.get<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register`, { params });
+
+export const recalculateCashRegisterDay = (date: string, params?: { department_id?: number }) =>
+  api.post<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register/recalculate`, {}, { params });
 
 export const getDepartmentCashActual = (date: string, params?: { department_id?: number }) =>
   api.get<{ date: string; department_id: number | null; cash_actual: number | null }>(

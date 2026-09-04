@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getCurrentUser, getUsers, getCashRegisterDay, recalculateCashRegisterDay, getDepartments, getPrinterCountersByDate, getDepartmentCashActual, saveDepartmentCashActual, type Department } from '../api';
-import { addCalendarDaysLocal, calendarDateLocal, todayCalendarLocal } from '../utils/numberInput';
+import { api, getCurrentUser, getCashRegisterDay, recalculateCashRegisterDay, getDepartments, getPrinterCountersByDate, getDepartmentCashActual, saveDepartmentCashActual, type Department } from '../api';
+import { addCalendarDaysLocal, todayCalendarLocal } from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
+
+function isAdminRole(role?: string | null): boolean {
+  return String(role || '').toLowerCase() === 'admin';
+}
+
+function parseCashActual(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 
 interface PrinterCounter {
   id: number;
@@ -11,7 +21,8 @@ interface PrinterCounter {
   name: string;
   value: number | null;
   prev_value: number | null;
-  difference?: number;
+  difference?: number | null;
+  expected_clicks?: number;
 }
 
 interface CashData {
@@ -65,112 +76,52 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const [printerExpectedClicks, setPrinterExpectedClicks] = useState<Record<number, number>>({});
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
-  const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined);
-  const isAdmin = user?.role === 'admin';
+  const [scopeReady, setScopeReady] = useState(false);
+  const [cashRefreshing, setCashRefreshing] = useState(false);
+  const [printersRefreshing, setPrintersRefreshing] = useState(false);
+  const isAdmin = isAdminRole(user?.role);
   const departmentLocked = !isAdmin;
   const [activeTab, setActiveTab] = useState<'cash' | 'printers'>('cash');
-  const previousDateLabel = React.useMemo(
+  const cashRequestSeq = useRef(0);
+  const printerRequestSeq = useRef(0);
+  const previousDateLabel = useMemo(
     () => addCalendarDaysLocal(selectedDate, -1),
     [selectedDate],
   );
+  const canLoadScopedData = Boolean(user && scopeReady && (isAdmin || selectedDepartmentId != null));
+  const dataRefreshing = cashRefreshing || (activeTab === 'printers' && printersRefreshing);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      loadCounters();
-    }
-  }, [user, selectedDate, selectedDepartmentId]);
-
-  useEffect(() => {
-    getUsers()
-      .then((res) => setAllUsers(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setAllUsers([]));
-    getDepartments()
-      .then((res) => setDepartments(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setDepartments([]));
-  }, []);
-
-  const loadUser = async () => {
+  const loadCashData = useCallback(async () => {
+    const seq = ++cashRequestSeq.current;
+    setCashRefreshing(true);
+    setError(null);
     try {
-      const response = await getCurrentUser();
-      const me = response.data;
-      setUser(me);
-      if (me?.department_id != null && Number(me.department_id) > 0) {
-        setSelectedDepartmentId(Number(me.department_id));
-      }
-    } catch (error) {
-      console.error('Failed to load user:', error);
-      navigate('/');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCounters = async () => {
-    if (!user) return;
-    
-    try {
-      setError(null);
-
+      const previousDateKey = addCalendarDaysLocal(selectedDate, -1);
       const deptParam =
         selectedDepartmentId != null ? { department_id: selectedDepartmentId } : undefined;
 
-      const countersResponse = await getPrinterCountersByDate(selectedDate, deptParam);
-      const counters = (Array.isArray(countersResponse.data) ? countersResponse.data : []).map((counter: any) => ({
-        ...counter,
-        difference: counter.value && counter.prev_value 
-          ? counter.value - counter.prev_value 
-          : null
-      }));
-      setPrinterCounters(counters);
+      const actualPromise =
+        selectedDepartmentId != null
+          ? getDepartmentCashActual(selectedDate, { department_id: selectedDepartmentId }).then((res) =>
+              parseCashActual(res.data?.cash_actual),
+            )
+          : Promise.resolve(null);
+      const previousActualPromise =
+        selectedDepartmentId != null
+          ? getDepartmentCashActual(previousDateKey, { department_id: selectedDepartmentId }).then((res) =>
+              parseCashActual(res.data?.cash_actual),
+            )
+          : Promise.resolve(null);
 
-      // Загружаем данные кассы
-      await loadCashData();
+      const [actualCash, previousActualCash, cashRegisterRes] = await Promise.all([
+        actualPromise,
+        previousActualPromise,
+        getCashRegisterDay(selectedDate, deptParam),
+      ]);
+      if (seq !== cashRequestSeq.current) return;
 
-    } catch (error: any) {
-      console.error('Error loading counters:', error);
-      setError('Ошибка загрузки счетчиков');
-    }
-  };
-
-  const loadCashData = async () => {
-    if (!user) return;
-    
-    try {
-      // Чтобы имена пользователей всегда были доступны (в т.ч. при первом открытии модалки)
-      let usersForNames = allUsers;
-      if (usersForNames.length === 0) {
-        try {
-          const res = await getUsers();
-          usersForNames = Array.isArray(res.data) ? res.data : [];
-          if (usersForNames.length > 0) setAllUsers(usersForNames);
-        } catch (_) { /* ignore */ }
-      }
-      const userNameById = new Map<number, string>(
-        usersForNames.map((u: { id: number; name: string }) => [Number(u.id), u.name])
-      );
-
-      const getCashActualForDate = async (date: string) => {
-        if (selectedDepartmentId == null) return null;
-        const res = await getDepartmentCashActual(date, { department_id: selectedDepartmentId });
-        const raw = res.data?.cash_actual;
-        return raw == null ? null : Number(raw);
-      };
-
-      const actualCash = await getCashActualForDate(selectedDate);
-      setCashActualValue(actualCash ? actualCash.toString() : '');
-
-      const previousDateKey = addCalendarDaysLocal(selectedDate, -1);
-      const previousActualCash = await getCashActualForDate(previousDateKey);
-
-      const cashRegisterRes = await getCashRegisterDay(selectedDate, {
-        department_id: selectedDepartmentId,
-      });
       const reg = cashRegisterRes.data;
       const dailyRevenue = Number(reg.cash_in_today ?? 0);
       const issuedOrdersTotal = Number(reg.issued_today ?? 0);
@@ -178,41 +129,15 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
 
       const contributionsToShow: CashContribution[] = (reg.contributions_by_user ?? []).map((c) => ({
         user_id: c.user_id,
-        user_name: userNameById.get(c.user_id) || `ID ${c.user_id}`,
+        user_name: c.user_name || `ID ${c.user_id}`,
         cash_actual: c.amount,
       }));
       const total = contributionsToShow.reduce((sum, report) => sum + Number(report.cash_actual || 0), 0);
       setCashContributions(contributionsToShow);
       setCashContributionsTotal(total);
-
-      const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`, {
-        params: selectedDepartmentId != null ? { department_id: selectedDepartmentId } : undefined,
-      });
-      const ordersForDate = Array.isArray(ordersResponse.data?.orders)
-        ? ordersResponse.data.orders
-        : [];
+      setCashActualValue(actualCash != null ? String(actualCash) : '');
 
       const calculatedCash = Number(previousActualCash || 0) + dailyRevenue;
-
-      const expectedClicks: Record<number, number> = {};
-      ordersForDate.forEach((order: any) => {
-        const createdDate = calendarDateLocal(order.created_at ?? order.createdAt);
-        if (order.cash_from_issue_today != null && createdDate !== selectedDate) {
-          return;
-        }
-        const items = Array.isArray(order.items) ? order.items : [];
-        items.forEach((item: any) => {
-          const printerId = Number(item.printerId || item.printer_id);
-          if (!printerId) return;
-          const sheets = Number(item.sheets ?? 0);
-          const sides = Number(item.sides ?? 1);
-          const clicks = Number(item.clicks ?? 0) || (Math.max(0, sheets) * (Math.max(1, sides) * 2));
-          if (!expectedClicks[printerId]) expectedClicks[printerId] = 0;
-          expectedClicks[printerId] += clicks;
-        });
-      });
-      setPrinterExpectedClicks(expectedClicks);
-
       const difference = actualCash !== null ? actualCash - calculatedCash : 0;
 
       setCashData({
@@ -225,9 +150,10 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         issuedByOperators,
         orderVolumeWorkDay: Number(reg.order_volume_work_day ?? 0),
       });
-
-    } catch (error: any) {
-      console.error('Error loading cash data:', error);
+    } catch (err: unknown) {
+      if (seq !== cashRequestSeq.current) return;
+      console.error('Error loading cash data:', err);
+      setError('Ошибка загрузки кассы');
       setCashData({
         actual: null,
         calculated: 0,
@@ -235,12 +161,88 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         dailyRevenue: 0,
         previousActual: null,
         issuedOrdersTotal: 0,
-        issuedByOperators: []
+        issuedByOperators: [],
       });
       setCashContributions([]);
       setCashContributionsTotal(0);
+    } finally {
+      if (seq === cashRequestSeq.current) setCashRefreshing(false);
     }
-  };
+  }, [selectedDate, selectedDepartmentId]);
+
+  const loadPrinters = useCallback(async () => {
+    const seq = ++printerRequestSeq.current;
+    setPrintersRefreshing(true);
+    setError(null);
+    try {
+      const deptParam =
+        selectedDepartmentId != null ? { department_id: selectedDepartmentId } : undefined;
+      const countersResponse = await getPrinterCountersByDate(selectedDate, deptParam);
+      if (seq !== printerRequestSeq.current) return;
+
+      const counters = (Array.isArray(countersResponse.data) ? countersResponse.data : []).map((counter: PrinterCounter) => ({
+        ...counter,
+        difference:
+          counter.value != null && counter.prev_value != null
+            ? counter.value - counter.prev_value
+            : null,
+      }));
+      setPrinterCounters(counters);
+
+      const expectedClicks: Record<number, number> = {};
+      for (const printer of counters) {
+        expectedClicks[printer.id] = Number(printer.expected_clicks ?? 0);
+      }
+      setPrinterExpectedClicks(expectedClicks);
+    } catch (err: unknown) {
+      if (seq !== printerRequestSeq.current) return;
+      console.error('Error loading counters:', err);
+      setError('Ошибка загрузки счетчиков');
+    } finally {
+      if (seq === printerRequestSeq.current) setPrintersRefreshing(false);
+    }
+  }, [selectedDate, selectedDepartmentId]);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const response = await getCurrentUser();
+        const me = response.data;
+        const admin = isAdminRole(me?.role);
+        if (admin) {
+          setSelectedDepartmentId(undefined);
+        } else if (me?.department_id != null && Number(me.department_id) > 0) {
+          setSelectedDepartmentId(Number(me.department_id));
+        } else {
+          setSelectedDepartmentId(undefined);
+        }
+        setUser(me);
+        setScopeReady(true);
+      } catch (err: unknown) {
+        console.error('Failed to load user:', err);
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void loadUser();
+  }, [navigate]);
+
+  useEffect(() => {
+    getDepartments()
+      .then((res) => setDepartments(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setDepartments([]));
+  }, []);
+
+  useEffect(() => {
+    if (!canLoadScopedData) return;
+    void loadCashData();
+  }, [canLoadScopedData, loadCashData]);
+
+  useEffect(() => {
+    if (!canLoadScopedData || activeTab !== 'printers') return;
+    void loadPrinters();
+  }, [canLoadScopedData, activeTab, loadPrinters]);
 
   const handleRecalculateCash = async () => {
     try {
@@ -265,7 +267,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         counter_date: selectedDate,
         value: value
       });
-      await loadCounters();
+      await loadPrinters();
       setEditingPrinter(null);
       setNewCounterValue('');
     } catch (error: any) {
@@ -441,6 +443,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             onChange={(e) => setSelectedDepartmentId(e.target.value === '' ? undefined : Number(e.target.value))}
           >
             {isAdmin ? <option value="">Все точки</option> : null}
+            {!isAdmin && selectedDepartmentId != null && !departments.some((d) => d.id === selectedDepartmentId) ? (
+              <option value={selectedDepartmentId}>Точка #{selectedDepartmentId}</option>
+            ) : null}
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
@@ -452,6 +457,12 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         <div className="counters-error-banner">
           <AppIcon name="warning" size="xs" /> {error}
           <button onClick={() => setError(null)} aria-label="Закрыть"><AppIcon name="x" size="xs" /></button>
+        </div>
+      )}
+
+      {!isAdmin && selectedDepartmentId == null && (
+        <div className="counters-error-banner">
+          <AppIcon name="warning" size="xs" /> Пользователь не привязан к точке — касса и счётчики недоступны
         </div>
       )}
 
@@ -472,7 +483,13 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         </button>
       </div>
 
-      <div className="counters-content">
+      <div className={`counters-content ${dataRefreshing ? 'counters-content--busy' : ''}`}>
+        {dataRefreshing && (
+          <div className="counters-refreshing" aria-live="polite">
+            <div className="loading-spinner"></div>
+            <p>Обновление...</p>
+          </div>
+        )}
         {activeTab === 'cash' && (
         <div className="counters-section">
           <div className="section-header">
