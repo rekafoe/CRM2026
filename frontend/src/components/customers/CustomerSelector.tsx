@@ -8,7 +8,10 @@ interface CustomerSelectorProps {
   orderId: number;
   currentCustomerId?: number | null;
   onCustomerChange?: () => void;
-  onOrderPatch?: (orderId: number, patch: { payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal' }) => void;
+  onOrderPatch?: (
+    orderId: number,
+    patch: { customer_id?: number | null; payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal' },
+  ) => void;
   /** Inline: без лейбла, в одну строку с кнопками (Создать | Селект 160px | Поиск) */
   inline?: boolean;
 }
@@ -66,16 +69,18 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
     try {
       await updateOrderCustomer(orderId, customerId);
       setSelectedCustomerId(customerId);
-      // Безналичный клиент (юрлицо) → автоматически «Счёт»; физлицо/без клиента → «Касса»
-      if (customerId) {
-        const c = customer ?? customers.find((x) => x.id === customerId);
-        if (c?.type === 'legal') {
-          await updateOrderPaymentChannel(orderId, 'invoice');
-          onOrderPatch?.(orderId, { payment_channel: 'invoice' });
-        } else if (c?.type === 'individual') {
-          await updateOrderPaymentChannel(orderId, 'cash');
-          onOrderPatch?.(orderId, { payment_channel: 'cash' });
-        }
+      const c = customerId ? (customer ?? customers.find((x) => x.id === customerId)) : null;
+      const paymentPatch =
+        c?.type === 'legal'
+          ? ({ payment_channel: 'invoice' } as const)
+          : c?.type === 'individual'
+            ? ({ payment_channel: 'cash' } as const)
+            : {};
+      onOrderPatch?.(orderId, { customer_id: customerId, ...paymentPatch });
+      if (c?.type === 'legal') {
+        await updateOrderPaymentChannel(orderId, 'invoice');
+      } else if (c?.type === 'individual') {
+        await updateOrderPaymentChannel(orderId, 'cash');
       }
       addToast({
         type: 'success',

@@ -18,6 +18,7 @@ import { AssignableUserSelect } from '../../orders/AssignableUserSelect';
 import { OrderTransferModal } from '../../orders/OrderTransferModal';
 import { useAssignableUsers } from '../../../hooks/useAssignableUsers';
 import { Button } from '../../common/Button';
+import { useOrderLegalDocuments } from '../hooks/useOrderLegalDocuments';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -72,6 +73,14 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   onOrderPatch,
 }) => {
   const { addToast } = useToast();
+  const {
+    showLegalDocsButton,
+    docsMenuOpen,
+    setDocsMenuOpen,
+    docsMenuRef,
+    generatingKind,
+    generateLegalDocument,
+  } = useOrderLegalDocuments({ order: selectedOrder, addToast });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
   const [receiptMenuOpen, setReceiptMenuOpen] = useState(false);
@@ -313,7 +322,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             {(selectedOrder.issued_by_me === true || selectedOrder.issued_by_me === 1) && (
               <span style={{ fontSize: 12, color: '#2e7d32', fontWeight: 600 }}>Выдали вы</span>
             )}
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="order-detail-actions-row">
               <button 
                 onClick={onShowFilesModal}
                 className="order-detail-action-btn order-detail-action-btn--primary"
@@ -354,6 +363,55 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 {isGeneratingPdf ? <><AppIcon name="refresh" size="xs" /> Генерация...</> : <><AppIcon name="document" size="xs" /> Бланк</>}
               </button>
+              {showLegalDocsButton && (
+                <div ref={docsMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!generatingKind) setDocsMenuOpen((v) => !v);
+                    }}
+                    disabled={Boolean(generatingKind)}
+                    className={`order-detail-action-btn order-detail-action-btn--legal ${generatingKind ? 'order-detail-action-btn--disabled' : ''}`}
+                    title="Договор, акт и счёт по этому заказу"
+                  >
+                    {generatingKind
+                      ? <><AppIcon name="refresh" size="xs" /> Генерация...</>
+                      : <><AppIcon name="briefcase" size="xs" /> Документы ▼</>}
+                  </button>
+                  {docsMenuOpen && !generatingKind && (
+                    <div
+                      className="order-detail-action-menu"
+                      role="menu"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => generateLegalDocument('contract')}
+                        className="order-detail-action-menu__item"
+                        role="menuitem"
+                      >
+                        Договор Word
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => generateLegalDocument('act')}
+                        className="order-detail-action-menu__item"
+                        role="menuitem"
+                      >
+                        Акт Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => generateLegalDocument('invoice')}
+                        className="order-detail-action-menu__item"
+                        role="menuitem"
+                      >
+                        Счёт Excel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <div ref={receiptMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
                   type="button"
