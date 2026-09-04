@@ -71,6 +71,7 @@ import {
   PLOTTER_FIN_MOUNTING,
   isPlotterCuttingSyntheticServiceId,
 } from '../constants/plotterCuttingFinishingIds';
+import { sheetLayoutPrintTierQuantity } from '../utils/sheetLayoutPrintTierQuantity';
 
 function parseServiceMeterBasis(parametersRaw: string | null | undefined): 'knife_path' | 'feed' {
   if (!parametersRaw) return 'knife_path';
@@ -1033,12 +1034,17 @@ export class SimplifiedPricingService {
       // Раньше при counter_unit=meters ветка рулона шла раньше и полностью игнорировала шаблон.
       let resolvedFromTemplate = false;
       if (printPriceConfig?.tiers?.length) {
+        // Листовые ступени — min_sheets × itemsPerSheet. Ищем по полным листам, иначе
+        // 107 шт. при 54 шт/лист остаются на тарифе 1 листа, а 108 шт. проваливают цену.
+        const sheetTierQuantity = sheetLayoutPrintTierQuantity(quantity, itemsPerSheet);
         const tierQuantity =
           tierSheetsOverride != null
             ? tierSheetsOverride
             : usePagesMultiplier
               ? multipageTierPrintUnits
-              : quantity;
+              : isRollPrint || isMaterialMeterBased
+                ? quantity
+                : sheetTierQuantity;
         const tier = this.findTierForQuantity(printPriceConfig.tiers, tierQuantity);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
@@ -1055,6 +1061,7 @@ export class SimplifiedPricingService {
           logger.info('Цена печати по шаблону продукта (print_prices)', {
             priceForTier,
             quantity,
+            tierQuantity,
             sheetsNeeded,
             pricePerSheet,
             pages: effectivePages,
@@ -2799,12 +2806,16 @@ export class SimplifiedPricingService {
 
       let printPrice = 0;
       if (ctx.printPriceConfig?.tiers?.length) {
-        const tier = this.findTierForQuantity(ctx.printPriceConfig.tiers, q);
+        const physicalSheets = ctx.usePagesMultiplier
+          ? Math.max(1, q * ctx.sheetsPerItem)
+          : Math.ceil(q / ctx.itemsPerSheet);
+        const printTierQty =
+          ctx.usePagesMultiplier || ctx.isRollPrint || ctx.isRollMeterage
+            ? q
+            : sheetLayoutPrintTierQuantity(q, ctx.itemsPerSheet);
+        const tier = this.findTierForQuantity(ctx.printPriceConfig.tiers, printTierQty);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
-          const physicalSheets = ctx.usePagesMultiplier
-            ? Math.max(1, q * ctx.sheetsPerItem)
-            : Math.ceil(q / ctx.itemsPerSheet);
           const printUnits = ctx.usePagesMultiplier
             ? computeMultipagePrintUnits(physicalSheets, ctx.itemsPerSheet)
             : q;
