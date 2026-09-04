@@ -32,11 +32,16 @@ export function getSourceLabel(source?: string): string {
 export type PoolFulfillmentChip = {
   label: string;
   title: string;
-  /** pickup — клиент заберёт в павильоне, нужен трансфер на точку. */
+  /** pickup — клиент заберёт в павильоне; shipping — почта/курьер. */
   variant: 'pickup' | 'shipping' | 'other';
-  /** Короткое имя точки: Океан, Титан или название департамента. */
+  /** Короткое имя точки или способа: Океан, Европочта, EMS. */
   pointName: string;
+  kicker: string;
 };
+
+export function poolFulfillmentShowsBanner(chip: PoolFulfillmentChip | null | undefined): chip is PoolFulfillmentChip {
+  return chip != null && (chip.variant === 'pickup' || chip.variant === 'shipping');
+}
 
 function sanitizeDeliveryLabel(value: string | null | undefined): string {
   const raw = typeof value === 'string' ? value.trim() : '';
@@ -76,8 +81,9 @@ function chip(
   title: string,
   variant: PoolFulfillmentChip['variant'],
   pointName: string,
+  kicker: string,
 ): PoolFulfillmentChip {
-  return { label, title, variant, pointName };
+  return { label, title, variant, pointName, kicker };
 }
 
 /**
@@ -110,27 +116,35 @@ export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null
     haystack.includes('evropocht') ||
     providerId.toLowerCase().includes('euro')
   ) {
-    return chip('Европочта', title, 'shipping', labelDisplay || 'Европочта');
+    return chip('Европочта', title, 'shipping', 'Европочта', 'Доставка');
   }
   if (
     haystack.includes('белпочт') ||
     haystack.includes('belpoch') ||
-    providerId.toLowerCase().includes('belpost')
+    providerId.toLowerCase().includes('belpost') ||
+    (deliveryHaystack.includes('почт') && !deliveryHaystack.includes('евро'))
   ) {
-    return chip('Белпочта', title, 'shipping', labelDisplay || 'Белпочта');
+    return chip('Белпочта', title, 'shipping', 'Белпочта', 'Доставка');
+  }
+  if (
+    /(?:^|[^a-zа-я])(?:ems|емс)(?:$|[^a-zа-я])/i.test(`${deliveryHaystack} ${providerId}`) ||
+    providerId.toLowerCase().includes('ems')
+  ) {
+    return chip('EMS', title, 'shipping', 'EMS', 'Доставка');
   }
   if (kind === 'courier_minsk' || (deliveryHaystack.includes('курьер') && deliveryHaystack.includes('минск'))) {
-    return chip('Курьер Минск', title, 'shipping', labelDisplay || 'Курьер Минск');
+    return chip('Курьер Минск', title, 'shipping', 'Курьер по Минску', 'Доставка');
   }
   if (
     kind === 'courier_country' ||
     deliveryHaystack.includes('курьер') ||
     deliveryHaystack.includes('courier')
   ) {
-    return chip('Курьер РБ', title, 'shipping', labelDisplay || 'Курьер РБ');
+    return chip('Курьер РБ', title, 'shipping', 'Курьер по РБ', 'Доставка');
   }
   if (kind === 'pickup_point' || deliveryHaystack.includes('пункт выдачи')) {
-    return chip(labelDisplay || 'Пункт выдачи', title, 'shipping', labelDisplay || 'Пункт выдачи');
+    const name = labelDisplay || 'Пункт выдачи';
+    return chip(name, title, 'shipping', name, 'Доставка');
   }
 
   const isStorePickup =
@@ -145,17 +159,17 @@ export function getPoolFulfillmentChip(order: Order): PoolFulfillmentChip | null
       : deptName
         ? `Самовывоз ${deptName}`
         : 'Самовывоз';
-    return chip(label, title, 'pickup', pointName);
+    return chip(label, title, 'pickup', pointName, 'Клиент заберёт');
   }
 
   if (labelDisplay) {
-    return chip(labelDisplay, title, 'other', labelDisplay);
+    return chip(labelDisplay, title, 'other', labelDisplay, 'Получение');
   }
   if (deptName) {
-    return chip(deptName, deptName, 'other', deptName);
+    return chip(deptName, deptName, 'other', deptName, 'Точка');
   }
   if (delivery) {
-    return chip('Доставка', title, 'other', labelDisplay || 'Доставка');
+    return chip('Доставка', title, 'shipping', labelDisplay || 'Доставка', 'Доставка');
   }
   return null;
 }

@@ -11,6 +11,7 @@ export {
   formatPoolDateTime,
   formatPoolDateTimeFull,
   getPoolFulfillmentChip,
+  poolFulfillmentShowsBanner,
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
   ORDER_POOL_SEARCH_LIMIT,

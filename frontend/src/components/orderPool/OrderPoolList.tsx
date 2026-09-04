@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order } from '../../types';
-import { AppIcon, MoneyAmount } from '../ui';
+import { MoneyAmount } from '../ui';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 import {
   formatPoolDateTime,
@@ -9,7 +9,9 @@ import {
   getOrderReadyLabel,
   getPoolFulfillmentChip,
   getSourceLabel,
+  poolFulfillmentShowsBanner,
 } from './orderPoolUtils';
+import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
 
 const OrderCard = React.memo<{
   order: Order;
@@ -59,7 +61,7 @@ const OrderCard = React.memo<{
         isMine ? 'is-mine' : '',
         payment.tone === 'pending' ? 'has-awaiting-pay' : '',
         debt > 0 ? 'has-debt' : '',
-        fulfillmentChip?.variant === 'pickup' ? 'has-pickup' : '',
+        poolFulfillmentShowsBanner(fulfillmentChip) ? 'has-fulfillment' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -79,7 +81,7 @@ const OrderCard = React.memo<{
             {order.source ? (
               <span className="order-pool-card__source">{getSourceLabel(order.source)}</span>
             ) : null}
-            {fulfillmentChip && fulfillmentChip.variant !== 'pickup' ? (
+            {fulfillmentChip && !poolFulfillmentShowsBanner(fulfillmentChip) ? (
               <span className="order-pool-card__fulfillment" title={fulfillmentChip.title}>
                 {fulfillmentChip.label}
               </span>
@@ -111,15 +113,7 @@ const OrderCard = React.memo<{
           </div>
         </div>
 
-        {fulfillmentChip?.variant === 'pickup' ? (
-          <div className="order-pool-card__pickup" title={fulfillmentChip.title}>
-            <AppIcon name="building" size="xs" />
-            <div className="order-pool-card__pickup-text">
-              <span className="order-pool-card__pickup-kicker">Клиент заберёт</span>
-              <strong className="order-pool-card__pickup-point">{fulfillmentChip.pointName}</strong>
-            </div>
-          </div>
-        ) : null}
+        <OrderPoolFulfillmentBanner chip={fulfillmentChip} size="card" />
 
         <div className="order-pool-card__client">
           <span className="order-pool-card__name" title={order.customerName || undefined}>

@@ -46,6 +46,7 @@ import {
   OrderPoolPaymentSummary,
   getEffectiveResponsibleUserId,
   getPoolFulfillmentChip,
+  poolFulfillmentShowsBanner,
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
   ORDER_POOL_SEARCH_LIMIT,
@@ -913,8 +914,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               <div
                 className={[
                   'order-pool-fulfillment',
-                  getPoolFulfillmentChip(selectedOrder)?.variant === 'pickup'
-                    ? 'order-pool-fulfillment--pickup'
+                  poolFulfillmentShowsBanner(getPoolFulfillmentChip(selectedOrder))
+                    ? 'order-pool-fulfillment--highlight'
                     : '',
                 ]
                   .filter(Boolean)

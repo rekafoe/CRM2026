@@ -12,7 +12,7 @@ import {
   getPoolFulfillmentChip,
   getSourceLabel,
 } from './orderPoolUtils';
-import { AppIcon } from '../ui';
+import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
 
 interface OrderPoolDetailHeaderProps {
   order: Order;
@@ -134,20 +134,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
         )}
       </div>
 
-      {fulfillmentChip?.variant === 'pickup' ? (
-        <div className="order-pool-pickup-banner" title={fulfillmentChip.title}>
-          <AppIcon name="building" size="sm" />
-          <div className="order-pool-pickup-banner__text">
-            <span className="order-pool-pickup-banner__kicker">Клиент заберёт сам</span>
-            <strong className="order-pool-pickup-banner__point">{fulfillmentChip.pointName}</strong>
-            {fulfillmentChip.title &&
-            fulfillmentChip.title !== fulfillmentChip.pointName &&
-            fulfillmentChip.title !== 'Способ получения' ? (
-              <span className="order-pool-pickup-banner__hint">{fulfillmentChip.title}</span>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <OrderPoolFulfillmentBanner chip={fulfillmentChip} size="detail" />
 
       <div className="order-detail-responsible order-detail-responsible--with-transfer">
         <label htmlFor="order-pool-responsible">
