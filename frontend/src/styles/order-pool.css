@@ -1608,7 +1608,7 @@
 .order-pool-fulfillment-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 10px;
   margin: 0 0 14px;
 }
