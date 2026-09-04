@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { asyncHandler } from '../middleware'
+import { asyncHandler, AuthenticatedRequest } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { sqlOrderTotalAfterDiscount } from '../utils/orderAmountsSql'
@@ -13,6 +13,10 @@ import {
   getCashRegisterDay,
   recalculateCashRegisterDay,
 } from '../services/cashRegisterDayService'
+import {
+  getDepartmentCashActual,
+  upsertDepartmentCashActual,
+} from '../services/departmentCashActualService'
 import { computeCashForReportDate } from '../utils/reportOrderCash'
 import {
   hasFulfillmentDepartmentColumn,
@@ -22,6 +26,7 @@ import {
   effectiveLocationDepartmentExpr,
   type FulfillmentDepartmentScope,
 } from '../utils/orderFulfillmentScope'
+import { resolveDepartmentScope } from '../utils/resolveDepartmentScope'
 
 const router = Router()
 
@@ -123,9 +128,25 @@ async function fulfillmentScopeFromQuery(
   return { departmentId, columnExists, ...scope }
 }
 
-function parseDepartmentIdFromQuery(query: Record<string, unknown>): number | undefined {
-  const parsed = parseFulfillmentDepartmentId(query.department_id)
-  return typeof parsed === 'number' ? parsed : undefined
+async function resolveCashDepartmentId(req: { user?: { id: number; role?: string }; query?: unknown }): Promise<number | undefined | 'empty'> {
+  const query = (req.query || {}) as Record<string, unknown>
+  return resolveDepartmentScope({
+    user: req.user ?? null,
+    queryDepartmentId: query.department_id,
+  })
+}
+
+function emptyCashRegisterPayload(date: string) {
+  return {
+    date,
+    cash_in_today: 0,
+    issued_today: 0,
+    issued_by_operators: [] as Array<{ user_id: number; user_name: string; amount: number }>,
+    contributions_by_user: [] as Array<{ user_id: number; amount: number }>,
+    order_volume_work_day: 0,
+    orders_included_count: 0,
+    orders_zero_cash: [] as unknown[],
+  }
 }
 
 async function loadExpensesByDepartment(
@@ -262,7 +283,11 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
 router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   const d = String(req.params.date || '').slice(0, 10)
   if (!d) { res.status(400).json({ message: 'date required' }); return }
-  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
+  const departmentId = await resolveCashDepartmentId(req as AuthenticatedRequest)
+  if (departmentId === 'empty') {
+    res.json({ date: d, department_id: null, orders: [], issued_orders_total: 0, issued_by_operators: [] })
+    return
+  }
 
   const { orders, issued_orders_total, issued_by_operators } = await loadDailyOrdersForCashReport(d, departmentId)
   res.json({ date: d, department_id: departmentId ?? null, orders, issued_orders_total, issued_by_operators })
@@ -272,7 +297,11 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
 router.get('/daily/:date/cash-register', asyncHandler(async (req, res) => {
   const d = String(req.params.date || '').slice(0, 10)
   if (!d) { res.status(400).json({ message: 'date required' }); return }
-  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
+  const departmentId = await resolveCashDepartmentId(req as AuthenticatedRequest)
+  if (departmentId === 'empty') {
+    res.json(emptyCashRegisterPayload(d))
+    return
+  }
   const payload = await getCashRegisterDay(d, departmentId)
   res.json(payload)
 }))
@@ -281,9 +310,47 @@ router.get('/daily/:date/cash-register', asyncHandler(async (req, res) => {
 router.post('/daily/:date/cash-register/recalculate', asyncHandler(async (req, res) => {
   const d = String(req.params.date || '').slice(0, 10)
   if (!d) { res.status(400).json({ message: 'date required' }); return }
-  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
+  const departmentId = await resolveCashDepartmentId(req as AuthenticatedRequest)
+  if (departmentId === 'empty') {
+    res.json(emptyCashRegisterPayload(d))
+    return
+  }
   const payload = await recalculateCashRegisterDay(d, departmentId)
   res.json(payload)
+}))
+
+// GET /api/reports/daily/:date/cash-actual — факт с терминала по точке
+router.get('/daily/:date/cash-actual', asyncHandler(async (req, res) => {
+  const d = String(req.params.date || '').slice(0, 10)
+  if (!d) { res.status(400).json({ message: 'date required' }); return }
+  const departmentId = await resolveCashDepartmentId(req as AuthenticatedRequest)
+  if (departmentId === 'empty' || departmentId == null) {
+    res.json({ date: d, department_id: null, cash_actual: null })
+    return
+  }
+  const cash_actual = await getDepartmentCashActual(d, departmentId)
+  res.json({ date: d, department_id: departmentId, cash_actual })
+}))
+
+// PUT /api/reports/daily/:date/cash-actual — сохранить факт кассы точки
+router.put('/daily/:date/cash-actual', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser?.id) { res.status(401).json({ message: 'Unauthorized' }); return }
+  const d = String(req.params.date || '').slice(0, 10)
+  if (!d) { res.status(400).json({ message: 'date required' }); return }
+  const departmentId = await resolveCashDepartmentId(req as AuthenticatedRequest)
+  if (departmentId === 'empty' || departmentId == null) {
+    res.status(400).json({ message: 'Укажите точку для сохранения кассы' })
+    return
+  }
+  const raw = (req.body as { cash_actual?: number })?.cash_actual
+  const amount = Number(raw)
+  if (!Number.isFinite(amount)) {
+    res.status(400).json({ message: 'Некорректная сумма' })
+    return
+  }
+  const cash_actual = await upsertDepartmentCashActual(d, departmentId, amount, authUser.id)
+  res.json({ date: d, department_id: departmentId, cash_actual })
 }))
 
 // GET /api/reports/daily-cash-by-month — касса по дням за месяц (month=YYYY-MM)
@@ -293,7 +360,11 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
     res.status(400).json({ message: 'month=YYYY-MM required' })
     return
   }
-  const departmentId = parseDepartmentIdFromQuery(req.query as Record<string, unknown>)
+  const departmentId = await resolveCashDepartmentId(req as AuthenticatedRequest)
+  if (departmentId === 'empty') {
+    res.json({ month, byDate: {} })
+    return
+  }
   const db = await getDb()
   const columnExists = await hasFulfillmentDepartmentColumn()
   const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })

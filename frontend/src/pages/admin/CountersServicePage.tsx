@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
 import { AppIcon, MoneyAmount, BynSymbol } from '../../components/ui';
-import { api, getUsers, getPrinterCountersByMonth, getDailyCashByMonth, getCashRegisterDay, getDepartments, type Department } from '../../api';
+import { getUsers, getPrinterCountersByDate, getPrinterCountersByMonth, getDailyCashByMonth, getCashRegisterDay, getDepartments, type Department } from '../../api';
 import { addCalendarDaysLocal, todayCalendarLocal } from '../../utils/numberInput';
 import './CountersServicePage.css';
 
@@ -66,7 +66,9 @@ export const CountersServicePage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const countersResponse = await api.get(`/printers/counters?date=${selectedDate}`);
+      const countersResponse = await getPrinterCountersByDate(selectedDate, {
+        department_id: selectedDepartmentId,
+      });
       const counters = Array.isArray(countersResponse.data)
         ? countersResponse.data.map((counter: any) => ({
             ...counter,
@@ -112,7 +114,7 @@ export const CountersServicePage: React.FC = () => {
       setError(null);
 
       const [countersRes, cashRes] = await Promise.all([
-        getPrinterCountersByMonth(selectedMonth),
+        getPrinterCountersByMonth(selectedMonth, { department_id: selectedDepartmentId }),
         getDailyCashByMonth(selectedMonth, { department_id: selectedDepartmentId }),
       ]);
 

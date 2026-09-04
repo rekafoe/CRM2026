@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getCurrentUser, getUsers, getCashRegisterDay, recalculateCashRegisterDay, getDepartments, type Department } from '../api';
+import { api, getCurrentUser, getUsers, getCashRegisterDay, recalculateCashRegisterDay, getDepartments, getPrinterCountersByDate, getDepartmentCashActual, saveDepartmentCashActual, type Department } from '../api';
 import { addCalendarDaysLocal, calendarDateLocal, todayCalendarLocal } from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
-
-interface Printer {
-  id: number;
-  code: string;
-  name: string;
-}
 
 interface PrinterCounter {
   id: number;
@@ -44,6 +38,7 @@ interface User {
   id: number;
   name: string;
   role: string;
+  department_id?: number | null;
 }
 
 interface CountersPageProps {
@@ -59,7 +54,6 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   // Данные счетчиков
   const [printerCounters, setPrinterCounters] = useState<PrinterCounter[]>([]);
   const [cashData, setCashData] = useState<CashData>({ actual: null, calculated: 0, difference: 0 });
-  const [printers, setPrinters] = useState<Printer[]>([]);
   
   // Состояние формы
   const [selectedDate, setSelectedDate] = useState<string>(todayCalendarLocal);
@@ -74,6 +68,8 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined);
+  const isAdmin = user?.role === 'admin';
+  const departmentLocked = !isAdmin;
   const [activeTab, setActiveTab] = useState<'cash' | 'printers'>('cash');
   const previousDateLabel = React.useMemo(
     () => addCalendarDaysLocal(selectedDate, -1),
@@ -102,7 +98,11 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const loadUser = async () => {
     try {
       const response = await getCurrentUser();
-      setUser(response.data);
+      const me = response.data;
+      setUser(me);
+      if (me?.department_id != null && Number(me.department_id) > 0) {
+        setSelectedDepartmentId(Number(me.department_id));
+      }
     } catch (error) {
       console.error('Failed to load user:', error);
       navigate('/');
@@ -117,13 +117,11 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
     try {
       setError(null);
 
-      // Загружаем список принтеров
-      const printersResponse = await api.get('/printers');
-      setPrinters(printersResponse.data);
+      const deptParam =
+        selectedDepartmentId != null ? { department_id: selectedDepartmentId } : undefined;
 
-      // Загружаем счетчики принтеров
-      const countersResponse = await api.get(`/printers/counters?date=${selectedDate}`);
-      const counters = countersResponse.data.map((counter: any) => ({
+      const countersResponse = await getPrinterCountersByDate(selectedDate, deptParam);
+      const counters = (Array.isArray(countersResponse.data) ? countersResponse.data : []).map((counter: any) => ({
         ...counter,
         difference: counter.value && counter.prev_value 
           ? counter.value - counter.prev_value 
@@ -158,17 +156,10 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       );
 
       const getCashActualForDate = async (date: string) => {
-        // Используем список, чтобы не ловить 404, если отчёта нет
-        const reportListResponse = await api.get('/daily-reports', {
-          params: {
-            from: date,
-            to: date,
-            show_all: true,
-            scope: 'global'
-          }
-        });
-        const report = Array.isArray(reportListResponse.data) ? reportListResponse.data[0] : null;
-        return report?.cash_actual ?? null;
+        if (selectedDepartmentId == null) return null;
+        const res = await getDepartmentCashActual(date, { department_id: selectedDepartmentId });
+        const raw = res.data?.cash_actual;
+        return raw == null ? null : Number(raw);
       };
 
       const actualCash = await getCashActualForDate(selectedDate);
@@ -287,32 +278,14 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
 
   const updateCashActual = async (value: number) => {
     if (!user) return;
+    if (selectedDepartmentId == null) {
+      setError('Выберите точку, чтобы сохранить кассу');
+      return;
+    }
     
     try {
       setSaving(true);
-      
-      // Сначала пытаемся обновить существующий отчет
-      try {
-        console.log('Updating cash_actual:', { date: selectedDate, userId: user.id, value });
-        await api.patch(`/daily-reports/${selectedDate}?scope=global`, {
-          cash_actual: value
-        });
-        console.log('Cash updated successfully');
-      } catch (patchError: any) {
-        // Если отчет не найден (404), создаем новый
-        if (patchError.response?.status === 404) {
-          console.log('Daily report not found, creating new one...');
-          await api.post('/daily-reports/full?scope=global', {
-            report_date: selectedDate,
-            orders_count: 0,
-            total_revenue: 0,
-            cash_actual: value
-          });
-        } else {
-          throw patchError;
-        }
-      }
-      
+      await saveDepartmentCashActual(selectedDate, value, { department_id: selectedDepartmentId });
       await loadCashData();
     } catch (error: any) {
       console.error('Error updating cash actual:', error);
@@ -464,9 +437,10 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             id="dept-input"
             className="date-input"
             value={selectedDepartmentId ?? ''}
+            disabled={departmentLocked}
             onChange={(e) => setSelectedDepartmentId(e.target.value === '' ? undefined : Number(e.target.value))}
           >
-            <option value="">Все точки</option>
+            {isAdmin ? <option value="">Все точки</option> : null}
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
@@ -537,7 +511,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                 <button
                   className="save-btn"
                   onClick={handleCashSave}
-                  disabled={saving || !cashActualValue.trim()}
+                  disabled={saving || !cashActualValue.trim() || selectedDepartmentId == null}
                 >
                   {saving ? <><AppIcon name="refresh" size="xs" /> Сохранение...</> : <><AppIcon name="save" size="xs" /> Сохранить</>}
                 </button>
@@ -633,7 +607,11 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
           </div>
           
           <div className="printers-grid">
-            {printerCounters.map(printer => (
+            {printerCounters.length === 0 ? (
+              <p className="cash-contributions-empty">
+                На этой точке нет принтеров. Привяжите принтеры к департаменту в админке «Принтеры».
+              </p>
+            ) : printerCounters.map(printer => (
               <div key={printer.id} className="printer-card">
                 <div className="printer-header">
                   <div className="printer-info">

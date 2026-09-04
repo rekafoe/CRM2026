@@ -1090,8 +1090,10 @@ export const getPrinters = (params?: {
 }) => api.get<Printer[]>('/printers', { params });
 export const getPrintTechnologies = () => api.get('/printing-technologies');
 export const submitPrinterCounter = (printerId: number, data: { counter_date: string; value: number }) => api.post(`/printers/${printerId}/counters`, data);
-export const getPrinterCountersByDate = (date: string) => api.get(`/printers/counters`, { params: { date } });
-export const getPrinterCountersByMonth = (month: string) => api.get(`/printers/counters`, { params: { month } });
+export const getPrinterCountersByDate = (date: string, params?: { department_id?: number }) =>
+  api.get(`/printers/counters`, { params: { date, ...params } });
+export const getPrinterCountersByMonth = (month: string, params?: { department_id?: number }) =>
+  api.get(`/printers/counters`, { params: { month, ...params } });
 export const getDailyCashByMonth = (month: string, params?: { department_id?: number }) =>
   api.get(`/reports/daily-cash-by-month`, { params: { month, ...params } });
 export const getDailySummary = (date: string) => api.get(`/reports/daily/${date}/summary`);
@@ -1119,8 +1121,22 @@ export type CashRegisterDayPayload = {
 export const getCashRegisterDay = (date: string, params?: { department_id?: number }) =>
   api.get<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register`, { params });
 
-export const recalculateCashRegisterDay = (date: string, params?: { department_id?: number }) =>
-  api.post<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register/recalculate`, undefined, { params });
+export const getDepartmentCashActual = (date: string, params?: { department_id?: number }) =>
+  api.get<{ date: string; department_id: number | null; cash_actual: number | null }>(
+    `/reports/daily/${date}/cash-actual`,
+    { params },
+  );
+
+export const saveDepartmentCashActual = (
+  date: string,
+  cash_actual: number,
+  params?: { department_id?: number },
+) =>
+  api.put<{ date: string; department_id: number; cash_actual: number }>(
+    `/reports/daily/${date}/cash-actual`,
+    { cash_actual },
+    { params },
+  );
 
 // Calculators (MVP)
 export const getFlyersSchema = () => api.get('/calculators/flyers-color');

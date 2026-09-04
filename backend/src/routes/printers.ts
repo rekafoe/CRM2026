@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { resolveDepartmentScope } from '../utils/resolveDepartmentScope'
 
 const router = Router()
 const VALID_COUNTER_UNITS = new Set(['sheets', 'meters', 'm2'])
@@ -44,22 +45,14 @@ async function printersSelectSql(): Promise<{ select: string; from: string; hasD
   }
 }
 
-function parseOptionalDepartmentId(raw: unknown): number | null | undefined {
-  if (raw === undefined || raw === null || raw === '') return undefined
-  if (raw === 'null' || raw === 'none') return null
-  const n = Number(raw)
-  return Number.isFinite(n) && n > 0 ? n : undefined
-}
-
 async function resolvePrintersDepartmentFilter(
   req: AuthenticatedRequest,
   db: Awaited<ReturnType<typeof getDb>>,
   hasPrinterDepartment: boolean
-): Promise<number | null | undefined> {
+): Promise<number | null | undefined | 'empty'> {
   if (!hasPrinterDepartment) return undefined
 
   const hasUserDepartment = await hasColumn('users', 'department_id').catch(() => false)
-
   const executorUserId = Number((req.query as any)?.executor_user_id)
   if (Number.isFinite(executorUserId) && executorUserId > 0) {
     if (!hasUserDepartment) return undefined
@@ -76,25 +69,29 @@ async function resolvePrintersDepartmentFilter(
     return undefined
   }
 
-  const queryDept = parseOptionalDepartmentId((req.query as any)?.department_id)
-  if (queryDept !== undefined) return queryDept
+  return resolveDepartmentScope({
+    user: req.user ?? null,
+    queryDepartmentId: (req.query as any)?.department_id,
+  })
+}
 
-  const authUser = req.user
-  if (!authUser || authUser.role === 'admin' || !hasUserDepartment) return undefined
-
-  try {
-    const userRow = await db.get<{ department_id: number | null }>(
-      'SELECT department_id FROM users WHERE id = ?',
-      [authUser.id]
-    )
-    const userDept = userRow?.department_id != null ? Number(userRow.department_id) : null
-    if (userDept != null && Number.isFinite(userDept) && userDept > 0) {
-      return userDept
-    }
-  } catch {
-    return undefined
+function applyPrinterDepartmentWhere(
+  hasDepartment: boolean,
+  departmentId: number | null | undefined | 'empty',
+  where: string[],
+  params: any[],
+) {
+  if (!hasDepartment || departmentId === undefined) return
+  if (departmentId === 'empty') {
+    where.push('1=0')
+    return
   }
-  return undefined
+  if (departmentId === null) {
+    where.push('p.department_id IS NULL')
+    return
+  }
+  where.push('p.department_id = ?')
+  params.push(departmentId)
 }
 
 // GET /api/printers — список принтеров (фильтр по технологии / департаменту)
@@ -116,12 +113,7 @@ router.get('/', asyncHandler(async (req, res) => {
     params.push(filterByTech)
   }
   if (hasDepartment && departmentId !== undefined) {
-    if (departmentId === null) {
-      where.push('p.department_id IS NULL')
-    } else {
-      where.push('p.department_id = ?')
-      params.push(departmentId)
-    }
+    applyPrinterDepartmentWhere(hasDepartment, departmentId, where, params)
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
@@ -357,6 +349,16 @@ router.get('/counters', asyncHandler(async (req, res) => {
   const month = String((req.query as any)?.month || '').slice(0, 7)
 
   const db = await getDb()
+  const hasDepartment = await hasColumn('printers', 'department_id').catch(() => false)
+  const departmentId = await resolvePrintersDepartmentFilter(
+    req as AuthenticatedRequest,
+    db,
+    hasDepartment
+  )
+  const deptWhere: string[] = []
+  const deptParams: any[] = []
+  applyPrinterDepartmentWhere(hasDepartment, departmentId, deptWhere, deptParams)
+  const deptSql = deptWhere.length ? `WHERE ${deptWhere.join(' AND ')}` : ''
 
   if (month && /^\d{4}-\d{2}$/.test(month)) {
     // Режим месяца: возвращаем счётчики по каждому дню
@@ -376,9 +378,11 @@ router.get('/counters', asyncHandler(async (req, res) => {
                 ) as prev_value
            FROM printers p
       LEFT JOIN printer_counters pc ON pc.printer_id = p.id AND pc.counter_date = ?
+          ${deptSql}
           ORDER BY p.name`,
         dateStr,
-        dateStr
+        dateStr,
+        ...deptParams
       )
       byDate[dateStr] = rows.map((r: any) => ({
         ...r,
@@ -400,9 +404,11 @@ router.get('/counters', asyncHandler(async (req, res) => {
             ) as prev_value
        FROM printers p
   LEFT JOIN printer_counters pc ON pc.printer_id = p.id AND pc.counter_date = ?
+      ${deptSql}
       ORDER BY p.name`,
     date,
-    date
+    date,
+    ...deptParams
   )
   res.json(rows)
 }))
