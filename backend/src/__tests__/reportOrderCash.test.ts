@@ -128,4 +128,60 @@ describe('computeCashForReportDate', () => {
     )
     expect(cash).toBe(40)
   })
+
+  it('does not count online/BePaid prepaid amount as cash', () => {
+    expect(
+      countsAsPaidForCashReport({
+        prepaymentAmount: 100,
+        prepaymentStatus: 'paid',
+        paymentMethod: 'online',
+        prepaymentUpdatedAt: '2025-06-01 12:00:00',
+      }),
+    ).toBe(false)
+    expect(
+      computeCashForReportDate(
+        {
+          prepaymentAmount: 100,
+          prepaymentStatus: 'paid',
+          paymentMethod: 'online',
+          created_at: '2025-05-30 12:00:00',
+          prepaymentUpdatedAt: '2025-06-01 12:00:00',
+          cash_from_issue_today: null,
+        },
+        '2025-06-01',
+      ),
+    ).toBe(0)
+  })
+
+  it('after online full prepay + issue (remainder 0) still excludes from cash', () => {
+    expect(
+      computeCashForReportDate(
+        {
+          prepaymentAmount: 100,
+          prepaymentStatus: 'paid',
+          paymentMethod: 'online',
+          created_at: '2025-05-30 12:00:00',
+          prepaymentUpdatedAt: '2025-06-01 12:00:00',
+          cash_from_issue_today: 0,
+        },
+        '2025-06-02',
+      ),
+    ).toBe(0)
+  })
+
+  it('counts only cash remainder when online partial + issue same day', () => {
+    expect(
+      computeCashForReportDate(
+        {
+          prepaymentAmount: 100,
+          prepaymentStatus: 'paid',
+          paymentMethod: 'online',
+          created_at: '2025-06-01 10:00:00',
+          prepaymentUpdatedAt: '2025-06-01 10:00:00',
+          cash_from_issue_today: 40,
+        },
+        '2025-06-01',
+      ),
+    ).toBe(40)
+  })
 })
