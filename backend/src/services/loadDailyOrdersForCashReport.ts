@@ -208,11 +208,12 @@ export async function loadDailyOrdersForCashReport(
     }
   }
 
+  let hasIssuedByColumn = false
   if (hasDebtClosed) {
     try {
-      const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id')
+      hasIssuedByColumn = await hasColumn('debt_closed_events', 'issued_by_user_id')
       const debtRows = (await db.all(
-        hasIssuedBy
+        hasIssuedByColumn
           ? 'SELECT order_id, amount, issued_by_user_id FROM debt_closed_events WHERE closed_date = ?'
           : 'SELECT order_id, amount, NULL as issued_by_user_id FROM debt_closed_events WHERE closed_date = ?',
         d,
@@ -246,42 +247,61 @@ export async function loadDailyOrdersForCashReport(
     order.cash_for_report_date = computeCashForReportDate(order, d)
   }
 
+  // Суммы выдачи — только по уже отфильтрованным заказам точки.
+  // Раньше SUM шёл по всем debt_closed_events за день → issued_today чужих филиалов.
   let issuedOrdersTotal = 0
   let issuedByOperators: IssuedByOperatorRow[] = []
   if (hasDebtClosed) {
-    try {
-      const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id')
-      const row = await db.get<{ s: number }>(
-        'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ?',
-        d,
-      )
-      issuedOrdersTotal = Number(row?.s ?? 0)
-      if (hasIssuedBy) {
-        const rows = (await db.all(
-          `SELECT d.issued_by_user_id as user_id, COALESCE(u.name, u.email, 'Без оператора') as user_name, SUM(d.amount) as amount
-           FROM debt_closed_events d
-           LEFT JOIN users u ON u.id = d.issued_by_user_id
-           WHERE d.closed_date = ? AND d.issued_by_user_id IS NOT NULL
-           GROUP BY d.issued_by_user_id
-           ORDER BY amount DESC`,
-          d,
-        )) as Array<{ user_id: number; user_name: string; amount: number }>
-        issuedByOperators = rows.map((r) => ({
-          user_id: Number(r.user_id),
-          user_name: r.user_name || `ID ${r.user_id}`,
-          amount: Number(r.amount ?? 0),
-        }))
-        const nullRow = await db.get<{ s: number }>(
-          'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ? AND issued_by_user_id IS NULL',
-          d,
-        )
-        const nullAmount = Number(nullRow?.s ?? 0)
-        if (nullAmount > 0) {
-          issuedByOperators.push({ user_id: 0, user_name: 'Без оператора', amount: nullAmount })
+    const byOperator = new Map<number, number>()
+    let nullOperatorAmount = 0
+    for (const order of orders) {
+      const amt = Number(order.cash_from_issue_today ?? 0)
+      if (!Number.isFinite(amt) || amt <= 0) continue
+      issuedOrdersTotal += amt
+      if (!hasIssuedByColumn) continue
+      const issuerId = Number(order.cash_issued_by_user_id)
+      if (Number.isFinite(issuerId) && issuerId > 0) {
+        byOperator.set(issuerId, (byOperator.get(issuerId) || 0) + amt)
+      } else {
+        nullOperatorAmount += amt
+      }
+    }
+    issuedOrdersTotal = Math.round(issuedOrdersTotal * 100) / 100
+
+    if (hasIssuedByColumn && (byOperator.size > 0 || nullOperatorAmount > 0)) {
+      const ids = [...byOperator.keys()]
+      const nameById = new Map<number, string>()
+      if (ids.length > 0) {
+        try {
+          const placeholders = ids.map(() => '?').join(',')
+          const users = (await db.all(
+            `SELECT id, name, email FROM users WHERE id IN (${placeholders})`,
+            ...ids,
+          )) as Array<{ id: number; name: string | null; email: string | null }>
+          for (const u of users) {
+            nameById.set(
+              Number(u.id),
+              String(u.name || u.email || '').trim() || `ID ${u.id}`,
+            )
+          }
+        } catch {
+          /* ignore */
         }
       }
-    } catch {
-      /* ignore */
+      issuedByOperators = [...byOperator.entries()]
+        .map(([user_id, amount]) => ({
+          user_id,
+          user_name: nameById.get(user_id) || `ID ${user_id}`,
+          amount: Math.round(amount * 100) / 100,
+        }))
+        .sort((a, b) => b.amount - a.amount)
+      if (nullOperatorAmount > 0) {
+        issuedByOperators.push({
+          user_id: 0,
+          user_name: 'Без оператора',
+          amount: Math.round(nullOperatorAmount * 100) / 100,
+        })
+      }
     }
   }
 
