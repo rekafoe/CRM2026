@@ -30,6 +30,7 @@ import {
 } from '../services/editorProductionJobService'
 import { logger } from '../utils/logger'
 import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition'
+import { fetchPublicHttpUrl } from '../utils/assertPublicHttpUrl'
 import { Readable } from 'stream'
 
 const router = Router()
@@ -979,13 +980,13 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
     if (row.externalUrl) {
       let externalResponse: Response
       try {
-        externalResponse = await fetch(String(row.externalUrl), {
-          cache: 'no-store',
-          redirect: 'follow',
-        })
+        // SSRF: не ходим на loopback/private; проверяем каждый hop редиректа
+        externalResponse = await fetchPublicHttpUrl(String(row.externalUrl), { cache: 'no-store' })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось подключиться к внешнему хранилищу'
-        res.status(502).json({ message })
+        const isBlocked =
+          /Адрес недоступен|Разрешены только HTTP|Некорректная ссылка|Пустая ссылка|Редирект|редирект/i.test(message)
+        res.status(isBlocked ? 400 : 502).json({ message })
         return
       }
       if (!externalResponse.ok || !externalResponse.body) {
