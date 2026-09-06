@@ -1,47 +1,6 @@
-import dns from 'dns/promises'
-import net from 'net'
+import { assertPublicHttpUrl, fetchPublicHttpUrl } from '../utils/assertPublicHttpUrl'
 
 const MAX_BYTES = 25 * 1024 * 1024
-
-function isPrivateOrLocalIPv4(parts: number[]): boolean {
-  const [a, b] = parts
-  if (a === 10) return true
-  if (a === 127) return true
-  if (a === 0) return true
-  if (a === 169 && b === 254) return true
-  if (a === 172 && b >= 16 && b <= 31) return true
-  if (a === 192 && b === 168) return true
-  if (a === 100 && b >= 64 && b <= 127) return true /* CGNAT */
-  return false
-}
-
-/** Блокируем SSRF: loopback, частные сети, link-local */
-async function assertPublicHost(hostname: string): Promise<void> {
-  const h = hostname.toLowerCase()
-  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) {
-    throw new Error('Адрес недоступен')
-  }
-  if (net.isIP(h)) {
-    if (h.includes(':')) {
-      if (h === '::1') throw new Error('Адрес недоступен')
-      return
-    }
-    const parts = h.split('.').map((x) => parseInt(x, 10))
-    if (parts.length === 4 && isPrivateOrLocalIPv4(parts)) throw new Error('Адрес недоступен')
-    return
-  }
-  const { address } = await dns.lookup(h)
-  if (net.isIP(address)) {
-    if (address.includes(':')) {
-      const a = address.toLowerCase()
-      if (a === '::1' || a.startsWith('fc') || a.startsWith('fd') || a.startsWith('fe80:'))
-        throw new Error('Адрес недоступен')
-      return
-    }
-    const parts = address.split('.').map((x) => parseInt(x, 10))
-    if (parts.length === 4 && isPrivateOrLocalIPv4(parts)) throw new Error('Адрес недоступен')
-  }
-}
 
 /**
  * Ссылка «просмотр» Google Drive → прямая выдача файла (если доступ открыт).
@@ -58,21 +17,7 @@ export async function fetchImageFromRemoteUrl(rawUrl: string): Promise<{ buffer:
 
   urlStr = normalizeGoogleDriveShareUrl(urlStr)
 
-  let parsed: URL
-  try {
-    parsed = new URL(urlStr)
-  } catch {
-    throw new Error('Некорректная ссылка')
-  }
-
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Разрешены только HTTP(S)')
-  }
-
-  await assertPublicHost(parsed.hostname)
-
-  const res = await fetch(urlStr, {
-    redirect: 'follow',
+  const res = await fetchPublicHttpUrl(urlStr, {
     headers: {
       'User-Agent': 'CRM-ImageProxy/1.0',
       Accept: 'image/*,*/*;q=0.8',
@@ -102,6 +47,9 @@ export async function fetchImageFromRemoteUrl(rawUrl: string): Promise<{ buffer:
 
   return { buffer: Buffer.from(ab), contentType }
 }
+
+// Re-export for callers that only need the guard
+export { assertPublicHttpUrl }
 
 function detectImageMime(buf: Buffer): string | null {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
