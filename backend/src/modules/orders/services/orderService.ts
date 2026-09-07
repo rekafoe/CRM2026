@@ -1064,9 +1064,11 @@ export class OrderService {
   }
 
   /**
-   * Переносит дату оформления заказа на «сейчас» (момент назначения ответственного).
+   * Сдвигает день оформления (created_at) на день взятия в работу — для списков/сдельной.
    * Заказ с сайта от 01.06, взятый в работу 02.06, попадает в отчёты и списки за 02.06.
-   * @returns предыдний календарный день created_at (YYYY-MM-DD) для пересчёта начислений
+   * Не трогает prepaymentUpdatedAt: день кассы = день фактической оплаты, иначе «Взять»
+   * переносит предоплату с дня приёма денег на день claim и ломает сверку кассы.
+   * @returns прежний календарный день created_at (YYYY-MM-DD) для пересчёта начислений
    */
   static async shiftOrderToAssignmentDay(orderId: number): Promise<string | null> {
     const db = await getDb()
@@ -1081,13 +1083,11 @@ export class OrderService {
     let hasCreatedAtSnake = false
     let hasUpdatedAt = false
     let hasUpdatedAtSnake = false
-    let hasPrepaymentUpdatedAt = false
     try {
       hasCreatedAt = await hasColumn('orders', 'createdAt')
       hasCreatedAtSnake = await hasColumn('orders', 'created_at')
       hasUpdatedAt = await hasColumn('orders', 'updatedAt')
       hasUpdatedAtSnake = await hasColumn('orders', 'updated_at')
-      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
     } catch { /* ignore */ }
 
     const dateUpdates: string[] = []
@@ -1104,24 +1104,6 @@ export class OrderService {
     if (hasUpdatedAtSnake) dateUpdates.push('updated_at = datetime("now")')
     if (dateUpdates.length > 0) {
       await db.run(`UPDATE orders SET ${dateUpdates.join(', ')} WHERE id = ?`, ...dateParams, orderId)
-    }
-
-    if (hasPrepaymentUpdatedAt) {
-      if (hasUpdatedAt) {
-        await db.run(
-          'UPDATE orders SET prepaymentUpdatedAt = ?, updatedAt = datetime("now") WHERE id = ?',
-          currentDate,
-          orderId,
-        )
-      } else if (hasUpdatedAtSnake) {
-        await db.run(
-          'UPDATE orders SET prepaymentUpdatedAt = ?, updated_at = datetime("now") WHERE id = ?',
-          currentDate,
-          orderId,
-        )
-      } else {
-        await db.run('UPDATE orders SET prepaymentUpdatedAt = ? WHERE id = ?', currentDate, orderId)
-      }
     }
 
     return preDay
