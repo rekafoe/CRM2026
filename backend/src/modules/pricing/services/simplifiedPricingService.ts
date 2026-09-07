@@ -72,6 +72,10 @@ import {
   isPlotterCuttingSyntheticServiceId,
 } from '../constants/plotterCuttingFinishingIds';
 import { sheetLayoutPrintTierQuantity } from '../utils/sheetLayoutPrintTierQuantity';
+import {
+  MaterialPrintResolver,
+  type MaterialPrintResolution,
+} from './materialPrintResolver';
 
 function parseServiceMeterBasis(parametersRaw: string | null | undefined): 'knife_path' | 'feed' {
   if (!parametersRaw) return 'knife_path';
@@ -145,6 +149,7 @@ export interface SimplifiedPricingResult {
     price_unit: string;
     units_per_item: number;
   }>;
+  resolvedMaterialPrint?: MaterialPrintResolution;
 
   /** Фактический обрез (мм), если отличается от строки тарифов (allow_custom_trim) */
   actualTrimMm?: { width: number; height: number };
@@ -271,6 +276,11 @@ interface SimplifiedSizeConfig {
   use_own_materials?: boolean;
   /** Материалы-основы (заготовки): футболки, кружки — расход 1 шт на изделие */
   allowed_base_material_ids?: number[];
+  default_print?: {
+    technology_code?: string;
+    color_mode?: 'color' | 'bw';
+    sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+  };
   print_prices: Array<{
     technology_code: string;
     color_mode: 'color' | 'bw';
@@ -323,6 +333,8 @@ function getEffectiveAllowedMaterialIds(typeConfig: SimplifiedTypeConfig, size: 
 
 interface SimplifiedConfig {
   sizes: SimplifiedSizeConfig[];
+  /** Технология и физический SKU определяются сервером по типу выбранного материала. */
+  material_driven_printing?: boolean;
   /** Учитывать раскладку на лист: false = 1 изделие на лист */
   use_layout?: boolean;
   /** Для duplex/duplex_bw_back: считать печать как single ×2 (материалы не удваиваются) */
@@ -403,6 +415,7 @@ export class SimplifiedPricingService {
       print_color_mode?: 'color' | 'bw';
       print_sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
       material_id?: number;
+      usage_context?: 'indoor' | 'outdoor';
       /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
       base_material_id?: number;
       cover_material_id?: number;
@@ -474,10 +487,10 @@ export class SimplifiedPricingService {
       simplifiedConfig.pages,
       (typeConfig as { pages?: SimplifiedPagesConfigLike } | null)?.pages,
     );
-    const uvTemplateConfig = typeConfig?.uv_print ?? simplifiedConfig.uv_print;
-    const rollM2TemplateConfig = typeConfig?.roll_m2 ?? simplifiedConfig.roll_m2;
-    const isUvFlatbedMode = uvTemplateConfig?.mode === 'flatbed_m2';
-    const isRollWideM2TemplateMode = rollM2TemplateConfig?.mode === 'roll_wide_m2';
+    let uvTemplateConfig = typeConfig?.uv_print ?? simplifiedConfig.uv_print;
+    let rollM2TemplateConfig = typeConfig?.roll_m2 ?? simplifiedConfig.roll_m2;
+    let isUvFlatbedMode = uvTemplateConfig?.mode === 'flatbed_m2';
+    let isRollWideM2TemplateMode = rollM2TemplateConfig?.mode === 'roll_wide_m2';
     if (typeId && typeConfigs?.[typeId]?.sizes?.length) {
       sizesToUse = typeConfigs[typeId].sizes;
       logger.info('Используем размеры из typeConfigs', { typeId, sizesCount: sizesToUse.length });
@@ -642,6 +655,105 @@ export class SimplifiedPricingService {
       ? Number((selectedSize as any).items_per_sheet_override)
       : undefined;
 
+    const effectiveAllowedMaterialIds = typeConfig
+      ? getEffectiveAllowedMaterialIds(typeConfig, selectedSize)
+      : (selectedSize.allowed_material_ids ?? []);
+    let resolvedMaterialPrint: MaterialPrintResolution | undefined;
+    if (simplifiedConfig.material_driven_printing === true) {
+      if (!normalizedConfig.material_id) {
+        const err: any = new Error('Выберите материал для автоматического определения технологии печати.');
+        err.status = 400;
+        throw err;
+      }
+      resolvedMaterialPrint = await MaterialPrintResolver.resolve({
+        requestedMaterialId: Number(normalizedConfig.material_id),
+        allowedMaterialIds: effectiveAllowedMaterialIds,
+        usageContext: normalizedConfig.usage_context,
+        trimMm: layoutTrim,
+        quantity,
+        bleedMm: resolvedBleedMm,
+        edgeMm: customMarginMm,
+        gapMm: customGapMm,
+        configuredTechnologyCodes: selectedSize.print_prices
+          .filter((row) =>
+            row.tiers?.some((tier) =>
+              Number(tier.unit_price ?? tier.price ?? tier.tier_prices?.[0] ?? 0) > 0,
+            ),
+          )
+          .map((row) => row.technology_code),
+      });
+
+      normalizedConfig.material_id = resolvedMaterialPrint.selectedMaterialId;
+      normalizedConfig.print_technology = resolvedMaterialPrint.technologyCode;
+
+      const techRows = selectedSize.print_prices.filter(
+        (row) =>
+          String(row.technology_code || '').trim().toLowerCase()
+          === resolvedMaterialPrint!.technologyCode.trim().toLowerCase(),
+      );
+      const requestedColor = String(normalizedConfig.print_color_mode || '').toLowerCase();
+      const requestedSides = String(normalizedConfig.print_sides_mode || '').toLowerCase();
+      const selectedPrintRow =
+        techRows.find(
+          (row) =>
+            String(row.color_mode).toLowerCase() === requestedColor
+            && String(row.sides_mode).toLowerCase() === requestedSides,
+        )
+        ?? techRows.find((row) => String(row.color_mode).toLowerCase() === requestedColor)
+        ?? techRows[0];
+
+      normalizedConfig.print_color_mode =
+        selectedPrintRow?.color_mode
+        ?? normalizedConfig.print_color_mode
+        ?? 'color';
+      normalizedConfig.print_sides_mode =
+        selectedPrintRow?.sides_mode
+        ?? normalizedConfig.print_sides_mode
+        ?? 'single';
+
+      if (resolvedMaterialPrint.m2PricingKind === 'uv_flatbed') {
+        uvTemplateConfig = uvTemplateConfig ?? {
+          mode: 'flatbed_m2',
+          layers: ['color'],
+          default_passes: { color: 1 },
+          dimensions_mode: 'presets_and_custom',
+        };
+        rollM2TemplateConfig = undefined;
+      } else if (resolvedMaterialPrint.m2PricingKind === 'roll_wide') {
+        rollM2TemplateConfig = { mode: 'roll_wide_m2' };
+        uvTemplateConfig = undefined;
+      } else {
+        uvTemplateConfig = undefined;
+        rollM2TemplateConfig = undefined;
+      }
+      isUvFlatbedMode = uvTemplateConfig?.mode === 'flatbed_m2';
+      isRollWideM2TemplateMode = rollM2TemplateConfig?.mode === 'roll_wide_m2';
+
+      logger.info('Автоматически определён маршрут печати по материалу', {
+        productId,
+        typeId,
+        sizeId: selectedSize.id,
+        usageContext: resolvedMaterialPrint.usageContext,
+        requestedMaterialId: resolvedMaterialPrint.requestedMaterialId,
+        selectedMaterialId: resolvedMaterialPrint.selectedMaterialId,
+        technologyCode: resolvedMaterialPrint.technologyCode,
+        materialKind: resolvedMaterialPrint.materialKind,
+      });
+    }
+
+    const configuredPlotter = typeConfig?.plotter;
+    const configuredPlotterMode = String((configuredPlotter as { mode?: string } | undefined)?.mode || '');
+    const effectivePlotterConfig =
+      configuredPlotterMode === 'auto'
+        ? configuredPlotter?.enabled === true && resolvedMaterialPrint
+          ? {
+              ...configuredPlotter,
+              mode: resolvedMaterialPrint.materialKind === 'roll' ? 'roll' as const : 'sheet' as const,
+              roll_allowed_material_ids: effectiveAllowedMaterialIds,
+            }
+          : undefined
+        : configuredPlotter;
+
     let materialSheetMm: { width: number; height: number } | null = null;
     if (normalizedConfig.material_id) {
       const matDim = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
@@ -759,8 +871,8 @@ export class SimplifiedPricingService {
       !isUvFlatbedMode && centralPriceForRoll?.counter_unit === 'meters';
     const plotterRollMode =
       !isUvFlatbedMode &&
-      typeConfig?.plotter?.enabled === true &&
-      typeConfig?.plotter?.mode === 'roll';
+      effectivePlotterConfig?.enabled === true &&
+      effectivePlotterConfig?.mode === 'roll';
     const isRollMeterage = isRollPrint || plotterRollMode;
 
     // Офисный принтер, рулон или ручная норма вместимости (items_per_sheet_override): не привязываем
@@ -1133,10 +1245,10 @@ export class SimplifiedPricingService {
     }
 
     if (includeMaterialCost && normalizedConfig.material_id) {
-      const effectiveAllowed = typeConfig
-        ? getEffectiveAllowedMaterialIds(typeConfig, selectedSize)
-        : (selectedSize.allowed_material_ids ?? []);
-      const isAllowed = effectiveAllowed.length === 0 ? true : effectiveAllowed.includes(normalizedConfig.material_id);
+      const isAllowed =
+        effectiveAllowedMaterialIds.length === 0
+          ? true
+          : effectiveAllowedMaterialIds.includes(normalizedConfig.material_id);
       if (!isAllowed) {
         logger.warn('Материал не в списке разрешённых для размера', { material_id: normalizedConfig.material_id });
       } else {
@@ -1204,6 +1316,9 @@ export class SimplifiedPricingService {
     // ✅ Теперь всегда берём цены из централизованной системы услуг (service_volume_prices / post_processing_services),
     //    а в simplified-конфиге используем только ссылки на service_id и конфиг units_per_item/price_unit.
     const pricingWarnings: string[] = [];
+    if (resolvedMaterialPrint?.warnings.length) {
+      pricingWarnings.push(...resolvedMaterialPrint.warnings);
+    }
     if (rollWideMaterialWarning) pricingWarnings.push(rollWideMaterialWarning);
     let finishingPrice = 0;
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
@@ -1373,7 +1488,7 @@ export class SimplifiedPricingService {
     let knifePathMetersTotal = 0;
     let plotterTariffsBundle: PlotterCuttingTariffsBundleDTO | null = null;
     let rollPlotterCutLevelMultiplier = 1;
-    const plotterCfg = typeConfig?.plotter;
+    const plotterCfg = effectivePlotterConfig;
     if (plotterCfg?.enabled === true && plotterCfg.mode) {
       const rollAllow = plotterCfg.roll_allowed_material_ids;
       if (plotterCfg.mode === 'roll' && Array.isArray(rollAllow) && rollAllow.length > 0) {
@@ -2650,6 +2765,7 @@ export class SimplifiedPricingService {
         density: materialDensity, // 🆕 Добавляем плотность материала
         paper_type_name: materialPaperTypeName, // 🆕 Добавляем display_name типа бумаги для установки materialType
       } : undefined,
+      ...(resolvedMaterialPrint ? { resolvedMaterialPrint } : {}),
       selectedBaseMaterial: normalizedConfig.base_material_id && selectedBaseMaterialName ? {
         material_id: normalizedConfig.base_material_id,
         material_name: selectedBaseMaterialName,

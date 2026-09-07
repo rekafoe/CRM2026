@@ -92,7 +92,8 @@ export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
           <div className="plotter-subtype__section">
             <div className="simplified-template__type-website-title">Режим резки</div>
             <p className="plotter-subtype__hint">
-              Цена за п.м. для основной резки и доптарифы выборки/накатки берутся из глобальных тарифов в админке.
+              Авто выбирает листовой или рулонный плоттер по фактическому виду материала.
+              Цена и доптарифы берутся из глобальных тарифов в админке.
             </p>
             <div className="simplified-template__type-website-field">
               <label htmlFor={`plotter-mode-${String(typeId)}`}>Режим плоттера</label>
@@ -101,9 +102,10 @@ export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
                 className="form-input"
                 value={plotter.mode ?? 'roll'}
                 onChange={(e) =>
-                  patchPlotter({ mode: e.target.value === 'sheet' ? 'sheet' : 'roll' })
+                  patchPlotter({ mode: e.target.value as 'auto' | 'sheet' | 'roll' })
                 }
               >
+                <option value="auto">Автоматически по материалу</option>
                 <option value="roll">Рулонный плоттер</option>
                 <option value="sheet">Листовой плоттер</option>
               </select>

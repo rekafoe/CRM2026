@@ -32,6 +32,7 @@ interface MaterialsSectionProps {
     material_id?: number; // 🆕 ID материала из схемы
     base_material_id?: number; // 🆕 Материал-основа (заготовка)
     size_id?: number | string; // 🆕 ID размера для упрощённых продуктов
+    usage_context?: 'indoor' | 'outdoor';
     [key: string]: any; // Для других полей
   };
   warehousePaperTypes: Array<{ 
@@ -61,6 +62,7 @@ interface MaterialsSectionProps {
     constraints?: { allowed_paper_types?: string[] | null };
     template?: { 
       simplified?: { 
+        material_driven_printing?: boolean;
         sizes?: Array<{ 
           id: string; 
           label: string; 
@@ -115,6 +117,16 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const isSimplifiedProduct = Boolean(
     simplifiedSizesSource && simplifiedSizesSource.length > 0,
   );
+  const isMaterialDriven = schema?.template?.simplified?.material_driven_printing === true;
+  const usageContext: 'indoor' | 'outdoor' =
+    specs.usage_context === 'outdoor' ? 'outdoor' : 'indoor';
+
+  useEffect(() => {
+    if (!isMaterialDriven || specs.usage_context === 'indoor' || specs.usage_context === 'outdoor') {
+      return;
+    }
+    updateSpecs({ usage_context: 'indoor' }, true);
+  }, [isMaterialDriven, specs.usage_context, updateSpecs]);
 
   /** Стабильный ключ: перезагрузка /materials только при смене подтипа/размеров/списков id, не при каждом рендере schema */
   const materialsReloadKey = useMemo(() => {
@@ -221,6 +233,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             'sheet_height',
             'printable_width',
             'unit',
+            'usage',
           ]) {
             if ((merged[key] == null || merged[key] === '') && (sm as any)[key] != null) {
               merged[key] = (sm as any)[key];
@@ -472,8 +485,19 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       const row = byId.get(mid);
       if (row) ordered.push(row);
     }
-    return ordered;
-  }, [isSimplifiedProduct, sizeIdForMaterials, simplifiedSizesSource, allMaterials]);
+    if (!isMaterialDriven) return ordered;
+    return ordered.filter((material) => {
+      const usage = Array.isArray(material.usage) ? material.usage : [];
+      return usage.includes(usageContext);
+    });
+  }, [
+    isSimplifiedProduct,
+    sizeIdForMaterials,
+    simplifiedSizesSource,
+    allMaterials,
+    isMaterialDriven,
+    usageContext,
+  ]);
 
   // 🆕 Разрешённые материалы-основы (заготовки) для выбранного размера — порядок как в шаблоне
   const allowedBaseMaterialsForSize = useMemo(() => {
@@ -537,6 +561,19 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       materialType: materialType as any,
     }, true);
   }, [resolveSpecsMaterialType, updateSpecs]);
+  const changeUsageContext = useCallback((nextUsage: 'indoor' | 'outdoor') => {
+    const currentMaterial = allMaterials.find(
+      (material) => Number(material.id) === Number(specs.material_id),
+    );
+    const remainsCompatible =
+      currentMaterial
+      && Array.isArray(currentMaterial.usage)
+      && currentMaterial.usage.includes(nextUsage);
+    updateSpecs({
+      usage_context: nextUsage,
+      ...(!remainsCompatible ? { material_id: undefined } : {}),
+    }, true);
+  }, [allMaterials, specs.material_id, updateSpecs]);
 
   // Единственная синхронизация внешнего material_id с локальным путём выбора.
   // Если сохранённый материал больше не разрешён, выбираем первый доступный SKU.
@@ -616,7 +653,34 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   // Упрощённые продукты: категория склада → тип материала → конкретный вариант.
   // Для рулона вариантом является ширина, для бумаги — плотность.
   const materialBlock = isSimplifiedProduct && sizeIdForMaterials ? (
-    <div className="material-type-density-row">
+    <>
+      {isMaterialDriven && (
+        <div className="material-usage-context">
+          <span className="material-usage-context__label">Где будет использоваться?</span>
+          <div className="material-usage-context__options" role="group" aria-label="Условия использования">
+            <button
+              type="button"
+              className={usageContext === 'indoor' ? 'is-active' : ''}
+              aria-pressed={usageContext === 'indoor'}
+              onClick={() => changeUsageContext('indoor')}
+            >
+              В помещении
+            </button>
+            <button
+              type="button"
+              className={usageContext === 'outdoor' ? 'is-active' : ''}
+              aria-pressed={usageContext === 'outdoor'}
+              onClick={() => changeUsageContext('outdoor')}
+            >
+              На улице
+            </button>
+          </div>
+          <small>
+            Для помещения доступны бумага и плёнки; для улицы — только стойкие материалы.
+          </small>
+        </div>
+      )}
+      <div className="material-type-density-row">
       <div className="param-group param-group--narrow">
         <label>Категория материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
         {loadingMaterials ? (
@@ -697,7 +761,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         )}
       </div>
       {baseMaterialBlock}
-    </div>
+      </div>
+    </>
   ) : null;
 
   if (renderMaterialOnly) {

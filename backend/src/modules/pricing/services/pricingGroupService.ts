@@ -3,7 +3,7 @@
  */
 
 import { logger } from '../../../utils/logger';
-import { UnifiedPricingService } from './unifiedPricingService';
+import { UnifiedPricingService, type UnifiedPricingResult } from './unifiedPricingService';
 import { getDb } from '../../../db';
 
 export interface PricingLineInput {
@@ -33,6 +33,9 @@ export interface QuotedLineResult {
     tierMinQty: number | null;
     sheetsNeeded: number;
   };
+  productionPlan?: UnifiedPricingResult['productionPlan'];
+  materials?: UnifiedPricingResult['materials'];
+  operations?: UnifiedPricingResult['operations'];
   skipped?: boolean;
   error?: string;
 }
@@ -152,7 +155,12 @@ export function buildPricingGroups(
 /** Физические листы и объём tier (для группировки) — всегда из актуального расчёта, не из устаревших params. */
 async function resolveLinePricingVolumes(
   line: PricingLineInput
-): Promise<{ sheetsNeeded: number; tierVolume: number }> {
+): Promise<{
+  sheetsNeeded: number;
+  tierVolume: number;
+  configuration: Record<string, unknown>;
+  productionPlan?: UnifiedPricingResult['productionPlan'];
+}> {
   try {
     const result = await UnifiedPricingService.calculatePrice(
       line.productId,
@@ -169,7 +177,20 @@ async function resolveLinePricingVolumes(
       Number.isFinite(Number(tierRaw)) && Number(tierRaw) > 0
         ? Math.max(1, Math.floor(Number(tierRaw)))
         : sheetsNeeded;
-    return { sheetsNeeded, tierVolume };
+    const configuration = result.productionPlan
+      ? {
+          ...line.configuration,
+          material_id: result.productionPlan.materialId,
+          print_technology: result.productionPlan.technologyCode,
+          usage_context: result.productionPlan.usageContext,
+        }
+      : line.configuration;
+    return {
+      sheetsNeeded,
+      tierVolume,
+      configuration,
+      ...(result.productionPlan ? { productionPlan: result.productionPlan } : {}),
+    };
   } catch (error) {
     logger.warn('[PricingGroupService] не удалось получить объёмы для группировки', {
       lineId: line.lineId,
@@ -180,7 +201,11 @@ async function resolveLinePricingVolumes(
       line.sheetsNeeded != null && line.sheetsNeeded > 0
         ? Math.floor(line.sheetsNeeded)
         : 1;
-    return { sheetsNeeded: fallback, tierVolume: fallback };
+    return {
+      sheetsNeeded: fallback,
+      tierVolume: fallback,
+      configuration: line.configuration,
+    };
   }
 }
 
@@ -191,11 +216,16 @@ export async function quoteLines(
   const skipNonGroupable = options?.skipNonGroupable !== false;
 
   const enriched: Array<
-    PricingLineInput & { sheetsNeeded: number; tierVolume: number; groupKey: string | null }
+    PricingLineInput & {
+      sheetsNeeded: number;
+      tierVolume: number;
+      groupKey: string | null;
+      productionPlan?: UnifiedPricingResult['productionPlan'];
+    }
   > = [];
   for (const line of lines) {
-    const groupKey = buildGroupKey(line.configuration);
     const volumes = await resolveLinePricingVolumes(line);
+    const groupKey = buildGroupKey(volumes.configuration);
     enriched.push({ ...line, ...volumes, groupKey });
   }
 
@@ -290,6 +320,9 @@ export async function quoteLines(
         groupTotalTierVolume: groupTotalTierVolume,
         tierMinQty: null,
         pricingMeta,
+        ...(result.productionPlan ? { productionPlan: result.productionPlan } : {}),
+        materials: result.materials,
+        operations: result.operations,
       });
       cartTotal += finalPrice;
     } catch (error) {

@@ -171,5 +171,66 @@ describe('pricingGroupService', () => {
         100
       );
     });
+
+    it('сначала резолвит material-driven маршрут и затем группирует без технологии от клиента', async () => {
+      const calculatePrice = UnifiedPricingService.calculatePrice as jest.Mock;
+      const productionPlan = {
+        usageContext: 'outdoor',
+        technologyCode: 'inkjet_solvent',
+        technologyName: 'Сольвентная',
+        materialId: 55,
+        materialName: 'Oracal матовая',
+        materialKind: 'roll',
+        materialWidthMm: 630,
+        stockSufficient: true,
+        steps: [],
+      };
+      calculatePrice
+        .mockResolvedValueOnce({
+          finalPrice: 30,
+          pricePerUnit: 0.3,
+          sheetsNeeded: 1,
+          tierVolumeForGrouping: 100,
+          productionPlan,
+        })
+        .mockResolvedValueOnce({
+          finalPrice: 30,
+          pricePerUnit: 0.3,
+          sheetsNeeded: 1,
+          productionPlan,
+          materials: [{ materialId: 55, quantity: 1.2 }],
+          operations: [{ operationId: 0, operationName: 'Печать' }],
+        });
+
+      const result = await quoteLines([
+        {
+          lineId: 'stickers',
+          productId: 10,
+          quantity: 100,
+          configuration: {
+            material_id: 41,
+            usage_context: 'outdoor',
+            print_color_mode: 'color',
+            print_sides_mode: 'single',
+          },
+        },
+      ]);
+
+      expect(calculatePrice).toHaveBeenNthCalledWith(
+        2,
+        10,
+        expect.objectContaining({
+          material_id: 55,
+          print_technology: 'inkjet_solvent',
+          usage_context: 'outdoor',
+          orderPricingContext: { tierSheetsOverride: 100 },
+        }),
+        100,
+      );
+      expect(result.lines[0]).toMatchObject({
+        groupKey: '55|inkjet_solvent|color|single',
+        productionPlan,
+      });
+    });
   });
 });

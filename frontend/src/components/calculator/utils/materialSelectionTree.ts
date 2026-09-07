@@ -15,6 +15,8 @@ export interface WarehouseMaterialOption {
   printable_width?: number | string | null
   unit?: string | null
   price?: number
+  /** Клиентские условия применения; техническая технология не раскрывается. */
+  usage?: Array<'indoor' | 'outdoor'>
 }
 
 export interface MaterialTypeNode {

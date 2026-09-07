@@ -78,6 +78,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   }, []);
 
   const simplifiedConfig = backendProductSchema?.template?.simplified;
+  const isMaterialDriven = simplifiedConfig?.material_driven_printing === true;
   const selectedTypeConfig = useMemo(() => {
     if (selectedTypeId == null) return null;
     return simplifiedConfig?.typeConfigs?.[String(selectedTypeId)] ?? null;
@@ -89,6 +90,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
 
   // Получаем разрешенные типы печати из цен печати размера/продукта и constraints
   const allowedPrintTechnologies = useMemo(() => {
+    if (isMaterialDriven) return [];
     const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase();
     const constraints = backendProductSchema?.constraints;
     const constrainedCodes = Array.isArray(constraints?.allowed_print_technologies)
@@ -195,7 +197,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
 
     // 4) Если ничего не найдено — пусто (без подстановки из справочника принтеров)
     return [];
-  }, [printTechnologies, backendProductSchema, effectiveSizesProp, selectedSizeId, isRollWideM2Mode, selectedTypeConfig]);
+  }, [printTechnologies, backendProductSchema, effectiveSizesProp, selectedSizeId, isRollWideM2Mode, selectedTypeConfig, isMaterialDriven]);
 
   // Получаем информацию о выбранной технологии печати
   const selectedPrintTechnology = useMemo(() => {
@@ -350,6 +352,17 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
         <div className="form-control" style={{ color: '#666' }}>
           Выберите продукт для настройки параметров печати
+        </div>
+      </div>
+    );
+  }
+
+  if (isMaterialDriven) {
+    return (
+      <div className="form-section compact printing-settings-material-driven">
+        {materialInFirstColumn}
+        <div className="printing-settings-material-driven__hint">
+          Технология печати и рабочий формат материала определятся автоматически.
         </div>
       </div>
     );

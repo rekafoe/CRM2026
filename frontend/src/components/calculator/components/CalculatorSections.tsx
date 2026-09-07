@@ -242,6 +242,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
                         quantity: specs.quantity,
                         material_id: (specs as any).material_id,
                         size_id: (specs as any).size_id,
+                        usage_context: (specs as any).usage_context,
                       }}
                       warehousePaperTypes={warehousePaperTypes}
                       availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}
@@ -267,7 +268,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             lamination: specs.lamination, 
             quantity: specs.quantity,
             material_id: (specs as any).material_id,
-            size_id: (specs as any).size_id
+            size_id: (specs as any).size_id,
+            usage_context: (specs as any).usage_context,
           }}
           warehousePaperTypes={warehousePaperTypes}
           availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}

@@ -6,6 +6,8 @@ export interface MaterialType {
   code?: string | null;
   description?: string | null;
   is_active?: number | boolean;
+  materials_count?: number;
+  print_technologies_count?: number;
   created_at?: string;
   updated_at?: string;
 }

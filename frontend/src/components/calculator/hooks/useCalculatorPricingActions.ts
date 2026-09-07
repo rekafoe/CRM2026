@@ -243,6 +243,8 @@ export function useCalculatorPricingActions({
 
         // ✅ Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
         const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes);
+        const materialDrivenPrinting =
+          backendProductSchema?.template?.simplified?.material_driven_printing === true;
         if (uvFlatbed) {
           if (!trimSize) {
             if (!showToast) return;
@@ -252,7 +254,11 @@ export function useCalculatorPricingActions({
             if (!showToast) return;
             throw new Error('Включите хотя бы один слой УФ-печати с числом проходов ≥ 1.');
           }
-        } else if (requiresPrint && (!printTechnology || !printColorMode)) {
+        } else if (
+          requiresPrint
+          && !materialDrivenPrinting
+          && (!printTechnology || !printColorMode)
+        ) {
           const missingParams = [];
           if (!printTechnology) missingParams.push('технология печати');
           if (!printColorMode) missingParams.push('режим цвета (чб/цвет)');
@@ -460,6 +466,13 @@ export function useCalculatorPricingActions({
           ),
         };
 
+        if (materialDrivenPrinting) {
+          delete (configuration as Record<string, unknown>).print_technology;
+          delete (configuration as Record<string, unknown>).printTechnology;
+          (configuration as Record<string, unknown>).usage_context =
+            specs.usage_context === 'outdoor' ? 'outdoor' : 'indoor';
+        }
+
         // ✅ Логируем trim_size для отладки
         if (trimSize) {
           logger.info('📐 trim_size передается в бэкенд', { 
@@ -508,17 +521,22 @@ export function useCalculatorPricingActions({
           print_technology?: string;
           print_color_mode?: string | null;
         };
-        if (!uvFlatbed && requiresPrint && (!configPrint.print_technology || !configPrint.print_color_mode)) {
+        if (
+          !uvFlatbed
+          && requiresPrint
+          && !materialDrivenPrinting
+          && (!configPrint.print_technology || !configPrint.print_color_mode)
+        ) {
           logger.info('⚠️ Параметры печати не переданы в конфигурацию!', {
             print_technology: configPrint.print_technology,
             print_color_mode: configPrint.print_color_mode,
           });
-        } else if (requiresPrint) {
+        } else if (requiresPrint && !materialDrivenPrinting) {
           logger.info('✅ Параметры печати переданы в конфигурацию', {
             print_technology: configPrint.print_technology,
             print_color_mode: configPrint.print_color_mode,
           });
-        } else {
+        } else if (!requiresPrint) {
           logger.info('ℹ️ Продукт без печати — расчёт без параметров печати', { productId: selectedProduct.id });
         }
 
@@ -1123,9 +1141,21 @@ export function useCalculatorPricingActions({
           productName: `${selectedProduct.name} ${formatInfo || specSnapshot.format} (${specSnapshot.paperType} ${specSnapshot.paperDensity}г/м², ${
             specSnapshot.sides === 2 ? 'двусторонние' : 'односторонние'
           })`,
-          specifications: specSnapshot,
+          specifications: {
+            ...specSnapshot,
+            ...(backendResult.productionPlan?.materialId
+              ? { material_id: Number(backendResult.productionPlan.materialId) }
+              : {}),
+            ...(backendResult.productionPlan?.technologyCode
+              ? {
+                  print_technology: String(backendResult.productionPlan.technologyCode),
+                  printTechnology: String(backendResult.productionPlan.technologyCode),
+                }
+              : {}),
+          },
           materials: normalizedMaterials,
           services: normalizedServices,
+          productionPlan: backendResult.productionPlan,
           totalCost: finalTotalCost,
           pricePerItem: finalPricePerItem,
           productionTime: getProductionTime(),

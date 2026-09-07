@@ -191,7 +191,7 @@ export type SimplifiedTypeConfig = {
   /** Плоттерная резка — один блок подтипа */
   plotter?: {
     enabled?: boolean;
-    mode?: 'sheet' | 'roll';
+    mode?: 'sheet' | 'roll' | 'auto';
     roll_allowed_material_ids?: number[];
     mounting_film_material_id?: number;
   };
@@ -215,6 +215,8 @@ export type SimplifiedTypeConfig = {
  */
 export type SimplifiedConfig = {
   sizes: SimplifiedSizeConfig[];
+  /** Технология печати и конкретный SKU определяются по типу выбранного материала. */
+  material_driven_printing?: boolean;
   pages?: SimplifiedPagesConfig;
   multiPageStructure?: MultiPageStructureConfig;
   /** Какой сценарий макетов открывать для продукта на сайте/в CRM. */

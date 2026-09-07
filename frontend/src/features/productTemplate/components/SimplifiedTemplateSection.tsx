@@ -505,9 +505,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         finishing: false,
       }
     }
-    const hasM2PrintMode = activeM2Mode !== 'none'
+    const hasM2PrintMode = value.material_driven_printing !== true && activeM2Mode !== 'none'
+    const materialDrivenTechnology = value.material_driven_printing === true
+      ? printTechs.find((technology) => technology.code === selected.default_print?.technology_code)
+      : undefined
+    const hasMaterialDrivenCentralPrint =
+      materialDrivenTechnology != null
+      && materialDrivenTechnology.pricing_mode !== 'per_sheet'
     const hasPrint = hasM2PrintMode
       ? Boolean(selected.default_print?.technology_code)
+      : hasMaterialDrivenCentralPrint
+        ? true
       : Array.isArray(selected.print_prices) &&
         selected.print_prices.some((p) => Array.isArray(p.tiers) && p.tiers.some((t) => Number(t.unit_price ?? 0) > 0))
     return {
@@ -516,11 +524,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       materials: effectiveAllowedMaterialIds.length > 0,
       finishing: Array.isArray(selected.finishing) && selected.finishing.length > 0,
     }
-  }, [selected, effectiveAllowedMaterialIds, activeM2Mode])
+  }, [selected, effectiveAllowedMaterialIds, activeM2Mode, value.material_driven_printing, printTechs])
 
   const quickTestPrintPreset = useMemo(() => {
     if (!selected) return null
-    if (activeM2Mode !== 'none') {
+    if (value.material_driven_printing !== true && activeM2Mode !== 'none') {
       const technology = selected.default_print?.technology_code || (activeM2Mode === 'uv' ? 'uv' : '')
       if (!technology) return null
       return {
@@ -544,7 +552,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       color: (row.color_mode as 'bw' | 'color') || 'color',
       sides: row.sides_mode === 'duplex' || row.sides_mode === 'duplex_bw_back' ? 2 : 1,
     }
-  }, [selected, activeM2Mode])
+  }, [selected, activeM2Mode, value.material_driven_printing])
 
   const isMultipageEditorTab =
     showPagesConfig && (editorTab === 'pages' || editorTab === 'assembly')
@@ -697,6 +705,22 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           </h3>
         </div>
         <div className="simplified-template__header-actions">
+          <label
+            className="simplified-template__material-routing-toggle"
+            title="Технология печати и конкретная ширина материала определяются сервером по типу выбранного материала"
+          >
+            <input
+              type="checkbox"
+              checked={value.material_driven_printing === true}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  material_driven_printing: event.target.checked || undefined,
+                })
+              }
+            />
+            <span>Печать определяется материалом</span>
+          </label>
           <Button
             variant="primary"
             onClick={onSave}
@@ -1055,7 +1079,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   </div>
                 )}
 
-                {editorTab === 'print' && (
+                {editorTab === 'print' && value.material_driven_printing !== true && (
                   <div className="simplified-card">
                     <div className="simplified-card__header">
                       <div>
@@ -1118,17 +1142,24 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   </div>
                 )}
 
-                {editorTab === 'print' && activeM2Mode === 'uv' && (
+                {editorTab === 'print' && value.material_driven_printing !== true && activeM2Mode === 'uv' && (
                   <UvPrintCard config={effectiveUvPrint} onChange={updateUvPrint} />
                 )}
 
-                {editorTab === 'print' && activeM2Mode === 'roll' && (
+                {editorTab === 'print' && value.material_driven_printing !== true && activeM2Mode === 'roll' && (
                   <Alert type="info">
                     Листовые цены по размерам скрыты в режиме «ШФП рулон (m²)». Используется централизованный профиль m².
                   </Alert>
                 )}
 
-                {editorTab === 'print' && activeM2Mode === 'none' && (
+                {editorTab === 'print' && value.material_driven_printing === true && (
+                  <Alert type="info">
+                    Режим печати определяется совместимостью выбранного типа материала.
+                    Листовые тарифы настройте ниже, цены за пог. м и м² — в централизованных ценах печати.
+                  </Alert>
+                )}
+
+                {editorTab === 'print' && (value.material_driven_printing === true || activeM2Mode === 'none') && (
                   <PrintPricesCard
                     selected={selected}
                     printTechs={printTechs}

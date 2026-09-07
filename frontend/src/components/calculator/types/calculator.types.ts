@@ -47,6 +47,8 @@ export interface ProductSpecs {
   name?: string;
   size_id?: number | string; // 🆕 Для упрощённых продуктов (number для новых, string для обратной совместимости)
   material_id?: number; // 🆕 ID материала (для упрощённых и обычных продуктов)
+  /** Условия использования для material-driven printing. */
+  usage_context?: 'indoor' | 'outdoor';
   /** Бумага обложки (multiPageStructure.cover.mode = separate) */
   cover_material_id?: number;
   /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
@@ -99,6 +101,25 @@ export interface CalculationResult {
     unitPrice?: number;
     totalCost?: number;
   }>;
+  productionPlan?: {
+    usageContext: 'indoor' | 'outdoor';
+    technologyCode: string;
+    technologyName: string;
+    materialId: number;
+    materialName: string;
+    materialKind: string;
+    materialWidthMm?: number;
+    stockSufficient: boolean;
+    steps: Array<{
+      type: 'print' | 'operation';
+      name: string;
+      technologyCode?: string;
+      materialId?: number;
+      serviceId?: number;
+      quantity?: number;
+      unit?: string;
+    }>;
+  };
   totalCost: number;
   pricePerItem: number;
   productionTime: string;

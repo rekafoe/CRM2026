@@ -85,6 +85,8 @@ export function buildOrderPayload({
     ? result.materials.find((m: any) => Number(m.materialId ?? m.material_id) === Number(result.specifications.material_id))
     : null;
   const materialTypeFromSelected = selectedMaterial?.paper_type_name ? String(selectedMaterial.paper_type_name).trim() : null;
+  const resolvedPrintTechnology =
+    result.productionPlan?.technologyCode || printTechnology || undefined;
 
   const specificationsPayload = {
     ...cleanSpecifications,
@@ -94,8 +96,8 @@ export function buildOrderPayload({
     piecesPerSheet: itemsPerSheet,
     layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined,
     customFormat: isCustomFormat ? customFormat : undefined,
-    print_technology: printTechnology || undefined,
-    printTechnology: printTechnology || undefined,
+    print_technology: resolvedPrintTechnology,
+    printTechnology: resolvedPrintTechnology,
     print_color_mode: printColorMode || undefined,
     printColorMode: printColorMode || undefined,
     ...(result.specifications.material_id ? { material_id: result.specifications.material_id } : {}),
@@ -185,6 +187,9 @@ export function buildOrderPayload({
     piecesPerSheet: itemsPerSheet,
     formatInfo: cleanFormatInfo,
     parameterSummary: cleanParameterSummary,
+    ...(result.productionPlan
+      ? { productionPlan: JSON.parse(JSON.stringify(result.productionPlan)) }
+      : {}),
     productId: selectedProduct?.id,
     productName: selectedProduct?.name,
     ...(result.specifications.typeId != null ? { typeId: result.specifications.typeId } : {}),

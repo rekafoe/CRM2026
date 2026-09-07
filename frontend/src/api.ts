@@ -1227,6 +1227,20 @@ export interface MaterialTypeDto {
   description?: string | null;
   is_active?: number | boolean;
   materials_count?: number;
+  print_technologies_count?: number;
+}
+
+export interface MaterialPrintTechnologyDto {
+  id?: number;
+  material_type_id?: number;
+  technology_code: string;
+  technology_name?: string;
+  pricing_mode?: string;
+  supports_indoor: number | boolean;
+  supports_outdoor: number | boolean;
+  is_default: number | boolean;
+  priority: number;
+  is_active?: number | boolean;
 }
 
 export const getMaterialTypes = (params?: { category_id?: number; search?: string; only_active?: boolean }) =>
@@ -1236,6 +1250,16 @@ export const createMaterialType = (payload: Partial<MaterialTypeDto>) => api.pos
 export const updateMaterialType = (id: number, payload: Partial<MaterialTypeDto>) =>
   api.put<MaterialTypeDto>(`/material-types/${id}`, payload);
 export const deleteMaterialType = (id: number) => api.delete(`/material-types/${id}`);
+export const getMaterialTypePrintTechnologies = (id: number) =>
+  api.get<MaterialPrintTechnologyDto[]>(`/material-types/${id}/print-technologies`);
+export const replaceMaterialTypePrintTechnologies = (
+  id: number,
+  printTechnologies: MaterialPrintTechnologyDto[],
+) =>
+  api.put<MaterialPrintTechnologyDto[]>(
+    `/material-types/${id}/print-technologies`,
+    { print_technologies: printTechnologies },
+  );
 
 // Поставщики
 export const getSuppliers = () => api.get<any[]>('/suppliers');

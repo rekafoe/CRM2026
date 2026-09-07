@@ -11,6 +11,7 @@ import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef 
 type PrintTechRow = {
   code: string
   name: string
+  pricing_mode?: 'per_sheet' | 'per_meter' | 'per_m2' | string
   is_active?: number | boolean
   supports_duplex?: number | boolean
   supports_bw?: number | boolean
@@ -169,7 +170,10 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
             </div>
           )}
         </div>
-        {selected.default_print?.technology_code && selected.width_mm > 0 && selected.height_mm > 0 && (
+        {selected.default_print?.technology_code
+          && printTechs.find((technology) => technology.code === selected.default_print?.technology_code)?.pricing_mode === 'per_sheet'
+          && selected.width_mm > 0
+          && selected.height_mm > 0 && (
           <Button
             variant="secondary"
             size="sm"
@@ -249,7 +253,12 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                 }
 
                 if (updated.length > 0) {
-                  const patch: Partial<typeof selected> = { print_prices: updated }
+                  const otherTechnologies = selected.print_prices.filter(
+                    (row) => String(row.technology_code) !== String(tech),
+                  )
+                  const patch: Partial<typeof selected> = {
+                    print_prices: [...otherTechnologies, ...updated],
+                  }
                   if (itemsPerSheet != null && itemsPerSheet > 0) {
                     patch.min_qty = itemsPerSheet
                   }
@@ -276,7 +285,10 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
             Заполнить из центральных цен
           </Button>
         )}
-        {selected.default_print?.technology_code && selected.width_mm > 0 && selected.height_mm > 0 && (
+        {selected.default_print?.technology_code
+          && printTechs.find((technology) => technology.code === selected.default_print?.technology_code)?.pricing_mode === 'per_sheet'
+          && selected.width_mm > 0
+          && selected.height_mm > 0 && (
           <span
             className="simplified-label-hint"
             title="Раскладка при этом запросе: первый разрешённый для размера материал с заполненными «ширина и высота листа (мм)» в карточке склада; если таких нет — размер листа из централизованной цены печати (по умолчанию часто 320×450)."
@@ -298,6 +310,19 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                   updateSize(selected.id, { default_print: undefined, print_prices: [] })
                   return
                 }
+                const existingForTechnology = selected.print_prices.filter(
+                  (row) => String(row.technology_code) === String(techCode),
+                )
+                if (existingForTechnology.length > 0) {
+                  updateSize(selected.id, {
+                    default_print: {
+                      technology_code: techCode,
+                      color_mode: existingForTechnology[0].color_mode,
+                      sides_mode: existingForTechnology[0].sides_mode,
+                    },
+                  })
+                  return
+                }
 
                 const selectedTech = printTechs.find(t => t.code === techCode)
                 const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
@@ -306,7 +331,14 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                 const existingRanges = getSizeRanges(selected)
                 const variations: Array<{ technology_code: string; color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex'; tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }> = []
 
-                if (isColorOnly) {
+                if (selectedTech?.pricing_mode && selectedTech.pricing_mode !== 'per_sheet') {
+                  variations.push({
+                    technology_code: techCode,
+                    color_mode: 'color',
+                    sides_mode: 'single',
+                    tiers: [],
+                  })
+                } else if (isColorOnly) {
                   if (supportsDuplex) {
                     variations.push(
                       { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
@@ -334,8 +366,12 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                 }
 
                 updateSize(selected.id, {
-                  default_print: { technology_code: techCode },
-                  print_prices: variations
+                  default_print: {
+                    technology_code: techCode,
+                    color_mode: variations[0]?.color_mode,
+                    sides_mode: variations[0]?.sides_mode,
+                  },
+                  print_prices: [...selected.print_prices, ...variations]
                 })
               }}
               disabled={loadingLists}
@@ -352,22 +388,65 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           <div className="text-muted">Выберите технологию печати, чтобы увидеть доступные вариации.</div>
         ) : (() => {
           const commonRanges = getSizeRanges(selected)
-          const colorRows = selected.print_prices.filter(p => p.color_mode === 'color')
-          const bwRows = selected.print_prices.filter(p => p.color_mode === 'bw')
-          const techCode = selected.print_prices[0]?.technology_code ?? selected.default_print?.technology_code ?? ''
+          const techCode =
+            selected.default_print?.technology_code
+            ?? selected.print_prices[0]?.technology_code
+            ?? ''
+          const activeRows = selected.print_prices.filter(
+            (row) => String(row.technology_code) === String(techCode),
+          )
+          const colorRows = activeRows.filter(p => p.color_mode === 'color')
+          const bwRows = activeRows.filter(p => p.color_mode === 'bw')
           const selectedTech = techCode ? printTechs.find(t => t.code === techCode) : null
+          if (selectedTech?.pricing_mode && selectedTech.pricing_mode !== 'per_sheet') {
+            return (
+              <div className="flex items-center gap-2 text-muted text-sm">
+                <span>
+                  Цена «{selectedTech.name}» берётся из централизованных тарифов
+                  ({selectedTech.pricing_mode}).
+                </span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const remaining = selected.print_prices.filter(
+                      (row) => String(row.technology_code) !== String(techCode),
+                    )
+                    const next = remaining[0]
+                    updateSize(selected.id, {
+                      print_prices: remaining,
+                      default_print: next
+                        ? {
+                            technology_code: next.technology_code,
+                            color_mode: next.color_mode,
+                            sides_mode: next.sides_mode,
+                          }
+                        : undefined,
+                    })
+                  }}
+                >
+                  Убрать технологию
+                </Button>
+              </div>
+            )
+          }
           const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
           const isColorOnly = selectedTech?.supports_bw === 0 || selectedTech?.supports_bw === false
 
           const removeVariant = (color_mode: 'color' | 'bw', sides_mode: 'single' | 'duplex') => {
             const remaining = selected.print_prices.filter(
-              p => !(p.color_mode === color_mode && p.sides_mode === sides_mode)
+              p => !(
+                String(p.technology_code) === String(techCode)
+                && p.color_mode === color_mode
+                && p.sides_mode === sides_mode
+              )
             )
-            if (remaining.length === 0) return
+            if (!remaining.some((row) => String(row.technology_code) === String(techCode))) return
             updateSize(selected.id, { print_prices: remaining })
           }
           const addVariant = (color_mode: 'color' | 'bw', sides_mode: 'single' | 'duplex') => {
-            const existing = selected.print_prices
+            const existing = activeRows
             const ref = existing[0]
             if (!ref) return
             const tiers = (ref.tiers || defaultTiers()).map(t => ({ ...t, unit_price: 0 }))
@@ -378,10 +457,10 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
               tiers,
             }
             if (existing.some(p => p.color_mode === color_mode && p.sides_mode === sides_mode)) return
-            updateSize(selected.id, { print_prices: [...existing, newEntry] })
+            updateSize(selected.id, { print_prices: [...selected.print_prices, newEntry] })
           }
           const hasVariant = (color_mode: 'color' | 'bw', sides_mode: 'single' | 'duplex') =>
-            selected.print_prices.some(p => p.color_mode === color_mode && p.sides_mode === sides_mode)
+            activeRows.some(p => p.color_mode === color_mode && p.sides_mode === sides_mode)
 
           const renderPriceRow = (row: typeof selected.print_prices[0], label: string, canRemove: boolean, removeFn: () => void) => {
             const actualIdx = selected.print_prices.findIndex(p =>
@@ -540,14 +619,14 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                         renderPriceRow(
                           colorRows.find(r => r.sides_mode === 'single')!,
                           'односторонняя',
-                          selected.print_prices.length > 1,
+                          activeRows.length > 1,
                           () => removeVariant('color', 'single')
                         )}
                       {colorRows.find(r => r.sides_mode === 'duplex') &&
                         renderPriceRow(
                           colorRows.find(r => r.sides_mode === 'duplex')!,
                           'двухсторонняя',
-                          selected.print_prices.length > 1,
+                          activeRows.length > 1,
                           () => removeVariant('color', 'duplex')
                         )}
                     </>
@@ -559,14 +638,14 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                         renderPriceRow(
                           bwRows.find(r => r.sides_mode === 'single')!,
                           'односторонняя',
-                          selected.print_prices.length > 1,
+                          activeRows.length > 1,
                           () => removeVariant('bw', 'single')
                         )}
                       {bwRows.find(r => r.sides_mode === 'duplex') &&
                         renderPriceRow(
                           bwRows.find(r => r.sides_mode === 'duplex')!,
                           'двухсторонняя',
-                          selected.print_prices.length > 1,
+                          activeRows.length > 1,
                           () => removeVariant('bw', 'duplex')
                         )}
                     </>

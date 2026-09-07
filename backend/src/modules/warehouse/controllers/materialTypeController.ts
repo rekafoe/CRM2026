@@ -1,6 +1,10 @@
 import { Request, Response } from 'express'
 import { AuthenticatedRequest } from '../../../middleware'
 import { MaterialTypeService } from '../services/materialTypeService'
+import {
+  MaterialPrintTechnologyService,
+  type MaterialPrintTechnologyInput,
+} from '../services/materialPrintTechnologyService'
 
 export class MaterialTypeController {
   static async getAllTypes(req: Request, res: Response) {
@@ -62,6 +66,45 @@ export class MaterialTypeController {
         return
       }
       res.json(updated)
+    } catch (error: any) {
+      const status = error.status || 500
+      res.status(status).json({ error: error.message })
+    }
+  }
+
+  static async getPrintTechnologies(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      const type = await MaterialTypeService.getTypeById(id)
+      if (!type) {
+        res.status(404).json({ error: 'Тип материала не найден' })
+        return
+      }
+      const rows = await MaterialPrintTechnologyService.listForMaterialType(id)
+      res.json(rows)
+    } catch (error: any) {
+      const status = error.status || 500
+      res.status(status).json({ error: error.message })
+    }
+  }
+
+  static async replacePrintTechnologies(req: Request, res: Response) {
+    try {
+      const user = (req as AuthenticatedRequest).user as { id: number; role: string } | undefined
+      if (!user || String(user.role || '').toLowerCase() !== 'admin') {
+        res.status(403).json({ message: 'Forbidden' })
+        return
+      }
+
+      const id = Number(req.params.id)
+      const links = Array.isArray(req.body)
+        ? req.body
+        : (req.body?.print_technologies ?? req.body?.technologies)
+      const rows = await MaterialPrintTechnologyService.replaceForMaterialType(
+        id,
+        links as MaterialPrintTechnologyInput[],
+      )
+      res.json(rows)
     } catch (error: any) {
       const status = error.status || 500
       res.status(status).json({ error: error.message })

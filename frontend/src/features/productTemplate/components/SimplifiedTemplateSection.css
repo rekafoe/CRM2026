@@ -46,6 +46,26 @@
   justify-content: flex-end;
 }
 
+.simplified-template__material-routing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 7px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #374151);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.simplified-template__material-routing-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 .simplified-template__grid {
   display: grid;
   grid-template-columns: 280px 1fr;

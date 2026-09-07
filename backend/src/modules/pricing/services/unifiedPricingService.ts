@@ -53,6 +53,25 @@ export interface UnifiedPricingResult {
     pricingKey?: string;
     technologyCode?: string;
   }>;
+  productionPlan?: {
+    usageContext: 'indoor' | 'outdoor';
+    technologyCode: string;
+    technologyName: string;
+    materialId: number;
+    materialName: string;
+    materialKind: string;
+    materialWidthMm?: number;
+    stockSufficient: boolean;
+    steps: Array<{
+      type: 'print' | 'operation';
+      name: string;
+      technologyCode?: string;
+      materialId?: number;
+      serviceId?: number;
+      quantity?: number;
+      unit?: string;
+    }>;
+  };
   
   // Итоги
   materialCost: number;
@@ -204,6 +223,53 @@ export class UnifiedPricingService {
             };
           })();
 
+    const productionPlan = result.resolvedMaterialPrint
+      ? {
+          usageContext: result.resolvedMaterialPrint.usageContext,
+          technologyCode: result.resolvedMaterialPrint.technologyCode,
+          technologyName: result.resolvedMaterialPrint.technologyName,
+          materialId: result.resolvedMaterialPrint.selectedMaterialId,
+          materialName: result.resolvedMaterialPrint.selectedMaterialName,
+          materialKind: result.resolvedMaterialPrint.materialKind,
+          ...(result.resolvedMaterialPrint.selectedMaterialWidthMm != null
+            ? { materialWidthMm: result.resolvedMaterialPrint.selectedMaterialWidthMm }
+            : {}),
+          stockSufficient: result.resolvedMaterialPrint.stockSufficient,
+          steps: [
+            {
+              type: 'print' as const,
+              name: `${
+                /печат/i.test(result.resolvedMaterialPrint.technologyName)
+                  ? result.resolvedMaterialPrint.technologyName
+                  : `${result.resolvedMaterialPrint.technologyName} печать`
+              } — ${result.resolvedMaterialPrint.selectedMaterialName}${
+                result.resolvedMaterialPrint.materialKind === 'roll'
+                && result.resolvedMaterialPrint.selectedMaterialWidthMm != null
+                  ? `, рулон ${result.resolvedMaterialPrint.selectedMaterialWidthMm} мм`
+                  : ''
+              }`,
+              technologyCode: result.resolvedMaterialPrint.technologyCode,
+              materialId: result.resolvedMaterialPrint.selectedMaterialId,
+              quantity:
+                result.layout?.metersNeeded != null && Number(result.layout.metersNeeded) > 0
+                  ? Number(result.layout.metersNeeded)
+                  : result.layout?.sheetsNeeded,
+              unit:
+                result.layout?.metersNeeded != null && Number(result.layout.metersNeeded) > 0
+                  ? 'п.м.'
+                  : 'лист',
+            },
+            ...(result.finishingDetails ?? []).map((finishing) => ({
+              type: 'operation' as const,
+              name: finishing.service_name,
+              serviceId: finishing.service_id,
+              quantity: finishing.feed_meters ?? finishing.units_needed,
+              unit: finishing.price_unit,
+            })),
+          ],
+        }
+      : undefined;
+
     // Преобразуем SimplifiedPricingResult в UnifiedPricingResult
     return {
       productId: result.productId,
@@ -328,6 +394,7 @@ export class UnifiedPricingService {
           };
         }) || []),
       ],
+      ...(productionPlan ? { productionPlan } : {}),
       materialCost: result.materialPrice,
       operationsCost: result.printPrice + result.finishingPrice,
       setupCosts: 0,

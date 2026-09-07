@@ -43,7 +43,7 @@ export class MaterialTypeService {
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
-    return db.all<MaterialType & { materials_count: number }>(
+    return db.all<MaterialType & { materials_count: number; print_technologies_count: number }>(
       `SELECT
         mt.id,
         mt.category_id,
@@ -54,7 +54,13 @@ export class MaterialTypeService {
         COALESCE(mt.is_active, 1) as is_active,
         mt.created_at,
         mt.updated_at,
-        COUNT(m.id) as materials_count
+        COUNT(m.id) as materials_count,
+        (
+          SELECT COUNT(*)
+          FROM material_type_print_technologies mpt
+          WHERE mpt.material_type_id = mt.id
+            AND mpt.is_active = 1
+        ) as print_technologies_count
       FROM material_types mt
       JOIN material_categories mc ON mc.id = mt.category_id
       LEFT JOIN materials m ON m.material_type_id = mt.id
@@ -67,7 +73,7 @@ export class MaterialTypeService {
 
   static async getTypeById(id: number) {
     const db = await getDb()
-    return db.get<MaterialType & { materials_count: number }>(
+    return db.get<MaterialType & { materials_count: number; print_technologies_count: number }>(
       `SELECT
         mt.id,
         mt.category_id,
@@ -78,7 +84,13 @@ export class MaterialTypeService {
         COALESCE(mt.is_active, 1) as is_active,
         mt.created_at,
         mt.updated_at,
-        COUNT(m.id) as materials_count
+        COUNT(m.id) as materials_count,
+        (
+          SELECT COUNT(*)
+          FROM material_type_print_technologies mpt
+          WHERE mpt.material_type_id = mt.id
+            AND mpt.is_active = 1
+        ) as print_technologies_count
       FROM material_types mt
       JOIN material_categories mc ON mc.id = mt.category_id
       LEFT JOIN materials m ON m.material_type_id = mt.id

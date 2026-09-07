@@ -2,8 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createMaterialType,
   deleteMaterialType,
+  getMaterialTypePrintTechnologies,
   getMaterialTypes,
+  getPrintTechnologies,
+  replaceMaterialTypePrintTechnologies,
   updateMaterialType,
+  MaterialPrintTechnologyDto,
   MaterialTypeDto,
 } from '../../api';
 import { useUIStore } from '../../stores/uiStore';
@@ -23,6 +27,13 @@ type TypeForm = {
   code: string;
   description: string;
   is_active: boolean;
+};
+
+type PrintTechnologyOption = {
+  code: string;
+  name: string;
+  pricing_mode?: string;
+  is_active?: number | boolean;
 };
 
 const EMPTY_FORM: TypeForm = {
@@ -45,6 +56,9 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
   const [form, setForm] = useState<TypeForm>(EMPTY_FORM);
   const [typeToDelete, setTypeToDelete] = useState<MaterialTypeDto | null>(null);
   const [saving, setSaving] = useState(false);
+  const [printTechnologies, setPrintTechnologies] = useState<PrintTechnologyOption[]>([]);
+  const [printLinks, setPrintLinks] = useState<MaterialPrintTechnologyDto[]>([]);
+  const [loadingPrintLinks, setLoadingPrintLinks] = useState(false);
 
   const load = useCallback(async () => {
     if (!categoryId) {
@@ -67,6 +81,24 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
     load();
   }, [load]);
 
+  useEffect(() => {
+    getPrintTechnologies()
+      .then((response) => {
+        const rows = Array.isArray(response.data) ? response.data : [];
+        setPrintTechnologies(
+          rows
+            .filter((row: any) => row?.code)
+            .map((row: any) => ({
+              code: String(row.code),
+              name: String(row.name || row.code),
+              pricing_mode: row.pricing_mode ? String(row.pricing_mode) : undefined,
+              is_active: row.is_active,
+            })),
+        );
+      })
+      .catch(() => setPrintTechnologies([]));
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return types;
@@ -80,6 +112,7 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setPrintLinks([]);
     setShowModal(true);
   };
 
@@ -91,13 +124,79 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
       description: row.description || '',
       is_active: Number(row.is_active ?? 1) !== 0,
     });
+    setPrintLinks([]);
     setShowModal(true);
+    setLoadingPrintLinks(true);
+    getMaterialTypePrintTechnologies(row.id)
+      .then((response) => {
+        const links = Array.isArray(response.data) ? response.data : [];
+        setPrintLinks(links);
+      })
+      .catch((error: any) => {
+        showToast(error?.response?.data?.error || 'Не удалось загрузить разрешённую печать', 'error');
+      })
+      .finally(() => setLoadingPrintLinks(false));
+  };
+
+  const togglePrintTechnology = (technologyCode: string, enabled: boolean) => {
+    setPrintLinks((current) => {
+      if (!enabled) {
+        const remaining = current.filter((link) => link.technology_code !== technologyCode);
+        if (current.some((link) => link.technology_code === technologyCode && Boolean(link.is_default))) {
+          return remaining.map((link, index) => ({ ...link, is_default: index === 0 }));
+        }
+        return remaining;
+      }
+      if (current.some((link) => link.technology_code === technologyCode)) return current;
+      return [
+        ...current,
+        {
+          technology_code: technologyCode,
+          supports_indoor: true,
+          supports_outdoor: false,
+          is_default: current.length === 0,
+          priority: current.length * 10 + 10,
+          is_active: true,
+        },
+      ];
+    });
+  };
+
+  const updatePrintLink = (
+    technologyCode: string,
+    patch: Partial<MaterialPrintTechnologyDto>,
+  ) => {
+    setPrintLinks((current) =>
+      current.map((link) =>
+        link.technology_code === technologyCode ? { ...link, ...patch } : link,
+      ),
+    );
+  };
+
+  const setDefaultPrintTechnology = (technologyCode: string) => {
+    setPrintLinks((current) =>
+      current.map((link) => ({
+        ...link,
+        is_default: link.technology_code === technologyCode,
+      })),
+    );
   };
 
   const save = async () => {
     if (!categoryId) return;
     if (!form.name.trim()) {
       showToast('Введите название типа', 'warning');
+      return;
+    }
+    const withoutUsage = printLinks.find(
+      (link) => !Boolean(link.supports_indoor) && !Boolean(link.supports_outdoor),
+    );
+    if (withoutUsage) {
+      const technology = printTechnologies.find((row) => row.code === withoutUsage.technology_code);
+      showToast(
+        `Для технологии «${technology?.name || withoutUsage.technology_code}» выберите помещение и/или улицу`,
+        'warning',
+      );
       return;
     }
     try {
@@ -109,13 +208,18 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
         description: form.description.trim() || null,
         is_active: form.is_active,
       };
+      let savedTypeId: number;
       if (editing) {
-        await updateMaterialType(editing.id, payload);
-        showToast('Тип обновлён', 'success');
+        const response = await updateMaterialType(editing.id, payload);
+        savedTypeId = response.data.id;
       } else {
-        await createMaterialType(payload);
-        showToast('Тип создан', 'success');
+        const response = await createMaterialType(payload);
+        savedTypeId = response.data.id;
+        // Если сохранение связей ниже не удастся, повторная попытка должна обновлять уже созданный тип.
+        setEditing(response.data);
       }
+      await replaceMaterialTypePrintTechnologies(savedTypeId, printLinks);
+      showToast(editing ? 'Тип обновлён' : 'Тип создан', 'success');
       setShowModal(false);
       await load();
     } catch (error: any) {
@@ -206,6 +310,7 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
                 <th>Описание</th>
                 <th>Статус</th>
                 <th>Материалы</th>
+                <th>Печать</th>
                 <th>Действия</th>
               </tr>
             </thead>
@@ -223,6 +328,11 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
                       </span>
                     </td>
                     <td>{row.materials_count ?? 0}</td>
+                    <td>
+                      {row.print_technologies_count
+                        ? `${row.print_technologies_count} техн.`
+                        : 'Не настроена'}
+                    </td>
                     <td>
                       <div className="inv-actions">
                         <WarehouseButton
@@ -302,6 +412,112 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
                 value={form.description}
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               />
+            </div>
+            <div className="form-group form-group--full material-types-print">
+              <div className="material-types-print__header">
+                <div>
+                  <strong>Разрешённая печать</strong>
+                  <p>
+                    Настройка действует для всех физических материалов этого типа,
+                    включая разные ширины рулона.
+                  </p>
+                </div>
+              </div>
+              {loadingPrintLinks ? (
+                <div className="material-types-print__empty">Загрузка технологий...</div>
+              ) : printTechnologies.length === 0 ? (
+                <div className="material-types-print__empty">
+                  Нет технологий печати. Сначала добавьте их в настройках принтеров.
+                </div>
+              ) : (
+                <div className="material-types-print__list">
+                  {printTechnologies
+                    .filter(
+                      (technology) =>
+                        Number(technology.is_active ?? 1) !== 0
+                        || printLinks.some((link) => link.technology_code === technology.code),
+                    )
+                    .map((technology) => {
+                      const link = printLinks.find(
+                        (item) => item.technology_code === technology.code,
+                      );
+                      const enabled = Boolean(link);
+                      return (
+                        <div
+                          key={technology.code}
+                          className={`material-types-print__row${enabled ? ' is-enabled' : ''}`}
+                        >
+                          <label className="material-types-print__technology">
+                            <input
+                              type="checkbox"
+                              checked={enabled}
+                              onChange={(event) =>
+                                togglePrintTechnology(technology.code, event.target.checked)
+                              }
+                            />
+                            <span>
+                              <strong>{technology.name}</strong>
+                              <small>{technology.pricing_mode || 'режим не указан'}</small>
+                            </span>
+                          </label>
+                          <div className="material-types-print__usage">
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(link?.supports_indoor)}
+                                disabled={!enabled}
+                                onChange={(event) =>
+                                  updatePrintLink(technology.code, {
+                                    supports_indoor: event.target.checked,
+                                  })
+                                }
+                              />
+                              Помещение
+                            </label>
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(link?.supports_outdoor)}
+                                disabled={!enabled}
+                                onChange={(event) =>
+                                  updatePrintLink(technology.code, {
+                                    supports_outdoor: event.target.checked,
+                                  })
+                                }
+                              />
+                              Улица
+                            </label>
+                          </div>
+                          <label className="material-types-print__default">
+                            <input
+                              type="radio"
+                              name="material-type-default-print"
+                              checked={Boolean(link?.is_default)}
+                              disabled={!enabled}
+                              onChange={() => setDefaultPrintTechnology(technology.code)}
+                            />
+                            По умолчанию
+                          </label>
+                          <label className="material-types-print__priority">
+                            <span>Приоритет</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={link?.priority ?? 100}
+                              disabled={!enabled}
+                              onChange={(event) =>
+                                updatePrintLink(technology.code, {
+                                  priority: Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                                })
+                              }
+                            />
+                          </label>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           </div>
         </div>

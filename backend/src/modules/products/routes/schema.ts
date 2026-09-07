@@ -24,6 +24,49 @@ import { PriceTypeRepository } from '../../pricing/repositories/priceTypeReposit
 
 const router = Router();
 
+async function loadMaterialUsageByType(
+  db: Awaited<ReturnType<typeof getDb>>,
+  materialTypeIds: unknown[],
+): Promise<Map<number, Array<'indoor' | 'outdoor'>>> {
+  const ids = [...new Set(
+    materialTypeIds
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0),
+  )];
+  if (ids.length === 0) return new Map();
+  try {
+    const table = await db.get(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'material_type_print_technologies'",
+    );
+    if (!table) return new Map();
+    const rows = await db.all<Array<{
+      material_type_id: number;
+      supports_indoor: number;
+      supports_outdoor: number;
+    }>>(
+      `SELECT
+         material_type_id,
+         MAX(CASE WHEN supports_indoor = 1 THEN 1 ELSE 0 END) as supports_indoor,
+         MAX(CASE WHEN supports_outdoor = 1 THEN 1 ELSE 0 END) as supports_outdoor
+       FROM material_type_print_technologies
+       WHERE material_type_id IN (${ids.map(() => '?').join(',')})
+         AND is_active = 1
+       GROUP BY material_type_id`,
+      ids,
+    );
+    return new Map(
+      rows.map((row) => {
+        const usage: Array<'indoor' | 'outdoor'> = [];
+        if (Number(row.supports_indoor) === 1) usage.push('indoor');
+        if (Number(row.supports_outdoor) === 1) usage.push('outdoor');
+        return [Number(row.material_type_id), usage];
+      }),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 /**
  * @swagger
  * /api/products/{productId}/schema:
@@ -451,6 +494,10 @@ router.get('/:productId/schema', async (req, res) => {
            WHERE m.id IN (${placeholders}) AND m.is_active = 1`,
           materialIds
         );
+        const materialUsageByType = await loadMaterialUsageByType(
+          db,
+          rows.map((row: any) => row.material_type_id),
+        );
         schemaMaterials = rows.map((r: any) => ({
           id: r.id,
           name: r.name,
@@ -460,6 +507,9 @@ router.get('/:productId/schema', async (req, res) => {
           category_color: r.category_color,
           material_type_id: r.material_type_id,
           material_type_name: r.material_type_name,
+          ...(materialUsageByType.has(Number(r.material_type_id))
+            ? { usage: materialUsageByType.get(Number(r.material_type_id)) }
+            : {}),
           material_kind: r.material_kind,
           paper_type_name: r.paper_type_name,
           paper_type_id: r.paper_type_id,
@@ -522,16 +572,25 @@ router.get('/:productId/schema', async (req, res) => {
         const placeholders = materialIds.map(() => '?').join(',');
         const rows = await db.all<any>(
           `SELECT m.id, m.name, m.density, m.unit, m.paper_type_id, pt.display_name as paper_type_name,
-                  m.material_type_id, mt.name as material_type_name
+                  m.material_type_id, mt.name as material_type_name, m.material_kind
            FROM materials m
            LEFT JOIN paper_types pt ON pt.id = m.paper_type_id
            LEFT JOIN material_types mt ON mt.id = m.material_type_id
            WHERE m.id IN (${placeholders}) AND m.is_active = 1`,
           materialIds
         );
+        const materialUsageByType = schema.template.simplified?.material_driven_printing === true
+          ? await loadMaterialUsageByType(
+              db,
+              rows.map((row: any) => row.material_type_id),
+            )
+          : new Map<number, Array<'indoor' | 'outdoor'>>();
         compactMaterials = rows.map((r) => ({
           id: r.id,
-          name: r.name,
+          name:
+            r.material_kind === 'roll' && r.material_type_name
+              ? r.material_type_name
+              : r.name,
           ...(r.density != null ? { density: r.density } : {}),
           ...(r.paper_type_id != null && Number.isFinite(Number(r.paper_type_id))
             ? { paper_type_id: Number(r.paper_type_id) }
@@ -541,6 +600,9 @@ router.get('/:productId/schema', async (req, res) => {
             ? { material_type_id: Number(r.material_type_id) }
             : {}),
           ...(r.material_type_name ? { material_type_name: r.material_type_name } : {}),
+          ...(materialUsageByType.has(Number(r.material_type_id))
+            ? { usage: materialUsageByType.get(Number(r.material_type_id)) }
+            : {}),
           ...(r.unit ? { unit: r.unit } : {}),
         }));
       }

@@ -112,7 +112,7 @@ export function simplifiedHasRollPlotterSubtype(simplified: any): boolean {
   if (!tc || typeof tc !== 'object') return false;
   for (const cfg of Object.values(tc) as Array<{ plotter?: { enabled?: boolean; mode?: string } }>) {
     const p = cfg?.plotter;
-    if (p?.enabled === true && p?.mode === 'roll') return true;
+    if (p?.enabled === true && (p?.mode === 'roll' || p?.mode === 'auto')) return true;
   }
   return false;
 }
@@ -360,10 +360,35 @@ export function compactSimplifiedForSite(simplified: any) {
     if (Array.isArray(size?.allowed_base_material_ids) && size.allowed_base_material_ids.length > 0) {
       base.allowed_base_material_ids = size.allowed_base_material_ids;
     }
-    if (Array.isArray(size?.print_prices) && size.print_prices.length > 0) {
+    if (
+      simplifiedOrdered.material_driven_printing !== true
+      && Array.isArray(size?.print_prices)
+      && size.print_prices.length > 0
+    ) {
       base.print_prices = size.print_prices
         .map(compactPrintPrice)
         .filter(Boolean);
+    }
+    if (simplifiedOrdered.material_driven_printing === true) {
+      const printRows = Array.isArray(size?.print_prices) ? size.print_prices : [];
+      const colorModes = [...new Set(
+        printRows
+          .map((row: any) => String(row?.color_mode ?? row?.colorMode ?? '').trim().toLowerCase())
+          .filter((value: string) => value === 'color' || value === 'bw'),
+      )];
+      const sidesModes = [...new Set(
+        printRows
+          .map((row: any) => String(row?.sides_mode ?? row?.sidesMode ?? '').trim().toLowerCase())
+          .filter((value: string) => (
+            value === 'single' || value === 'duplex' || value === 'duplex_bw_back'
+          )),
+      )];
+      if (colorModes.length > 0 || sidesModes.length > 0) {
+        base.print_options = {
+          ...(colorModes.length > 0 ? { color_modes: colorModes } : {}),
+          ...(sidesModes.length > 0 ? { sides_modes: sidesModes } : {}),
+        };
+      }
     }
     if (Array.isArray(size?.finishing) && size.finishing.length > 0) {
       base.finishing = size.finishing
@@ -399,6 +424,18 @@ export function compactSimplifiedForSite(simplified: any) {
       })
     : undefined;
 
+  const compactInitial = (initial: any) => {
+    if (!initial || typeof initial !== 'object') return undefined;
+    if (simplifiedOrdered.material_driven_printing !== true) return initial;
+    const {
+      print_technology: _printTechnology,
+      printTechnology: _printTechnologyCamel,
+      technology_code: _technologyCode,
+      ...clientInitial
+    } = initial;
+    return clientInitial;
+  };
+
   const compactTypeConfigs =
     simplifiedOrdered.typeConfigs && typeof simplifiedOrdered.typeConfigs === 'object'
       ? Object.fromEntries(
@@ -411,7 +448,7 @@ export function compactSimplifiedForSite(simplified: any) {
                 ? { allowed_price_types: cfg.allowed_price_types.slice() }
                 : {}),
               pages: cfg?.pages || simplifiedOrdered.pages || null,
-              initial: cfg?.initial || undefined,
+              initial: compactInitial(cfg?.initial),
             },
           ])
         )
@@ -420,6 +457,7 @@ export function compactSimplifiedForSite(simplified: any) {
   const blankId = Number(simplifiedOrdered.souvenirBlankTemplateId);
 
   return {
+    material_driven_printing: simplifiedOrdered.material_driven_printing === true,
     use_layout: simplifiedOrdered.use_layout,
     cutting: simplifiedOrdered.cutting,
     pages: simplifiedOrdered.pages || null,

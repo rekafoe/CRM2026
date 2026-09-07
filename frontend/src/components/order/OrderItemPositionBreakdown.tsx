@@ -79,6 +79,15 @@ export const OrderItemPositionBreakdown: React.FC<Props> = ({
     ? (params.materials as OrderItemMaterialRow[])
     : [];
   const services = Array.isArray(params.services) ? (params.services as OrderItemServiceRow[]) : [];
+  const productionPlan =
+    params.productionPlan && typeof params.productionPlan === 'object'
+      ? params.productionPlan as {
+          steps?: Array<{ type?: string; name?: string }>;
+        }
+      : null;
+  const plannedPrintName = productionPlan?.steps
+    ?.find((step) => step?.type === 'print')
+    ?.name?.trim();
 
   const printServices = services.filter(isPrintCostRow);
   const otherServices = services.filter((s) => !isPrintCostRow(s));
@@ -167,11 +176,13 @@ export const OrderItemPositionBreakdown: React.FC<Props> = ({
                 const printOnly = serviceRowTotal(s);
                 const rowTotal =
                   i === 0 ? printOnly + foldedPaperCost : printOnly;
-                const caption = formatPrintOperationCaption(
-                  specs,
-                  materials,
-                  parameterSummary
-                );
+                const caption =
+                  plannedPrintName
+                  || formatPrintOperationCaption(
+                    specs,
+                    materials,
+                    parameterSummary
+                  );
                 return (
                   <tr key={`p-${s.operationId ?? i}`}>
                     <td>{caption}</td>
