@@ -162,8 +162,14 @@ export class OrderManagementController {
         data: order,
         message: 'Заказ выдан и закрыт'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error issuing order:', error);
+      if (error?.message && /отменён/i.test(String(error.message))) {
+        return res.status(409).json({
+          success: false,
+          message: error.message
+        });
+      }
       res.status(500).json({
         success: false,
         message: 'Ошибка при выдаче заказа'
