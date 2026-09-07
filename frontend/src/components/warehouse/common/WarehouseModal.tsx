@@ -9,6 +9,7 @@ interface WarehouseModalProps {
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  modalClassName?: string;
 }
 
 export const WarehouseModal: React.FC<WarehouseModalProps> = ({
@@ -19,6 +20,7 @@ export const WarehouseModal: React.FC<WarehouseModalProps> = ({
   footer,
   size = 'md',
   className = '',
+  modalClassName = '',
 }) => {
   return (
     <Modal
@@ -26,6 +28,7 @@ export const WarehouseModal: React.FC<WarehouseModalProps> = ({
       onClose={onClose}
       title={title}
       size={size}
+      className={modalClassName}
     >
       <div className={`warehouse-modal-content ${className}`}>
         {children}

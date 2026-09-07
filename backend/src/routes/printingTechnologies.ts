@@ -1,8 +1,11 @@
 import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
-import { hasColumn } from '../utils/tableSchemaCache'
 import { AuthenticatedRequest } from '../middleware'
+import {
+  getPrintingTechnologyUsageCounts,
+  getPrintingTechnologyUsageMap,
+} from '../services/printingTechnologyUsageService'
 
 const router = Router()
 
@@ -33,7 +36,22 @@ router.get('/', asyncHandler(async (_req, res) => {
   LEFT JOIN print_technology_prices p ON p.technology_code = t.code
    ORDER BY t.name`
   )
-  res.json(rows)
+  const usageByCode = await getPrintingTechnologyUsageMap(
+    db,
+    rows.map((row: any) => String(row.code)),
+  )
+  res.json(
+    rows.map((row: any) => ({
+      ...row,
+      usage_counts: usageByCode.get(String(row.code).toLowerCase()) ?? {
+        printers: 0,
+        products: 0,
+        print_prices: 0,
+        material_types: 0,
+        total: 0,
+      },
+    })),
+  )
 }))
 
 // POST /api/printing-technologies — создать тип печати
@@ -226,11 +244,14 @@ router.delete('/:code', asyncHandler(async (req, res) => {
   const existing = await db.get<any>('SELECT code FROM print_technologies WHERE code = ?', code)
   if (!existing) { res.status(404).json({ message: 'Print technology not found' }); return }
 
-  try {
-    if (await hasColumn('printers', 'technology_code')) {
-      await db.run(`UPDATE printers SET technology_code = NULL WHERE technology_code = ?`, code)
-    }
-  } catch {}
+  const usageCounts = await getPrintingTechnologyUsageCounts(db, code)
+  if (usageCounts.total > 0) {
+    res.status(409).json({
+      message: 'Нельзя удалить технологию, пока она используется. Сначала удалите все связи.',
+      usage_counts: usageCounts,
+    })
+    return
+  }
 
   await db.run(`DELETE FROM print_technologies WHERE code = ?`, code)
   res.status(204).end()

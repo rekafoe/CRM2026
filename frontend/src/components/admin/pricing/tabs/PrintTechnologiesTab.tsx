@@ -106,11 +106,20 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
       setDeleteTechCode(null);
       await onLoadData();
       onSuccess('Тип печати удалён');
-    } catch (error) {
-      onError('Ошибка удаления типа печати');
+    } catch (error: any) {
+      onError(
+        error?.response?.data?.message
+        || error?.response?.data?.error
+        || 'Ошибка удаления типа печати',
+      );
       console.error('Error deleting print technology:', error);
     }
   };
+
+  const technologyPendingDelete = printTechnologies.find(
+    (technology) => technology.code === deleteTechCode,
+  );
+  const pendingDeleteUsageTotal = technologyPendingDelete?.usage_counts?.total ?? 0;
 
   return (
     <div className="pricing-section">
@@ -204,8 +213,20 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
           <div key={tech.code} className="data-card">
             <div className="card-header">
               <div className="card-title">
-                <h4>{tech.name}</h4>
+                <div className="print-technology-card__identity">
+                  <h4>{tech.name}</h4>
+                  <code>{tech.code}</code>
+                </div>
                 <StatusBadge status={tech.is_active ? 'active' : 'inactive'} />
+                <span
+                  className={`print-technology-links-badge ${
+                    (tech.usage_counts?.total ?? 0) === 0
+                      ? 'print-technology-links-badge--empty'
+                      : ''
+                  }`}
+                >
+                  Связей: {tech.usage_counts?.total ?? 0}
+                </span>
               </div>
               {editingTechCode === tech.code ? (
                 <div className="card-actions">
@@ -221,7 +242,17 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
                   <Button variant="primary" size="sm" onClick={() => startEditTech(tech)}>
                     Изменить
                   </Button>
-                  <Button variant="error" size="sm" onClick={() => setDeleteTechCode(tech.code)}>
+                  <Button
+                    variant="error"
+                    size="sm"
+                    onClick={() => setDeleteTechCode(tech.code)}
+                    disabled={(tech.usage_counts?.total ?? 0) > 0}
+                    title={
+                      (tech.usage_counts?.total ?? 0) > 0
+                        ? 'Сначала удалите связи с технологией'
+                        : 'Удалить неиспользуемую технологию'
+                    }
+                  >
                     Удалить
                   </Button>
                 </div>
@@ -229,6 +260,20 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
             </div>
 
             <div className="card-content">
+              <div className="print-technology-usage">
+                <span>
+                  Принтеры <strong>{tech.usage_counts?.printers ?? 0}</strong>
+                </span>
+                <span>
+                  Продукты <strong>{tech.usage_counts?.products ?? 0}</strong>
+                </span>
+                <span>
+                  Тарифы <strong>{tech.usage_counts?.print_prices ?? 0}</strong>
+                </span>
+                <span>
+                  Типы материалов <strong>{tech.usage_counts?.material_types ?? 0}</strong>
+                </span>
+              </div>
               {editingTechCode === tech.code ? (
                 <div className="field-group">
                   <FormField label="Название">
@@ -318,13 +363,20 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
       >
         <div className="space-y-4">
           <div className="text-secondary">
-            Это действие удалит тип печати и отвяжет его от принтеров (если был выбран).
+            {pendingDeleteUsageTotal > 0
+              ? `Технология используется: ${pendingDeleteUsageTotal} связей. Сначала удалите их.`
+              : `Технология «${technologyPendingDelete?.name || deleteTechCode}» не используется и может быть удалена.`}
           </div>
           <div className="flex items-center gap-2 justify-end">
             <Button variant="secondary" onClick={() => setDeleteTechCode(null)}>
               Отмена
             </Button>
-            <Button variant="error" onClick={confirmDeleteTech} loading={loading}>
+            <Button
+              variant="error"
+              onClick={confirmDeleteTech}
+              loading={loading}
+              disabled={pendingDeleteUsageTotal > 0}
+            >
               Удалить
             </Button>
           </div>
