@@ -1293,15 +1293,27 @@ export class OrderService {
     const values: (number | null)[] = [];
     let hasContact = false;
     let hasResponsible = false;
+    let hasUpdatedAt = false;
+    let hasUpdatedAtSnake = false;
     try {
       hasContact = await hasColumn('orders', 'contact_user_id');
       hasResponsible = await hasColumn('orders', 'responsible_user_id');
+      hasUpdatedAt = await hasColumn('orders', 'updatedAt');
+      hasUpdatedAtSnake = await hasColumn('orders', 'updated_at');
     } catch { /* ignore */ }
     if (hasContact && contact_user_id !== undefined) {
       updates.push('contact_user_id = ?');
       values.push(contact_user_id ?? null);
     }
-    let responsibleAssignmentDayBefore: string | null = null
+    const previousUserId =
+      existing.userId != null && Number.isFinite(Number(existing.userId))
+        ? Number(existing.userId)
+        : null
+    // Free-pool take from OptimizedApp «Ответственный» must be atomic, same as pool «Взять».
+    const claimFromPool =
+      responsible_user_id !== undefined
+      && responsible_user_id != null
+      && previousUserId == null
     if (responsible_user_id !== undefined) {
       if (hasResponsible) {
         updates.push('responsible_user_id = ?');
@@ -1309,18 +1321,26 @@ export class OrderService {
       }
       updates.push('userId = ?');
       values.push(responsible_user_id ?? null);
-      if (responsible_user_id != null) {
-        responsibleAssignmentDayBefore = await OrderService.shiftOrderToAssignmentDay(id);
-      }
     }
     if (updates.length === 0) {
       return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
     }
+    if (hasUpdatedAt) updates.push('updatedAt = datetime("now")')
+    else if (hasUpdatedAtSnake) updates.push('updated_at = datetime("now")')
     values.push(id);
-    await db.run(
-      `UPDATE orders SET ${updates.join(', ')}, updated_at = datetime("now") WHERE id = ?`,
+    const whereExtra = claimFromPool ? ' AND userId IS NULL' : ''
+    const updateResult = await db.run(
+      `UPDATE orders SET ${updates.join(', ')} WHERE id = ?${whereExtra}`,
       values
     );
+    if (claimFromPool && Number(updateResult?.changes ?? 0) === 0) {
+      throw new Error('Заказ уже взят другим сотрудником');
+    }
+    let responsibleAssignmentDayBefore: string | null = null
+    if (responsible_user_id != null) {
+      // Only shift after a successful claim/reassign — never move dates on a lost race.
+      responsibleAssignmentDayBefore = await OrderService.shiftOrderToAssignmentDay(id);
+    }
     if (hasContact && contact_user_id !== undefined && Number(existing.contact_user_id ?? 0) !== Number(contact_user_id ?? 0)) {
       await this.recordOrderActivity(db, {
         orderId: id,

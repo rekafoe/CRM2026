@@ -755,8 +755,13 @@ export class OrderController {
       const updated = await OrderService.updateOrderAssignees(id, contact_user_id, responsible_user_id, authUser?.id)
       res.json(updated)
     } catch (error: any) {
-      const status = error.message?.includes('не найден') ? 404 : 400
-      res.status(status).json({ error: error.message })
+      const message = String(error?.message || '')
+      const status = message.includes('не найден')
+        ? 404
+        : message.includes('уже взят')
+          ? 409
+          : 400
+      res.status(status).json({ error: message })
     }
   }
 
