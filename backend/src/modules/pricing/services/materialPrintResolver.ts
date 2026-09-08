@@ -54,8 +54,21 @@ function routingError(message: string, status = 400): Error & { status: number }
   return error
 }
 
-function normalizeUsageContext(raw: unknown): MaterialUsageContext {
-  return String(raw || '').trim().toLowerCase() === 'outdoor' ? 'outdoor' : 'indoor'
+function normalizeUsageContext(
+  raw: unknown,
+  links: Array<{ is_active?: number; supports_indoor?: number; supports_outdoor?: number }>,
+): MaterialUsageContext {
+  const explicit = String(raw || '').trim().toLowerCase()
+  if (explicit === 'outdoor') return 'outdoor'
+  if (explicit === 'indoor') return 'indoor'
+
+  const active = links.filter((link) => Number(link.is_active) !== 0)
+  const indoorOk = active.some((link) => Number(link.supports_indoor) === 1)
+  const outdoorOk = active.some((link) => Number(link.supports_outdoor) === 1)
+  // Outdoor-only material types must not silently fall back to indoor (Mini App/website
+  // often omit usage_context) — that made calculate fail or pick the wrong technology.
+  if (outdoorOk && !indoorOk) return 'outdoor'
+  return 'indoor'
 }
 
 function normalizeMaterialKind(raw: unknown): MaterialPrintResolution['materialKind'] {
@@ -115,11 +128,11 @@ export class MaterialPrintResolver {
       )
     }
 
-    const usageContext = normalizeUsageContext(input.usageContext)
     const links = await MaterialPrintTechnologyService.listForMaterialType(
       Number(requested.material_type_id),
       { onlyActive: true },
     )
+    const usageContext = normalizeUsageContext(input.usageContext, links)
     const configuredCodes = new Set(
       (input.configuredTechnologyCodes || [])
         .map((code) => String(code || '').trim().toLowerCase())

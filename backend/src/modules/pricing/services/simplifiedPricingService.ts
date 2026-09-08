@@ -693,23 +693,64 @@ export class SimplifiedPricingService {
       );
       const requestedColor = String(normalizedConfig.print_color_mode || '').toLowerCase();
       const requestedSides = String(normalizedConfig.print_sides_mode || '').toLowerCase();
-      const selectedPrintRow =
-        techRows.find(
+      const hasRequestedColor = requestedColor === 'color' || requestedColor === 'bw';
+      const hasRequestedSides =
+        requestedSides === 'single'
+        || requestedSides === 'duplex'
+        || requestedSides === 'duplex_bw_back';
+      const defaultColor = String(selectedSize.default_print?.color_mode || '').toLowerCase();
+      const defaultSides = String(selectedSize.default_print?.sides_mode || '').toLowerCase();
+
+      let selectedPrintRow:
+        | (typeof selectedSize.print_prices)[number]
+        | undefined;
+      if (hasRequestedColor && hasRequestedSides) {
+        selectedPrintRow = techRows.find(
           (row) =>
             String(row.color_mode).toLowerCase() === requestedColor
             && String(row.sides_mode).toLowerCase() === requestedSides,
-        )
-        ?? techRows.find((row) => String(row.color_mode).toLowerCase() === requestedColor)
-        ?? techRows[0];
+        );
+        if (!selectedPrintRow) {
+          const err: any = new Error(
+            `Для технологии «${resolvedMaterialPrint.technologyName}» нет тарифа печати ` +
+              `${requestedColor}/${requestedSides} у выбранного размера`,
+          );
+          err.status = 422;
+          throw err;
+        }
+      } else if (hasRequestedColor) {
+        selectedPrintRow = techRows.find(
+          (row) => String(row.color_mode).toLowerCase() === requestedColor,
+        );
+        if (!selectedPrintRow) {
+          const err: any = new Error(
+            `Для технологии «${resolvedMaterialPrint.technologyName}» нет тарифа печати ` +
+              `с цветом «${requestedColor}» у выбранного размера`,
+          );
+          err.status = 422;
+          throw err;
+        }
+      } else if (techRows.length > 0) {
+        selectedPrintRow =
+          techRows.find(
+            (row) =>
+              String(row.color_mode).toLowerCase() === defaultColor
+              && String(row.sides_mode).toLowerCase() === defaultSides,
+          )
+          ?? techRows.find((row) => String(row.color_mode).toLowerCase() === defaultColor)
+          ?? techRows[0];
+      }
 
       normalizedConfig.print_color_mode =
         selectedPrintRow?.color_mode
-        ?? normalizedConfig.print_color_mode
-        ?? 'color';
+        ?? (hasRequestedColor ? normalizedConfig.print_color_mode : undefined)
+        ?? (defaultColor === 'bw' ? 'bw' : 'color');
       normalizedConfig.print_sides_mode =
         selectedPrintRow?.sides_mode
-        ?? normalizedConfig.print_sides_mode
-        ?? 'single';
+        ?? (hasRequestedSides ? normalizedConfig.print_sides_mode : undefined)
+        ?? (defaultSides === 'duplex' || defaultSides === 'duplex_bw_back'
+          ? (defaultSides as 'duplex' | 'duplex_bw_back')
+          : 'single');
 
       if (resolvedMaterialPrint.m2PricingKind === 'uv_flatbed') {
         uvTemplateConfig = uvTemplateConfig ?? {
