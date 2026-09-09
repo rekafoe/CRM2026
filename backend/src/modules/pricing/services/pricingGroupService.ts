@@ -183,6 +183,13 @@ async function resolveLinePricingVolumes(
           material_id: result.productionPlan.materialId,
           print_technology: result.productionPlan.technologyCode,
           usage_context: result.productionPlan.usageContext,
+          // Billed color/sides after material-driven resolve (client often omits them).
+          ...(result.productionPlan.colorMode
+            ? { print_color_mode: result.productionPlan.colorMode }
+            : {}),
+          ...(result.productionPlan.sidesMode
+            ? { print_sides_mode: result.productionPlan.sidesMode }
+            : {}),
         }
       : line.configuration;
     return {

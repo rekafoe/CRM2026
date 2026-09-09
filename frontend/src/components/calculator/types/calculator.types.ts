@@ -109,6 +109,8 @@ export interface CalculationResult {
     materialName: string;
     materialKind: string;
     materialWidthMm?: number;
+    colorMode?: 'color' | 'bw';
+    sidesMode?: 'single' | 'duplex' | 'duplex_bw_back';
     stockSufficient: boolean;
     steps: Array<{
       type: 'print' | 'operation';

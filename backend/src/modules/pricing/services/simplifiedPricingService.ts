@@ -309,7 +309,7 @@ interface SimplifiedTypeConfig {
   /** Плоттерная резка: одна точка включения в подтипе */
   plotter?: {
     enabled?: boolean;
-    mode?: 'sheet' | 'roll';
+    mode?: 'sheet' | 'roll' | 'auto';
     roll_allowed_material_ids?: number[];
     mounting_film_material_id?: number;
   };
@@ -741,29 +741,61 @@ export class SimplifiedPricingService {
       });
     }
 
-    const configuredPlotter = typeConfig?.plotter;
-    const configuredPlotterMode = String((configuredPlotter as { mode?: string } | undefined)?.mode || '');
-    const effectivePlotterConfig =
-      configuredPlotterMode === 'auto'
-        ? configuredPlotter?.enabled === true && resolvedMaterialPrint
-          ? {
-              ...configuredPlotter,
-              mode: resolvedMaterialPrint.materialKind === 'roll' ? 'roll' as const : 'sheet' as const,
-              roll_allowed_material_ids: effectiveAllowedMaterialIds,
-            }
-          : undefined
-        : configuredPlotter;
-
     let materialSheetMm: { width: number; height: number } | null = null;
+    let materialKindFromDb: 'sheet' | 'roll' | 'consumable' | 'area' | null = null;
     if (normalizedConfig.material_id) {
-      const matDim = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
-        `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
+      const matDim = await db.get<{
+        sheet_width: number | null;
+        sheet_height: number | null;
+        material_kind: string | null;
+      }>(
+        `SELECT sheet_width, sheet_height, material_kind FROM materials WHERE id = ?`,
         [normalizedConfig.material_id]
       );
       const mw0 = matDim?.sheet_width != null && matDim.sheet_width > 0 ? Number(matDim.sheet_width) : 0;
       const mh0 = matDim?.sheet_height != null && matDim.sheet_height > 0 ? Number(matDim.sheet_height) : 0;
       if (mw0 > 0) {
         materialSheetMm = { width: mw0, height: mh0 > 0 ? mh0 : 0 };
+      }
+      const kindRaw = String(matDim?.material_kind || '').trim().toLowerCase();
+      if (kindRaw === 'roll' || kindRaw === 'sheet' || kindRaw === 'area' || kindRaw === 'consumable') {
+        materialKindFromDb = kindRaw;
+      }
+    }
+
+    const configuredPlotter = typeConfig?.plotter;
+    const configuredPlotterMode = String((configuredPlotter as { mode?: string } | undefined)?.mode || '');
+    // auto: sheet vs roll by material kind. Prefer material-driven resolution; otherwise warehouse kind.
+    // Never drop the plotter entirely when auto is set — that silently omitted cutting charges.
+    const plotterMaterialKind =
+      resolvedMaterialPrint?.materialKind
+      ?? materialKindFromDb;
+    type EffectivePlotter = NonNullable<SimplifiedTypeConfig['plotter']> & {
+      mode?: 'sheet' | 'roll';
+    };
+    let effectivePlotterConfig: EffectivePlotter | undefined =
+      configuredPlotterMode === 'auto'
+        ? undefined
+        : configuredPlotter
+          ? { ...configuredPlotter, mode: configuredPlotter.mode === 'sheet' ? 'sheet' : 'roll' }
+          : undefined;
+    if (configuredPlotterMode === 'auto') {
+      if (configuredPlotter?.enabled !== true) {
+        effectivePlotterConfig = undefined;
+      } else if (!plotterMaterialKind) {
+        const err: any = new Error(
+          'Плоттер в режиме «авто»: укажите материал с типом sheet/roll (или включите печать по материалу).',
+        );
+        err.status = 400;
+        throw err;
+      } else {
+        effectivePlotterConfig = {
+          ...configuredPlotter,
+          mode: plotterMaterialKind === 'roll' ? 'roll' : 'sheet',
+          ...(plotterMaterialKind === 'roll' && resolvedMaterialPrint
+            ? { roll_allowed_material_ids: effectiveAllowedMaterialIds }
+            : {}),
+        };
       }
     }
 
@@ -2485,7 +2517,7 @@ export class SimplifiedPricingService {
       ? (finishingDetails.find((d: any) => (serviceTypesMap.get(d.service_id) || '').toLowerCase() === 'cut')?.tier?.price ?? 0)
       : 0;
     const knifePathByQty = (q: number): number => {
-      const pc = typeConfig?.plotter;
+      const pc = effectivePlotterConfig;
       if (!pc?.enabled || !pc.mode) return 0;
       const margins = resolvePlotterMargins(pc.mode, customMarginMm, customGapMm);
       const qq = Math.max(1, Math.floor(Number(q) || 0));
