@@ -380,6 +380,12 @@ export async function claimEditorDraftsForCustomer(input: {
 export async function cleanupExpiredEditorDrafts(): Promise<{ deleted: number }> {
   await ensureEditorDraftOwnerColumns()
   const db = await getDb()
+  // Release crash-stuck checkout claims so the client can retry.
+  await db.run(
+    `UPDATE editor_drafts SET status = 'draft', updated_at = datetime('now')
+     WHERE status = 'finalizing'
+       AND datetime(updated_at) <= datetime('now', '-10 minutes')`,
+  )
   const expired = (await db.all(
     `SELECT id FROM editor_drafts
      WHERE status = 'draft'

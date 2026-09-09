@@ -8,6 +8,7 @@ import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { planIssuePaymentUpdate } from '../utils/issuePaymentUpdate'
+import { planSendPaymentLinkUpdate } from '../utils/sendPaymentLinkUpdate'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
@@ -1527,13 +1528,40 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
     const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
     const todayLocal = (todayRow?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
     const prepaymentMoment = `${todayLocal} 12:00:00`
-    const updateSql = hasPrepaymentUpdatedAt
-      ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
-      : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
-    if (hasPrepaymentUpdatedAt) {
-      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', prepaymentMoment, id)
+    const plan = planSendPaymentLinkUpdate(order, {
+      amount,
+      paymentUrl: paymentUrl!,
+      paymentId,
+    })
+    if (plan.mode === 'keep_paid_refresh_checkout') {
+      // Already paid (offline cash or BePaid): never downgrade to pending / wipe amount.
+      await db.run(
+        `UPDATE orders SET paymentUrl = ?, paymentId = ?, updated_at = datetime('now') WHERE id = ?`,
+        plan.paymentUrl,
+        plan.paymentId,
+        id,
+      )
+    } else if (hasPrepaymentUpdatedAt) {
+      await db.run(
+        'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?',
+        plan.prepaymentAmount,
+        plan.prepaymentStatus,
+        plan.paymentUrl,
+        plan.paymentId,
+        plan.paymentMethod,
+        prepaymentMoment,
+        id,
+      )
     } else {
-      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', id)
+      await db.run(
+        'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?',
+        plan.prepaymentAmount,
+        plan.prepaymentStatus,
+        plan.paymentUrl,
+        plan.paymentId,
+        plan.paymentMethod,
+        id,
+      )
     }
   }
 
