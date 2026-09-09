@@ -36,21 +36,25 @@ export type OrderCashInput = {
   createdAt?: string | null
   prepaymentUpdatedAt?: string | null
   cash_from_issue_today?: number | null
+  /** Сумма всех debt_closed_events по заказу (любые дни). Нужна, т.к. выдача пишет prepaymentAmount=total. */
+  cash_issued_lifetime?: number | null
 }
 
-/** Оплата для кассы: paid/successful, офлайн, предоплата в день отчёта (CRM), без online/telegram. */
+/** Оплата для кассы: paid/successful офлайн, предоплата в день отчёта (CRM), без online/telegram. */
 export function countsAsPaidForCashReport(order: OrderCashInput, reportDate?: string): boolean {
+  const method = String(order.paymentMethod ?? '').toLowerCase()
+  // BePaid / Mini App: paid+online не должны попадать в кассу как наличные.
+  if (method === 'online' || method === 'telegram') return false
   if (isPaidPrepaymentStatus(order.prepaymentStatus)) return true
   const prepayment = Number(order.prepaymentAmount ?? 0)
   if (!Number.isFinite(prepayment) || prepayment <= 0) return false
-  const method = String(order.paymentMethod ?? '').toLowerCase()
   if (method === 'offline') return true
   const rd = reportDate?.slice(0, 10)
   if (rd) {
     const prepayDay = sliceReportDateLocal(order.prepaymentUpdatedAt)
-    if (prepayDay === rd && method !== 'online' && method !== 'telegram') return true
+    if (prepayDay === rd) return true
   }
-  if (!order.prepaymentStatus && method !== 'online' && method !== 'telegram') return true
+  if (!order.prepaymentStatus) return true
   return false
 }
 
@@ -65,7 +69,7 @@ export function shouldIncludeOrderInCashRegister(order: OrderCashInput, reportDa
 /**
  * Сумма в кассу за конкретный календарный день отчёта.
  * День работы (created_at) без оплаты в этот день → 0.
- * День оплаты (prepaymentUpdatedAt) → prepaymentAmount.
+ * День оплаты (prepaymentUpdatedAt) → предоплата (total − Σ debt_closed, если выдача уже раздула prepaymentAmount).
  * День выдачи (cash_from_issue_today) → остаток (всегда, если debt_closed > 0).
  */
 export function computeCashForReportDate(order: OrderCashInput, reportDate: string): number {
@@ -77,6 +81,11 @@ export function computeCashForReportDate(order: OrderCashInput, reportDate: stri
   if (hasIssue && Number.isFinite(issueAmt) && issueAmt > 0) {
     const prepayment = Number(order.prepaymentAmount ?? 0)
     const created = sliceReportDateLocal(order.created_at ?? order.createdAt)
+    const method = String(order.paymentMethod ?? '').toLowerCase()
+    // Частичный online + остаток наличными в день оформления: в кассу только remainder.
+    if (method === 'online' || method === 'telegram') {
+      return Math.max(0, issueAmt)
+    }
     if (created === rd && Number.isFinite(prepayment) && prepayment > 0) {
       if (issueAmt < prepayment) return prepayment
       if (issueAmt === 0 && prepayment > 0) return prepayment
@@ -89,11 +98,17 @@ export function computeCashForReportDate(order: OrderCashInput, reportDate: stri
   if (!countsAsPaidForCashReport(order, rd)) return 0
 
   const prepayDay = sliceReportDateLocal(order.prepaymentUpdatedAt)
-  if (prepayDay === rd) return prepayment
+  const lifetimeIssued = Number(order.cash_issued_lifetime ?? 0)
+  const prepaidCash =
+    Number.isFinite(lifetimeIssued) && lifetimeIssued > 0
+      ? Math.max(0, prepayment - lifetimeIssued)
+      : prepayment
+
+  if (prepayDay === rd) return prepaidCash
 
   const created = sliceReportDateLocal(order.created_at ?? order.createdAt)
   // Legacy CRM: оплата в день оформления без prepaymentUpdatedAt
-  if (!prepayDay && created === rd) return prepayment
+  if (!prepayDay && created === rd) return prepaidCash
 
   return 0
 }

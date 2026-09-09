@@ -33,6 +33,8 @@ jest.mock('../services/editorDraftWebsitePrepare', () => ({
     editorDraftItems: [],
   })),
   attachEditorDraftsToOrderItems: jest.fn(),
+  claimEditorDraftsForCheckout: jest.fn(async () => []),
+  releaseEditorDraftCheckoutClaims: jest.fn(),
 }))
 
 jest.mock('../services/editorOrderIntakeService', () => ({

@@ -282,6 +282,68 @@ export async function collectEditorDraftItemsFromOrder(
   return items
 }
 
+/** Unique tokens from prepared editor draft items (layout groups may repeat). */
+export function collectUniqueEditorDraftTokens(
+  editorDraftItems: PreparedEditorDraftItem[],
+): string[] {
+  const seen = new Set<string>()
+  const tokens: string[] = []
+  for (const item of editorDraftItems) {
+    for (const token of item.tokens) {
+      const t = String(token || '').trim()
+      if (!t || seen.has(t)) continue
+      seen.add(t)
+      tokens.push(t)
+    }
+  }
+  return tokens
+}
+
+/**
+ * Claim drafts before createOrder so concurrent website checkouts cannot double-spend.
+ * Status draft → finalizing (same pattern as finalizeEditorDraft).
+ */
+export async function claimEditorDraftsForCheckout(
+  editorDraftItems: PreparedEditorDraftItem[],
+): Promise<string[]> {
+  const tokens = collectUniqueEditorDraftTokens(editorDraftItems)
+  if (tokens.length === 0) return tokens
+  const db = await getDb()
+  const claimed: string[] = []
+  try {
+    for (const token of tokens) {
+      const result = await db.run(
+        `UPDATE editor_drafts SET status = 'finalizing', updated_at = datetime('now')
+         WHERE token = ? AND status = 'draft'`,
+        [token],
+      )
+      if (!result || Number(result.changes || 0) === 0) {
+        throw new Error('Draft уже финализирован')
+      }
+      claimed.push(token)
+    }
+  } catch (err) {
+    if (claimed.length > 0) {
+      await releaseEditorDraftCheckoutClaims(claimed)
+    }
+    throw err
+  }
+  return tokens
+}
+
+/** Roll back finalizing → draft after createOrder failure (before attach). */
+export async function releaseEditorDraftCheckoutClaims(tokens: string[]): Promise<void> {
+  if (tokens.length === 0) return
+  const db = await getDb()
+  for (const token of tokens) {
+    await db.run(
+      `UPDATE editor_drafts SET status = 'draft', updated_at = datetime('now')
+       WHERE token = ? AND status = 'finalizing'`,
+      [token],
+    )
+  }
+}
+
 export async function attachEditorDraftsToOrderItems(
   orderId: number,
   itemIds: number[],
@@ -298,7 +360,10 @@ export async function attachEditorDraftsToOrderItems(
     for (const token of draftItem.tokens) {
       const draft = await getEditorDraft(token)
       if (!draft) throw new Error('Draft не найден')
-      if (draft.status !== 'draft') throw new Error('Draft уже финализирован')
+      // Allow 'finalizing' when claimed before createOrder; reject only finalized/other.
+      if (draft.status !== 'draft' && draft.status !== 'finalizing') {
+        throw new Error('Draft уже финализирован')
+      }
 
       const copied = await copyEditorDraftFilesToOrderItem(draft.id, orderId, orderItemId)
       for (const [fileId, filename] of copied) fileNameByDraftFileId.set(fileId, filename)
