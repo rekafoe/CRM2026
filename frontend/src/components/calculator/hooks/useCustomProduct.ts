@@ -2,6 +2,32 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
 import { CUSTOM_PRODUCT_ID } from '../components/DynamicProductSelector';
 
+/** Поля обычного калькулятора — при сохранении произвольного продукта не тащим их обратно в форму. */
+const CALCULATOR_ARTIFACT_KEYS = [
+  'productId',
+  'product_id',
+  'specifications',
+  'materials',
+  'services',
+  'selectedOperations',
+  'layout',
+  'customFormat',
+  'formatInfo',
+  'postprintProduct',
+  'postprintOperations',
+] as const;
+
+function mergeCustomProductParams(
+  existing: Record<string, unknown> | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...(existing || {}) };
+  for (const key of CALCULATOR_ARTIFACT_KEYS) {
+    delete merged[key];
+  }
+  return { ...merged, ...patch };
+}
+
 interface UseCustomProductParams {
   isOpen: boolean;
   editContext?: any;
@@ -111,17 +137,27 @@ export function useCustomProduct({
     const name = customProductForm.name.trim();
     const characteristics = customProductForm.characteristics.trim();
     const storedTotal = Math.round(customPrice * customQuantity * 100) / 100;
-    const paramsPayload = {
+    // replace = delete+add: без merge затираются readyDate и прочие поля позиции
+    const existingParams =
+      isEditMode && editContext?.item?.params && typeof editContext.item.params === 'object'
+        ? (editContext.item.params as Record<string, unknown>)
+        : undefined;
+    const paramsPayload = mergeCustomProductParams(existingParams, {
       customProduct: true,
       customName: name,
-      characteristics: characteristics || undefined,
       productionDays: customProductionDays > 0 ? customProductionDays : undefined,
-      operator_percent: 10,
+      operator_percent: existingParams?.operator_percent ?? 10,
       productType: 'custom',
       productName: name,
+      description: name,
       storedTotalCost: storedTotal,
       priceLockedByCalculator: true,
-    };
+    });
+    if (characteristics) {
+      paramsPayload.characteristics = characteristics;
+    } else {
+      delete paramsPayload.characteristics;
+    }
 
     const apiItem = {
       type: 'custom',
