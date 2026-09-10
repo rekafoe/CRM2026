@@ -2814,13 +2814,16 @@ export class SimplifiedPricingService {
           }
         : {}),
       ...(operationMaterials.length > 0 ? { operationMaterials } : {}),
+      // Листовые: объём группы = полные листы × шт/лист (как sheetLayoutPrintTierQuantity),
+      // иначе quoteLines/tierSheetsOverride снова ищет ступень по «сырому» тиражу и
+      // откатывает фикс 7c7a6fe9 (107 шт при 54 шт/лист → тариф 1 листа вместо 2).
       tierVolumeForGrouping: usePagesMultiplier
         ? multipageTierPrintUnits
         : isRollMeterage
           ? Math.max(1, Math.floor(metersNeeded))
           : isRollWideM2Mode
             ? Math.max(0.001, Math.round(totalM2Needed * 1000) / 1000)
-          : quantity,
+          : sheetLayoutPrintTierQuantity(quantity, itemsPerSheet),
     };
   }
   

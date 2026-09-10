@@ -757,6 +757,54 @@ export class OrderService {
     )
   }
 
+  /**
+   * Если у заказа ещё нет точки исполнения — зафиксировать департамент пользователя.
+   * Нужно для website/miniapp (userId/fulfillment изначально NULL): касса скоупится по
+   * COALESCE(fulfillment, owner.department), и смена/очистка userId иначе двигает или
+   * обнуляет cash_in_today между точками.
+   */
+  static async ensureFulfillmentDepartmentFromUser(
+    orderId: number,
+    userId: number | null | undefined,
+  ): Promise<number | null> {
+    const uid = userId != null ? Number(userId) : NaN
+    if (!Number.isFinite(uid) || uid <= 0) return null
+    const db = await getDb()
+    let hasFulfillment = false
+    let hasUserDept = false
+    try {
+      hasFulfillment = await hasColumn('orders', 'fulfillment_department_id')
+      hasUserDept = await hasColumn('users', 'department_id')
+    } catch {
+      return null
+    }
+    if (!hasFulfillment || !hasUserDept) return null
+
+    const order = await db.get<{ fulfillment_department_id: number | null }>(
+      'SELECT fulfillment_department_id FROM orders WHERE id = ?',
+      [orderId],
+    )
+    if (!order) return null
+    if (order.fulfillment_department_id != null && Number(order.fulfillment_department_id) > 0) {
+      return Number(order.fulfillment_department_id)
+    }
+
+    const user = await db.get<{ department_id: number | null }>(
+      'SELECT department_id FROM users WHERE id = ?',
+      [uid],
+    )
+    const deptId = user?.department_id != null ? Number(user.department_id) : NaN
+    if (!Number.isFinite(deptId) || deptId <= 0) return null
+
+    await db.run(
+      `UPDATE orders
+          SET fulfillment_department_id = ?, updated_at = datetime('now')
+        WHERE id = ? AND fulfillment_department_id IS NULL`,
+      [deptId, orderId],
+    )
+    return deptId
+  }
+
   static readOrderDeliveryFromRow(row: { delivery_json?: string | null }): WebsiteOrderDelivery | null {
     return parseWebsiteOrderDeliveryJson(row.delivery_json ?? null)
   }
@@ -1307,6 +1355,17 @@ export class OrderService {
         updates.push('responsible_user_id = ?');
         values.push(responsible_user_id ?? null);
       }
+      const previousOwner =
+        existing.userId != null && Number.isFinite(Number(existing.userId))
+          ? Number(existing.userId)
+          : existing.responsible_user_id != null && Number.isFinite(Number(existing.responsible_user_id))
+            ? Number(existing.responsible_user_id)
+            : null
+      // До смены/снятия владельца зафиксировать точку (касса по fulfillment, не по userId).
+      await OrderService.ensureFulfillmentDepartmentFromUser(
+        id,
+        responsible_user_id != null ? responsible_user_id : previousOwner,
+      )
       updates.push('userId = ?');
       values.push(responsible_user_id ?? null);
       if (responsible_user_id != null) {
@@ -1792,6 +1851,11 @@ export class OrderService {
       throw new Error('Переназначение доступно только для заказов в статусе «ожидает» (0 или 1)')
     }
     const previousUserId = row.userId != null && Number.isFinite(Number(row.userId)) ? Number(row.userId) : null
+    // Зафиксировать точку до смены владельца: иначе касса «ездит» за userId.
+    await OrderService.ensureFulfillmentDepartmentFromUser(
+      row.id,
+      previousUserId ?? targetUserId,
+    )
     let hasUpdatedAt = false
     let hasUpdatedAtSnake = false
     try {
@@ -1804,6 +1868,9 @@ export class OrderService {
       await db.run('UPDATE orders SET userId = ?, updated_at = datetime("now") WHERE id = ?', [targetUserId, row.id])
     } else {
       await db.run('UPDATE orders SET userId = ? WHERE id = ?', [targetUserId, row.id])
+    }
+    if (previousUserId == null) {
+      await OrderService.ensureFulfillmentDepartmentFromUser(row.id, targetUserId)
     }
     await this.recordOrderActivity(db, {
       orderId: row.id,
@@ -1856,6 +1923,10 @@ export class OrderService {
 
     await db.run('BEGIN')
     try {
+      // До обнуления userId: иначе заказ без fulfillment выпадает из кассы точки.
+      const ownerId =
+        ord.userId != null && Number.isFinite(Number(ord.userId)) ? Number(ord.userId) : null
+      await OrderService.ensureFulfillmentDepartmentFromUser(id, ownerId ?? userId ?? null)
       await this.recordCancellationEvent(db, {
         orderId: id,
         orderNumber: ord?.number ?? null,

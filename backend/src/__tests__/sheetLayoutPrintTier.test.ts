@@ -114,6 +114,10 @@ describe('SimplifiedPricingService: листовые ступени печати
     // 2 листа × 54 × 0.23 (тариф 2 листов)
     expect(p108.finalPrice).toBeCloseTo(24.84, 2);
     expect(p107.finalPrice).toBeCloseTo(p108.finalPrice, 2);
+    // quoteLines суммирует tierVolumeForGrouping как tierSheetsOverride —
+    // сырой тираж 107 снова выбрал бы тариф 1 листа.
+    expect(p107.tierVolumeForGrouping).toBe(108);
+    expect(p108.tierVolumeForGrouping).toBe(108);
   });
 
   it('109 шт. переходят на 3 листа и тариф 3 листов', async () => {
@@ -122,5 +126,6 @@ describe('SimplifiedPricingService: листовые ступени печати
     // 3 листа × 54 × 0.18
     expect(p109.finalPrice).toBeCloseTo(29.16, 2);
     expect(p109.finalPrice).toBeGreaterThan(p108.finalPrice);
+    expect(p109.tierVolumeForGrouping).toBe(162);
   });
 });
