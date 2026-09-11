@@ -72,6 +72,7 @@ import {
   isPlotterCuttingSyntheticServiceId,
 } from '../constants/plotterCuttingFinishingIds';
 import { sheetLayoutPrintTierQuantity } from '../utils/sheetLayoutPrintTierQuantity';
+import { smoothedSheetPrintTotal } from '../utils/smoothedSheetPrintTotal';
 import {
   MaterialPrintResolver,
   type MaterialPrintResolution,
@@ -1161,9 +1162,14 @@ export class SimplifiedPricingService {
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
           const pricePerSheet = priceForTier * itemsPerSheet;
+          const discreteSheetTotal = sheetsNeeded * pricePerSheet;
+          const smoothedTotal =
+            !usePagesMultiplier && !isRollPrint && !isMaterialMeterBased
+              ? smoothedSheetPrintTotal(sheetsNeeded, printPriceConfig.tiers, itemsPerSheet)
+              : null;
           const basePrintPrice = usePagesMultiplier
             ? priceForTier * multipagePrintUnits
-            : sheetsNeeded * pricePerSheet;
+            : (smoothedTotal ?? discreteSheetTotal);
           printPrice = basePrintPrice * billingModeMultiplier;
           printDetails = {
             tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
@@ -2950,9 +2956,14 @@ export class SimplifiedPricingService {
             : tier;
           const unitPrice = tierForPrint ? this.getPriceForQuantityTier(tierForPrint) : priceForTier;
           const pricePerSheet = unitPrice * ctx.itemsPerSheet;
+          const discreteSheetTotal = physicalSheets * pricePerSheet;
+          const smoothedTotal =
+            !ctx.usePagesMultiplier && !ctx.isRollPrint && !ctx.isRollMeterage
+              ? smoothedSheetPrintTotal(physicalSheets, ctx.printPriceConfig.tiers, ctx.itemsPerSheet)
+              : null;
           const basePrintPrice = ctx.usePagesMultiplier
             ? unitPrice * printUnits
-            : physicalSheets * pricePerSheet;
+            : (smoothedTotal ?? discreteSheetTotal);
           printPrice = basePrintPrice * ctx.billingModeMultiplier;
         }
       }

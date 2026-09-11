@@ -124,3 +124,106 @@ describe('SimplifiedPricingService: листовые ступени печати
     expect(p109.finalPrice).toBeGreaterThan(p108.finalPrice);
   });
 });
+
+describe('SimplifiedPricingService: плавный переход тиражной скидки печати', () => {
+  const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>;
+
+  const makeConfig = (tiers: Array<{ min_qty: number; unit_price: number }>) => ({
+    config_data: JSON.stringify({
+      simplified: {
+        include_material_cost: false,
+        sizes: [
+          {
+            id: 'postcard',
+            label: 'открытка',
+            width_mm: 100,
+            height_mm: 150,
+            min_qty: 10,
+            items_per_sheet_override: 10,
+            print_prices: [
+              {
+                technology_code: 'laser_prof',
+                color_mode: 'color',
+                sides_mode: 'single',
+                tiers,
+              },
+            ],
+            material_prices: [],
+            finishing: [],
+          },
+        ],
+      },
+    }),
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layoutMock(10));
+    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layoutMock(10));
+  });
+
+  const calcWithTiers = (
+    tiers: Array<{ min_qty: number; unit_price: number }>,
+    quantity: number,
+  ) => {
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return {
+            id: 1,
+            name: 'Открытки',
+            calculator_type: 'simplified',
+            product_type: 'postcards',
+          };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return makeConfig(tiers);
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    return SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'postcard',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+      } as any,
+      quantity,
+    );
+  };
+
+  it('между 30 и 50 листами цена растёт плавно, без скачка дороже следующего порога', async () => {
+    const tiers = [
+      { min_qty: 300, unit_price: 130 },
+      { min_qty: 500, unit_price: 91 },
+    ];
+    const p300 = await calcWithTiers(tiers, 300);
+    const p400 = await calcWithTiers(tiers, 400);
+    const p500 = await calcWithTiers(tiers, 500);
+    expect(p300.finalPrice).toBeCloseTo(39000, 2);
+    expect(p500.finalPrice).toBeCloseTo(45500, 2);
+    expect(p400.finalPrice).toBeCloseTo(42250, 2);
+    expect(p400.finalPrice).toBeGreaterThan(p300.finalPrice);
+    expect(p400.finalPrice).toBeLessThan(p500.finalPrice);
+    expect(p400.finalPrice).toBeLessThan(40 * 130 * 10);
+  });
+
+  it('если 30 листов по тарифу дороже 50, меньший тираж не дороже большего', async () => {
+    const tiers = [
+      { min_qty: 300, unit_price: 200 },
+      { min_qty: 500, unit_price: 50 },
+    ];
+    const p300 = await calcWithTiers(tiers, 300);
+    const p400 = await calcWithTiers(tiers, 400);
+    const p500 = await calcWithTiers(tiers, 500);
+    expect(p500.finalPrice).toBeCloseTo(25000, 2);
+    expect(p300.finalPrice).toBeCloseTo(p500.finalPrice, 2);
+    expect(p400.finalPrice).toBeCloseTo(p500.finalPrice, 2);
+  });
+});
+
