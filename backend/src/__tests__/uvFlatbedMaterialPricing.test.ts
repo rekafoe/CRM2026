@@ -73,8 +73,8 @@ describe('UV flatbed material quantity', () => {
         if (query.includes('FROM product_template_configs')) {
           return { config_data: JSON.stringify(templateConfigData) };
         }
-        if (query.includes('sheet_width, sheet_height FROM materials')) {
-          return { sheet_width: 85, sheet_height: 55 };
+        if (query.includes('FROM materials WHERE id = ?') && query.includes('sheet_width')) {
+          return { sheet_width: 85, sheet_height: 55, printable_width: null };
         }
         if (query.includes('sheet_price_single FROM materials')) {
           return { sheet_price_single: sheetPrice };
@@ -164,8 +164,8 @@ describe('UV flatbed material quantity', () => {
         if (query.includes('FROM product_template_configs')) {
           return { config_data: JSON.stringify(templateConfigData) };
         }
-        if (query.includes('sheet_width, sheet_height FROM materials')) {
-          return { sheet_width: 320, sheet_height: 450 };
+        if (query.includes('FROM materials WHERE id = ?') && query.includes('sheet_width')) {
+          return { sheet_width: 320, sheet_height: 450, printable_width: null };
         }
         if (query.includes('sheet_price_single FROM materials')) {
           return { sheet_price_single: sheetPrice };

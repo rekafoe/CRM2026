@@ -115,6 +115,40 @@ function normalizeFinishingPriceUnit(raw: unknown, fallback: string = 'per_item'
   return ALLOWED_FINISHING_PRICE_UNITS.has(v) ? v : fallback;
 }
 
+/**
+ * Слои УФ: клиентский uv_print, иначе default_passes из шаблона
+ * (material_driven подставляет color×1, когда в запросе слоёв нет).
+ */
+function resolveUvPrintLayers(
+  client: UvPrintConfiguration | undefined,
+  template: {
+    layers?: Array<'color' | 'white' | 'varnish'>;
+    default_passes?: { color?: number; white?: number; varnish?: number };
+  } | null | undefined,
+): UvPrintConfiguration {
+  const fromClient: UvPrintConfiguration = {};
+  for (const layer of ['color', 'white', 'varnish'] as const) {
+    const src = client?.[layer];
+    if (!src?.enabled) continue;
+    const passes = Math.max(0, Math.min(5, Math.floor(Number(src.passes) || 0)));
+    if (passes < 1) continue;
+    fromClient[layer] = { enabled: true, passes };
+  }
+  if (Object.keys(fromClient).length > 0) return fromClient;
+
+  const layers = (template?.layers?.length ? template.layers : ['color']) as Array<
+    'color' | 'white' | 'varnish'
+  >;
+  const defaults = template?.default_passes ?? { color: 1 };
+  const out: UvPrintConfiguration = {};
+  for (const layer of layers) {
+    if (layer !== 'color' && layer !== 'white' && layer !== 'varnish') continue;
+    const passes = Math.max(1, Math.min(5, Math.floor(Number(defaults[layer]) || 1)));
+    out[layer] = { enabled: true, passes };
+  }
+  return out;
+}
+
 export interface SimplifiedPricingResult {
   productId: number;
   productName: string;
@@ -755,16 +789,28 @@ export class SimplifiedPricingService {
         : configuredPlotter;
 
     let materialSheetMm: { width: number; height: number } | null = null;
+    /** Ширина для раскладки на рулоне: printable_width ?? sheet_width (как в MaterialPrintResolver). */
+    let materialRollLayoutWidthMm: number | null = null;
     if (normalizedConfig.material_id) {
-      const matDim = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
-        `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
+      const matDim = await db.get<{
+        sheet_width: number | null;
+        sheet_height: number | null;
+        printable_width: number | null;
+      }>(
+        `SELECT sheet_width, sheet_height, printable_width FROM materials WHERE id = ?`,
         [normalizedConfig.material_id]
       );
       const mw0 = matDim?.sheet_width != null && matDim.sheet_width > 0 ? Number(matDim.sheet_width) : 0;
       const mh0 = matDim?.sheet_height != null && matDim.sheet_height > 0 ? Number(matDim.sheet_height) : 0;
+      const printableW =
+        matDim?.printable_width != null && Number(matDim.printable_width) > 0
+          ? Number(matDim.printable_width)
+          : 0;
       if (mw0 > 0) {
         materialSheetMm = { width: mw0, height: mh0 > 0 ? mh0 : 0 };
       }
+      const rollLayoutW = printableW > 0 ? printableW : mw0;
+      if (rollLayoutW > 0) materialRollLayoutWidthMm = rollLayoutW;
     }
 
     // Учёт раскладки: use_layout=false → 1 изделие на лист (без оптимизации, для крупноформатных и т.п.)
@@ -970,10 +1016,11 @@ export class SimplifiedPricingService {
     // Длина в направлении подачи: меньшая сторона (594×420 → 0.42 м, т.к. 420 мм вдоль рулона)
     const metersPerItem = isRollMeterage ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
     const metersNeeded = isRollMeterage ? metersPerItem * quantity : 0;
+    const rollLayoutWidthMm = materialRollLayoutWidthMm ?? materialSheetMm?.width ?? 0;
     const rollMaterialLayout =
-      isRollWideM2Mode && (materialSheetMm?.width ?? 0) > 0
+      isRollWideM2Mode && rollLayoutWidthMm > 0
         ? computeOptimizedRollFeedMeters({
-            rollWidthMm: materialSheetMm!.width,
+            rollWidthMm: rollLayoutWidthMm,
             trimMm: layoutTrim,
             bleedMm: resolvedBleedMm,
             quantity,
@@ -1006,7 +1053,7 @@ export class SimplifiedPricingService {
     if (isRollWideM2Mode && rollMaterialLayout) {
       logger.info('Расход материала ШФП рулон (пог. м)', {
         material_id: normalizedConfig.material_id,
-        rollWidthMm: materialSheetMm?.width,
+        rollWidthMm: materialRollLayoutWidthMm ?? materialSheetMm?.width,
         orientation: rollMaterialLayout.orientation,
         cols: rollMaterialLayout.cols,
         rowsFeed: rollMaterialLayout.rowsFeed,
@@ -1060,13 +1107,16 @@ export class SimplifiedPricingService {
     if (isUvFlatbedMode) {
       const techCode = String(normalizedConfig.print_technology || 'uv').trim().toLowerCase() || 'uv';
       normalizedConfig.print_technology = techCode;
-      const uvInput = (normalizedConfig as { uv_print?: UvPrintConfiguration }).uv_print;
+      const uvInput = resolveUvPrintLayers(
+        (normalizedConfig as { uv_print?: UvPrintConfiguration }).uv_print,
+        uvTemplateConfig,
+      );
       uvPrintDetails = await UvFlatbedPricingService.calculate({
         technologyCode: techCode,
         trimWidthMm: layoutTrim.width,
         trimHeightMm: layoutTrim.height,
         quantity,
-        uvPrint: uvInput ?? {},
+        uvPrint: uvInput,
       });
       printPrice = uvPrintDetails.printPrice;
       printDetails = {
@@ -1503,7 +1553,7 @@ export class SimplifiedPricingService {
       }
       const margins = resolvePlotterMargins(plotterCfg.mode, customMarginMm, customGapMm);
       if (plotterCfg.mode === 'roll') {
-        const wRoll = materialSheetMm?.width ?? 0;
+        const wRoll = materialRollLayoutWidthMm ?? materialSheetMm?.width ?? 0;
         if (wRoll <= 0) {
           pricingWarnings.push(
             'Плоттер (рулон): у материала не задана ширина рулона (sheet_width) — пробег ножа не оценен.'
@@ -2485,12 +2535,12 @@ export class SimplifiedPricingService {
       ? (finishingDetails.find((d: any) => (serviceTypesMap.get(d.service_id) || '').toLowerCase() === 'cut')?.tier?.price ?? 0)
       : 0;
     const knifePathByQty = (q: number): number => {
-      const pc = typeConfig?.plotter;
+      const pc = effectivePlotterConfig;
       if (!pc?.enabled || !pc.mode) return 0;
       const margins = resolvePlotterMargins(pc.mode, customMarginMm, customGapMm);
       const qq = Math.max(1, Math.floor(Number(q) || 0));
       if (pc.mode === 'roll') {
-        const wRoll = materialSheetMm?.width ?? 0;
+        const wRoll = materialRollLayoutWidthMm ?? materialSheetMm?.width ?? 0;
         if (wRoll <= 0) return 0;
         return computeKnifePathMetersRoll({
           rollWidthMm: wRoll,
