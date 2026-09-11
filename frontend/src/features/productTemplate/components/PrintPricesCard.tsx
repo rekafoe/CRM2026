@@ -25,6 +25,15 @@ type TierRangeModalState = {
   anchorElement?: HTMLElement
 }
 
+function printVariantKey(
+  color_mode: string | undefined,
+  sides_mode: string | undefined,
+): string {
+  const color = color_mode === 'bw' ? 'bw' : 'color'
+  const sides = sides_mode === 'duplex' || sides_mode === 'duplex_bw_back' ? sides_mode : 'single'
+  return `${color}|${sides}`
+}
+
 /** Первый разрешённый материал с заполненными sheet_width и sheet_height — для раскладки при «Заполнить из центральных цен». */
 function firstMaterialIdWithSheetDims(
   allMaterials: Array<{ id: number; sheet_width?: number | null; sheet_height?: number | null }> | undefined,
@@ -185,23 +194,30 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
               const w = selected.width_mm
               const h = selected.height_mm
               const layoutMaterialId = firstMaterialIdWithSheetDims(allMaterials, allowedMaterialIds)
-              const selectedTech = printTechs.find((t) => t.code === tech)
-              const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
-              const isColorOnly = selectedTech?.supports_bw === 0 || selectedTech?.supports_bw === false
-              const modes: Array<{ color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' }> = []
-              if (isColorOnly) {
-                modes.push({ color_mode: 'color', sides_mode: 'single' })
-                if (supportsDuplex) modes.push({ color_mode: 'color', sides_mode: 'duplex' })
-              } else {
-                modes.push(
-                  { color_mode: 'color', sides_mode: 'single' },
-                  ...(supportsDuplex ? [{ color_mode: 'color' as const, sides_mode: 'duplex' as const }] : []),
-                  { color_mode: 'bw', sides_mode: 'single' },
-                  ...(supportsDuplex ? [{ color_mode: 'bw' as const, sides_mode: 'duplex' as const }] : []),
+              const remainingForTech = selected.print_prices.filter(
+                (row) => String(row.technology_code) === String(tech),
+              )
+              const modes: Array<{ color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' | 'duplex_bw_back' }> = []
+              const seenModes = new Set<string>()
+              for (const row of remainingForTech) {
+                const key = printVariantKey(row.color_mode, row.sides_mode)
+                if (seenModes.has(key)) continue
+                seenModes.add(key)
+                const [color_mode, sides_mode] = key.split('|') as [
+                  'color' | 'bw',
+                  'single' | 'duplex' | 'duplex_bw_back',
+                ]
+                modes.push({ color_mode, sides_mode })
+              }
+              if (modes.length === 0) {
+                toast.error(
+                  'Нет параметров печати для заполнения',
+                  'Добавьте нужные вариации кнопками внизу и повторите запрос.',
                 )
+                return
               }
               const modeLabel = (m: (typeof modes)[0]) =>
-                `${m.color_mode === 'color' ? 'цвет' : 'ч/б'}, ${m.sides_mode === 'duplex' ? 'двусторонне' : 'односторонне'}`
+                `${m.color_mode === 'color' ? 'цвет' : 'ч/б'}, ${m.sides_mode === 'duplex' || m.sides_mode === 'duplex_bw_back' ? 'двусторонне' : 'односторонне'}`
 
               const updated: typeof selected.print_prices = []
               let itemsPerSheet: number | undefined
@@ -217,7 +233,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                         width_mm: w,
                         height_mm: h,
                         color_mode: m.color_mode,
-                        sides_mode: m.sides_mode,
+                        sides_mode: m.sides_mode === 'duplex' || m.sides_mode === 'duplex_bw_back' ? 'duplex' : 'single',
                         ...(layoutMaterialId != null ? { material_id: layoutMaterialId } : {}),
                         ...(selected.cut_margin_mm != null ? { cut_margin_mm: selected.cut_margin_mm } : {}),
                         ...(selected.cut_gap_mm != null ? { cut_gap_mm: selected.cut_gap_mm } : {}),
@@ -256,8 +272,14 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                   const otherTechnologies = selected.print_prices.filter(
                     (row) => String(row.technology_code) !== String(tech),
                   )
+                  const derivedByKey = new Map(
+                    updated.map((row) => [printVariantKey(row.color_mode, row.sides_mode), row] as const),
+                  )
+                  const nextForTech = remainingForTech.map((row) =>
+                    derivedByKey.get(printVariantKey(row.color_mode, row.sides_mode)) ?? row,
+                  )
                   const patch: Partial<typeof selected> = {
-                    print_prices: [...otherTechnologies, ...updated],
+                    print_prices: [...otherTechnologies, ...nextForTech],
                   }
                   if (itemsPerSheet != null && itemsPerSheet > 0) {
                     patch.min_qty = itemsPerSheet
