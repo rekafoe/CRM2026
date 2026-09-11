@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppIcon } from '../../../components/ui/AppIcon';
+import { Button } from '../../../components/common';
+import { useToastNotifications } from '../../../components/Toast';
+import { getPrintTechnologies } from '../../../api';
 import { ProductTypesCard } from './ProductTypesCard';
 import { TemplateProductRouteKey } from './TemplateProductRouteKey';
 import type { DesignEditorMode, SimplifiedConfig } from '../hooks/useProductTemplate';
 import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes';
 import type { ServiceRow } from './SimplifiedTemplateSection';
 import type { ProductWithDetails } from '../../../services/products';
+import { deriveAllProductPrintPricesFromCentral } from '../utils/derivePrintPricesFromCentral';
 
 const DESIGN_EDITOR_MODE_OPTIONS: Array<{
   value: DesignEditorMode;
@@ -77,6 +81,8 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
 }) => {
   const selectedEditorMode = value.design_editor_mode ?? 'none';
   const selectedEditorModeHint = DESIGN_EDITOR_MODE_OPTIONS.find((option) => option.value === selectedEditorMode)?.hint;
+  const toast = useToastNotifications();
+  const [refillPrintPricesLoading, setRefillPrintPricesLoading] = useState(false);
   const prepress = value.prepress ?? {};
   const updatePrepress = (patch: NonNullable<SimplifiedConfig['prepress']>) => {
     onChange({
@@ -86,6 +92,48 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
         ...patch,
       },
     });
+  };
+
+  const refillPrintPricesFromPrinters = async () => {
+    if (refillPrintPricesLoading) return;
+    setRefillPrintPricesLoading(true);
+    try {
+      const techResp = await getPrintTechnologies();
+      const printTechs = (Array.isArray(techResp.data) ? techResp.data : [])
+        .filter((tech: { code?: string }) => Boolean(tech?.code))
+        .map((tech: { code: string; pricing_mode?: string }) => ({
+          code: String(tech.code),
+          pricing_mode: tech.pricing_mode,
+        }));
+      const result = await deriveAllProductPrintPricesFromCentral({
+        config: value,
+        printTechs,
+        allMaterials,
+      });
+      if (result.filledSizes > 0) {
+        onChange(result.config);
+        toast.success(
+          `Цены печати обновлены из принтеров: ${result.filledSizes} размер(ов)`,
+          result.problems.length > 0
+            ? result.problems.slice(0, 4).join('\n') + (result.problems.length > 4 ? '\n…' : '')
+            : undefined,
+        );
+      } else {
+        toast.error(
+          'Не удалось пересчитать цены из принтеров',
+          result.problems.length > 0
+            ? result.problems.slice(0, 6).join('\n') + (result.problems.length > 6 ? '\n…' : '')
+            : 'Нет листовых размеров с оставшимися режимами печати. Добавьте технологию на подтипах и повторите.',
+        );
+      }
+    } catch (e: unknown) {
+      toast.error(
+        'Не удалось пересчитать цены из принтеров',
+        e instanceof Error ? e.message : String(e),
+      );
+    } finally {
+      setRefillPrintPricesLoading(false);
+    }
   };
 
   return (
@@ -138,6 +186,27 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
         </div>
         {calcOptionsExpanded && (
           <div className="template-summary-card__calc-content">
+            <div className="template-summary-card__calc-action">
+              <span className="simplified-label-with-hint">
+                <span>Цены печати</span>
+                <span
+                  className="simplified-label-hint"
+                  title="Для всех подтипов и размеров запрашивает листовые ставки из центральных цен принтеров. Удалённые режимы печати не возвращаются — как кнопка «Заполнить из центральных цен» на карточке печати."
+                >
+                  ?
+                </span>
+              </span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={refillPrintPricesLoading}
+                disabled={refillPrintPricesLoading}
+                onClick={() => void refillPrintPricesFromPrinters()}
+              >
+                Пересчитать цены из принтеров
+              </Button>
+            </div>
             <label className="template-summary-card__field">
               <span>Режим макета</span>
               <select

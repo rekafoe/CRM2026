@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, FormField } from '../../../components/common'
 import { useToastNotifications } from '../../../components/Toast'
-import { api } from '../../../api'
 import type { SimplifiedSizeConfig } from '../hooks/useProductTemplate'
 import { PriceCell } from './PriceCell'
 import { type Tier, defaultTiers, addRangeBoundary, editRangeBoundary, removeRange, normalizeTiers } from '../utils/tierManagement'
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../hooks/useTierRangeFloating'
+import { deriveSizePrintPricesFromCentral } from '../utils/derivePrintPricesFromCentral'
 
 type PrintTechRow = {
   code: string
@@ -23,32 +23,6 @@ type TierRangeModalState = {
   isOpen: boolean
   boundary: string
   anchorElement?: HTMLElement
-}
-
-function printVariantKey(
-  color_mode: string | undefined,
-  sides_mode: string | undefined,
-): string {
-  const color = color_mode === 'bw' ? 'bw' : 'color'
-  const sides = sides_mode === 'duplex' || sides_mode === 'duplex_bw_back' ? sides_mode : 'single'
-  return `${color}|${sides}`
-}
-
-/** Первый разрешённый материал с заполненными sheet_width и sheet_height — для раскладки при «Заполнить из центральных цен». */
-function firstMaterialIdWithSheetDims(
-  allMaterials: Array<{ id: number; sheet_width?: number | null; sheet_height?: number | null }> | undefined,
-  allowedIds: number[] | undefined,
-): number | undefined {
-  if (!allMaterials?.length || !allowedIds?.length) return undefined
-  for (const rawId of allowedIds) {
-    const id = Number(rawId)
-    if (!Number.isFinite(id)) continue
-    const m = allMaterials.find((x) => Number(x.id) === id)
-    const sw = m != null ? Number(m.sheet_width) : 0
-    const sh = m != null ? Number(m.sheet_height) : 0
-    if (sw > 0 && sh > 0) return id
-  }
-  return undefined
 }
 
 interface PrintPricesCardProps {
@@ -191,111 +165,40 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
             onClick={async () => {
               const tech = selected.default_print?.technology_code ?? ''
               if (!tech) return
-              const w = selected.width_mm
-              const h = selected.height_mm
-              const layoutMaterialId = firstMaterialIdWithSheetDims(allMaterials, allowedMaterialIds)
-              const remainingForTech = selected.print_prices.filter(
-                (row) => String(row.technology_code) === String(tech),
-              )
-              const modes: Array<{ color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' | 'duplex_bw_back' }> = []
-              const seenModes = new Set<string>()
-              for (const row of remainingForTech) {
-                const key = printVariantKey(row.color_mode, row.sides_mode)
-                if (seenModes.has(key)) continue
-                seenModes.add(key)
-                const [color_mode, sides_mode] = key.split('|') as [
-                  'color' | 'bw',
-                  'single' | 'duplex' | 'duplex_bw_back',
-                ]
-                modes.push({ color_mode, sides_mode })
-              }
-              if (modes.length === 0) {
-                toast.error(
-                  'Нет параметров печати для заполнения',
-                  'Добавьте нужные вариации кнопками внизу и повторите запрос.',
-                )
-                return
-              }
-              const modeLabel = (m: (typeof modes)[0]) =>
-                `${m.color_mode === 'color' ? 'цвет' : 'ч/б'}, ${m.sides_mode === 'duplex' || m.sides_mode === 'duplex_bw_back' ? 'двусторонне' : 'односторонне'}`
-
-              const updated: typeof selected.print_prices = []
-              let itemsPerSheet: number | undefined
-              const problems: string[] = []
-
               setDeriveLoading(true)
               try {
-                for (const m of modes) {
-                  try {
-                    const r = await api.get('/pricing/print-prices/derive', {
-                      params: {
-                        technology_code: tech,
-                        width_mm: w,
-                        height_mm: h,
-                        color_mode: m.color_mode,
-                        sides_mode: m.sides_mode === 'duplex' || m.sides_mode === 'duplex_bw_back' ? 'duplex' : 'single',
-                        ...(layoutMaterialId != null ? { material_id: layoutMaterialId } : {}),
-                        ...(selected.cut_margin_mm != null ? { cut_margin_mm: selected.cut_margin_mm } : {}),
-                        ...(selected.cut_gap_mm != null ? { cut_gap_mm: selected.cut_gap_mm } : {}),
-                        ...(selected.items_per_sheet_override != null
-                          ? { items_per_sheet_override: selected.items_per_sheet_override }
-                          : {}),
-                      },
-                    })
-                    const raw = r.data as { data?: unknown } & Record<string, unknown> | undefined
-                    const data = (raw != null && raw.data !== undefined ? raw.data : raw) as {
-                      items_per_sheet?: number
-                      tiers?: Array<{ min_qty: number; max_qty?: number; unit_price: number }>
-                      message?: string
-                      error?: string
-                    }
-                    if (data?.items_per_sheet != null) itemsPerSheet = data.items_per_sheet
-                    const tiers = data?.tiers ?? []
-                    if (tiers.length > 0) {
-                      updated.push({
-                        technology_code: tech,
-                        color_mode: m.color_mode,
-                        sides_mode: m.sides_mode,
-                        tiers: tiers.map((t: any) => ({ min_qty: t.min_qty, max_qty: t.max_qty, unit_price: t.unit_price ?? 0 })),
-                      })
-                    } else {
-                      const hint = data?.message || data?.error || 'Нет диапазонов тиража для этой комбинации в центральных ценах печати.'
-                      problems.push(`${modeLabel(m)}: ${hint}`)
-                    }
-                  } catch (e: unknown) {
-                    const msg = e instanceof Error ? e.message : String(e)
-                    problems.push(`${modeLabel(m)}: ${msg}`)
-                  }
+                const result = await deriveSizePrintPricesFromCentral({
+                  size: selected,
+                  printTechs,
+                  allMaterials,
+                  allowedMaterialIds,
+                  technologyCode: tech,
+                })
+                if (result.skipped) {
+                  toast.error(
+                    'Нет параметров печати для заполнения',
+                    result.skipped === 'нет параметров печати для заполнения'
+                      ? 'Добавьте нужные вариации кнопками внизу и повторите запрос.'
+                      : result.skipped,
+                  )
+                  return
                 }
-
-                if (updated.length > 0) {
-                  const otherTechnologies = selected.print_prices.filter(
-                    (row) => String(row.technology_code) !== String(tech),
-                  )
-                  const derivedByKey = new Map(
-                    updated.map((row) => [printVariantKey(row.color_mode, row.sides_mode), row] as const),
-                  )
-                  const nextForTech = remainingForTech.map((row) =>
-                    derivedByKey.get(printVariantKey(row.color_mode, row.sides_mode)) ?? row,
-                  )
-                  const patch: Partial<typeof selected> = {
-                    print_prices: [...otherTechnologies, ...nextForTech],
-                  }
-                  if (itemsPerSheet != null && itemsPerSheet > 0) {
-                    patch.min_qty = itemsPerSheet
-                  }
-                  updateSize(selected.id, patch)
+                if (result.filledModes > 0) {
+                  updateSize(selected.id, {
+                    print_prices: result.size.print_prices,
+                    ...(result.size.min_qty != null ? { min_qty: result.size.min_qty } : {}),
+                  })
                   toast.success(
                     'Цены подставлены из центральных настроек',
-                    problems.length > 0
-                      ? `Не для всех режимов: ${problems.slice(0, 3).join(' ')}${problems.length > 3 ? '…' : ''}`
+                    result.problems.length > 0
+                      ? `Не для всех режимов: ${result.problems.slice(0, 3).join(' ')}${result.problems.length > 3 ? '…' : ''}`
                       : undefined,
                   )
                 } else {
                   toast.error(
                     'Не удалось заполнить из центральных цен',
-                    problems.length > 0
-                      ? problems.join('\n')
+                    result.problems.length > 0
+                      ? result.problems.join('\n')
                       : 'Проверьте, что для выбранной технологии в «Цены печати» заданы листовые цены и диапазоны тиража.',
                   )
                 }

@@ -399,6 +399,17 @@
   padding-top: 8px;
 }
 
+.template-summary-card__calc-action {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.template-summary-card__calc-action .btn {
+  width: 100%;
+}
+
 .template-summary-card__calc-content .checkbox-label {
   display: flex;
   align-items: center;
