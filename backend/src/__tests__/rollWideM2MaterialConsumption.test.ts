@@ -93,8 +93,8 @@ describe('roll_wide_m2 material write-off by running meters', () => {
         if (query.includes('FROM product_template_configs')) {
           return { config_data: JSON.stringify(templateConfigData) };
         }
-        if (query.includes('sheet_width, sheet_height FROM materials')) {
-          return { sheet_width: 610, sheet_height: null };
+        if (query.includes('FROM materials WHERE id = ?') && query.includes('sheet_width')) {
+          return { sheet_width: 610, sheet_height: null, printable_width: null };
         }
         if (query.includes('sheet_price_single FROM materials')) {
           return { sheet_price_single: materialPricePerMeter };
@@ -132,5 +132,80 @@ describe('roll_wide_m2 material write-off by running meters', () => {
     expect(result.layout?.sheetsNeeded).toBe(0);
     expect(result.materialPrice).toBeCloseTo(2.5 * materialPricePerMeter, 4);
     expect(result.materialDetails?.priceForQuantity).toBeCloseTo(2.5 * materialPricePerMeter, 4);
+  });
+
+  it('uses printable_width for roll feed so stock width cannot under-write-off', async () => {
+    const printableTemplate = {
+      simplified: {
+        use_layout: false,
+        include_material_cost: true,
+        roll_m2: { mode: 'roll_wide_m2' },
+        sizes: [
+          {
+            id: 'roll',
+            label: 'Рулон',
+            width_mm: 600,
+            height_mm: 340,
+            cut_margin_mm: 10,
+            cut_gap_mm: 2,
+            print_prices: [],
+            allowed_material_ids: [materialId],
+            material_prices: [],
+            finishing: [],
+          },
+        ],
+      },
+    };
+
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return {
+            id: 1,
+            name: 'ШФП постер',
+            calculator_type: 'simplified',
+            product_type: 'universal',
+          };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(printableTemplate) };
+        }
+        if (query.includes('FROM materials WHERE id = ?') && query.includes('sheet_width')) {
+          // edge=10 → usable 1010 vs 1030; pitch 342 → 2 cols on printable, 3 on stock.
+          return { sheet_width: 1050, sheet_height: null, printable_width: 1030 };
+        }
+        if (query.includes('sheet_price_single FROM materials')) {
+          return { sheet_price_single: materialPricePerMeter };
+        }
+        if (query.includes('FROM materials m') && query.includes('paper_type_id')) {
+          return { name: 'Баннер 1050', density: null, paper_type_id: null };
+        }
+        if (query.includes('FROM print_prices') && query.includes("counter_unit = 'meters'")) {
+          return null;
+        }
+        if (query.includes('FROM price_types WHERE key = ?')) {
+          return null;
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'roll',
+        material_id: materialId,
+        print_technology: 'inkjet_solvent',
+        trim_size: { width: 600, height: 340 },
+      },
+      100,
+    );
+
+    // printable 1030: rotated 2 cols × 50 rows × 600mm + gaps/edges ≈ 30.118 п.м.
+    // sheet_width 1050 would wrongly use 3 cols → ~20.5 п.м. (under-write-off).
+    expect(result.layout?.metersNeeded).toBeCloseTo(30.118, 2);
+    expect(result.materialPrice).toBeCloseTo(30.118 * materialPricePerMeter, 2);
   });
 });

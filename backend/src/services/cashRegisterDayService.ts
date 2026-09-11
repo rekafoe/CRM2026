@@ -192,7 +192,10 @@ export async function getCashRegisterDay(reportDate: string, departmentId?: numb
 }
 
 /** Консервативный backfill метаданных оплаты для заказов за день отчёта. */
-export async function backfillPaymentMetadataForCashDay(reportDate: string): Promise<number> {
+export async function backfillPaymentMetadataForCashDay(
+  reportDate: string,
+  departmentId?: number,
+): Promise<number> {
   const d = reportDate.slice(0, 10)
   const db = await getDb()
 
@@ -216,6 +219,9 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
     updated_ts?: string | null
   }
 
+  const columnExists = await hasFulfillmentDepartmentColumn()
+  const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })
+
   const paidFilter = `COALESCE(o.prepaymentAmount, 0) > 0
         AND o.prepaymentUpdatedAt IS NULL
         AND COALESCE(o.prepaymentStatus, '') NOT IN ('pending')
@@ -229,8 +235,10 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
             o.paymentMethod
        FROM orders o
       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-        AND ${paidFilter}`,
+        AND ${paidFilter}
+        ${fulfillmentScope.clause}`,
     d,
+    ...fulfillmentScope.params,
   )) as BackfillRow[]
 
   let hasUpdatedAt = false
@@ -262,9 +270,11 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
          FROM orders o
         WHERE substr(${updatedAtExpr}, 1, 10) = ?
           AND substr(COALESCE(o.created_at, o.createdAt), 1, 10) != ?
-          AND ${paidFilter}`,
+          AND ${paidFilter}
+          ${fulfillmentScope.clause}`,
       d,
       d,
+      ...fulfillmentScope.params,
     )) as BackfillRow[]
   }
 
@@ -306,7 +316,7 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
   }
 
   if (updated > 0) {
-    logger.info('cashRegisterDayService backfill', { date: d, updated })
+    logger.info('cashRegisterDayService backfill', { date: d, updated, departmentId: departmentId ?? null })
   }
 
   return updated
@@ -316,7 +326,7 @@ export async function recalculateCashRegisterDay(
   reportDate: string,
   departmentId?: number,
 ): Promise<CashRegisterDayPayload & { backfill_updated: number }> {
-  const backfill_updated = await backfillPaymentMetadataForCashDay(reportDate)
+  const backfill_updated = await backfillPaymentMetadataForCashDay(reportDate, departmentId)
   const payload = await getCashRegisterDay(reportDate, departmentId)
   return { ...payload, backfill_updated }
 }

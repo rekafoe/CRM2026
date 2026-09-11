@@ -27,6 +27,7 @@ import {
   type WebsiteOrderDelivery,
 } from '../../../types/websiteOrderDelivery'
 import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
+import { planDiscountPrepaymentUpdate } from '../../../utils/itemMutationPrepayment'
 import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
 
 export class OrderService {
@@ -431,6 +432,10 @@ export class OrderService {
       insertFields.push(['prepaymentStatus', 'pending'], ['paymentMethod', 'online'])
     } else if (paymentMethodHint === 'offline') {
       // Явно NULL: колонка orders.paymentMethod имеет DEFAULT 'online'
+      insertFields.push(['paymentMethod', null])
+    } else {
+      // Unpaid CRM create without hint: do not leave SQLite DEFAULT 'online'
+      // (addItem used to treat any non-null method as allowAutoPay → phantom offline paid).
       insertFields.push(['paymentMethod', null])
     }
     if (hasPrepaymentUpdatedAt) {
@@ -1550,25 +1555,23 @@ export class OrderService {
     const oldTotal = oldAmounts.totalAmount
     const newTotal = Math.round(subtotal * (1 - p / 100) * 100) / 100
     const prepaymentAmount = Number(order.prepaymentAmount || 0)
-    const eps = 0.005
-    const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
 
     await db.run(
       'UPDATE orders SET discount_percent = ?, updated_at = datetime("now") WHERE id = ?',
       [p, id]
     )
 
-    if (order.paymentMethod === 'offline' && inSync && newTotal >= 0) {
-      let hasPrepaymentUpdatedAt = false
-      try {
-        hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-      } catch {
-        hasPrepaymentUpdatedAt = false
-      }
-      const updateSql = hasPrepaymentUpdatedAt
-        ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime(\'now\',\'localtime\'), updated_at = datetime(\'now\',\'localtime\') WHERE id = ?'
-        : 'UPDATE orders SET prepaymentAmount = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?'
-      await db.run(updateSql, newTotal, id)
+    const discountPrepayPlan = planDiscountPrepaymentUpdate({
+      paymentMethod: order.paymentMethod,
+      prepaymentAmount,
+      oldTotal,
+      newTotal,
+    })
+    if (discountPrepayPlan.action === 'resize_offline_amount') {
+      await db.run(
+        'UPDATE orders SET prepaymentAmount = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?',
+        [discountPrepayPlan.nextAmount, id]
+      )
     }
 
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
