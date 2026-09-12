@@ -376,6 +376,12 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
   } catch {
     hasPrepaymentUpdatedAt = false
   }
+  let hasIsCancelledMonth = false
+  try {
+    hasIsCancelledMonth = await hasColumn('orders', 'is_cancelled')
+  } catch {
+    hasIsCancelledMonth = false
+  }
   let hasDebtClosedCash = false
   try {
     hasDebtClosedCash = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
@@ -403,6 +409,7 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
       WHERE (${monthParts.join(' OR ')})
         AND COALESCE(o.prepaymentAmount, 0) > 0
         AND (o.status IS NULL OR o.status != 0)
+        ${hasIsCancelledMonth ? 'AND COALESCE(o.is_cancelled, 0) = 0' : ''}
         ${fulfillmentScope.clause}`,
     ...monthParams,
     ...fulfillmentScope.params,
