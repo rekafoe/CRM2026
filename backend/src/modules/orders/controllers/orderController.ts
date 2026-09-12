@@ -26,6 +26,7 @@ import {
   WebsiteCorporateCheckoutError,
   validateWebsiteCorporateCheckout,
 } from '../../../services/websiteCorporateCheckoutService'
+import { resolveBePaidPaidAmount } from '../../../utils/bepaidPaidAmount'
 
 function readWebsiteDeliveryFromBody(body: Record<string, unknown>) {
   if (!Object.prototype.hasOwnProperty.call(body, 'delivery')) {
@@ -407,17 +408,25 @@ export class OrderController {
 
     const db = await getDb()
     let row = orderIdFromPath
-      ? await db.get<{ id: number; source?: string | null; number?: string | null }>(
-          'SELECT id, source, number FROM orders WHERE id = ?',
-          orderIdFromPath
-        )
+      ? await db.get<{
+          id: number
+          source?: string | null
+          number?: string | null
+          prepaymentAmount?: number | string | null
+          prepaymentStatus?: string | null
+          paymentId?: string | null
+        }>('SELECT id, source, number, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE id = ?', orderIdFromPath)
       : undefined
 
     if (!row && orderNumber) {
-      row = await db.get<{ id: number; source?: string | null; number?: string | null }>(
-        'SELECT id, source, number FROM orders WHERE number = ?',
-        orderNumber
-      )
+      row = await db.get<{
+        id: number
+        source?: string | null
+        number?: string | null
+        prepaymentAmount?: number | string | null
+        prepaymentStatus?: string | null
+        paymentId?: string | null
+      }>('SELECT id, source, number, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE number = ?', orderNumber)
     }
 
     if (!row) {
@@ -435,19 +444,28 @@ export class OrderController {
     }
 
     const isSuccessful = paymentStatus === 'successful' || paymentStatus === 'paid'
+    const existingStatus = String(row.prepaymentStatus || '').toLowerCase()
+    const alreadyPaid = existingStatus === 'paid' || existingStatus === 'successful'
+    const existingPrepay = Number(row.prepaymentAmount ?? 0)
 
     if (isSuccessful) {
-      const amount = rawAmount > 0 ? rawAmount : 0
+      const amount = resolveBePaidPaidAmount({
+        existingPrepay,
+        amountByn: rawAmount > 0 ? rawAmount : 0,
+        alreadyPaid,
+        existingPaymentId: row.paymentId,
+        incomingPaymentId: paymentId,
+      })
       if (amount <= 0) {
         res.status(400).json({ error: 'amount обязателен при successful' })
         return
       }
       const updateSql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
-           paymentUrl = NULL, paymentId = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
+           paymentUrl = NULL, paymentId = COALESCE(?, paymentId), prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
            WHERE id = ?`
         : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
-           paymentUrl = NULL, paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+           paymentUrl = NULL, paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(updateSql, amount, paymentId, orderId)
       const updated = await db.get('SELECT * FROM orders WHERE id = ?', orderId)
       res.json({ ok: true, order: OrderService.toApiOrder({ ...(updated as Record<string, unknown>), items: [] }) })

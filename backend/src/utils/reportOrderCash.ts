@@ -23,8 +23,19 @@ export function isPaidPrepaymentStatus(status: string | null | undefined): boole
 }
 
 /** Заказ в пуле «Ожидает» (id=0) — не в выручку кассы. id=1 — «Оформлен», учитывается. */
-export function isOrderExcludedFromCashRegister(status: number | string | null | undefined): boolean {
+export function isOrderExcludedFromCashRegister(
+  status: number | string | null | undefined,
+  isCancelled?: number | boolean | null,
+): boolean {
+  if (Number(isCancelled) === 1 || isCancelled === true) return true
   return Number(status) === 0
+}
+
+/** SQL: не учитывать мягко отменённые заказы в кассе/счётчиках. */
+export function sqlExcludeCancelledOrders(alias: string, columnExists: boolean): string {
+  if (!columnExists) return ''
+  const p = alias ? `${alias}.` : ''
+  return ` AND COALESCE(${p}is_cancelled, 0) = 0`
 }
 
 export type OrderCashInput = {
