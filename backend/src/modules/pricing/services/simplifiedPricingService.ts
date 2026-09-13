@@ -2428,10 +2428,11 @@ export class SimplifiedPricingService {
       .filter((d) => String(d.operation_type || '').toLowerCase() === 'bind')
       .reduce((sum, d) => sum + Number(d.priceForQuantity || 0), 0);
     let bindingPrice = configuredBindingQuote ? configuredBindingQuote.total : bindFromFinishing;
-    let otherFinishingPrice = Math.max(
-      0,
-      finishingPrice - bindFromFinishing
-    );
+    // Configured multi_page binding is billed outside the finishing loop (filtered from
+    // effectiveFinishingToUse). Do not subtract it from finishingPrice — that undercharges
+    // other finishing (lamination etc.) by the binding amount.
+    const bindIncludedInFinishingPrice = configuredBindingQuote ? 0 : bindFromFinishing;
+    let otherFinishingPrice = Math.max(0, finishingPrice - bindIncludedInFinishingPrice);
 
     // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
     let subtotal = printPrice + materialPrice + otherFinishingPrice + bindingPrice + coverPrice;
