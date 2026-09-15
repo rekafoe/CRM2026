@@ -255,6 +255,17 @@ export class OrderService {
     return OrderService.attachItemsToOrders(orders)
   }
 
+  /** Все заказы клиента без лимита пула — для карточки юрлица и документов. */
+  static async getOrdersByCustomerId(customerId: number) {
+    const orders = (await OrderRepository.listAllOrders({ customerId })) as Order[]
+    const withItems = await OrderService.attachItemsToOrders(orders)
+    return [...withItems].sort((a, b) => {
+      const ta = new Date(a.created_at).getTime()
+      const tb = new Date(b.created_at).getTime()
+      return tb - ta
+    })
+  }
+
   private static async attachItemsToOrders(orders: Order[]) {
     const telegramIds = orders.filter((o) => o.paymentMethod === 'telegram').map((o) => o.id)
     const websiteIds = orders.filter((o) => o.paymentMethod !== 'telegram').map((o) => o.id)

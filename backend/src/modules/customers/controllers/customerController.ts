@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { CustomerService } from '../services/customerService'
 import { CustomerLegalDocumentService } from '../services/customerLegalDocumentService'
 import { listCustomerProjects } from '../../../services/customerProjectService'
+import { OrderService } from '../../orders/services/orderService'
 import { asyncHandler } from '../../../middleware'
 
 export class CustomerController {
@@ -284,6 +285,24 @@ export class CustomerController {
     }
     const projects = await listCustomerProjects(id)
     res.json(projects)
+  })
+
+  /**
+   * GET /api/customers/:id/orders — все заказы клиента без лимита пула
+   */
+  static listOrders = asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
+    }
+    const customer = await CustomerService.getCustomerById(id)
+    if (!customer) {
+      res.status(404).json({ error: 'Клиент не найден' })
+      return
+    }
+    const orders = await OrderService.getOrdersByCustomerId(id)
+    res.json(orders)
   })
 
   /**

@@ -3,7 +3,7 @@ import { Alert, LoadingState } from '../../common';
 import {
   createCustomerLegalDocument,
   getCustomer,
-  getOrders,
+  getCustomerOrders,
   updateCustomer,
   generateDocumentByType,
   generateDocumentByTypeFromOrders,
@@ -26,6 +26,7 @@ import { DEFAULT_CUSTOMER_DETAIL_TAB, type CustomerDetailTab } from './customerD
 import { CustomerDetailOverviewPanel } from './customerDetail/CustomerDetailOverviewPanel';
 import { CustomerDetailProfilePanel } from './customerDetail/CustomerDetailProfilePanel';
 import { CustomerDetailOrdersPanel } from './customerDetail/CustomerDetailOrdersPanel';
+import { CustomerDetailAllOrdersPanel } from './customerDetail/CustomerDetailAllOrdersPanel';
 import { CustomerDetailProjectsPanel } from './customerDetail/CustomerDetailProjectsPanel';
 
 export const CustomerDetailView: React.FC<{
@@ -142,14 +143,9 @@ export const CustomerDetailView: React.FC<{
   const loadOrdersForCustomer = useCallback(async (customer: Customer) => {
     try {
       setOrdersLoading(true);
-      // Запрашиваем все заказы (all: true), чтобы видеть заказы клиента от любых пользователей — иначе при генерации акта/счёта orderItems пустые
-      const res = await getOrders({ all: true });
+      const res = await getCustomerOrders(customer.id);
       const list = Array.isArray(res.data) ? res.data : [];
-      const filtered = list.filter((order) => {
-        const anyOrder = order as any;
-        return order.customer_id === customer.id || anyOrder.customer_id === customer.id || order.customer?.id === customer.id;
-      });
-      const sorted = [...filtered].sort((a, b) => {
+      const sorted = [...list].sort((a, b) => {
         const aDate = new Date(a.created_at || (a as any).created_at || 0).getTime();
         const bDate = new Date(b.created_at || (b as any).created_at || 0).getTime();
         return bDate - aDate;
@@ -900,9 +896,11 @@ export const CustomerDetailView: React.FC<{
       key: 'orders',
       label: customer.type === 'legal' ? 'Заказы и документы' : 'Заказы',
     },
+    ...(customer.type === 'legal' ? [{ key: 'allOrders' as const, label: 'Все заказы' }] : []),
     { key: 'projects', label: 'Макеты' },
   ];
   const visibleTabs = tabItems;
+  const showPeriodFilter = activeTab === 'overview' || activeTab === 'orders';
   const displayName = getCustomerDisplayName(customer);
 
   return (
@@ -928,6 +926,7 @@ export const CustomerDetailView: React.FC<{
               </button>
             ))}
           </div>
+          {showPeriodFilter && (
           <div className="customer-detail-view__period">
             <span className="customer-detail-view__period-label">Период</span>
             <div className="customers-date-filter">
@@ -944,10 +943,11 @@ export const CustomerDetailView: React.FC<{
               />
             </div>
             <p className="customer-detail-view__period-hint">
-              Метрики, список заказов и выгрузка документов учитывают выбранный период; если даты не заданы — учитываются
-              все заказы.
+              Метрики и сводная выгрузка документов учитывают выбранный период; если даты не заданы — учитываются
+              все заказы клиента.
             </p>
           </div>
+          )}
         </div>
 
         <div className="management-content customer-detail-view__content">
@@ -989,6 +989,14 @@ export const CustomerDetailView: React.FC<{
                     }
                   : null
               }
+            />
+          )}
+          {activeTab === 'allOrders' && customer.type === 'legal' && (
+            <CustomerDetailAllOrdersPanel
+              customer={customer}
+              orders={orders}
+              ordersLoading={ordersLoading}
+              onDocumentGenerated={() => setLegalDocsRefresh((n) => n + 1)}
             />
           )}
           {activeTab === 'projects' && (

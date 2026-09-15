@@ -1377,6 +1377,8 @@ export const getCustomer = (id: number) =>
   api.get<Customer>(`/customers/${id}`);
 export const getCustomerProjects = (customerId: number) =>
   api.get(`/customers/${customerId}/projects`);
+export const getCustomerOrders = (customerId: number) =>
+  api.get<Order[]>(`/customers/${customerId}/orders`);
 export const generateOrderItemProduction = (orderId: number, orderItemId: number) =>
   api.post(`/orders/${orderId}/items/${orderItemId}/generate-production`);
 export const getOrderItemProductionStatus = (orderId: number, orderItemId: number) =>

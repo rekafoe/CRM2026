@@ -30,6 +30,7 @@ function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(orde
 type ListAllOrdersOptions = {
   statuses?: number[]
   departmentId?: number
+  customerId?: number
   /** Ограничение размера пула (по умолчанию без лимита для обратной совместимости внутренних вызовов) */
   limit?: number
 }
@@ -564,6 +565,10 @@ export const OrderRepository = {
       const placeholders = options.statuses.map(() => '?').join(',')
       whereParts.push(`CAST(o.status AS INTEGER) IN (${placeholders})`)
       queryParams.push(...options.statuses)
+    }
+    if (options.customerId != null && Number.isFinite(options.customerId)) {
+      whereParts.push('o.customer_id = ?')
+      queryParams.push(options.customerId)
     }
     if (options.departmentId != null && Number.isFinite(options.departmentId) && hasFulfillmentDept) {
       if (hasUsersDepartmentId) {

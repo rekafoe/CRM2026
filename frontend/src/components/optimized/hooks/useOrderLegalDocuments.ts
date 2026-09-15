@@ -1,66 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Customer, Order, TemplateData } from '../../../types';
+import type { Customer, Order } from '../../../types';
+import { getCustomer } from '../../../api';
+import { getApiErrorMessage } from '../../../utils/downloadBlob';
 import {
-  createCustomerLegalDocument,
-  generateDocumentByType,
-  generateDocumentByTypeFromOrders,
-  getCustomer,
-} from '../../../api';
-import {
-  formatDateForFile,
-  formatDateValue,
-  getCustomerDisplayName,
-  getOrderTotal,
-} from '../../../pages/admin/clients/customerDocumentHelpers';
-import { downloadAxiosBlob, getApiErrorMessage } from '../../../utils/downloadBlob';
+  generateCustomerOrderLegalDocument,
+  ORDER_LEGAL_DOC_LABELS,
+  type OrderLegalDocKind,
+} from '../../../pages/admin/clients/customerOrderLegalDocuments';
 
-const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
-export type OrderLegalDocKind = 'contract' | 'act' | 'invoice';
-
-function buildContractTemplateData(customer: Customer, order: Order): TemplateData {
-  const orderRef = order.number || `#${order.id}`;
-  return {
-    customerName: customer.company_name || customer.legal_name || getCustomerDisplayName(customer),
-    companyName: customer.company_name || '',
-    legalName: customer.legal_name || '',
-    legalAddress: customer.address || '—',
-    taxId: customer.tax_id || '—',
-    bankDetails: customer.bank_details || '—',
-    authorizedPerson: customer.authorized_person || '—',
-    contractNumber: `CONTRACT-${formatDateForFile(new Date())}-${order.id}`,
-    contractDate: new Date().toLocaleDateString('ru-RU'),
-    orders: [
-      {
-        number: orderRef,
-        date: formatDateValue(order.created_at),
-        amount: getOrderTotal(order),
-        status: String(order.status ?? '—'),
-      },
-    ],
-    totalAmount: getOrderTotal(order),
-  };
-}
-
-async function recordOrderLegalExport(customerId: number, order: Order, kind: OrderLegalDocKind): Promise<void> {
-  const orderRef = order.number || `№${order.id}`;
-  const dayStr = new Date().toLocaleDateString('ru-RU');
-  const title =
-    kind === 'act'
-      ? `Акт (Excel) — ${orderRef} — ${dayStr}`
-      : kind === 'invoice'
-        ? `Счёт (Excel) — ${orderRef} — ${dayStr}`
-        : `Договор (Word) — ${orderRef} — ${dayStr}`;
-  await createCustomerLegalDocument(customerId, {
-    title,
-    document_kind: kind,
-    issued_at: new Date().toISOString(),
-    returned_at: null,
-    notes: null,
-    order_id: order.id,
-  });
-}
+export type { OrderLegalDocKind } from '../../../pages/admin/clients/customerOrderLegalDocuments';
 
 interface UseOrderLegalDocumentsParams {
   order: Order;
@@ -110,30 +58,9 @@ export function useOrderLegalDocuments({ order, addToast }: UseOrderLegalDocumen
       if (!legalCustomer) return;
       setDocsMenuOpen(false);
       setGeneratingKind(kind);
-      const orderRef = order.number || String(order.id);
       try {
-        if (kind === 'act' || kind === 'invoice') {
-          const response = await generateDocumentByTypeFromOrders(kind, [order.id]);
-          downloadAxiosBlob(
-            response,
-            kind === 'act' ? `АКТ-${orderRef}.xlsx` : `СЧЁТ-${orderRef}.xlsx`,
-            XLSX_MIME,
-          );
-        } else {
-          const response = await generateDocumentByType('contract', buildContractTemplateData(legalCustomer, order));
-          downloadAxiosBlob(response, `CONTRACT-${orderRef}.docx`, DOCX_MIME);
-        }
-        try {
-          await recordOrderLegalExport(legalCustomer.id, order, kind);
-        } catch (journalError) {
-          console.warn('[Заказ] Не удалось записать документ в журнал', journalError);
-        }
-        const labels: Record<OrderLegalDocKind, string> = {
-          contract: 'Договор',
-          act: 'Акт',
-          invoice: 'Счёт',
-        };
-        addToast({ type: 'success', title: 'Успешно', message: `${labels[kind]} по заказу скачан` });
+        await generateCustomerOrderLegalDocument({ customer: legalCustomer, order, kind });
+        addToast({ type: 'success', title: 'Успешно', message: `${ORDER_LEGAL_DOC_LABELS[kind]} по заказу скачан` });
       } catch (error) {
         const message = await getApiErrorMessage(error, 'Не удалось сформировать документ');
         addToast({ type: 'error', title: 'Ошибка', message });

@@ -34,7 +34,8 @@ export const CustomerDetailOrdersPanel: React.FC<CustomerDetailOrdersPanelProps>
       <div className="customer-detail-view__legal-exports">
         <p className="customer-detail-view__doc-intro">
           Выгрузка формирует файлы по заказам за выбранный период; в журнале создаётся отдельная запись на каждый
-          заказ (если в периоде нет заказов — одна запись «без заказа в периоде»).
+          заказ (если в периоде нет заказов — одна запись «без заказа в периоде»). Старые заказы вне периода
+          смотрите во вкладке «Все заказы».
         </p>
         <div className="customers-doc-actions customer-detail-view__doc-actions">
           <Button

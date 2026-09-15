@@ -132,6 +132,17 @@
   gap: 12px;
 }
 
+.customer-detail-all-orders__docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.customer-detail-all-orders__error {
+  margin: 0 0 10px;
+  color: #b91c1c;
+}
+
 .customer-detail-view__orders-heading {
   margin: 0 0 10px;
   font-size: 15px;
