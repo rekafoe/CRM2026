@@ -8,6 +8,7 @@ import { upload } from '../config/upload';
 import path from 'path';
 import fs from 'fs';
 import { asyncHandler } from '../middleware';
+import { computeOrderAmounts } from '../utils/orderAmounts';
 
 const router = Router();
 
@@ -352,16 +353,15 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     const getDiscountPercent = (orderId: number) => orderMap.get(orderId)?.discount_percent ?? 0;
     const { orderItems, totalAmount, totalQuantity } = PDFReportService.buildDocumentRowsFromItems(flatItems, getDiscountPercent);
 
+    // Как CRM и строки акта/счёта: storedTotalCost ?? price×qty (+ serviceCost), не сырой price×qty
     const orderAmounts = new Map<number, number>();
     for (const o of orders) {
       const list = itemsMap.get(o.id) ?? [];
-      const discountPct = getDiscountPercent(o.id) / 100;
-      let sum = 0;
-      for (const it of list) {
-        const qty = Math.max(1, Number(it.quantity) || 1);
-        sum += Math.round((Number(it.price) || 0) * qty * (1 - discountPct) * 100) / 100;
-      }
-      orderAmounts.set(o.id, sum);
+      const amounts = computeOrderAmounts({
+        items: list,
+        discount_percent: getDiscountPercent(o.id),
+      });
+      orderAmounts.set(o.id, amounts.totalAmount);
     }
 
     const customerId = orders[0].customer_id;
