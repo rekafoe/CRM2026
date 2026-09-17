@@ -19,6 +19,7 @@ import {
   formatDateForFile,
   getOrderItemProductionRows,
   distributeItemSumToRows,
+  filterActiveOrdersForLegalDocuments,
 } from '../../../pages/admin/clients/customerDocumentHelpers';
 import '../../../pages/admin/CustomersAdminPage.css';
 import './CustomerDetailView.css';
@@ -190,6 +191,12 @@ export const CustomerDetailView: React.FC<{
     });
   }, [orders, ordersFrom, ordersTo]);
 
+  /** Акт/счёт/договор: soft-cancelled заказы не входят в суммы документа. */
+  const documentOrders = useMemo(
+    () => filterActiveOrdersForLegalDocuments(filteredOrders),
+    [filteredOrders],
+  );
+
   const customerMetrics = useMemo(() => {
     if (!customer) {
       return {
@@ -236,17 +243,17 @@ export const CustomerDetailView: React.FC<{
             ? `Счёт (Excel) — ${orderRef} — ${dayStr}`
             : `Договор (Word) — ${orderRef} — ${dayStr}`;
       try {
-        if (filteredOrders.length === 0) {
+        if (documentOrders.length === 0) {
           await createCustomerLegalDocument(customer.id, {
             title: mkTitle('без заказа в периоде'),
             document_kind: kind,
             issued_at: new Date().toISOString(),
             returned_at: null,
-            notes: 'В выбранном периоде нет заказов; сводная выгрузка',
+            notes: 'В выбранном периоде нет активных заказов; сводная выгрузка',
             order_id: null,
           });
         } else {
-          for (const order of filteredOrders) {
+          for (const order of documentOrders) {
             const orderRef = order.number || `№${order.id}`;
             await createCustomerLegalDocument(customer.id, {
               title: mkTitle(orderRef),
@@ -264,7 +271,7 @@ export const CustomerDetailView: React.FC<{
         console.warn('[Клиенты] Не удалось записать документ в журнал', e);
       }
     },
-    [customer, refreshCustomer, filteredOrders],
+    [customer, refreshCustomer, documentOrders],
   );
 
   const handleSaveLegalDetails = useCallback(async () => {
@@ -332,7 +339,12 @@ export const CustomerDetailView: React.FC<{
     
     try {
       setGeneratingDocument('act');
-      const orderIds = filteredOrders.map((o) => o.id);
+      if (documentOrders.length === 0) {
+        setError('В выбранном периоде нет активных (не отменённых) заказов для документа');
+        setGeneratingDocument(null);
+        return;
+      }
+      const orderIds = documentOrders.map((o) => o.id);
       if (orderIds.length > 0) {
         try {
           const response = await generateDocumentByTypeFromOrders('act', orderIds);
@@ -382,11 +394,11 @@ export const CustomerDetailView: React.FC<{
       }> = [];
       
       let itemNumber = 1;
-      console.log(`[Frontend] Начинаем сбор позиций из ${filteredOrders.length} заказов`);
+      console.log(`[Frontend] Начинаем сбор позиций из ${documentOrders.length} заказов`);
       
       // Проверяем, есть ли items в заказах
       let totalItemsFound = 0;
-      for (const order of filteredOrders) {
+      for (const order of documentOrders) {
         const orderItems = (order as any).items || [];
         totalItemsFound += orderItems.length;
         if (orderItems.length === 0) {
@@ -398,7 +410,7 @@ export const CustomerDetailView: React.FC<{
         }
       }
       
-      console.log(`[Frontend] Всего найдено позиций: ${totalItemsFound} из ${filteredOrders.length} заказов`);
+      console.log(`[Frontend] Всего найдено позиций: ${totalItemsFound} из ${documentOrders.length} заказов`);
       
       // Функция для формирования краткого названия (если нет листов/резок)
       const buildSimplifiedItemName = (item: any): string => {
@@ -409,7 +421,7 @@ export const CustomerDetailView: React.FC<{
         return item.name || item.params?.productName || item.params?.name || item.params?.description || item.type || 'Услуга';
       };
       
-      for (const order of filteredOrders) {
+      for (const order of documentOrders) {
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
@@ -462,14 +474,14 @@ export const CustomerDetailView: React.FC<{
           taxId: customer.tax_id || '—',
           bankDetails: customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—'),
           authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
-          orders: filteredOrders.map((order, index) => ({
+          orders: documentOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
           orderItems: allOrderItems,
-          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalAmount: documentOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
           totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0),
         };
         
@@ -529,9 +541,9 @@ export const CustomerDetailView: React.FC<{
       // Стандартная генерация без шаблона
       const rows = [
         ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
-        ...buildOrdersTableRows(filteredOrders),
+        ...buildOrdersTableRows(documentOrders),
       ];
-      const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+      const total = documentOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
       rows.push(['', '', 'Итого', total.toFixed(2), '']);
 
       const worksheet = XLSX.utils.aoa_to_sheet(rows);
@@ -545,14 +557,19 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, documentOrders, legalForm, recordLegalExport, customer]);
 
   const handleExportInvoice = useCallback(async () => {
     if (!customer) return;
     
     try {
       setGeneratingDocument('invoice');
-      const orderIds = filteredOrders.map((o) => o.id);
+      if (documentOrders.length === 0) {
+        setError('В выбранном периоде нет активных (не отменённых) заказов для документа');
+        setGeneratingDocument(null);
+        return;
+      }
+      const orderIds = documentOrders.map((o) => o.id);
       if (orderIds.length > 0) {
         try {
           const response = await generateDocumentByTypeFromOrders('invoice', orderIds);
@@ -611,7 +628,7 @@ export const CustomerDetailView: React.FC<{
       };
       
       let itemNumber = 1;
-      for (const order of filteredOrders) {
+      for (const order of documentOrders) {
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
@@ -651,14 +668,14 @@ export const CustomerDetailView: React.FC<{
           taxId: customer.tax_id || '—',
           bankDetails: customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—'),
           authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
-          orders: filteredOrders.map((order, index) => ({
+          orders: documentOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
           orderItems: allOrderItems,
-          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalAmount: documentOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
           totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0),
         };
         
@@ -704,9 +721,9 @@ export const CustomerDetailView: React.FC<{
       // Стандартная генерация без шаблона
       const rows = [
         ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
-        ...buildOrdersTableRows(filteredOrders),
+        ...buildOrdersTableRows(documentOrders),
       ];
-      const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+      const total = documentOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
       rows.push(['', '', 'Итого', total.toFixed(2), '']);
 
       const worksheet = XLSX.utils.aoa_to_sheet(rows);
@@ -720,13 +737,18 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, documentOrders, legalForm, recordLegalExport, customer]);
 
   const handleExportContract = useCallback(async () => {
     if (!customer) return;
     
     try {
       setGeneratingDocument('contract');
+      if (documentOrders.length === 0) {
+        setError('В выбранном периоде нет активных (не отменённых) заказов для документа');
+        setGeneratingDocument(null);
+        return;
+      }
       
       const contractNumber = `CONTRACT-${formatDateForFile(new Date())}-${customer.id}`;
       const customerName = customer.company_name || customer.legal_name || getCustomerDisplayName(customer);
@@ -743,13 +765,13 @@ export const CustomerDetailView: React.FC<{
           authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
           contractNumber,
           contractDate: new Date().toLocaleDateString('ru-RU'),
-          orders: filteredOrders.map((order, index) => ({
+          orders: documentOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
-          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalAmount: documentOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
         };
         
         const response = await generateDocumentByType('contract', templateData);
@@ -806,7 +828,7 @@ export const CustomerDetailView: React.FC<{
             })
           ),
         }),
-        ...buildOrdersTableRows(filteredOrders).map(
+        ...buildOrdersTableRows(documentOrders).map(
           (cells) =>
             new TableRow({
               children: cells.map((value) => new TableCell({ children: [new Paragraph(value)] })),
@@ -875,7 +897,7 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, documentOrders, legalForm, recordLegalExport, customer]);
 
   if (pageLoading) {
     return (

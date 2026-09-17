@@ -10,6 +10,7 @@ import {
   formatDateValue,
   getCustomerDisplayName,
   getOrderTotal,
+  isCancelledCustomerOrder,
 } from './customerDocumentHelpers';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -76,6 +77,9 @@ export async function generateCustomerOrderLegalDocument(args: {
   kind: OrderLegalDocKind;
 }): Promise<void> {
   const { customer, order, kind } = args;
+  if (isCancelledCustomerOrder(order)) {
+    throw new Error('Нельзя сформировать документ по отменённому заказу');
+  }
   const orderRef = order.number || String(order.id);
   if (kind === 'act' || kind === 'invoice') {
     const response = await generateDocumentByTypeFromOrders(kind, [order.id]);

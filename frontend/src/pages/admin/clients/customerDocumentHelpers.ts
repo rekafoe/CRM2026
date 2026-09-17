@@ -27,6 +27,14 @@ export const getCustomerSourceLabel = (source?: string | null) => {
 /** Итог заказа после скидки (с API). */
 export const getOrderTotal = (order: Order) => getOrderAmounts(order).total;
 
+/** Soft-cancel: не включать в акт/счёт/договор и не считать выручку юрлица. */
+export const isCancelledCustomerOrder = (order: Pick<Order, 'is_cancelled'> | null | undefined) =>
+  Number(order?.is_cancelled) === 1;
+
+export const filterActiveOrdersForLegalDocuments = <T extends Pick<Order, 'is_cancelled'>>(
+  orders: T[],
+): T[] => orders.filter((order) => !isCancelledCustomerOrder(order));
+
 export const formatDateValue = (value?: string) => {
   if (!value) return '—';
   const date = new Date(value);

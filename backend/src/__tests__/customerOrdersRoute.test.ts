@@ -15,4 +15,10 @@ describe('customer orders endpoint', () => {
     expect(src).toContain('customerId?: number')
     expect(src).toContain('o.customer_id = ?')
   })
+
+  it('from-orders generation excludes soft-cancelled orders', () => {
+    const src = readFileSync(join(__dirname, '../routes/documentTemplates.ts'), 'utf8')
+    expect(src).toContain('selectActiveOrdersForLegalDocuments')
+    expect(src).toContain('Нет активных (не отменённых) заказов для документа')
+  })
 })

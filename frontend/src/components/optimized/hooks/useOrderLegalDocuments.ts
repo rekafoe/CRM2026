@@ -7,6 +7,7 @@ import {
   ORDER_LEGAL_DOC_LABELS,
   type OrderLegalDocKind,
 } from '../../../pages/admin/clients/customerOrderLegalDocuments';
+import { isCancelledCustomerOrder } from '../../../pages/admin/clients/customerDocumentHelpers';
 
 export type { OrderLegalDocKind } from '../../../pages/admin/clients/customerOrderLegalDocuments';
 
@@ -56,6 +57,14 @@ export function useOrderLegalDocuments({ order, addToast }: UseOrderLegalDocumen
   const generateLegalDocument = useCallback(
     async (kind: OrderLegalDocKind) => {
       if (!legalCustomer) return;
+      if (isCancelledCustomerOrder(order)) {
+        addToast({
+          type: 'error',
+          title: 'Ошибка',
+          message: 'Нельзя сформировать документ по отменённому заказу',
+        });
+        return;
+      }
       setDocsMenuOpen(false);
       setGeneratingKind(kind);
       try {
@@ -72,7 +81,7 @@ export function useOrderLegalDocuments({ order, addToast }: UseOrderLegalDocumen
   );
 
   return {
-    showLegalDocsButton: Boolean(legalCustomer),
+    showLegalDocsButton: Boolean(legalCustomer) && !isCancelledCustomerOrder(order),
     docsMenuOpen,
     setDocsMenuOpen,
     docsMenuRef,
