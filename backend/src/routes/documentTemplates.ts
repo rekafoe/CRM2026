@@ -8,6 +8,8 @@ import { upload } from '../config/upload';
 import path from 'path';
 import fs from 'fs';
 import { asyncHandler } from '../middleware';
+import { hasColumn } from '../utils/tableSchemaCache';
+import { selectActiveOrdersForLegalDocuments } from '../utils/legalDocumentOrders';
 
 const router = Router();
 
@@ -318,18 +320,35 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       return;
     }
 
-    type OrderRow = { id: number; number: string; created_at: string; status: number; customer_id: number; discount_percent: number };
+    type OrderRow = {
+      id: number;
+      number: string;
+      created_at: string;
+      status: number;
+      customer_id: number;
+      discount_percent: number;
+      is_cancelled?: number;
+    };
     const db = await getDb();
     const placeholders = orderIds.map(() => '?').join(',');
+    const hasIsCancelled = await hasColumn('orders', 'is_cancelled');
+    const isCancelledSel = hasIsCancelled
+      ? 'COALESCE(is_cancelled, 0) as is_cancelled'
+      : '0 as is_cancelled';
     const rawOrderRows = await db.all<OrderRow>(
-      `SELECT id, number, created_at, status, customer_id, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id IN (${placeholders})`,
+      `SELECT id, number, created_at, status, customer_id, COALESCE(discount_percent, 0) as discount_percent, ${isCancelledSel} FROM orders WHERE id IN (${placeholders})`,
       ...orderIds
     );
     const orderRows: OrderRow[] = Array.isArray(rawOrderRows) ? rawOrderRows : [];
     const orderMap = new Map<number, OrderRow>(orderRows.map((r) => [r.id, r]));
-    const orders: OrderRow[] = orderIds.map((id) => orderMap.get(id)).filter((o): o is OrderRow => Boolean(o));
+    const orders = selectActiveOrdersForLegalDocuments(orderIds, orderMap);
     if (orders.length === 0) {
-      res.status(404).json({ message: 'Заказы не найдены' });
+      const anyFound = orderRows.length > 0;
+      res.status(anyFound ? 400 : 404).json({
+        message: anyFound
+          ? 'Нет активных (не отменённых) заказов для документа'
+          : 'Заказы не найдены',
+      });
       return;
     }
 
