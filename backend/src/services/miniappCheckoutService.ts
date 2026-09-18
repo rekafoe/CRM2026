@@ -351,9 +351,6 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
     (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_FOUND';
     throw err;
   }
-
-  const db = await getDb();
-  // Layout/design checks before the claim so a failed validation does not leave the order finalized.
   const draftOrder = await getOwnedMiniappOrderRow(telegramChatId, orderId);
   if (!draftOrder) {
     const err = new Error('Заказ не найден');
@@ -369,6 +366,7 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
     throw err;
   }
 
+  const db = await getDb();
   const itemCountRow = await db.get<{ count: number }>(
     'SELECT COUNT(*) AS count FROM items WHERE orderId = ?',
     [orderId]
@@ -391,38 +389,17 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
   }
 
   try {
-    // IMMEDIATE + claim-before-deduct: concurrent finalize of the same draft must not
-    // double-spend warehouse (state was previously checked only outside the transaction).
-    await db.run('BEGIN IMMEDIATE');
-    const claim = await db.run(
-      `UPDATE orders
-       SET miniapp_checkout_state = ?
-       WHERE id = ?
-         AND telegram_chat_id = ?
-         AND (
-           miniapp_checkout_state IS NULL
-           OR trim(COALESCE(miniapp_checkout_state, '')) = ''
-           OR miniapp_checkout_state = ?
-         )`,
-      [
-        MINIAPP_CHECKOUT_STATE_FINALIZED,
-        orderId,
-        telegramChatId,
-        MINIAPP_CHECKOUT_STATE_DRAFT,
-      ]
-    );
-    if (!claim || Number(claim.changes || 0) < 1) {
-      const err = new Error('Этот заказ уже оформлен');
-      (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_DRAFT';
-      throw err;
-    }
-
+    await db.run('BEGIN');
     const deductionResult = await OrderService.deductMaterialsForExistingOrder(orderId, undefined);
     if (!deductionResult.success) {
       const err = new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);
       (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
       throw err;
     }
+    await db.run(
+      'UPDATE orders SET miniapp_checkout_state = ? WHERE id = ?',
+      [MINIAPP_CHECKOUT_STATE_FINALIZED, orderId]
+    );
     const nextNotes = designHelpRequested
       ? String(draftOrder.notes || '').trim() || null
       : clearMiniappLayoutsPendingNote(draftOrder.notes ?? null) || null;
@@ -459,11 +436,7 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
       deductionResult,
     };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      // ignore: may already be rolled back / no active transaction
-    }
+    await db.run('ROLLBACK');
     throw error;
   }
 }

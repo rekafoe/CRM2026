@@ -1964,7 +1964,6 @@ export class PDFReportService {
       const receiptItems: Array<{ number: number; name: string; quantity: number; unit?: string; price: number; amount: number }> = [];
       let itemNumber = 0;
       for (const item of Array.isArray(items) ? items : []) {
-        const qty = Number(item.quantity) || 1;
         const lineSubtotal = computeItemLineTotal(item);
         const itemAmount = Math.round(lineSubtotal * (1 - discountPercent / 100) * 100) / 100;
         const lines = this.getOrderItemProductionRows(item);

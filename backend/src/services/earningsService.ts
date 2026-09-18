@@ -1,6 +1,7 @@
 import { getDb } from '../config/database';
 import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
+import { computeItemLineTotal } from '../utils/orderAmounts';
 import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
 import { getDesignTemplatesByIds } from './designTemplateService';
 
@@ -365,7 +366,11 @@ export class EarningsService {
         }
 
         const qty = Number(row.quantity) || 0;
-        const lineTotal = (Number(row.price) || 0) * qty;
+        const lineTotal = computeItemLineTotal({
+          price: row.price,
+          quantity: qty,
+          params: row.params,
+        });
         // База оператора = X (без платы за дизайн Y). Y — один раз на позицию с макетом.
         let designUsageTotal = 0;
         const designTemplateIdForFee = Number(params?.designTemplateId);
