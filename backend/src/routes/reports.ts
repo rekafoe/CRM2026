@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { asyncHandler, AuthenticatedRequest } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
-import { sqlOrderTotalAfterDiscount } from '../utils/orderAmountsSql'
+import { sqlOrderTotalAfterDiscount, SQL_ITEM_LINE_TOTAL_EXPR } from '../utils/orderAmountsSql'
 import {
   ORDER_ITEM_PRODUCT_JOIN,
   orderItemProductGroupKeyExpr,
@@ -479,7 +479,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
 
   const productPopularity = await db.all<any>(
     `SELECT MAX(${itemL}) as product_type, COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity,
-      SUM(i.price * i.quantity) as total_revenue, AVG(i.price) as avg_price, MAX(COALESCE(o.createdAt, o.created_at)) as last_order_date
+      SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as total_revenue, AVG(i.price) as avg_price, MAX(COALESCE(o.createdAt, o.created_at)) as last_order_date
      FROM items i
      JOIN orders o ON o.id = i.orderId
      ${ORDER_ITEM_PRODUCT_JOIN}
@@ -495,7 +495,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
         WHEN LOWER(i.type) LIKE '%буклет%' OR LOWER(i.type) LIKE '%каталог%' THEN 'Буклеты/Каталоги'
         WHEN LOWER(i.type) LIKE '%плакат%' OR LOWER(i.type) LIKE '%poster%' THEN 'Плакаты'
         WHEN LOWER(i.type) LIKE '%календар%' THEN 'Календари' ELSE 'Другое' END as category,
-      COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity, SUM(i.price * i.quantity) as total_revenue
+      COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity, SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as total_revenue
      FROM items i JOIN orders o ON o.id = i.orderId WHERE ${orderScopeCond}
      GROUP BY category ORDER BY total_revenue DESC`,
     orderScopeParams
@@ -503,7 +503,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
 
   const productTrends = await db.all<any>(
     `SELECT DATE(COALESCE(o.createdAt, o.created_at)) as date, MAX(${itemL}) as product_type, COUNT(DISTINCT o.id) as daily_orders,
-      SUM(i.price * i.quantity) as daily_revenue
+      SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as daily_revenue
      FROM items i
      JOIN orders o ON o.id = i.orderId
      ${ORDER_ITEM_PRODUCT_JOIN}
@@ -514,7 +514,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   )
 
   const averageOrderValue = await db.all<any>(
-    `SELECT MAX(${itemL}) as product_type, AVG(i.price * i.quantity) as avg_order_value, COUNT(DISTINCT o.id) as orders_with_product
+    `SELECT MAX(${itemL}) as product_type, AVG(${SQL_ITEM_LINE_TOTAL_EXPR}) as avg_order_value, COUNT(DISTINCT o.id) as orders_with_product
      FROM items i
      JOIN orders o ON o.id = i.orderId
      ${ORDER_ITEM_PRODUCT_JOIN}
@@ -582,8 +582,8 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
   const labF = orderItemProductLabelExpr()
 
   const productProfitability = await db.all<any>(`
-    SELECT MAX(${labF}) as product_type, SUM(i.price * i.quantity) as total_revenue, COUNT(DISTINCT o.id) as order_count,
-      AVG(i.price * i.quantity) as avg_order_value, SUM(i.quantity) as total_items
+    SELECT MAX(${labF}) as product_type, SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as total_revenue, COUNT(DISTINCT o.id) as order_count,
+      AVG(${SQL_ITEM_LINE_TOTAL_EXPR}) as avg_order_value, SUM(i.quantity) as total_items
     FROM items i
     JOIN orders o ON o.id = i.orderId
     ${ORDER_ITEM_PRODUCT_JOIN}
@@ -625,7 +625,7 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
       SELECT
         o.id as order_id,
         DATE(${createdExpr}) as date,
-        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
+        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(${SQL_ITEM_LINE_TOTAL_EXPR}), 0) as order_total
       FROM orders o
       LEFT JOIN items i ON i.orderId = o.id
       WHERE ${currentRangeCondition}
@@ -645,7 +645,7 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
     WITH order_totals AS (
       SELECT
         o.id as order_id,
-        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
+        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(${SQL_ITEM_LINE_TOTAL_EXPR}), 0) as order_total
       FROM orders o
       LEFT JOIN items i ON i.orderId = o.id
       WHERE ${currentRangeCondition}
@@ -664,7 +664,7 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
     WITH order_totals AS (
       SELECT
         o.id as order_id,
-        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
+        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(${SQL_ITEM_LINE_TOTAL_EXPR}), 0) as order_total
       FROM orders o
       LEFT JOIN items i ON i.orderId = o.id
       WHERE ${createdExpr} >= ? AND ${createdExpr} <= ? AND o.status != 0
@@ -771,7 +771,7 @@ router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
       SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) AS revenue
     FROM orders o
     LEFT JOIN (
-      SELECT i.orderId AS order_id, SUM(i.price * i.quantity) AS raw_total
+      SELECT i.orderId AS order_id, SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) AS raw_total
       FROM items i
       GROUP BY i.orderId
     ) i_totals ON i_totals.order_id = o.id
@@ -822,7 +822,7 @@ router.get('/analytics/revenue/by-location', asyncHandler(async (req, res) => {
     FROM orders o
     ${deptJoin}
     LEFT JOIN (
-      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+      SELECT i.orderId as order_id, SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as raw_total
       FROM items i GROUP BY i.orderId
     ) i_totals ON i_totals.order_id = o.id
     WHERE ${dateCond} AND ${revenueCond}
@@ -876,7 +876,7 @@ router.get('/analytics/revenue/by-location', asyncHandler(async (req, res) => {
              SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) as revenue
       FROM orders o
       LEFT JOIN (
-        SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+        SELECT i.orderId as order_id, SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as raw_total
         FROM items i GROUP BY i.orderId
       ) i_totals ON i_totals.order_id = o.id
       WHERE ${dateCond} AND ${revenueCond}
@@ -936,7 +936,7 @@ router.get('/analytics/pnl', asyncHandler(async (req, res) => {
     FROM orders o
     ${deptJoin}
     LEFT JOIN (
-      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+      SELECT i.orderId as order_id, SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as raw_total
       FROM items i GROUP BY i.orderId
     ) i_totals ON i_totals.order_id = o.id
     WHERE ${dateCond} AND ${revenueCond}
@@ -1099,7 +1099,7 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
     LEFT JOIN users u ON u.id = o.userId
     LEFT JOIN order_statuses os ON os.id = o.status
     LEFT JOIN (
-      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+      SELECT i.orderId as order_id, SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) as raw_total
       FROM items i
       GROUP BY i.orderId
     ) i_totals ON i_totals.order_id = o.id

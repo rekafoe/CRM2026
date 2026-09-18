@@ -996,10 +996,17 @@ export const OrderRepository = {
           ${applyListLimit ? 'LIMIT ? OFFSET ?' : ''}
         ),
         order_totals AS (
-          SELECT i.orderId, SUM(i.price * i.quantity) as totalAmount
-          FROM items i
-          WHERE i.orderId IN (SELECT id FROM paged_orders)
-          GROUP BY i.orderId
+          SELECT orderId, COALESCE(SUM(
+            CASE
+              WHEN json_valid(params) = 1
+                AND json_type(json_extract(params, '$.storedTotalCost')) IN ('integer', 'real')
+              THEN CAST(json_extract(params, '$.storedTotalCost') AS REAL)
+              ELSE CAST(price AS REAL) * CAST(MAX(1, COALESCE(quantity, 1)) AS REAL)
+            END
+          ), 0) as totalAmount
+          FROM items
+          WHERE orderId IN (SELECT id FROM paged_orders)
+          GROUP BY orderId
         )
         SELECT p.*, COALESCE(t.totalAmount, 0) as totalAmount
         FROM paged_orders p

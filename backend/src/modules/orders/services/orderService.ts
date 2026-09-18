@@ -2223,12 +2223,8 @@ export class OrderService {
     light?: boolean;
   }) {
     const orders = await OrderRepository.searchOrders(userId, searchParams)
-    const orderIds = (orders as Order[]).map((o) => o.id)
-    const itemsByOrderId = await OrderRepository.getItemsByOrderIds(orderIds)
-    for (const order of orders as Order[]) {
-      order.items = itemsByOrderId.get(order.id) ?? []
-    }
-    return (orders as Order[]).map((o) => OrderService.orderForApi(o as any) as Order)
+    // Как getAllOrders / пул: totalAmount через storedTotalCost (+ скидка), не price×qty из SQL.
+    return OrderService.attachItemsToOrders(orders as Order[])
   }
 
   static async getOrdersStats(userId: number, dateFrom?: string, dateTo?: string) {
