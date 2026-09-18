@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler } from '../../../middleware'
 import { getDb } from '../../../config/database'
+import { sqlOrderTotalAfterDiscount } from '../../../utils/orderAmountsSql'
 
 const router = Router()
 
@@ -12,16 +13,20 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
   const ordersCount = await db.get<any>(
     `SELECT COUNT(1) as c FROM orders WHERE substr(createdAt,1,10) = ?`, d
   )
+  const orderTotalExpr = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)')
+  const dayCreated = `substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?`
   const sums = await db.get<any>(
-    `SELECT 
-        COALESCE(SUM(i.price * i.quantity), 0) as total_revenue,
-        COALESCE(SUM(i.quantity), 0) as items_qty,
-        COALESCE(SUM(i.clicks), 0) as total_clicks,
-        COALESCE(SUM(i.sheets), 0) as total_sheets,
-        COALESCE(SUM(i.waste), 0) as total_waste
-     FROM items i
-     JOIN orders o ON o.id = i.orderId
-    WHERE substr(o.createdAt,1,10) = ?`, d
+    `SELECT
+        (SELECT COALESCE(SUM(${orderTotalExpr}), 0) FROM orders o WHERE ${dayCreated}) as total_revenue,
+        (SELECT COALESCE(SUM(i.quantity), 0) FROM items i
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as items_qty,
+        (SELECT COALESCE(SUM(i.clicks), 0) FROM items i
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as total_clicks,
+        (SELECT COALESCE(SUM(i.sheets), 0) FROM items i
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as total_sheets,
+        (SELECT COALESCE(SUM(i.waste), 0) FROM items i
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as total_waste`,
+    d, d, d, d, d,
   )
   const prepay = await db.get<any>(
     `SELECT 
@@ -45,14 +50,15 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
       ORDER BY spent DESC
       LIMIT 5`, d
   )
-  // Расчёт долга клиентов
+  const ordTotalSql = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)')
   const debtInfo = await db.get<any>(
-    `SELECT 
-        COALESCE(SUM(o.total), 0) as total_orders_amount,
-        COALESCE(SUM(o.prepaymentAmount), 0) as total_prepayment_amount,
-        COALESCE(SUM(o.total) - SUM(o.prepaymentAmount), 0) as total_debt
-     FROM orders o 
-     WHERE substr(o.createdAt,1,10) = ?`, d
+    `SELECT
+       COALESCE(SUM(${ordTotalSql}), 0) AS total_orders_amount,
+       COALESCE(SUM(COALESCE(o.prepaymentAmount, 0)), 0) AS total_prepayment_amount,
+       COALESCE(SUM(${ordTotalSql}) - SUM(COALESCE(o.prepaymentAmount, 0)), 0) AS total_debt
+     FROM orders o
+     WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?`,
+    d,
   )
 
   res.json({

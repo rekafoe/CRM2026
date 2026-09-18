@@ -1,5 +1,6 @@
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { SQL_ITEM_LINE_TOTAL_EXPR } from '../utils/orderAmountsSql'
 
 const DESIGN_TEMPLATE_ID_EXPR = `
   CAST(NULLIF(TRIM(COALESCE(CAST(json_extract(i.params, '$.designTemplateId') AS TEXT), '')), '') AS INTEGER)
@@ -136,7 +137,7 @@ export async function getDesignTemplateUsageAnalytics(
       COUNT(*) AS line_count,
       COUNT(DISTINCT i.orderId) AS order_count,
       SUM(i.quantity) AS total_quantity,
-      SUM(i.price * i.quantity) AS total_revenue,
+      SUM(${SQL_ITEM_LINE_TOTAL_EXPR}) AS total_revenue,
       MAX(COALESCE(o.createdAt, o.created_at)) AS last_used_at
      FROM items i
      JOIN orders o ON o.id = i.orderId

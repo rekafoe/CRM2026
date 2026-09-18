@@ -3,7 +3,8 @@
  * Отдельный файл, чтобы не дублировать в raw-запросах.
  */
 
-const SQL_ITEM_LINE_TOTAL_INNER = `
+/** Сумма позиции с алиасом `i` (для JOIN/SUM в отчётах). */
+export const SQL_ITEM_LINE_TOTAL_EXPR = `
   CASE
     WHEN json_valid(i.params) = 1
       AND json_type(json_extract(i.params, '$.storedTotalCost')) IN ('integer', 'real')
@@ -14,7 +15,7 @@ const SQL_ITEM_LINE_TOTAL_INNER = `
 
 /** Подытог заказа: `orderIdSqlRef` — например `o.id` или `orders.id`. */
 export function sqlOrderSubtotalSubquery(orderIdSqlRef: string): string {
-  return `(SELECT COALESCE(SUM(${SQL_ITEM_LINE_TOTAL_INNER}), 0) FROM items i WHERE i.orderId = ${orderIdSqlRef})`;
+  return `(SELECT COALESCE(SUM(${SQL_ITEM_LINE_TOTAL_EXPR}), 0) FROM items i WHERE i.orderId = ${orderIdSqlRef})`;
 }
 
 /** Итог после скидки; `discountRef` — например `COALESCE(o.discount_percent, 0)`. */
