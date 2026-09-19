@@ -43,6 +43,33 @@ export function firstMaterialIdWithSheetDims(
   return undefined
 }
 
+/**
+ * У размера print_prices общие на все материалы: unit_price = цена_листа / items_per_sheet.
+ * В биллинге pricePerSheet = unit_price × itemsPerSheet(выбранный материал).
+ * Если среди разрешённых материалов разные форматы листа, а items_per_sheet_override
+ * не задан, «заполнить из принтеров» по первому материалу портит цены для остальных.
+ */
+export function allowedMaterialsHaveDistinctSheetFormats(
+  allMaterials: WarehouseMaterialSheetDims[] | undefined,
+  allowedIds: number[] | undefined,
+): boolean {
+  if (!allMaterials?.length || !allowedIds?.length) return false
+  const formats = new Set<string>()
+  for (const rawId of allowedIds) {
+    const id = Number(rawId)
+    if (!Number.isFinite(id)) continue
+    const m = allMaterials.find((x) => Number(x.id) === id)
+    const sw = m != null ? Number(m.sheet_width) : 0
+    const sh = m != null ? Number(m.sheet_height) : 0
+    if (!(sw > 0 && sh > 0)) continue
+    // Нормализуем ориентацию: 320×450 и 450×320 — один формат листа.
+    const a = Math.min(sw, sh)
+    const b = Math.max(sw, sh)
+    formats.add(`${a}x${b}`)
+  }
+  return formats.size > 1
+}
+
 export function isPerSheetPrintTech(
   printTechs: PrintTechForDerive[],
   technologyCode: string,
@@ -156,6 +183,24 @@ export async function deriveSizePrintPricesFromCentral(options: {
   )
   if (techs.length === 0) {
     return { size, problems: [], filledModes: 0, skipped: 'нет листовой технологии печати' }
+  }
+
+  const hasOverride =
+    size.items_per_sheet_override != null && Number(size.items_per_sheet_override) > 0
+  if (
+    !hasOverride
+    && allowedMaterialsHaveDistinctSheetFormats(allMaterials, allowedMaterialIds)
+  ) {
+    return {
+      size,
+      problems: [
+        'У размера разрешены материалы с разными форматами листа. '
+          + 'Задайте «шт/лист» (items_per_sheet_override) или оставьте один формат листа — '
+          + 'иначе цены из принтеров по первому материалу исказят оплату для остальных.',
+      ],
+      filledModes: 0,
+      skipped: 'разные форматы листа среди материалов',
+    }
   }
 
   const layoutMaterialId = firstMaterialIdWithSheetDims(allMaterials, allowedMaterialIds)
