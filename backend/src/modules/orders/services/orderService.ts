@@ -11,7 +11,6 @@ import { OrderRepository } from '../../../repositories/orderRepository'
 import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMapper'
 import { EarningsService } from '../../../services/earningsService'
 import {
-  mapPhotoOrderToOrder,
   mapPhotoOrderToVirtualItem,
   photoOrderRowToPoolOrder,
 } from '../../../models/mappers/telegramPhotoOrderMapper'
@@ -1598,82 +1597,67 @@ export class OrderService {
     if (await this.isCancellationStatusId(db, targetStatus)) {
       throw new Error('Статус отмены назначается только через отмену заказа')
     }
-    
-    // Сначала проверяем, есть ли заказ в таблице photo_orders (Telegram заказы)
-    let telegramOrder: any = null
-    try {
-      telegramOrder = await db.get('SELECT id FROM photo_orders WHERE id = ?', [id])
-    } catch {
-      // photo_orders может отсутствовать на некоторых инстансах/БД — считаем, что телеграм-заказа нет
-      telegramOrder = null
+
+    // Только таблица orders. photo_orders имеют отдельный API (строковые статусы) и
+    // независимое AUTOINCREMENT — проверка photo_orders раньше orders ломала CRM-заказы
+    // с тем же числовым id (статус уходил в photo_orders, резервы не подтверждались).
+    const orderInOrders = await db.get('SELECT id FROM orders WHERE id = ?', [id])
+
+    if (!orderInOrders) {
+      throw new Error(`Заказ с ID ${id} не найден`)
     }
-    
-    if (telegramOrder) {
-      await db.run('UPDATE photo_orders SET status = ?, updated_at = datetime("now") WHERE id = ?', [targetStatus, id])
-      const updatedTelegramOrder = await OrderRepository.getPhotoOrderById(id)
-      const updated: Order = updatedTelegramOrder ? mapPhotoOrderToOrder(updatedTelegramOrder) : { id, number: `tg-ord-${id}`, status: targetStatus, created_at: new Date().toISOString(), items: [] }
-      return updated
-    } else {
-      // Проверяем, есть ли заказ в таблице orders
-      const orderInOrders = await db.get('SELECT id FROM orders WHERE id = ?', [id])
-      
-      if (orderInOrders) {
-        const prevRow = await db.get<{ status: number; source?: Order['source'] | null }>(
-          'SELECT status, source FROM orders WHERE id = ?',
-          [id]
-        );
-        const oldStatusId = Number(prevRow?.status ?? 0);
-        // Статус 5 в order_statuses = «Передан в ПВЗ», не отмена. Запись в order_cancellation_events
-        // только при deleteOrder (handleDeleteOrder). Отмена через статус не используется.
-        // Обновляем обычный заказ
-        try {
-          await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [targetStatus, id])
-        } catch {
-          // На некоторых схемах есть только updated_at
-          await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [targetStatus, id])
-        }
 
-        // Если статус "Принят в работу", подтверждаем резервы по заказу
-        const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
-        if (inWorkId != null && targetStatus === Number(inWorkId)) {
-          const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
-          const reservationIds = reservations
-            .filter(r => r.status === 'reserved')
-            .map(r => r.id)
-          if (reservationIds.length > 0) {
-            await UnifiedWarehouseService.confirmReservations(reservationIds)
-          }
-        }
+    const prevRow = await db.get<{ status: number; source?: Order['source'] | null }>(
+      'SELECT status, source FROM orders WHERE id = ?',
+      [id]
+    );
+    const oldStatusId = Number(prevRow?.status ?? 0);
+    // Статус 5 в order_statuses = «Передан в ПВЗ», не отмена. Запись в order_cancellation_events
+    // только при deleteOrder (handleDeleteOrder). Отмена через статус не используется.
+    try {
+      await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [targetStatus, id])
+    } catch {
+      // На некоторых схемах есть только updated_at
+      await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [targetStatus, id])
+    }
 
-        const newStatusId = targetStatus;
-        void tryEnqueueOrderStatusEmail({
-          orderId: id,
-          oldStatusId,
-          newStatusId,
-          source: prevRow?.source ?? 'crm',
-        });
-        void tryScheduleOrderStatusSms({ orderId: id, newStatusId });
-        void tryNotifyTelegramOrderStatusForMiniappOrder({
-          orderId: id,
-          oldStatusId,
-          newStatusId: targetStatus,
-        });
-        void trySyncWebsiteOrderStatusFromCrm(db, id);
-
-        void EarningsService.recalculateEarningsForOrderDays({ orderId: id }).catch((e) => {
-          logger.error('Earnings recalc after status change failed', {
-            orderId: id,
-            message: (e as Error)?.message,
-          });
-        });
-
-        const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
-        const updated: Order = { ...(raw as Order), items: [] }
-        return OrderService.orderForApi(updated) as Order
-      } else {
-        throw new Error(`Заказ с ID ${id} не найден`)
+    // Если статус "Принят в работу", подтверждаем резервы по заказу
+    const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
+    if (inWorkId != null && targetStatus === Number(inWorkId)) {
+      const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
+      const reservationIds = reservations
+        .filter(r => r.status === 'reserved')
+        .map(r => r.id)
+      if (reservationIds.length > 0) {
+        await UnifiedWarehouseService.confirmReservations(reservationIds)
       }
     }
+
+    const newStatusId = targetStatus;
+    void tryEnqueueOrderStatusEmail({
+      orderId: id,
+      oldStatusId,
+      newStatusId,
+      source: prevRow?.source ?? 'crm',
+    });
+    void tryScheduleOrderStatusSms({ orderId: id, newStatusId });
+    void tryNotifyTelegramOrderStatusForMiniappOrder({
+      orderId: id,
+      oldStatusId,
+      newStatusId: targetStatus,
+    });
+    void trySyncWebsiteOrderStatusFromCrm(db, id);
+
+    void EarningsService.recalculateEarningsForOrderDays({ orderId: id }).catch((e) => {
+      logger.error('Earnings recalc after status change failed', {
+        orderId: id,
+        message: (e as Error)?.message,
+      });
+    });
+
+    const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
+    const updated: Order = { ...(raw as Order), items: [] }
+    return OrderService.orderForApi(updated) as Order
   }
 
   // Возврат заказа в пул без отмены: снимаем ответственного, но не ставим is_cancelled.
