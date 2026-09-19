@@ -13,6 +13,30 @@ describe('OrderService.updateOrderStatus vs photo_orders id collision', () => {
     const db = await getDb()
     const collisionId = 9_100_001 + Math.floor(Math.random() * 1000)
 
+    let statusFrom = await db.get<{ id: number }>('SELECT id FROM order_statuses ORDER BY id LIMIT 1')
+    if (!statusFrom) {
+      await db.run(
+        `INSERT INTO order_statuses (name, color, sort_order) VALUES ('Оформлен', '#90caf9', 1)`,
+      )
+      statusFrom = await db.get<{ id: number }>('SELECT id FROM order_statuses ORDER BY id LIMIT 1')
+    }
+    let statusTo = await db.get<{ id: number }>(
+      'SELECT id FROM order_statuses WHERE id != ? ORDER BY id LIMIT 1',
+      [statusFrom!.id],
+    )
+    if (!statusTo) {
+      await db.run(
+        `INSERT INTO order_statuses (name, color, sort_order) VALUES ('Принят в работу', '#ffe082', 2)`,
+      )
+      statusTo = await db.get<{ id: number }>(
+        'SELECT id FROM order_statuses WHERE id != ? ORDER BY id LIMIT 1',
+        [statusFrom!.id],
+      )
+    }
+    expect(statusFrom?.id).toBeTruthy()
+    expect(statusTo?.id).toBeTruthy()
+
+    await db.run('DELETE FROM items WHERE orderId = ?', [collisionId])
     await db.run('DELETE FROM orders WHERE id = ?', [collisionId])
     await db.run('DELETE FROM photo_orders WHERE id = ?', [collisionId])
 
@@ -35,12 +59,12 @@ describe('OrderService.updateOrderStatus vs photo_orders id collision', () => {
        VALUES (?, ?, ?, datetime('now'), datetime('now'), ?, ?)`,
       collisionId,
       orderNumber,
-      1,
+      statusFrom!.id,
       'Collision test',
       'crm',
     )
 
-    const targetStatus = 2
+    const targetStatus = statusTo!.id
     const updated = await OrderService.updateOrderStatus(collisionId, targetStatus)
 
     expect(Number(updated.status)).toBe(targetStatus)
