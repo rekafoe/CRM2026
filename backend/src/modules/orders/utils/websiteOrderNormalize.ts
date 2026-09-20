@@ -8,6 +8,9 @@ const INTERNAL_PARAM_KEYS = new Set([
   'crmCalculateConfiguration',
   // editorDraftToken — контракт checkout редактора; нужен до prepareWebsiteItemsWithEditorDrafts
   'designEditorMode',
+  // Нельзя принимать с сайта/Mini App: иначе totalCost/storedTotalCost
+  // переживают OrderPricingService.recalculateOrderPrices и фиксируют недоплату.
+  'priceLockedByCalculator',
 ]);
 
 const HIDDEN_SUMMARY_LABELS = new Set([
