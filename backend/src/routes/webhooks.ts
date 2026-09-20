@@ -3,6 +3,10 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { logger } from '../utils/logger'
+import {
+  getBePaidShopCredentials,
+  isBePaidWebhookAuthorized,
+} from '../services/bepaidCheckoutService'
 
 const router = Router()
 
@@ -31,10 +35,29 @@ function mapBePaidStatus(raw: string): 'paid' | 'failed' | 'pending' | null {
   return null
 }
 
-// POST /api/webhooks/bepaid — статус оплаты BePaid (checkout notification)
+/**
+ * POST /api/webhooks/bepaid — статус оплаты BePaid (checkout notification).
+ * BePaid sends HTTP Basic Auth (Shop ID + Secret Key). Without verification
+ * anyone could mark an order paid by number/id.
+ * @see https://docs.bepaid.by/en/using_api/webhooks/
+ */
 router.post(
   '/bepaid',
   asyncHandler(async (req, res) => {
+    if (!getBePaidShopCredentials()) {
+      logger.error('BePaid webhook: BEPAID_SHOP_ID/BEPAID_SECRET_KEY not configured')
+      res.status(503).json({ message: 'BePaid webhook is not configured' })
+      return
+    }
+    if (!isBePaidWebhookAuthorized(req.headers.authorization)) {
+      logger.warn('BePaid webhook: rejected unauthorized request', {
+        hasAuthorization: Boolean(req.headers.authorization),
+      })
+      res.setHeader('WWW-Authenticate', 'Basic realm="bePaid"')
+      res.status(401).json({ message: 'Unauthorized' })
+      return
+    }
+
     const body = (req.body || {}) as BePaidWebhookBody
     const tx = body.transaction
     const gatewayPayment = body.checkout?.gateway_response?.payment
