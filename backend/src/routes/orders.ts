@@ -1511,22 +1511,35 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
       return
     }
 
-    let hasPrepaymentUpdatedAt = false
-    try {
-      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-    } catch {
-      hasPrepaymentUpdatedAt = false
-    }
-    const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
-    const todayLocal = (todayRow?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
-    const prepaymentMoment = `${todayLocal} 12:00:00`
-    const updateSql = hasPrepaymentUpdatedAt
-      ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
-      : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
-    if (hasPrepaymentUpdatedAt) {
-      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', prepaymentMoment, id)
+    // Already-paid orders: only refresh BePaid link fields. Overwriting
+    // prepaymentAmount/status to pending would erase the recorded payment (and
+    // the subsequent webhook SET would keep only the installment amount).
+    if (isPaid) {
+      await db.run(
+        `UPDATE orders SET paymentUrl = ?, paymentId = ?, paymentMethod = 'online',
+         updated_at = datetime('now') WHERE id = ?`,
+        paymentUrl,
+        paymentId,
+        id,
+      )
     } else {
-      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', id)
+      let hasPrepaymentUpdatedAt = false
+      try {
+        hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+      } catch {
+        hasPrepaymentUpdatedAt = false
+      }
+      const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
+      const todayLocal = (todayRow?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+      const prepaymentMoment = `${todayLocal} 12:00:00`
+      const updateSql = hasPrepaymentUpdatedAt
+        ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
+        : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      if (hasPrepaymentUpdatedAt) {
+        await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', prepaymentMoment, id)
+      } else {
+        await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', id)
+      }
     }
   }
 

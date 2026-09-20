@@ -6,10 +6,26 @@ import {
 } from '../services/bepaidCheckoutService'
 import webhooksRouter from '../routes/webhooks'
 
+const orderRow: {
+  id: number
+  prepaymentAmount: number
+  prepaymentStatus: string | null
+  paymentUrl: string | null
+  paymentId: string | null
+} = {
+  id: 42,
+  prepaymentAmount: 0,
+  prepaymentStatus: null,
+  paymentUrl: null,
+  paymentId: null,
+}
+
+const runMock = jest.fn(async (..._args: unknown[]) => undefined)
+
 jest.mock('../config/database', () => ({
   getDb: jest.fn(async () => ({
-    get: jest.fn(async () => ({ id: 42, prepaymentAmount: 0 })),
-    run: jest.fn(async () => undefined),
+    get: jest.fn(async () => ({ ...orderRow })),
+    run: runMock,
   })),
 }))
 
@@ -62,6 +78,12 @@ describe('POST /api/webhooks/bepaid auth', () => {
   beforeEach(() => {
     process.env.BEPAID_SHOP_ID = 'shop-1'
     process.env.BEPAID_SECRET_KEY = 'secret-xyz'
+    runMock.mockClear()
+    orderRow.id = 42
+    orderRow.prepaymentAmount = 0
+    orderRow.prepaymentStatus = null
+    orderRow.paymentUrl = null
+    orderRow.paymentId = null
   })
 
   afterAll(() => {
@@ -109,5 +131,36 @@ describe('POST /api/webhooks/bepaid auth', () => {
       .set('Authorization', basicAuth('shop-1', 'secret-xyz'))
       .send(paidBody)
     expect(res.status).toBe(204)
+  })
+
+  it('accumulates amount when a paid order has an open follow-up checkout', async () => {
+    orderRow.prepaymentAmount = 40
+    orderRow.prepaymentStatus = 'paid'
+    orderRow.paymentUrl = 'https://checkout.example/open'
+    orderRow.paymentId = 'checkout-token'
+
+    const res = await request(app)
+      .post('/api/webhooks/bepaid')
+      .set('Authorization', basicAuth('shop-1', 'secret-xyz'))
+      .send(paidBody)
+    expect(res.status).toBe(204)
+    expect(runMock).toHaveBeenCalled()
+    const args = runMock.mock.calls[0]
+    expect(String(args[0])).toContain('prepaymentAmount')
+    expect(args[1]).toBe(190)
+  })
+
+  it('is idempotent for the same payment uid already marked paid', async () => {
+    orderRow.prepaymentAmount = 150
+    orderRow.prepaymentStatus = 'paid'
+    orderRow.paymentUrl = null
+    orderRow.paymentId = 'uid-1'
+
+    const res = await request(app)
+      .post('/api/webhooks/bepaid')
+      .set('Authorization', basicAuth('shop-1', 'secret-xyz'))
+      .send(paidBody)
+    expect(res.status).toBe(204)
+    expect(runMock).not.toHaveBeenCalled()
   })
 })
