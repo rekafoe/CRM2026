@@ -30,6 +30,7 @@ import {
 } from '../services/editorProductionJobService'
 import { logger } from '../utils/logger'
 import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition'
+import { planPrepayUpdate } from '../utils/prepayUpdate'
 import { Readable } from 'stream'
 
 const router = Router()
@@ -1363,7 +1364,6 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
 
   let paymentId: string | null = null
   let paymentUrl: string | null = null
-  const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
 
   if (paymentMethod === 'online') {
     const email = String(order.customerEmail || '').trim()
@@ -1406,13 +1406,42 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
     await db.run('UPDATE orders SET userId = ?, updated_at = datetime(\'now\') WHERE id = ?', authUser.id, id)
   }
 
-  const updateSql = hasPrepaymentUpdatedAt
-    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
-    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
-  if (hasPrepaymentUpdatedAt) {
-    await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, prepaymentMoment, id)
+  const plan = planPrepayUpdate(order, {
+    amount,
+    paymentMethod,
+    paymentUrl,
+    paymentId,
+  })
+
+  if (plan.mode === 'keep_paid_refresh_checkout') {
+    // Already paid/successful: only attach BePaid checkout for remainder — never pending/wipe prepaid.
+    await db.run(
+      'UPDATE orders SET paymentUrl = ?, paymentId = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      plan.paymentUrl,
+      plan.paymentId,
+      id,
+    )
+  } else if (hasPrepaymentUpdatedAt && plan.stampPrepaymentUpdatedAt) {
+    await db.run(
+      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      plan.prepaymentAmount,
+      plan.prepaymentStatus,
+      plan.paymentUrl,
+      plan.paymentId,
+      plan.paymentMethod,
+      prepaymentMoment,
+      id,
+    )
   } else {
-    await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
+    await db.run(
+      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      plan.prepaymentAmount,
+      plan.prepaymentStatus,
+      plan.paymentUrl,
+      plan.paymentId,
+      plan.paymentMethod,
+      id,
+    )
   }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
