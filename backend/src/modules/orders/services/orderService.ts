@@ -1536,12 +1536,14 @@ export class OrderService {
 
   /**
    * Обновить скидку на заказ (процент от итоговой суммы).
-   * Если оплата offline и предоплата была «в синке» с итогом — пересчитываем предоплату под новый итог.
+   * Не трогает prepaymentAmount / prepaymentUpdatedAt: автосинк prepaid→newTotal
+   * при offline+inSync раздувал оплату при снятии скидки и сдвигал день кассы
+   * (см. planPrepaymentAfterDiscountChange).
    */
   static async updateOrderDiscount(id: number, discountPercent: number): Promise<Order> {
     const db = await getDb()
-    const order = await db.get<{ id: number; prepaymentAmount?: number | null; paymentMethod?: string | null; discount_percent?: number | null }>(
-      'SELECT id, prepaymentAmount, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?',
+    const order = await db.get<{ id: number }>(
+      'SELECT id FROM orders WHERE id = ?',
       [id]
     )
     if (!order) {
@@ -1551,36 +1553,11 @@ export class OrderService {
     if (!Number.isFinite(p) || !OrderService.ALLOWED_DISCOUNT_PERCENTS.has(p)) {
       throw new Error('Скидка должна быть 0, 5, 10, 15, 20 или 25%')
     }
-    const items = await OrderRepository.getItemsByOrderId(id)
-    const oldAmounts = computeOrderAmounts({
-      items: items as Parameters<typeof computeOrderAmounts>[0]['items'],
-      discount_percent: order.discount_percent ?? 0,
-      prepaymentAmount: order.prepaymentAmount,
-    })
-    const subtotal = oldAmounts.subtotal
-    const oldTotal = oldAmounts.totalAmount
-    const newTotal = Math.round(subtotal * (1 - p / 100) * 100) / 100
-    const prepaymentAmount = Number(order.prepaymentAmount || 0)
-    const eps = 0.005
-    const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
 
     await db.run(
       'UPDATE orders SET discount_percent = ?, updated_at = datetime("now") WHERE id = ?',
       [p, id]
     )
-
-    if (order.paymentMethod === 'offline' && inSync && newTotal >= 0) {
-      let hasPrepaymentUpdatedAt = false
-      try {
-        hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-      } catch {
-        hasPrepaymentUpdatedAt = false
-      }
-      const updateSql = hasPrepaymentUpdatedAt
-        ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime(\'now\',\'localtime\'), updated_at = datetime(\'now\',\'localtime\') WHERE id = ?'
-        : 'UPDATE orders SET prepaymentAmount = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?'
-      await db.run(updateSql, newTotal, id)
-    }
 
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
     const withItems = await OrderRepository.getItemsByOrderId(id)
