@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { logger } from '../utils/logger'
+import { planBePaidWebhookStatusUpdate } from '../utils/bepaidWebhookUpdate'
 
 const router = Router()
 
@@ -61,26 +62,36 @@ router.post(
     }
 
     const db = await getDb()
+    type OrderPayRow = {
+      id: number
+      prepaymentAmount?: number | string | null
+      prepaymentStatus?: string | null
+    }
+    const selectPay = 'SELECT id, prepaymentAmount, prepaymentStatus FROM orders WHERE '
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
-          paymentId,
-        )
+      ? await db.get<OrderPayRow>(`${selectPay}paymentId = ?`, paymentId)
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
-        trackingId,
-      )
+      order = await db.get<OrderPayRow>(`${selectPay}number = ?`, trackingId)
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
-          Number(trackingId),
-        )
+        order = await db.get<OrderPayRow>(`${selectPay}id = ?`, Number(trackingId))
       }
     }
     if (!order) {
       logger.warn('BePaid webhook: order not found', { paymentId, trackingId, statusRaw })
+      res.status(204).end()
+      return
+    }
+
+    // Already-paid order + later incomplete/failed on a follow-up checkout must not
+    // drop prepaymentStatus out of paid/successful (cash reports key off that status).
+    const statusPlan = planBePaidWebhookStatusUpdate(order.prepaymentStatus, prepaymentStatus)
+    if (statusPlan.action === 'noop_keep_paid') {
+      logger.info('BePaid webhook: keep paid status (ignore non-paid notification)', {
+        orderId: order.id,
+        incoming: prepaymentStatus,
+        paymentId: paymentId || undefined,
+      })
       res.status(204).end()
       return
     }
@@ -100,9 +111,7 @@ router.post(
           : existingPrepay > 0
             ? existingPrepay
             : 0
-        : prepaymentStatus === 'failed'
-          ? 0
-          : existingPrepay
+        : existingPrepay
 
     if (prepaymentStatus === 'paid' && amount <= 0) {
       logger.warn('BePaid webhook: paid without amount', { orderId: order.id, paymentId })
@@ -119,6 +128,7 @@ router.post(
            paymentUrl = NULL, paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(sql, amount, paymentId || null, order.id)
     } else if (prepaymentStatus === 'failed') {
+      // Do not wipe an already-recorded prepaymentAmount on failed attempts.
       const sql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
            paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
