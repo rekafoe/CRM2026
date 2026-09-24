@@ -478,6 +478,10 @@ export class OrderManagementService {
             return null;
           }
 
+          if (issuerId != null) {
+            await OrderService.ensureFulfillmentDepartmentFromUser(orderId, issuerId);
+          }
+
           const amounts = await OrderService.getOrderAmountsById(orderId);
           const totalAmount = amounts.totalAmount;
           const remainder = amounts.debt;

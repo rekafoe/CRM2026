@@ -1258,6 +1258,9 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
     res.json(orderForApi(updated))
     return
   }
+  if (issuerId != null) {
+    await OrderService.ensureFulfillmentDepartmentFromUser(id, issuerId)
+  }
   const amounts = await OrderService.getOrderAmountsById(id)
   const total = amounts.totalAmount
   const remainder = amounts.debt
@@ -1403,7 +1406,10 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const assignToMe = (req.body as any)?.assignToMe === true || (req.body as any)?.assignToMe === 'true'
   const authUser = (req as any).user as { id: number } | undefined
   if (assignToMe && authUser?.id) {
+    await OrderService.ensureFulfillmentDepartmentFromUser(id, authUser.id)
     await db.run('UPDATE orders SET userId = ?, updated_at = datetime(\'now\') WHERE id = ?', authUser.id, id)
+  } else if (authUser?.id) {
+    await OrderService.ensureFulfillmentDepartmentFromUser(id, authUser.id)
   }
 
   const updateSql = hasPrepaymentUpdatedAt
