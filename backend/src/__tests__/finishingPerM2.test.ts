@@ -51,6 +51,39 @@ describe('finishingPerM2', () => {
     expect(w.feedMeters).toBeCloseTo(2, 4);
   });
 
+  it('без ширины рулона: fallbackMeters не должен быть billed м² (оба габарита >1000 мм)', () => {
+    const bigLayout = {
+      trimMm: { width: 2000, height: 1500 },
+      bleedMm: 0,
+      quantity: 1,
+      margins: { edgeMm: 0, gapMm: 0 },
+    };
+    const quoted = quotePerM2Finishing({
+      rollWidthMm: null,
+      layout: bigLayout,
+      rate: 10,
+    });
+    // billed м² = 3, грубая подача = 2 пог. м — единицы разные
+    expect(quoted.rawUnits).toBeCloseTo(3, 4);
+    expect(quoted.feedMeters).toBeCloseTo(2, 4);
+
+    const withMeterFallback = resolveWarehouseFeedMeters({
+      rollWidthMm: null,
+      layout: bigLayout,
+      fallbackMeters: quoted.feedMeters,
+    });
+    expect(withMeterFallback.feedMeters).toBeCloseTo(quoted.feedMeters, 4);
+
+    // Антипаттерн: Math.max(..., rawUnits) завышает списание склада
+    const withM2Fallback = resolveWarehouseFeedMeters({
+      rollWidthMm: null,
+      layout: bigLayout,
+      fallbackMeters: quoted.rawUnits,
+    });
+    expect(withM2Fallback.feedMeters).toBeCloseTo(quoted.rawUnits, 4);
+    expect(withMeterFallback.feedMeters).toBeLessThan(withM2Fallback.feedMeters);
+  });
+
   it('A1×2 on 630 mm roll → ~1.682 feed m (lamination per_meter)', () => {
     const w = resolveWarehouseFeedMeters({
       rollWidthMm: 630,

@@ -2315,6 +2315,9 @@ export class SimplifiedPricingService {
         if (useRollFeedUnits) {
           const matInfo = materialInfoMap.get(src.material_id);
           const rollWidthMm = Number(matInfo?.sheet_width ?? matInfo?.printable_width ?? 0);
+          // fallback только в пог. м: materialMetersNeeded / feed_meters.
+          // Нельзя брать rawUnits — для per_m2 это billed м², иначе склад списывает м² как пог. м.
+          const feedMetersHint = Number(d.feed_meters);
           const feed = resolveWarehouseFeedMeters({
             rollWidthMm: Number.isFinite(rollWidthMm) && rollWidthMm > 0 ? rollWidthMm : null,
             layout: {
@@ -2332,7 +2335,10 @@ export class SimplifiedPricingService {
                     : 0,
               },
             },
-            fallbackMeters: Math.max(materialMetersNeeded, rawUnits),
+            fallbackMeters: Math.max(
+              materialMetersNeeded,
+              Number.isFinite(feedMetersHint) && feedMetersHint > 0 ? feedMetersHint : 0,
+            ),
             materialId: src.material_id,
           });
           baseUnitsForConsumption = feed.feedMeters;
