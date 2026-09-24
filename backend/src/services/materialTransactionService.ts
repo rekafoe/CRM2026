@@ -290,12 +290,16 @@ export class MaterialTransactionService {
       throw new Error(`Материал с ID ${materialId} не найден`);
     }
 
-    // Считаем активные резервы
+    // Считаем активные резервы. ISO expires_at vs sqlite datetime('now') ломает same-day expiry.
+    const nowIso = new Date().toISOString();
     const reservedResult = await db.get<{ reserved: number }>(
       `SELECT COALESCE(SUM(quantity_reserved), 0) as reserved
        FROM material_reservations
-       WHERE material_id = ? AND status = 'active' AND expires_at > datetime('now')`,
-      materialId
+       WHERE material_id = ?
+         AND status IN ('active', 'reserved')
+         AND (expires_at IS NULL OR expires_at > ?)`,
+      materialId,
+      nowIso
     );
 
     const currentQuantity = Number(material.quantity);
