@@ -454,21 +454,38 @@ export class OrderManagementService {
   static async issueOrder(orderId: number, orderType: string, issuerId?: number | null, issuedOn?: string | null): Promise<UnifiedOrder | null> {
     try {
       const db = await getDb();
-      await db.run('BEGIN');
+      // IMMEDIATE: concurrent «Выдать» must not insert duplicate debt_closed_events.
+      await db.run('BEGIN IMMEDIATE');
       try {
         if (orderType === 'telegram') {
-          await db.run(
-            `
-            UPDATE photo_orders 
-            SET status = 7, updated_at = datetime('now','localtime')
-            WHERE id = ?
-          `,
+          const photo = await db.get<{ id: number; status: string | number }>(
+            'SELECT id, status FROM photo_orders WHERE id = ?',
             [orderId],
           );
+          if (!photo) {
+            await db.run('ROLLBACK');
+            return null;
+          }
+          if (Number(photo.status) !== 7) {
+            await db.run(
+              `
+              UPDATE photo_orders 
+              SET status = 7, updated_at = datetime('now','localtime')
+              WHERE id = ? AND CAST(status AS INTEGER) != 7
+            `,
+              [orderId],
+            );
+          }
         } else {
+          const hasIsCancelled = await hasColumn('orders', 'is_cancelled').catch(() => false);
           const order = await db.get<any>(
-            `
-            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent
+            hasIsCancelled
+              ? `
+            SELECT id, source, status, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, is_cancelled
+            FROM orders WHERE id = ?
+          `
+              : `
+            SELECT id, source, status, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent
             FROM orders WHERE id = ?
           `,
             [orderId],
@@ -477,41 +494,53 @@ export class OrderManagementService {
             await db.run('ROLLBACK');
             return null;
           }
+          if (hasIsCancelled && Number(order.is_cancelled) === 1) {
+            throw new Error('Нельзя выдать отменённый заказ');
+          }
 
-          const amounts = await OrderService.getOrderAmountsById(orderId);
-          const totalAmount = amounts.totalAmount;
-          const remainder = amounts.debt;
-          const prepaymentAmount = Number(order.prepaymentAmount || 0);
+          if (Number(order.status) !== 7) {
+            const amounts = await OrderService.getOrderAmountsById(orderId);
+            const totalAmount = amounts.totalAmount;
+            const remainder = amounts.debt;
 
-          let hasPrepaymentUpdatedAt = false;
-          try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
-          const paymentId = `ISSUE-${Date.now()}-${orderId}`;
-          const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`
-            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`;
-          await db.run(updateSql, totalAmount, paymentId, orderId);
+            let hasPrepaymentUpdatedAt = false;
+            try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
+            const paymentId = `ISSUE-${Date.now()}-${orderId}`;
+            const updateSql = hasPrepaymentUpdatedAt
+              ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = 7 WHERE id = ? AND status != 7`
+              : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = 7 WHERE id = ? AND status != 7`;
+            const updateResult = await db.run(updateSql, totalAmount, paymentId, orderId);
 
-          // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
-          const issuer = issuerId ?? null;
-          const isValidIssuedOn = issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(String(issuedOn).slice(0, 10));
-          const closedDate = isValidIssuedOn
-            ? String(issuedOn).slice(0, 10)
-            : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
-          try {
-            const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id');
-            if (hasIssuedBy) {
-              await db.run(
-                'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
-                orderId, closedDate, remainder, issuer
-              );
-            } else {
-              await db.run(
-                'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
-                orderId, closedDate, remainder
-              );
+            if ((updateResult?.changes ?? 0) > 0) {
+              // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
+              const issuer = issuerId ?? null;
+              const isValidIssuedOn = issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(String(issuedOn).slice(0, 10));
+              const closedDate = isValidIssuedOn
+                ? String(issuedOn).slice(0, 10)
+                : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+              try {
+                const alreadyClosed = await db.get<{ id: number }>(
+                  'SELECT id FROM debt_closed_events WHERE order_id = ? LIMIT 1',
+                  orderId,
+                );
+                if (!alreadyClosed) {
+                  const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id');
+                  if (hasIssuedBy) {
+                    await db.run(
+                      'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
+                      orderId, closedDate, remainder, issuer
+                    );
+                  } else {
+                    await db.run(
+                      'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+                      orderId, closedDate, remainder
+                    );
+                  }
+                }
+              } catch (e) {
+                console.warn('[OrderManagementService.issueOrder] debt_closed_events insert failed:', (e as Error)?.message);
+              }
             }
-          } catch (e) {
-            console.warn('[OrderManagementService.issueOrder] debt_closed_events insert failed:', (e as Error)?.message);
           }
         }
 
@@ -541,7 +570,11 @@ export class OrderManagementService {
           void trySyncWebsiteOrderStatusFromCrm(db, orderId);
         }
       } catch (error) {
-        await db.run('ROLLBACK');
+        try {
+          await db.run('ROLLBACK');
+        } catch {
+          /* already rolled back / no active tx */
+        }
         throw error;
       }
 
@@ -553,6 +586,9 @@ export class OrderManagementService {
             : String(orderId);
       return await OrderManagementService.searchOrder(searchKey);
     } catch (error) {
+      if (error instanceof Error && /отменён/i.test(error.message)) {
+        throw error;
+      }
       console.error('❌ Error issuing order:', error);
       return null;
     }

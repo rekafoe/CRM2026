@@ -1251,62 +1251,96 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const authUser = (req as any).user as { id: number } | undefined
   const issuerId = authUser?.id ?? null
   const db = await getDb()
-  const order = await db.get<any>('SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
-  if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
-  if (Number(order.status) === 7) {
-    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
-    res.json(orderForApi(updated))
-    return
-  }
-  const amounts = await OrderService.getOrderAmountsById(id)
-  const total = amounts.totalAmount
-  const remainder = amounts.debt
 
-  // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
-  const bodyDate = (req.body as any)?.issued_on
-  const isValidBodyDate = bodyDate && /^\d{4}-\d{2}-\d{2}$/.test(String(bodyDate).slice(0, 10))
-  const today = isValidBodyDate
-    ? String(bodyDate).slice(0, 10)
-    : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
-
-  let hasPrepaymentUpdatedAt = false
-  try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
-  const paymentId = `ISSUE-${Date.now()}-${id}`
-  // prepaymentUpdatedAt = дата выдачи (today), чтобы заказ попадал в отчёты по этой дате
-  const issueDateTime = `${today} 12:00:00`
-  if (hasPrepaymentUpdatedAt) {
-    await db.run(
-      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = ?, updated_at = ?, status = 7 WHERE id = ?',
-      total, paymentId, issueDateTime, issueDateTime, id
-    )
-  } else {
-    await db.run(
-      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = ?, status = 7 WHERE id = ?',
-      total, paymentId, issueDateTime, id
-    )
-  }
-
+  // IMMEDIATE + WHERE status != 7: concurrent double-click must not insert two debt_closed_events
+  // (issued_orders_total / касса иначе удваивают остаток).
+  await db.run('BEGIN IMMEDIATE')
   try {
-    let hasIssuedBy = false
-    try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
-    if (hasIssuedBy) {
-      await db.run(
-        'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
-        id,
-        today,
-        remainder,
-        issuerId
-      )
-    } else {
-      await db.run(
-        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
-        id,
-        today,
-        remainder
-      )
+    const hasIsCancelled = await hasColumn('orders', 'is_cancelled').catch(() => false)
+    const order = await db.get<any>(
+      hasIsCancelled
+        ? 'SELECT id, status, prepaymentAmount, discount_percent, is_cancelled FROM orders WHERE id = ?'
+        : 'SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?',
+      id,
+    )
+    if (!order) {
+      await db.run('ROLLBACK')
+      res.status(404).json({ message: 'Заказ не найден' })
+      return
     }
+    if (hasIsCancelled && Number(order.is_cancelled) === 1) {
+      await db.run('ROLLBACK')
+      res.status(409).json({ message: 'Нельзя выдать отменённый заказ' })
+      return
+    }
+    if (Number(order.status) === 7) {
+      await db.run('COMMIT')
+      const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
+      res.json(orderForApi(updated))
+      return
+    }
+
+    const amounts = await OrderService.getOrderAmountsById(id)
+    const total = amounts.totalAmount
+    const remainder = amounts.debt
+
+    // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
+    const bodyDate = (req.body as any)?.issued_on
+    const isValidBodyDate = bodyDate && /^\d{4}-\d{2}-\d{2}$/.test(String(bodyDate).slice(0, 10))
+    const today = isValidBodyDate
+      ? String(bodyDate).slice(0, 10)
+      : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+
+    let hasPrepaymentUpdatedAt = false
+    try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
+    const paymentId = `ISSUE-${Date.now()}-${id}`
+    // prepaymentUpdatedAt = дата выдачи (today), чтобы заказ попадал в отчёты по этой дате
+    const issueDateTime = `${today} 12:00:00`
+    const updateResult = hasPrepaymentUpdatedAt
+      ? await db.run(
+          'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = ?, updated_at = ?, status = 7 WHERE id = ? AND status != 7',
+          total, paymentId, issueDateTime, issueDateTime, id
+        )
+      : await db.run(
+          'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = ?, status = 7 WHERE id = ? AND status != 7',
+          total, paymentId, issueDateTime, id
+        )
+
+    if ((updateResult?.changes ?? 0) > 0) {
+      try {
+        const alreadyClosed = await db.get<{ id: number }>(
+          'SELECT id FROM debt_closed_events WHERE order_id = ? LIMIT 1',
+          id,
+        )
+        if (!alreadyClosed) {
+          let hasIssuedBy = false
+          try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
+          if (hasIssuedBy) {
+            await db.run(
+              'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
+              id,
+              today,
+              remainder,
+              issuerId
+            )
+          } else {
+            await db.run(
+              'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+              id,
+              today,
+              remainder
+            )
+          }
+        }
+      } catch (e) {
+        console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
+      }
+    }
+
+    await db.run('COMMIT')
   } catch (e) {
-    console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
+    try { await db.run('ROLLBACK') } catch { /* ignore */ }
+    throw e
   }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
