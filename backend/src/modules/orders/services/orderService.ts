@@ -443,6 +443,10 @@ export class OrderService {
     } else if (paymentMethodHint === 'offline') {
       // Явно NULL: колонка orders.paymentMethod имеет DEFAULT 'online'
       insertFields.push(['paymentMethod', null])
+    } else {
+      // CRM create без hint: не наследовать DEFAULT 'online' — иначе addItem
+      // считает любой non-null method авто-оплатой и выставляет paid offline на весь итог.
+      insertFields.push(['paymentMethod', null])
     }
     if (hasPrepaymentUpdatedAt) {
       insertFields.push([

@@ -12,6 +12,7 @@ import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
+import { planPrepaymentAfterAddItem } from '../../../utils/planPrepaymentAfterAddItem'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 
 function isMeterUnit(unitRaw: unknown): boolean {
@@ -348,15 +349,14 @@ export class OrderItemController {
         const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
         const prepaymentStatus = paymentRow?.prepaymentStatus
         const paymentMethod = paymentRow?.paymentMethod
-        const allowAutoPay = paymentMethod !== null && paymentMethod !== undefined
-        const hasPrepayment = prepaymentAmount > 0 || (prepaymentStatus && prepaymentStatus.length > 0)
-        const eps = 0.005
-        const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
-        const shouldSetPrepayment =
-          allowAutoPay &&
-          newTotal > 0 &&
-          (!hasPrepayment || (paymentMethod === 'offline' && inSync))
-        if (shouldSetPrepayment) {
+        const prepayPlan = planPrepaymentAfterAddItem({
+          paymentMethod,
+          prepaymentAmount,
+          prepaymentStatus,
+          oldTotal,
+          newTotal,
+        })
+        if (prepayPlan.shouldSet) {
           let hasPrepaymentUpdatedAt = false
           try {
             hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -370,7 +370,7 @@ export class OrderItemController {
             : `UPDATE orders
                SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL, updated_at = datetime('now','localtime')
                WHERE id = ?`
-          await db.run(updateSql, newTotal, orderId)
+          await db.run(updateSql, prepayPlan.amount, orderId)
         }
         
         logger.info('✅ [addItem] Позиция вставлена', { itemId })
