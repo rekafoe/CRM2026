@@ -103,4 +103,62 @@ describe('MaterialPrintResolver', () => {
       }),
     ).rejects.toThrow(/не разрешён/)
   })
+
+  it('infers outdoor usage when material type has no indoor technologies', async () => {
+    jest.spyOn(MaterialPrintTechnologyService, 'listForMaterialType').mockResolvedValue([
+      {
+        id: 1,
+        material_type_id: 7,
+        technology_code: 'inkjet_solvent',
+        technology_name: 'Сольвентная',
+        pricing_mode: 'per_meter',
+        supports_indoor: 0,
+        supports_outdoor: 1,
+        is_default: 1,
+        priority: 10,
+        is_active: 1,
+      },
+    ])
+
+    const outdoorRoll = {
+      id: 101,
+      name: 'Oracal outdoor',
+      material_type_id: 7,
+      material_kind: 'roll',
+      sheet_width: 630,
+      sheet_height: null,
+      printable_width: 620,
+      quantity: 100,
+      reserved_quantity: 0,
+    }
+
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM materials m') && query.includes('WHERE m.id = ?')) {
+          return outdoorRoll
+        }
+        if (query.includes('FROM print_prices')) {
+          return { counter_unit: 'meters', m2_pricing_kind: null }
+        }
+        return null
+      }),
+      all: jest.fn(async (query: string) => {
+        if (query.includes("m.material_kind = 'roll'")) return [outdoorRoll]
+        return []
+      }),
+      run: jest.fn(),
+    } as any)
+
+    const result = await MaterialPrintResolver.resolve({
+      requestedMaterialId: 101,
+      allowedMaterialIds: [101],
+      // usageContext intentionally omitted — Mini App / website often skip it
+      trimMm: { width: 100, height: 100 },
+      quantity: 1,
+      configuredTechnologyCodes: ['inkjet_solvent'],
+    })
+
+    expect(result.usageContext).toBe('outdoor')
+    expect(result.technologyCode).toBe('inkjet_solvent')
+  })
 })

@@ -856,7 +856,17 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
     res.status(400).json({ message: 'userId must be a number' });
     return;
   }
-  const result = await OrderService.reassignOrderByNumber(param, targetUserId, authUser?.id);
+  let result: { id: number; userId: number }
+  try {
+    result = await OrderService.reassignOrderByNumber(param, targetUserId, authUser?.id);
+  } catch (error: any) {
+    const message = String(error?.message || '')
+    if (message.includes('уже взят')) {
+      res.status(409).json({ message })
+      return
+    }
+    throw error
+  }
   if (/^tg-ord-/i.test(String(param).trim())) {
     res.json({ success: true, message: 'Order reassigned successfully' });
     return;

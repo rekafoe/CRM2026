@@ -146,8 +146,47 @@ export const MINIAPP_CLIENT_PART_CALC = `
   }
   function calcPrintOptions() {
     var sz = calcSelectedSize();
-    if (!sz || !Array.isArray(sz.print_prices)) return [];
-    return sz.print_prices;
+    if (!sz) return [];
+    if (Array.isArray(sz.print_prices) && sz.print_prices.length > 0) return sz.print_prices;
+    // material_driven_printing compact schema: print_prices stripped, print_options kept
+    var po = sz.print_options;
+    if (!po || typeof po !== 'object') return [];
+    var colors = Array.isArray(po.color_modes) && po.color_modes.length ? po.color_modes : ['color'];
+    var sides = Array.isArray(po.sides_modes) && po.sides_modes.length ? po.sides_modes : ['single'];
+    var rows = [];
+    for (var ci = 0; ci < colors.length; ci++) {
+      for (var si = 0; si < sides.length; si++) {
+        rows.push({
+          technology_code: '',
+          color_mode: colors[ci],
+          sides_mode: sides[si]
+        });
+      }
+    }
+    return rows;
+  }
+  function calcSelectedMaterial() {
+    var mats = calcMaterials();
+    for (var i = 0; i < mats.length; i++) {
+      if (String(mats[i].id) === String(out.calcForm.matId)) return mats[i];
+    }
+    return null;
+  }
+  function calcUsageContext() {
+    var mat = calcSelectedMaterial();
+    var usage = mat && Array.isArray(mat.usage) ? mat.usage : null;
+    if (out.calcForm.usageContext === 'outdoor' || out.calcForm.usageContext === 'indoor') {
+      if (!usage || usage.length === 0) return out.calcForm.usageContext;
+      for (var ui = 0; ui < usage.length; ui++) {
+        if (String(usage[ui]) === String(out.calcForm.usageContext)) return out.calcForm.usageContext;
+      }
+    }
+    if (!usage || usage.length === 0) return null;
+    if (usage.length === 1) return usage[0];
+    for (var uj = 0; uj < usage.length; uj++) {
+      if (String(usage[uj]) === 'indoor') return 'indoor';
+    }
+    return usage[0];
   }
   function priceTypeEntryDescription(x) {
     if (!x || typeof x !== 'object') return '';
@@ -355,7 +394,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.calcErr = null;
     out.calcResult = null;
     out.calcStagedLayout = out.checkoutFileByK && out.checkoutFileByK[c.k] ? out.checkoutFileByK[c.k] : null;
-    out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false };
+    out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false, usageContext: null };
     out.view = 'calculator';
     loadCalcSchema();
   }
@@ -537,6 +576,8 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (out.calcForm.typeId != null) pl.type_id = out.calcForm.typeId;
     if (out.calcForm.priceType) pl.priceType = out.calcForm.priceType;
     if (out.calcForm.cutting) pl.cutting = true;
+    var usageCtx = calcUsageContext();
+    if (usageCtx) pl.usage_context = usageCtx;
     var fin = typeof buildMiniappFinishingPayload === 'function'
       ? buildMiniappFinishingPayload()
       : buildFinishingFromTypeInitial();
@@ -641,6 +682,16 @@ export const MINIAPP_CLIENT_PART_CALC = `
       };
     }) : [];
     var specs = (r.specifications && typeof r.specifications === 'object') ? JSON.parse(JSON.stringify(r.specifications)) : {};
+    if (r.productionPlan && r.productionPlan.materialId != null) {
+      specs.material_id = Number(r.productionPlan.materialId);
+      if (r.productionPlan.technologyCode) {
+        specs.print_technology = String(r.productionPlan.technologyCode);
+        specs.printTechnology = String(r.productionPlan.technologyCode);
+      }
+      if (r.productionPlan.usageContext) specs.usage_context = r.productionPlan.usageContext;
+    } else if (out.calcForm.matId != null && specs.material_id == null) {
+      specs.material_id = out.calcForm.matId;
+    }
     var selectedOps = specs.selectedOperations;
     try { delete specs.selectedOperations; } catch (e) {}
     var itemsPerSheet = r.layout && Number(r.layout.itemsPerSheet) > 0 ? Number(r.layout.itemsPerSheet) : null;
@@ -669,6 +720,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
       parameterSummary: summary,
       description: description
     };
+    if (r.productionPlan) outParams.productionPlan = r.productionPlan;
     if (Array.isArray(selectedOps) && selectedOps.length > 0) outParams.selectedOperations = selectedOps;
     return outParams;
   }
@@ -1062,3 +1114,4 @@ export const MINIAPP_CLIENT_PART_CALC = `
     return box;
   }
 `;
+
