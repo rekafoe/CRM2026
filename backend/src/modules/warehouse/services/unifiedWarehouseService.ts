@@ -275,10 +275,22 @@ export class UnifiedWarehouseService {
     }
   }
 
+  /** Истёкший hold: expires_at в ISO сравниваем со строкой ISO now (не sqlite datetime). */
+  static isReservationExpired(
+    expiresAt: unknown,
+    nowIso: string = new Date().toISOString()
+  ): boolean {
+    if (expiresAt == null || expiresAt === '') return false
+    const raw = String(expiresAt).trim()
+    if (!raw) return false
+    return raw <= nowIso
+  }
+
   // Подтверждение резерва (списание материалов)
   static async confirmReservations(reservationIds: number[]): Promise<void> {
     try {
       const db = await getDb();
+      const nowIso = new Date().toISOString();
       
       await db.run('BEGIN');
       
@@ -290,6 +302,12 @@ export class UnifiedWarehouseService {
         
         if (!reservation) {
           throw new Error(`Резерв с ID ${reservationId} не найден или уже обработан`);
+        }
+
+        if (this.isReservationExpired(reservation.expires_at, nowIso)) {
+          throw new Error(
+            `Резерв с ID ${reservationId} истёк и не может быть подтверждён. Создайте новый резерв.`
+          );
         }
         
         // Списываем материалы через единый сервис
