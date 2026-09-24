@@ -1,4 +1,4 @@
-import { smoothedSheetPrintTotal } from '../modules/pricing/utils/smoothedSheetPrintTotal'
+import { smoothedSheetPrintTotal, smoothedSheetPrintTotalForLine } from '../modules/pricing/utils/smoothedSheetPrintTotal'
 
 describe('smoothedSheetPrintTotal', () => {
   const ips = 10
@@ -44,5 +44,38 @@ describe('smoothedSheetPrintTotal', () => {
       { min_qty: 500, unit_price: 91 },
     ]
     expect(smoothedSheetPrintTotal(30, mixed, ips)).toBeCloseTo(30 * 130 * ips, 6)
+  })
+})
+
+describe('smoothedSheetPrintTotalForLine (group tierSheetsOverride)', () => {
+  const ips = 10
+  const tiers = [
+    { min_qty: 100, unit_price: 1.0 },
+    { min_qty: 500, unit_price: 0.4 },
+  ]
+
+  it('без override совпадает с локальным сглаживанием', () => {
+    expect(smoothedSheetPrintTotalForLine(20, tiers, ips, null)).toBeCloseTo(
+      smoothedSheetPrintTotal(20, tiers, ips)!,
+      6,
+    )
+  })
+
+  it('с групповым объёмом 500 шт. применяет дешёвый тариф к локальным листам', () => {
+    // 200 шт. = 20 листов; группа 500 шт. = 50 листов → тариф 0.4
+    const line = smoothedSheetPrintTotalForLine(20, tiers, ips, 500)
+    expect(line).toBeCloseTo(20 * 0.4 * ips, 6)
+    expect(line).toBeLessThan(smoothedSheetPrintTotal(20, tiers, ips)!)
+  })
+
+  it('две позиции группы в сумме дают сглаженный итог по Σ листам', () => {
+    const a = smoothedSheetPrintTotalForLine(20, tiers, ips, 500)!
+    const b = smoothedSheetPrintTotalForLine(30, tiers, ips, 500)!
+    const group = smoothedSheetPrintTotal(50, tiers, ips)!
+    expect(a + b).toBeCloseTo(group, 6)
+    // без override сумма была бы дороже группового порога
+    const alone =
+      smoothedSheetPrintTotal(20, tiers, ips)! + smoothedSheetPrintTotal(30, tiers, ips)!
+    expect(a + b).toBeLessThan(alone)
   })
 })

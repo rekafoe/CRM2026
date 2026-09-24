@@ -72,7 +72,7 @@ import {
   isPlotterCuttingSyntheticServiceId,
 } from '../constants/plotterCuttingFinishingIds';
 import { sheetLayoutPrintTierQuantity } from '../utils/sheetLayoutPrintTierQuantity';
-import { smoothedSheetPrintTotal } from '../utils/smoothedSheetPrintTotal';
+import { smoothedSheetPrintTotal, smoothedSheetPrintTotalForLine } from '../utils/smoothedSheetPrintTotal';
 import {
   MaterialPrintResolver,
   type MaterialPrintResolution,
@@ -1165,7 +1165,12 @@ export class SimplifiedPricingService {
           const discreteSheetTotal = sheetsNeeded * pricePerSheet;
           const smoothedTotal =
             !usePagesMultiplier && !isRollPrint && !isMaterialMeterBased
-              ? smoothedSheetPrintTotal(sheetsNeeded, printPriceConfig.tiers, itemsPerSheet)
+              ? smoothedSheetPrintTotalForLine(
+                  sheetsNeeded,
+                  printPriceConfig.tiers,
+                  itemsPerSheet,
+                  tierSheetsOverride,
+                )
               : null;
           const basePrintPrice = usePagesMultiplier
             ? priceForTier * multipagePrintUnits

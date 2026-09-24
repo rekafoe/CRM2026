@@ -93,3 +93,47 @@ export function smoothedSheetPrintTotal(
 
   return last.pricePerSheet * sheets
 }
+
+/**
+ * Объём группы (tierSheetsOverride) задан в штуках, кратных раскладке.
+ * Для сглаживания переводим в листы так же, как sheetLayoutPrintTierQuantity.
+ */
+export function sheetsFromTierVolumePieces(
+  tierVolumePieces: number,
+  itemsPerSheet: number,
+): number {
+  const ips = Math.max(1, Math.floor(Number(itemsPerSheet) || 1))
+  const vol = Math.max(0, Number(tierVolumePieces) || 0)
+  if (vol <= 0) return 1
+  return Math.max(1, Math.ceil(vol / ips))
+}
+
+/**
+ * Итог печати по позиции: при групповом тираже сглаживаем по Σ штук группы
+ * и распределяем пропорционально физическим листам позиции.
+ * Иначе tierSheetsOverride из quote-cart / пересчёта заказа игнорировался бы
+ * (сглаживание всегда брало только локальный sheetsNeeded).
+ */
+export function smoothedSheetPrintTotalForLine(
+  sheetsNeeded: number,
+  tiers: SheetPrintQtyTier[] | null | undefined,
+  itemsPerSheet: number,
+  tierVolumeOverridePieces?: number | null,
+): number | null {
+  const localSheets = Math.max(1, Math.ceil(Number(sheetsNeeded) || 0))
+  const override =
+    tierVolumeOverridePieces != null &&
+    Number.isFinite(Number(tierVolumeOverridePieces)) &&
+    Number(tierVolumeOverridePieces) > 0
+      ? Number(tierVolumeOverridePieces)
+      : null
+
+  if (override == null) {
+    return smoothedSheetPrintTotal(localSheets, tiers, itemsPerSheet)
+  }
+
+  const groupSheets = sheetsFromTierVolumePieces(override, itemsPerSheet)
+  const groupTotal = smoothedSheetPrintTotal(groupSheets, tiers, itemsPerSheet)
+  if (groupTotal == null) return null
+  return groupTotal * (localSheets / groupSheets)
+}

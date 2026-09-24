@@ -225,5 +225,46 @@ describe('SimplifiedPricingService: плавный переход тиражно
     expect(p300.finalPrice).toBeCloseTo(p500.finalPrice, 2);
     expect(p400.finalPrice).toBeCloseTo(p500.finalPrice, 2);
   });
+
+  it('tierSheetsOverride (группа корзины) снижает цену позиции относительно локального тиража', async () => {
+    const tiers = [
+      { min_qty: 100, unit_price: 1.0 },
+      { min_qty: 500, unit_price: 0.4 },
+    ];
+    const alone = await calcWithTiers(tiers, 200);
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return {
+            id: 1,
+            name: 'Открытки',
+            calculator_type: 'simplified',
+            product_type: 'postcards',
+          };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return makeConfig(tiers);
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    const grouped = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'postcard',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        orderPricingContext: { tierSheetsOverride: 500 },
+      } as any,
+      200,
+    );
+    // 20 листов × 0.4 × 10 (групповой порог 50 листов)
+    expect(grouped.finalPrice).toBeCloseTo(80, 2);
+    expect(grouped.finalPrice).toBeLessThan(alone.finalPrice);
+  });
 });
 

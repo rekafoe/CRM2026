@@ -71,6 +71,8 @@ describe('computeCashForReportDate', () => {
   it('excludes pool waiting status 0, not status 1 (оформлен)', () => {
     expect(isOrderExcludedFromCashRegister(0)).toBe(true)
     expect(isOrderExcludedFromCashRegister(1)).toBe(false)
+    expect(isOrderExcludedFromCashRegister(7, 1)).toBe(true)
+    expect(isOrderExcludedFromCashRegister(7, 0)).toBe(false)
   })
 
   it('counts issue remainder even when prepayment was pending (before issue)', () => {

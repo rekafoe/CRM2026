@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { logger } from '../utils/logger'
+import { resolveBePaidPaidAmount } from '../utils/bepaidPaidAmount'
 
 const router = Router()
 
@@ -21,6 +22,13 @@ type BePaidWebhookBody = {
     order?: { tracking_id?: string | null; amount?: number }
     gateway_response?: { payment?: { uid?: string; status?: string; amount?: number } }
   }
+}
+
+type OrderPaymentRow = {
+  id: number
+  prepaymentAmount?: number | string | null
+  prepaymentStatus?: string | null
+  paymentId?: string | null
 }
 
 function mapBePaidStatus(raw: string): 'paid' | 'failed' | 'pending' | null {
@@ -62,19 +70,19 @@ router.post(
 
     const db = await getDb()
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
+      ? await db.get<OrderPaymentRow>(
+          'SELECT id, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE paymentId = ?',
           paymentId,
         )
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
+      order = await db.get<OrderPaymentRow>(
+        'SELECT id, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE number = ?',
         trackingId,
       )
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
+        order = await db.get<OrderPaymentRow>(
+          'SELECT id, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE id = ?',
           Number(trackingId),
         )
       }
@@ -84,6 +92,9 @@ router.post(
       res.status(204).end()
       return
     }
+
+    const existingStatus = String(order.prepaymentStatus || '').toLowerCase()
+    const alreadyPaid = existingStatus === 'paid' || existingStatus === 'successful'
 
     let hasPrepaymentUpdatedAt = false
     try {
@@ -95,11 +106,13 @@ router.post(
     const existingPrepay = Number(order.prepaymentAmount ?? 0)
     const amount =
       prepaymentStatus === 'paid'
-        ? amountByn > 0
-          ? amountByn
-          : existingPrepay > 0
-            ? existingPrepay
-            : 0
+        ? resolveBePaidPaidAmount({
+            existingPrepay,
+            amountByn,
+            alreadyPaid,
+            existingPaymentId: order.paymentId,
+            incomingPaymentId: paymentId,
+          })
         : prepaymentStatus === 'failed'
           ? 0
           : existingPrepay
@@ -111,6 +124,21 @@ router.post(
     }
 
     if (prepaymentStatus === 'paid') {
+      // Idempotent replay of the same uid: refresh timestamps only when amount unchanged and id matches.
+      const samePaymentReplay =
+        alreadyPaid &&
+        paymentId &&
+        String(order.paymentId || '').trim() === paymentId &&
+        Math.abs(amount - existingPrepay) < 0.009
+      if (samePaymentReplay) {
+        logger.info('BePaid webhook: idempotent paid replay', {
+          orderId: order.id,
+          paymentId,
+          amount,
+        })
+        res.status(204).end()
+        return
+      }
       const sql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
            paymentUrl = NULL, paymentId = COALESCE(?, paymentId), prepaymentUpdatedAt = datetime('now','localtime'),
@@ -135,6 +163,7 @@ router.post(
       orderId: order.id,
       prepaymentStatus,
       paymentId: paymentId || undefined,
+      amount: prepaymentStatus === 'paid' ? amount : undefined,
     })
     res.status(204).end()
   }),

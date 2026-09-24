@@ -4,6 +4,7 @@ import { sqlOrderTotalAfterDiscount } from '../utils/orderAmountsSql'
 import {
   isOrderExcludedFromCashRegister,
   shouldIncludeOrderInCashRegister,
+  sqlExcludeCancelledOrders,
 } from '../utils/reportOrderCash'
 import {
   loadDailyOrdersForCashReport,
@@ -59,7 +60,7 @@ function aggregateCashFromOrders(
     const cashIncrement = Number(order.cash_for_report_date ?? 0)
     if (!shouldIncludeOrderInCashRegister(order, reportDate, cashIncrement)) {
       if (
-        !isOrderExcludedFromCashRegister(order.status) &&
+        !isOrderExcludedFromCashRegister(order.status, order.is_cancelled) &&
         (Number(order.prepaymentAmount ?? 0) > 0 || order.cash_from_issue_today != null)
       ) {
         ordersZeroCash.push({
@@ -79,7 +80,7 @@ function aggregateCashFromOrders(
 
     if (cashIncrement <= 0) {
       if (
-        !isOrderExcludedFromCashRegister(order.status) &&
+        !isOrderExcludedFromCashRegister(order.status, order.is_cancelled) &&
         (Number(order.prepaymentAmount ?? 0) > 0 || Number(order.cash_from_issue_today ?? 0) > 0)
       ) {
         ordersZeroCash.push({
@@ -133,12 +134,20 @@ async function loadOrderVolumeWorkDay(reportDate: string, departmentId?: number)
   const db = await getDb()
   const columnExists = await hasFulfillmentDepartmentColumn()
   const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })
+  let hasIsCancelled = false
+  try {
+    hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+  } catch {
+    hasIsCancelled = false
+  }
+  const excludeCancelled = sqlExcludeCancelledOrders('o', hasIsCancelled)
   const totalExpr = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)')
   const row = await db.get<{ s: number }>(
     `SELECT COALESCE(SUM(${totalExpr}), 0) as s
        FROM orders o
       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
         AND o.status != 0
+        ${excludeCancelled}
         ${fulfillmentScope.clause}`,
     d,
     ...fulfillmentScope.params,
@@ -221,6 +230,14 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
         AND COALESCE(o.prepaymentStatus, '') NOT IN ('pending')
         AND LOWER(COALESCE(o.paymentMethod, '')) NOT IN ('online', 'telegram')`
 
+  let hasIsCancelled = false
+  try {
+    hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+  } catch {
+    hasIsCancelled = false
+  }
+  const excludeCancelled = sqlExcludeCancelledOrders('o', hasIsCancelled)
+
   const candidates = (await db.all(
     `SELECT o.id,
             COALESCE(o.created_at, o.createdAt) as created_at,
@@ -229,7 +246,8 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
             o.paymentMethod
        FROM orders o
       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-        AND ${paidFilter}`,
+        AND ${paidFilter}
+        ${excludeCancelled}`,
     d,
   )) as BackfillRow[]
 
@@ -262,7 +280,8 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
          FROM orders o
         WHERE substr(${updatedAtExpr}, 1, 10) = ?
           AND substr(COALESCE(o.created_at, o.createdAt), 1, 10) != ?
-          AND ${paidFilter}`,
+          AND ${paidFilter}
+          ${excludeCancelled}`,
       d,
       d,
     )) as BackfillRow[]
