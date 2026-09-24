@@ -1,7 +1,14 @@
-const BLOCKED_TAGS = /<\s*(script|foreignObject|iframe|object|embed|link|meta)(\s[^>]*)?>[\s\S]*?<\s*\/\s*\1\s*>/gi
-const BLOCKED_EMPTY_TAGS = /<\s*(script|foreignObject|iframe|object|embed|link|meta)[^>]*\/?\s*>/gi
+const BLOCKED_TAGS =
+  /<\s*(script|foreignObject|iframe|object|embed|link|meta|style|handler|set|animate|animateTransform|animateMotion)(\s[^>]*)?>[\s\S]*?<\s*\/\s*\1\s*>/gi
+const BLOCKED_EMPTY_TAGS =
+  /<\s*(script|foreignObject|iframe|object|embed|link|meta|style|handler|set|animate|animateTransform|animateMotion)[^>]*\/?\s*>/gi
 const EVENT_ATTRS = /\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi
-const JS_URL_ATTRS = /\s(href|xlink:href|src)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi
+/** javascript: in href/src — including HTML entity encodings like &#106;avascript: */
+const JS_URL_ATTRS =
+  /\s(href|xlink:href|src)\s*=\s*(['"])\s*(?:javascript:|&\s*#\s*0*106\s*;\s*avascript:|\\\s*6a\s*avascript:)(?:(?!\2).)*\2/gi
+/** Nested SVG/HTML via data: on use/image — classic sanitizer bypass (value may contain quotes) */
+const DATA_URL_ATTRS =
+  /\s(href|xlink:href|src)\s*=\s*(['"])\s*data:(?:image\/svg\+xml|text\/html)(?:(?!\2).)*\2/gi
 
 export function sanitizeSvg(svg: string): string {
   if (!svg || !/<svg[\s>]/i.test(svg)) {
@@ -12,6 +19,7 @@ export function sanitizeSvg(svg: string): string {
     .replace(BLOCKED_EMPTY_TAGS, '')
     .replace(EVENT_ATTRS, '')
     .replace(JS_URL_ATTRS, '')
+    .replace(DATA_URL_ATTRS, '')
 }
 
 export function parseSvgSize(svg: string): { width: number | null; height: number | null } {

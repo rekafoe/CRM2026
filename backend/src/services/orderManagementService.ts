@@ -454,6 +454,11 @@ export class OrderManagementService {
   static async issueOrder(orderId: number, orderType: string, issuerId?: number | null, issuedOn?: string | null): Promise<UnifiedOrder | null> {
     try {
       const db = await getDb();
+      // Confirm holds outside issue BEGIN: confirmReservations opens its own transaction.
+      // Without this, «выдать» из раннего статуса минует updateOrderStatus → склад не списывается.
+      if (orderType !== 'telegram') {
+        await OrderService.confirmActiveReservationsForOrder(orderId);
+      }
       await db.run('BEGIN');
       try {
         if (orderType === 'telegram') {

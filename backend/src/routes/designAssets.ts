@@ -66,9 +66,14 @@ function sendAssetFile(
     : asset.format
   res.setHeader('Content-Type', contentTypeForAssetFormat(format))
   res.setHeader('Cache-Control', cache)
+  res.setHeader('X-Content-Type-Options', 'nosniff')
   if (format === 'svg' || asset.format === 'svg') {
-    res.setHeader('Content-Disposition', 'inline')
-    res.setHeader('X-Content-Type-Options', 'nosniff')
+    // SVG served as a document can execute scripts; block active content even if sanitizer misses a vector.
+    res.setHeader('Content-Disposition', 'attachment')
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; script-src 'none'; sandbox; style-src 'none'",
+    )
   }
   res.sendFile(filePath)
 }
