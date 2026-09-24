@@ -39,24 +39,16 @@ describe('ensureWebsiteLegalCustomer', () => {
     jest.clearAllMocks()
   })
 
-  it('updates a legal customer found by exact trimmed tax_id', async () => {
+  it('links an existing legal customer by tax_id without overwriting bank details', async () => {
     const get = jest.fn().mockResolvedValue({ id: 42 })
     mockedGetDb.mockResolvedValue({ get } as any)
-    mockedUpdate.mockResolvedValue({ id: 42 } as any)
 
     await expect(ensureWebsiteLegalCustomer(input)).resolves.toEqual({ id: 42 })
     expect(get).toHaveBeenCalledWith(
       expect.stringContaining("WHERE type = 'legal' AND TRIM(tax_id) = ?"),
       ['190000001'],
     )
-    expect(mockedUpdate).toHaveBeenCalledWith(
-      42,
-      expect.objectContaining({
-        type: 'legal',
-        tax_id: '190000001',
-        email: 'office@example.by',
-      }),
-    )
+    expect(mockedUpdate).not.toHaveBeenCalled()
     expect(mockedCreate).not.toHaveBeenCalled()
   })
 
@@ -72,6 +64,7 @@ describe('ensureWebsiteLegalCustomer', () => {
         type: 'legal',
         source: 'website',
         tax_id: '190000001',
+        email: 'office@example.by',
       }),
     )
     expect(mockedUpdate).not.toHaveBeenCalled()
