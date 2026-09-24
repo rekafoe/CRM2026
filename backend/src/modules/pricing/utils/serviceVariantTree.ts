@@ -36,11 +36,12 @@ function hasLevelParameters(row: ServiceVariantTreeRow): boolean {
 
 /**
  * Повторяет модель CRM-редактора:
- * - level 0 — один корень группы variant_name;
- * - level 1 — остальные варианты группы без parent_variant_id;
+ * - level 0 — явный корень группы variant_name (без type/density и без parent);
+ * - level 1 — варианты группы с type/density без parent_variant_id;
  * - level 2 — варианты с parent_variant_id.
  *
  * Цену может иметь только лист: узел без более глубокого варианта.
+ * Плоские peers с type/density без явного корня — все листья (не синтетический non-leaf).
  */
 export function collectNonLeafVariantIds(rows: ServiceVariantTreeRow[]): Set<number> {
   const nonLeaf = new Set<number>();
@@ -63,9 +64,13 @@ export function collectNonLeafVariantIds(rows: ServiceVariantTreeRow[]): Set<num
     if (group.length <= 1) continue;
     const roots = group.filter((row) => resolveServiceVariantParentId(row) == null);
     if (roots.length === 0) continue;
+    // Только явный заголовок группы (без type/density) — non-leaf.
+    // Плоские peers с type/density без заголовка — все листья с ценой.
+    // Иначе миграция/clearNonLeafVariantPrices стирают тарифы у реального
+    // продаваемого варианта, а калькулятор падает на base rate услуги.
     const explicitRoots = roots.filter((row) => !hasLevelParameters(row));
-    const candidates = explicitRoots.length > 0 ? explicitRoots : roots;
-    const root = [...candidates].sort((left, right) => Number(left.id) - Number(right.id))[0];
+    if (explicitRoots.length === 0) continue;
+    const root = [...explicitRoots].sort((left, right) => Number(left.id) - Number(right.id))[0];
     if (root) nonLeaf.add(Number(root.id));
   }
 
