@@ -14,6 +14,7 @@ import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { planPrepaymentAfterAddItem } from '../../../utils/planPrepaymentAfterAddItem'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
+import { adjustFulfilledReservationsForQuantityChange } from '../services/orderItemFulfilledQtyAdjust'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -726,42 +727,53 @@ export class OrderItemController {
           const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
 
           if (components.length > 0) {
-            if (deltaQty > 0) {
-              // Дозарезервировать недостающий объём
-              const componentMaterialIds = components
-                .map((c) => Number(c.materialId))
-                .filter((id) => Number.isFinite(id) && id > 0);
-              let componentUnitsMap = new Map<number, string | null>();
-              if (componentMaterialIds.length > 0) {
-                const unitRows = await db.all<Array<{ id: number; unit?: string | null }>>(
-                  `SELECT id, unit FROM materials WHERE id IN (${componentMaterialIds.map(() => '?').join(',')})`,
-                  componentMaterialIds
-                );
-                unitRows.forEach((row) => componentUnitsMap.set(Number(row.id), row.unit ?? null));
-              }
-              const reservationsPayload = components.map(c => ({
-                material_id: Number(c.materialId),
-                quantity: computeRequiredQuantityForReservation(
-                  Math.max(0, Number(c.qtyPerItem) || 0),
-                  deltaQty,
-                  componentUnitsMap.get(Number(c.materialId))
-                ),
-                order_id: orderId,
-                reason: 'order update qty +'
-              })).filter(r => r.quantity > 0)
-              if (reservationsPayload.length > 0) {
-                const newReservations = await UnifiedWarehouseService.reserveMaterials(reservationsPayload)
-                // дописывать reservationId не требуется для существующей позиции; подтверждение произойдёт по id из components + новые вернутся отдельно при дальнейшем апдейте
-                // опционально можно хранить массив reservationIds на уровне позиции в будущем
-              }
-            } else {
-              // Снизили количество — отменяем часть резервов пропорционально
-              const toCancel: number[] = []
-              for (const c of components) {
-                if (c.reservationId) toCancel.push(c.reservationId)
-              }
-              if (toCancel.length > 0) {
-                await UnifiedWarehouseService.cancelReservations(toCancel)
+            // После «Принят в работу» (fulfilled) материалы уже списаны — правим склад по дельте.
+            // Активные холды по-прежнему: ± резерв (см. открытый PR #15 для полного re-reserve).
+            const fulfilledAdjusted = await adjustFulfilledReservationsForQuantityChange(db, {
+              orderId,
+              components,
+              oldQuantity: existing.quantity ?? 1,
+              newQuantity,
+              userId: (req as AuthenticatedRequest).user?.id,
+            })
+            if (!fulfilledAdjusted) {
+              if (deltaQty > 0) {
+                // Дозарезервировать недостающий объём
+                const componentMaterialIds = components
+                  .map((c) => Number(c.materialId))
+                  .filter((id) => Number.isFinite(id) && id > 0);
+                let componentUnitsMap = new Map<number, string | null>();
+                if (componentMaterialIds.length > 0) {
+                  const unitRows = await db.all<Array<{ id: number; unit?: string | null }>>(
+                    `SELECT id, unit FROM materials WHERE id IN (${componentMaterialIds.map(() => '?').join(',')})`,
+                    componentMaterialIds
+                  );
+                  unitRows.forEach((row) => componentUnitsMap.set(Number(row.id), row.unit ?? null));
+                }
+                const reservationsPayload = components.map(c => ({
+                  material_id: Number(c.materialId),
+                  quantity: computeRequiredQuantityForReservation(
+                    Math.max(0, Number(c.qtyPerItem) || 0),
+                    deltaQty,
+                    componentUnitsMap.get(Number(c.materialId))
+                  ),
+                  order_id: orderId,
+                  reason: 'order update qty +'
+                })).filter(r => r.quantity > 0)
+                if (reservationsPayload.length > 0) {
+                  const newReservations = await UnifiedWarehouseService.reserveMaterials(reservationsPayload)
+                  // дописывать reservationId не требуется для существующей позиции; подтверждение произойдёт по id из components + новые вернутся отдельно при дальнейшем апдейте
+                  // опционально можно хранить массив reservationIds на уровне позиции в будущем
+                }
+              } else {
+                // Снизили количество — отменяем часть резервов пропорционально
+                const toCancel: number[] = []
+                for (const c of components) {
+                  if (c.reservationId) toCancel.push(c.reservationId)
+                }
+                if (toCancel.length > 0) {
+                  await UnifiedWarehouseService.cancelReservations(toCancel)
+                }
               }
             }
           } else if (
