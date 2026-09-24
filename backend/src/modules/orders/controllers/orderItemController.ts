@@ -12,6 +12,11 @@ import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
+import {
+  planAddItemPrepaymentUpdate,
+  planDeleteItemPrepaymentUpdate,
+  planUpdateItemPrepaymentUpdate,
+} from '../../../utils/itemMutationPrepayment'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 
 function isMeterUnit(unitRaw: unknown): boolean {
@@ -346,31 +351,24 @@ export class OrderItemController {
         const oldTotal = Math.round(oldSubtotal * (1 - pct) * 100) / 100
         const newTotal = newAmounts.totalAmount
         const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
-        const prepaymentStatus = paymentRow?.prepaymentStatus
         const paymentMethod = paymentRow?.paymentMethod
-        const allowAutoPay = paymentMethod !== null && paymentMethod !== undefined
-        const hasPrepayment = prepaymentAmount > 0 || (prepaymentStatus && prepaymentStatus.length > 0)
-        const eps = 0.005
-        const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
-        const shouldSetPrepayment =
-          allowAutoPay &&
-          newTotal > 0 &&
-          (!hasPrepayment || (paymentMethod === 'offline' && inSync))
-        if (shouldSetPrepayment) {
-          let hasPrepaymentUpdatedAt = false
-          try {
-            hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-          } catch {
-            hasPrepaymentUpdatedAt = false
-          }
-          const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders
-               SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
-               WHERE id = ?`
-            : `UPDATE orders
-               SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL, updated_at = datetime('now','localtime')
-               WHERE id = ?`
-          await db.run(updateSql, newTotal, orderId)
+        // Only resize an already fully-prepaid offline amount. Never invent paid/offline
+        // from unpaid CRM orders (SQLite DEFAULT paymentMethod='online' made !hasPrepayment
+        // auto-pay and forced offline — phantom cash). Never rewrite prepaymentUpdatedAt.
+        const prepayPlan = planAddItemPrepaymentUpdate({
+          paymentMethod,
+          prepaymentAmount,
+          oldTotal,
+          newTotal,
+        })
+        if (prepayPlan.action === 'resize_offline_amount') {
+          await db.run(
+            `UPDATE orders
+             SET prepaymentAmount = ?, updated_at = datetime('now','localtime')
+             WHERE id = ?`,
+            prepayPlan.nextAmount,
+            orderId,
+          )
         }
         
         logger.info('✅ [addItem] Позиция вставлена', { itemId })
@@ -590,21 +588,21 @@ export class OrderItemController {
         const newTotal = newAmounts.totalAmount
         const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
         const paymentMethod = paymentRow?.paymentMethod
-        if (paymentMethod === 'offline' && currentPrepayment > newTotal) {
-          let hasPrepaymentUpdatedAt = false
-          try {
-            hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-          } catch {
-            hasPrepaymentUpdatedAt = false
-          }
-          const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
-            : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-          await db.run(updateSql, newTotal, orderId)
+        const deletePrepayPlan = planDeleteItemPrepaymentUpdate({
+          paymentMethod,
+          prepaymentAmount: currentPrepayment,
+          newTotal,
+        })
+        if (deletePrepayPlan.action === 'resize_offline_amount') {
+          await db.run(
+            `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
+            deletePrepayPlan.nextAmount,
+            orderId,
+          )
           logger.info('💰 [deleteItem] Предоплата пересчитана', {
             orderId,
             oldPrepayment: currentPrepayment,
-            newPrepayment: newTotal
+            newPrepayment: deletePrepayPlan.nextAmount,
           })
         }
         
@@ -907,27 +905,27 @@ export class OrderItemController {
         }
         await db.run(updateSql, ...bindings)
 
-        if (priceOrQtyChanged && paymentRow && paymentRow.paymentMethod === 'offline') {
+        if (priceOrQtyChanged && paymentRow) {
           const pct = Number(paymentRow?.discount_percent || 0) / 100
           const oldTotal = Math.round(oldSubtotal * (1 - pct) * 100) / 100
           const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
-          const eps = 0.005
-          if (Math.abs(prepaymentAmount - oldTotal) < eps) {
-            const itemsAfter = await OrderRepository.getItemsByOrderId(orderId)
-            const newTotal = computeOrderAmounts({
-              items: itemsAfter,
-              discount_percent: paymentRow?.discount_percent ?? 0,
-            }).totalAmount
-            let hasPrepaymentUpdatedAt = false
-            try {
-              hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-            } catch {
-              hasPrepaymentUpdatedAt = false
-            }
-            const updateSql = hasPrepaymentUpdatedAt
-              ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
-              : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-            await db.run(updateSql, newTotal, orderId)
+          const itemsAfter = await OrderRepository.getItemsByOrderId(orderId)
+          const newTotal = computeOrderAmounts({
+            items: itemsAfter,
+            discount_percent: paymentRow?.discount_percent ?? 0,
+          }).totalAmount
+          const updatePrepayPlan = planUpdateItemPrepaymentUpdate({
+            paymentMethod: paymentRow.paymentMethod,
+            prepaymentAmount,
+            oldTotal,
+            newTotal,
+          })
+          if (updatePrepayPlan.action === 'resize_offline_amount') {
+            await db.run(
+              `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
+              updatePrepayPlan.nextAmount,
+              orderId,
+            )
           }
         }
 
