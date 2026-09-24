@@ -206,6 +206,15 @@ export interface SimplifiedPricingResult {
   }>;
   /** Материалы по операциям отделки (ламинирование, крепление и т.д.) — для списания со склада */
   operationMaterials?: Array<{ material_id: number; material_name: string; quantity: number }>;
+  /**
+   * Отдельная обложка multi_page: листы к списанию.
+   * Если material_id совпадает с блоком — в UnifiedPricingService количество мёржится в основную строку.
+   */
+  coverMaterialDetails?: {
+    material_id: number;
+    material_name: string;
+    sheets: number;
+  };
 
   calculatedAt: string;
   calculationMethod: 'simplified';
@@ -2374,8 +2383,9 @@ export class SimplifiedPricingService {
     }
     
     let coverPrice = 0;
+    let coverMaterialDetails: SimplifiedPricingResult['coverMaterialDetails'];
     if (usePagesMultiplier && pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
-      coverPrice = await this.calculateMultiPageCoverCost({
+      const coverQuote = await this.calculateMultiPageCoverCost({
         db,
         quantity,
         selectedSize,
@@ -2388,6 +2398,14 @@ export class SimplifiedPricingService {
         sidesMode: normalizedConfig.print_sides_mode || 'single',
         tierPrintUnits: tierSheetsOverride ?? multipageTierPrintUnits,
       });
+      coverPrice = coverQuote.price;
+      if (coverQuote.coverMaterialId > 0 && coverQuote.coverSheetsTotal > 0) {
+        coverMaterialDetails = {
+          material_id: coverQuote.coverMaterialId,
+          material_name: coverQuote.coverMaterialName || `Material #${coverQuote.coverMaterialId}`,
+          sheets: coverQuote.coverSheetsTotal,
+        };
+      }
     }
 
     let configuredBindingQuote: BindingQuoteResult | null = null;
@@ -2586,19 +2604,21 @@ export class SimplifiedPricingService {
             itemsPerSheet,
             sidesMode: tierCoverSides,
           });
-          tierCoverPrice = await this.calculateMultiPageCoverCost({
-            db,
-            quantity: qtyForTier,
-            selectedSize,
-            includeMaterialCost,
-            configuration: normalizedConfig as any,
-            multiPageStructure,
-            selectedTypeConfig: typeConfig ?? undefined,
-            coverPages: pageSplit.coverPages,
-            itemsPerSheet,
-            sidesMode: normalizedConfig.print_sides_mode || 'single',
-            tierPrintUnits: tierBlockUnits + tierCoverUnitsOnly,
-          });
+          tierCoverPrice = (
+            await this.calculateMultiPageCoverCost({
+              db,
+              quantity: qtyForTier,
+              selectedSize,
+              includeMaterialCost,
+              configuration: normalizedConfig as any,
+              multiPageStructure,
+              selectedTypeConfig: typeConfig ?? undefined,
+              coverPages: pageSplit.coverPages,
+              itemsPerSheet,
+              sidesMode: normalizedConfig.print_sides_mode || 'single',
+              tierPrintUnits: tierBlockUnits + tierCoverUnitsOnly,
+            })
+          ).price;
         }
 
         let tierBindingPrice = 0;
@@ -2820,6 +2840,7 @@ export class SimplifiedPricingService {
           }
         : {}),
       ...(operationMaterials.length > 0 ? { operationMaterials } : {}),
+      ...(coverMaterialDetails ? { coverMaterialDetails } : {}),
       tierVolumeForGrouping: usePagesMultiplier
         ? multipageTierPrintUnits
         : isRollMeterage
@@ -3161,9 +3182,15 @@ export class SimplifiedPricingService {
     sidesMode: string;
     /** Объём для tier (блок + обложка); биллинг — по coverPrintUnits. */
     tierPrintUnits?: number;
-  }): Promise<number> {
+  }): Promise<{
+    price: number;
+    coverMaterialId: number;
+    coverMaterialName: string;
+    coverSheetsTotal: number;
+  }> {
+    const empty = { price: 0, coverMaterialId: 0, coverMaterialName: '', coverSheetsTotal: 0 };
     const cover = ctx.multiPageStructure.cover;
-    if (!cover || cover.mode !== 'separate' || ctx.coverPages < 1) return 0;
+    if (!cover || cover.mode !== 'separate' || ctx.coverPages < 1) return empty;
 
     const sidesMode =
       ctx.configuration.cover_print_sides_mode ||
@@ -3209,7 +3236,9 @@ export class SimplifiedPricingService {
     }
 
     let materialPrice = 0;
-    if (ctx.includeMaterialCost && coverMaterialId > 0) {
+    let coverMaterialName = '';
+    let warehouseCoverMaterialId = 0;
+    if (coverMaterialId > 0) {
       const coverAllowed = getCoverAllowedMaterialIds(cover);
       const blockAllowed = ctx.selectedTypeConfig
         ? getEffectiveAllowedMaterialIds(ctx.selectedTypeConfig, ctx.selectedSize)
@@ -3219,15 +3248,26 @@ export class SimplifiedPricingService {
       const materialAllowed = allowed.length === 0 || allowed.includes(coverMaterialId);
       if (materialAllowed) {
         const material = await ctx.db.get(
-          `SELECT sheet_price_single FROM materials WHERE id = ? AND is_active = 1`,
+          `SELECT name, sheet_price_single FROM materials WHERE id = ? AND is_active = 1`,
           [coverMaterialId]
-        ) as { sheet_price_single?: number | null } | undefined;
-        const sheetPrice = Number(material?.sheet_price_single ?? 0);
-        materialPrice = sheetPrice * coverSheetsTotal;
+        ) as { name?: string; sheet_price_single?: number | null } | undefined;
+        if (material) {
+          warehouseCoverMaterialId = coverMaterialId;
+          coverMaterialName = String(material.name || '');
+          if (ctx.includeMaterialCost) {
+            const sheetPrice = Number(material.sheet_price_single ?? 0);
+            materialPrice = sheetPrice * coverSheetsTotal;
+          }
+        }
       }
     }
 
-    return Math.round((printPrice + materialPrice) * 100) / 100;
+    return {
+      price: Math.round((printPrice + materialPrice) * 100) / 100,
+      coverMaterialId: warehouseCoverMaterialId,
+      coverMaterialName,
+      coverSheetsTotal: warehouseCoverMaterialId > 0 ? coverSheetsTotal : 0,
+    };
   }
 
   /**

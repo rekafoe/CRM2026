@@ -307,6 +307,55 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.finalPrice).toBe(100);
   });
 
+  it('coverMaterialDetails: листы обложки для склада даже при include_material_cost=false', async () => {
+    templateConfigData.simplified.include_material_cost = false;
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      cover: {
+        mode: 'separate',
+        page_count: 4,
+        material_id: 99,
+        allowed_material_ids: [99],
+        print: { sides_mode: 'single' },
+      },
+    };
+
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM materials WHERE id = ?')) {
+          expect(params?.[0]).toBe(99);
+          return { name: 'Обложка 300г', sheet_price_single: 1.5 };
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 10 as any,
+        cover_material_id: 99,
+      } as any,
+      10,
+    );
+
+    expect(result.coverMaterialDetails).toEqual({
+      material_id: 99,
+      material_name: 'Обложка 300г',
+      sheets: 40,
+    });
+  });
+
   it('использует max страниц из typeConfigs при type_id', async () => {
     templateConfigData.simplified.pages = {
       options: [4, 8, 12, 16, 20, 24, 28],
