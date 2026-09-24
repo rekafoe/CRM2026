@@ -8,7 +8,9 @@ import { setLastWebsiteOrderAt } from '../../../utils/poolSync'
 import { normalizeWebsiteItems } from '../utils/websiteOrderNormalize'
 import {
   attachEditorDraftsToOrderItems,
+  claimEditorDraftsForCheckout,
   prepareWebsiteItemsWithEditorDrafts,
+  releaseEditorDraftCheckoutClaims,
 } from '../../../services/editorDraftWebsitePrepare'
 import { completeEditorOrderIntake } from '../../../services/editorOrderIntakeService'
 import {
@@ -253,19 +255,26 @@ export class OrderController {
             })
           }
         }
-        const result = await OrderService.createOrderWithAutoDeduction({
-          customerName: resolvedCustomerName || undefined,
-          customerPhone: resolvedCustomerPhone || undefined,
-          customerEmail: resolvedCustomerEmail || undefined,
-          prepaymentAmount: resolvedPrepaymentAmount,
-          userId: undefined,
-          customer_id: resolvedCustomerId ?? undefined,
-          source: 'website',
-          delivery,
-          paymentMethod: paymentMethodHint,
-          paymentChannel,
-          items: editorDraftPrepared.items
-        })
+        const claimedTokens = await claimEditorDraftsForCheckout(editorDraftPrepared.editorDraftItems)
+        let result: Awaited<ReturnType<typeof OrderService.createOrderWithAutoDeduction>>
+        try {
+          result = await OrderService.createOrderWithAutoDeduction({
+            customerName: resolvedCustomerName || undefined,
+            customerPhone: resolvedCustomerPhone || undefined,
+            customerEmail: resolvedCustomerEmail || undefined,
+            prepaymentAmount: resolvedPrepaymentAmount,
+            userId: undefined,
+            customer_id: resolvedCustomerId ?? undefined,
+            source: 'website',
+            delivery,
+            paymentMethod: paymentMethodHint,
+            paymentChannel,
+            items: editorDraftPrepared.items
+          })
+        } catch (err) {
+          await releaseEditorDraftCheckoutClaims(claimedTokens)
+          throw err
+        }
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
         await completeEditorOrderIntake({
           orderId: result.order.id,
@@ -536,17 +545,24 @@ export class OrderController {
       if (items != null && Array.isArray(items) && items.length > 0) {
         const normalizedItems = normalizeWebsiteItems(items)
         const editorDraftPrepared = await prepareWebsiteItemsWithEditorDrafts(normalizedItems)
-        const result = await OrderService.createOrderWithAutoDeduction({
-          customerName,
-          customerPhone,
-          customerEmail,
-          prepaymentAmount,
-          userId: undefined,
-          customer_id,
-          source: 'website',
-          delivery,
-          items: editorDraftPrepared.items
-        })
+        const claimedTokens = await claimEditorDraftsForCheckout(editorDraftPrepared.editorDraftItems)
+        let result: Awaited<ReturnType<typeof OrderService.createOrderWithAutoDeduction>>
+        try {
+          result = await OrderService.createOrderWithAutoDeduction({
+            customerName,
+            customerPhone,
+            customerEmail,
+            prepaymentAmount,
+            userId: undefined,
+            customer_id,
+            source: 'website',
+            delivery,
+            items: editorDraftPrepared.items
+          })
+        } catch (err) {
+          await releaseEditorDraftCheckoutClaims(claimedTokens)
+          throw err
+        }
         order = result.order as any
         deductionResult = result.deductionResult
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)

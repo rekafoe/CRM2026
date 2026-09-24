@@ -396,7 +396,7 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
     monthParams.push(month)
   }
   const orders = await db.all<any>(
-    `SELECT o.id, o.userId as user_id, o.prepaymentAmount, o.prepaymentStatus,
+    `SELECT o.id, o.userId as user_id, o.prepaymentAmount, o.prepaymentStatus, o.paymentMethod,
             COALESCE(o.created_at, o.createdAt) as created_at,
             ${prepayCol}
        FROM orders o
@@ -408,13 +408,34 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
     ...fulfillmentScope.params,
   )
   const issueByOrderDay = new Map<string, number>()
+  const lifetimeIssuedByOrder = new Map<number, number>()
   if (hasDebtClosedCash) {
     const debtRows = (await db.all(
       'SELECT order_id, closed_date, amount FROM debt_closed_events WHERE substr(closed_date, 1, 7) = ?',
       month,
     )) as unknown as Array<{ order_id: number; closed_date: string; amount: number }>
     for (const r of debtRows) {
-      issueByOrderDay.set(`${r.order_id}:${String(r.closed_date).slice(0, 10)}`, Number(r.amount))
+      const oid = Number(r.order_id)
+      const amt = Number(r.amount)
+      issueByOrderDay.set(`${oid}:${String(r.closed_date).slice(0, 10)}`, amt)
+    }
+    const orderIdsForLife = [
+      ...new Set(
+        (orders as Array<{ id: number }>).map((o) => Number(o.id)).filter((id) => Number.isFinite(id) && id > 0),
+      ),
+    ]
+    if (orderIdsForLife.length > 0) {
+      const placeholders = orderIdsForLife.map(() => '?').join(',')
+      const lifeRows = (await db.all(
+        `SELECT order_id, COALESCE(SUM(amount), 0) AS s
+           FROM debt_closed_events
+          WHERE order_id IN (${placeholders})
+          GROUP BY order_id`,
+        ...orderIdsForLife,
+      )) as Array<{ order_id: number; s: number }>
+      for (const r of lifeRows) {
+        lifetimeIssuedByOrder.set(Number(r.order_id), Number(r.s ?? 0))
+      }
     }
   }
   const byDate: Record<string, { total: number; contributions: Array<{ user_id: number; amount: number }> }> = {}
@@ -438,12 +459,14 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
         if (Number(oid) === Number(o.id)) days.add(day)
       }
     }
+    const lifetimeIssued = lifetimeIssuedByOrder.get(Number(o.id)) ?? 0
     for (const day of days) {
       const issueAmt = issueByOrderDay.get(`${o.id}:${day}`)
       const cash = computeCashForReportDate(
         {
           ...o,
           cash_from_issue_today: issueAmt !== undefined ? issueAmt : null,
+          cash_issued_lifetime: lifetimeIssued,
         },
         day,
       )

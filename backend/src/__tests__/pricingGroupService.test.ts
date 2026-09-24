@@ -182,6 +182,8 @@ describe('pricingGroupService', () => {
         materialName: 'Oracal матовая',
         materialKind: 'roll',
         materialWidthMm: 630,
+        colorMode: 'color' as const,
+        sidesMode: 'single' as const,
         stockSufficient: true,
         steps: [],
       };
@@ -210,8 +212,7 @@ describe('pricingGroupService', () => {
           configuration: {
             material_id: 41,
             usage_context: 'outdoor',
-            print_color_mode: 'color',
-            print_sides_mode: 'single',
+            // client omits print_technology / color / sides (material_driven / CRM)
           },
         },
       ]);
@@ -222,6 +223,8 @@ describe('pricingGroupService', () => {
         expect.objectContaining({
           material_id: 55,
           print_technology: 'inkjet_solvent',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
           usage_context: 'outdoor',
           orderPricingContext: { tierSheetsOverride: 100 },
         }),

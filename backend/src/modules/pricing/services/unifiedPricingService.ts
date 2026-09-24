@@ -61,6 +61,8 @@ export interface UnifiedPricingResult {
     materialName: string;
     materialKind: string;
     materialWidthMm?: number;
+    colorMode?: 'color' | 'bw';
+    sidesMode?: 'single' | 'duplex' | 'duplex_bw_back';
     stockSufficient: boolean;
     steps: Array<{
       type: 'print' | 'operation';
@@ -233,6 +235,12 @@ export class UnifiedPricingService {
           materialKind: result.resolvedMaterialPrint.materialKind,
           ...(result.resolvedMaterialPrint.selectedMaterialWidthMm != null
             ? { materialWidthMm: result.resolvedMaterialPrint.selectedMaterialWidthMm }
+            : {}),
+          ...(result.selectedPrint?.color_mode
+            ? { colorMode: result.selectedPrint.color_mode }
+            : {}),
+          ...(result.selectedPrint?.sides_mode
+            ? { sidesMode: result.selectedPrint.sides_mode }
             : {}),
           stockSufficient: result.resolvedMaterialPrint.stockSufficient,
           steps: [

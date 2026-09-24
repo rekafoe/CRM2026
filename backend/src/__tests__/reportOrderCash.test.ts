@@ -88,6 +88,51 @@ describe('computeCashForReportDate', () => {
     expect(cash).toBe(66)
   })
 
+  it('does not count paid online prepayment as cash', () => {
+    expect(
+      countsAsPaidForCashReport({
+        prepaymentAmount: 200,
+        prepaymentStatus: 'paid',
+        paymentMethod: 'online',
+        prepaymentUpdatedAt: '2025-06-01',
+      }),
+    ).toBe(false)
+    expect(
+      computeCashForReportDate(
+        {
+          prepaymentAmount: 200,
+          prepaymentStatus: 'paid',
+          paymentMethod: 'online',
+          created_at: '2025-05-30',
+          prepaymentUpdatedAt: '2025-06-01',
+          cash_from_issue_today: null,
+        },
+        '2025-06-01',
+      ),
+    ).toBe(0)
+  })
+
+  it('keeps offline prepay on payment day and remainder on later issue day', () => {
+    // После выдачи: prepaymentAmount=total, stamp оплаты сохранён, debt_closed=остаток.
+    const afterIssue = {
+      prepaymentAmount: 138,
+      prepaymentStatus: 'paid' as const,
+      paymentMethod: 'offline',
+      created_at: '2025-05-30 12:00:00',
+      prepaymentUpdatedAt: '2025-06-01 12:00:00',
+      cash_issued_lifetime: 38,
+    }
+    expect(
+      computeCashForReportDate({ ...afterIssue, cash_from_issue_today: null }, '2025-06-01'),
+    ).toBe(100)
+    expect(
+      computeCashForReportDate({ ...afterIssue, cash_from_issue_today: 38 }, '2025-06-05'),
+    ).toBe(38)
+    expect(
+      computeCashForReportDate({ ...afterIssue, cash_from_issue_today: null }, '2025-06-05'),
+    ).toBe(0)
+  })
+
   it('counts prepayment on work day without prepaymentUpdatedAt (legacy CRM)', () => {
     const cash = computeCashForReportDate(
       {

@@ -3,8 +3,10 @@ import { OrderService } from '../modules/orders/services/orderService';
 import { normalizeWebsiteItems } from '../modules/orders/utils/websiteOrderNormalize';
 import {
   attachEditorDraftsToOrderItems,
+  claimEditorDraftsForCheckout,
   collectEditorDraftItemsFromOrder,
   prepareWebsiteItemsWithEditorDrafts,
+  releaseEditorDraftCheckoutClaims,
 } from './editorDraftWebsitePrepare';
 import { completeEditorOrderIntake } from './editorOrderIntakeService';
 import { TelegramUserService } from './telegramUserService';
@@ -390,12 +392,27 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
 
   try {
     await db.run('BEGIN');
-    const deductionResult = await OrderService.deductMaterialsForExistingOrder(orderId, undefined);
-    if (!deductionResult.success) {
-      const err = new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);
-      (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
+    const itemIdRows = await db.all<Array<{ id: number }>>(
+      'SELECT id FROM items WHERE orderId = ? ORDER BY id ASC',
+      [orderId],
+    );
+    const itemIds = (itemIdRows ?? []).map((r) => r.id);
+    const editorDraftItems = await collectEditorDraftItemsFromOrder(orderId);
+    const claimedTokens = await claimEditorDraftsForCheckout(editorDraftItems);
+
+    let deductionResult: Awaited<ReturnType<typeof OrderService.deductMaterialsForExistingOrder>>;
+    try {
+      deductionResult = await OrderService.deductMaterialsForExistingOrder(orderId, undefined);
+      if (!deductionResult.success) {
+        const err = new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);
+        (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
+        throw err;
+      }
+    } catch (err) {
+      await releaseEditorDraftCheckoutClaims(claimedTokens);
       throw err;
     }
+
     await db.run(
       'UPDATE orders SET miniapp_checkout_state = ? WHERE id = ?',
       [MINIAPP_CHECKOUT_STATE_FINALIZED, orderId]
@@ -405,12 +422,6 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
       : clearMiniappLayoutsPendingNote(draftOrder.notes ?? null) || null;
     await OrderService.updateOrderNotes(orderId, nextNotes, undefined);
 
-    const itemIdRows = await db.all<Array<{ id: number }>>(
-      'SELECT id FROM items WHERE orderId = ? ORDER BY id ASC',
-      [orderId],
-    );
-    const itemIds = (itemIdRows ?? []).map((r) => r.id);
-    const editorDraftItems = await collectEditorDraftItemsFromOrder(orderId);
     if (editorDraftItems.length > 0) {
       await attachEditorDraftsToOrderItems(orderId, itemIds, editorDraftItems);
       const orderCustomer = await db.get<{ customer_id: number | null }>(

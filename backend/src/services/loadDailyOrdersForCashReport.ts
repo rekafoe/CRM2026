@@ -20,6 +20,8 @@ export type DailyOrderForCashReport = {
   user_id?: number | null
   cash_from_issue_today?: number | null
   cash_issued_by_user_id?: number | null
+  /** Σ debt_closed_events по заказу за все дни (см. computeCashForReportDate). */
+  cash_issued_lifetime?: number | null
   cash_for_report_date?: number
   items?: unknown[]
 }
@@ -229,16 +231,39 @@ export async function loadDailyOrdersForCashReport(
         order.cash_from_issue_today = issue ? issue.amount : null
         order.cash_issued_by_user_id = issue ? issue.issuedBy : null
       }
+
+      // Lifetime issued: выдача пишет prepaymentAmount=total, поэтому день предоплаты
+      // должен считать (total − Σ debt_closed), а не раздутую сумму.
+      const orderIds = orders.map((o) => Number(o.id)).filter((id) => Number.isFinite(id) && id > 0)
+      const lifetimeByOrder = new Map<number, number>()
+      if (orderIds.length > 0) {
+        const placeholders = orderIds.map(() => '?').join(',')
+        const lifeRows = (await db.all(
+          `SELECT order_id, COALESCE(SUM(amount), 0) AS s
+             FROM debt_closed_events
+            WHERE order_id IN (${placeholders})
+            GROUP BY order_id`,
+          ...orderIds,
+        )) as Array<{ order_id: number; s: number }>
+        for (const r of lifeRows) {
+          lifetimeByOrder.set(Number(r.order_id), Number(r.s ?? 0))
+        }
+      }
+      for (const order of orders) {
+        order.cash_issued_lifetime = lifetimeByOrder.get(Number(order.id)) ?? 0
+      }
     } catch {
       for (const order of orders) {
         order.cash_from_issue_today = null
         order.cash_issued_by_user_id = null
+        order.cash_issued_lifetime = null
       }
     }
   } else {
     for (const order of orders) {
       order.cash_from_issue_today = null
       order.cash_issued_by_user_id = null
+      order.cash_issued_lifetime = null
     }
   }
 

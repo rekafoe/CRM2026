@@ -95,6 +95,8 @@ describe('material-driven production plan', () => {
       materialId: 55,
       materialWidthMm: 630,
       stockSufficient: true,
+      colorMode: 'color',
+      sidesMode: 'single',
     })
     expect(result.productionPlan?.steps.map((step) => step.name)).toEqual([
       'Сольвентная печать — Oracal матовая, рулон 630 мм',

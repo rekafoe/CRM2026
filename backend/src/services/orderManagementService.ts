@@ -6,6 +6,7 @@ import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
 import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
 import { OrderService } from '../modules/orders/services/orderService';
+import { planIssuePaymentUpdate } from '../utils/issuePaymentUpdate';
 
 export interface UnifiedOrder {
   id: number;
@@ -466,8 +467,15 @@ export class OrderManagementService {
             [orderId],
           );
         } else {
+          let hasPrepaymentUpdatedAt = false;
+          try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
           const order = await db.get<any>(
-            `
+            hasPrepaymentUpdatedAt
+              ? `
+            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, prepaymentUpdatedAt
+            FROM orders WHERE id = ?
+          `
+              : `
             SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent
             FROM orders WHERE id = ?
           `,
@@ -481,22 +489,25 @@ export class OrderManagementService {
           const amounts = await OrderService.getOrderAmountsById(orderId);
           const totalAmount = amounts.totalAmount;
           const remainder = amounts.debt;
-          const prepaymentAmount = Number(order.prepaymentAmount || 0);
 
-          let hasPrepaymentUpdatedAt = false;
-          try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
-          const paymentId = `ISSUE-${Date.now()}-${orderId}`;
-          const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`
-            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`;
-          await db.run(updateSql, totalAmount, paymentId, orderId);
-
-          // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
           const issuer = issuerId ?? null;
           const isValidIssuedOn = issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(String(issuedOn).slice(0, 10));
           const closedDate = isValidIssuedOn
             ? String(issuedOn).slice(0, 10)
             : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+          const issueDateTime = `${closedDate} 12:00:00`;
+          const paymentPlan = planIssuePaymentUpdate(order, { issueDateTime });
+          const paymentId = `ISSUE-${Date.now()}-${orderId}`;
+          const updateSql = hasPrepaymentUpdatedAt
+            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`
+            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = ?, updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`;
+          if (hasPrepaymentUpdatedAt) {
+            await db.run(updateSql, totalAmount, paymentId, paymentPlan.paymentMethod, paymentPlan.prepaymentUpdatedAt, orderId);
+          } else {
+            await db.run(updateSql, totalAmount, paymentId, paymentPlan.paymentMethod, orderId);
+          }
+
+          // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
           try {
             const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id');
             if (hasIssuedBy) {
