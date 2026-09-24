@@ -103,4 +103,53 @@ describe('productionSceneScale', () => {
     expect(diagnostics.mismatched).toBe(false)
     expect(scale).toBe(3)
   })
+
+  it('uses 1/MM_TO_PX for legacy souvenir_3d mm-as-px drafts', () => {
+    const pageWidth = 300
+    const pageHeight = 400
+    const { scale, diagnostics } = resolveProductionSceneScale({
+      pageWidth,
+      pageHeight,
+      sceneScale: 1,
+      editorKind: 'souvenir_3d',
+      pages: [
+        {
+          fabricJSON: {
+            objects: [
+              { type: 'i-text', left: 150, top: 200, width: 80, height: 24, fontSize: 28 },
+            ],
+          },
+        },
+      ],
+    })
+    expect(scale).toBeCloseTo(1 / MM_TO_PX, 6)
+    expect(diagnostics.resolved).toBeCloseTo(1 / MM_TO_PX, 6)
+    // Canvas at this scale is ~pageWidth×pageHeight px — matches legacy object coords.
+    expect(pageWidth * MM_TO_PX * scale).toBeCloseTo(pageWidth, 5)
+  })
+
+  it('keeps sceneScale 1 for souvenir_3d with fabricCoordSpace=css_px', () => {
+    const pageWidth = 300
+    const pageHeight = 400
+    const baseW = pageWidth * MM_TO_PX
+    const baseH = pageHeight * MM_TO_PX
+    const { scale, diagnostics } = resolveProductionSceneScale({
+      pageWidth,
+      pageHeight,
+      sceneScale: 1,
+      editorKind: 'souvenir_3d',
+      fabricCoordSpace: 'css_px',
+      pages: [
+        {
+          fabricJSON: {
+            objects: [
+              { type: 'rect', left: 0, top: 0, width: baseW * 0.9, height: baseH * 0.9 },
+            ],
+          },
+        },
+      ],
+    })
+    expect(scale).toBe(1)
+    expect(diagnostics.mismatched).toBe(false)
+  })
 })

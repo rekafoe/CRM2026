@@ -313,6 +313,7 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
     sceneScale: 1,
   });
   designState.editorKind = 'souvenir_3d';
+  designState.fabricCoordSpace = 'css_px';
   designState.activePrintAreaId = area.id;
   designState.usedPrintAreaIds = [];
   designState.pages = areas.map((printArea) => ({
