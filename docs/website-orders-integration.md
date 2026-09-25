@@ -70,8 +70,9 @@
 - **`POST /api/orders/from-website`** — создание заказа с сайта без авторизации в CRM.
 - **Авторизация:** заголовок **`X-API-Key`** или **`Authorization: Bearer <key>`**. Ключ задаётся в env: **`WEBSITE_ORDER_API_KEY`**. Если переменная не задана — эндпоинт возвращает 503.
 - **Body (JSON):**
-  - `customerName`, `customerPhone`, `customerEmail` (опционально), `prepaymentAmount` (опционально), `customer_id` (опционально).
+  - `customerName`, `customerPhone`, `customerEmail` (опционально), `prepaymentAmount` (опционально, **игнорируется при create**), `customer_id` (опционально).
   - Обязательно: **`customerName`** или **`customerPhone`**.
+  - **Предоплата:** на `from-website` / `with-files` / editor finalize / mini_app create поле `prepaymentAmount` **не помечает заказ как оплаченный**. Сумма при create всегда `0`; статус `paid` выставляется только через BePaid webhook, `confirm-prepayment` или вручную в CRM. Для `paymentMethod=online` заказ создаётся как `pending` с нулевой предоплатой.
   - Опционально: **`delivery`** — способ получения заказа (самовывоз, курьер, почта). Сохраняется в `orders.delivery_json`, в API ответа — объект **`order.delivery`**. Обязательные поля: `kind`, `providerId`, `label`. См. [раздел «Доставка и самовывоз»](#доставка-и-самовывоз-с-сайта).
   - Опционально: **`items`** — массив позиций заказа (как в `POST /api/orders/with-auto-deduction`). Если передан непустой массив — заказ создаётся с позициями и автоматическим списанием материалов; иначе создаётся пустой заказ.
   - Для каждой позиции в **`items`** укажите **`priceType`** в `params` или на уровне позиции (`online`, `urgent`, `promo`, …). После создания заказа CRM **пересчитывает** цены с тиражной скидкой по корзине/заказу и применяет множитель `priceType` в калькуляторе — **не умножайте цену на сайте повторно**, если уже использовали `quote-cart`.
@@ -238,7 +239,8 @@ curl -X POST "https://your-backend.example.com/api/orders/from-website" \
     "customerName": "Иван Петров",
     "customerPhone": "+375 29 123-45-67",
     "customerEmail": "ivan@example.com",
-    "prepaymentAmount": 10.50,
+    "prepaymentAmount": 0,
+    "paymentMethod": "online",
     "items": [
       {
         "type": "Визитки",
@@ -304,7 +306,7 @@ curl -X POST "https://api.printcore.by/api/orders/from-website" \
     "customerName": "Мария Иванова",
     "customerPhone": "+375 29 555-12-34",
     "customerEmail": "maria@example.com",
-    "prepaymentAmount": 4.80,
+    "prepaymentAmount": 0,
     "items": [
       {
         "type": "Премиум - Квадратные фото",
@@ -452,7 +454,7 @@ Production export должен уметь вернуть ZIP с общей па�
 {
   "customerName": "Мария Иванова",
   "customerPhone": "+375 29 555-12-34",
-  "prepaymentAmount": 4.80,
+  "prepaymentAmount": 0,
   "items": [
     {
       "type": "Премиум - Квадратные фото",

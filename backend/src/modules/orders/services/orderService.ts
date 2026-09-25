@@ -28,6 +28,7 @@ import {
 } from '../../../types/websiteOrderDelivery'
 import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
 import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
+import { planCreateOrderPrepayment } from '../../../utils/planCreateOrderPrepayment'
 
 export class OrderService {
   private static isMeterUnit(unitRaw: unknown): boolean {
@@ -402,7 +403,11 @@ export class OrderService {
       }
     } catch {}
 
-    const initialPrepay = Number(prepaymentAmount || 0)
+    const prepayPlan = planCreateOrderPrepayment({
+      source,
+      prepaymentAmount,
+      paymentMethodHint,
+    })
     let hasPrepaymentUpdatedAt = false
     let hasPaymentChannel = false
     let hasIsInternal = false
@@ -434,20 +439,20 @@ export class OrderService {
       ['customerName', customerName || null],
       ['customerPhone', customerPhone || null],
       ['customerEmail', customerEmail || null],
-      ['prepaymentAmount', initialPrepay],
+      ['prepaymentAmount', prepayPlan.prepaymentAmount],
     ]
-    if (initialPrepay > 0) {
-      insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', paymentMethodHint === 'online' ? 'online' : 'offline'])
-    } else if (paymentMethodHint === 'online') {
-      insertFields.push(['prepaymentStatus', 'pending'], ['paymentMethod', 'online'])
-    } else if (paymentMethodHint === 'offline') {
+    if (prepayPlan.prepaymentStatus === 'paid') {
+      insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', prepayPlan.paymentMethod])
+    } else if (prepayPlan.prepaymentStatus === 'pending') {
+      insertFields.push(['prepaymentStatus', 'pending'], ['paymentMethod', prepayPlan.paymentMethod])
+    } else if (prepayPlan.paymentMethod === null) {
       // Явно NULL: колонка orders.paymentMethod имеет DEFAULT 'online'
       insertFields.push(['paymentMethod', null])
     }
     if (hasPrepaymentUpdatedAt) {
       insertFields.push([
         'prepaymentUpdatedAt',
-        initialPrepay > 0 || paymentMethodHint === 'online' ? createdAt : null,
+        prepayPlan.stampPrepaymentUpdatedAt ? createdAt : null,
       ])
     }
     insertFields.push(
