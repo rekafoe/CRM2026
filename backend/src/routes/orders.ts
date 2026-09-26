@@ -32,23 +32,10 @@ import { logger } from '../utils/logger'
 import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition'
 import {
   ISSUED_ORDER_PREPAY_BLOCK_MESSAGE,
+  orderHasDebtClosedEvent,
   planIssuedOrderPrepayBlock,
 } from '../utils/issuedOrderPrepayGuard'
 import { Readable } from 'stream'
-
-async function orderHasDebtClosedEvent(db: Awaited<ReturnType<typeof getDb>>, orderId: number): Promise<boolean> {
-  try {
-    const hasTable = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
-    if (!hasTable) return false
-    const row = await db.get<{ c: number }>(
-      'SELECT 1 as c FROM debt_closed_events WHERE order_id = ? LIMIT 1',
-      orderId,
-    )
-    return Boolean(row)
-  } catch {
-    return false
-  }
-}
 
 const router = Router()
 
