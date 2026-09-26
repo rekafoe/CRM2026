@@ -330,6 +330,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 <AppIcon name="folder" size="xs" /> Файлы
               </button>
+              {Number(selectedOrder.status) !== 7 && (
               <button 
                 onClick={onShowPrepaymentModal}
                 className="order-detail-action-btn order-detail-action-btn--success"
@@ -337,7 +338,8 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 <AppIcon name="card" size="xs" /> Внести предоплату
               </button>
-              {orderAmounts.prepayment > 0 && onRemovePrepayment && (
+              )}
+              {Number(selectedOrder.status) !== 7 && orderAmounts.prepayment > 0 && onRemovePrepayment && (
                 <button 
                   onClick={() => onRemovePrepayment(selectedOrder.id)}
                   className="order-detail-action-btn order-detail-action-btn--danger"

@@ -12,6 +12,7 @@ import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
+import { isOrderPrepaySealed } from '../../../utils/issuedOrderPrepayGuard'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 
 function isMeterUnit(unitRaw: unknown): boolean {
@@ -356,7 +357,8 @@ export class OrderItemController {
           allowAutoPay &&
           newTotal > 0 &&
           (!hasPrepayment || (paymentMethod === 'offline' && inSync))
-        if (shouldSetPrepayment) {
+        // После выдачи prepaid + debt_closed зафиксированы для кассы — не синкать сумму/дату.
+        if (shouldSetPrepayment && !(await isOrderPrepaySealed(db, orderId, orderStatus))) {
           let hasPrepaymentUpdatedAt = false
           try {
             hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -590,7 +592,11 @@ export class OrderItemController {
         const newTotal = newAmounts.totalAmount
         const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
         const paymentMethod = paymentRow?.paymentMethod
-        if (paymentMethod === 'offline' && currentPrepayment > newTotal) {
+        if (
+          paymentMethod === 'offline' &&
+          currentPrepayment > newTotal &&
+          !(await isOrderPrepaySealed(db, orderId))
+        ) {
           let hasPrepaymentUpdatedAt = false
           try {
             hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -907,7 +913,12 @@ export class OrderItemController {
         }
         await db.run(updateSql, ...bindings)
 
-        if (priceOrQtyChanged && paymentRow && paymentRow.paymentMethod === 'offline') {
+        if (
+          priceOrQtyChanged &&
+          paymentRow &&
+          paymentRow.paymentMethod === 'offline' &&
+          !(await isOrderPrepaySealed(db, orderId))
+        ) {
           const pct = Number(paymentRow?.discount_percent || 0) / 100
           const oldTotal = Math.round(oldSubtotal * (1 - pct) * 100) / 100
           const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)

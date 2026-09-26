@@ -140,31 +140,40 @@ export const CustomerDetailView: React.FC<{
     });
   }, [customer]);
 
-  const loadOrdersForCustomer = useCallback(async (customer: Customer) => {
-    try {
-      setOrdersLoading(true);
-      const res = await getCustomerOrders(customer.id);
-      const list = Array.isArray(res.data) ? res.data : [];
-      const sorted = [...list].sort((a, b) => {
-        const aDate = new Date(a.created_at || (a as any).created_at || 0).getTime();
-        const bDate = new Date(b.created_at || (b as any).created_at || 0).getTime();
-        return bDate - aDate;
-      });
-      setOrders(sorted);
-    } catch (err: any) {
-      setError(err?.message || 'Не удалось загрузить заказы клиента');
-    } finally {
-      setOrdersLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (!customer) {
       setOrders([]);
+      setOrdersLoading(false);
       return;
     }
-    void loadOrdersForCustomer(customer);
-  }, [customer, loadOrdersForCustomer]);
+    let cancelled = false;
+    const customerIdForLoad = customer.id;
+    (async () => {
+      try {
+        setOrdersLoading(true);
+        const res = await getCustomerOrders(customerIdForLoad);
+        if (cancelled) return;
+        const list = Array.isArray(res.data) ? res.data : [];
+        // Защита от рассинхрона ответа API / гонки при быстрой смене карточки
+        const own = list.filter((order) => Number(order.customer_id) === Number(customerIdForLoad));
+        const sorted = [...own].sort((a, b) => {
+          const aDate = new Date(a.created_at || (a as any).created_at || 0).getTime();
+          const bDate = new Date(b.created_at || (b as any).created_at || 0).getTime();
+          return bDate - aDate;
+        });
+        setOrders(sorted);
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.message || 'Не удалось загрузить заказы клиента');
+        }
+      } finally {
+        if (!cancelled) setOrdersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [customer]);
 
   useEffect(() => {
     setActiveTab(DEFAULT_CUSTOMER_DETAIL_TAB);
