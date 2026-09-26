@@ -30,7 +30,25 @@ import {
 } from '../services/editorProductionJobService'
 import { logger } from '../utils/logger'
 import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition'
+import {
+  ISSUED_ORDER_PREPAY_BLOCK_MESSAGE,
+  planIssuedOrderPrepayBlock,
+} from '../utils/issuedOrderPrepayGuard'
 import { Readable } from 'stream'
+
+async function orderHasDebtClosedEvent(db: Awaited<ReturnType<typeof getDb>>, orderId: number): Promise<boolean> {
+  try {
+    const hasTable = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
+    if (!hasTable) return false
+    const row = await db.get<{ c: number }>(
+      'SELECT 1 as c FROM debt_closed_events WHERE order_id = ? LIMIT 1',
+      orderId,
+    )
+    return Boolean(row)
+  } catch {
+    return false
+  }
+}
 
 const router = Router()
 
@@ -1319,6 +1337,14 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const db = await getDb()
   const order = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
+  const issuedBlock = planIssuedOrderPrepayBlock({
+    status: order.status,
+    hasDebtClosedEvent: await orderHasDebtClosedEvent(db, id),
+  })
+  if (issuedBlock.blocked) {
+    res.status(409).json({ message: ISSUED_ORDER_PREPAY_BLOCK_MESSAGE, code: 'ORDER_ALREADY_ISSUED' })
+    return
+  }
   let hasPrepaymentUpdatedAt = false
   try {
     hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -1429,6 +1455,14 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
   const order = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   if (!order) {
     res.status(404).json({ message: 'Заказ не найден' })
+    return
+  }
+  const issuedBlock = planIssuedOrderPrepayBlock({
+    status: order.status,
+    hasDebtClosedEvent: await orderHasDebtClosedEvent(db, id),
+  })
+  if (issuedBlock.blocked) {
+    res.status(409).json({ message: ISSUED_ORDER_PREPAY_BLOCK_MESSAGE, code: 'ORDER_ALREADY_ISSUED' })
     return
   }
 
