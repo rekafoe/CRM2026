@@ -21,10 +21,15 @@ export function useOrderLegalDocuments({ order, addToast }: UseOrderLegalDocumen
   const [generatingKind, setGeneratingKind] = useState<OrderLegalDocKind | null>(null);
   const docsMenuRef = useRef<HTMLDivElement>(null);
   const customerId = Number(order.customer_id) || 0;
+  // Не показывать кнопку/меню, пока подтянут клиент именно этого заказа
+  // (иначе после смены заказа в пуле остаётся previous legalCustomer → чужой договор).
+  const matchedLegalCustomer =
+    legalCustomer && Number(legalCustomer.id) === customerId ? legalCustomer : null;
 
   useEffect(() => {
+    setDocsMenuOpen(false);
+    setLegalCustomer(null);
     if (!customerId) {
-      setLegalCustomer(null);
       return;
     }
     let cancelled = false;
@@ -55,11 +60,11 @@ export function useOrderLegalDocuments({ order, addToast }: UseOrderLegalDocumen
 
   const generateLegalDocument = useCallback(
     async (kind: OrderLegalDocKind) => {
-      if (!legalCustomer) return;
+      if (!matchedLegalCustomer) return;
       setDocsMenuOpen(false);
       setGeneratingKind(kind);
       try {
-        await generateCustomerOrderLegalDocument({ customer: legalCustomer, order, kind });
+        await generateCustomerOrderLegalDocument({ customer: matchedLegalCustomer, order, kind });
         addToast({ type: 'success', title: 'Успешно', message: `${ORDER_LEGAL_DOC_LABELS[kind]} по заказу скачан` });
       } catch (error) {
         const message = await getApiErrorMessage(error, 'Не удалось сформировать документ');
@@ -68,11 +73,11 @@ export function useOrderLegalDocuments({ order, addToast }: UseOrderLegalDocumen
         setGeneratingKind(null);
       }
     },
-    [addToast, legalCustomer, order],
+    [addToast, matchedLegalCustomer, order],
   );
 
   return {
-    showLegalDocsButton: Boolean(legalCustomer),
+    showLegalDocsButton: Boolean(matchedLegalCustomer),
     docsMenuOpen,
     setDocsMenuOpen,
     docsMenuRef,

@@ -29,6 +29,10 @@ export const CustomerDetailAllOrdersPanel: React.FC<CustomerDetailAllOrdersPanel
   const handleGenerate = useCallback(
     async (order: Order, kind: OrderLegalDocKind) => {
       setError(null);
+      if (Number(order.customer_id) !== Number(customer.id)) {
+        setError('Заказ не относится к этому клиенту — обновите список заказов');
+        return;
+      }
       setGeneratingKey(`${order.id}:${kind}`);
       try {
         await generateCustomerOrderLegalDocument({ customer, order, kind });

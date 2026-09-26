@@ -70,12 +70,20 @@ export async function recordOrderLegalExport(
   });
 }
 
+/** Договор берёт реквизиты с клиента; акт/счёт — orderId на бэкенде. Нельзя смешивать чужой customer. */
+export function assertOrderBelongsToCustomer(customer: Customer, order: Order): void {
+  if (Number(order.customer_id) !== Number(customer.id)) {
+    throw new Error('Заказ не относится к этому клиенту');
+  }
+}
+
 export async function generateCustomerOrderLegalDocument(args: {
   customer: Customer;
   order: Order;
   kind: OrderLegalDocKind;
 }): Promise<void> {
   const { customer, order, kind } = args;
+  assertOrderBelongsToCustomer(customer, order);
   const orderRef = order.number || String(order.id);
   if (kind === 'act' || kind === 'invoice') {
     const response = await generateDocumentByTypeFromOrders(kind, [order.id]);
