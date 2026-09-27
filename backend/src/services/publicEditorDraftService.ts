@@ -627,7 +627,7 @@ export async function finalizeEditorDraft(
   })
 
   const primaryOrderItemId = Array.isArray(result.itemIds) && result.itemIds.length > 0 ? Number(result.itemIds[0]) : null
-  await copyEditorDraftFilesToOrderItem(draft.id, result.order.id, primaryOrderItemId)
+  await copyEditorDraftFilesToOrderItem(draft.id, result.order.id, primaryOrderItemId, 0)
 
   const db = await getDb()
   await db.run(
