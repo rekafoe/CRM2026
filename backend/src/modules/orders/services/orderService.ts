@@ -681,6 +681,11 @@ export class OrderService {
           qtyPerItem: Number(component.qtyPerItem),
         }));
       }
+      // Website/mini_app/telegram: lock только из CRM-калькулятора. Иначе клиентский
+      // totalCost + priceLockedByCalculator обходит server-side пересчёт.
+      if (payload.source !== 'crm') {
+        delete paramsObj.priceLockedByCalculator;
+      }
       const qty = Math.max(1, Number(item.quantity) || 1);
       const effectiveTotal =
         item.totalCost != null && Number.isFinite(Number(item.totalCost))
