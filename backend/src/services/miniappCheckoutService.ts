@@ -7,7 +7,6 @@ import {
   prepareWebsiteItemsWithEditorDrafts,
 } from './editorDraftWebsitePrepare';
 import { completeEditorOrderIntake } from './editorOrderIntakeService';
-import { applyServerPricesToMiniappOrder } from './miniappServerPrices';
 import { TelegramUserService } from './telegramUserService';
 import { setLastWebsiteOrderAt } from '../utils/poolSync';
 import { getDb } from '../config/database';
@@ -338,8 +337,6 @@ export async function createMiniappDraft(telegramChatId: string, body: MiniappCh
     items: editorDraftPrepared.items,
   });
 
-  await applyServerPricesToMiniappOrder(result.order.id);
-
   if (prepared.orderNotes) {
     await OrderService.updateOrderNotes(result.order.id, prepared.orderNotes, undefined);
   }
@@ -390,9 +387,6 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
       throw err;
     }
   }
-
-  // Пересчёт до списания: draft мог быть создан с клиентской ценой (в т.ч. до фикса).
-  await applyServerPricesToMiniappOrder(orderId);
 
   try {
     await db.run('BEGIN');
