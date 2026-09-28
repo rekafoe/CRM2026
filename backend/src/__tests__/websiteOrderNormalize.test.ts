@@ -25,4 +25,38 @@ describe('websiteOrderNormalize', () => {
     expect(item.params.layoutHumanLabel).toBeUndefined()
     expect(item.params.designEditorMode).toBeUndefined()
   })
+
+  it('keeps only positive qtyPerItem components (negative would inflate warehouse stock)', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: '42',
+        price: 1,
+        quantity: 2,
+        components: [
+          { materialId: 10, qtyPerItem: -5 },
+          { materialId: 11, qtyPerItem: 0 },
+          { materialId: 12, qtyPerItem: 1.5 },
+          { materialId: 'bad', qtyPerItem: 2 },
+        ],
+      },
+    ])
+
+    expect(item.components).toEqual([{ materialId: 12, qtyPerItem: 1.5 }])
+  })
+
+  it('omits components when every qtyPerItem is non-positive', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: '42',
+        price: 1,
+        quantity: 1,
+        components: [
+          { materialId: 10, qtyPerItem: -1 },
+          { materialId: 11, qtyPerItem: 0 },
+        ],
+      },
+    ])
+
+    expect(item.components).toBeUndefined()
+  })
 })
