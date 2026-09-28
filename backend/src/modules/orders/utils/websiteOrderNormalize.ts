@@ -160,14 +160,23 @@ export function normalizeWebsiteItems(
 }> {
   return items.map((it: any) => ({
     ...(Array.isArray(it?.components) && it.components.length > 0
-      ? {
-          components: it.components
+      ? (() => {
+          // qtyPerItem <= 0 must never reach warehouse spend: spend does old - qty,
+          // so a negative client qty would inflate stock instead of deducting.
+          const components = it.components
             .map((c: any) => ({
               materialId: Math.floor(Number(c?.materialId)),
               qtyPerItem: Number(c?.qtyPerItem),
             }))
-            .filter((c: { materialId: number; qtyPerItem: number }) => Number.isFinite(c.materialId) && c.materialId > 0 && Number.isFinite(c.qtyPerItem)),
-        }
+            .filter(
+              (c: { materialId: number; qtyPerItem: number }) =>
+                Number.isFinite(c.materialId) &&
+                c.materialId > 0 &&
+                Number.isFinite(c.qtyPerItem) &&
+                c.qtyPerItem > 0
+            );
+          return components.length > 0 ? { components } : {};
+        })()
       : {}),
     type: String(it?.type ?? ''),
     params: normalizeItemParams(it?.params),

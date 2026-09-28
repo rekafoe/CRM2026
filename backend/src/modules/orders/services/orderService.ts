@@ -676,10 +676,21 @@ export class OrderService {
         paramsObj = {};
       }
       if (Array.isArray(item.components) && item.components.length > 0) {
-        paramsObj._miniappComponents = item.components.map((component) => ({
-          materialId: Number(component.materialId),
-          qtyPerItem: Number(component.qtyPerItem),
-        }));
+        const safeComponents = item.components
+          .map((component) => ({
+            materialId: Number(component.materialId),
+            qtyPerItem: Number(component.qtyPerItem),
+          }))
+          .filter(
+            (component) =>
+              Number.isFinite(component.materialId) &&
+              component.materialId > 0 &&
+              Number.isFinite(component.qtyPerItem) &&
+              component.qtyPerItem > 0
+          );
+        if (safeComponents.length > 0) {
+          paramsObj._miniappComponents = safeComponents;
+        }
       }
       const qty = Math.max(1, Number(item.quantity) || 1);
       const effectiveTotal =
@@ -907,7 +918,8 @@ export class OrderService {
           .filter((component: { materialId: number; qtyPerItem: number }) =>
             Number.isFinite(component.materialId) &&
             component.materialId > 0 &&
-            Number.isFinite(component.qtyPerItem)
+            Number.isFinite(component.qtyPerItem) &&
+            component.qtyPerItem > 0
           ),
       };
     });

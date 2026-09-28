@@ -54,6 +54,12 @@ export class MaterialTransactionService {
 
     // Для материалов в пог. м — округляем до 2 знаков, иначе ceil (листы, шт.)
     const roundedQty = this.normalizeQuantityByUnit(quantity, material.unit);
+    // spend must only decrease stock; negative qty would inflate quantity (old - (-n)).
+    if (!(roundedQty > 0)) {
+      throw new Error(
+        `Количество для списания материала "${material.name}" должно быть больше 0 (получено: ${quantity})`
+      );
+    }
     const oldQuantity = Number(material.quantity);
     const newQuantity = oldQuantity - roundedQty;
 

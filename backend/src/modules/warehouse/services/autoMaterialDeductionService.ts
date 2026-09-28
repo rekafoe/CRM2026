@@ -49,10 +49,20 @@ export class AutoMaterialDeductionService {
       const materialRequirements: MaterialRequirement[] = []
       
       for (const item of items) {
-        if (item.components && item.components.length > 0) {
-          // Если есть явно указанные компоненты
-          for (const component of item.components) {
+        const positiveComponents = (item.components || []).filter(
+          (component) =>
+            Number.isFinite(component.materialId) &&
+            component.materialId > 0 &&
+            Number.isFinite(component.qtyPerItem) &&
+            component.qtyPerItem > 0 &&
+            Number.isFinite(item.quantity) &&
+            item.quantity > 0
+        )
+        if (positiveComponents.length > 0) {
+          // Если есть явно указанные компоненты с положительным qty
+          for (const component of positiveComponents) {
             const totalQuantity = component.qtyPerItem * item.quantity
+            if (!(totalQuantity > 0)) continue
             materialRequirements.push({
               materialId: component.materialId,
               quantity: totalQuantity,
@@ -65,7 +75,9 @@ export class AutoMaterialDeductionService {
           // Пытаемся найти материалы по типу товара
           const presetMaterials = await this.getMaterialsForProductType(item.type, item.params)
           for (const material of presetMaterials) {
+            if (!(Number(material.qtyPerItem) > 0)) continue
             const totalQuantity = material.qtyPerItem * item.quantity
+            if (!(totalQuantity > 0)) continue
             materialRequirements.push({
               materialId: material.materialId,
               quantity: totalQuantity,
@@ -233,6 +245,12 @@ export class AutoMaterialDeductionService {
 
         const availableQuantity = material.quantity
         const minQuantity = material.min_quantity || 0
+        if (!(Number(req.quantity) > 0)) {
+          errors.push(
+            `Некорректное количество списания для материала "${material.name}": ${req.quantity}`
+          )
+          continue
+        }
         const remainingAfterDeduction = availableQuantity - req.quantity
 
         if (remainingAfterDeduction < 0) {
