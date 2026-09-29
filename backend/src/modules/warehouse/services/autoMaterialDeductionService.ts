@@ -1,5 +1,7 @@
 import { getDb } from '../../../config/database'
 import { logger } from '../../../utils/logger'
+import { configurationFromItemParams } from '../../pricing/services/pricingGroupService'
+import { UnifiedPricingService } from '../../pricing/services/unifiedPricingService'
 import { WarehouseTransactionService } from './warehouseTransactionService'
 
 export interface MaterialRequirement {
@@ -49,31 +51,24 @@ export class AutoMaterialDeductionService {
       const materialRequirements: MaterialRequirement[] = []
       
       for (const item of items) {
-        if (item.components && item.components.length > 0) {
-          // Если есть явно указанные компоненты
-          for (const component of item.components) {
-            const totalQuantity = component.qtyPerItem * item.quantity
-            materialRequirements.push({
-              materialId: component.materialId,
-              quantity: totalQuantity,
-              reason: `Автоматическое списание для заказа ${orderId}`,
-              orderId,
-              userId
-            })
-          }
-        } else {
-          // Пытаемся найти материалы по типу товара
-          const presetMaterials = await this.getMaterialsForProductType(item.type, item.params)
-          for (const material of presetMaterials) {
-            const totalQuantity = material.qtyPerItem * item.quantity
-            materialRequirements.push({
-              materialId: material.materialId,
-              quantity: totalQuantity,
-              reason: `Автоматическое списание для заказа ${orderId}`,
-              orderId,
-              userId
-            })
-          }
+        // Клиентские components / _miniappComponents нельзя доверять: website/miniapp
+        // могут подставить чужой materialId и списать чужой остаток. Только сервер.
+        const serverMaterials = await this.resolveServerMaterialsForItem(
+          item.type,
+          item.params,
+          item.quantity
+        )
+        for (const material of serverMaterials) {
+          if (!(Number(material.qtyPerItem) > 0)) continue
+          const totalQuantity = material.qtyPerItem * Math.max(0, Number(item.quantity) || 0)
+          if (!(totalQuantity > 0)) continue
+          materialRequirements.push({
+            materialId: material.materialId,
+            quantity: totalQuantity,
+            reason: `Автоматическое списание для заказа ${orderId}`,
+            orderId,
+            userId
+          })
         }
       }
 
@@ -142,6 +137,74 @@ export class AutoMaterialDeductionService {
   }
 
   /**
+   * Серверный состав списания: quote/calculate по params, иначе BOM product_materials.
+   * Клиентские components намеренно игнорируются.
+   */
+  private static async resolveServerMaterialsForItem(
+    productType: string,
+    params: any,
+    orderQty: number
+  ): Promise<Array<{ materialId: number; qtyPerItem: number }>> {
+    const qty = Math.max(1, Number(orderQty) || 1)
+    const paramsObj =
+      params && typeof params === 'object' && !Array.isArray(params)
+        ? (params as Record<string, unknown>)
+        : {}
+
+    const nestedConfig =
+      paramsObj.configuration &&
+      typeof paramsObj.configuration === 'object' &&
+      !Array.isArray(paramsObj.configuration)
+        ? (paramsObj.configuration as Record<string, unknown>)
+        : {}
+
+    const fromParams = configurationFromItemParams(paramsObj)
+    const productIdFromType =
+      typeof productType === 'string' && /^\d+$/.test(productType) ? Number(productType) : NaN
+    const productId =
+      fromParams.productId ??
+      (Number.isFinite(productIdFromType) && productIdFromType > 0 ? productIdFromType : null)
+
+    if (productId != null && productId > 0) {
+      const configuration: Record<string, unknown> = { ...nestedConfig }
+      for (const [key, value] of Object.entries(fromParams.configuration)) {
+        if (value !== undefined && value !== null) {
+          configuration[key] = value
+        }
+      }
+      try {
+        const result = await UnifiedPricingService.calculatePrice(productId, configuration, qty)
+        const materials = Array.isArray(result.materials) ? result.materials : []
+        const resolved = materials
+          .map((row) => {
+            const materialId = Math.floor(Number(row.materialId))
+            const totalQty = Number(row.quantity)
+            const qtyPerItem = qty > 0 && Number.isFinite(totalQty) ? totalQty / qty : NaN
+            return { materialId, qtyPerItem }
+          })
+          .filter(
+            (row) =>
+              Number.isFinite(row.materialId) &&
+              row.materialId > 0 &&
+              Number.isFinite(row.qtyPerItem) &&
+              row.qtyPerItem > 0
+          )
+        if (resolved.length > 0) {
+          return resolved
+        }
+      } catch (error) {
+        logger.warn('Не удалось рассчитать материалы для автосписания', {
+          productType,
+          productId,
+          error: (error as Error).message,
+        })
+      }
+    }
+
+    return this.getMaterialsForProductType(productType, paramsObj)
+  }
+
+  /**
    * Получить материалы для типа продукта
    */
   private static async getMaterialsForProductType(
@@ -163,10 +226,12 @@ export class AutoMaterialDeductionService {
           productId
         )
         const list = Array.isArray(rows) ? rows : rows != null ? [rows] : []
-        return list.map((m) => ({
-          materialId: m.material_id,
-          qtyPerItem: m.qty_per_sheet
-        }))
+        return list
+          .map((m) => ({
+            materialId: m.material_id,
+            qtyPerItem: Number(m.qty_per_sheet),
+          }))
+          .filter((m) => Number.isFinite(m.materialId) && m.materialId > 0 && Number(m.qtyPerItem) > 0)
       }
 
       // Старая структура: presetCategory, presetDescription, materialId, qtyPerItem
@@ -176,10 +241,12 @@ export class AutoMaterialDeductionService {
         params.description || ''
       )
       const list = Array.isArray(materials) ? materials : materials != null ? [materials] : []
-      return list.map((m) => ({
-        materialId: m.materialId,
-        qtyPerItem: m.qtyPerItem
-      }))
+      return list
+        .map((m) => ({
+          materialId: m.materialId,
+          qtyPerItem: Number(m.qtyPerItem),
+        }))
+        .filter((m) => Number.isFinite(m.materialId) && m.materialId > 0 && Number(m.qtyPerItem) > 0)
     } catch (error) {
       logger.warn('Не удалось найти материалы для типа продукта', {
         productType,

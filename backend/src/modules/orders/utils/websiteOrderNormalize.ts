@@ -158,17 +158,9 @@ export function normalizeWebsiteItems(
   priceType?: string;
   price_type?: string;
 }> {
+  // components с сайта/Mini App намеренно отбрасываем: складское списание
+  // должно идти только через серверный BOM / pricing (см. AutoMaterialDeductionService).
   return items.map((it: any) => ({
-    ...(Array.isArray(it?.components) && it.components.length > 0
-      ? {
-          components: it.components
-            .map((c: any) => ({
-              materialId: Math.floor(Number(c?.materialId)),
-              qtyPerItem: Number(c?.qtyPerItem),
-            }))
-            .filter((c: { materialId: number; qtyPerItem: number }) => Number.isFinite(c.materialId) && c.materialId > 0 && Number.isFinite(c.qtyPerItem)),
-        }
-      : {}),
     type: String(it?.type ?? ''),
     params: normalizeItemParams(it?.params),
     price: Number(it?.price) || 0,
