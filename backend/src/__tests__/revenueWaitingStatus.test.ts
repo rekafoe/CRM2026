@@ -38,11 +38,13 @@ describe('revenueOrdersCondition', () => {
     }
 
     await insert('TEST-WAIT-REV-WAIT', waiting.id)
+    await insert('TEST-WAIT-REV-FIRST', 1)
     await insert('TEST-WAIT-REV-DONE', done.id)
 
-    const row = await db.get<{ waiting_revenue: number; done_revenue: number }>(
+    const row = await db.get<{ waiting_revenue: number; first_revenue: number; done_revenue: number }>(
       `SELECT
          COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-WAIT' THEN i.price ELSE 0 END), 0) as waiting_revenue,
+         COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-FIRST' THEN i.price ELSE 0 END), 0) as first_revenue,
          COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-DONE' THEN i.price ELSE 0 END), 0) as done_revenue
        FROM orders o
        JOIN items i ON i.orderId = o.id
@@ -51,6 +53,7 @@ describe('revenueOrdersCondition', () => {
     )
 
     expect(Number(row?.waiting_revenue)).toBe(0)
+    expect(Number(row?.first_revenue)).toBe(0)
     expect(Number(row?.done_revenue)).toBe(800)
   })
 })

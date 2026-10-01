@@ -70,9 +70,12 @@ export function waitingStatusIdsSubquery(): string {
   return `SELECT id FROM order_statuses WHERE ${waitingStatusNameMatchSql('name')}`
 }
 
-/** Пул status=0 и статус с именем «Ожидает» — не выручка, даже если предоплата уже paid. */
+/** Пул 0/1 и любой статус с именем «Ожидает» — не выручка, даже с предоплатой paid. */
 export function isWaitingStatusSql(statusColumn = 'status'): string {
-  return `(COALESCE(${statusColumn}, -1) = 0 OR ${statusColumn} IN (${waitingStatusIdsSubquery()}))`
+  return `(
+    CAST(COALESCE(${statusColumn}, -1) AS INTEGER) IN (0, 1)
+    OR ${statusColumn} IN (${waitingStatusIdsSubquery()})
+  )`
 }
 
 export function notWaitingStatusSql(statusColumn = 'status'): string {
@@ -80,8 +83,8 @@ export function notWaitingStatusSql(statusColumn = 'status'): string {
 }
 
 /**
- * Заказ в выручке: оплачен или завершён, и это не «Ожидает» / просчёт.
- * Предоплата на ожидающем заказе выручку не включает.
+ * Заказ в выручке: оплачен или завершён, и это уже не «Ожидает».
+ * Статусы 0 и 1 в CRM — пул «Ожидает». Предоплата на них выручку не включает.
  */
 export function revenueOrdersCondition(alias: string): string {
   const p = alias ? `${alias}.` : ''
