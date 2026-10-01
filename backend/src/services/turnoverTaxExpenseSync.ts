@@ -114,7 +114,7 @@ async function quarterRevenue(
   return Number(row?.revenue || 0)
 }
 
-async function doSync(dateFrom?: string, dateTo?: string): Promise<void> {
+async function doSync(dateFrom?: string, _dateTo?: string, asOf?: string): Promise<void> {
   const db = await getDb()
   const categoryId = await ensureTaxCategory(db)
   if (!categoryId) return
@@ -126,10 +126,16 @@ async function doSync(dateFrom?: string, dateTo?: string): Promise<void> {
     WHERE notes LIKE 'tax-auto:%'
   `)
 
-  const from = dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(dateFrom) ? dateFrom : null
-  const to = dateTo && /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? dateTo : null
-  const today = todayIso()
-  const quarters = quartersOverlapping(from, to).filter((q) => q.start <= today)
+  const today = asOf && /^\d{4}-\d{2}-\d{2}$/.test(asOf) ? asOf : todayIso()
+  // Фильтр расходов часто равен одному месяцу. Он не должен обрезать базу налога:
+  // 6% считается с 1-го дня календарного квартала по его последний день.
+  const year = Number(today.slice(0, 4))
+  let horizon = `${year - 1}-01-01`
+  if (dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
+    const quarterStart = quarterOfIso(dateFrom).start
+    if (quarterStart < horizon) horizon = quarterStart
+  }
+  const quarters = quartersOverlapping(horizon, today).filter((q) => q.start <= today)
 
   for (const quarter of quarters) {
     const revenueEnd = quarter.end < today ? quarter.end : today
@@ -170,9 +176,9 @@ async function doSync(dateFrom?: string, dateTo?: string): Promise<void> {
   }
 }
 
-/** Пишет в расходы 6% выручки за каждый затронутый квартал. */
-export function syncTurnoverTaxExpenses(dateFrom?: string, dateTo?: string): Promise<void> {
-  const run = syncChain.then(() => doSync(dateFrom, dateTo))
+/** Пишет в расходы 6% выручки за каждый календарный квартал, не за выбранный месяц. */
+export function syncTurnoverTaxExpenses(dateFrom?: string, dateTo?: string, asOf?: string): Promise<void> {
+  const run = syncChain.then(() => doSync(dateFrom, dateTo, asOf))
   syncChain = run.then(
     () => undefined,
     () => undefined,

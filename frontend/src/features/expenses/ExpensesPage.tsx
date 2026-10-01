@@ -428,7 +428,7 @@ export const ExpensesPage: React.FC = () => {
                   <td>
                     {expense.title || '—'}
                     {expense.notes === 'payroll-auto' ? ' · из ЗП' : ''}
-                    {expense.notes?.startsWith('tax-auto:') ? ' · 6% оборота' : ''}
+                    {expense.notes?.startsWith('tax-auto:') ? ' · 6% за квартал' : ''}
                     {expense.recurring_source_id == null && Number(expense.recurring_monthly) === 1
                       ? ' · каждый месяц'
                       : ''}
@@ -441,7 +441,7 @@ export const ExpensesPage: React.FC = () => {
                     {expense.notes === 'payroll-auto' ? (
                       <span className="expenses-empty">считается из процентов</span>
                     ) : expense.notes?.startsWith('tax-auto:') ? (
-                      <span className="expenses-empty">считается от выручки за квартал</span>
+                      <span className="expenses-empty">6% выручки за весь календарный квартал</span>
                     ) : (
                       <div className="expenses-table-actions">
                         <Button type="button" variant="secondary" size="sm" onClick={() => handleEdit(expense)}>
