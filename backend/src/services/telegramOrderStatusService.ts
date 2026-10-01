@@ -32,7 +32,7 @@ async function getCompletedOrderStatusIds(): Promise<number[]> {
     const rows = (await db.all(
       `SELECT id
        FROM order_statuses
-       WHERE lower(trim(name)) IN ('завершён', 'завершен')`
+       WHERE code = 'completed' OR name IN ('Завершён', 'Завершен')`
     )) as Array<{ id: number }>;
     return rows.map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
   } catch {

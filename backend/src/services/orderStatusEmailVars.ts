@@ -44,22 +44,18 @@ function getItemLineTotal(item: {
   return Math.round((Number(item.price) || 0) * q * 100) / 100
 }
 
-/** Краткая фраза статуса для темы/первого абзаца. */
+/** Краткая фраза статуса для темы/первого абзаца. Имена — из текущего справочника. */
 export function buildStatusPhrase(statusName: string): string {
-  const n = String(statusName || '').trim().toLowerCase()
+  const n = String(statusName || '').trim().toLowerCase().replace(/ё/g, 'е')
   if (!n) return 'обновлён'
   if (n.includes('отмен')) return 'отменён'
+  if (n.includes('заверш')) return 'завершён'
+  if (n.includes('получен')) return 'получен в пункте выдачи'
+  if (n.includes('передан') || n.includes('пвз')) return 'передан в пункт выдачи'
   if (n.includes('готов') || n.includes('выполнен') || n.includes('выдан')) return 'готов к выдаче'
-  if (
-    n.includes('оформлен') ||
-    n.includes('ожидает') ||
-    n.includes('в работе') ||
-    n.includes('принят') ||
-    n.includes('новый') ||
-    n.includes('печат')
-  ) {
-    return 'принят в работу'
-  }
+  if (n.includes('принят') || n.includes('в работе') || n.includes('печат')) return 'принят в работу'
+  if (n.includes('оформлен')) return 'оформлен'
+  if (n.includes('ожида') || n.includes('новый')) return 'ожидает обработки'
   return `переведён в статус «${statusName}»`
 }
 

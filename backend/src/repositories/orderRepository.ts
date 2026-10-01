@@ -6,6 +6,7 @@ import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 import { parseWebsiteOrderDeliveryJson } from '../types/websiteOrderDelivery'
 import { notWaitingStatusSql } from '../utils/orderFulfillmentScope'
+import { SQL_ITEMS_SUBTOTAL_BY_ORDER } from '../utils/orderAmountsSql'
 import { completedStatusSql } from '../utils/orderStatusCatalog'
 import { getTodayString } from '../utils/date'
 import {
