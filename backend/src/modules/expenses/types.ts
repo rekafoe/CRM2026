@@ -19,6 +19,8 @@ export interface ExpenseRow {
   title: string | null
   notes: string | null
   created_by: number | null
+  recurring_monthly: number
+  recurring_source_id: number | null
   created_at: string
   updated_at: string
 }
@@ -44,6 +46,7 @@ export interface ExpenseInput {
   expense_date: string
   title?: string | null
   notes?: string | null
+  recurring_monthly?: boolean | number
 }
 
 export interface ExpenseListFilters {

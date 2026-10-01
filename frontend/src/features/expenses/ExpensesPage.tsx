@@ -35,6 +35,7 @@ const emptyForm = () => ({
   expense_date: todayIso(),
   title: '',
   notes: '',
+  recurring_monthly: false,
 });
 
 export const ExpensesPage: React.FC = () => {
@@ -49,6 +50,7 @@ export const ExpensesPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<number | ''>('');
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingChild, setEditingChild] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export const ExpensesPage: React.FC = () => {
   const resetForm = () => {
     setForm(emptyForm());
     setEditingId(null);
+    setEditingChild(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,6 +146,7 @@ export const ExpensesPage: React.FC = () => {
       expense_date: form.expense_date,
       title: form.title.trim() || null,
       notes: form.notes.trim() || null,
+      ...(editingChild ? {} : { recurring_monthly: form.recurring_monthly }),
     };
 
     setSaving(true);
@@ -163,7 +167,9 @@ export const ExpensesPage: React.FC = () => {
   };
 
   const handleEdit = (expense: Expense) => {
+    const isChild = expense.recurring_source_id != null;
     setEditingId(expense.id);
+    setEditingChild(isChild);
     setForm({
       department_id: expense.department_id == null ? 'company' : expense.department_id,
       category_id: String(expense.category_id),
@@ -171,16 +177,24 @@ export const ExpensesPage: React.FC = () => {
       expense_date: expense.expense_date?.slice(0, 10) ?? todayIso(),
       title: expense.title ?? '',
       notes: expense.notes ?? '',
+      recurring_monthly: !isChild && Number(expense.recurring_monthly) === 1,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Удалить этот расход?')) return;
+  const handleDelete = async (expense: Expense) => {
+    const isChild = expense.recurring_source_id != null;
+    const isTemplate = !isChild && Number(expense.recurring_monthly) === 1;
+    const message = isChild
+      ? 'Удалить списание за этот месяц? Этот месяц больше не создастся автоматически.'
+      : isTemplate
+        ? 'Удалить шаблон? Уже созданные месяцы останутся, новые месяцы списываться не будут.'
+        : 'Удалить этот расход?';
+    if (!confirm(message)) return;
     setErrorMessage(null);
     try {
-      await deleteExpense(id);
-      if (editingId === id) resetForm();
+      await deleteExpense(expense.id);
+      if (editingId === expense.id) resetForm();
       await loadData();
     } catch (error) {
       setErrorMessage(getErrorMessage(error, 'Ошибка удаления расхода'));
@@ -354,6 +368,28 @@ export const ExpensesPage: React.FC = () => {
             placeholder="Дополнительные детали"
           />
         </div>
+        {!editingChild && (
+          <div className="expenses-recurring">
+            <label htmlFor="expense-recurring">
+              <input
+                id="expense-recurring"
+                type="checkbox"
+                checked={form.recurring_monthly}
+                onChange={(e) => setForm((f) => ({ ...f, recurring_monthly: e.target.checked }))}
+              />
+              <span>Повторять каждый календарный месяц</span>
+            </label>
+            <p className="expenses-recurring-hint">
+              Та же сумма спишется в этот день каждого следующего месяца. Если потом изменить сумму, уже
+              созданные месяцы останутся как есть.
+            </p>
+          </div>
+        )}
+        {editingChild && (
+          <p className="expenses-recurring-hint">
+            Это списание за один месяц. Его можно поправить или удалить: удалённый месяц заново не создастся.
+          </p>
+        )}
         <div className="expenses-form-actions">
           <Button type="submit" disabled={saving}>
             {saving ? 'Сохранение...' : editingId ? 'Сохранить' : 'Добавить расход'}
@@ -393,6 +429,10 @@ export const ExpensesPage: React.FC = () => {
                     {expense.title || '—'}
                     {expense.notes === 'payroll-auto' ? ' · из ЗП' : ''}
                     {expense.notes?.startsWith('tax-auto:') ? ' · 6% оборота' : ''}
+                    {expense.recurring_source_id == null && Number(expense.recurring_monthly) === 1
+                      ? ' · каждый месяц'
+                      : ''}
+                    {expense.recurring_source_id != null ? ' · авто · месяц' : ''}
                   </td>
                   <td className="expenses-amount">
                     <MoneyAmount value={expense.amount} />
@@ -407,7 +447,7 @@ export const ExpensesPage: React.FC = () => {
                         <Button type="button" variant="secondary" size="sm" onClick={() => handleEdit(expense)}>
                           Изменить
                         </Button>
-                        <Button type="button" variant="error" size="sm" onClick={() => void handleDelete(expense.id)}>
+                        <Button type="button" variant="error" size="sm" onClick={() => void handleDelete(expense)}>
                           Удалить
                         </Button>
                       </div>

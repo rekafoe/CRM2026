@@ -1,4 +1,5 @@
 import { syncPayrollExpenses } from '../../services/payrollExpenseSync'
+import { skipRecurringMonth, syncRecurringExpenses } from '../../services/recurringExpenseSync'
 import { syncTurnoverTaxExpenses } from '../../services/turnoverTaxExpenseSync'
 import { ExpenseRepository } from './expenseRepository'
 import type {
@@ -45,6 +46,7 @@ export class ExpenseService {
   static async list(filters?: ExpenseListFilters): Promise<ExpenseWithRelations[]> {
     await syncPayrollExpenses(filters?.date_from, filters?.date_to)
     await syncTurnoverTaxExpenses(filters?.date_from, filters?.date_to)
+    await syncRecurringExpenses()
     return ExpenseRepository.listExpenses(filters)
   }
 
@@ -60,6 +62,7 @@ export class ExpenseService {
         expense_date: normalizeDate(payload.expense_date),
         title: payload.title != null ? String(payload.title).trim() || null : null,
         notes: payload.notes != null ? String(payload.notes).trim() || null : null,
+        recurring_monthly: payload.recurring_monthly ? 1 : 0,
       },
       createdBy
     )
@@ -80,16 +83,32 @@ export class ExpenseService {
     if (payload.amount !== undefined) {
       normalized.amount = Number(payload.amount)
     }
+    const current = await ExpenseRepository.getExpenseById(id)
+    if (!current) throw new Error('Расход не найден')
+    if (current.recurring_source_id) {
+      normalized.recurring_monthly = 0
+    } else if (payload.recurring_monthly !== undefined) {
+      normalized.recurring_monthly = payload.recurring_monthly ? 1 : 0
+    }
     return ExpenseRepository.updateExpense(id, normalized)
   }
 
   static async delete(id: number): Promise<void> {
+    const current = await ExpenseRepository.getExpenseById(id)
+    if (!current) throw new Error('Расход не найден')
+    if (current.recurring_source_id) {
+      const yearMonth = String(current.expense_date || '').slice(0, 7)
+      if (/^\d{4}-\d{2}$/.test(yearMonth)) {
+        await skipRecurringMonth(current.recurring_source_id, yearMonth)
+      }
+    }
     await ExpenseRepository.deleteExpense(id)
   }
 
   static async getSummary(filters?: { date_from?: string; date_to?: string }): Promise<ExpenseSummary> {
     await syncPayrollExpenses(filters?.date_from, filters?.date_to)
     await syncTurnoverTaxExpenses(filters?.date_from, filters?.date_to)
+    await syncRecurringExpenses()
     const [byDeptRows, companyWide, total] = await Promise.all([
       ExpenseRepository.sumByDepartment(filters),
       ExpenseRepository.sumCompanyWide(filters),

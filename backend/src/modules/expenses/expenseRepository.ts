@@ -10,7 +10,8 @@ import type {
 
 const EXPENSE_SELECT = `
   e.id, e.department_id, e.category_id, e.amount, e.currency, e.expense_date,
-  e.title, e.notes, e.created_by, e.created_at, e.updated_at,
+  e.title, e.notes, e.created_by, e.recurring_monthly, e.recurring_source_id,
+  e.created_at, e.updated_at,
   c.name AS category_name,
   d.name AS department_name,
   u.name AS created_by_name
@@ -134,8 +135,9 @@ export class ExpenseRepository {
     const db = await getDb()
     const result = await db.run(
       `INSERT INTO expenses
-       (department_id, category_id, amount, currency, expense_date, title, notes, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+       (department_id, category_id, amount, currency, expense_date, title, notes, created_by,
+        recurring_monthly, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
       [
         payload.department_id ?? null,
         payload.category_id,
@@ -145,6 +147,7 @@ export class ExpenseRepository {
         payload.title ?? null,
         payload.notes ?? null,
         createdBy ?? null,
+        payload.recurring_monthly ? 1 : 0,
       ]
     )
     const row = await this.getExpenseById(Number(result.lastID))
@@ -159,7 +162,8 @@ export class ExpenseRepository {
     await db.run(
       `UPDATE expenses
        SET department_id = ?, category_id = ?, amount = ?, currency = ?,
-           expense_date = ?, title = ?, notes = ?, updated_at = datetime('now')
+           expense_date = ?, title = ?, notes = ?, recurring_monthly = ?,
+           updated_at = datetime('now')
        WHERE id = ?`,
       [
         payload.department_id !== undefined ? payload.department_id : current.department_id,
@@ -169,6 +173,15 @@ export class ExpenseRepository {
         payload.expense_date ?? current.expense_date,
         payload.title !== undefined ? payload.title : current.title,
         payload.notes !== undefined ? payload.notes : current.notes,
+        current.recurring_source_id
+          ? 0
+          : payload.recurring_monthly !== undefined
+            ? payload.recurring_monthly
+              ? 1
+              : 0
+            : current.recurring_monthly
+              ? 1
+              : 0,
         id,
       ]
     )
@@ -256,7 +269,8 @@ export class ExpenseRepository {
   static async getExpenseRow(id: number): Promise<ExpenseRow | null> {
     const db = await getDb()
     const row = await db.get<ExpenseRow>(
-      `SELECT id, department_id, category_id, amount, currency, expense_date, title, notes, created_by, created_at, updated_at
+      `SELECT id, department_id, category_id, amount, currency, expense_date, title, notes,
+              created_by, recurring_monthly, recurring_source_id, created_at, updated_at
        FROM expenses WHERE id = ?`,
       id
     )

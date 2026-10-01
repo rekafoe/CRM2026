@@ -352,6 +352,8 @@ export interface Expense {
   title: string | null;
   notes: string | null;
   created_by: number | null;
+  recurring_monthly?: number | boolean;
+  recurring_source_id?: number | null;
   created_at?: string;
   updated_at?: string;
   category_name?: string;
@@ -412,6 +414,7 @@ export const createExpense = (data: {
   expense_date: string;
   title?: string | null;
   notes?: string | null;
+  recurring_monthly?: boolean;
 }) => api.post<Expense>('/expenses', data);
 
 export const updateExpense = (
@@ -424,6 +427,7 @@ export const updateExpense = (
     expense_date: string;
     title: string | null;
     notes: string | null;
+    recurring_monthly: boolean;
   }>
 ) => api.put<Expense>(`/expenses/${id}`, data);
 

@@ -141,6 +141,30 @@
   resize: vertical;
 }
 
+.expenses-recurring {
+  margin: 4px 0 12px;
+}
+
+.expenses-recurring label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.expenses-recurring input {
+  width: auto;
+  margin-top: 2px;
+}
+
+.expenses-recurring-hint {
+  margin: 6px 0 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .expenses-form-actions {
   display: flex;
   gap: 8px;
