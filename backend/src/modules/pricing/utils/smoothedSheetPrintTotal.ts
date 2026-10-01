@@ -44,12 +44,17 @@ export function buildMonotonicSheetPrintKnots(
     .sort((a, b) => Number(a.min_qty) - Number(b.min_qty))
 
   for (const tier of sorted) {
-    const sheets = Math.max(1, Math.round(Number(tier.min_qty) / ips))
+    // Точный порог в листах (min_qty в штуках / ips). Math.round схлопывал несколько
+    // тиражных ступеней в один ключ при ips, не кратном сетке min_qty (смена материала /
+    // override) — более дешёвая ступень перезаписывала дорогую → undercharge.
+    const sheetsExact = Number(tier.min_qty) / ips
+    if (!Number.isFinite(sheetsExact) || sheetsExact <= 0) continue
+    if (bySheets.has(sheetsExact)) continue
     const pricePerSheet = printTierUnitPrice(tier) * ips
-    bySheets.set(sheets, {
-      sheets,
+    bySheets.set(sheetsExact, {
+      sheets: sheetsExact,
       pricePerSheet,
-      total: sheets * pricePerSheet,
+      total: sheetsExact * pricePerSheet,
     })
   }
 

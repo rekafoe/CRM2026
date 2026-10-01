@@ -101,4 +101,54 @@ describe('cashRegisterDayService', () => {
     expect(row?.prepaymentUpdatedAt == null || String(row.prepaymentUpdatedAt).trim() === '').toBe(true)
     expect(row?.prepaymentStatus == null || String(row.prepaymentStatus).trim() === '').toBe(true)
   })
+
+  it('excludes soft-cancelled prepaid orders from cash_in_today and issued_today', async () => {
+    const db = await getDb()
+    const payDay = '2026-06-15'
+    const orderNumber = `SOFTCASH-${Date.now()}`
+
+    let hasIsCancelled = false
+    let hasPrepayCol = false
+    try {
+      hasIsCancelled = !!(await db.get("SELECT 1 FROM pragma_table_info('orders') WHERE name = 'is_cancelled'"))
+      hasPrepayCol = !!(await db.get("SELECT 1 FROM pragma_table_info('orders') WHERE name = 'prepaymentUpdatedAt'"))
+    } catch {
+      hasIsCancelled = false
+      hasPrepayCol = false
+    }
+    if (!hasIsCancelled || !hasPrepayCol) return
+
+    const before = await getCashRegisterDay(payDay)
+
+    await db.run(
+      `INSERT INTO orders (number, status, createdAt, created_at, customerName, prepaymentAmount, prepaymentStatus, paymentMethod, prepaymentUpdatedAt, is_cancelled)
+       VALUES (?, 3, ?, ?, 'soft-cancel cash', 90, 'paid', 'offline', ?, 1)`,
+      orderNumber,
+      `${payDay} 10:00:00`,
+      `${payDay} 10:00:00`,
+      `${payDay} 12:00:00`,
+    )
+    const inserted = await db.get<{ id: number }>('SELECT id FROM orders WHERE number = ?', orderNumber)
+    expect(inserted?.id).toBeTruthy()
+
+    let hasDebtClosed = false
+    try {
+      hasDebtClosed = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
+    } catch {
+      hasDebtClosed = false
+    }
+    if (hasDebtClosed) {
+      await db.run(
+        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+        inserted!.id,
+        payDay,
+        40,
+      )
+    }
+
+    const after = await getCashRegisterDay(payDay)
+    expect(after.cash_in_today).toBe(before.cash_in_today)
+    expect(after.issued_today).toBe(before.issued_today)
+    expect(after.orders_included_count).toBe(before.orders_included_count)
+  })
 })

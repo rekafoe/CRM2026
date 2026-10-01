@@ -1253,21 +1253,38 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const db = await getDb()
   const order = await db.get<any>('SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
-  if (Number(order.status) === 7) {
-    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
-    res.json(orderForApi(updated))
-    return
-  }
-  const amounts = await OrderService.getOrderAmountsById(id)
-  const total = amounts.totalAmount
-  const remainder = amounts.debt
 
-  // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
+  // Дата выдачи: из body.issued_on (дата, указанная пользователем) или date('now','localtime').
   const bodyDate = (req.body as any)?.issued_on
   const isValidBodyDate = bodyDate && /^\d{4}-\d{2}-\d{2}$/.test(String(bodyDate).slice(0, 10))
   const today = isValidBodyDate
     ? String(bodyDate).slice(0, 10)
     : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+
+  let hasDebtClosedTable = false
+  try {
+    hasDebtClosedTable = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
+  } catch {
+    hasDebtClosedTable = false
+  }
+  let existingDebt: { amount: number } | undefined
+  if (hasDebtClosedTable) {
+    existingDebt = await db.get<{ amount: number }>(
+      'SELECT amount FROM debt_closed_events WHERE order_id = ? LIMIT 1',
+      id,
+    )
+  }
+
+  // Уже выдан через Issue — идемпотентный ответ. Если status=7 без debt_closed — чиним ниже.
+  if (Number(order.status) === 7 && existingDebt) {
+    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
+    res.json(orderForApi(updated))
+    return
+  }
+
+  const amounts = await OrderService.getOrderAmountsById(id)
+  const total = amounts.totalAmount
+  const remainder = amounts.debt
 
   let hasPrepaymentUpdatedAt = false
   try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
@@ -1286,27 +1303,29 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
     )
   }
 
-  try {
-    let hasIssuedBy = false
-    try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
-    if (hasIssuedBy) {
-      await db.run(
-        'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
-        id,
-        today,
-        remainder,
-        issuerId
-      )
-    } else {
-      await db.run(
-        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
-        id,
-        today,
-        remainder
-      )
+  if (hasDebtClosedTable && !existingDebt) {
+    try {
+      let hasIssuedBy = false
+      try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
+      if (hasIssuedBy) {
+        await db.run(
+          'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
+          id,
+          today,
+          remainder,
+          issuerId
+        )
+      } else {
+        await db.run(
+          'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+          id,
+          today,
+          remainder
+        )
+      }
+    } catch (e) {
+      console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
     }
-  } catch (e) {
-    console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
   }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)

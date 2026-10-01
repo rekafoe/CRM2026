@@ -60,6 +60,29 @@ describe('orderAmounts', () => {
     expect(amounts.debt).toBe(130);
   });
 
+  it('computeOrderAmounts ignores unpaid pending online prepayment for debt', () => {
+    const amounts = computeOrderAmounts({
+      items: [{ price: 100, quantity: 1, params: { storedTotalCost: 100 } }],
+      discount_percent: 0,
+      prepaymentAmount: 100,
+      prepaymentStatus: 'pending',
+      paymentMethod: 'online',
+    });
+    expect(amounts.prepayment).toBe(100);
+    expect(amounts.debt).toBe(100);
+  });
+
+  it('computeOrderAmounts counts paid offline prepayment toward debt', () => {
+    const amounts = computeOrderAmounts({
+      items: [{ price: 100, quantity: 1, params: { storedTotalCost: 100 } }],
+      discount_percent: 0,
+      prepaymentAmount: 40,
+      prepaymentStatus: 'paid',
+      paymentMethod: 'offline',
+    });
+    expect(amounts.debt).toBe(60);
+  });
+
   it('attachAmountsToOrder sets lineTotal on items', () => {
     const order = attachAmountsToOrder({
       id: 1,

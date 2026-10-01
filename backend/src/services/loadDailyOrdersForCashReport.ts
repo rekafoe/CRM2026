@@ -52,6 +52,18 @@ async function resolveItemsPrinterColumn(): Promise<string> {
   return 'printerId'
 }
 
+/** Soft-cancel оставляет заказ в БД с prepaid/debt_closed — в кассу такие не входят. */
+export async function sqlExcludeSoftCancelledOrders(tableAlias = 'o'): Promise<string> {
+  try {
+    if (await hasColumn('orders', 'is_cancelled')) {
+      return `AND COALESCE(${tableAlias}.is_cancelled, 0) = 0`
+    }
+  } catch {
+    /* ignore */
+  }
+  return ''
+}
+
 /**
  * Ожидаемые клики по принтерам за день отчёта (без выгрузки всех позиций).
  * Как в UI: не считаем клики у заказов, выданных сегодня, но оформленных в другой день.
@@ -89,6 +101,7 @@ export async function loadPrinterExpectedClicksForDay(
     hasDebtClosed,
     tableAlias: 'o',
   })
+  const excludeCancelled = await sqlExcludeSoftCancelledOrders('o')
 
   const skipIssuedOtherDaySql = hasDebtClosed
     ? `AND NOT (
@@ -111,6 +124,7 @@ export async function loadPrinterExpectedClicksForDay(
          JOIN orders o ON o.id = i.orderId
         WHERE ${dayFilter.whereSql}
           ${fulfillmentScope.clause}
+          ${excludeCancelled}
           AND i.${printerCol} IS NOT NULL
           AND CAST(i.${printerCol} AS INTEGER) != 0
           ${skipIssuedOtherDaySql}
@@ -179,6 +193,7 @@ export async function loadDailyOrdersForCashReport(
     hasDebtClosed,
     tableAlias: 'o',
   })
+  const excludeCancelled = await sqlExcludeSoftCancelledOrders('o')
 
   const orders = (await db.all(
     `SELECT o.id, o.number, o.status,
@@ -191,6 +206,7 @@ export async function loadDailyOrdersForCashReport(
        FROM orders o
       WHERE ${dayFilter.whereSql}
         ${fulfillmentScope.clause}
+        ${excludeCancelled}
       ORDER BY o.id DESC`,
     ...dayFilter.params,
     ...fulfillmentScope.params,
@@ -251,8 +267,15 @@ export async function loadDailyOrdersForCashReport(
   if (hasDebtClosed) {
     try {
       const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id')
+      const hasIsCancelled = await hasColumn('orders', 'is_cancelled').catch(() => false)
+      const activeJoin = hasIsCancelled
+        ? 'JOIN orders o ON o.id = d.order_id AND COALESCE(o.is_cancelled, 0) = 0'
+        : 'JOIN orders o ON o.id = d.order_id'
       const row = await db.get<{ s: number }>(
-        'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ?',
+        `SELECT COALESCE(SUM(d.amount), 0) AS s
+           FROM debt_closed_events d
+           ${activeJoin}
+          WHERE d.closed_date = ?`,
         d,
       )
       issuedOrdersTotal = Number(row?.s ?? 0)
@@ -260,6 +283,7 @@ export async function loadDailyOrdersForCashReport(
         const rows = (await db.all(
           `SELECT d.issued_by_user_id as user_id, COALESCE(u.name, u.email, 'Без оператора') as user_name, SUM(d.amount) as amount
            FROM debt_closed_events d
+           ${activeJoin}
            LEFT JOIN users u ON u.id = d.issued_by_user_id
            WHERE d.closed_date = ? AND d.issued_by_user_id IS NOT NULL
            GROUP BY d.issued_by_user_id
@@ -272,7 +296,10 @@ export async function loadDailyOrdersForCashReport(
           amount: Number(r.amount ?? 0),
         }))
         const nullRow = await db.get<{ s: number }>(
-          'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ? AND issued_by_user_id IS NULL',
+          `SELECT COALESCE(SUM(d.amount), 0) AS s
+             FROM debt_closed_events d
+             ${activeJoin}
+            WHERE d.closed_date = ? AND d.issued_by_user_id IS NULL`,
           d,
         )
         const nullAmount = Number(nullRow?.s ?? 0)

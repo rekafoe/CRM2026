@@ -7,6 +7,7 @@ import {
 } from '../utils/reportOrderCash'
 import {
   loadDailyOrdersForCashReport,
+  sqlExcludeSoftCancelledOrders,
   type DailyOrderForCashReport,
 } from './loadDailyOrdersForCashReport'
 import { logger } from '../utils/logger'
@@ -133,12 +134,14 @@ async function loadOrderVolumeWorkDay(reportDate: string, departmentId?: number)
   const db = await getDb()
   const columnExists = await hasFulfillmentDepartmentColumn()
   const fulfillmentScope = scopeByFulfillmentDepartment('o', departmentId, { columnExists })
+  const excludeCancelled = await sqlExcludeSoftCancelledOrders('o')
   const totalExpr = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)')
   const row = await db.get<{ s: number }>(
     `SELECT COALESCE(SUM(${totalExpr}), 0) as s
        FROM orders o
       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
         AND o.status != 0
+        ${excludeCancelled}
         ${fulfillmentScope.clause}`,
     d,
     ...fulfillmentScope.params,
