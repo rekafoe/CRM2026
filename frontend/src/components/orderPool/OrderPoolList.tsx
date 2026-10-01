@@ -12,6 +12,7 @@ import {
   poolFulfillmentShowsBanner,
 } from './orderPoolUtils';
 import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
+import { isPoolOrderStatusId } from '../../hooks/useOrderStatuses';
 
 const OrderCard = React.memo<{
   order: Order;
@@ -44,7 +45,7 @@ const OrderCard = React.memo<{
   const canTake =
     !isCancelled
     && !isAssigned
-    && (Number(order.status) === 0 || Number(order.status) === 1);
+    && isPoolOrderStatusId(Number(order.status));
   const readiness = getOrderReadyLabel(order);
   const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
   const fulfillmentChip = getPoolFulfillmentChip(order);

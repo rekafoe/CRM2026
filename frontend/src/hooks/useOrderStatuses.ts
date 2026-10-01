@@ -6,6 +6,34 @@ export interface OrderStatus {
   name: string;
   color?: string;
   sort_order: number;
+  code?: string | null;
+}
+
+const POOL_NAMES = new Set(['Ожидает', 'Оформлен']);
+
+/** Пул: status 0 и строки «Ожидает» / «Оформлен». Пока справочник не загружен — ещё и id 1. */
+export function isPoolOrderStatusId(statusId: number): boolean {
+  const id = Number(statusId);
+  if (id === 0) return true;
+  if (!_cache || _cache.length === 0) return id === 1;
+  const row = _cache.find((status) => status.id === id);
+  if (!row) return false;
+  if (row.code === 'waiting' || row.code === 'placed') return true;
+  return POOL_NAMES.has(row.name);
+}
+
+/** Выдан: строка «Завершён» или прежний номер 7. */
+export function isCompletedOrderStatusId(statusId: number): boolean {
+  const id = Number(statusId);
+  if (id === 7) return true;
+  const row = _cache?.find((status) => status.id === id);
+  if (!row) return false;
+  return row.code === 'completed' || row.name === 'Завершён';
+}
+
+export function completedOrderStatusId(): number {
+  const row = _cache?.find((status) => status.code === 'completed' || status.name === 'Завершён');
+  return row?.id ?? 7;
 }
 
 let _cache: OrderStatus[] | null = null;

@@ -19,6 +19,7 @@ import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailSe
 import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
 import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/miniappOrderStatusTelegramService'
 import { trySyncWebsiteOrderStatusFromCrm } from '../../../services/websiteOrderStatusSyncService'
+import { isPoolStatusId } from '../../../utils/orderStatusCatalog'
 import { logger } from '../../../utils/logger'
 import { MINIAPP_CHECKOUT_STATE_FINALIZED, type MiniappCheckoutState } from '../../../utils/miniappCheckoutState'
 import {
@@ -307,20 +308,22 @@ export class OrderService {
     })
   }
 
-  /** Статусы пула: канонично id 0/1, но на части БД «Ожидает»/«Оформлен» имеют другие id. */
+  /** Пул: status 0 и строки «Ожидает» / «Оформлен», на каком бы id они ни лежали. */
   private static async resolvePoolActiveStatusIds(): Promise<number[]> {
     const db = await getDb()
-    const ids = new Set<number>([0, 1])
+    const ids = new Set<number>([0])
     try {
-      const rows = await db.all<{ id: number }>(
+      const rows = await db.all<{ id: number }[]>(
         `SELECT id FROM order_statuses
-         WHERE name IN ('Ожидает', 'Оформлен', 'Новый')`
+         WHERE code IN ('waiting', 'placed') OR name IN ('Ожидает', 'Оформлен')`
       )
       for (const row of Array.isArray(rows) ? rows : []) {
         const id = Number(row.id)
         if (Number.isFinite(id)) ids.add(id)
       }
-    } catch { /* ignore */ }
+    } catch {
+      ids.add(1)
+    }
     return Array.from(ids)
   }
 
@@ -1702,8 +1705,8 @@ export class OrderService {
     }
 
     const statusId = Number(row.status)
-    if (statusId !== 0 && statusId !== 1) {
-      throw new Error('Вернуть в пул можно только заказ в статусе «ожидает» (0 или 1)')
+    if (!(await isPoolStatusId(db, statusId))) {
+      throw new Error('Вернуть в пул можно только заказ в статусе «Ожидает» или «Оформлен»')
     }
 
     const previousUserId = row.userId != null && Number.isFinite(Number(row.userId)) ? Number(row.userId) : null
@@ -1799,8 +1802,8 @@ export class OrderService {
       throw new Error('Заказ не найден')
     }
     const statusId = Number(row.status)
-    if (statusId !== 0 && statusId !== 1) {
-      throw new Error('Переназначение доступно только для заказов в статусе «ожидает» (0 или 1)')
+    if (!(await isPoolStatusId(db, statusId))) {
+      throw new Error('Переназначение доступно только для заказов в статусе «Ожидает» или «Оформлен»')
     }
     const previousUserId = row.userId != null && Number.isFinite(Number(row.userId)) ? Number(row.userId) : null
     let hasUpdatedAt = false

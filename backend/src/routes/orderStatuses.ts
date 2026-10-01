@@ -12,7 +12,7 @@ router.get('/', asyncHandler(async (req, res) => {
     async () => {
       const db = await getDb()
       return await db.all<any>(
-        'SELECT id, name, color, sort_order FROM order_statuses ORDER BY sort_order'
+        'SELECT id, name, color, sort_order, code FROM order_statuses ORDER BY sort_order'
       )
     },
     30 * 60 * 1000 // 30 минут

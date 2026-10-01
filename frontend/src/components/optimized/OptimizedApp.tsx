@@ -12,6 +12,7 @@ import {
   unassignOrderByNumber,
 } from "../../api";
 import { useNavigate } from 'react-router-dom';
+import { isPoolOrderStatusId } from "../../hooks/useOrderStatuses";
 import AddItemModal from "../AddItemModal";
 import { PrepaymentModal } from "../PrepaymentModal";
 import { FeatureFlaggedCalculator } from "../calculator/FeatureFlaggedCalculator";
@@ -149,8 +150,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
   const handleReturnOrderToPool = useCallback(
     async (order: Order) => {
-      if (Number(order.status) !== 0 && Number(order.status) !== 1) {
-        toast.error('Нельзя вернуть в пул', 'Вернуть в пул можно только заказ со статусом «Ожидает» (0 или 1).');
+      if (!isPoolOrderStatusId(Number(order.status))) {
+        toast.error('Нельзя вернуть в пул', 'Вернуть в пул можно только заказ в статусе «Ожидает» или «Оформлен».');
         return;
       }
       try {

@@ -22,7 +22,7 @@ import {
   type Department,
   type AssignableUser,
 } from '../api';
-import { useOrderStatuses } from '../hooks/useOrderStatuses';
+import { completedOrderStatusId, isCompletedOrderStatusId, isPoolOrderStatusId, useOrderStatuses } from '../hooks/useOrderStatuses';
 import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
 import { isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
@@ -539,8 +539,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const handleAssignToMe = useCallback(
     async (orderNumber: string) => {
       const ord = orders.find((o) => o.number === orderNumber);
-      if (ord && Number(ord.status) !== 0 && Number(ord.status) !== 1) {
-        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (0 или 1).');
+      if (ord && !isPoolOrderStatusId(Number(ord.status))) {
+        toast.error('Нельзя переназначить', 'Переназначить можно только заказ в статусе «Ожидает» или «Оформлен».');
         return;
       }
       try {
@@ -568,8 +568,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const handleReassignTo = useCallback(
     async (orderNumber: string, userId: number) => {
       const ord = orders.find((o) => o.number === orderNumber);
-      if (ord && Number(ord.status) !== 0 && Number(ord.status) !== 1) {
-        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (0 или 1).');
+      if (ord && !isPoolOrderStatusId(Number(ord.status))) {
+        toast.error('Нельзя переназначить', 'Переназначить можно только заказ в статусе «Ожидает» или «Оформлен».');
         return;
       }
       try {
@@ -589,8 +589,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const handleReturnToPool = useCallback(
     async (orderNumber: string) => {
       const ord = orders.find((o) => o.number === orderNumber);
-      if (ord && Number(ord.status) !== 0 && Number(ord.status) !== 1) {
-        toast.error('Нельзя вернуть в пул', 'Вернуть в пул можно только заказ со статусом «Ожидает» (0 или 1).');
+      if (ord && !isPoolOrderStatusId(Number(ord.status))) {
+        toast.error('Нельзя вернуть в пул', 'Вернуть в пул можно только заказ в статусе «Ожидает» или «Оформлен».');
         return;
       }
       try {
@@ -626,7 +626,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         const order = orders.find((o) => o.id === orderId);
         const total = order ? getOrderAmounts(order).total : 0;
         updateOrderInList(orderId, {
-          status: 7 as Order['status'],
+          status: completedOrderStatusId() as Order['status'],
           prepaymentAmount: total,
           prepaymentStatus: 'paid',
           paymentMethod: 'offline',
@@ -885,10 +885,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               showIssueOrder={
                 (selectedDebt > 0 ||
                   (selectedPrepay >= selectedTotal && selectedTotal > 0)) &&
-                Number(selectedOrder.status) !== 7
+                !isCompletedOrderStatusId(Number(selectedOrder.status))
               }
               showCancelOrder={
-                (Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
+                isPoolOrderStatusId(Number(selectedOrder.status)) &&
                 selectedOrder.is_cancelled !== 1
               }
               showPermanentDelete={isAdmin && selectedOrder.is_cancelled === 1}

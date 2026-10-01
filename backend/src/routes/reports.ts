@@ -30,6 +30,7 @@ import {
   type FulfillmentDepartmentScope,
 } from '../utils/orderFulfillmentScope'
 import { resolveDepartmentScope } from '../utils/resolveDepartmentScope'
+import { completedStatusSql } from '../utils/orderStatusCatalog'
 import { syncPayrollExpenses } from '../services/payrollExpenseSync'
 import { syncRecurringExpenses } from '../services/recurringExpenseSync'
 import { syncTurnoverTaxExpenses } from '../services/turnoverTaxExpenseSync'
@@ -739,7 +740,7 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
       COUNT(CASE WHEN status >= 2 THEN 1 END) as confirmed_orders,
       COUNT(CASE WHEN status >= 3 THEN 1 END) as in_progress_orders,
       COUNT(CASE WHEN status >= 4 THEN 1 END) as ready_orders,
-      COUNT(CASE WHEN status = 7 THEN 1 END) as completed_orders,
+      COUNT(CASE WHEN ${completedStatusSql('status')} THEN 1 END) as completed_orders,
       COUNT(CASE WHEN ${totalActiveCond} THEN 1 END) as total_active
     FROM orders WHERE ${orderScopeNoAlias}
     GROUP BY DATE(COALESCE(createdAt, created_at)) ORDER BY date DESC
@@ -747,7 +748,7 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 
   const avgProcessingTime = await db.all<any>(`
     SELECT AVG(JULIANDAY(COALESCE(updatedAt, updated_at)) - JULIANDAY(COALESCE(createdAt, created_at))) * 24 as avg_hours_to_complete, COUNT(*) as completed_orders
-    FROM orders WHERE status = 7 AND ${orderScopeNoAlias} AND COALESCE(updatedAt, updated_at) > COALESCE(createdAt, created_at)
+    FROM orders WHERE ${completedStatusSql('status')} AND ${orderScopeNoAlias} AND COALESCE(updatedAt, updated_at) > COALESCE(createdAt, created_at)
   `, orderScopeNoAliasParams)
 
   const cancelledCond = hasFunnelIsCancelled
@@ -1061,7 +1062,7 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
       where.push(notCancelledListCond)
       where.push(`COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
     } else if (statusFilter === 'completed') {
-      where.push('o.status = 7')
+      where.push(completedStatusSql('o.status'))
     } else if (statusFilter === 'cancelled') {
       where.push(cancelledListCond)
     } else if (statusFilter === 'created') {

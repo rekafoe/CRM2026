@@ -7,6 +7,7 @@ import { upload, uploadMemory, uploadOrderFilesMemory, saveBufferToOrderFiles, o
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { findOrderStatusId } from '../utils/orderStatusCatalog'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
@@ -1253,7 +1254,8 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const db = await getDb()
   const order = await db.get<any>('SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
-  if (Number(order.status) === 7) {
+  const completedId = await findOrderStatusId(db, 'completed', 7)
+  if (Number(order.status) === completedId || Number(order.status) === 7) {
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
     res.json(orderForApi(updated))
     return
@@ -1276,13 +1278,13 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const issueDateTime = `${today} 12:00:00`
   if (hasPrepaymentUpdatedAt) {
     await db.run(
-      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = ?, updated_at = ?, status = 7 WHERE id = ?',
-      total, paymentId, issueDateTime, issueDateTime, id
+      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = ?, updated_at = ?, status = ? WHERE id = ?',
+      total, paymentId, issueDateTime, issueDateTime, completedId, id
     )
   } else {
     await db.run(
-      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = ?, status = 7 WHERE id = ?',
-      total, paymentId, issueDateTime, id
+      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = ?, status = ? WHERE id = ?',
+      total, paymentId, issueDateTime, completedId, id
     )
   }
 

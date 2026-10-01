@@ -1,4 +1,5 @@
 import { hasColumn } from './tableSchemaCache'
+import { completedStatusSql } from './orderStatusCatalog'
 
 let cachedHasFulfillmentCol: boolean | null = null
 
@@ -57,14 +58,16 @@ export function scopeByFulfillmentDepartment(
 }
 
 /**
- * Не в деньгах: просчёт без строки справочника (status 0)
- * или единственная строка с именем «Ожидает». Номер 1 сюда не входит:
- * на части баз это уже «Оформлен».
+ * Не в деньгах: status 0 (просчёт без строки или строка «Ожидает» на id 0)
+ * и любая строка с кодом waiting / именем «Ожидает».
  */
 export function isWaitingStatusSql(statusColumn = 'status'): string {
   return `(
     CAST(COALESCE(${statusColumn}, -1) AS INTEGER) = 0
-    OR ${statusColumn} IN (SELECT id FROM order_statuses WHERE name = 'Ожидает')
+    OR ${statusColumn} IN (
+      SELECT id FROM order_statuses
+      WHERE code = 'waiting' OR name = 'Ожидает'
+    )
   )`
 }
 
@@ -73,12 +76,12 @@ export function notWaitingStatusSql(statusColumn = 'status'): string {
 }
 
 /**
- * Заказ в выручке: оплачен или status 7, и это уже не просчёт и не «Ожидает».
- * status 7 оставлен как есть: на старых базах это не всегда строка «Завершён».
+ * Заказ в выручке: оплачен или завершён (код completed, либо прежний status 7),
+ * и это уже не просчёт и не «Ожидает».
  */
 export function revenueOrdersCondition(alias: string): string {
   const p = alias ? `${alias}.` : ''
-  return `${notWaitingStatusSql(`${p}status`)} AND (${p}status = 7 OR ${p}prepaymentStatus IN ('paid', 'successful'))`
+  return `${notWaitingStatusSql(`${p}status`)} AND (${completedStatusSql(`${p}status`)} OR ${p}prepaymentStatus IN ('paid', 'successful'))`
 }
 
 /** status = 0 — просчёт, его суммы не входят в денежные итоги. NULL не отсекаем. */

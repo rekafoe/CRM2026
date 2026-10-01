@@ -6,6 +6,7 @@ import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 import { parseWebsiteOrderDeliveryJson } from '../types/websiteOrderDelivery'
 import { notWaitingStatusSql } from '../utils/orderFulfillmentScope'
+import { completedStatusSql } from '../utils/orderStatusCatalog'
 import { getTodayString } from '../utils/date'
 import {
   buildOrderQuerySearchClause,
@@ -362,7 +363,7 @@ export const OrderRepository = {
         SELECT 1 FROM user_order_page_orders uopo
         JOIN user_order_pages uop ON uopo.page_id = uop.id
         WHERE uopo.order_id = o.id AND uopo.order_type = 'website' AND uop.user_id = ?
-      )) AND o.status = 7
+      )) AND ${completedStatusSql('o.status')}
         AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
       userId,
@@ -419,7 +420,7 @@ export const OrderRepository = {
         ) AS issued_by_me
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.status = 7
+      WHERE ${completedStatusSql('o.status')}
         AND EXISTS (SELECT 1 FROM debt_closed_events d3 WHERE d3.order_id = o.id AND d3.closed_date = ?)
         AND (
           o.userId = ?
@@ -476,7 +477,7 @@ export const OrderRepository = {
         c.phone as customer__phone, c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.status = 7
+      WHERE ${completedStatusSql('o.status')}
         AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
       d
@@ -1092,7 +1093,7 @@ export const OrderRepository = {
         COUNT(CASE WHEN base.status = 1 THEN 1 END) as newOrders,
         COUNT(CASE WHEN base.status = 2 THEN 1 END) as inProgressOrders,
         COUNT(CASE WHEN base.status = 3 THEN 1 END) as readyOrders,
-        COUNT(CASE WHEN base.status = 7 THEN 1 END) as shippedOrders,
+        COUNT(CASE WHEN ${completedStatusSql('base.status')} THEN 1 END) as shippedOrders,
         COUNT(CASE WHEN base.status = 5 THEN 1 END) as completedOrders,
         COALESCE(SUM(CASE WHEN ${notWaitingStatusSql('base.status')} THEN base.totalAmount ELSE 0 END), 0) as totalRevenue,
         COALESCE(AVG(CASE WHEN ${notWaitingStatusSql('base.status')} THEN base.totalAmount END), 0) as averageOrderValue,

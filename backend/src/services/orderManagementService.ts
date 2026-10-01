@@ -6,6 +6,7 @@ import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
 import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
 import { OrderService } from '../modules/orders/services/orderService';
+import { findOrderStatusId } from '../utils/orderStatusCatalog';
 
 export interface UnifiedOrder {
   id: number;
@@ -486,10 +487,11 @@ export class OrderManagementService {
           let hasPrepaymentUpdatedAt = false;
           try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
           const paymentId = `ISSUE-${Date.now()}-${orderId}`;
+          const completedId = await findOrderStatusId(db, 'completed', 7);
           const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`
-            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`;
-          await db.run(updateSql, totalAmount, paymentId, orderId);
+            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = ? WHERE id = ?`
+            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = ? WHERE id = ?`;
+          await db.run(updateSql, totalAmount, paymentId, completedId, orderId);
 
           // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
           const issuer = issuerId ?? null;

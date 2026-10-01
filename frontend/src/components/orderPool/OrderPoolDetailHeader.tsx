@@ -14,6 +14,7 @@ import {
   poolFulfillmentShowsBanner,
 } from './orderPoolUtils';
 import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
+import { isPoolOrderStatusId } from '../../hooks/useOrderStatuses';
 import { OrderDeliveryBlock } from '../orders/OrderDeliveryBlock';
 
 interface OrderPoolDetailHeaderProps {
@@ -71,7 +72,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
 }) => {
   const [transferOpen, setTransferOpen] = useState(false);
   const responsibleId = getEffectiveResponsibleUserId(order);
-  const canReassign = Number(order.status) === 0 || Number(order.status) === 1;
+  const canReassign = isPoolOrderStatusId(Number(order.status));
   const showCancelled = order.is_cancelled === 1;
   const readiness = getOrderReadyLabel(order);
   const needsAssign = canReassign && responsibleId == null;
@@ -180,7 +181,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             disabled={!canReassign}
             title={
               !canReassign
-                ? 'Переназначить можно только при статусе «Ожидает» (0 или 1)'
+                ? 'Переназначить можно только при статусе «Ожидает» или «Оформлен»'
                 : undefined
             }
           />
