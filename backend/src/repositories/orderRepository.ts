@@ -5,7 +5,7 @@ import { Item } from '../models/Item'
 import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 import { parseWebsiteOrderDeliveryJson } from '../types/websiteOrderDelivery'
-import { SQL_ITEMS_SUBTOTAL_BY_ORDER } from '../utils/orderAmountsSql'
+import { notWaitingStatusSql } from '../utils/orderFulfillmentScope'
 import { getTodayString } from '../utils/date'
 import {
   buildOrderQuerySearchClause,
@@ -1094,10 +1094,10 @@ export const OrderRepository = {
         COUNT(CASE WHEN base.status = 3 THEN 1 END) as readyOrders,
         COUNT(CASE WHEN base.status = 7 THEN 1 END) as shippedOrders,
         COUNT(CASE WHEN base.status = 5 THEN 1 END) as completedOrders,
-        COALESCE(SUM(CASE WHEN COALESCE(base.status, -1) != 0 THEN base.totalAmount ELSE 0 END), 0) as totalRevenue,
-        COALESCE(AVG(CASE WHEN COALESCE(base.status, -1) != 0 THEN base.totalAmount END), 0) as averageOrderValue,
-        COUNT(CASE WHEN COALESCE(base.status, -1) != 0 AND base.prepaymentAmount > 0 THEN 1 END) as ordersWithPrepayment,
-        COALESCE(SUM(CASE WHEN COALESCE(base.status, -1) != 0 THEN base.prepaymentAmount ELSE 0 END), 0) as totalPrepayment
+        COALESCE(SUM(CASE WHEN ${notWaitingStatusSql('base.status')} THEN base.totalAmount ELSE 0 END), 0) as totalRevenue,
+        COALESCE(AVG(CASE WHEN ${notWaitingStatusSql('base.status')} THEN base.totalAmount END), 0) as averageOrderValue,
+        COUNT(CASE WHEN ${notWaitingStatusSql('base.status')} AND base.prepaymentAmount > 0 THEN 1 END) as ordersWithPrepayment,
+        COALESCE(SUM(CASE WHEN ${notWaitingStatusSql('base.status')} THEN base.prepaymentAmount ELSE 0 END), 0) as totalPrepayment
       FROM (
         SELECT
           o.status,

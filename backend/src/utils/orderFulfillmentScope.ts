@@ -57,12 +57,35 @@ export function scopeByFulfillmentDepartment(
 }
 
 /**
- * Заказ в выручке: оплачен или завершён.
- * status = 0 — просчёт: в деньги не входит ни с предоплатой, ни без неё.
+ * «Ожидает» и старое «Новый». SQLite не меняет регистр кириллицы, поэтому перечисляем варианты.
+ */
+export function waitingStatusNameMatchSql(nameExpr = 'name'): string {
+  return `(
+    ${nameExpr} LIKE '%жида%' OR ${nameExpr} LIKE '%Жида%' OR ${nameExpr} LIKE '%ЖИДА%'
+    OR ${nameExpr} IN ('Новый', 'новый', 'НОВЫЙ', 'New', 'new', 'Pending', 'pending')
+  )`
+}
+
+export function waitingStatusIdsSubquery(): string {
+  return `SELECT id FROM order_statuses WHERE ${waitingStatusNameMatchSql('name')}`
+}
+
+/** Пул status=0 и статус с именем «Ожидает» — не выручка, даже если предоплата уже paid. */
+export function isWaitingStatusSql(statusColumn = 'status'): string {
+  return `(COALESCE(${statusColumn}, -1) = 0 OR ${statusColumn} IN (${waitingStatusIdsSubquery()}))`
+}
+
+export function notWaitingStatusSql(statusColumn = 'status'): string {
+  return `NOT ${isWaitingStatusSql(statusColumn)}`
+}
+
+/**
+ * Заказ в выручке: оплачен или завершён, и это не «Ожидает» / просчёт.
+ * Предоплата на ожидающем заказе выручку не включает.
  */
 export function revenueOrdersCondition(alias: string): string {
   const p = alias ? `${alias}.` : ''
-  return `${p}status != 0 AND (${p}status = 7 OR ${p}prepaymentStatus IN ('paid', 'successful'))`
+  return `${notWaitingStatusSql(`${p}status`)} AND (${p}status = 7 OR ${p}prepaymentStatus IN ('paid', 'successful'))`
 }
 
 /** status = 0 — просчёт, его суммы не входят в денежные итоги. NULL не отсекаем. */
