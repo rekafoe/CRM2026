@@ -1,4 +1,5 @@
 import { initDB } from '../db'
+import { up as mergeDuplicateOrderStatuses } from '../migrations/20261001161000_merge_duplicate_order_statuses'
 import { hashPassword } from '../utils'
 import { randomBytes } from 'crypto'
 
@@ -52,6 +53,7 @@ async function ensureOrderStatuses(db: any): Promise<void> {
     }
   }
 
+  await mergeDuplicateOrderStatuses(db)
   const row = await db.get('SELECT COUNT(1) as c FROM order_statuses') as { c?: number } | undefined
   const count = Number(row?.c || 0)
   console.log(`✅ Order statuses ensured (bootstrap): ${count}`)

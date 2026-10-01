@@ -20,11 +20,13 @@ async function seedOrderStatuses(db: Database): Promise<void> {
   if (existing && Number(existing.c) > 0) return
 
   const statuses = [
-    { name: 'Новый', color: '#9e9e9e', sort: 1 },
-    { name: 'В производстве', color: '#1976d2', sort: 2 },
-    { name: 'Готов к отправке', color: '#ffa000', sort: 3 },
-    { name: 'Отправлен', color: '#7b1fa2', sort: 4 },
-    { name: 'Завершён', color: '#2e7d32', sort: 5 }
+    { name: 'Ожидает', color: '#9e9e9e', sort: 1 },
+    { name: 'Оформлен', color: '#1976d2', sort: 2 },
+    { name: 'Принят в работу', color: '#5c6bc0', sort: 3 },
+    { name: 'Выполнен', color: '#2e7d32', sort: 4 },
+    { name: 'Передан в ПВЗ', color: '#ffa000', sort: 5 },
+    { name: 'Получен в ПВЗ', color: '#7b1fa2', sort: 6 },
+    { name: 'Завершён', color: '#1b5e20', sort: 7 },
   ]
 
   for (const status of statuses) {
