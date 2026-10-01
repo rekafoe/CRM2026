@@ -2,6 +2,7 @@ import { getDb } from '../config/database';
 import { syncPayrollExpenses } from './payrollExpenseSync'
 import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
+import { notWaitingStatusSql } from '../utils/orderFulfillmentScope';
 import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
 import { getDesignTemplatesByIds } from './designTemplateService';
 
@@ -169,13 +170,8 @@ export class EarningsService {
       : hasPaymentChannel
         ? "AND COALESCE(o.payment_channel, 'cash') != 'internal'"
         : '';
-    /** Раньше: status != 1 — в актуальном справочнике id=1 часто «Оформлен», заказы с TG/оплатой попадали сюда и выпадали из ЗП целиком. */
     const excludeCancelled = hasIsCancelled ? 'AND COALESCE(o.is_cancelled, 0) = 0' : '';
-    /**
-     * Статусы 0/1 в CRM — «ожидает» (пул / только что оформлен).
-     * Проценты не начисляем, пока заказ не ушёл дальше — независимо от предоплаты.
-     */
-    const excludeWaitingStatus = 'AND CAST(o.status AS INTEGER) NOT IN (0, 1)';
+    const excludeWaitingStatus = `AND ${notWaitingStatusSql('o.status')}`;
 
     const rows = await db.all<EarningsRow[]>(
       `

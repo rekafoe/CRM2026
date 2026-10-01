@@ -19,11 +19,15 @@ describe('revenueOrdersCondition', () => {
       `INSERT OR IGNORE INTO order_statuses (name, color, sort_order) VALUES ('Ожидает', '#9e9e9e', 1)`,
     )
     await db.run(
+      `INSERT OR IGNORE INTO order_statuses (name, color, sort_order) VALUES ('Оформлен', '#1976d2', 2)`,
+    )
+    await db.run(
       `INSERT OR IGNORE INTO order_statuses (name, color, sort_order) VALUES ('Завершён', '#1b5e20', 7)`,
     )
     const waiting = await db.get<{ id: number }>(`SELECT id FROM order_statuses WHERE name = 'Ожидает' LIMIT 1`)
+    const issued = await db.get<{ id: number }>(`SELECT id FROM order_statuses WHERE name = 'Оформлен' LIMIT 1`)
     const done = await db.get<{ id: number }>(`SELECT id FROM order_statuses WHERE name = 'Завершён' LIMIT 1`)
-    if (!waiting?.id || !done?.id) throw new Error('Не удалось создать статусы')
+    if (!waiting?.id || !issued?.id || !done?.id) throw new Error('Не удалось создать статусы')
 
     const insert = async (number: string, statusId: number) => {
       const order = await db.run(
@@ -38,13 +42,20 @@ describe('revenueOrdersCondition', () => {
     }
 
     await insert('TEST-WAIT-REV-WAIT', waiting.id)
-    await insert('TEST-WAIT-REV-FIRST', 1)
+    await insert('TEST-WAIT-REV-POOL', 0)
+    await insert('TEST-WAIT-REV-ISSUED', issued.id)
     await insert('TEST-WAIT-REV-DONE', done.id)
 
-    const row = await db.get<{ waiting_revenue: number; first_revenue: number; done_revenue: number }>(
+    const row = await db.get<{
+      waiting_revenue: number
+      pool_revenue: number
+      issued_revenue: number
+      done_revenue: number
+    }>(
       `SELECT
          COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-WAIT' THEN i.price ELSE 0 END), 0) as waiting_revenue,
-         COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-FIRST' THEN i.price ELSE 0 END), 0) as first_revenue,
+         COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-POOL' THEN i.price ELSE 0 END), 0) as pool_revenue,
+         COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-ISSUED' THEN i.price ELSE 0 END), 0) as issued_revenue,
          COALESCE(SUM(CASE WHEN o.number = 'TEST-WAIT-REV-DONE' THEN i.price ELSE 0 END), 0) as done_revenue
        FROM orders o
        JOIN items i ON i.orderId = o.id
@@ -53,7 +64,8 @@ describe('revenueOrdersCondition', () => {
     )
 
     expect(Number(row?.waiting_revenue)).toBe(0)
-    expect(Number(row?.first_revenue)).toBe(0)
+    expect(Number(row?.pool_revenue)).toBe(0)
+    expect(Number(row?.issued_revenue)).toBe(800)
     expect(Number(row?.done_revenue)).toBe(800)
   })
 })

@@ -57,24 +57,14 @@ export function scopeByFulfillmentDepartment(
 }
 
 /**
- * «Ожидает» и старое «Новый». SQLite не меняет регистр кириллицы, поэтому перечисляем варианты.
+ * Не в деньгах: просчёт без строки справочника (status 0)
+ * или единственная строка с именем «Ожидает». Номер 1 сюда не входит:
+ * на части баз это уже «Оформлен».
  */
-export function waitingStatusNameMatchSql(nameExpr = 'name'): string {
-  return `(
-    ${nameExpr} LIKE '%жида%' OR ${nameExpr} LIKE '%Жида%' OR ${nameExpr} LIKE '%ЖИДА%'
-    OR ${nameExpr} IN ('Новый', 'новый', 'НОВЫЙ', 'New', 'new', 'Pending', 'pending')
-  )`
-}
-
-export function waitingStatusIdsSubquery(): string {
-  return `SELECT id FROM order_statuses WHERE ${waitingStatusNameMatchSql('name')}`
-}
-
-/** Пул 0/1 и любой статус с именем «Ожидает» — не выручка, даже с предоплатой paid. */
 export function isWaitingStatusSql(statusColumn = 'status'): string {
   return `(
-    CAST(COALESCE(${statusColumn}, -1) AS INTEGER) IN (0, 1)
-    OR ${statusColumn} IN (${waitingStatusIdsSubquery()})
+    CAST(COALESCE(${statusColumn}, -1) AS INTEGER) = 0
+    OR ${statusColumn} IN (SELECT id FROM order_statuses WHERE name = 'Ожидает')
   )`
 }
 
@@ -83,8 +73,8 @@ export function notWaitingStatusSql(statusColumn = 'status'): string {
 }
 
 /**
- * Заказ в выручке: оплачен или завершён, и это уже не «Ожидает».
- * Статусы 0 и 1 в CRM — пул «Ожидает». Предоплата на них выручку не включает.
+ * Заказ в выручке: оплачен или status 7, и это уже не просчёт и не «Ожидает».
+ * status 7 оставлен как есть: на старых базах это не всегда строка «Завершён».
  */
 export function revenueOrdersCondition(alias: string): string {
   const p = alias ? `${alias}.` : ''
