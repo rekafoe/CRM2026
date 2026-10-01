@@ -56,8 +56,16 @@ export function scopeByFulfillmentDepartment(
   return { clause: ` AND (${expr}) = ?`, params: [departmentId] }
 }
 
-/** Условие «заказ в выручке» (оплачен или завершён, не отменён). */
+/**
+ * Заказ в выручке: оплачен или завершён.
+ * status = 0 — просчёт: в деньги не входит ни с предоплатой, ни без неё.
+ */
 export function revenueOrdersCondition(alias: string): string {
   const p = alias ? `${alias}.` : ''
   return `${p}status != 0 AND (${p}status = 7 OR ${p}prepaymentStatus IN ('paid', 'successful'))`
+}
+
+/** status = 0 — просчёт, его суммы не входят в денежные итоги. NULL не отсекаем. */
+export function notEstimateStatusSql(column = 'status'): string {
+  return `COALESCE(${column}, -1) != 0`
 }

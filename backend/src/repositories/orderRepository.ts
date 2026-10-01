@@ -1094,10 +1094,10 @@ export const OrderRepository = {
         COUNT(CASE WHEN base.status = 3 THEN 1 END) as readyOrders,
         COUNT(CASE WHEN base.status = 7 THEN 1 END) as shippedOrders,
         COUNT(CASE WHEN base.status = 5 THEN 1 END) as completedOrders,
-        COALESCE(SUM(base.totalAmount), 0) as totalRevenue,
-        COALESCE(AVG(base.totalAmount), 0) as averageOrderValue,
-        COUNT(CASE WHEN base.prepaymentAmount > 0 THEN 1 END) as ordersWithPrepayment,
-        COALESCE(SUM(base.prepaymentAmount), 0) as totalPrepayment
+        COALESCE(SUM(CASE WHEN COALESCE(base.status, -1) != 0 THEN base.totalAmount ELSE 0 END), 0) as totalRevenue,
+        COALESCE(AVG(CASE WHEN COALESCE(base.status, -1) != 0 THEN base.totalAmount END), 0) as averageOrderValue,
+        COUNT(CASE WHEN COALESCE(base.status, -1) != 0 AND base.prepaymentAmount > 0 THEN 1 END) as ordersWithPrepayment,
+        COALESCE(SUM(CASE WHEN COALESCE(base.status, -1) != 0 THEN base.prepaymentAmount ELSE 0 END), 0) as totalPrepayment
       FROM (
         SELECT
           o.status,
