@@ -303,6 +303,19 @@ router.get('/admin', asyncHandler(async (req, res) => {
       shifts: Number(r.shifts) || 0,
     })
   })
+  const shiftsPrev = await db.all<any>(
+    `
+    SELECT user_id, SUM(hours) as hours
+    FROM user_shifts
+    WHERE substr(work_date, 1, 7) = ?
+    GROUP BY user_id
+    `,
+    [prevMonth]
+  ).catch(() => [])
+  const shiftsPrevMap = new Map<number, number>()
+  ;(shiftsPrev || []).forEach((r: any) => {
+    shiftsPrevMap.set(Number(r.user_id), Number(r.hours) || 0)
+  })
 
   const penaltiesRows = await db.all<any>(
     `SELECT user_id, SUM(amount) as total FROM user_penalties
@@ -318,6 +331,20 @@ router.get('/admin', asyncHandler(async (req, res) => {
     [month]
   ).catch(() => [])
   const bonusesMap = new Map(bonusesRows.map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
+  const penaltiesPrevRows = await db.all<any>(
+    `SELECT user_id, SUM(amount) as total FROM user_penalties
+     WHERE substr(penalty_date, 1, 7) = ?
+     GROUP BY user_id`,
+    [prevMonth]
+  ).catch(() => [])
+  const penaltiesPrevMap = new Map((penaltiesPrevRows || []).map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
+  const bonusesPrevRows = await db.all<any>(
+    `SELECT user_id, SUM(amount) as total FROM user_bonuses
+     WHERE substr(bonus_date, 1, 7) = ?
+     GROUP BY user_id`,
+    [prevMonth]
+  ).catch(() => [])
+  const bonusesPrevMap = new Map((bonusesPrevRows || []).map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
 
   const historyKeys = buildMonthKeys(historyMonths, month)
   const historyRows = await db.all<any>(
@@ -345,6 +372,14 @@ router.get('/admin', asyncHandler(async (req, res) => {
       0,
       Number(earnings) + Number(totalBonuses) + hourlyPay - Number(totalPenalties),
     )
+    const previousPercent = totalsPrevMap.get(u.id) || 0
+    const previousHourlyPay = Math.round((shiftsPrevMap.get(u.id) || 0) * hourlyRate * 100) / 100
+    const previousBonuses = bonusesPrevMap.get(u.id) || 0
+    const previousPenalties = penaltiesPrevMap.get(u.id) || 0
+    const totalPreviousNet = Math.max(
+      0,
+      Number(previousPercent) + Number(previousBonuses) + previousHourlyPay - Number(previousPenalties),
+    )
     const history = historyKeys.map((key) => ({
       month: key,
       total: historyMap.get(`${u.id}_${key}`) || 0,
@@ -355,7 +390,8 @@ router.get('/admin', asyncHandler(async (req, res) => {
       role: u.role,
       isActive: !!u.is_active,
       totalCurrentMonth: earnings,
-      totalPreviousMonth: totalsPrevMap.get(u.id) || 0,
+      totalPreviousMonth: previousPercent,
+      totalPreviousNet,
       totalPenalties,
       totalBonuses,
       hourlyRate,

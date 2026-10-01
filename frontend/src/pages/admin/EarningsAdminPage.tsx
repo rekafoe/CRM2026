@@ -415,7 +415,7 @@ export const EarningsAdminPage: React.FC = () => {
                   <th>Премии</th>
                   <th>Штрафы</th>
                   <th>К выплате</th>
-                  <th>Пред. месяц</th>
+                  <th title="К выплате за прошлый месяц: проценты, часы, премии и штрафы">Пред. месяц</th>
                   <th>Часы</th>
                   <th>Смены</th>
                   <th>Действия</th>
@@ -463,7 +463,15 @@ export const EarningsAdminPage: React.FC = () => {
                     <td className="earn-cell-money earn-cell-money--net">
                       <MoneyAmount value={row.totalNet ?? row.totalCurrentMonth} />
                     </td>
-                    <td><MoneyAmount value={row.totalPreviousMonth} /></td>
+                    <td
+                      className="earn-cell-money"
+                      title="Сумма к выплате за прошлый месяц. Ниже — только проценты."
+                    >
+                      <MoneyAmount value={row.totalPreviousNet ?? row.totalPreviousMonth} />
+                      <div className="earn-cell-hint">
+                        проценты <MoneyAmount value={row.totalPreviousMonth} />
+                      </div>
+                    </td>
                     <td>{Number(row.hours).toFixed(1)}</td>
                     <td>{row.shifts}</td>
                     <td>

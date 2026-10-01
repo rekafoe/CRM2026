@@ -5,6 +5,8 @@ export type AdminUserRow = {
   isActive: boolean;
   totalCurrentMonth: number;
   totalPreviousMonth: number;
+  /** К выплате за прошлый месяц: проценты + часы + премии − штрафы. */
+  totalPreviousNet?: number;
   totalPenalties?: number;
   totalBonuses?: number;
   hourlyRate?: number;
