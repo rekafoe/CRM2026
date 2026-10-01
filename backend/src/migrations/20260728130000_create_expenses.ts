@@ -12,6 +12,7 @@ const SEED_CATEGORIES: Array<{ name: string; kind: 'opex' | 'cogs' | 'other'; so
   { name: 'Налоги', kind: 'opex', sort_order: 5 },
   { name: 'Транспорт', kind: 'opex', sort_order: 6 },
   { name: 'Прочее', kind: 'opex', sort_order: 7 },
+  { name: 'Зарплата', kind: 'opex', sort_order: 8 },
 ]
 
 export async function up(db: Database): Promise<void> {

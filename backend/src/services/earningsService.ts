@@ -1,4 +1,5 @@
 import { getDb } from '../config/database';
+import { syncPayrollExpenses } from './payrollExpenseSync'
 import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
 import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
@@ -126,6 +127,12 @@ export class EarningsService {
 
     try {
       await this.doRecalculateForDate(db, date);
+      await syncPayrollExpenses(date, date).catch((syncError) => {
+        logger.error('EarningsService payroll expense sync failed', {
+          date,
+          message: (syncError as Error)?.message,
+        });
+      });
       logger.info('EarningsService recalculateForDate done', { date, durationMs: Date.now() - started });
     } catch (error) {
       logger.error('EarningsService recalculateForDate failed', {

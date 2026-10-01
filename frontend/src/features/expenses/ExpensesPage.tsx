@@ -84,10 +84,11 @@ export const ExpensesPage: React.FC = () => {
         listParams.category_id = categoryFilter;
       }
 
-      const [listRes, summaryRes] = await Promise.all([
-        getExpenses(listParams),
-        getExpenseSummary({ date_from: dateFrom || undefined, date_to: dateTo || undefined }),
-      ]);
+      const summaryRes = await getExpenseSummary({
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      });
+      const listRes = await getExpenses(listParams);
       setExpenses(listRes.data?.expenses ?? []);
       setPeriodTotal(summaryRes.data?.total ?? 0);
     } catch (error) {
@@ -388,19 +389,26 @@ export const ExpensesPage: React.FC = () => {
                   <td>{expense.expense_date?.slice(0, 10)}</td>
                   <td>{departmentLabel(expense.department_id)}</td>
                   <td>{expense.category_name ?? '—'}</td>
-                  <td>{expense.title || '—'}</td>
+                  <td>
+                    {expense.title || '—'}
+                    {expense.notes === 'payroll-auto' ? ' · из ЗП' : ''}
+                  </td>
                   <td className="expenses-amount">
                     <MoneyAmount value={expense.amount} />
                   </td>
                   <td>
-                    <div className="expenses-table-actions">
-                      <Button type="button" variant="secondary" size="sm" onClick={() => handleEdit(expense)}>
-                        Изменить
-                      </Button>
-                      <Button type="button" variant="error" size="sm" onClick={() => void handleDelete(expense.id)}>
-                        Удалить
-                      </Button>
-                    </div>
+                    {expense.notes === 'payroll-auto' ? (
+                      <span className="expenses-empty">считается из процентов</span>
+                    ) : (
+                      <div className="expenses-table-actions">
+                        <Button type="button" variant="secondary" size="sm" onClick={() => handleEdit(expense)}>
+                          Изменить
+                        </Button>
+                        <Button type="button" variant="error" size="sm" onClick={() => void handleDelete(expense.id)}>
+                          Удалить
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
