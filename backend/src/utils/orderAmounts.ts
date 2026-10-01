@@ -15,6 +15,8 @@ export type OrderLike = {
   items?: ItemLike[];
   discount_percent?: number | string | null;
   prepaymentAmount?: number | string | null;
+  prepaymentStatus?: string | null;
+  paymentMethod?: string | null;
   subtotal?: number;
   discountAmount?: number;
   totalAmount?: number;
@@ -86,6 +88,36 @@ export function attachAmountsToItems<T extends ItemLike>(items: T[]): Array<T & 
   }));
 }
 
+/**
+ * Сколько предоплаты уже реально собрано (касса / BePaid paid).
+ * pending/failed online|telegram не уменьшают долг и не должны уменьшать remainder при выдаче.
+ */
+export function computeCollectedPrepaymentAmount(order: {
+  prepaymentAmount?: number | string | null;
+  prepaymentStatus?: string | null;
+  paymentMethod?: string | null;
+}): number {
+  const amount = round2(parseNum(order.prepaymentAmount));
+  if (amount <= 0) return 0;
+  const status = String(order.prepaymentStatus ?? '').toLowerCase().trim();
+  if (status === 'paid' || status === 'successful') return amount;
+  if (
+    status === 'pending' ||
+    status === 'failed' ||
+    status === 'expired' ||
+    status === 'deleted' ||
+    status === 'canceled' ||
+    status === 'cancelled'
+  ) {
+    return 0;
+  }
+  const method = String(order.paymentMethod ?? '').toLowerCase().trim();
+  if (method === 'offline') return amount;
+  if (method === 'online' || method === 'telegram') return 0;
+  // Legacy CRM: сумма без статуса, не online/telegram
+  return amount;
+}
+
 export function computeOrderAmounts(order: OrderLike): OrderAmounts {
   const items = order.items ?? [];
   const subtotal = round2(
@@ -95,7 +127,8 @@ export function computeOrderAmounts(order: OrderLike): OrderAmounts {
   const discountAmount = round2(subtotal * (discountPercent / 100));
   const totalAmount = round2(subtotal - discountAmount);
   const prepayment = round2(parseNum(order.prepaymentAmount));
-  const debt = round2(Math.max(0, totalAmount - prepayment));
+  const collected = computeCollectedPrepaymentAmount(order);
+  const debt = round2(Math.max(0, totalAmount - collected));
 
   return {
     subtotal,

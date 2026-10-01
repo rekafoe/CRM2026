@@ -183,6 +183,22 @@ export class OrderService {
     }
   }
 
+  /** «Завершён» (выдача) — только через POST /issue, иначе нет debt_closed / prepaid seal. */
+  private static async isIssueCompletionStatusId(db: any, statusId: number): Promise<boolean> {
+    if (!Number.isFinite(statusId)) return false
+    if (Number(statusId) === 7) return true
+    try {
+      const status = await db.get(
+        'SELECT name FROM order_statuses WHERE id = ?',
+        [statusId]
+      ) as { name?: string } | undefined
+      const name = String(status?.name || '').trim().toLowerCase()
+      return name === 'завершён' || name === 'завершен' || name.includes('выдан')
+    } catch {
+      return false
+    }
+  }
+
   private static async getOrCreateCancelledStatusId(db: any): Promise<number> {
     try {
       const statuses = await db.all(
@@ -295,8 +311,10 @@ export class OrderService {
     const orderRow = await db.get<{
       discount_percent?: number | null
       prepaymentAmount?: number | null
+      prepaymentStatus?: string | null
+      paymentMethod?: string | null
     }>(
-      'SELECT COALESCE(discount_percent, 0) as discount_percent, prepaymentAmount FROM orders WHERE id = ?',
+      'SELECT COALESCE(discount_percent, 0) as discount_percent, prepaymentAmount, prepaymentStatus, paymentMethod FROM orders WHERE id = ?',
       orderId
     )
     const items = await OrderRepository.getItemsByOrderId(orderId)
@@ -304,6 +322,8 @@ export class OrderService {
       items: items as Parameters<typeof computeOrderAmounts>[0]['items'],
       discount_percent: orderRow?.discount_percent ?? 0,
       prepaymentAmount: orderRow?.prepaymentAmount,
+      prepaymentStatus: orderRow?.prepaymentStatus,
+      paymentMethod: orderRow?.paymentMethod,
     })
   }
 
@@ -1598,6 +1618,9 @@ export class OrderService {
     if (await this.isCancellationStatusId(db, targetStatus)) {
       throw new Error('Статус отмены назначается только через отмену заказа')
     }
+    if (await this.isIssueCompletionStatusId(db, targetStatus)) {
+      throw new Error('Статус «Завершён» ставится только через выдачу заказа')
+    }
     
     // Сначала проверяем, есть ли заказ в таблице photo_orders (Telegram заказы)
     let telegramOrder: any = null
@@ -2247,6 +2270,9 @@ export class OrderService {
     }
     if (await this.isCancellationStatusId(db, targetStatus)) {
       throw new Error('Статус отмены назначается только через отмену заказа')
+    }
+    if (await this.isIssueCompletionStatusId(db, targetStatus)) {
+      throw new Error('Статус «Завершён» ставится только через выдачу заказа')
     }
     
     const placeholders = orderIds.map(() => '?').join(',')
