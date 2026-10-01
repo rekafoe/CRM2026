@@ -1,4 +1,5 @@
 import { syncPayrollExpenses } from '../../services/payrollExpenseSync'
+import { syncTurnoverTaxExpenses } from '../../services/turnoverTaxExpenseSync'
 import { ExpenseRepository } from './expenseRepository'
 import type {
   ExpenseCategoryInput,
@@ -43,6 +44,7 @@ export class ExpenseService {
 
   static async list(filters?: ExpenseListFilters): Promise<ExpenseWithRelations[]> {
     await syncPayrollExpenses(filters?.date_from, filters?.date_to)
+    await syncTurnoverTaxExpenses(filters?.date_from, filters?.date_to)
     return ExpenseRepository.listExpenses(filters)
   }
 
@@ -87,6 +89,7 @@ export class ExpenseService {
 
   static async getSummary(filters?: { date_from?: string; date_to?: string }): Promise<ExpenseSummary> {
     await syncPayrollExpenses(filters?.date_from, filters?.date_to)
+    await syncTurnoverTaxExpenses(filters?.date_from, filters?.date_to)
     const [byDeptRows, companyWide, total] = await Promise.all([
       ExpenseRepository.sumByDepartment(filters),
       ExpenseRepository.sumCompanyWide(filters),

@@ -29,6 +29,7 @@ import {
 } from '../utils/orderFulfillmentScope'
 import { resolveDepartmentScope } from '../utils/resolveDepartmentScope'
 import { syncPayrollExpenses } from '../services/payrollExpenseSync'
+import { syncTurnoverTaxExpenses } from '../services/turnoverTaxExpenseSync'
 
 const router = Router()
 
@@ -159,6 +160,7 @@ async function loadExpensesByDepartment(
   const empty = { byDepartment: new Map<number | null, number>(), companyWide: 0 }
   try {
     await syncPayrollExpenses(dateFrom, dateTo)
+    await syncTurnoverTaxExpenses(dateFrom, dateTo)
     const table = await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='expenses'")
     if (!table) return empty
     const hasDeptCol = await hasColumn('expenses', 'department_id')

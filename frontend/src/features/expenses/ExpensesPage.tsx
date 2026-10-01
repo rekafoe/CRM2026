@@ -392,6 +392,7 @@ export const ExpensesPage: React.FC = () => {
                   <td>
                     {expense.title || '—'}
                     {expense.notes === 'payroll-auto' ? ' · из ЗП' : ''}
+                    {expense.notes?.startsWith('tax-auto:') ? ' · 6% оборота' : ''}
                   </td>
                   <td className="expenses-amount">
                     <MoneyAmount value={expense.amount} />
@@ -399,6 +400,8 @@ export const ExpensesPage: React.FC = () => {
                   <td>
                     {expense.notes === 'payroll-auto' ? (
                       <span className="expenses-empty">считается из процентов</span>
+                    ) : expense.notes?.startsWith('tax-auto:') ? (
+                      <span className="expenses-empty">считается от выручки за квартал</span>
                     ) : (
                       <div className="expenses-table-actions">
                         <Button type="button" variant="secondary" size="sm" onClick={() => handleEdit(expense)}>
