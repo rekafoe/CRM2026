@@ -118,4 +118,38 @@ describe('syncRecurringExpenses', () => {
       '2026-03-31',
     ])
   })
+
+  it('удаление шаблона убирает копии — повторное создание не дублирует месяцы', async () => {
+    const first = await ExpenseService.create({
+      category_id: categoryId,
+      amount: 700,
+      expense_date: '2026-01-10',
+      title: 'TEST-RECUR-recreate',
+      recurring_monthly: true,
+    })
+    await syncRecurringExpenses('2026-02-15')
+    await ExpenseService.delete(first.id)
+
+    const second = await ExpenseService.create({
+      category_id: categoryId,
+      amount: 700,
+      expense_date: '2026-01-10',
+      title: 'TEST-RECUR-recreate',
+      recurring_monthly: true,
+    })
+    await syncRecurringExpenses('2026-02-15')
+
+    const db = await getDb()
+    const rows = (await db.all(
+      `SELECT expense_date, recurring_source_id FROM expenses
+        WHERE title = 'TEST-RECUR-recreate' ORDER BY expense_date, id`,
+    )) as Array<{ expense_date: string; recurring_source_id: number | null }>
+
+    expect(rows.map((row) => String(row.expense_date).slice(0, 10))).toEqual([
+      '2026-01-10',
+      '2026-02-10',
+    ])
+    expect(rows[0].recurring_source_id ?? null).toBeNull()
+    expect(Number(rows[1].recurring_source_id)).toBe(Number(second.id))
+  })
 })
