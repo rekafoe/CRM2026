@@ -21,6 +21,55 @@
   margin: 0;
 }
 
+.admin-home .admin-page-content {
+  padding: 16px;
+}
+
+.admin-home .daily-activity-overview {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.admin-home .daily-activity-overview__title {
+  display: none;
+}
+
+.admin-home .system-features-panel {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --bg-secondary: #f8fafc;
+  --bg-primary: #fff;
+  --border-color: #e2e8f0;
+}
+
+.admin-home .features-header {
+  display: none;
+}
+
+.admin-home .feature-action-btn {
+  background: rgba(59, 130, 246, 0.18);
+  color: #1e3a8a;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.admin-home .feature-action-btn:hover {
+  background: rgba(59, 130, 246, 0.26);
+}
+
+@media (max-width: 768px) {
+  .admin-home .admin-page-content {
+    padding: 12px;
+  }
+}
+
 .admin-panel-header {
   margin-bottom: 12px;
   padding: 16px;

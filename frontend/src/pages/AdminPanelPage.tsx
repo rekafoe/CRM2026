@@ -1,17 +1,15 @@
-import React, { lazy, Suspense, useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import React, { lazy, Suspense, useMemo } from 'react';
+import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAdminBack } from '../hooks/useAdminBack';
 import { NotificationsManager } from '../components/notifications/NotificationsManager';
-import AdminDashboard from '../components/admin/AdminDashboard';
 import { DailyActivityOverview } from '../components/admin/DailyActivityOverview';
 import SystemFeaturesPanel from '../components/admin/SystemFeaturesPanel';
-import { useCurrentUser } from '../hooks/useCurrentUser';
-import { useMaterials } from '../api/hooks/useMaterials';
-import { useOrders } from '../api/hooks/useOrders';
-import { AppIcon } from '../components/ui/AppIcon';
+import { AdminPageLayout } from '../components/admin/AdminPageLayout';
+import { AppIcon, type IconName } from '../components/ui/AppIcon';
 import '../styles/admin-panel.css';
 import '../components/notifications/NotificationsManager.css';
 import './NotificationsPage.css';
+import './admin/SettingsPage.css';
 const LoadingFallback: React.FC = () => (
   <div className="loading-overlay">Загрузка...</div>
 );
@@ -103,296 +101,158 @@ const NotificationsPage: React.FC = () => {
   );
 };
 
-// Главная страница админ панели с навигацией
+type AdminGroupId = 'overview' | 'work' | 'production' | 'clients' | 'design' | 'communication' | 'settings' | 'plan';
+
+type AdminLink = {
+  title: string;
+  description: string;
+  to: string;
+  icon: IconName;
+};
+
+const ADMIN_GROUPS: Array<{ id: AdminGroupId; title: string; hint: string; icon: IconName; links?: AdminLink[] }> = [
+  { id: 'overview', title: 'Обзор', hint: 'Активность за день', icon: 'chart' },
+  {
+    id: 'work',
+    title: 'Работа',
+    hint: 'Заказы, деньги, доставка',
+    icon: 'briefcase',
+    links: [
+      { title: 'Отчеты', description: 'Аналитика, выручка и дневные отчёты.', to: '/adminpanel/reports', icon: 'chart' },
+      { title: 'Расходы', description: 'Операционные расходы по департаментам.', to: '/adminpanel/expenses', icon: 'receipt' },
+      { title: 'Проценты', description: 'Начисления сотрудников, часы и аналитика.', to: '/adminpanel/earnings', icon: 'briefcase' },
+      { title: 'Счётчики', description: 'Касса и принтеры по дням.', to: '/adminpanel/counters', icon: 'receipt' },
+      { title: 'Доставка', description: 'Белпочта и Европочта: статус и история.', to: '/adminpanel/deliveries', icon: 'package' },
+    ],
+  },
+  {
+    id: 'production',
+    title: 'Производство',
+    hint: 'Калькулятор и склад',
+    icon: 'wrench',
+    links: [
+      { title: 'Материалы', description: 'Склад, остатки и поставщики.', to: '/adminpanel/materials', icon: 'package' },
+      { title: 'Продукты калькулятора', description: 'Типы изделий, шаблоны и техпроцесс.', to: '/adminpanel/products', icon: 'puzzle' },
+      { title: 'Операции', description: 'Постпечатные услуги и проценты операторов.', to: '/adminpanel/services-management', icon: 'wrench' },
+      { title: 'Плоттерная резка', description: 'Тарифы рулона и листа, выборка и накатка.', to: '/adminpanel/plotter-cutting', icon: 'scissors' },
+      { title: 'Принтеры', description: 'Оборудование и привязка к печати.', to: '/adminpanel/printers', icon: 'printer' },
+      { title: 'Ценообразование', description: 'Обзор формул и переход к продуктам.', to: '/adminpanel/pricing', icon: 'chart-up' },
+    ],
+  },
+  {
+    id: 'clients',
+    title: 'Клиенты',
+    hint: 'База и юрлица',
+    icon: 'users',
+    links: [
+      { title: 'Клиенты', description: 'База клиентов и история заказов.', to: '/adminpanel/clients', icon: 'users' },
+      { title: 'Организации и чеки', description: 'Юрлица, УНП и реквизиты для оплаты.', to: '/adminpanel/organizations', icon: 'building' },
+    ],
+  },
+  {
+    id: 'design',
+    title: 'Макеты',
+    hint: 'Документы и редактор',
+    icon: 'image',
+    links: [
+      { title: 'Шаблоны документов', description: 'Договоры, счета и бланки для клиента.', to: '/adminpanel/document-templates', icon: 'clipboard' },
+      { title: 'Шаблоны дизайна', description: 'Каталог макетов редактора.', to: '/adminpanel/design-templates', icon: 'image' },
+      { title: 'Префлайт', description: 'Проверка макетов перед печатью.', to: '/adminpanel/preflight', icon: 'layers' },
+      { title: 'База знаний', description: 'Инструкции, регламенты и предложения команды.', to: '/knowledge', icon: 'document' },
+    ],
+  },
+  {
+    id: 'communication',
+    title: 'Связь',
+    hint: 'Почта и уведомления',
+    icon: 'bell',
+    links: [
+      { title: 'Уведомления', description: 'Каналы оповещений внутри CRM.', to: '/adminpanel/notifications', icon: 'bell' },
+      { title: 'Почта заказов', description: 'SMTP и письма при смене статуса.', to: '/adminpanel/notifications?tab=client', icon: 'document' },
+      { title: 'Рассылка', description: 'Кампании, сегменты и журнал отправки.', to: '/adminpanel/notifications?tab=campaigns', icon: 'bell-ring' },
+      { title: 'Воронка чатов', description: 'План единого входящего: Telegram, Viber, Instagram, сайт.', to: '/adminpanel/inbox-plan', icon: 'bell' },
+    ],
+  },
+  {
+    id: 'settings',
+    title: 'Настройки',
+    hint: 'Доступы и команда',
+    icon: 'settings',
+    links: [
+      { title: 'Общие настройки', description: 'Доставка, процент калькулятора и связанные разделы.', to: '/adminpanel/settings', icon: 'settings' },
+      { title: 'Пользователи', description: 'Сотрудники, роли и API-токены.', to: '/adminpanel/users', icon: 'user' },
+    ],
+  },
+  { id: 'plan', title: 'План модулей', hint: 'Что уже есть и что в работе', icon: 'layers' },
+];
+
+const ADMIN_GROUP_IDS = new Set<string>(ADMIN_GROUPS.map((group) => group.id));
+
 const AdminPanelHome: React.FC = () => {
   const navigate = useNavigate();
-  const currentUser = useCurrentUser();
-  const { data: materials } = useMaterials();
-  const { data: orders } = useOrders();
-  const [showNotificationsManager, setShowNotificationsManager] = useState(false);
-
-  const lowStockCount = materials?.filter((m: any) => m.quantity < 10).length || 0;
-  const totalOrders = orders?.length || 0;
-  const totalRevenue = orders?.reduce((sum, order: any) => sum + (order.totalAmount ?? order.total_amount ?? 0), 0) || 0;
-
-  const handleNavigate = (page: string) => {
-    navigate(`/adminpanel/${page}`);
-  };
-
-  const handleOpenModal = (modal: string) => {
-    // Здесь можно открыть модальные окна
-    console.log('Opening modal:', modal);
-    if (modal === 'notifications') {
-      setShowNotificationsManager(true);
-    }
-  };
-
-  // Показываем загрузку если пользователь еще не загружен
-  if (currentUser === null) {
-    return (
-      <div className="admin-panel-home">
-        <div className="admin-panel-header">
-          <h1><AppIcon name="settings" size="xl" /> Админ панель</h1>
-          <p>Загрузка...</p>
-        </div>
-      </div>
-    );
-  }
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get('group');
+  const groupId: AdminGroupId = requested && ADMIN_GROUP_IDS.has(requested) ? requested as AdminGroupId : 'overview';
+  const group = useMemo(
+    () => ADMIN_GROUPS.find((item) => item.id === groupId) ?? ADMIN_GROUPS[0],
+    [groupId],
+  );
 
   return (
-    <div className="admin-panel-home">
-      <div className="admin-panel-header">
-        <div className="header-content">
-          <button 
-            onClick={() => navigate('/')} 
-            className="back-btn"
-            title="Вернуться на главную"
-          >
-            ← Назад
-          </button>
-          <div className="header-text">
-            <h1><AppIcon name="settings" size="xl" /> Админ панель</h1>
-            <p>Добро пожаловать в систему управления CRM</p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Простая навигация */}
-      <div className="admin-navigation">
-        <div className="nav-buttons">
-          <button onClick={() => navigate('/adminpanel/materials')} className="nav-btn">
-            <AppIcon name="package" size="xs" /> Материалы
-          </button>
-          <button onClick={() => navigate('/adminpanel/reports')} className="nav-btn">
-            <AppIcon name="chart" size="xs" /> Отчеты
-          </button>
-          <button onClick={() => navigate('/adminpanel/expenses')} className="nav-btn">
-            <AppIcon name="receipt" size="xs" /> Расходы
-          </button>
-          <button onClick={() => navigate('/adminpanel/deliveries')} className="nav-btn">
-            <AppIcon name="package" size="xs" /> Доставка
-          </button>
-          <button onClick={() => navigate('/adminpanel/products')} className="nav-btn">
-            <AppIcon name="puzzle" size="xs" /> Продукты калькулятора
-          </button>
-          <button onClick={() => navigate('/adminpanel/earnings')} className="nav-btn">
-            <AppIcon name="briefcase" size="xs" /> Проценты
-          </button>
-          <button onClick={() => navigate('/adminpanel/printers')} className="nav-btn">
-            <AppIcon name="printer" size="xs" /> Принтеры
-          </button>
-          <button onClick={() => navigate('/adminpanel/counters')} className="nav-btn">
-            <AppIcon name="receipt" size="xs" /> Счётчики
-          </button>
-          <button onClick={() => navigate('/adminpanel/services-management')} className="nav-btn">
-            <AppIcon name="wrench" size="xs" /> Настройка операций
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/adminpanel/plotter-cutting')}
-            className="nav-btn"
-            title="Тарифы рулон/лист за п.м., объёмные ступени; выборка и накатка — фикс. за изделие. Включение плоттера — в шаблоне продукта, подтип"
-          >
-            <AppIcon name="scissors" size="xs" /> Плоттерная резка
-          </button>
-          <button onClick={() => navigate('/adminpanel/clients')} className="nav-btn">
-            <AppIcon name="users" size="xs" /> Клиенты
-          </button>
-          <button onClick={() => navigate('/adminpanel/document-templates')} className="nav-btn">
-            <AppIcon name="clipboard" size="xs" /> Шаблоны документов
-          </button>
-          <button onClick={() => navigate('/adminpanel/organizations')} className="nav-btn">
-            <AppIcon name="receipt" size="xs" /> Организации и чеки
-          </button>
-          <button onClick={() => navigate('/adminpanel/users')} className="nav-btn">
-            <AppIcon name="users" size="xs" /> Пользователи
-          </button>
-          <button onClick={() => navigate('/adminpanel/settings')} className="nav-btn">
-            <AppIcon name="settings" size="xs" /> Настройки
-          </button>
-          <button onClick={() => navigate('/adminpanel/notifications')} className="nav-btn">
-            <AppIcon name="bell" size="xs" /> Уведомления
-          </button>
-          <button onClick={() => navigate('/adminpanel/preflight')} className="nav-btn">
-            <AppIcon name="layers" size="xs" /> Префлайт
-          </button>
-          <button onClick={() => navigate('/adminpanel/inbox-plan')} className="nav-btn">
-            <AppIcon name="bell" size="xs" /> Воронка чатов
-          </button>
-          <button onClick={() => navigate('/knowledge')} className="nav-btn">
-            <AppIcon name="document" size="xs" /> База знаний
-          </button>
-          <button onClick={() => navigate('/adminpanel/design-templates')} className="nav-btn">
-            <AppIcon name="image" size="xs" /> Шаблоны дизайна
-          </button>
-        </div>
-      </div>
-      
-      <div className="admin-panel-content">
-        {/* Обзор активности пользователей */}
-        <div className="mb-6">
-          <DailyActivityOverview />
-        </div>
-        
-        <div className="admin-welcome">
-          <h2>Выберите раздел для управления</h2>
-          <p>Используйте кнопки навигации выше или выберите нужный раздел:</p>
-          
-          <div className="admin-quick-links">
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/materials')}
-            >
-              <span className="link-icon"><AppIcon name="package" size="md" circle /></span>
-              <span className="link-title">Материалы</span>
-              <span className="link-desc">Полное управление материалами и складом</span>
-            </button>
-            
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/reports')}
-            >
-              <span className="link-icon"><AppIcon name="chart" size="md" circle /></span>
-              <span className="link-title">Отчеты</span>
-              <span className="link-desc">Аналитика и отчеты</span>
-            </button>
-
+    <AdminPageLayout
+      title="Админ панель"
+      description="Заказы, производство, клиенты и доступы."
+      icon={<AppIcon name="settings" size="lg" />}
+      onBack={() => navigate('/')}
+      className="admin-home"
+    >
+      <div className="settings-shell">
+        <nav className="settings-nav" aria-label="Разделы админки">
+          {ADMIN_GROUPS.map((item) => (
             <button
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/expenses')}
-            >
-              <span className="link-icon"><AppIcon name="receipt" size="md" circle /></span>
-              <span className="link-title">Расходы</span>
-              <span className="link-desc">Операционные расходы по департаментам</span>
-            </button>
-            
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/products')}
-            >
-              <span className="link-icon"><AppIcon name="puzzle" size="md" circle /></span>
-              <span className="link-title">Калькулятор</span>
-              <span className="link-desc">Настройки калькулятора</span>
-            </button>
-
-            <button
+              key={item.id}
               type="button"
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/plotter-cutting')}
+              className={`settings-nav__btn${item.id === groupId ? ' settings-nav__btn--active' : ''}`}
+              onClick={() => setSearchParams({ group: item.id })}
+              aria-current={item.id === groupId ? 'page' : undefined}
             >
-              <span className="link-icon"><AppIcon name="scissors" size="md" circle /></span>
-              <span className="link-title">Плоттерная резка</span>
-              <span className="link-desc">
-                Основная резка и два доптарифа (выборка, накатка за изделие). В калькуляторе — чекбоксы только для рулонного подтипа
+              <span className="settings-nav__icon">
+                <AppIcon name={item.icon} size="sm" />
+              </span>
+              <span className="settings-nav__text">
+                <span className="settings-nav__title">{item.title}</span>
+                <span className="settings-nav__hint">{item.hint}</span>
               </span>
             </button>
-            
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/price-management')}
-            >
-              <span className="link-icon"><AppIcon name="chart-up" size="md" circle /></span>
-              <span className="link-title">Управление ценами</span>
-              <span className="link-desc">История цен, уведомления, пересчет</span>
-            </button>
+          ))}
+        </nav>
 
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/earnings')}
-            >
-              <span className="link-icon"><AppIcon name="briefcase" size="md" circle /></span>
-              <span className="link-title">Проценты</span>
-              <span className="link-desc">Начисления сотрудников и часы</span>
-            </button>
-            
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/notifications')}
-            >
-              <span className="link-icon"><AppIcon name="bell" size="md" circle /></span>
-              <span className="link-title">Уведомления</span>
-              <span className="link-desc">Управление всеми уведомлениями системы</span>
-            </button>
-            <button
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/notifications?tab=client')}
-            >
-              <span className="link-icon"><AppIcon name="document" size="md" circle /></span>
-              <span className="link-title">Почта (заказы)</span>
-              <span className="link-desc">SMTP, тест, правила писем при смене статуса</span>
-            </button>
-            <button
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/notifications?tab=campaigns')}
-            >
-              <span className="link-icon"><AppIcon name="bell" size="md" circle /></span>
-              <span className="link-title">Менеджер рассылки</span>
-              <span className="link-desc">Кампании, шаблоны, сегменты и журнал отправки</span>
-            </button>
-            <button
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/counters')}
-            >
-              <span className="link-icon"><AppIcon name="receipt" size="md" circle /></span>
-              <span className="link-title">Счётчики</span>
-              <span className="link-desc">Касса и принтеры по дням</span>
-            </button>
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/clients')}
-            >
-              <span className="link-icon"><AppIcon name="users" size="md" circle /></span>
-              <span className="link-title">Клиенты</span>
-              <span className="link-desc">База клиентов и история заказов</span>
-            </button>
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/preflight')}
-            >
-              <span className="link-icon"><AppIcon name="layers" size="md" circle /></span>
-              <span className="link-title">Префлайт</span>
-              <span className="link-desc">Проверка макетов: вылеты, цвет, шрифты, разрешение</span>
-            </button>
-            <button
-              type="button"
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/inbox-plan')}
-            >
-              <span className="link-icon"><AppIcon name="bell" size="md" circle /></span>
-              <span className="link-title">Воронка чатов</span>
-              <span className="link-desc">План единого inbox + security hotfix (TG / Viber / Instagram / сайт)</span>
-            </button>
-            <button
-              type="button"
-              className="admin-link-card"
-              onClick={() => navigate('/knowledge')}
-            >
-              <span className="link-icon"><AppIcon name="document" size="md" circle /></span>
-              <span className="link-title">База знаний</span>
-              <span className="link-desc">Инструкции, регламенты и предложения команды</span>
-            </button>
-            <button 
-              className="admin-link-card"
-              onClick={() => navigate('/adminpanel/design-templates')}
-            >
-              <span className="link-icon"><AppIcon name="image" size="md" circle /></span>
-              <span className="link-title">Шаблоны дизайна</span>
-              <span className="link-desc">Каталог шаблонов для редактора макетов</span>
-            </button>
-          </div>
-        </div>
+        <section className="settings-panel" aria-labelledby="admin-group-title">
+          <header className="settings-panel__header">
+            <h2 id="admin-group-title">{group.title}</h2>
+            <p>{group.hint}</p>
+          </header>
 
-        {/* Панель модулей системы */}
-        <div className="system-features-section">
-          <SystemFeaturesPanel />
-        </div>
+          {group.id === 'overview' && <DailyActivityOverview />}
+          {group.id === 'plan' && <SystemFeaturesPanel />}
+          {group.links && (
+            <div className="settings-links">
+              {group.links.map((link) => (
+                <button key={link.to} type="button" className="settings-link" onClick={() => navigate(link.to)}>
+                  <span className="settings-link__icon">
+                    <AppIcon name={link.icon} size="md" circle />
+                  </span>
+                  <span className="settings-link__body">
+                    <strong>{link.title}</strong>
+                    <span>{link.description}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
-      
-      {/* Модальное окно уведомлений */}
-      {showNotificationsManager && (
-        <NotificationsManager onClose={() => setShowNotificationsManager(false)} />
-      )}
-    </div>
+    </AdminPageLayout>
   );
 };
 
