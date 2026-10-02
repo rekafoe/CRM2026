@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Order } from '../../types';
 import { StatusBadge } from '../common/StatusBadge';
-import { Button } from '../common/Button';
 import { AssignableUserSelect } from '../orders/AssignableUserSelect';
 import { OrderTransferModal } from '../orders/OrderTransferModal';
 import type { AssignableUser, Department } from '../../api';
@@ -105,7 +104,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
                 type="button"
                 className="order-pool-detail-header__phone-btn"
                 title="Скопировать телефон"
-                onClick={() =>onCopyPhone?.(order.customerPhone!)}
+                onClick={() => onCopyPhone?.(order.customerPhone!)}
               >
                 {order.customerPhone}
               </button>
@@ -129,14 +128,13 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
         </div>
 
         {needsAssign && (
-          <Button
+          <button
             type="button"
-            variant="success"
-            className="order-pool-detail-header__take-primary"
+            className="lg-btn lg-btn--success order-pool-detail-header__take-primary"
             onClick={onAssignToMe}
           >
             Взять в работу
-          </Button>
+          </button>
         )}
       </div>
 
@@ -186,11 +184,9 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             }
           />
         </label>
-        <Button
+        <button
           type="button"
-          variant={fulfillmentChip?.variant === 'pickup' ? 'primary' : 'secondary'}
-          size="sm"
-          className={fulfillmentChip?.variant === 'pickup' ? 'order-pool-transfer-btn--pickup' : undefined}
+          className={`lg-btn${fulfillmentChip?.variant === 'pickup' ? ' lg-btn--primary' : ''}`}
           onClick={() => setTransferOpen(true)}
           title={
             fulfillmentChip?.variant === 'pickup'
@@ -201,51 +197,48 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
           {fulfillmentChip?.variant === 'pickup'
             ? `Передать на ${fulfillmentChip.pointName}`
             : 'Передать'}
-        </Button>
+        </button>
       </div>
 
       <div className="order-detail-actions" role="toolbar" aria-label="Действия по заказу">
-        <Button type="button" variant="secondary" size="sm" onClick={onShowFiles}>
+        <button type="button" className="lg-btn" onClick={onShowFiles}>
           Файлы
-        </Button>
-        <Button type="button" variant="success" size="sm" onClick={onShowPrepayment}>
+        </button>
+        <button type="button" className="lg-btn lg-btn--success" onClick={onShowPrepayment}>
           Предоплата
-        </Button>
-        <Button
+        </button>
+        <button
           type="button"
-          variant="primary"
-          size="sm"
+          className="lg-btn lg-btn--primary"
           onClick={onSendPaymentLink}
           title="Создать ссылку BePaid и отправить клиенту"
         >
           Ссылка на оплату
-        </Button>
+        </button>
         {showIssueOrder && (
-          <Button
+          <button
             type="button"
-            variant="success"
-            size="sm"
+            className="lg-btn lg-btn--success"
             onClick={onIssueOrder}
             disabled={issuing}
-            loading={issuing}
           >
             {issuing ? 'Выдача…' : 'Выдать'}
-          </Button>
+          </button>
         )}
         {showRemovePrepayment && (
-          <Button type="button" variant="error" size="sm" onClick={onRemovePrepayment}>
+          <button type="button" className="lg-btn lg-btn--danger" onClick={onRemovePrepayment}>
             Снять предоплату
-          </Button>
+          </button>
         )}
         {showCancelOrder && (
-          <Button type="button" variant="warning" size="sm" onClick={onCancelOrder}>
+          <button type="button" className="lg-btn lg-btn--warning" onClick={onCancelOrder}>
             Отменить
-          </Button>
+          </button>
         )}
         {showPermanentDelete && (
-          <Button type="button" variant="error" size="sm" onClick={onPermanentDelete}>
+          <button type="button" className="lg-btn lg-btn--danger" onClick={onPermanentDelete}>
             Удалить из базы
-          </Button>
+          </button>
         )}
       </div>
 

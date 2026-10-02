@@ -1,7 +1,6 @@
 import React from 'react';
 import { Order } from '../../types';
 import { MoneyAmount } from '../ui';
-import { Button } from '../common/Button';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 
 interface OrderPoolPaymentSummaryProps {
@@ -37,7 +36,7 @@ export const OrderPoolPaymentSummary: React.FC<OrderPoolPaymentSummaryProps> = (
         </div>
         <div className="order-detail-payment__chip">
           <span className="order-detail-payment__label">Долг</span>
-          <span className={`order-detail-payment__debt ${debt >0 ? 'is-due' : 'is-paid'}`}>
+          <span className={`order-detail-payment__debt ${debt > 0 ? 'is-due' : 'is-paid'}`}>
             <MoneyAmount value={debt} />
           </span>
         </div>
@@ -47,15 +46,13 @@ export const OrderPoolPaymentSummary: React.FC<OrderPoolPaymentSummaryProps> = (
           <a href={order.paymentUrl} target="_blank" rel="noreferrer">
             BePaid
           </a>
-          <Button
+          <button
             type="button"
-            variant="secondary"
-            size="sm"
-            className="order-detail-payment__copy"
+            className="lg-btn order-detail-payment__copy"
             onClick={onCopyPaymentUrl}
           >
             Копировать
-          </Button>
+          </button>
         </div>
       )}
     </div>

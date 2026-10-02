@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../ui/AppIcon';
 import { FilterAction, FilterState, OrderPoolFilterCounts } from './orderPoolUtils';
 
 interface OrderPoolFiltersProps {
@@ -14,24 +15,22 @@ function Chip({
   title,
   children,
   count,
-  reset,
 }: {
   active: boolean;
   onClick: () => void;
   title?: string;
   children: React.ReactNode;
   count?: number;
-  reset?: boolean;
 }) {
   return (
     <button
       type="button"
-      className={`quick-btn ${active ? 'active' : ''} ${reset ? 'quick-btn--reset' : ''}`}
+      className={`lg-btn${active ? ' lg-btn--primary' : ''}`}
       onClick={onClick}
       title={title}
     >
       <span>{children}</span>
-      {typeof count === 'number' ? <span className="quick-btn__count">{count}</span> : null}
+      {typeof count === 'number' ? <span className="lg-btn__count">{count}</span> : null}
     </button>
   );
 }
@@ -105,14 +104,14 @@ export const OrderPoolFilters: React.FC<OrderPoolFiltersProps> = ({
         >
           Ожидает оплату
         </Chip>
-        <Chip active={false} reset onClick={() => dispatchFilters({ type: 'resetFilters' })}>
+        <Chip active={false} onClick={() => dispatchFilters({ type: 'resetFilters' })}>
           Сбросить
         </Chip>
       </div>
 
       <div className={`order-pool-search ${searchLoading ? 'order-pool-search--loading' : ''}`}>
         <span className="order-pool-search__icon" aria-hidden="true">
-          ⌕
+          <AppIcon name="search" size="xs" />
         </span>
         <input
           type="text"
@@ -161,8 +160,8 @@ export const OrderPoolFilters: React.FC<OrderPoolFiltersProps> = ({
         </label>
         <button
           type="button"
-          className="filters-secondary__sort-dir"
-          onClick={() =>dispatchFilters({ type: 'toggleSortDirection' })}
+          className="lg-btn filters-secondary__sort-dir"
+          onClick={() => dispatchFilters({ type: 'toggleSortDirection' })}
           title="Направление сортировки"
           aria-label="Направление сортировки"
         >

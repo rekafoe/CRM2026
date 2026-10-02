@@ -1,3 +1,5 @@
+@import './admin-glass-buttons.css';
+
 /* Order Pool Page — операторский UI в стиле CRM */
 
 .btn-order-permanent-delete {
@@ -14,22 +16,76 @@
 
 .order-pool-page {
   display: flex;
+  flex-direction: column;
   height: 100vh;
-  background: var(--bg-secondary, #f8f9fa);
-  padding: 20px;
-  gap: 20px;
+  background: #f8f9fa;
+  padding: 0;
+  gap: 0;
   box-sizing: border-box;
-  color: var(--text-primary, #212529);
+  color: #0f172a;
+}
+
+.order-pool-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.order-pool-topbar__title {
+  min-width: 0;
+}
+
+.order-pool-topbar__title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.order-pool-topbar__title p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.order-pool-topbar__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.order-pool-workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+  padding: 16px;
 }
 
 .order-pool-sidebar {
-  flex: 0 0 clamp(480px, 44%, 680px);
-  width: clamp(480px, 44%, 680px);
+  flex: 0 0 clamp(420px, 42%, 640px);
+  width: clamp(420px, 42%, 640px);
   min-width: 280px;
-  background: var(--bg-primary, #ffffff);
-  border: 1px solid var(--border-color, #dee2e6);
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
-  box-shadow: 0 2px 12px var(--shadow-light, rgba(0, 0, 0, 0.04));
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -80,14 +136,14 @@
 }
 
 .filters {
-  margin: 0 16px 10px;
-  padding: 10px;
+  margin: 12px 12px 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: var(--bg-secondary, #f8f9fa);
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 12px;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
 }
 
 .filters-quick {
@@ -148,15 +204,39 @@
   color: var(--text-secondary, #495057);
 }
 
+.filters-quick .lg-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.lg-btn__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.filters-quick .lg-btn--primary .lg-btn__count {
+  background: rgba(255, 255, 255, 0.72);
+  color: #1d4ed8;
+}
+
 .order-pool-search {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 10px;
-  background: var(--bg-primary, #ffffff);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
   overflow: hidden;
   transition: border-color 0.2s ease;
 }
@@ -248,11 +328,11 @@
 .filters-secondary select {
   min-width: 120px;
   padding: 7px 10px;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   font-size: 13px;
-  background: var(--bg-primary, #ffffff);
-  color: var(--text-primary, #212529);
+  background: #fff;
+  color: #0f172a;
 }
 
 .filters-secondary select:focus {
@@ -260,19 +340,11 @@
   border-color: var(--accent-primary, #6c8eb8);
 }
 
-.filters-secondary__sort-dir {
+.filters-secondary__sort-dir.lg-btn {
+  min-width: 40px;
   padding: 7px 12px;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 8px;
-  background: var(--bg-primary, #ffffff);
-  cursor: pointer;
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-primary, #212529);
-}
-
-.filters-secondary__sort-dir:hover {
-  background: var(--bg-hover, #f1f3f4);
 }
 
 .order-list {
@@ -325,11 +397,12 @@
   align-items: stretch;
   gap: 0;
   padding: 0;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 12px;
-  background: var(--bg-primary, #ffffff);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
   cursor: pointer;
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
@@ -344,9 +417,9 @@
 }
 
 .order-pool-card.is-selected {
-  border-color: var(--accent-primary, #6c8eb8);
-  background: color-mix(in srgb, var(--accent-primary, #6c8eb8) 8%, #fff);
-  box-shadow: 0 0 0 1px var(--accent-primary, #6c8eb8);
+  border-color: rgba(59, 130, 246, 0.55);
+  background: rgba(59, 130, 246, 0.06);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
 }
 
 .order-pool-card.has-fulfillment:not(.is-selected) {
@@ -447,10 +520,10 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #fff7ed;
-  border: 2px solid #ea580c;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(251, 146, 60, 0.12);
+  border: 1px solid rgba(234, 88, 12, 0.28);
   color: #9a3412;
 }
 
@@ -671,22 +744,23 @@
 
 .order-pool-card__take {
   flex-shrink: 0;
-  align-self: stretch;
+  align-self: center;
+  margin: 8px;
   min-width: 64px;
-  border: 0;
-  border-left: 1px solid var(--border-color, #dee2e6);
-  background: color-mix(in srgb, #15803d 12%, #fff);
-  color: #166534;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0 10px;
+  padding: 8px 12px;
   transition: background 0.15s ease;
 }
 
 .order-pool-card__take:hover {
-  background: #15803d;
-  color: #fff;
+  background: rgba(34, 197, 94, 0.28);
+  color: #166534;
 }
 
 .order-pool-detail-empty {
@@ -982,12 +1056,12 @@
   flex: 1;
   flex-basis: 60%;
   min-width: 0;
-  padding: 20px 24px;
+  padding: 16px 18px;
   overflow-y: auto;
-  background: var(--bg-primary, #ffffff);
-  border: 1px solid var(--border-color, #dee2e6);
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
-  box-shadow: 0 2px 12px var(--shadow-light, rgba(0, 0, 0, 0.04));
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .order-pool-detail > * {
@@ -1096,10 +1170,10 @@
 
 .order-pool-detail-header__take-primary {
   flex-shrink: 0;
-  min-height: 42px;
-  padding-left: 18px !important;
-  padding-right: 18px !important;
-  font-size: 14px !important;
+  min-height: 40px;
+  padding-left: 18px;
+  padding-right: 18px;
+  font-size: 14px;
 }
 
 .order-detail-payment {
@@ -1111,9 +1185,9 @@
   width: fit-content;
   margin: 0 0 14px;
   padding: 8px 10px;
-  background: var(--bg-secondary, #f8f9fa);
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
 }
 
 .order-detail-payment__chips {
@@ -1457,9 +1531,9 @@
 .order-activity-panel {
   margin-top: 16px;
   padding: 14px 16px;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 12px;
-  background: var(--bg-secondary, #f8f9fa);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
 }
 
 .order-activity-panel__header {
@@ -1564,43 +1638,50 @@
 }
 
 @media (max-width: 768px) {
-  .order-pool-page {
+  .order-pool-workspace {
     flex-direction: column;
     padding: 12px;
-    gap: 12px;
+    overflow: auto;
   }
 
   .order-pool-sidebar {
     flex: 0 0 auto;
     width: 100%;
-    height: 300px;
-    border-radius: 12px;
+    height: 46vh;
+    min-height: 280px;
+    border-radius: 16px;
   }
 
   .order-pool-detail {
     margin: 0;
     padding: 16px;
-    border-radius: 12px;
+    border-radius: 16px;
     min-width: 0;
+    flex: 1 0 auto;
+  }
+
+  .order-pool-topbar__title p {
+    display: none;
   }
 }
 
 .order-pool-department-filter {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0 16px 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted, #64748b);
+  color: #64748b;
 }
 
 .order-pool-department-filter select {
-  padding: 8px 10px;
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 8px;
-  background: var(--bg-secondary, #f8fafc);
-  color: var(--text-primary, #0f172a);
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
   font-size: 13px;
   font-weight: 500;
 }

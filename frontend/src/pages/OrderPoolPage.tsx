@@ -34,7 +34,6 @@ import { FilesModal } from '../components/FilesModal';
 import { PrepaymentModal } from '../components/PrepaymentModal';
 import { PrepaymentDetailsModal } from '../components/PrepaymentDetailsModal';
 import { SendPaymentLinkModal } from '../components/SendPaymentLinkModal';
-import { Button } from '../components/common/Button';
 import { useToastNotifications } from '../components/Toast';
 import { useLogger } from '../utils/logger';
 import { useReasonPrompt } from '../components/common/useReasonPrompt';
@@ -782,22 +781,15 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
 
   return (
     <div className="order-pool-page">
-      <div className="order-pool-sidebar">
-        <button type="button" onClick={() =>navigate('/')} className="back-button">
+      <header className="order-pool-topbar">
+        <button type="button" className="lg-btn" onClick={() => navigate('/')}>
           ← Назад
         </button>
-        <h2>
-          Пул заказов
-          <span className="order-pool-sidebar__count">{filteredOrders.length}</span>
-        </h2>
-
-        <OrderPoolFilters
-          filters={filters}
-          dispatchFilters={dispatchFilters}
-          searchLoading={searchLoading}
-          counts={filterCounts}
-        />
-
+        <div className="order-pool-topbar__title">
+          <h1>Пул заказов</h1>
+          <p>Новые заказы, назначение и выдача</p>
+        </div>
+        <span className="order-pool-topbar__count">{filteredOrders.length}</span>
         {departments.length > 0 ? (
           <label className="order-pool-department-filter">
             Точка
@@ -817,6 +809,16 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </select>
           </label>
         ) : null}
+      </header>
+
+      <div className="order-pool-workspace">
+      <div className="order-pool-sidebar">
+        <OrderPoolFilters
+          filters={filters}
+          dispatchFilters={dispatchFilters}
+          searchLoading={searchLoading}
+          counts={filterCounts}
+        />
 
         <OrderPoolList
           orders={visibleOrders}
@@ -835,14 +837,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
 
         {hasMoreOrders && (
           <div className="order-list-load-more">
-            <Button
+            <button
               type="button"
-              variant="secondary"
-              className="load-more-btn"
+              className="lg-btn load-more-btn"
               onClick={() => dispatchFilters({ type: 'increaseVisible', step: 100 })}
             >
               Показать ещё
-            </Button>
+            </button>
           </div>
         )}
       </div>
@@ -952,16 +953,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             <div className="order-activity-panel">
               <div className="order-activity-panel__header">
                 <h3>Примечания</h3>
-                <Button
+                <button
                   type="button"
-                  variant="success"
-                  size="sm"
+                  className="lg-btn lg-btn--success"
                   onClick={() => void handleSaveNotes()}
                   disabled={notesSaving}
-                  loading={notesSaving}
                 >
                   {notesSaving ? 'Сохранение...' : 'Сохранить'}
-                </Button>
+                </button>
               </div>
               <textarea
                 className="order-activity-panel__notes"
@@ -1014,6 +1013,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </p>
           </div>
         )}
+      </div>
       </div>
 
       {showFilesModal && selectedOrder && (
