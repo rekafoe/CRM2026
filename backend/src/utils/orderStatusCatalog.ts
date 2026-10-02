@@ -20,15 +20,32 @@ export function stateByCode(code: OrderStateCode) {
   return ORDER_STATES.find((state) => state.code === code)!
 }
 
-/** Выдан / завершён. status = 7 оставлен: так уже пишет выдача, пока строка не привязана. */
+/**
+ * Выдан / завершён — только по code/name справочника.
+ * Нельзя считать «status = 7» завершённым: после unify на каталоге 0..6
+ * AUTOINCREMENT вешает «Отменён» на id 7, и soft-cancel попадал в выручку/выдачу.
+ */
 export function completedStatusSql(statusColumn = 'status'): string {
   return `(
-    CAST(COALESCE(${statusColumn}, -1) AS INTEGER) = 7
-    OR ${statusColumn} IN (
+    ${statusColumn} IN (
       SELECT id FROM order_statuses
       WHERE code = 'completed' OR name = 'Завершён'
     )
   )`
+}
+
+/** Мягкая отмена / Отменён — не в выручке и не «выдан». */
+export function cancelledStatusSql(statusColumn = 'status'): string {
+  return `(
+    ${statusColumn} IN (
+      SELECT id FROM order_statuses
+      WHERE code = 'cancelled' OR name = 'Отменён' OR name = 'Отменен'
+    )
+  )`
+}
+
+export function notCancelledStatusSql(statusColumn = 'status'): string {
+  return `NOT ${cancelledStatusSql(statusColumn)}`
 }
 
 export async function findOrderStatusId(

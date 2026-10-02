@@ -16,6 +16,8 @@ import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
+import { planReplaceComponentReservations } from '../services/replaceOrderItemReservations'
+import { planPrepaymentAfterItemTotalChange } from '../../../utils/itemTotalPrepaymentUpdate'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -34,11 +36,30 @@ async function reserveComponentsForOrder(
   orderId: number,
   components: Array<{ materialId: number; qtyPerItem: number }>,
   quantity: number,
+  options?: { creditReservationIds?: number[]; softShortage?: boolean },
 ): Promise<{
   components: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }>
   shortages: MaterialShortageItem[]
 }> {
   if (components.length === 0) return { components: [], shortages: [] }
+  const softShortage = options?.softShortage !== false
+  const creditIds = (options?.creditReservationIds || []).filter((id) => Number.isFinite(id) && id > 0)
+  const creditByMaterial = new Map<number, number>()
+  if (creditIds.length > 0) {
+    const creditRows = await db.all<Array<{ material_id: number; quantity_reserved: number }>>(
+      `SELECT material_id, quantity_reserved FROM material_reservations
+        WHERE id IN (${creditIds.map(() => '?').join(',')})
+          AND status IN ('active', 'reserved')`,
+      creditIds,
+    )
+    for (const row of creditRows || []) {
+      const materialId = Number(row.material_id)
+      creditByMaterial.set(
+        materialId,
+        (creditByMaterial.get(materialId) || 0) + Number(row.quantity_reserved || 0),
+      )
+    }
+  }
   const ids = components
     .map((component) => Number(component.materialId))
     .filter((id) => Number.isFinite(id) && id > 0)
@@ -73,7 +94,8 @@ async function reserveComponentsForOrder(
           AND (expires_at IS NULL OR expires_at > ?)`,
       [materialId, now],
     )
-    const available = Number(material.quantity) - Number(existing?.reserved || 0)
+    const credit = creditByMaterial.get(materialId) || 0
+    const available = Number(material.quantity) - Number(existing?.reserved || 0) + credit
     if (available < neededQty) {
       shortages.push({
         materialId,
@@ -81,6 +103,14 @@ async function reserveComponentsForOrder(
         available: Math.round(available * 100) / 100,
         required: neededQty,
       })
+      if (!softShortage) {
+        const error = new Error(
+          `Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${neededQty}`,
+        )
+        ;(error as any).status = 400
+        ;(error as any).code = 'INSUFFICIENT_MATERIAL'
+        throw error
+      }
       reserved.push({ materialId, qtyPerItem })
       continue
     }
@@ -451,12 +481,14 @@ export class OrderItemController {
         const paymentMethod = paymentRow?.paymentMethod
         const allowAutoPay = paymentMethod !== null && paymentMethod !== undefined
         const hasPrepayment = prepaymentAmount > 0 || (prepaymentStatus && prepaymentStatus.length > 0)
-        const eps = 0.005
-        const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
-        const shouldSetPrepayment =
-          allowAutoPay &&
-          newTotal > 0 &&
-          (!hasPrepayment || (paymentMethod === 'offline' && inSync))
+        // Не раздувать уже оплаченный offline prepaid при добавлении позиции (см. planPrepaymentAfterItemTotalChange).
+        void planPrepaymentAfterItemTotalChange({
+          paymentMethod,
+          prepaymentAmount,
+          oldTotal,
+          newTotal,
+        })
+        const shouldSetPrepayment = allowAutoPay && newTotal > 0 && !hasPrepayment
         if (shouldSetPrepayment) {
           let hasPrepaymentUpdatedAt = false
           try {
@@ -675,40 +707,11 @@ export class OrderItemController {
         }
 
         await db.run('DELETE FROM items WHERE orderId = ? AND id = ?', orderId, itemId)
-        
-        // 🆕 Пересчитываем предоплату после удаления позиции (итог с учётом скидки)
-        const paymentRow = await db.get<{
-          prepaymentAmount?: number | null
-          prepaymentStatus?: string | null
-          paymentMethod?: string | null
-          discount_percent?: number | null
-        }>('SELECT prepaymentAmount, prepaymentStatus, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
-        const itemsAfterDelete = await OrderRepository.getItemsByOrderId(orderId)
-        const newAmounts = computeOrderAmounts({
-          items: itemsAfterDelete,
-          discount_percent: paymentRow?.discount_percent ?? 0,
-        })
-        const newTotal = newAmounts.totalAmount
-        const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
-        const paymentMethod = paymentRow?.paymentMethod
-        if (paymentMethod === 'offline' && currentPrepayment > newTotal) {
-          let hasPrepaymentUpdatedAt = false
-          try {
-            hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-          } catch {
-            hasPrepaymentUpdatedAt = false
-          }
-          const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
-            : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-          await db.run(updateSql, newTotal, orderId)
-          logger.info('💰 [deleteItem] Предоплата пересчитана', {
-            orderId,
-            oldPrepayment: currentPrepayment,
-            newPrepayment: newTotal
-          })
-        }
-        
+
+        // Prepaid / день кассы не трогаем: схлопывание offline prepaid к новому итогу
+        // стирало приход с реального дня оплаты (planPrepaymentAfterItemTotalChange).
+        void planPrepaymentAfterItemTotalChange()
+
         await db.run('COMMIT')
         try {
           await OrderPricingService.recalculateOrderPrices(orderId)
@@ -931,18 +934,8 @@ export class OrderItemController {
         const nextSheets = body.sheets != null ? Math.max(0, Number(body.sheets) || 0) : existing.sheets
         const clicks = nextSheets * (nextSides * 2)
 
-        const priceOrQtyChanged = body.price != null || body.quantity != null
-        let oldSubtotal = 0
-        let paymentRow: { prepaymentAmount?: number | null; paymentMethod?: string | null; discount_percent?: number | null } | null = null
-        if (priceOrQtyChanged) {
-          const itemsBefore = await OrderRepository.getItemsByOrderId(orderId)
-          oldSubtotal = computeOrderAmounts({ items: itemsBefore }).subtotal
-          paymentRow = await db.get<{
-            prepaymentAmount?: number | null
-            paymentMethod?: string | null
-            discount_percent?: number | null
-          }>('SELECT prepaymentAmount, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
-        }
+        // Смена цены/тиража не трогает prepaid / prepaymentUpdatedAt (planPrepaymentAfterItemTotalChange).
+        void planPrepaymentAfterItemTotalChange()
 
         let hasExecutorUserId = false
         try {
@@ -977,13 +970,42 @@ export class OrderItemController {
             const reservationIds = oldComponents
               .map((component) => Number((component as { reservationId?: number }).reservationId))
               .filter((id) => Number.isFinite(id) && id > 0)
+            let activeIds: number[] = []
             if (reservationIds.length > 0) {
+              const oldRows = await db.all<Array<{ id: number; status: string }>>(
+                `SELECT id, status FROM material_reservations
+                  WHERE id IN (${reservationIds.map(() => '?').join(',')})`,
+                reservationIds,
+              )
+              const plan = planReplaceComponentReservations(oldRows || [])
+              if (plan.action === 'reject_fulfilled') {
+                const error = new Error(
+                  'Состав материалов нельзя менять после «Принят в работу»: склад уже списан',
+                )
+                ;(error as any).status = 409
+                ;(error as any).code = 'MATERIALS_ALREADY_FULFILLED'
+                throw error
+              }
+              activeIds = plan.activeIds
+            }
+            // Сначала новые холды с учётом своих active, потом отмена старых.
+            // Soft-shortage здесь нельзя: иначе COMMIT без резервов (потеря hold).
+            const reserved = await reserveComponentsForOrder(
+              db,
+              orderId,
+              incomingComponents,
+              newQuantity,
+              { creditReservationIds: activeIds, softShortage: false },
+            )
+            if (activeIds.length > 0) {
               await db.run(
-                `UPDATE material_reservations SET status = 'cancelled' WHERE id IN (${reservationIds.map(() => '?').join(',')})`,
-                ...reservationIds,
+                `UPDATE material_reservations
+                    SET status = 'cancelled'
+                  WHERE id IN (${activeIds.map(() => '?').join(',')})
+                    AND status IN ('active', 'reserved')`,
+                ...activeIds,
               )
             }
-            const reserved = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
             reservedComponents = reserved.components
             replacementShortages = reserved.shortages
           }
@@ -1066,30 +1088,6 @@ export class OrderItemController {
           })
         }
         await db.run(updateSql, ...bindings)
-
-        if (priceOrQtyChanged && paymentRow && paymentRow.paymentMethod === 'offline') {
-          const pct = Number(paymentRow?.discount_percent || 0) / 100
-          const oldTotal = Math.round(oldSubtotal * (1 - pct) * 100) / 100
-          const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
-          const eps = 0.005
-          if (Math.abs(prepaymentAmount - oldTotal) < eps) {
-            const itemsAfter = await OrderRepository.getItemsByOrderId(orderId)
-            const newTotal = computeOrderAmounts({
-              items: itemsAfter,
-              discount_percent: paymentRow?.discount_percent ?? 0,
-            }).totalAmount
-            let hasPrepaymentUpdatedAt = false
-            try {
-              hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-            } catch {
-              hasPrepaymentUpdatedAt = false
-            }
-            const updateSql = hasPrepaymentUpdatedAt
-              ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
-              : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-            await db.run(updateSql, newTotal, orderId)
-          }
-        }
 
         await db.run('COMMIT')
         const pricingFieldsChanged =

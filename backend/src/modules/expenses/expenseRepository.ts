@@ -192,6 +192,9 @@ export class ExpenseRepository {
 
   static async deleteExpense(id: number): Promise<void> {
     const db = await getDb()
+    // Копии ежемесячного шаблона: иначе DELETE шаблона обнуляет FK и sync плодит дубли.
+    await db.run('DELETE FROM expenses WHERE recurring_source_id = ?', id)
+    await db.run('DELETE FROM expense_recurring_skips WHERE source_id = ?', id).catch(() => undefined)
     const result = await db.run('DELETE FROM expenses WHERE id = ?', id)
     if (result.changes === 0) throw new Error('Расход не найден')
   }

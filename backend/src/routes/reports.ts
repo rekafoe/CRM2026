@@ -160,8 +160,8 @@ async function loadExpensesByDepartment(
   db: Awaited<ReturnType<typeof getDb>>,
   dateFrom: string,
   dateTo: string,
-): Promise<{ byDepartment: Map<number | null, number>; companyWide: number }> {
-  const empty = { byDepartment: new Map<number | null, number>(), companyWide: 0 }
+): Promise<{ byDepartment: Map<number | null, number>; companyWide: number; total: number }> {
+  const empty = { byDepartment: new Map<number | null, number>(), companyWide: 0, total: 0 }
   try {
     await syncPayrollExpenses(dateFrom, dateTo)
     await syncTurnoverTaxExpenses(dateFrom, dateTo)
@@ -181,13 +181,15 @@ async function loadExpensesByDepartment(
     )
     const byDepartment = new Map<number | null, number>()
     let companyWide = 0
+    let total = 0
     for (const row of rows) {
       const deptId = row.department_id == null ? null : Number(row.department_id)
       const amt = Number(row.total || 0)
       byDepartment.set(deptId, (byDepartment.get(deptId) || 0) + amt)
+      total += amt
       if (deptId == null) companyWide += amt
     }
-    return { byDepartment, companyWide }
+    return { byDepartment, companyWide, total }
   } catch {
     return empty
   }
@@ -997,7 +999,7 @@ router.get('/analytics/pnl', asyncHandler(async (req, res) => {
   if (includeCogs) company_wide.cogs = 0
 
   const totalRevenue = locations.reduce((s, l) => s + l.revenue, 0) + unassigned_revenue
-  const totalExpenses = expensesSummary.companyWide
+  const totalExpenses = expensesSummary.total
   const totals: {
     revenue: number
     expenses: number

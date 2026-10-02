@@ -347,7 +347,13 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   <AppIcon name="trash" size="xs" /> Удалить предоплату
                 </button>
               )}
-              {onIssueOrder && (orderAmounts.debt > 0 || (orderAmounts.debt === 0 && orderAmounts.total > 0)) && Number(selectedOrder.status) !== 7 && (
+              {onIssueOrder && (orderAmounts.debt > 0 || (orderAmounts.debt === 0 && orderAmounts.total > 0)) && (() => {
+                const statusRow = statuses.find((s) => s.id === Number(selectedOrder.status))
+                const isCompleted =
+                  statusRow != null &&
+                  ((statusRow as { code?: string }).code === 'completed' || statusRow.name === 'Завершён')
+                return !isCompleted
+              })() && (
                 <button 
                   onClick={() => onIssueOrder(selectedOrder.id)}
                   className="order-detail-action-btn order-detail-action-btn--info"

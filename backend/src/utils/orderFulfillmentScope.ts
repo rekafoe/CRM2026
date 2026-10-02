@@ -1,5 +1,5 @@
 import { hasColumn } from './tableSchemaCache'
-import { completedStatusSql } from './orderStatusCatalog'
+import { completedStatusSql, notCancelledStatusSql } from './orderStatusCatalog'
 
 let cachedHasFulfillmentCol: boolean | null = null
 
@@ -76,12 +76,12 @@ export function notWaitingStatusSql(statusColumn = 'status'): string {
 }
 
 /**
- * Заказ в выручке: оплачен или завершён (код completed, либо прежний status 7),
- * и это уже не просчёт и не «Ожидает».
+ * Заказ в выручке: оплачен или завершён (код completed),
+ * не просчёт / «Ожидает» и не мягко отменённый «Отменён».
  */
 export function revenueOrdersCondition(alias: string): string {
   const p = alias ? `${alias}.` : ''
-  return `${notWaitingStatusSql(`${p}status`)} AND (${completedStatusSql(`${p}status`)} OR ${p}prepaymentStatus IN ('paid', 'successful'))`
+  return `${notWaitingStatusSql(`${p}status`)} AND ${notCancelledStatusSql(`${p}status`)} AND (${completedStatusSql(`${p}status`)} OR ${p}prepaymentStatus IN ('paid', 'successful'))`
 }
 
 /** status = 0 — просчёт, его суммы не входят в денежные итоги. NULL не отсекаем. */
