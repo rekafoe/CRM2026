@@ -18,6 +18,7 @@ export type PostalDispatchInput = {
   recipientName: string
   recipientPhone: string
   recipientAddress: string
+  pickupPointId: string
   weightKg: number
   codAmount: number | null
   declaredValue: number | null
@@ -46,6 +47,7 @@ export async function dispatchPostalShipment(
       recipientName: input.recipientName,
       recipientPhone: input.recipientPhone,
       recipientAddress: input.recipientAddress,
+      pickupPointId: input.pickupPointId,
       weightKg: input.weightKg,
       notes: input.notes,
     }, settings, request)

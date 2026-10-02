@@ -3,9 +3,11 @@ import type { Order } from '../../types';
 import {
   createPostalShipment,
   downloadPostalBlankPdf,
+  getEuropostOffices,
   getOrganizations,
   getPostalCarrierStatus,
   getPostalShipments,
+  type EuropostOffice,
   type Organization,
   type PostalCarrier,
   type PostalShipment,
@@ -42,6 +44,10 @@ function recipientName(order: Order): string {
 
 function recipientAddress(order: Order): string {
   return order.delivery?.address || order.customer?.address || '';
+}
+
+function officeLabel(office: EuropostOffice): string {
+  return [office.city, office.name, office.address].filter(Boolean).join(', ');
 }
 
 function formatByn(amount: number): string {
@@ -98,6 +104,11 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
   const [cod, setCod] = useState('');
   const [declared, setDeclared] = useState('');
   const [notes, setNotes] = useState('');
+  const [offices, setOffices] = useState<EuropostOffice[]>([]);
+  const [officeQuery, setOfficeQuery] = useState('');
+  const [officeId, setOfficeId] = useState('');
+  const [officesLoading, setOfficesLoading] = useState(false);
+  const [officesError, setOfficesError] = useState('');
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [carrierReady, setCarrierReady] = useState({ belpost: false, europost: false, belpostMessage: '', europostMessage: '' });
@@ -114,6 +125,8 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     setName(recipientName(order));
     setPhone(order.customerPhone || order.customer?.phone || '');
     setAddress(recipientAddress(order));
+    setOfficeId('');
+    setOfficeQuery(recipientAddress(order));
     setCod('');
     setDeclared('');
     load().catch(() => setShipments([]));
@@ -169,6 +182,43 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
   const ready = carrier === 'belpost' ? carrierReady.belpost : carrierReady.europost;
   const readyMessage = carrier === 'belpost' ? carrierReady.belpostMessage : carrierReady.europostMessage;
 
+  useEffect(() => {
+    if (!open || carrier !== 'europost' || !carrierReady.europost || offices.length > 0) return;
+    let cancelled = false;
+    setOfficesLoading(true);
+    setOfficesError('');
+    getEuropostOffices()
+      .then((response) => {
+        if (cancelled) return;
+        const rows = Array.isArray(response.data?.offices) ? response.data.offices : [];
+        setOffices(rows);
+        setOfficeQuery((current) => current || address);
+      })
+      .catch(async (error: any) => {
+        if (cancelled) return;
+        setOfficesError(await explain(error, 'Европочта не отдала пункты выдачи'));
+      })
+      .finally(() => {
+        if (!cancelled) setOfficesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, carrier, carrierReady.europost, offices.length, address]);
+
+  const visibleOffices = useMemo(() => {
+    const query = officeQuery.trim().toLowerCase();
+    const matched = query
+      ? offices.filter((office) => officeLabel(office).toLowerCase().includes(query))
+      : offices;
+    const sliced = matched.slice(0, 40);
+    if (officeId && !sliced.some((office) => office.id === officeId)) {
+      const selected = offices.find((office) => office.id === officeId);
+      if (selected) sliced.unshift(selected);
+    }
+    return { rows: sliced, total: matched.length };
+  }, [offices, officeQuery, officeId]);
+
   const createAndPrint = async () => {
     if (!name.trim() || !address.trim()) {
       onNotify('error', 'Укажите получателя и адрес');
@@ -176,6 +226,10 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     }
     if (!weight.trim() || !(Number(weight.replace(',', '.')) > 0)) {
       onNotify('error', 'Укажите вес, кг');
+      return;
+    }
+    if (carrier === 'europost' && !officeId) {
+      onNotify('error', 'Выберите пункт выдачи Европочты');
       return;
     }
     try {
@@ -189,6 +243,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
         recipient_name: name.trim(),
         recipient_phone: phone.trim(),
         recipient_address: address.trim(),
+        pickup_point_id: carrier === 'europost' ? officeId : null,
         places: Math.max(1, Number(places) || 1),
         weight_kg: weightValue,
         cod_amount: codAmount,
@@ -250,7 +305,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
           Почтовый сбор платит {payerLabel}.
           {carrier === 'belpost'
             ? ' Наложенный платёж, если указать, Белпочта возьмёт у получателя за товар.'
-            : ' Для Европочты наложенный платёж не отправляем.'}
+            : ' Пункт выдачи выбирается из справочника Европочты. Наложенный платёж не отправляем.'}
         </p>
         {!ready ? <p className="postal-shipment__warn">{readyMessage || 'Доступ перевозчика не сохранён. Его добавляет администратор в общих настройках.'}</p> : null}
       </div>
@@ -284,10 +339,46 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
           Телефон
           <input value={phone} onChange={(event) => setPhone(event.target.value)} />
         </label>
-        <label className="postal-shipment__wide">
-          {carrier === 'belpost' ? 'Адрес получателя' : 'Пункт выдачи или адрес'}
-          <input value={address} onChange={(event) => setAddress(event.target.value)} />
-        </label>
+        {carrier === 'europost' ? (
+          <>
+            <label className="postal-shipment__wide">
+              Найти пункт выдачи
+              <input
+                value={officeQuery}
+                onChange={(event) => setOfficeQuery(event.target.value)}
+                placeholder="Город, улица или номер отделения"
+              />
+            </label>
+            <label className="postal-shipment__wide">
+              Пункт выдачи Европочты
+              <select
+                value={officeId}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setOfficeId(nextId);
+                  const office = offices.find((item) => item.id === nextId);
+                  if (office) setAddress(officeLabel(office));
+                }}
+              >
+                <option value="">{officesLoading ? 'Загружаем пункты…' : 'Выберите пункт'}</option>
+                {visibleOffices.rows.map((office) => (
+                  <option key={office.id} value={office.id}>{officeLabel(office)}</option>
+                ))}
+              </select>
+            </label>
+            {officesError ? <p className="postal-shipment__warn postal-shipment__wide">{officesError}</p> : null}
+            {!officesError && visibleOffices.total > visibleOffices.rows.length ? (
+              <p className="postal-shipment__note postal-shipment__wide">
+                Показаны {visibleOffices.rows.length} из {visibleOffices.total}. Уточните город или улицу.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <label className="postal-shipment__wide">
+            Адрес получателя
+            <input value={address} onChange={(event) => setAddress(event.target.value)} />
+          </label>
+        )}
         <label>
           Мест
           <input value={places} onChange={(event) => setPlaces(event.target.value)} inputMode="numeric" />

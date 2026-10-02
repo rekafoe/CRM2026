@@ -253,6 +253,35 @@ export function pickSenderDeliveryId(rows: DirectoryRow[]): string | null {
   return notReceiver?.id ?? rows[0]?.id ?? null
 }
 
+export type EuropostOffice = {
+  id: string
+  name: string
+  address: string
+  city: string
+}
+
+export function collectEuropostOffices(payload: unknown): EuropostOffice[] {
+  const table = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === 'object' && Array.isArray((payload as { Table?: unknown }).Table)
+      ? (payload as { Table: unknown[] }).Table
+      : []
+  const offices: EuropostOffice[] = []
+  const seen = new Set<string>()
+  for (const item of table) {
+    if (!item || typeof item !== 'object') continue
+    const record = item as Record<string, unknown>
+    const id = textField(record, ['WarehouseId', 'Id', 'id'])
+    const name = textField(record, ['WarehouseName', 'Name', 'NameRu'])
+    const address = textField(record, ['Address', 'AddressName', 'WarehouseAddress', 'Info1', 'Note'])
+    const city = textField(record, ['Address7Name', 'City', 'CityName', 'Locality'])
+    if (!id || seen.has(id) || (!name && !address)) continue
+    seen.add(id)
+    offices.push({ id, name: name || address, address, city })
+  }
+  return offices
+}
+
 export function pickGoodsId(rows: DirectoryRow[]): string | null {
   const preferred = rows.find((row) => /посыл|товар|отправ/i.test(row.label))
   return preferred?.id ?? rows[0]?.id ?? null

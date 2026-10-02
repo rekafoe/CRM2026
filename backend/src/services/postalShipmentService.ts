@@ -12,6 +12,7 @@ export type PostalShipmentRow = {
   recipient_name: string
   recipient_phone: string | null
   recipient_address: string
+  pickup_point_id: string | null
   places: number
   weight_kg: number | null
   cod_amount: number | null
@@ -36,6 +37,7 @@ type CreateInput = {
   recipient_name?: unknown
   recipient_phone?: unknown
   recipient_address?: unknown
+  pickup_point_id?: unknown
   places?: unknown
   weight_kg?: unknown
   cod_amount?: unknown
@@ -62,7 +64,7 @@ function blankNumber(carrier: PostalCarrier, id: number): string {
 }
 
 const SHIPMENT_COLUMNS = `id, order_id, carrier, payer, organization_id, recipient_name, recipient_phone,
-              recipient_address, places, weight_kg, cod_amount, declared_value, tracking_number,
+              recipient_address, pickup_point_id, places, weight_kg, cod_amount, declared_value, tracking_number,
               external_id, document_id, blank_status, carrier_message,
               CASE WHEN blank_file IS NOT NULL AND length(blank_file) > 0 THEN 1 ELSE 0 END AS has_blank,
               status, notes, created_at, updated_at`
@@ -121,6 +123,10 @@ export class PostalShipmentService {
     const weightKg = weightRaw != null && Number.isFinite(weightRaw) && weightRaw > 0 ? Math.round(weightRaw * 1000) / 1000 : null
     const { codAmount, declaredValue } = belpostMoney(carrier, input.cod_amount, input.declared_value)
     if (weightKg == null) throw Object.assign(new Error('Укажите вес, кг'), { status: 400 })
+    const pickupPointId = carrier === 'europost' ? asText(input.pickup_point_id) : ''
+    if (carrier === 'europost' && !pickupPointId) {
+      throw Object.assign(new Error('Выберите пункт выдачи Европочты'), { status: 400 })
+    }
     const organizationId = Number(input.organization_id)
     const db = await getDb()
     const order = await db.get<{ id: number; number: string | null }>(
@@ -137,6 +143,7 @@ export class PostalShipmentService {
       recipientName,
       recipientPhone: asText(input.recipient_phone),
       recipientAddress,
+      pickupPointId,
       weightKg,
       codAmount,
       declaredValue,
@@ -145,7 +152,7 @@ export class PostalShipmentService {
     const inserted = await db.run(
       `INSERT INTO postal_shipments (
          order_id, carrier, payer, organization_id, recipient_name, recipient_phone, recipient_address,
-         places, weight_kg, cod_amount, declared_value, tracking_number, external_id, document_id,
+         pickup_point_id, places, weight_kg, cod_amount, declared_value, tracking_number, external_id, document_id,
          blank_status, blank_filename, blank_content_type, blank_file, carrier_message, notes, status,
          created_at, updated_at
        ) VALUES (?, ?, 'sender_legal', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'blank_issued', datetime('now'), datetime('now'))`,
@@ -156,6 +163,7 @@ export class PostalShipmentService {
         recipientName,
         asText(input.recipient_phone) || null,
         recipientAddress,
+        pickupPointId || null,
         places,
         weightKg,
         codAmount,

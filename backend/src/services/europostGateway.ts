@@ -7,9 +7,11 @@ import {
   findCarrierFile,
   findStringByKey,
   phoneDigits,
+  collectEuropostOffices,
   pickGoodsId,
   pickSenderDeliveryId,
   pickWeightTypeId,
+  type EuropostOffice,
   sniffCarrierFile,
   splitRecipientName,
   type CarrierFile,
@@ -23,6 +25,7 @@ export type EuropostDispatchInput = {
   recipientName: string
   recipientPhone: string
   recipientAddress: string
+  pickupPointId: string
   weightKg: number
   notes: string
 }
@@ -169,6 +172,8 @@ export async function submitEuropost(
   const person = splitRecipientName(input.recipientName)
   const phone = phoneDigits(input.recipientPhone)
   if (!phone) throw new PostalCarrierError('Для Европочты нужен телефон получателя', 400)
+  const pickupPointId = input.pickupPointId.trim()
+  if (!pickupPointId) throw new PostalCarrierError('Выберите пункт выдачи Европочты', 400)
 
   const asId = (value: string) => (/^\d+$/.test(value) ? Number(value) : value)
   const created = await callMethod(settings, 'Postal.PutOrder', {
@@ -176,6 +181,7 @@ export async function submitEuropost(
     PostDeliveryTypeId: asId(ids.deliveryId),
     PostalWeightId: asId(ids.weightId),
     WarehouseIdStart: asId(ids.warehouseId),
+    WarehouseIdFinish: asId(pickupPointId),
     PhoneNumberReciever: phone,
     Name1Reciever: person.last,
     Name2Reciever: person.first,
@@ -217,6 +223,19 @@ export async function submitEuropost(
     file,
     message: `Европочта приняла отправление, доставку оплачивает наше юрлицо. ${tracking ? `Номер ${tracking}.` : 'Номер Европочта пришлёт вместе с накладной.'} ${ids.note} ${detail}`.replace(/\s+/g, ' ').trim(),
   }
+}
+
+export async function listEuropostOffices(
+  settings: PostalCarrierSettings,
+  request: CarrierRequest = carrierRequest,
+): Promise<EuropostOffice[]> {
+  const token = await jwtToken(settings, request)
+  const payload = await callMethod(settings, 'Postal.OfficesIn', { TypeSender: 2 }, token, request)
+  const offices = collectEuropostOffices(payload)
+  if (offices.length === 0) {
+    throw new PostalCarrierError('Европочта не вернула пункты выдачи', 502)
+  }
+  return offices
 }
 
 export async function probeEuropostAccess(

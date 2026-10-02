@@ -4,6 +4,7 @@ import { dispatchPostalShipment } from '../services/postalDispatch'
 import { emptyPostalCarrierSettings } from '../services/postalCarrierSettings'
 import {
   collectBelpostAddresses,
+  collectEuropostOffices,
   decodePdfString,
   pickBelpostAddress,
   pickSenderDeliveryId,
@@ -45,6 +46,7 @@ describe('postal carrier responses', () => {
       recipientName: 'Иванов Иван',
       recipientPhone: '+375291112233',
       recipientAddress: '220030 Минск',
+      pickupPointId: '',
       weightKg: 0.4,
       codAmount: null,
       declaredValue: null,
@@ -106,6 +108,7 @@ describe('postal carrier responses', () => {
         expect(body.Packet.JWT).toBe('jwt-1')
         expect(body.Packet.Data.IsRecieverShipping).toBe(0)
         expect(body.Packet.Data.CashOnDeliverySum).toBe(0)
+        expect(body.Packet.Data.WarehouseIdFinish).toBe(70130010)
         return jsonResponse({ Table: [{ Number: 'EP998877', PostalItemId: '555' }] })
       }
       if (body.Packet.MethodName === 'Postal.GetPDFContent') {
@@ -118,7 +121,8 @@ describe('postal carrier responses', () => {
       externalRef: 'crm-3-1',
       recipientName: 'Петров Пётр',
       recipientPhone: '+375291112233',
-      recipientAddress: 'пункт 12',
+      recipientAddress: 'Отделение №1, Минск',
+      pickupPointId: '70130010',
       weightKg: 0.5,
       notes: '',
     }, {
@@ -134,5 +138,13 @@ describe('postal carrier responses', () => {
     expect(result.file?.bytes.subarray(0, 4).toString()).toBe('%PDF')
     expect(decodePdfString(encoded)?.subarray(0, 4).toString()).toBe('%PDF')
     expect(pickSenderDeliveryId([{ id: '1', label: 'За счёт получателя' }, { id: '8', label: 'Оплата отправителем' }])).toBe('8')
+    expect(collectEuropostOffices({
+      Table: [
+        { WarehouseId: 70130010, WarehouseName: 'Отделение №1', Address7Name: 'Минск', Address: 'ул. Ленина, 1' },
+        { WarehouseName: 'без номера' },
+      ],
+    })).toEqual([
+      { id: '70130010', name: 'Отделение №1', city: 'Минск', address: 'ул. Ленина, 1' },
+    ])
   })
 })

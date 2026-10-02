@@ -12,7 +12,7 @@ import {
   type PostalCarrierSettings,
 } from '../services/postalCarrierSettings'
 import { probeBelpostAccess } from '../services/belpostGateway'
-import { probeEuropostAccess } from '../services/europostGateway'
+import { listEuropostOffices, probeEuropostAccess } from '../services/europostGateway'
 
 const router = Router()
 
@@ -51,6 +51,21 @@ function publicSettings(settings: PostalCarrierSettings) {
     europostDeliveryTypeId: settings.europostDeliveryTypeId,
   }
 }
+
+router.get('/europost/offices', asyncHandler(async (req, res) => {
+  if (!requireUser(req as AuthenticatedRequest, res)) return
+  const settings = await getPostalCarrierSettings()
+  if (!europostReady(settings)) {
+    res.status(409).json({ message: missingEuropostMessage() })
+    return
+  }
+  try {
+    const offices = await listEuropostOffices(settings)
+    res.json({ offices })
+  } catch (error: any) {
+    res.status(error?.status || 502).json({ message: error?.message || 'Европочта не отдала пункты выдачи' })
+  }
+}))
 
 router.get('/status', asyncHandler(async (req, res) => {
   if (!requireUser(req as AuthenticatedRequest, res)) return

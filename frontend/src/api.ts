@@ -1072,6 +1072,7 @@ export type PostalShipment = {
   recipient_name: string;
   recipient_phone: string | null;
   recipient_address: string;
+  pickup_point_id: string | null;
   places: number;
   weight_kg: number | null;
   cod_amount: number | null;
@@ -1116,6 +1117,7 @@ export const createPostalShipment = (
     recipient_name: string;
     recipient_phone?: string;
     recipient_address: string;
+    pickup_point_id?: string | null;
     places?: number;
     weight_kg?: number | null;
     cod_amount?: number | null;
@@ -1132,6 +1134,16 @@ export const updatePostalShipment = (
 
 export const downloadPostalBlankPdf = (orderId: number, shipmentId: number) =>
   api.get(`/orders/${orderId}/postal-shipments/${shipmentId}/blank-pdf`, { responseType: 'blob' });
+
+export type EuropostOffice = {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+};
+
+export const getEuropostOffices = () =>
+  api.get<{ offices: EuropostOffice[] }>('/postal-carriers/europost/offices', { timeout: 45000 });
 
 export const getPostalCarrierStatus = () =>
   api.get<{
