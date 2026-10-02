@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../../api';
 import { MoneyAmount } from '../ui';
 import './DailyActivityOverview.css';
@@ -27,6 +27,36 @@ interface DailyActivityData {
 
 interface DailyActivityOverviewProps {
   onDateSelect?: (date: string) => void;
+}
+
+const PERIODS = [7, 14, 30] as const;
+
+function formatIso(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function recentDates(days: number) {
+  const dates: string[] = [];
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    dates.push(formatIso(date));
+  }
+  return dates;
+}
+
+function plural(count: number, one: string, few: string, many: string) {
+  const abs = Math.abs(count) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
 }
 
 export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
@@ -64,11 +94,8 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const todayStr = today.toISOString().split('T')[0];
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    if (dateString === todayStr) return 'Сегодня';
-    if (dateString === yesterdayStr) return 'Вчера';
+    if (dateString === formatIso(today)) return 'Сегодня';
+    if (dateString === formatIso(yesterday)) return 'Вчера';
     return date.toLocaleDateString('ru-RU', {
       weekday: 'short',
       day: 'numeric',
@@ -76,43 +103,52 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
     });
   };
 
+  const formatAmountText = (n: number) =>
+    Number.isFinite(n)
+      ? `${Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} бел. руб.`
+      : '—';
+
+  const timeline = useMemo(() => {
+    const totals = data?.dailyTotals ?? [];
+    const byDate = new Map(totals.map((day) => [day.date, day]));
+    const dates = new Set(recentDates(period));
+    totals.forEach((day) => dates.add(day.date));
+    return [...dates].sort().map((date) => byDate.get(date) ?? {
+      date,
+      orders_count: 0,
+      total_amount: 0,
+      operators_count: 0,
+    });
+  }, [data, period]);
+
+  const activeDays = useMemo(
+    () => timeline.filter((day) => day.orders_count > 0).slice().reverse(),
+    [timeline],
+  );
+
   const handleDateClick = (date: string) => {
     setSelectedDate(selectedDate === date ? null : date);
     onDateSelect?.(date);
   };
 
-  const formatAmountText = (n: number) =>
-    n != null && Number.isFinite(n)
-      ? `${Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} бел. руб.`
-      : '—';
-
-  if (loading) {
+  if (loading && !data) {
     return (
-      <div className="daily-activity-overview">
+      <div className="daily-activity-overview" aria-busy="true">
         <div className="daily-activity-overview__skeleton">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded mb-4 w-1/3" />
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded" />
-              ))}
-            </div>
-          </div>
+          <div className="daily-activity-overview__skeleton-row" />
+          <div className="daily-activity-overview__skeleton-cards" />
+          <div className="daily-activity-overview__skeleton-chart" />
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="daily-activity-overview">
         <div className="daily-activity-overview__error">
-          <p>❌ {error}</p>
-          <button
-            type="button"
-            onClick={loadData}
-            className="mt-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors"
-          >
+          <p>{error}</p>
+          <button type="button" className="daily-activity-overview__retry" onClick={loadData}>
             Повторить
           </button>
         </div>
@@ -122,158 +158,169 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
 
   if (!data) return null;
 
-  const { dailyTotals, dailyByUser, overallTotal } = data;
+  const { dailyByUser, overallTotal } = data;
+  const periodDays = Math.max(timeline.length, 1);
+  const average = overallTotal.total_amount / periodDays;
+  const hasActivity = overallTotal.orders_count > 0;
   const maxChartValue = Math.max(
-    ...dailyTotals.map((d) => (chartMode === 'orders' ? d.orders_count : d.total_amount)),
-    1
+    ...timeline.map((day) => (chartMode === 'orders' ? day.orders_count : day.total_amount)),
+    1,
   );
+  const labelStep = timeline.length > 20 ? 5 : timeline.length > 10 ? 2 : 1;
 
   return (
     <div className="daily-activity-overview">
-      <div className="daily-activity-overview__header">
-        <h3 className="daily-activity-overview__title">
-          📊 Активность операторов по дням
-        </h3>
-        <div className="daily-activity-overview__controls">
-          <select
-            value={period}
-            onChange={(e) => setPeriod(Number(e.target.value))}
-            className="daily-activity-overview__select"
+      <div className="daily-activity-overview__toolbar">
+        <div className="daily-activity-overview__pills" role="group" aria-label="Период">
+          {PERIODS.map((days) => (
+            <button
+              key={days}
+              type="button"
+              className={`daily-activity-overview__pill${period === days ? ' daily-activity-overview__pill--active' : ''}`}
+              onClick={() => setPeriod(days)}
+              aria-pressed={period === days}
+            >
+              {days} дней
+            </button>
+          ))}
+        </div>
+        <div className="daily-activity-overview__pills" role="group" aria-label="Что показать на графике">
+          <button
+            type="button"
+            className={`daily-activity-overview__pill${chartMode === 'revenue' ? ' daily-activity-overview__pill--active' : ''}`}
+            onClick={() => setChartMode('revenue')}
+            aria-pressed={chartMode === 'revenue'}
           >
-            <option value={7}>7 дней</option>
-            <option value={14}>14 дней</option>
-            <option value={30}>30 дней</option>
-          </select>
-          <select
-            value={chartMode}
-            onChange={(e) => setChartMode(e.target.value as 'orders' | 'revenue')}
-            className="daily-activity-overview__select"
+            Выручка
+          </button>
+          <button
+            type="button"
+            className={`daily-activity-overview__pill${chartMode === 'orders' ? ' daily-activity-overview__pill--active' : ''}`}
+            onClick={() => setChartMode('orders')}
+            aria-pressed={chartMode === 'orders'}
           >
-            <option value="revenue">График: выручка</option>
-            <option value="orders">График: заказы</option>
-          </select>
+            Заказы
+          </button>
         </div>
       </div>
 
-      {/* Сводные карточки */}
       <div className="daily-activity-overview__summary">
         <div className="daily-activity-overview__card">
-          <div className="daily-activity-overview__card-value">
-            {overallTotal.orders_count}
-          </div>
-          <div className="daily-activity-overview__card-label">Всего заказов</div>
+          <div className="daily-activity-overview__card-label">Заказы</div>
+          <div className="daily-activity-overview__card-value">{overallTotal.orders_count}</div>
         </div>
         <div className="daily-activity-overview__card daily-activity-overview__card--accent">
+          <div className="daily-activity-overview__card-label">Сумма</div>
           <div className="daily-activity-overview__card-value">
             <MoneyAmount value={overallTotal.total_amount} />
           </div>
-          <div className="daily-activity-overview__card-label">Общая сумма</div>
         </div>
         <div className="daily-activity-overview__card">
+          <div className="daily-activity-overview__card-label">В среднем за день</div>
           <div className="daily-activity-overview__card-value">
-            {dailyTotals.length > 0
-              ? <MoneyAmount value={overallTotal.total_amount / dailyTotals.length} />
-              : '—'}
+            <MoneyAmount value={average} />
           </div>
-          <div className="daily-activity-overview__card-label">Среднее за день</div>
         </div>
       </div>
 
-      {/* График по дням */}
-      <div className="daily-activity-overview__chart-section">
-        <h4 className="daily-activity-overview__chart-title">
-          {chartMode === 'revenue' ? 'Выручка по дням' : 'Заказы по дням'}
-        </h4>
-        <div className="daily-activity-overview__chart">
-          {[...dailyTotals].reverse().map((d) => {
-            const val = chartMode === 'orders' ? d.orders_count : d.total_amount;
-            const height = maxChartValue > 0 ? (val / maxChartValue) * 100 : 0;
-            return (
-              <div key={d.date} className="daily-activity-overview__chart-bar-wrap">
-                <div
-                  className="daily-activity-overview__chart-bar"
-                  style={{ height: `${Math.max(height, 2)}%` }}
-                  title={`${formatDate(d.date)}: ${chartMode === 'revenue' ? formatAmountText(val) : val} зак.`}
-                />
-                <div className="daily-activity-overview__chart-label">
-                  {new Date(d.date + 'T12:00:00').toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {hasActivity ? (
+        <>
+          <div className="daily-activity-overview__chart-section">
+            <h3 className="daily-activity-overview__chart-title">
+              {chartMode === 'revenue' ? 'Выручка по дням' : 'Заказы по дням'}
+            </h3>
+            <div className="daily-activity-overview__chart">
+              {timeline.map((day, index) => {
+                const value = chartMode === 'orders' ? day.orders_count : day.total_amount;
+                const height = value > 0 && maxChartValue > 0 ? (value / maxChartValue) * 100 : 0;
+                const showLabel = index % labelStep === 0 || index === timeline.length - 1;
+                const tip = chartMode === 'revenue'
+                  ? `${formatDate(day.date)}: ${formatAmountText(value)}`
+                  : `${formatDate(day.date)}: ${value} ${plural(value, 'заказ', 'заказа', 'заказов')}`;
+                return (
+                  <div key={day.date} className="daily-activity-overview__chart-bar-wrap" title={tip}>
+                    <div className="daily-activity-overview__chart-track">
+                      <div
+                        className={`daily-activity-overview__chart-bar${value <= 0 ? ' daily-activity-overview__chart-bar--zero' : ''}`}
+                        style={value > 0 ? { height: `${Math.max(height, 8)}%` } : undefined}
+                      />
+                    </div>
+                    <div className="daily-activity-overview__chart-label">
+                      {showLabel
+                        ? new Date(day.date + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric' })
+                        : ''}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-      {/* Таблица по дням с раскрытием операторов */}
-      <div className="daily-activity-overview__table-section">
-        <h4 className="daily-activity-overview__table-title">Детали по дням</h4>
-        <div className="daily-activity-overview__list">
-          {dailyTotals.map((dayTotal) => {
-            const dayUsers = dailyByUser.filter((u) => u.date === dayTotal.date);
-            const isExpanded = selectedDate === dayTotal.date;
-
-            return (
-              <div key={dayTotal.date} className="daily-activity-overview__day">
-                <button
-                  type="button"
-                  onClick={() => handleDateClick(dayTotal.date)}
-                  className={`daily-activity-overview__day-btn ${isExpanded ? 'daily-activity-overview__day-btn--expanded' : ''}`}
-                >
-                  <div className="daily-activity-overview__day-main">
-                    <div>
+          <div className="daily-activity-overview__table-section">
+            <h3 className="daily-activity-overview__table-title">Дни с заказами</h3>
+            <div className="daily-activity-overview__list">
+              {activeDays.map((dayTotal) => {
+                const dayUsers = dailyByUser.filter((user) => user.date === dayTotal.date);
+                const isExpanded = selectedDate === dayTotal.date;
+                return (
+                  <div key={dayTotal.date} className="daily-activity-overview__day">
+                    <button
+                      type="button"
+                      onClick={() => handleDateClick(dayTotal.date)}
+                      className={`daily-activity-overview__day-btn${isExpanded ? ' daily-activity-overview__day-btn--expanded' : ''}`}
+                      aria-expanded={isExpanded}
+                    >
                       <span className="daily-activity-overview__day-date">
                         {formatDate(dayTotal.date)}
+                        <span className="daily-activity-overview__day-num">{dayTotal.date}</span>
                       </span>
-                      <span className="daily-activity-overview__day-num">
-                        {dayTotal.date}
+                      <span className="daily-activity-overview__day-stats">
+                        <span>
+                          {dayTotal.operators_count} {plural(dayTotal.operators_count, 'оператор', 'оператора', 'операторов')}
+                        </span>
+                        <span>
+                          {dayTotal.orders_count} {plural(dayTotal.orders_count, 'заказ', 'заказа', 'заказов')}
+                        </span>
+                        <span className="daily-activity-overview__day-amount">
+                          <MoneyAmount value={dayTotal.total_amount} />
+                        </span>
                       </span>
-                    </div>
-                    <div className="daily-activity-overview__day-stats">
-                      <span>👥 {dayTotal.operators_count} опер.</span>
-                      <span>📦 {dayTotal.orders_count} зак.</span>
-                      <span className="daily-activity-overview__day-amount">
-                        💰 <MoneyAmount value={dayTotal.total_amount} />
-                      </span>
-                    </div>
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="daily-activity-overview__day-detail">
-                    <div className="daily-activity-overview__operators">
-                      {dayUsers.length > 0 ? (
-                        dayUsers.map((u) => (
-                          <div
-                            key={`${dayTotal.date}-${u.user_id ?? 'null'}`}
-                            className="daily-activity-overview__operator"
-                          >
-                            <span className="daily-activity-overview__operator-name">
-                              {u.user_name}
-                            </span>
-                            <span className="daily-activity-overview__operator-orders">
-                              {u.orders_count} зак.
-                            </span>
-                            <span className="daily-activity-overview__operator-amount">
-                              <MoneyAmount value={u.total_amount} />
-                            </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="daily-activity-overview__day-detail">
+                        {dayUsers.length > 0 ? (
+                          dayUsers.map((user) => (
+                            <div
+                              key={`${dayTotal.date}-${user.user_id ?? 'null'}`}
+                              className="daily-activity-overview__operator"
+                            >
+                              <span className="daily-activity-overview__operator-name">{user.user_name}</span>
+                              <span className="daily-activity-overview__operator-orders">
+                                {user.orders_count} {plural(user.orders_count, 'заказ', 'заказа', 'заказов')}
+                              </span>
+                              <span className="daily-activity-overview__operator-amount">
+                                <MoneyAmount value={user.total_amount} />
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="daily-activity-overview__operator daily-activity-overview__operator--empty">
+                            Заказов за этот день нет
                           </div>
-                        ))
-                      ) : (
-                        <div className="daily-activity-overview__operator daily-activity-overview__operator--empty">
-                          Нет заказов за этот день
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="daily-activity-overview__empty">
+          За {period} {plural(period, 'день', 'дня', 'дней')} заказов не было.
+        </p>
+      )}
     </div>
   );
 };

@@ -111,7 +111,7 @@ type AdminLink = {
 };
 
 const ADMIN_GROUPS: Array<{ id: AdminGroupId; title: string; hint: string; icon: IconName; links?: AdminLink[] }> = [
-  { id: 'overview', title: 'Обзор', hint: 'Активность за день', icon: 'chart' },
+  { id: 'overview', title: 'Обзор', hint: 'Заказы и выручка по дням', icon: 'chart' },
   {
     id: 'work',
     title: 'Работа',
