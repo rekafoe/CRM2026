@@ -1,3 +1,5 @@
+@import '../../styles/admin-glass-buttons.css';
+
 /* Список клиентов: разметка product-management, отступы у алертов */
 .clients-crm-page > .alert,
 .product-management > .alert {
@@ -520,4 +522,169 @@
 
 .product-management .clients-crm__table tbody td:last-child {
   border-right: none;
+}
+
+.clients-layout .admin-page-content {
+  padding: 16px;
+  background: #f8f9fa;
+}
+
+.clients-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.clients-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.clients-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clients-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clients-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.clients-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+  max-width: 420px;
+  margin-left: auto;
+  padding: 0 12px;
+  min-height: 40px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  color: #64748b;
+}
+
+.clients-search input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.clients-table-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.clients-table-scroll {
+  overflow-x: auto;
+}
+
+.clients-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.clients-table th,
+.clients-table td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.clients-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.clients-table tbody tr {
+  cursor: pointer;
+}
+
+.clients-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.clients-row--active td {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.clients-table-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: #64748b;
+}
+
+.clients-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.clients-pager-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clients-pager-page {
+  min-width: 64px;
+  text-align: center;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .clients-search {
+    max-width: none;
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+
+  .clients-header-actions {
+    width: 100%;
+  }
 }

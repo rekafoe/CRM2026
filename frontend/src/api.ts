@@ -1520,8 +1520,24 @@ export const getPageChanges = (pageId: number, lastUpdate: string) =>
   api.get(`/order-management/pages/${pageId}/changes?lastUpdate=${lastUpdate}`);
 
 // Customers API
-export const getCustomers = (params?: { type?: 'individual' | 'legal'; search?: string }) => 
+export const getCustomers = (params?: {
+  type?: 'individual' | 'legal';
+  search?: string;
+  /** 0 — без даты и суммы последнего заказа */
+  stats?: 0 | 1;
+}) =>
   api.get<Customer[]>('/customers', { params });
+
+export const getCustomersPage = (params: {
+  type?: 'individual' | 'legal';
+  search?: string;
+  limit: number;
+  offset: number;
+  stats?: 0 | 1;
+}) =>
+  api.get<{ customers: Customer[]; total: number }>('/customers', {
+    params: { ...params, paged: 1 },
+  });
 export const getCustomer = (id: number) => 
   api.get<Customer>(`/customers/${id}`);
 export const getCustomerProjects = (customerId: number) =>

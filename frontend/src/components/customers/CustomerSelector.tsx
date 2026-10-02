@@ -32,7 +32,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await getCustomers({ search: debouncedQuery || undefined });
+      const response = await getCustomers({ search: debouncedQuery || undefined, stats: 0 });
       setCustomers(response.data);
     } catch (error: any) {
       addToast({

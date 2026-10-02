@@ -105,36 +105,61 @@ export class CustomerService {
   }
 
   /**
-   * К последним заказам: дата и сумма (по позициям и скидке заказа).
+   * Дата и сумма последнего заказа.
+   * Сначала выбирается один заказ на клиента, сумма позиций считается только для этих заказов.
    */
   private static async attachLastOrderStats(customers: Customer[]): Promise<Customer[]> {
     if (customers.length === 0) return customers;
     const db = await getDb();
-    const ids = customers.map((c) => c.id);
-    const ph = ids.map(() => '?').join(',');
+    const map = new Map<number, { last_order_at: string; last_order_amount: number }>();
+    const chunkSize = 400;
     const lastOrderAmountSql = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)');
-    const sql = `
-      SELECT customer_id, last_order_at, last_order_amount
-      FROM (
-        SELECT
-          o.customer_id,
-          COALESCE(o.created_at, o.createdAt) AS last_order_at,
-          ${lastOrderAmountSql} AS last_order_amount,
-          ROW_NUMBER() OVER (
-            PARTITION BY o.customer_id
-            ORDER BY datetime(COALESCE(o.created_at, o.createdAt)) DESC, o.id DESC
-          ) AS rn
+
+    for (let offset = 0; offset < customers.length; offset += chunkSize) {
+      const ids = customers.slice(offset, offset + chunkSize).map((c) => c.id);
+      const ph = ids.map(() => '?').join(',');
+      const latest = (await db.all(
+        `
+        SELECT customer_id, order_id, last_order_at
+        FROM (
+          SELECT
+            o.customer_id AS customer_id,
+            o.id AS order_id,
+            COALESCE(o.created_at, o.createdAt) AS last_order_at,
+            ROW_NUMBER() OVER (
+              PARTITION BY o.customer_id
+              ORDER BY datetime(COALESCE(o.created_at, o.createdAt)) DESC, o.id DESC
+            ) AS rn
+          FROM orders o
+          WHERE o.customer_id IN (${ph})
+        )
+        WHERE rn = 1
+        `,
+        ids
+      )) as Array<{ customer_id: number; order_id: number; last_order_at: string }>;
+
+      if (latest.length === 0) continue;
+
+      const orderIds = latest.map((row) => row.order_id);
+      const orderPh = orderIds.map(() => '?').join(',');
+      const amounts = (await db.all(
+        `
+        SELECT o.id AS order_id, ${lastOrderAmountSql} AS last_order_amount
         FROM orders o
-        WHERE o.customer_id IN (${ph})
-      ) t
-      WHERE t.rn = 1
-    `;
-    const rows = (await db.all(sql, ids)) as Array<{
-      customer_id: number;
-      last_order_at: string;
-      last_order_amount: number;
-    }>;
-    const map = new Map(rows.map((r) => [r.customer_id, r]));
+        WHERE o.id IN (${orderPh})
+        `,
+        orderIds
+      )) as Array<{ order_id: number; last_order_amount: number }>;
+      const amountByOrder = new Map(amounts.map((row) => [row.order_id, row.last_order_amount]));
+
+      latest.forEach((row) => {
+        map.set(row.customer_id, {
+          last_order_at: row.last_order_at,
+          last_order_amount: amountByOrder.get(row.order_id) ?? 0,
+        });
+      });
+    }
+
     return customers.map((c) => {
       const s = map.get(c.id);
       if (!s) {
@@ -148,50 +173,54 @@ export class CustomerService {
     });
   }
 
-  /**
-   * Получить всех клиентов с возможностью фильтрации
-   */
-  static async getAllCustomers(filters?: {
-    type?: 'individual' | 'legal'
-    search?: string
-  }): Promise<Customer[]> {
-    const allCustomers = await this.getAllCustomersCached();
+  private static filterCustomers(
+    allCustomers: Customer[],
+    filters?: { type?: 'individual' | 'legal'; search?: string }
+  ): Customer[] {
     const typeFiltered = filters?.type
       ? allCustomers.filter((customer) => customer.type === filters.type)
       : allCustomers;
 
-    if (!filters?.search) {
-      return this.attachLastOrderStats(typeFiltered);
-    }
+    if (!filters?.search) return typeFiltered;
 
     const queryText = String(filters.search || '');
     const normalizedQuery = this.normalizeSearchValue(queryText);
     const directMatches = typeFiltered.filter((customer) => {
-      const haystack = this.normalizeSearchValue(
-        this.buildCustomerSearchText(customer)
-      );
+      const haystack = this.normalizeSearchValue(this.buildCustomerSearchText(customer));
       return haystack.includes(normalizedQuery);
     });
+    if (directMatches.length > 0) return directMatches;
 
-    if (directMatches.length > 0) {
-      return this.attachLastOrderStats(directMatches);
-    }
-
-    // Fallback: триграммный поиск по всем клиентам для защиты от опечаток
-    const scored = typeFiltered
+    return typeFiltered
       .map((customer) => ({
         customer,
-        score: this.trigramSimilarity(
-          this.buildCustomerSearchText(customer),
-          queryText
-        ),
+        score: this.trigramSimilarity(this.buildCustomerSearchText(customer), queryText),
       }))
       .filter((item) => item.score >= 0.2)
       .sort((a, b) => b.score - a.score)
       .slice(0, 20)
       .map((item) => item.customer);
+  }
 
-    return this.attachLastOrderStats(scored);
+  /**
+   * Список клиентов. Поиск остаётся в JS: SQLite LOWER не приводит кириллицу.
+   * includeStats=false пропускает суммы заказов (селектор в заказе).
+   * limit/offset режут уже отфильтрованный список до расчёта сумм.
+   */
+  static async getAllCustomers(filters?: {
+    type?: 'individual' | 'legal'
+    search?: string
+    includeStats?: boolean
+    limit?: number
+    offset?: number
+  }): Promise<{ customers: Customer[]; total: number }> {
+    const matched = this.filterCustomers(await this.getAllCustomersCached(), filters);
+    const total = matched.length;
+    const offset = Math.max(0, filters?.offset ?? 0);
+    const limit = filters?.limit != null && filters.limit > 0 ? filters.limit : undefined;
+    const page = limit != null ? matched.slice(offset, offset + limit) : matched.slice(offset);
+    const customers = filters?.includeStats === false ? page : await this.attachLastOrderStats(page);
+    return { customers, total };
   }
 
   /**

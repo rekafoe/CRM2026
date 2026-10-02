@@ -137,11 +137,36 @@ export class CustomerController {
    * GET /api/customers - Получить всех клиентов
    */
   static getAll = asyncHandler(async (req: Request, res: Response) => {
-    const type = req.query.type as 'individual' | 'legal' | undefined
-    const search = req.query.search as string | undefined
+    const typeQuery = req.query.type
+    const type = typeQuery === 'individual' || typeQuery === 'legal' ? typeQuery : undefined
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined
+    const statsOff = req.query.stats === '0' || req.query.stats === 'false'
+    const paged = req.query.paged === '1' || req.query.paged === 'true'
 
-    const customers = await CustomerService.getAllCustomers({ type, search })
-    res.json(customers)
+    let limit: number | undefined
+    if (req.query.limit != null && String(req.query.limit) !== '') {
+      const parsed = parseInt(String(req.query.limit), 10)
+      if (Number.isFinite(parsed) && parsed > 0) limit = Math.min(parsed, 500)
+    }
+    let offset = 0
+    if (req.query.offset != null && String(req.query.offset) !== '') {
+      const parsed = parseInt(String(req.query.offset), 10)
+      if (Number.isFinite(parsed) && parsed > 0) offset = parsed
+    }
+
+    const result = await CustomerService.getAllCustomers({
+      type,
+      search,
+      includeStats: !statsOff,
+      limit,
+      offset,
+    })
+
+    if (paged) {
+      res.json(result)
+      return
+    }
+    res.json(result.customers)
   })
 
   /**

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon, MoneyAmount } from '../../components/ui';
 import { Alert } from '../../components/common';
-import { createCustomer, getCustomers } from '../../api';
+import { createCustomer, getCustomers, getCustomersPage } from '../../api';
 import { Customer } from '../../types';
 import * as XLSX from 'xlsx';
-import '../../components/admin/ProductManagement.css';
 import {
   getCustomerDisplayName,
   getCustomerSourceLabel,
@@ -14,6 +14,8 @@ import {
 import './CustomersAdminPage.css';
 
 type CustomerTab = 'individual' | 'legal';
+
+const PAGE_SIZE = 50;
 
 interface CustomersAdminPageProps {
   backTo?: string;
@@ -26,6 +28,8 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [importing, setImporting] = useState(false);
@@ -37,17 +41,27 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
     try {
       setLoading(true);
       setError(null);
-      const res = await getCustomers({
+      const res = await getCustomersPage({
         type: activeTab,
         search: debouncedQuery || undefined,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
       });
-      setCustomers(Array.isArray(res.data) ? res.data : []);
+      const payload = res.data;
+      const rows = Array.isArray(payload?.customers) ? payload.customers : [];
+      const nextTotal = typeof payload?.total === 'number' ? payload.total : rows.length;
+      if (page > 0 && page * PAGE_SIZE >= nextTotal) {
+        setPage(Math.max(0, Math.ceil(nextTotal / PAGE_SIZE) - 1));
+        return;
+      }
+      setCustomers(rows);
+      setTotal(nextTotal);
     } catch (err: any) {
       setError(err?.message || 'Не удалось загрузить клиентов');
     } finally {
       setLoading(false);
     }
-  }, [activeTab, debouncedQuery]);
+  }, [activeTab, debouncedQuery, page]);
 
   useEffect(() => {
     void loadCustomers();
@@ -129,13 +143,20 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
     return { first_name: parts[1], last_name: parts[0], middle_name: parts.slice(2).join(' ') };
   };
 
-  const handleExport = useCallback(() => {
-    if (customers.length === 0) {
-      setImportError('Нет клиентов для экспорта');
-      return;
-    }
+  const handleExport = useCallback(async () => {
     setImportError(null);
-    const rows = customers.map((c) => ({
+    try {
+      const res = await getCustomers({
+        type: activeTab,
+        search: debouncedQuery || undefined,
+        stats: 0,
+      });
+      const list = Array.isArray(res.data) ? res.data : [];
+      if (list.length === 0) {
+        setImportError('Нет клиентов для экспорта');
+        return;
+      }
+    const rows = list.map((c) => ({
       Тип: c.type === 'legal' ? 'Юридическое лицо' : 'Физическое лицо',
       Клиент: getCustomerDisplayName(c),
       Фамилия: c.last_name || '',
@@ -158,7 +179,10 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
     const dateSuffix = new Date().toISOString().slice(0, 10);
     const fileName = `clients-${activeTab}-${dateSuffix}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-  }, [activeTab, customers]);
+    } catch (err: any) {
+      setImportError(err?.message || 'Не удалось выгрузить клиентов');
+    }
+  }, [activeTab, debouncedQuery]);
 
   const handleImport = useCallback(
     async (file: File) => {
@@ -253,146 +277,178 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
     [handleImport],
   );
 
+  const rangeFrom = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeTo = Math.min(total, page * PAGE_SIZE + customers.length);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
   return (
-    <div className="product-management clients-crm-page">
-      <div className="product-management__header">
-        <div className="product-management__header-left">
-          <button type="button" className="lg-btn" onClick={() => navigate(backTo)}>
-            ← Назад
+    <AdminPageLayout
+      title="Клиенты"
+      description="Поиск, импорт и карточки базы"
+      icon={<AppIcon name="users" size="md" />}
+      backTo={backTo}
+      className="clients-layout"
+      headerExtra={
+        <div className="clients-header-actions">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileChange}
+            className="customers-file-input"
+          />
+          <button
+            type="button"
+            className="lg-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? 'Импорт…' : 'Импорт'}
           </button>
-          <div className="product-management__title-row">
-            <AppIcon name="users" size="lg" circle />
-            <div>
-              <h1 className="product-management__title">Клиенты CRM</h1>
-              <p className="product-management__subtitle">Поиск, импорт и экспорт базы клиентов</p>
-            </div>
-          </div>
+          <button type="button" className="lg-btn" onClick={() => void handleExport()} disabled={loading}>
+            Экспорт
+          </button>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() => void loadCustomers()} disabled={loading}>
+            {loading ? 'Загрузка…' : 'Обновить'}
+          </button>
         </div>
-      </div>
+      }
+    >
+      <div className="clients-admin">
+        {error && <Alert type="error">{error}</Alert>}
+        {importError && <Alert type="error">{importError}</Alert>}
+        {importSummary && (
+          <Alert type="success">
+            Импортировано: {importSummary.created} из {importSummary.total}. Пропущено: {importSummary.skipped}.
+          </Alert>
+        )}
 
-      {error && <Alert type="error">{error}</Alert>}
-      {importError && <Alert type="error">{importError}</Alert>}
-      {importSummary && (
-        <Alert type="success">
-          Импортировано: {importSummary.created} из {importSummary.total}. Пропущено: {importSummary.skipped}.
-        </Alert>
-      )}
-
-      <div className="product-controls">
-        <div className="product-controls__main-row">
-          <div className="product-controls__search-row">
-            <div className="product-controls__search">
-              <span className="product-controls__search-icon">
-                <AppIcon name="search" size="xs" />
-              </span>
-              <input
-                className="product-controls__search-input"
-                type="text"
-                placeholder="Поиск по имени, телефону, УНП..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              className="customers-file-input"
-            />
+        <div className="clients-toolbar">
+          <div className="clients-tabs" role="tablist">
             <button
               type="button"
-              className="lg-btn"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
+              className={`lg-btn${activeTab === 'individual' ? ' lg-btn--primary' : ''}`}
+              onClick={() => {
+                setActiveTab('individual');
+                setPage(0);
+              }}
             >
-              {importing ? 'Импорт…' : 'Импорт Excel'}
+              Физические лица
+              {activeTab === 'individual' ? <span className="clients-tab-count">{total}</span> : null}
             </button>
-            <button type="button" className="lg-btn" onClick={handleExport} disabled={loading}>
-              Экспорт Excel
-            </button>
-            <button type="button" className="lg-btn" onClick={loadCustomers} disabled={loading}>
-              {loading ? 'Загрузка…' : 'Обновить'}
+            <button
+              type="button"
+              className={`lg-btn${activeTab === 'legal' ? ' lg-btn--primary' : ''}`}
+              onClick={() => {
+                setActiveTab('legal');
+                setPage(0);
+              }}
+            >
+              Юридические лица
+              {activeTab === 'legal' ? <span className="clients-tab-count">{total}</span> : null}
             </button>
           </div>
+          <label className="clients-search">
+            <AppIcon name="search" size="xs" />
+            <input
+              type="search"
+              placeholder="Имя, телефон, почта, УНП"
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setPage(0);
+              }}
+            />
+          </label>
         </div>
-        <div className="product-quick-filters">
-          <button
-            type="button"
-            className={`product-filter-chip ${activeTab === 'individual' ? 'product-filter-chip--active' : ''}`}
-            onClick={() => setActiveTab('individual')}
-          >
-            <AppIcon name="user" size="xs" />
-            <span>Физические лица</span>
-            {activeTab === 'individual' && (
-              <span className="product-filter-chip__count">{customers.length}</span>
-            )}
-          </button>
-          <button
-            type="button"
-            className={`product-filter-chip ${activeTab === 'legal' ? 'product-filter-chip--active' : ''}`}
-            onClick={() => setActiveTab('legal')}
-          >
-            <AppIcon name="building" size="xs" />
-            <span>Юридические лица</span>
-            {activeTab === 'legal' && <span className="product-filter-chip__count">{customers.length}</span>}
-          </button>
-        </div>
-      </div>
 
-      <div className="management-content">
-        <div className="products-table-wrapper">
-          <table className="customers-table clients-crm__table">
-                <thead>
+        <div className="clients-table-card">
+          <div className="clients-table-scroll">
+            <table className="clients-table">
+              <thead>
+                <tr>
+                  <th>Клиент</th>
+                  <th>Телефон</th>
+                  <th>Email</th>
+                  <th>Последний заказ</th>
+                  <th>Сумма</th>
+                  <th>Источник</th>
+                  <th>Создан</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && customers.length === 0 && (
                   <tr>
-                    <th>Клиент</th>
-                    <th>Телефон</th>
-                    <th>Email</th>
-                    <th>Последний заказ</th>
-                    <th>Сумма</th>
-                    <th>Источник</th>
-                    <th>Дата создания</th>
+                    <td colSpan={7} className="clients-table-empty">
+                      Загрузка клиентов…
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {customers.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="customers-muted">
-                        Нет клиентов этого типа
-                      </td>
+                )}
+                {!loading && customers.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="clients-table-empty">
+                      {debouncedQuery ? 'Ничего не найдено' : 'Нет клиентов этого типа'}
+                    </td>
+                  </tr>
+                )}
+                {customers.map((c) => {
+                  const isOpen = location.pathname === `/adminpanel/clients/${c.id}`;
+                  return (
+                    <tr
+                      key={c.id}
+                      className={isOpen ? 'clients-row--active' : ''}
+                      onClick={() => navigate(`/adminpanel/clients/${c.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/adminpanel/clients/${c.id}`);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <td>{getCustomerDisplayName(c)}</td>
+                      <td>{c.phone || '—'}</td>
+                      <td>{c.email || '—'}</td>
+                      <td>{c.last_order_at ? formatDateValue(c.last_order_at) : '—'}</td>
+                      <td><MoneyAmount value={c.last_order_amount} /></td>
+                      <td>{getCustomerSourceLabel(c.source)}</td>
+                      <td>{new Date(c.created_at).toLocaleDateString('ru-RU')}</td>
                     </tr>
-                  )}
-                  {customers.map((c) => {
-                    const isOpen = location.pathname === `/adminpanel/clients/${c.id}`;
-                    return (
-                      <tr
-                        key={c.id}
-                        className={isOpen ? 'customers-row--active' : ''}
-                        onClick={() => navigate(`/adminpanel/clients/${c.id}`)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            navigate(`/adminpanel/clients/${c.id}`);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <td>{getCustomerDisplayName(c)}</td>
-                        <td>{c.phone || '—'}</td>
-                        <td>{c.email || '—'}</td>
-                        <td>{c.last_order_at ? formatDateValue(c.last_order_at) : '—'}</td>
-                        <td><MoneyAmount value={c.last_order_amount} /></td>
-                        <td>{getCustomerSourceLabel(c.source)}</td>
-                        <td>{new Date(c.created_at).toLocaleDateString('ru-RU')}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-          </table>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="clients-pager">
+            <span>
+              {total === 0 ? '0 клиентов' : `${rangeFrom}–${rangeTo} из ${total}`}
+            </span>
+            <div className="clients-pager-actions">
+              <button
+                type="button"
+                className="lg-btn"
+                disabled={page <= 0 || loading}
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
+              >
+                Назад
+              </button>
+              <span className="clients-pager-page">
+                {page + 1} / {pageCount}
+              </span>
+              <button
+                type="button"
+                className="lg-btn"
+                disabled={loading || (page + 1) * PAGE_SIZE >= total}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Дальше
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </AdminPageLayout>
   );
 };
 
