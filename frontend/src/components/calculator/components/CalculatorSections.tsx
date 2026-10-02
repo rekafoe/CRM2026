@@ -144,7 +144,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
                   key={t.id}
                   type="button"
                   className={`calculator-product-types__tab ${selectedTypeId === t.id ? 'calculator-product-types__tab--active' : ''}`}
-                  onClick={() => onSelectType(t.id)}
+                  onClick={() =>onSelectType(t.id)}
                 >
                   {t.name}
                   {t.default && <span className="calculator-product-types__badge">по умолчанию</span>}

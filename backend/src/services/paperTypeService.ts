@@ -183,22 +183,22 @@ export class PaperTypeService {
 
   // Удалить тип бумаги (физическое удаление с каскадным удалением связанных данных)
   static async deletePaperType(id: number): Promise<void> {
-    console.log('🗑️ PaperTypeService.deletePaperType called with ID:', id);
+    console.log('PaperTypeService.deletePaperType called with ID:', id);
     const db = await getDb()
     
     try {
       // Проверяем, существует ли тип бумаги
       const existing = await db.get('SELECT id, name FROM paper_types WHERE id = ?', id);
-      console.log('🔍 Existing paper type:', existing);
+      console.log('Existing paper type:', existing);
       
       if (!existing) {
-        console.log('❌ Paper type not found');
+        console.log('Paper type not found');
         throw new Error('Paper type not found');
       }
 
       // Проверяем, есть ли материалы, использующие этот тип бумаги
       const materialsUsingType = await db.all('SELECT id, name FROM materials WHERE paper_type_id = ?', id);
-      console.log('🔍 Materials using this paper type:', materialsUsingType);
+      console.log('Materials using this paper type:', materialsUsingType);
       
       if (materialsUsingType.length > 0) {
         throw new Error(`Cannot delete paper type "${existing.name}" - it is used by ${materialsUsingType.length} material(s)`);
@@ -211,19 +211,19 @@ export class PaperTypeService {
         await db.run('PRAGMA foreign_keys = OFF');
         
         // Отвязываем материалы, связанные с типом бумаги (на всякий случай)
-        console.log('🔗 Detaching materials from paper type:', id);
+        console.log('Detaching materials from paper type:', id);
         await db.run('UPDATE materials SET paper_type_id = NULL WHERE paper_type_id = ?', id);
 
         // Удаляем сам тип бумаги
-        console.log('🗑️ Deleting paper type row');
+        console.log('Deleting paper type row');
         const result = await db.run('DELETE FROM paper_types WHERE id = ?', id);
-        console.log('🗑️ Delete result:', result);
+        console.log('Delete result:', result);
 
         // Включаем обратно проверку внешних ключей
         await db.run('PRAGMA foreign_keys = ON');
 
         await db.run('COMMIT');
-        console.log('✅ Paper type deleted successfully');
+        console.log('Paper type deleted successfully');
       } catch (e) {
         await db.run('ROLLBACK');
         // Включаем обратно проверку внешних ключей в случае ошибки
@@ -231,7 +231,7 @@ export class PaperTypeService {
         throw e;
       }
     } catch (error) {
-      console.error('❌ Error deleting paper type:', error);
+      console.error('Error deleting paper type:', error);
       throw error
     }
   }

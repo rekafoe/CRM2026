@@ -34,7 +34,7 @@ const QuickTestSection: React.FC<QuickTestSectionProps> = ({ parameters, qty, pa
                     {par.type === 'select' && Array.isArray(par.options) ? (
                       <select className="form-select form-select--compact" value={val ?? ''} onChange={(e)=>{ const v=e.target.value; const next={...params,[key as string]:v}; onChangeParams(next) }}>
                         {(() => {
-                          // 🆕 Для material_id группируем по типам бумаги
+                          //  Для material_id группируем по типам бумаги
                           const isMaterialId = key === 'material_id';
                           
                           if (isMaterialId && par.options.length > 0 && typeof par.options[0] === 'object') {
@@ -131,10 +131,10 @@ const QuickTestSection: React.FC<QuickTestSectionProps> = ({ parameters, qty, pa
                   {d.pricePerUnit !== undefined && (<div><strong>Цена за шт.:</strong> <MoneyAmount value={d.pricePerUnit} /></div>)}
                   {(d.sheetsNeeded !== undefined || d.itemsPerSheet !== undefined || d.cutsPerSheet !== undefined || d.numberOfStacks !== undefined) && (
                     <div style={{marginTop:8, padding:8, backgroundColor:'#f0f0f0', borderRadius:4}}>
-                      {d.sheetsNeeded !== undefined && (<div><strong>📄 Листов печати:</strong> {d.sheetsNeeded}</div>)}
-                      {d.itemsPerSheet !== undefined && (<div><strong>📐 Укладка:</strong> {d.itemsPerSheet} шт/лист</div>)}
-                      {d.cutsPerSheet !== undefined && (<div><strong>🔪 Резов на лист:</strong> {d.cutsPerSheet}</div>)}
-                      {d.numberOfStacks !== undefined && d.numberOfStacks > 1 && (<div style={{color:'#d97706'}}><strong>📚 Стоп для резки:</strong> {d.numberOfStacks} (режем {d.cutsPerSheet}×{d.numberOfStacks}={d.cutsPerSheet * d.numberOfStacks} резов)</div>)}
+                      {d.sheetsNeeded !== undefined && (<div><strong>Листов печати:</strong> {d.sheetsNeeded}</div>)}
+                      {d.itemsPerSheet !== undefined && (<div><strong>Укладка:</strong> {d.itemsPerSheet} шт/лист</div>)}
+                      {d.cutsPerSheet !== undefined && (<div><strong>Резов на лист:</strong> {d.cutsPerSheet}</div>)}
+                      {d.numberOfStacks !== undefined && d.numberOfStacks > 1 && (<div style={{color:'#d97706'}}><strong>Стоп для резки:</strong> {d.numberOfStacks} (режем {d.cutsPerSheet}×{d.numberOfStacks}={d.cutsPerSheet * d.numberOfStacks} резов)</div>)}
                     </div>
                   )}
                 </>

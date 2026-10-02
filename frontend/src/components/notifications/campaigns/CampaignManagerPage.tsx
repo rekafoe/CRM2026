@@ -33,7 +33,7 @@ export const CampaignManagerPage: React.FC = () => {
             role="tab"
             aria-selected={tab === id}
             className={`lg-btn${tab === id ? ' lg-btn--primary' : ''}`}
-            onClick={() => setTab(id)}
+            onClick={() =>setTab(id)}
           >
             {label}
           </button>

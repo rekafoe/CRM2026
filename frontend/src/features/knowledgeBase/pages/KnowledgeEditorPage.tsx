@@ -210,8 +210,8 @@ export const KnowledgeEditorPage: React.FC = () => {
     }
   };
 
-  if (initialArticleId && articleQuery.isLoading) return <KnowledgeShell><div className="kb-state"><span className="kb-spinner" /> Загружаем редактор…</div></KnowledgeShell>;
-  if (initialArticleId && articleQuery.isError) return <KnowledgeShell><div className="kb-state kb-state--error"><h2>Статья не найдена</h2><button className="kb-button" onClick={() => navigate('/knowledge')}>В каталог</button></div></KnowledgeShell>;
+  if (initialArticleId && articleQuery.isLoading) return <KnowledgeShell><div className="kb-state"><span className="kb-spinner" />Загружаем редактор…</div></KnowledgeShell>;
+  if (initialArticleId && articleQuery.isError) return <KnowledgeShell><div className="kb-state kb-state--error"><h2>Статья не найдена</h2><button className="kb-button" onClick={() =>navigate('/knowledge')}>В каталог</button></div></KnowledgeShell>;
 
   const setLink = () => {
     if (!editor) return;
@@ -227,17 +227,17 @@ export const KnowledgeEditorPage: React.FC = () => {
       <div className="kb-editor-page">
         <header className="kb-editor-header">
           <div>
-            <button className="kb-link-button" onClick={() => navigate(articleId ? `/knowledge/articles/${articleId}` : '/knowledge')}>
+            <button className="kb-link-button" onClick={() =>navigate(articleId ? `/knowledge/articles/${articleId}` : '/knowledge')}>
               <AppIcon name="arrow-left" size="sm" /> Назад
             </button>
             <h1>{canEditDirectly ? (articleId ? 'Редактирование статьи' : 'Новая статья') : 'Предложить изменения'}</h1>
             <p>{canEditDirectly ? 'Изменения сохраняются как новая версия.' : 'Автор увидит исходную и предложенную версии рядом.'}</p>
           </div>
           <div className="kb-editor-actions">
-            <button className="kb-button" type="button" onClick={() => setPreview(true)}><AppIcon name="search" size="sm" /> Предпросмотр</button>
-            <button className="kb-button" type="button" disabled={saving} onClick={() => save(false)}><AppIcon name="save" size="sm" /> {canEditDirectly ? 'Сохранить' : 'Отправить правку'}</button>
+            <button className="kb-button" type="button" onClick={() =>setPreview(true)}><AppIcon name="search" size="sm" /> Предпросмотр</button>
+            <button className="kb-button" type="button" disabled={saving} onClick={() =>save(false)}><AppIcon name="save" size="sm" /> {canEditDirectly ? 'Сохранить' : 'Отправить правку'}</button>
             {canEditDirectly && (
-              <button className="kb-button kb-button--primary" type="button" disabled={saving} onClick={() => save(true)}><AppIcon name="check" size="sm" /> Опубликовать</button>
+              <button className="kb-button kb-button--primary" type="button" disabled={saving} onClick={() =>save(true)}><AppIcon name="check" size="sm" /> Опубликовать</button>
             )}
           </div>
         </header>
@@ -268,7 +268,7 @@ export const KnowledgeEditorPage: React.FC = () => {
               <span className="kb-toolbar-group">
                 <ToolbarButton title="Маркированный список" active={editor?.isActive('bulletList')} onClick={() => editor?.chain().focus().toggleBulletList().run()}>• Список</ToolbarButton>
                 <ToolbarButton title="Нумерованный список" active={editor?.isActive('orderedList')} onClick={() => editor?.chain().focus().toggleOrderedList().run()}>1. Список</ToolbarButton>
-                <ToolbarButton title="Список задач" active={editor?.isActive('taskList')} onClick={() => editor?.chain().focus().toggleTaskList().run()}>☑</ToolbarButton>
+                <ToolbarButton title="Список задач" active={editor?.isActive('taskList')} onClick={() => editor?.chain().focus().toggleTaskList().run()}>Задачи</ToolbarButton>
                 <ToolbarButton title="Цитата" active={editor?.isActive('blockquote')} onClick={() => editor?.chain().focus().toggleBlockquote().run()}>❝</ToolbarButton>
               </span>
               <span className="kb-toolbar-group">
@@ -298,7 +298,7 @@ export const KnowledgeEditorPage: React.FC = () => {
                 }}
               />
             </div>
-            {uploading && <div className="kb-uploading"><span className="kb-spinner" /> Загружаем изображение…</div>}
+            {uploading && <div className="kb-uploading"><span className="kb-spinner" />Загружаем изображение…</div>}
             <EditorContent editor={editor} className="kb-editor-content" />
           </section>
 
@@ -330,9 +330,9 @@ export const KnowledgeEditorPage: React.FC = () => {
       </div>
 
       {preview && (
-        <div className="kb-modal-backdrop" onMouseDown={() => setPreview(false)}>
-          <div className="kb-preview-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <header><div><span className="kb-eyebrow">Предпросмотр</span><h1>{title || 'Без названия'}</h1></div><button className="kb-icon-button" onClick={() => setPreview(false)}><AppIcon name="x" size="sm" /></button></header>
+        <div className="kb-modal-backdrop" onMouseDown={() =>setPreview(false)}>
+          <div className="kb-preview-modal" onMouseDown={(event) =>event.stopPropagation()}>
+            <header><div><span className="kb-eyebrow">Предпросмотр</span><h1>{title || 'Без названия'}</h1></div><button className="kb-icon-button" onClick={() =>setPreview(false)}><AppIcon name="x" size="sm" /></button></header>
             {excerpt && <p className="kb-article-lead">{excerpt}</p>}
             <KnowledgeContent content={(editor?.getJSON() ?? EMPTY_KNOWLEDGE_CONTENT) as KnowledgeContentValue} />
           </div>

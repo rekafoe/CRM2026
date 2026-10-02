@@ -82,7 +82,7 @@ export const CalculationResult: React.FC<CalculationResultProps> = React.memo(({
         </div>
       ) : (
         <EmptyState
-          icon="📊"
+          icon=""
           title="Нет результатов"
           description="Нажмите 'Рассчитать цену' для получения результата"
         />

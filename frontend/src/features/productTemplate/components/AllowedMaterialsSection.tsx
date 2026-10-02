@@ -11,7 +11,7 @@ const AllowedMaterialsSection: React.FC<{
   const [q, setQ] = useState('')
   const [paperTypes, setPaperTypes] = useState<PaperTypeForCalculator[]>([])
   const [loading, setLoading] = useState(true)
-  // 🆕 По умолчанию показываем только выбранные типы, если они есть
+  //  По умолчанию показываем только выбранные типы, если они есть
   const [showAllTypes, setShowAllTypes] = useState(false)
 
   useEffect(() => {
@@ -29,7 +29,7 @@ const AllowedMaterialsSection: React.FC<{
     loadPaperTypes()
   }, [])
 
-  // 🆕 Фильтруем типы бумаги: если есть выбранные типы и не показываем все - показываем только выбранные
+  //  Фильтруем типы бумаги: если есть выбранные типы и не показываем все - показываем только выбранные
   const filtered = useMemo(() => {
     let typesToShow = paperTypes
     
@@ -46,7 +46,7 @@ const AllowedMaterialsSection: React.FC<{
     )
   }, [q, paperTypes, selectedPaperTypes, showAllTypes])
   
-  // 🆕 Если ничего не выбрано - автоматически показываем все типы
+  //  Если ничего не выбрано - автоматически показываем все типы
   useEffect(() => {
     if (selectedPaperTypes.length === 0 && !showAllTypes) {
       setShowAllTypes(true) // Если ничего не выбрано - показываем все типы
@@ -77,7 +77,7 @@ const AllowedMaterialsSection: React.FC<{
               type="button"
               className="btn-secondary" 
               style={{ marginLeft: '10px', fontSize: '0.85em', padding: '4px 8px' }}
-              onClick={() => setShowAllTypes(true)}
+              onClick={() =>setShowAllTypes(true)}
             >
               Показать все типы
             </button>
@@ -87,7 +87,7 @@ const AllowedMaterialsSection: React.FC<{
               type="button"
               className="btn-secondary" 
               style={{ marginLeft: '10px', fontSize: '0.85em', padding: '4px 8px' }}
-              onClick={() => setShowAllTypes(false)}
+              onClick={() =>setShowAllTypes(false)}
             >
               Показать только выбранные
             </button>
@@ -113,7 +113,7 @@ const AllowedMaterialsSection: React.FC<{
               <>
                 {selectedPaperTypes.length > 0 && !showAllTypes && (
                   <div className="alert alert-info" style={{ fontSize: '0.85em', marginBottom: '1rem' }}>
-                    <small>ℹ️ Показаны только выбранные типы бумаги ({selectedPaperTypes.length}). Нажмите "Показать все типы", чтобы добавить новые.</small>
+                    <small> Показаны только выбранные типы бумаги ({selectedPaperTypes.length}). Нажмите "Показать все типы", чтобы добавить новые.</small>
                   </div>
                 )}
                 <div className="am-list-box">
@@ -124,7 +124,7 @@ const AllowedMaterialsSection: React.FC<{
                       <button 
                         type="button" 
                         className="btn-secondary" 
-                        onClick={() => {
+                        onClick={() =>{
                           const allTypes = filtered.map(pt => pt.name)
                           onChange([...new Set([...selectedPaperTypes, ...allTypes])])
                         }}
@@ -134,7 +134,7 @@ const AllowedMaterialsSection: React.FC<{
                       <button 
                         type="button" 
                         className="btn-secondary" 
-                        onClick={() => {
+                        onClick={() =>{
                           const filteredNames = filtered.map(pt => pt.name)
                           onChange(selectedPaperTypes.filter(name => !filteredNames.includes(name)))
                         }}
@@ -178,9 +178,9 @@ const AllowedMaterialsSection: React.FC<{
             <button 
               className="btn-primary" 
               disabled={saving || loading} 
-              onClick={() => onSave()}
+              onClick={() =>onSave()}
             >
-              {saving ? 'Сохранение…' : '💾 Сохранить разрешённые типы'}
+              {saving ? 'Сохранение…' : 'Сохранить разрешённые типы'}
             </button>
           </div>
         </div>

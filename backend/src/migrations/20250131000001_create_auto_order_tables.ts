@@ -74,7 +74,7 @@ export async function up(db: Database) {
     INSERT OR IGNORE INTO auto_order_templates (name, template, is_active)
     VALUES (
       'Стандартный заказ',
-      '🛒 АВТОЗАКАЗ МАТЕРИАЛА\n\n📦 Материал: {material_name}\n📊 Количество: {quantity}\n🏭 Поставщик: {supplier_name}\n📅 Дата: {date} {time}\n\n⚠️ Причина: {reason}\n\nПожалуйста, подтвердите получение заказа.',
+      'АВТОЗАКАЗ МАТЕРИАЛА\n\n Материал: {material_name}\n Количество: {quantity}\n Поставщик: {supplier_name}\n Дата: {date} {time}\n\n Причина: {reason}\n\nПожалуйста, подтвердите получение заказа.',
       1
     );
   `);

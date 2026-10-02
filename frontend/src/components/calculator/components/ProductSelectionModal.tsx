@@ -13,21 +13,21 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
 }) => {
   const getProductIcon = (productType: string): string => {
     const iconMap: Record<string, string> = {
-      'flyers': '📄',
-      'business_cards': '💳',
-      'booklets': '📖',
-      'posters': '🖼️',
-      'brochures': '📚',
-      'stickers': '🏷️',
-      'envelopes': '✉️',
-      'labels': '🏷️',
-      'blanks': '📋',
-      'calendars': '📅',
-      'badges': '🎫',
-      'business_forms': '📝'
+      'flyers': '',
+      'business_cards': '',
+      'booklets': '',
+      'posters': '',
+      'brochures': '',
+      'stickers': '',
+      'envelopes': '',
+      'labels': '',
+      'blanks': '',
+      'calendars': '',
+      'badges': '',
+      'business_forms': ''
     };
     
-    return iconMap[productType] || '📄';
+    return iconMap[productType] || '';
   };
 
   return (
@@ -38,7 +38,7 @@ export const ProductSelectionModal: React.FC<ProductSelectionModalProps> = ({
           <div 
             key={key}
             className="product-type-card"
-            onClick={() => onSelectProduct(key)}
+            onClick={() =>onSelectProduct(key)}
           >
             <div className="product-icon">
               {getProductIcon(key)}

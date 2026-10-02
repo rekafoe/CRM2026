@@ -18,7 +18,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Ошибка подключения к базе данных:', err.message);
     process.exit(1);
   }
-  console.log('✅ Подключение к базе данных установлено');
+  console.log('Подключение к базе данных установлено');
 });
 
 // Функция для выполнения SQL запроса
@@ -52,15 +52,15 @@ function getQuery(sql, params = []) {
 // Основная функция добавления связей
 async function addProductOperations() {
   try {
-    console.log('🔗 Добавляем связи продукт-операции...');
+    console.log('Добавляем связи продукт-операции...');
 
     // Получаем все продукты
     const products = await getQuery('SELECT id, name FROM products WHERE is_active = 1');
-    console.log(`📦 Найдено продуктов: ${products.length}`);
+    console.log(`Найдено продуктов: ${products.length}`);
 
     // Получаем все услуги
     const services = await getQuery('SELECT id, service_name FROM service_prices WHERE is_active = 1');
-    console.log(`🛠️ Найдено услуг: ${services.length}`);
+    console.log(`Найдено услуг: ${services.length}`);
 
     // Создаем карту услуг по названию
     const serviceMap = {};
@@ -102,7 +102,7 @@ async function addProductOperations() {
     let totalLinks = 0;
 
     for (const product of products) {
-      console.log(`\n📄 Обрабатываем продукт: ${product.name}`);
+      console.log(`\n Обрабатываем продукт: ${product.name}`);
 
       // Добавляем базовые операции
       for (const operation of baseOperations) {
@@ -114,10 +114,10 @@ async function addProductOperations() {
             VALUES (?, ?, ?, ?, datetime('now'))
           `, [product.id, serviceId, operation.sequence, operation.isRequired ? 1 : 0]);
           
-          console.log(`  ✅ Добавлена базовая операция: ${operation.name}`);
+          console.log(`  Добавлена базовая операция: ${operation.name}`);
           totalLinks++;
         } else {
-          console.log(`  ⚠️ Услуга не найдена: ${operation.name}`);
+          console.log(`  Услуга не найдена: ${operation.name}`);
         }
       }
 
@@ -132,30 +132,30 @@ async function addProductOperations() {
             VALUES (?, ?, ?, ?, datetime('now'))
           `, [product.id, serviceId, operation.sequence, operation.isRequired ? 1 : 0]);
           
-          console.log(`  ✅ Добавлена специфичная операция: ${operation.name}`);
+          console.log(`  Добавлена специфичная операция: ${operation.name}`);
           totalLinks++;
         } else {
-          console.log(`  ⚠️ Услуга не найдена: ${operation.name}`);
+          console.log(`  Услуга не найдена: ${operation.name}`);
         }
       }
     }
 
-    console.log(`\n🎉 Связи продукт-операции добавлены успешно!`);
-    console.log(`📊 Всего создано связей: ${totalLinks}`);
+    console.log(`\n Связи продукт-операции добавлены успешно!`);
+    console.log(`Всего создано связей: ${totalLinks}`);
 
     // Выводим статистику
     const linkCount = await getQuery('SELECT COUNT(*) as count FROM product_operations_link');
-    console.log(`📊 Всего связей в базе: ${linkCount[0].count}`);
+    console.log(`Всего связей в базе: ${linkCount[0].count}`);
 
   } catch (error) {
-    console.error('❌ Ошибка добавления связей:', error);
+    console.error('Ошибка добавления связей:', error);
     process.exit(1);
   } finally {
     db.close((err) => {
       if (err) {
         console.error('Ошибка закрытия базы данных:', err.message);
       } else {
-        console.log('✅ Соединение с базой данных закрыто');
+        console.log('Соединение с базой данных закрыто');
       }
     });
   }

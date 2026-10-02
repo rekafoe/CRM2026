@@ -88,7 +88,7 @@ export class OrderManagementService {
           ORDER BY COALESCE(createdAt, created_at) DESC
         `);
       } catch (error) {
-        console.log('📝 Website orders table not found, skipping...');
+        console.log('Website orders table not found, skipping...');
       }
 
       // Объединяем все заказы
@@ -150,7 +150,7 @@ export class OrderManagementService {
         completed
       };
     } catch (error) {
-      console.error('❌ Error getting order pool:', error);
+      console.error('Error getting order pool:', error);
       return {
         unassigned: [],
         assigned: [],
@@ -207,16 +207,16 @@ export class OrderManagementService {
               `, [orderId]);
             }
 
-      console.log(`✅ Assigned ${orderType} order ${orderId} to user ${userName}`);
+      console.log(`Assigned ${orderType} order ${orderId} to user ${userName}`);
       
       // Запускаем проверку уведомлений в фоне
       NotificationService.checkOrderNotifications().catch(error => {
-        console.error('❌ Ошибка при проверке уведомлений:', error);
+        console.error('Ошибка при проверке уведомлений:', error);
       });
       
       return true;
     } catch (error) {
-      console.error('❌ Error assigning order to user:', error);
+      console.error('Error assigning order to user:', error);
       return false;
     }
   }
@@ -258,16 +258,16 @@ export class OrderManagementService {
         await UserOrderPageService.updatePageStats(pageOrder.page_id);
       }
 
-      console.log(`✅ Completed ${orderType} order ${orderId}`);
+      console.log(`Completed ${orderType} order ${orderId}`);
       
       // Запускаем проверку уведомлений в фоне
       NotificationService.checkOrderNotifications().catch(error => {
-        console.error('❌ Ошибка при проверке уведомлений:', error);
+        console.error('Ошибка при проверке уведомлений:', error);
       });
       
       return true;
     } catch (error) {
-      console.error('❌ Error completing order:', error);
+      console.error('Error completing order:', error);
       return false;
     }
   }
@@ -443,7 +443,7 @@ export class OrderManagementService {
         assignedToName: assignment?.assigned_to_name,
       };
     } catch (error) {
-      console.error('❌ Error searching order:', error);
+      console.error('Error searching order:', error);
       return null;
     }
   }
@@ -555,7 +555,7 @@ export class OrderManagementService {
             : String(orderId);
       return await OrderManagementService.searchOrder(searchKey);
     } catch (error) {
-      console.error('❌ Error issuing order:', error);
+      console.error('Error issuing order:', error);
       return null;
     }
   }
@@ -642,7 +642,7 @@ export class OrderManagementService {
         manualOrder: order.manualOrder
       };
     } catch (error) {
-      console.error('❌ Error getting order details:', error);
+      console.error('Error getting order details:', error);
       return null;
     }
   }
@@ -663,7 +663,7 @@ export class OrderManagementService {
       `, [orderId, orderType]);
 
       if (!currentPageOrder) {
-        console.error('❌ Order not found in user pages');
+        console.error('Order not found in user pages');
         return false;
       }
 
@@ -681,7 +681,7 @@ export class OrderManagementService {
         `, [userId, newDate]);
         
         targetPage = { id: result.lastID };
-        console.log(`✅ Created new page for date ${newDate}`);
+        console.log(`Created new page for date ${newDate}`);
       }
 
       // Перемещаем заказ на новую страницу
@@ -695,10 +695,10 @@ export class OrderManagementService {
       await UserOrderPageService.updatePageStats(currentPageOrder.page_id);
       await UserOrderPageService.updatePageStats(targetPage.id);
 
-      console.log(`✅ Moved order ${orderId} from ${currentPageOrder.current_date} to ${newDate}`);
+      console.log(`Moved order ${orderId} from ${currentPageOrder.current_date} to ${newDate}`);
       return true;
     } catch (error) {
-      console.error('❌ Error moving order to date:', error);
+      console.error('Error moving order to date:', error);
       return false;
     }
   }

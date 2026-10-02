@@ -95,7 +95,7 @@ function updateFileImports(filePath) {
   
   if (updated && content !== originalContent) {
     fs.writeFileSync(filePath, content);
-    console.log(`✅ Updated: ${path.relative(process.cwd(), filePath)}`);
+    console.log(`Updated: ${path.relative(process.cwd(), filePath)}`);
     return true;
   }
   return false;
@@ -123,8 +123,8 @@ function scanDirectory(dir, ignorePatterns = ['node_modules', 'dist', '__tests__
   return updatedCount;
 }
 
-console.log('🔄 Fixing all import paths...\n');
+console.log('Fixing all import paths...\n');
 const srcPath = path.join(__dirname, '../src');
 const count = scanDirectory(srcPath);
-console.log(`\n✅ Complete! Updated ${count} files.`);
+console.log(`\n Complete! Updated ${count} files.`);
 

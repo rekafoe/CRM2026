@@ -512,7 +512,7 @@ export class OperationsController {
         is_active: op.is_active
       }));
       
-      logger.info('📤 Отправка операций продукта', { productId, count: parsedOperations.length });
+      logger.info('Отправка операций продукта', { productId, count: parsedOperations.length });
 
       res.json({
         success: true,

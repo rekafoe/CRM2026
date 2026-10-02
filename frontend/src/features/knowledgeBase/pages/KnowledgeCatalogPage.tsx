@@ -55,7 +55,7 @@ export const KnowledgeCatalogPage: React.FC = () => {
           <h1>Найдите ответ за пару секунд</h1>
           <p>Инструкции, регламенты и накопленный опыт типографии — в одном месте.</p>
         </div>
-        <button className="kb-button kb-button--primary" type="button" onClick={() => navigate('/knowledge/new')}>
+        <button className="kb-button kb-button--primary" type="button" onClick={() =>navigate('/knowledge/new')}>
           <AppIcon name="plus" size="sm" /> Новая статья
         </button>
         <label className="kb-search">
@@ -67,7 +67,7 @@ export const KnowledgeCatalogPage: React.FC = () => {
             aria-label="Поиск по базе знаний"
           />
           {searchInput && (
-            <button type="button" onClick={() => setSearchInput('')} aria-label="Очистить поиск">
+            <button type="button" onClick={() =>setSearchInput('')} aria-label="Очистить поиск">
               <AppIcon name="x" size="sm" />
             </button>
           )}
@@ -77,7 +77,7 @@ export const KnowledgeCatalogPage: React.FC = () => {
       <div className="kb-catalog-layout">
         <aside className="kb-category-panel">
           <h2>Категории</h2>
-          <button className={!categoryId ? 'active' : ''} type="button" onClick={() => { setCategoryId(undefined); setPage(1); }}>
+          <button className={!categoryId ? 'active' : ''} type="button" onClick={() =>{ setCategoryId(undefined); setPage(1); }}>
             <span><AppIcon name="folder" size="sm" /> Все материалы</span>
           </button>
           {categories.isLoading && <span className="kb-muted">Загрузка…</span>}
@@ -86,7 +86,7 @@ export const KnowledgeCatalogPage: React.FC = () => {
               key={category.id}
               className={categoryId === category.id ? 'active' : ''}
               type="button"
-              onClick={() => { setCategoryId(category.id); setPage(1); }}
+              onClick={() =>{ setCategoryId(category.id); setPage(1); }}
             >
               <span><AppIcon name="document" size="sm" /> {category.name}</span>
               {category.articleCount ? <small>{category.articleCount}</small> : null}
@@ -101,18 +101,18 @@ export const KnowledgeCatalogPage: React.FC = () => {
               <span>{articles.data?.total ?? 0} материалов</span>
             </div>
             <div className="kb-segmented">
-              <button type="button" className={mode === 'updated' ? 'active' : ''} onClick={() => { setMode('updated'); setPage(1); }}>Обновлённые</button>
-              <button type="button" className={mode === 'new' ? 'active' : ''} onClick={() => { setMode('new'); setPage(1); }}>Новые</button>
-              <button type="button" className={mode === 'mine' ? 'active' : ''} onClick={() => { setMode('mine'); setPage(1); }}>Мои</button>
+              <button type="button" className={mode === 'updated' ? 'active' : ''} onClick={() =>{ setMode('updated'); setPage(1); }}>Обновлённые</button>
+              <button type="button" className={mode === 'new' ? 'active' : ''} onClick={() =>{ setMode('new'); setPage(1); }}>Новые</button>
+              <button type="button" className={mode === 'mine' ? 'active' : ''} onClick={() =>{ setMode('mine'); setPage(1); }}>Мои</button>
             </div>
           </div>
 
-          {articles.isLoading && <div className="kb-state"><span className="kb-spinner" /> Загружаем статьи…</div>}
+          {articles.isLoading && <div className="kb-state"><span className="kb-spinner" />Загружаем статьи…</div>}
           {articles.isError && (
             <div className="kb-state kb-state--error">
               <AppIcon name="warning" size="lg" />
               <h3>Не удалось загрузить статьи</h3>
-              <button className="kb-button" type="button" onClick={() => articles.refetch()}>Повторить</button>
+              <button className="kb-button" type="button" onClick={() =>articles.refetch()}>Повторить</button>
             </div>
           )}
           {!articles.isLoading && !articles.isError && !articles.data?.items.length && (
@@ -142,7 +142,7 @@ export const KnowledgeCatalogPage: React.FC = () => {
                     <AppIcon name="users" size="xs" /> {article.engagement.uniqueViewers}
                   </span>
                   <span className="kb-card-metric" title="Реакции">
-                    👍 {article.engagement.totalReactions}
+                     {article.engagement.totalReactions}
                   </span>
                   <time>{formatDate(article.updatedAt || article.createdAt)}</time>
                 </footer>
@@ -152,7 +152,7 @@ export const KnowledgeCatalogPage: React.FC = () => {
 
           {(articles.data?.totalPages ?? 1) > 1 && (
             <div className="kb-pagination">
-              <button className="kb-button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Назад</button>
+              <button className="kb-button" disabled={page <= 1} onClick={() =>setPage((value) => value - 1)}>Назад</button>
               <span>Страница {page} из {articles.data?.totalPages}</span>
               <button className="kb-button" disabled={page >= (articles.data?.totalPages ?? 1)} onClick={() => setPage((value) => value + 1)}>Далее</button>
             </div>

@@ -114,7 +114,7 @@ export class TelegramService {
       return false;
     }
 
-    const emoji = priority === 'high' ? '🚨' : priority === 'medium' ? '⚠️' : 'ℹ️';
+    const emoji = priority === 'high' ? '' : priority === 'medium' ? '' : '';
     const formattedMessage = `${emoji} *${title}*\n\n${message}`;
     
     const result = await this.sendToAllUsers(formattedMessage);
@@ -167,24 +167,24 @@ export class TelegramService {
   private static formatLowStockMessage(notification: LowStockNotification): string {
     const { materialName, currentQuantity, minQuantity, supplierName, supplierContact, categoryName } = notification;
     
-    let message = `🚨 *Низкий остаток материала*\n\n`;
-    message += `📦 *Материал:* ${materialName}\n`;
-    message += `📊 *Текущий остаток:* ${currentQuantity}\n`;
-    message += `⚠️ *Минимальный уровень:* ${minQuantity}\n`;
+    let message = `*Низкий остаток материала*\n\n`;
+    message += `*Материал:* ${materialName}\n`;
+    message += `*Текущий остаток:* ${currentQuantity}\n`;
+    message += `*Минимальный уровень:* ${minQuantity}\n`;
     
     if (categoryName) {
-      message += `🏷️ *Категория:* ${categoryName}\n`;
+      message += `*Категория:* ${categoryName}\n`;
     }
     
     if (supplierName) {
-      message += `🏢 *Поставщик:* ${supplierName}\n`;
+      message += `*Поставщик:* ${supplierName}\n`;
     }
     
     if (supplierContact) {
-      message += `📞 *Контакт:* ${supplierContact}\n`;
+      message += `*Контакт:* ${supplierContact}\n`;
     }
     
-    message += `\n💡 *Рекомендация:* Необходимо пополнить запас`;
+    message += `\n *Рекомендация:* Необходимо пополнить запас`;
     
     return message;
   }
@@ -195,25 +195,25 @@ export class TelegramService {
   private static formatOrderMessage(notification: OrderNotification): string {
     const { orderId, supplierName, supplierContact, materials, totalAmount, deliveryDate } = notification;
     
-    let message = `📋 *Новый заказ поставщику*\n\n`;
-    message += `🆔 *Заказ №:* ${orderId}\n`;
-    message += `🏢 *Поставщик:* ${supplierName}\n`;
+    let message = `*Новый заказ поставщику*\n\n`;
+    message += `*Заказ №:* ${orderId}\n`;
+    message += `*Поставщик:* ${supplierName}\n`;
     
     if (supplierContact) {
-      message += `📞 *Контакт:* ${supplierContact}\n`;
+      message += `*Контакт:* ${supplierContact}\n`;
     }
     
     if (deliveryDate) {
-      message += `📅 *Дата поставки:* ${deliveryDate}\n`;
+      message += `*Дата поставки:* ${deliveryDate}\n`;
     }
     
-    message += `\n📦 *Материалы:*\n`;
+    message += `\n *Материалы:*\n`;
     
     materials.forEach((material, index) => {
       message += `${index + 1}. ${material.name} - ${material.quantity} ${material.unit} (${material.price} BYN)\n`;
     });
     
-    message += `\n💰 *Общая сумма:* ${totalAmount.toFixed(2)} BYN`;
+    message += `\n *Общая сумма:* ${totalAmount.toFixed(2)} BYN`;
     
     return message;
   }
@@ -222,7 +222,7 @@ export class TelegramService {
    * Тестовая отправка сообщения
    */
   static async sendTestMessage(): Promise<boolean> {
-    const testMessage = `🧪 *Тестовое сообщение*\n\nСистема уведомлений работает корректно!`;
+    const testMessage = `*Тестовое сообщение*\n\nСистема уведомлений работает корректно!`;
     const result = await this.sendToAllUsers(testMessage);
     return result.sent > 0;
   }

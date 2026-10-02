@@ -110,7 +110,7 @@ export const PublicDesignCheckoutPreview: React.FC<PublicDesignCheckoutPreviewPr
                 key={issue.id}
                 type="button"
                 className={`public-design-editor__checkout-issue public-design-editor__checkout-issue--${issue.level}`}
-                onClick={() => {
+                onClick={() =>{
                   onClose();
                   onIssueFocus?.(issue);
                 }}

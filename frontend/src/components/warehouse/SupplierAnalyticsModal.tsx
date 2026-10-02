@@ -117,9 +117,9 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
-      case 'increasing': return '📈';
-      case 'decreasing': return '📉';
-      default: return '➡️';
+      case 'increasing': return '';
+      case 'decreasing': return '';
+      default: return '';
     }
   };
 
@@ -127,9 +127,9 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
 
   return (
     <div className="supplier-analytics-modal-overlay" onClick={onClose}>
-      <div className="supplier-analytics-modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="supplier-analytics-modal-content" onClick={(e) =>e.stopPropagation()}>
         <div className="modal-header">
-          <h2>📊 Аналитика поставщика: {supplier?.name}</h2>
+          <h2>Аналитика поставщика: {supplier?.name}</h2>
           <button className="close-button" onClick={onClose}>&times;</button>
         </div>
 
@@ -169,7 +169,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
               {/* Рекомендации */}
               {analytics.recommendations.length > 0 && (
                 <div className="recommendations">
-                  <h3>💡 Рекомендации</h3>
+                  <h3>Рекомендации</h3>
                   <ul>
                     {analytics.recommendations.map((rec, index) => (
                       <li key={index}>{rec}</li>
@@ -182,27 +182,27 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
               <div className="tabs">
                 <button 
                   className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('overview')}
+                  onClick={() =>setActiveTab('overview')}
                 >
-                  📋 Обзор
+                   Обзор
                 </button>
                 <button 
                   className={`tab ${activeTab === 'deliveries' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('deliveries')}
+                  onClick={() =>setActiveTab('deliveries')}
                 >
-                  🚚 Поставки
+                   Поставки
                 </button>
                 <button 
                   className={`tab ${activeTab === 'financial' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('financial')}
+                  onClick={() =>setActiveTab('financial')}
                 >
-                  💰 Финансы
+                   Финансы
                 </button>
                 <button 
                   className={`tab ${activeTab === 'usage' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('usage')}
+                  onClick={() =>setActiveTab('usage')}
                 >
-                  📦 Использование
+                   Использование
                 </button>
               </div>
 
@@ -212,7 +212,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
                   <div className="overview-tab">
                     <div className="stats-grid">
                       <div className="stat-card">
-                        <div className="stat-icon">🚚</div>
+                        <div className="stat-icon"></div>
                         <div className="stat-content">
                           <div className="stat-value">{analytics.delivery_stats.total_deliveries}</div>
                           <div className="stat-label">Всего поставок</div>
@@ -220,7 +220,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
                       </div>
                       
                       <div className="stat-card">
-                        <div className="stat-icon">💰</div>
+                        <div className="stat-icon"></div>
                         <div className="stat-content">
                           <div className="stat-value"><MoneyAmount value={analytics.delivery_stats.total_value} /></div>
                           <div className="stat-label">Общая стоимость</div>
@@ -228,7 +228,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
                       </div>
                       
                       <div className="stat-card">
-                        <div className="stat-icon">⭐</div>
+                        <div className="stat-icon"></div>
                         <div className="stat-content">
                           <div className="stat-value">{analytics.delivery_stats.reliability_score}%</div>
                           <div className="stat-label">Надежность</div>
@@ -236,7 +236,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
                       </div>
                       
                       <div className="stat-card">
-                        <div className="stat-icon">📦</div>
+                        <div className="stat-icon"></div>
                         <div className="stat-content">
                           <div className="stat-value">{analytics.usage_stats.materials_count}</div>
                           <div className="stat-label">Материалов</div>

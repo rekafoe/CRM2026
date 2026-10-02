@@ -52,11 +52,11 @@ function all(sql, params = []) {
     await run('COMMIT')
 
     const rows = await all('SELECT id, name, color, sort_order FROM order_statuses ORDER BY sort_order')
-    console.log('✅ Seeded order_statuses into', dbPath)
+    console.log('Seeded order_statuses into', dbPath)
     console.table(rows)
   } catch (e) {
     try { await run('ROLLBACK') } catch {}
-    console.error('❌ Failed to seed order_statuses', e)
+    console.error('Failed to seed order_statuses', e)
     process.exit(1)
   } finally {
     db.close()

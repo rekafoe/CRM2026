@@ -69,7 +69,7 @@ export const ServiceVariantsGrid: React.FC<ServiceVariantsGridProps> = ({
       {noPriceColumns && (
         <div className="service-variants-ranges-hint">
           Столбцы с ценами появятся после добавления диапазона тиража. Нажмите <strong>«Диапазон»</strong> над
-          таблицей (например, граница <strong>1</strong>). Кнопки ↘ / ↓ / × закреплены слева и не уезжают за
+          таблицей (например, граница <strong>1</strong>). Кнопки  / ↓ / × закреплены слева и не уезжают за
           диапазоны. Цены и материал — в конечных строках.
         </div>
       )}

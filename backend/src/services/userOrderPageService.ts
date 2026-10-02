@@ -29,10 +29,10 @@ export class UserOrderPageService {
         SELECT * FROM user_order_pages WHERE id = ?
       `, [result.lastID]);
 
-      console.log(`✅ Created user order page for ${userName} on ${date}`);
+      console.log(`Created user order page for ${userName} on ${date}`);
       return this.mapRowToPage(newPage);
     } catch (error) {
-      console.error('❌ Error creating user order page:', error);
+      console.error('Error creating user order page:', error);
       throw error;
     }
   }
@@ -50,7 +50,7 @@ export class UserOrderPageService {
 
       return row ? this.mapRowToPage(row) : null;
     } catch (error) {
-      console.error('❌ Error getting user order page:', error);
+      console.error('Error getting user order page:', error);
       return null;
     }
   }
@@ -70,7 +70,7 @@ export class UserOrderPageService {
 
       return rows.map(row => this.mapRowToPage(row));
     } catch (error) {
-      console.error('❌ Error getting user order pages:', error);
+      console.error('Error getting user order pages:', error);
       return [];
     }
   }
@@ -89,7 +89,7 @@ export class UserOrderPageService {
 
       return rows.map(row => this.mapRowToPage(row));
     } catch (error) {
-      console.error('❌ Error getting all order pages:', error);
+      console.error('Error getting all order pages:', error);
       return [];
     }
   }
@@ -124,10 +124,10 @@ export class UserOrderPageService {
         SELECT * FROM user_order_page_orders WHERE id = ?
       `, [result.lastID]);
 
-      console.log(`✅ Assigned order ${request.orderId} to page ${request.pageId}`);
+      console.log(`Assigned order ${request.orderId} to page ${request.pageId}`);
       return this.mapRowToOrder(newAssignment);
     } catch (error) {
-      console.error('❌ Error assigning order to page:', error);
+      console.error('Error assigning order to page:', error);
       throw error;
     }
   }
@@ -146,7 +146,7 @@ export class UserOrderPageService {
 
       return rows.map(row => this.mapRowToOrder(row));
     } catch (error) {
-      console.error('❌ Error getting page orders:', error);
+      console.error('Error getting page orders:', error);
       return [];
     }
   }
@@ -218,7 +218,7 @@ export class UserOrderPageService {
         }
       };
     } catch (error) {
-      console.error('❌ Error getting page changes:', error);
+      console.error('Error getting page changes:', error);
       return {
         newOrders: [],
         updatedOrders: [],
@@ -251,10 +251,10 @@ export class UserOrderPageService {
         await this.updatePageStats(pageOrder.page_id);
       }
 
-      console.log(`✅ Updated order ${orderId} status to ${status}`);
+      console.log(`Updated order ${orderId} status to ${status}`);
       return true;
     } catch (error) {
-      console.error('❌ Error updating order status:', error);
+      console.error('Error updating order status:', error);
       return false;
     }
   }
@@ -281,7 +281,7 @@ export class UserOrderPageService {
       `, [stats.total_orders, stats.completed_orders, pageId]);
 
     } catch (error) {
-      console.error('❌ Error updating page stats:', error);
+      console.error('Error updating page stats:', error);
     }
   }
 
@@ -325,9 +325,9 @@ export class UserOrderPageService {
         CREATE INDEX IF NOT EXISTS idx_user_order_page_orders_order ON user_order_page_orders (order_id, order_type);
       `);
       
-      console.log('✅ User order pages tables created');
+      console.log('User order pages tables created');
     } catch (error) {
-      console.error('❌ Error creating user order pages tables:', error);
+      console.error('Error creating user order pages tables:', error);
       throw error;
     }
   }

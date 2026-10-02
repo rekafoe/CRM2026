@@ -766,7 +766,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             onClick={handleExportXlsx}
             disabled={isExportingXlsx}
           >
-            {isExportingXlsx ? '⏳ Экспорт...' : <><AppIcon name="chart-bar" size="xs" /> Экспорт XLSX</>}
+            {isExportingXlsx ? 'Экспорт...' : <><AppIcon name="chart-bar" size="xs" /> Экспорт XLSX</>}
           </Button>
           <Button variant="primary" size="sm" onClick={() => { void refreshAnalytics(); void loadYearlyRevenue(departmentId); }} disabled={isLoading}>
             {isLoading ? 'Загрузка…' : <><AppIcon name="refresh" size="xs" /> Обновить</>}
@@ -778,7 +778,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
         <div className="reports-stats">
           <div
             className="reports-stat-card reports-stat-card--clickable"
-            onClick={() => void loadDrilldownOrders('all', 'Все заказы за период')}
+            onClick={() =>void loadDrilldownOrders('all', 'Все заказы за период')}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('all', 'Все заказы за период'); }}
@@ -790,7 +790,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable"
-            onClick={() => void loadDrilldownOrders('revenue', 'Заказы в выручке')}
+            onClick={() =>void loadDrilldownOrders('revenue', 'Заказы в выручке')}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('revenue', 'Заказы в выручке'); }}
@@ -812,7 +812,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable reports-stat-card--yearly"
-            onClick={() => {
+            onClick={() =>{
               const now = new Date();
               const yearTo = now.toISOString().slice(0, 10);
               const yearFrom = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1).toISOString().slice(0, 10);
@@ -850,7 +850,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable"
-            onClick={() => void loadDrilldownOrders('pending_payment', 'Неоплаченные заказы')}
+            onClick={() =>void loadDrilldownOrders('pending_payment', 'Неоплаченные заказы')}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('pending_payment', 'Неоплаченные заказы'); }}
@@ -894,7 +894,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable"
-            onClick={() => void loadDrilldownOrders('paid', 'Оплаченные заказы (по предоплате)')}
+            onClick={() =>void loadDrilldownOrders('paid', 'Оплаченные заказы (по предоплате)')}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('paid', 'Оплаченные заказы (по предоплате)'); }}
@@ -908,7 +908,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable"
-            onClick={() => void loadDrilldownOrders('completed', 'Выданные заказы')}
+            onClick={() =>void loadDrilldownOrders('completed', 'Выданные заказы')}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('completed', 'Выданные заказы'); }}
@@ -922,7 +922,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable"
-            onClick={() => void loadDrilldownOrders('completed', 'Сквозная конверсия: выданные заказы')}
+            onClick={() =>void loadDrilldownOrders('completed', 'Сквозная конверсия: выданные заказы')}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('completed', 'Сквозная конверсия: выданные заказы'); }}
@@ -993,7 +993,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               key={`${alert.title}-${idx}`}
               type="button"
               className={`reports-alert reports-alert--${alert.level} ${alert.tab ? 'reports-alert--clickable' : ''}`}
-              onClick={() => handleAlertNavigate(alert.tab)}
+              onClick={() =>handleAlertNavigate(alert.tab)}
               disabled={!alert.tab}
               title={alert.tab ? 'Открыть связанную аналитику' : undefined}
             >
@@ -1018,7 +1018,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                     key={`cancel-${row.reason_code}`}
                     type="button"
                     className="reports-reason-item"
-                    onClick={() => void loadDrilldownOrders('cancelled', `Отмены: ${row.reason}`, row.reason_code)}
+                    onClick={() =>void loadDrilldownOrders('cancelled', `Отмены: ${row.reason}`, row.reason_code)}
                     title="Открыть список заказов по причине"
                   >
                     <span>{row.reason}</span>
@@ -1038,7 +1038,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                     key={`delay-${row.reason_code}`}
                     type="button"
                     className="reports-reason-item"
-                    onClick={() => void loadDrilldownOrders('all', `Задержки: ${row.reason}`, row.reason_code)}
+                    onClick={() =>void loadDrilldownOrders('all', `Задержки: ${row.reason}`, row.reason_code)}
                     title="Открыть список заказов по причине"
                   >
                     <span>{row.reason}</span>
@@ -1100,7 +1100,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               disabled={reasonPresetsSaving}
               title="Сохранить справочник причин в backend"
             >
-              {reasonPresetsSaving ? '⏳ Сохранение...' : '💾 Сохранить справочник причин'}
+              {reasonPresetsSaving ? 'Сохранение...' : 'Сохранить справочник причин'}
             </button>
           </div>
         </div>
@@ -1223,7 +1223,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               disabled={!settingsDirty || settingsSaving}
               title="Сохранить пороги тревог и планы в backend"
             >
-              {settingsSaving ? '⏳ Сохранение...' : '💾 Сохранить пороги и планы'}
+              {settingsSaving ? 'Сохранение...' : 'Сохранить пороги и планы'}
             </button>
           </div>
         </div>
@@ -1320,7 +1320,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
         ].map(tab => (
           <button
             key={tab.key}
-            onClick={() => handleTabChange(tab.key as AnalyticsTab)}
+            onClick={() =>handleTabChange(tab.key as AnalyticsTab)}
             className={`reports-tab-btn ${activeTab === tab.key ? 'reports-tab-btn--active' : ''}`}
           >
             <AppIcon name={tab.iconName} size="xs" /> {tab.label}
@@ -1383,8 +1383,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
       )}
 
       {drilldownOpen && (
-        <div className="reports-drilldown-overlay" onClick={() => setDrilldownOpen(false)}>
-          <div className="reports-drilldown-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="reports-drilldown-overlay" onClick={() =>setDrilldownOpen(false)}>
+          <div className="reports-drilldown-modal" onClick={(e) =>e.stopPropagation()}>
             <div className="reports-drilldown-header">
               <h3>{drilldownTitle}</h3>
               <Button variant="secondary" size="sm" type="button" onClick={() => setDrilldownOpen(false)}>Закрыть</Button>

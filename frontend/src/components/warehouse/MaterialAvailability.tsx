@@ -15,7 +15,7 @@ const MaterialAvailability: React.FC<MaterialAvailabilityProps> = ({ materialId 
 
   return (
     <span className={`availability-badge ${
-      (availability?.available_quantity || 0) > 10 ? 'success' : 
+      (availability?.available_quantity || 0) >10 ? 'success' : 
       (availability?.available_quantity || 0) > 0 ? 'warning' : 'danger'
     }`}>
       {availability?.available_quantity || 0}

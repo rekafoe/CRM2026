@@ -193,15 +193,15 @@ export const PaperTypesManager: React.FC<PaperTypesManagerProps> = ({ isOpen, on
         <div className="tabs">
           <button 
             className={`tab ${activeTab === 'types' ? 'active' : ''}`}
-            onClick={() => setActiveTab('types')}
+            onClick={() =>setActiveTab('types')}
           >
-            📄 Типы бумаги
+             Типы бумаги
           </button>
           <button 
             className={`tab ${activeTab === 'prices' ? 'active' : ''}`}
-            onClick={() => setActiveTab('prices')}
+            onClick={() =>setActiveTab('prices')}
           >
-            💰 Цены печати
+             Цены печати
           </button>
         </div>
 
@@ -253,7 +253,7 @@ export const PaperTypesManager: React.FC<PaperTypesManagerProps> = ({ isOpen, on
                   {editingType ? (
                     <>
                       <button type="submit">Сохранить</button>
-                      <button type="button" onClick={() => setEditingType(null)}>Отмена</button>
+                      <button type="button" onClick={() =>setEditingType(null)}>Отмена</button>
                     </>
                   ) : (
                     <button type="submit">Добавить</button>
@@ -276,8 +276,8 @@ export const PaperTypesManager: React.FC<PaperTypesManagerProps> = ({ isOpen, on
                         <p><strong>Ключевые слова:</strong> {type.search_keywords}</p>
                       </div>
                       <div className="paper-type-actions">
-                        <button onClick={() => setEditingType(type)}>Редактировать</button>
-                        <button onClick={() => handleDeletePaperType(type.id)} className="delete-btn">
+                        <button onClick={() =>setEditingType(type)}>Редактировать</button>
+                        <button onClick={() =>handleDeletePaperType(type.id)} className="delete-btn">
                           Удалить
                         </button>
                       </div>
@@ -349,7 +349,7 @@ export const PaperTypesManager: React.FC<PaperTypesManagerProps> = ({ isOpen, on
                                 <span>{density}г/м²</span>
                                 <span>{typeof price === 'number' ? <><MoneyAmount value={price} />/лист</> : 'N/A'}</span>
                                 <button 
-                                  onClick={() => {
+                                  onClick={() =>{
                                     // Пока что просто показываем сообщение, так как у нас нет ID цены
                                     alert('Для удаления цены нужно сначала получить ID из базы данных');
                                   }}

@@ -29,7 +29,7 @@ export const OrderFileAccessLogsModal: React.FC<OrderFileAccessLogsModalProps> =
 
   return (
     <div className="access-logs-overlay" onClick={onClose}>
-      <div className="access-logs-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="access-logs-modal" onClick={(e) =>e.stopPropagation()}>
         <div className="access-logs-header">
           <h4>
             <AppIcon name="shield" size="sm" />

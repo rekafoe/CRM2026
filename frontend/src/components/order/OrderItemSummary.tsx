@@ -106,7 +106,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
         <>
           <span className="separator">|</span>
           <span className="detail-item price-type urgency">
-            {priceTypeLabel ? `⚡ ${priceTypeLabel.displayLabel}` : `⚡ ${priceTypeKey}`}
+            {priceTypeLabel ? `${priceTypeLabel.displayLabel}` : `${priceTypeKey}`}
           </span>
         </>
       )}
@@ -125,7 +125,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
         <>
           <span className="separator">|</span>
           <span className="detail-item customer">
-            👑{' '}
+            {''}
             {item.params.customerType === 'vip'
               ? 'VIP'
               : item.params.customerType === 'wholesale'
@@ -166,20 +166,20 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       {/* Тип материала - показываем display_name из типов бумаги со склада для оператора */}
       {!compact &&
       (() => {
-        // 🆕 Приоритет: materialTypeDisplay (уже содержит display_name из склада), затем из parameterSummary
+        //  Приоритет: materialTypeDisplay (уже содержит display_name из склада), затем из parameterSummary
         // materialTypeDisplay загружается из склада и содержит транслированное название типа бумаги
         // Это позволяет оператору видеть понятное название (например, "Глянцевая" вместо "glossy")
         const fromWarehouse = materialTypeDisplay; // Уже содержит display_name из склада
         const fromMaterial = parameterSummary.find((p) => p.label === 'Материал')?.value;
         const fromType = parameterSummary.find((p) => p.label === 'Тип материала')?.value;
         
-        // 🆕 Показываем "Тип материала" всегда, если есть materialTypeDisplay или materialTypeRaw
+        //  Показываем "Тип материала" всегда, если есть materialTypeDisplay или materialTypeRaw
         // Это важно для оператора, чтобы он видел тип бумаги (например, "Глянцевая"), даже если "Материал" показывает то же самое
         // Плотности для материалов разных типов могут быть одинаковыми, поэтому нужен именно тип бумаги
         const raw = String(fromWarehouse || fromType || materialTypeRaw || '').trim();
         if (!raw) return null;
         
-        // 🆕 Не скрываем тип материала, даже если он совпадает с "Материал"
+        //  Не скрываем тип материала, даже если он совпадает с "Материал"
         // Оператору нужно видеть тип бумаги для правильного выполнения заказа
         return (
           <>

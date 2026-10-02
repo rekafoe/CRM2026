@@ -12,7 +12,7 @@ export async function up(db: Database): Promise<void> {
   const hasOldStructure = columns.some((col: any) => col.name === 'presetCategory');
   
   if (hasOldStructure) {
-    console.log('📋 Migrating product_materials table to new structure...');
+    console.log('Migrating product_materials table to new structure...');
     
     // Сохраняем старые данные
     const oldData = await db.all(`SELECT * FROM product_materials`);
@@ -47,14 +47,14 @@ export async function up(db: Database): Promise<void> {
       ON product_materials(material_id)
     `);
     
-    console.log('✅ product_materials table updated to new structure');
+    console.log('product_materials table updated to new structure');
     console.log(`   Old records: ${oldData.length} (not migrated, old schema incompatible)`);
   } else {
     // Таблица уже имеет новую структуру, проверяем наличие всех колонок
     const hasProductId = columns.some((col: any) => col.name === 'product_id');
     
     if (!hasProductId) {
-      console.log('❌ Unexpected table structure, recreating...');
+      console.log('Unexpected table structure, recreating...');
       
       await db.exec(`DROP TABLE IF EXISTS product_materials`);
       
@@ -83,15 +83,15 @@ export async function up(db: Database): Promise<void> {
         ON product_materials(material_id)
       `);
       
-      console.log('✅ product_materials table created with correct structure');
+      console.log('product_materials table created with correct structure');
     } else {
-      console.log('✅ product_materials table already has correct structure');
+      console.log('product_materials table already has correct structure');
     }
   }
 }
 
 export async function down(db: Database): Promise<void> {
   // Rollback - возвращаем старую структуру (не рекомендуется)
-  console.log('⚠️ Rollback not recommended - keeping new structure');
+  console.log('Rollback not recommended - keeping new structure');
 }
 

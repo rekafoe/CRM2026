@@ -15,7 +15,7 @@ import { getDb } from '../db';
 export async function up(db?: Database): Promise<void> {
   const database = db || await getDb();
 
-  console.log('🔧 Добавляем per_cut в допустимые значения price_unit...');
+  console.log('Добавляем per_cut в допустимые значения price_unit...');
   
   // SQLite не поддерживает ALTER COLUMN для CHECK constraint
   // Нужно пересоздать таблицу
@@ -29,7 +29,7 @@ export async function up(db?: Database): Promise<void> {
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='post_processing_services'"
       );
       if (master?.sql && master.sql.includes("'per_cut'")) {
-        console.log('✅ per_cut уже присутствует в схеме — пропускаем пересоздание таблицы');
+        console.log('per_cut уже присутствует в схеме — пропускаем пересоздание таблицы');
         await database.exec('COMMIT');
         return;
       }
@@ -95,12 +95,12 @@ export async function up(db?: Database): Promise<void> {
     
     await database.exec('COMMIT');
     
-    console.log('✅ Схема обновлена: добавлен per_cut');
-    console.log('✅ Операция резки обновлена: price_unit = per_cut');
+    console.log('Схема обновлена: добавлен per_cut');
+    console.log('Операция резки обновлена: price_unit = per_cut');
     
   } catch (error) {
     await database.exec('ROLLBACK');
-    console.error('❌ Ошибка миграции:', error);
+    console.error('Ошибка миграции:', error);
     throw error;
   }
 }
@@ -108,7 +108,7 @@ export async function up(db?: Database): Promise<void> {
 export async function down(db?: Database): Promise<void> {
   const database = db || await getDb();
   
-  console.log('⚠️ Откат: возвращаем price_unit = per_sheet для резки');
+  console.log('Откат: возвращаем price_unit = per_sheet для резки');
   
   await database.run(`
     UPDATE post_processing_services 
@@ -118,6 +118,6 @@ export async function down(db?: Database): Promise<void> {
     WHERE operation_type = 'cut'
   `);
   
-  console.log('✅ Откат выполнен (не рекомендуется!)');
+  console.log('Откат выполнен (не рекомендуется!)');
 }
 

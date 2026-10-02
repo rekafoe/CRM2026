@@ -72,7 +72,7 @@ export const PostalTrackingPage: React.FC = () => {
     <AdminPageLayout
       title="Доставка"
       description="Текущий статус и история Белпочты и Европочты по отправлениям из заказов."
-      icon="📦"
+      icon=""
     >
       <div className="postal-tracking">
         <div className="postal-tracking__toolbar">
@@ -82,13 +82,13 @@ export const PostalTrackingPage: React.FC = () => {
                 key={item.id}
                 type="button"
                 className={carrier === item.id ? 'postal-tracking__tab postal-tracking__tab--active' : 'postal-tracking__tab'}
-                onClick={() => setCarrier(item.id)}
+                onClick={() =>setCarrier(item.id)}
               >
                 {item.label}
               </button>
             ))}
           </div>
-          <button type="button" className="btn btn-primary" onClick={() => refresh()} disabled={busyId !== null}>
+          <button type="button" className="btn btn-primary" onClick={() =>refresh()} disabled={busyId !== null}>
             {busyId === 'all' ? 'Обновляем…' : 'Обновить статусы'}
           </button>
         </div>
@@ -123,10 +123,10 @@ export const PostalTrackingPage: React.FC = () => {
                   <p className="postal-tracking__error">{shipment.tracking_error}</p>
                 ) : null}
                 <div className="postal-tracking__actions">
-                  <button type="button" onClick={() => setOpenId(open ? null : shipment.id)}>
+                  <button type="button" onClick={() =>setOpenId(open ? null : shipment.id)}>
                     {open ? 'Скрыть историю' : `История (${shipment.events.length})`}
                   </button>
-                  <button type="button" onClick={() => refresh(shipment.id)} disabled={busyId !== null || !shipment.tracking_number}>
+                  <button type="button" onClick={() =>refresh(shipment.id)} disabled={busyId !== null || !shipment.tracking_number}>
                     {busyId === shipment.id ? 'Обновляем…' : 'Обновить'}
                   </button>
                 </div>

@@ -29,7 +29,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [icon, setIcon] = useState('📦');
+  const [icon, setIcon] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(
     categories.length > 0 ? categories[0].id : null
   );
@@ -43,7 +43,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
       // Сброс формы при открытии
       setName('');
       setDescription('');
-      setIcon('📦');
+      setIcon('');
       setCategoryId(categories.length > 0 ? categories[0].id : null);
       setCalculatorType('product');
       setProductType('sheet_single');
@@ -87,7 +87,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
   const handleClose = () => {
     setName('');
     setDescription('');
-    setIcon('📦');
+    setIcon('');
     setCategoryId(categories.length > 0 ? categories[0].id : null);
     setCalculatorType('product');
     setProductType('sheet_single');
@@ -143,15 +143,6 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         </FormField>
 
         <div className="form-row">
-          <FormField label="Иконка (эмодзи)" className="flex-1">
-            <input
-              className="form-input"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              maxLength={2}
-              placeholder="📦"
-            />
-          </FormField>
           <FormField label="Тип калькулятора" className="flex-1">
             <select
               className="form-select"

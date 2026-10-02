@@ -171,7 +171,7 @@ function VariantRow({
           <button
             type="button"
             className="lg-btn lg-btn--sm"
-            onClick={() => void openClientSandbox()}
+            onClick={() =>void openClientSandbox()}
             disabled={sandboxBusy}
             title={
               parsed.editorKind === 'souvenir_3d'
@@ -184,7 +184,7 @@ function VariantRow({
           <button
             type="button"
             className="lg-btn lg-btn--sm lg-btn--icon lg-btn--danger"
-            onClick={() => void onDelete(variant.id, sizeStr)}
+            onClick={() =>void onDelete(variant.id, sizeStr)}
             title="Удалить этот размер"
             aria-label="Удалить"
           >
@@ -215,7 +215,7 @@ function VariantRow({
             type="button"
             className="lg-btn lg-btn--primary lg-btn--sm design-family-variant-row__bind-btn"
             disabled={!canBind || saving}
-            onClick={() => void handleBind()}
+            onClick={() =>void handleBind()}
           >
             {saving ? '…' : linked ? 'Обновить привязку' : 'Привязать'}
           </button>

@@ -55,7 +55,7 @@ export const CampaignRunLog: React.FC = () => {
       <div className="campaign-card">
         <div className="campaign-card__header">
           <h4>Запуски кампаний</h4>
-          <button type="button" className="lg-btn" onClick={() => void loadRuns()}>
+          <button type="button" className="lg-btn" onClick={() =>void loadRuns()}>
             Обновить
           </button>
         </div>
@@ -65,7 +65,7 @@ export const CampaignRunLog: React.FC = () => {
               key={item.id}
               type="button"
               className={`campaign-list__item ${selectedRun === item.id ? 'active' : ''}`}
-              onClick={() => setSelectedRun(item.id)}
+              onClick={() =>setSelectedRun(item.id)}
             >
               <strong>{item.campaign_name}</strong>
               <span>{item.channel} · {item.mode} · {item.status}</span>
@@ -80,7 +80,7 @@ export const CampaignRunLog: React.FC = () => {
       <div className="campaign-card">
         <div className="campaign-card__header">
           <h4>Получатели запуска</h4>
-          <button type="button" className="lg-btn" onClick={() => void handleCancel()} disabled={!selectedRun}>
+          <button type="button" className="lg-btn" onClick={() =>void handleCancel()} disabled={!selectedRun}>
             Отменить запуск
           </button>
         </div>

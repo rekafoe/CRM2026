@@ -82,7 +82,7 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
     return (
       <div className="mobile-warehouse">
         <div className="mobile-header">
-          <h2>📱 Мобильный склад</h2>
+          <h2>Мобильный склад</h2>
           <button onClick={onClose} className="close-btn">✕</button>
         </div>
         <div className="loading">
@@ -96,13 +96,13 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
   return (
     <div className="mobile-warehouse">
       <div className="mobile-header">
-        <h2>📱 Мобильный склад</h2>
+        <h2>Мобильный склад</h2>
         <button onClick={onClose} className="close-btn">✕</button>
       </div>
 
       {error && (
         <div className="error-message">
-          <span className="error-icon">❌</span>
+          <span className="error-icon"></span>
           <span>{error}</span>
         </div>
       )}
@@ -110,17 +110,17 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
       {/* Статистика */}
       <div className="mobile-stats">
         <div className="stat-card">
-          <div className="stat-icon">📦</div>
+          <div className="stat-icon"></div>
           <div className="stat-value">{stats.total}</div>
           <div className="stat-label">Всего</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">⚠️</div>
+          <div className="stat-icon"></div>
           <div className="stat-value">{stats.lowStock}</div>
           <div className="stat-label">Низкий запас</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">🔴</div>
+          <div className="stat-icon"></div>
           <div className="stat-value">{stats.outOfStock}</div>
           <div className="stat-label">Нет в наличии</div>
         </div>
@@ -131,7 +131,7 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
         <div className="search-box">
           <input
             type="text"
-            placeholder="🔍 Поиск материалов..."
+            placeholder="Поиск материалов..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
@@ -141,7 +141,7 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
         <div className="filter-buttons">
           <button
             className={`filter-btn ${filterCategory === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterCategory('all')}
+            onClick={() =>setFilterCategory('all')}
           >
             Все
           </button>
@@ -149,7 +149,7 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
             <button
               key={category}
               className={`filter-btn ${filterCategory === category ? 'active' : ''}`}
-              onClick={() => setFilterCategory(category)}
+              onClick={() =>setFilterCategory(category)}
             >
               {category}
             </button>
@@ -159,9 +159,9 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
         <div className="toggle-filters">
           <button
             className={`toggle-btn ${showLowStock ? 'active' : ''}`}
-            onClick={() => setShowLowStock(!showLowStock)}
+            onClick={() =>setShowLowStock(!showLowStock)}
           >
-            {showLowStock ? '🔴' : '⚪'} Только низкий запас
+            Только низкий запас
           </button>
         </div>
       </div>
@@ -170,7 +170,7 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
       <div className="mobile-materials-list">
         {filteredMaterials.length === 0 ? (
           <div className="no-materials">
-            <div className="no-materials-icon">📦</div>
+            <div className="no-materials-icon"></div>
             <p>Материалы не найдены</p>
           </div>
         ) : (
@@ -182,8 +182,8 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
                   material.quantity === 0 ? 'out-of-stock' :
                   material.quantity <= material.min_quantity ? 'low-stock' : 'normal'
                 }`}>
-                  {material.quantity === 0 ? '🔴' :
-                   material.quantity <= material.min_quantity ? '⚠️' : '✅'}
+                  {material.quantity === 0 ? 'Нет' :
+                   material.quantity <= material.min_quantity ? 'Мало' : 'Норма'}
                 </div>
               </div>
               
@@ -215,10 +215,10 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
 
               <div className="material-actions">
                 <button className="action-btn primary">
-                  📝 Редактировать
+                   Редактировать
                 </button>
                 <button className="action-btn secondary">
-                  📦 Пополнить
+                   Пополнить
                 </button>
               </div>
             </div>
@@ -229,13 +229,13 @@ export const MobileWarehouse: React.FC<MobileWarehouseProps> = ({ onClose }) => 
       {/* Быстрые действия */}
       <div className="mobile-quick-actions">
         <button className="quick-action-btn">
-          📦 Сканировать QR
+           Сканировать QR
         </button>
         <button className="quick-action-btn">
-          📊 Отчет
+           Отчет
         </button>
         <button className="quick-action-btn">
-          🔄 Обновить
+           Обновить
         </button>
       </div>
     </div>

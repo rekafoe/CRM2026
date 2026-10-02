@@ -9,7 +9,7 @@ import { apiRequest, apiRequestSafe, extractData } from './utils/apiHelpers';
 import { clearProductConfigsCache } from './configs';
 
 const productsByCategoryCache = new KeyedCache<Product[]>(5 * 60 * 1000);
-const allProductsCache = new KeyedCache<Product[]>(5 * 60 * 1000); // ✅ Используем KeyedCache для поддержки activeOnly
+const allProductsCache = new KeyedCache<Product[]>(5 * 60 * 1000); //  Используем KeyedCache для поддержки activeOnly
 const productDetailsCache = new KeyedCache<ProductWithDetails>(5 * 60 * 1000);
 
 /**

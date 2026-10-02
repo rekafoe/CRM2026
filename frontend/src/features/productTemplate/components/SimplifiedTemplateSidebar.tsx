@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppIcon } from '../../../components/ui/AppIcon';
+import { withoutEmoji } from '../../../utils/withoutEmoji';
 import { Button } from '../../../components/common';
 import { useToastNotifications } from '../../../components/Toast';
 import { getPrintTechnologies } from '../../../api';
@@ -154,7 +155,7 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
               className="template-summary-card__image"
             />
           ) : (
-            icon || product?.icon || <AppIcon name="package" size="md" />
+            withoutEmoji(icon || product?.icon) || <AppIcon name="package" size="md" />
           )}
         </div>
         <div className="template-summary-card__name">{name || product?.name || 'Без названия'}</div>
@@ -174,7 +175,7 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
           onClick={onToggleCalcOptions}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onToggleCalcOptions()}
+          onKeyDown={(e) =>e.key === 'Enter' && onToggleCalcOptions()}
         >
           <div>
             <span className="simplified-label-with-hint">
@@ -239,7 +240,7 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => {
+                    onClick={() =>{
                       void import('../../../features/designTemplates/openSiteSandboxForDesignTemplate')
                         .then(({ openSiteSandboxForDesignTemplate }) =>
                           openSiteSandboxForDesignTemplate(value.souvenirBlankTemplateId!),
@@ -354,7 +355,7 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => {
+                  onClick={() =>{
                     const next = [...(value.printAreas ?? [])];
                     if (next.length === 0) {
                       next.push({

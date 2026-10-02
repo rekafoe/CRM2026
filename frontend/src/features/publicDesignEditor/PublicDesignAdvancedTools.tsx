@@ -180,7 +180,7 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
             <button
               type="button"
               className={`public-design-editor__advanced-tab${section === item.id ? ' public-design-editor__advanced-tab--active' : ''}`}
-              onClick={() => setSection((current) => (current === item.id ? null : item.id))}
+              onClick={() =>setSection((current) => (current === item.id ? null : item.id))}
               title={item.hint}
               aria-label={`${item.label}: ${item.hint}`}
             >

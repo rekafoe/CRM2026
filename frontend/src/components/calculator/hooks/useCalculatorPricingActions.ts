@@ -221,7 +221,7 @@ export function useCalculatorPricingActions({
           const height = parseFloat(customFormat.height);
           if (!isNaN(width) && !isNaN(height) && width > 0 && height > 0) {
             trimSize = { width, height };
-            logger.info('📐 Используем кастомный формат', { trimSize });
+            logger.info('Используем кастомный формат', { trimSize });
           }
         } else if (specs.format) {
           // Парсим format строку в trim_size
@@ -235,13 +235,13 @@ export function useCalculatorPricingActions({
           if (parsed) {
             trimSize = parsed;
           } else {
-            logger.info('⚠️ Не удалось распарсить format', { format: specs.format });
+            logger.info('Не удалось распарсить format', { format: specs.format });
           }
         } else {
-          logger.info('ℹ️ format не указан, бэкенд должен взять размер из шаблона продукта', { productId: selectedProduct.id });
+          logger.info('format не указан, бэкенд должен взять размер из шаблона продукта', { productId: selectedProduct.id });
         }
 
-        // ✅ Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
+        //  Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
         const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes);
         const materialDrivenPrinting =
           backendProductSchema?.template?.simplified?.material_driven_printing === true;
@@ -268,12 +268,12 @@ export function useCalculatorPricingActions({
           }
           
           throw new Error(
-            `❌ Не указаны параметры печати: ${missingParams.join(', ')}. ` +
+            `Не указаны параметры печати: ${missingParams.join(', ')}.` +
             `Пожалуйста, выберите технологию печати и режим цвета в разделе "Печать" перед расчетом.`
           );
         }
 
-        // 🆕 Нормализуем выбранные операции в формат finishing для SimplifiedPricingService
+        //  Нормализуем выбранные операции в формат finishing для SimplifiedPricingService
         // selectedOperations (фронтенд) -> finishing (бэкенд, simplified-конфиг)
         type FinishingCalcEntry = {
           service_id: number;
@@ -312,7 +312,7 @@ export function useCalculatorPricingActions({
                 ? (op.operation_id ?? op.id ?? (op as any).service_id)
                 : Number(sel.operationId);
               if (!serviceId || !Number.isFinite(serviceId)) {
-                logger.info('⚠️ Невалидный service_id для selectedOperation', { sel });
+                logger.info('Невалидный service_id для selectedOperation', { sel });
                 return null;
               }
 
@@ -353,13 +353,13 @@ export function useCalculatorPricingActions({
                 ...(sel.variantId != null ? { variant_id: Number(sel.variantId) } : {}),
               };
               if (!op) {
-                logger.info('🧩 finishing из selectedOperation без совпадения в schema (simplified)', { selectedOperation: sel, entry });
+                logger.info('finishing из selectedOperation без совпадения в schema (simplified)', { selectedOperation: sel, entry });
               }
               return entry;
             });
           finishingConfig = mappedFinishing.filter((f): f is FinishingCalcEntry => f != null);
 
-          logger.info('🧮 Нормализованные finishing из selectedOperations', {
+          logger.info('Нормализованные finishing из selectedOperations', {
             selectedOperationsCount: specs.selectedOperations.length,
             finishingCount: finishingConfig.length,
             finishing: finishingConfig,
@@ -371,7 +371,7 @@ export function useCalculatorPricingActions({
             })),
           });
         } else {
-          logger.info('⚠️ selectedOperations пуст или не массив', {
+          logger.info('selectedOperations пуст или не массив', {
             selectedOperations: specs.selectedOperations,
             isArray: Array.isArray(specs.selectedOperations),
             length: Array.isArray(specs.selectedOperations) ? specs.selectedOperations.length : 0,
@@ -398,22 +398,22 @@ export function useCalculatorPricingActions({
             });
           finishingConfig = fallbackMapped.filter((f): f is FinishingCalcEntry => f != null);
           if (finishingConfig && finishingConfig.length > 0) {
-            logger.info('🧩 finishing собран из selectedOperations (fallback)', { count: finishingConfig.length });
+            logger.info('finishing собран из selectedOperations (fallback)', { count: finishingConfig.length });
           }
         }
 
         const configuration = {
           ...specs,
           productType: resolvedType,
-          format: specs.format, // ✅ Явно передаем формат
-          ...(specs.typeId != null ? { type_id: specs.typeId } : {}), // ✅ Явно type_id для продуктов с подтипами (открытки и т.д.)
+          format: specs.format, //  Явно передаем формат
+          ...(specs.typeId != null ? { type_id: specs.typeId } : {}), //  Явно type_id для продуктов с подтипами (открытки и т.д.)
           urgency: specs.priceType,
           paperDensity: specs.paperDensity,
           customerType: specs.customerType,
-          // ✅ ВАЖНО: Всегда передаем trim_size, если он вычислен
+          //  ВАЖНО: Всегда передаем trim_size, если он вычислен
           // Бэкенд должен использовать trim_size вместо размера из шаблона, если он указан
           ...(trimSize ? { trim_size: trimSize } : {}),
-          // ✅ Добавляем параметры печати (обязательные для операций печати)
+          //  Добавляем параметры печати (обязательные для операций печати)
           ...(uvFlatbed
             ? {
                 print_technology: 'uv',
@@ -426,16 +426,16 @@ export function useCalculatorPricingActions({
                 print_color_mode: printColorMode,
                 printColorMode,
               }),
-          // 🆕 Для упрощённых продуктов передаем size_id, material_id и base_material_id
+          //  Для упрощённых продуктов передаем size_id, material_id и base_material_id
           ...(specs.size_id ? { size_id: specs.size_id } : {}),
           ...(specs.material_id ? { material_id: specs.material_id } : {}),
           ...(specs.cover_material_id ? { cover_material_id: specs.cover_material_id } : {}),
           ...(specs.base_material_id ? { base_material_id: specs.base_material_id } : {}),
-          // 🆕 Резка: явно передаём в заказ для simplified (бэкенд учтёт в цене и вернёт в operations)
+          //  Резка: явно передаём в заказ для simplified (бэкенд учтёт в цене и вернёт в operations)
           ...(specs.cutting === true || (backendProductSchema?.template?.simplified as any)?.cutting === true
             ? { cutting: true }
             : {}),
-          // 🆕 Передаем выбранные операции (для обратной совместимости и отладки)
+          //  Передаем выбранные операции (для обратной совместимости и отладки)
           ...(specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
             ? { selectedOperations: specs.selectedOperations }
             : {}),
@@ -473,23 +473,23 @@ export function useCalculatorPricingActions({
             specs.usage_context === 'outdoor' ? 'outdoor' : 'indoor';
         }
 
-        // ✅ Логируем trim_size для отладки
+        //  Логируем trim_size для отладки
         if (trimSize) {
-          logger.info('📐 trim_size передается в бэкенд', { 
+          logger.info('trim_size передается в бэкенд', { 
             trim_size: trimSize, 
             format: specs.format,
             note: 'Бэкенд должен использовать этот размер вместо размера из шаблона продукта'
           });
         } else {
-          logger.info('⚠️ trim_size не вычислен, бэкенд будет использовать размер из шаблона продукта', {
+          logger.info('trim_size не вычислен, бэкенд будет использовать размер из шаблона продукта', {
             format: specs.format,
             isCustomFormat,
             customFormat
           });
         }
 
-        // ✅ Детальное логирование конфигурации для отладки
-        logger.info('💰 Вызываем бэкенд для расчета цены', {
+        //  Детальное логирование конфигурации для отладки
+        logger.info('Вызываем бэкенд для расчета цены', {
           productId: selectedProduct.id,
           configuration: {
             ...configuration,
@@ -502,7 +502,7 @@ export function useCalculatorPricingActions({
             print_color_mode: (configuration as { print_color_mode?: string | null }).print_color_mode,
             sides: configuration.sides,
             bleed_mm: (configuration as { bleed_mm?: number }).bleed_mm,
-            // 🆕 Явно логируем finishing для отладки
+            //  Явно логируем finishing для отладки
             finishing: configuration.finishing,
             hasFinishing: !!(configuration.finishing && Array.isArray(configuration.finishing) && configuration.finishing.length > 0),
             selectedOperations: configuration.selectedOperations,
@@ -512,11 +512,11 @@ export function useCalculatorPricingActions({
           hasTrimSize: !!trimSize,
           printTechnology,
           printColorMode,
-          // ✅ Полная конфигурация для отладки (раскомментируйте при необходимости)
+          //  Полная конфигурация для отладки (раскомментируйте при необходимости)
           // fullConfiguration: configuration
         });
         
-        // ✅ Для продуктов с печатью параметры должны быть переданы; для продуктов без печати — нормально, что их нет
+        //  Для продуктов с печатью параметры должны быть переданы; для продуктов без печати — нормально, что их нет
         const configPrint = configuration as {
           print_technology?: string;
           print_color_mode?: string | null;
@@ -527,17 +527,17 @@ export function useCalculatorPricingActions({
           && !materialDrivenPrinting
           && (!configPrint.print_technology || !configPrint.print_color_mode)
         ) {
-          logger.info('⚠️ Параметры печати не переданы в конфигурацию!', {
+          logger.info('Параметры печати не переданы в конфигурацию!', {
             print_technology: configPrint.print_technology,
             print_color_mode: configPrint.print_color_mode,
           });
         } else if (requiresPrint && !materialDrivenPrinting) {
-          logger.info('✅ Параметры печати переданы в конфигурацию', {
+          logger.info('Параметры печати переданы в конфигурацию', {
             print_technology: configPrint.print_technology,
             print_color_mode: configPrint.print_color_mode,
           });
         } else if (!requiresPrint) {
-          logger.info('ℹ️ Продукт без печати — расчёт без параметров печати', { productId: selectedProduct.id });
+          logger.info('Продукт без печати — расчёт без параметров печати', { productId: selectedProduct.id });
         }
 
         requestSeq = ++calcRequestSeqRef.current;
@@ -553,13 +553,13 @@ export function useCalculatorPricingActions({
 
         const backendResult: any = pricingResult;
         
-        // ✅ СТРОГАЯ ВАЛИДАЦИЯ ответа бэкенда
+        //  СТРОГАЯ ВАЛИДАЦИЯ ответа бэкенда
         if (!backendResult) {
           throw new Error('Бэкенд не вернул результат расчета');
         }
         
-        // 🔍 Логируем структуру ответа для отладки
-        logger.info('📦 Структура ответа от бэкенда', {
+        //  Логируем структуру ответа для отладки
+        logger.info('Структура ответа от бэкенда', {
           hasProductSize: !!backendResult.productSize,
           productSize: backendResult.productSize,
           hasLayout: !!backendResult.layout,
@@ -589,8 +589,8 @@ export function useCalculatorPricingActions({
               })
             : materials;
 
-        // 🆕 Логируем операции для отладки finishing
-        logger.info('🔧 Операции от бэкенда (включая finishing)', {
+        //  Логируем операции для отладки finishing
+        logger.info('Операции от бэкенда (включая finishing)', {
           operationsCount: services.length,
           operations: services.map((op: any) => ({
             operationId: op.operationId ?? op.operation_id ?? op.id,
@@ -605,8 +605,8 @@ export function useCalculatorPricingActions({
           selectedOperationsFromSpecs: specs.selectedOperations,
         });
 
-        // 🆕 Логируем материалы для отладки
-        logger.info('📦 Материалы от бэкенда', {
+        //  Логируем материалы для отладки
+        logger.info('Материалы от бэкенда', {
           materialsCount: materials.length,
           materials: materials.map((m: any) => ({
             materialId: m.materialId ?? m.material_id ?? m.id,
@@ -615,8 +615,8 @@ export function useCalculatorPricingActions({
             quantity: m.quantity,
             unitPrice: m.unitPrice ?? m.unit_price ?? m.price,
             totalCost: m.totalCost ?? m.total,
-            paper_type_name: m.paper_type_name, // 🆕 Добавляем для отладки
-            allKeys: Object.keys(m) // 🆕 Показываем все ключи для отладки
+            paper_type_name: m.paper_type_name, //  Добавляем для отладки
+            allKeys: Object.keys(m) //  Показываем все ключи для отладки
           })),
           hasMaterialId: specs.material_id ? true : false,
           materialId: specs.material_id,
@@ -624,8 +624,8 @@ export function useCalculatorPricingActions({
           specsSizeId: specs.size_id
         });
         
-        // 🆕 Дополнительное логирование для отладки paper_type_name
-        console.log('🔍 [useCalculatorPricingActions] Детальный анализ материалов от бэкенда:', 
+        //  Дополнительное логирование для отладки paper_type_name
+        console.log('[useCalculatorPricingActions] Детальный анализ материалов от бэкенда:', 
           materials.map((m: any) => ({
             materialId: m.materialId ?? m.material_id ?? m.id,
             materialName: m.materialName || m.material || m.name,
@@ -635,10 +635,10 @@ export function useCalculatorPricingActions({
           }))
         );
 
-        // ✅ Проверяем, что бэкенд вернул материалы и операции
+        //  Проверяем, что бэкенд вернул материалы и операции
         // Для упрощённых продуктов материалы могут быть пустыми, если не выбран материал
         if (materials.length === 0 && !specs.material_id) {
-          logger.info('⚠️ Бэкенд не вернул материалы', { 
+          logger.info('Бэкенд не вернул материалы', { 
             productId: selectedProduct.id,
             isSimplified: !!specs.size_id,
             hasMaterialId: !!specs.material_id
@@ -651,11 +651,11 @@ export function useCalculatorPricingActions({
 
         // Продукты без печати и без операций могут иметь только стоимость материалов — это допустимо
         if (services.length === 0) {
-          logger.info('ℹ️ Бэкенд вернул расчёт без операций (только материалы)', { productId: selectedProduct.id });
+          logger.info('Бэкенд вернул расчёт без операций (только материалы)', { productId: selectedProduct.id });
         }
 
-        // ✅ Детальное логирование операций для проверки стоимости печати
-        logger.info('✅ Цена рассчитана бэкендом', {
+        //  Детальное логирование операций для проверки стоимости печати
+        logger.info('Цена рассчитана бэкендом', {
           finalPrice: backendResult.finalPrice,
           materialsCount: materials.length,
           servicesCount: services.length,
@@ -670,7 +670,7 @@ export function useCalculatorPricingActions({
             pricingKey: s.pricingKey,
             technologyCode: s.technologyCode
           })),
-          // 🧾 Детальный список операций для анализа стоимости печати
+          //  Детальный список операций для анализа стоимости печати
           operationsFlat: services.map((s: any) => ({
             id: s.operationId || s.id,
             name: s.operationName || s.name,
@@ -681,7 +681,7 @@ export function useCalculatorPricingActions({
             technologyCode: s.technologyCode
           })),
 
-          // 🧾 Консоль лог для быстрого просмотра
+          //  Консоль лог для быстрого просмотра
           _operationsFlat: services.map((s: any) => ({
             id: s.operationId || s.id,
             name: s.operationName || s.name,
@@ -701,7 +701,7 @@ export function useCalculatorPricingActions({
           }))
         });
 
-        // 🧾 Прямой консоль лог для анализа стоимости печати
+        //  Прямой консоль лог для анализа стоимости печати
         const operationsFlat = services.map((s: any) => ({
           id: s.operationId || s.id,
           name: s.operationName || s.name,
@@ -721,7 +721,7 @@ export function useCalculatorPricingActions({
           totalCost: m.totalCost ?? m.total ?? 0
         }));
 
-        console.log('🧾 === ПОДРОБНЫЙ АНАЛИЗ МАТЕРИАЛОВ ===');
+        console.log('=== ПОДРОБНЫЙ АНАЛИЗ МАТЕРИАЛОВ ===');
         materialsFlat.forEach((mat, index) => {
           console.log(`Материал ${index + 1}: ${mat.name}`);
           console.log(`  unitPrice: ${mat.unitPrice} руб`);
@@ -730,7 +730,7 @@ export function useCalculatorPricingActions({
           console.log('');
         });
 
-        console.log('🧾 === ПОДРОБНЫЙ АНАЛИЗ ОПЕРАЦИЙ ===');
+        console.log('=== ПОДРОБНЫЙ АНАЛИЗ ОПЕРАЦИЙ ===');
         operationsFlat.forEach((op, index) => {
           console.log(`Операция ${index + 1}: ${op.name}`);
           console.log(`  unitPrice: ${op.unitPrice} руб`);
@@ -740,7 +740,7 @@ export function useCalculatorPricingActions({
           console.log(`  technologyCode: ${op.technologyCode}`);
           console.log('');
         });
-        console.log('🧾 === КОНЕЦ АНАЛИЗА ===');
+        console.log('=== КОНЕЦ АНАЛИЗА ===');
         const layoutData = backendResult.layout || {};
 
         const itemsPerSheetRaw = layoutData.itemsPerSheet ?? layoutData.items_per_sheet;
@@ -763,7 +763,7 @@ export function useCalculatorPricingActions({
             ? Number(totalM2FromBackendRaw)
             : undefined;
 
-        console.log('📊 Расчет количества листов:');
+        console.log('Расчет количества листов:');
         console.log(`  itemsPerSheet: ${itemsPerSheet}`);
         console.log(`  specs.quantity: ${specs.quantity}`);
         console.log(`  computedSheets: ${computedSheets} (Math.ceil(${specs.quantity} / ${itemsPerSheet}))`);
@@ -771,7 +771,7 @@ export function useCalculatorPricingActions({
         console.log(`  sheetsNeeded: ${sheetsNeeded}`);
         console.log('');
 
-        // ⚠️ Формат листа: НЕ показываем формат листа для печати (297×420 - это A3 для печати)
+        //  Формат листа: НЕ показываем формат листа для печати (297×420 - это A3 для печати)
         // Показываем только формат материала со склада, если он доступен
         // Если формат материала недоступен - не показываем "Формат листа" вообще
         let sheetSizeLabel: string | undefined;
@@ -785,14 +785,14 @@ export function useCalculatorPricingActions({
           const material = materialForSheetFormat as any;
           if (material.sheet_width && material.sheet_height) {
             sheetSizeLabel = `${material.sheet_width}×${material.sheet_height} мм`;
-            logger.info('✅ Используем формат материала со склада', { sheetSizeLabel });
+            logger.info('Используем формат материала со склада', { sheetSizeLabel });
           } else if (material.width && material.height) {
             sheetSizeLabel = `${material.width}×${material.height} мм`;
-            logger.info('✅ Используем формат материала (альтернативные поля)', { sheetSizeLabel });
+            logger.info('Используем формат материала (альтернативные поля)', { sheetSizeLabel });
           }
         }
         
-        // ⚠️ НЕ используем формат листа для печати (297×420 - это A3) - это не формат материала!
+        //  НЕ используем формат листа для печати (297×420 - это A3) - это не формат материала!
         // Если нет формата материала со склада - не показываем "Формат листа"
 
         const wastePercentage = layoutData.wastePercentage ?? layoutData.waste_percentage;
@@ -830,11 +830,11 @@ export function useCalculatorPricingActions({
 
         const specSnapshot = { ...specs };
         
-        // ⚠️ ВАЖНО: Для упрощённых продуктов плотность нужно получать из выбранного материала
+        //  ВАЖНО: Для упрощённых продуктов плотность нужно получать из выбранного материала
         // Поле плотности скрыто для упрощённых продуктов, поэтому specs.paperDensity может быть 0 или undefined
         let actualPaperDensity = specSnapshot.paperDensity;
         
-        // 🆕 Для упрощённых продуктов: получаем плотность из материала бэкенда, если material_id есть
+        //  Для упрощённых продуктов: получаем плотность из материала бэкенда, если material_id есть
         // Для упрощённых продуктов поле плотности скрыто, поэтому specs.paperDensity может быть 0 или undefined
         // Нужно использовать плотность из выбранного материала
         if (specs.material_id && specs.size_id) {
@@ -843,7 +843,7 @@ export function useCalculatorPricingActions({
             const material = materials.find((m: any) => sameMaterialId(materialRowId(m), specs.material_id));
             if (!material) {
               logger.info(
-                '⚠️ В ответе бэкенда нет строки материала с выбранным material_id (проверьте тип id: число/строка). Не подставляем materials[0] — это часто расходник отделки (DTF).',
+                'В ответе бэкенда нет строки материала с выбранным material_id (проверьте тип id: число/строка). Не подставляем materials[0] — это часто расходник отделки (DTF).',
                 {
                   specsMaterialId: specs.material_id,
                   backendIds: materials.map((m: any) => materialRowId(m)),
@@ -856,7 +856,7 @@ export function useCalculatorPricingActions({
               // Для упрощённых продуктов ВСЕГДА используем плотность из материала бэкенда
               // (потому что пользователь не может выбрать плотность вручную - поле скрыто)
               actualPaperDensity = materialDensity;
-              logger.info('🆕 Для упрощённого продукта используем плотность из материала бэкенда', {
+              logger.info('Для упрощённого продукта используем плотность из материала бэкенда', {
                 material_id: specs.material_id,
                 materialName: material.materialName || material.material || material.name,
                 density: actualPaperDensity,
@@ -864,14 +864,14 @@ export function useCalculatorPricingActions({
                 note: 'Поле плотности скрыто для упрощённых продуктов, поэтому используем плотность из материала'
               });
             } else if (material) {
-              logger.info('⚠️ Для упрощённого продукта не найдена плотность в материале бэкенда', {
+              logger.info('Для упрощённого продукта не найдена плотность в материале бэкенда', {
                 material_id: specs.material_id,
                 material: material.materialName || material.material || material.name,
                 materialKeys: Object.keys(material)
               });
             }
           } else {
-            logger.info('⚠️ Для упрощённого продукта нет материалов в результате бэкенда', {
+            logger.info('Для упрощённого продукта нет материалов в результате бэкенда', {
               material_id: specs.material_id,
               size_id: specs.size_id
             });
@@ -885,7 +885,7 @@ export function useCalculatorPricingActions({
           
           if (backendDensity && backendDensity !== actualPaperDensity) {
             // Плотность из бэкенда не совпадает с выбранной - используем выбранную пользователем
-            logger.info('⚠️ Плотность из материала бэкенда не совпадает с выбранной пользователем, используем выбранную', { 
+            logger.info('Плотность из материала бэкенда не совпадает с выбранной пользователем, используем выбранную', { 
               materialId: materialRowId(material),
               backendDensity,
               userSelectedDensity: actualPaperDensity,
@@ -893,10 +893,10 @@ export function useCalculatorPricingActions({
               specsMaterialId: specs.material_id,
               specsPaperDensity: specSnapshot.paperDensity
             });
-            // ⚠️ ВАЖНО: НЕ перезаписываем actualPaperDensity - используем выбранную пользователем
+            //  ВАЖНО: НЕ перезаписываем actualPaperDensity - используем выбранную пользователем
           } else if (backendDensity && backendDensity === actualPaperDensity) {
             // Плотности совпадают - всё хорошо
-            logger.info('✅ Плотность из материала бэкенда совпадает с выбранной', { 
+            logger.info('Плотность из материала бэкенда совпадает с выбранной', { 
               materialId: materialRowId(material),
               density: actualPaperDensity
             });
@@ -909,7 +909,7 @@ export function useCalculatorPricingActions({
           const backendDensity = material?.density;
           if (backendDensity) {
             actualPaperDensity = backendDensity;
-            logger.info('ℹ️ Используем плотность из материала бэкенда (пользователь не выбрал)', { 
+            logger.info('Используем плотность из материала бэкенда (пользователь не выбрал)', { 
               materialId: materialRowId(material),
               density: actualPaperDensity
             });
@@ -919,12 +919,12 @@ export function useCalculatorPricingActions({
         // Обновляем плотность в snapshot (используем выбранную пользователем или из бэкенда, если не выбрана)
         specSnapshot.paperDensity = actualPaperDensity;
         
-        // ⚠️ ВАЖНО: Используем реальный размер из результата бэкенда, а не из specs.format
+        //  ВАЖНО: Используем реальный размер из результата бэкенда, а не из specs.format
         // Бэкенд может использовать размер из шаблона продукта, который отличается от выбранного формата
         let formatInfo: string;
         let formatForSummary: string;
         
-        logger.info('📐 Определение формата для отображения', {
+        logger.info('Определение формата для отображения', {
           hasProductSize: !!backendResult.productSize,
           productSize: backendResult.productSize,
           isCustomFormat,
@@ -935,13 +935,13 @@ export function useCalculatorPricingActions({
         if (isCustomFormat && customFormat.width && customFormat.height) {
           formatInfo = `${customFormat.width}×${customFormat.height} мм`;
           formatForSummary = formatInfo;
-          logger.info('✅ Используем кастомный формат', { formatInfo });
+          logger.info('Используем кастомный формат', { formatInfo });
         } else if (backendResult.productSize && backendResult.productSize.width && backendResult.productSize.height) {
           // Используем размер из результата бэкенда (может быть из шаблона)
           const { width, height } = backendResult.productSize;
           formatInfo = `${width}×${height} мм`;
           formatForSummary = formatInfo;
-          logger.info('✅ Используем размер из результата бэкенда (из шаблона)', { 
+          logger.info('Используем размер из результата бэкенда (из шаблона)', { 
             formatInfo, 
             productSize: backendResult.productSize 
           });
@@ -949,7 +949,7 @@ export function useCalculatorPricingActions({
           // Fallback на формат из specs
           formatInfo = specSnapshot.format;
           formatForSummary = specSnapshot.format;
-          logger.info('⚠️ Используем формат из specs (fallback)', { formatInfo });
+          logger.info('Используем формат из specs (fallback)', { formatInfo });
         }
 
         // Создаем модифицированный snapshot с правильным форматом для summary
@@ -958,7 +958,7 @@ export function useCalculatorPricingActions({
           format: formatForSummary, // Заменяем формат на реальный размер (50×90 мм вместо A4)
         };
 
-        logger.info('📋 Формируем parameterSummary', {
+        logger.info('Формируем parameterSummary', {
           formatForSummary,
           formatInfo,
           specSnapshotFormat: specSnapshot.format,
@@ -976,7 +976,7 @@ export function useCalculatorPricingActions({
           productTypeLabels,
         });
         
-        logger.info('📋 parameterSummary сформирован', {
+        logger.info('parameterSummary сформирован', {
           formatInSummary: parameterSummary.find(p => p.key === 'format'),
           densityInSummary: parameterSummary.find(p => p.key === 'paperDensity'),
           allSummary: parameterSummary.map(p => `${p.label}: ${p.value}`),
@@ -984,7 +984,7 @@ export function useCalculatorPricingActions({
           actualPaperDensity: actualPaperDensity
         });
 
-        // 🆕 Нормализуем материалы, добавляя material_id из specs для упрощённых продуктов
+        //  Нормализуем материалы, добавляя material_id из specs для упрощённых продуктов
         const normalizedMaterials = materials.map((m: any) => {
           const rawId = m.materialId ?? m.material_id ?? m.id;
           const hasOwnId =
@@ -1010,9 +1010,9 @@ export function useCalculatorPricingActions({
             isConsumableOnly: m.isConsumableOnly === true,
           };
           
-          // 🆕 Логирование для отладки
+          //  Логирование для отладки
           if (specs.material_id != null && sameMaterialId(finalMaterialId, specs.material_id)) {
-            console.log('🔍 [useCalculatorPricingActions] Нормализация материала для упрощённого продукта', {
+            console.log('[useCalculatorPricingActions] Нормализация материала для упрощённого продукта', {
               originalMaterial: m,
               normalized,
               hasPaperTypeName: !!m.paper_type_name,
@@ -1036,9 +1036,9 @@ export function useCalculatorPricingActions({
           }
         }
         
-        // 🆕 Для упрощённых продуктов, если материалов нет в результате, но material_id есть в specs - добавляем
+        //  Для упрощённых продуктов, если материалов нет в результате, но material_id есть в specs - добавляем
         if (normalizedMaterials.length === 0 && specs.material_id && specs.size_id) {
-          logger.info('🆕 Добавляем материал из specs для упрощённого продукта', {
+          logger.info('Добавляем материал из specs для упрощённого продукта', {
             material_id: specs.material_id,
             size_id: specs.size_id
           });
@@ -1056,7 +1056,7 @@ export function useCalculatorPricingActions({
           });
         }
         
-        logger.info('📦 Нормализованные материалы', {
+        logger.info('Нормализованные материалы', {
           materialsCount: normalizedMaterials.length,
           materials: normalizedMaterials.map(m => ({
             materialId: m.materialId,
@@ -1123,13 +1123,13 @@ export function useCalculatorPricingActions({
           });
           if (hasChanges) {
             setSpecsFromParent((prev) => ({ ...prev, selectedOperations: updatedOps }));
-            logger.info('🔄 Синхронизированы quantity операций отделки с бэкендом', {
+            logger.info('Синхронизированы quantity операций отделки с бэкендом', {
               updated: updatedOps.filter((o: any, i: number) => (specs.selectedOperations?.[i]?.quantity ?? null) !== (o.quantity ?? null)),
             });
           }
         }
 
-        // ✅ Используем ТОЛЬКО цену от бэкенда - скидки должны применяться на бэкенде
+        //  Используем ТОЛЬКО цену от бэкенда - скидки должны применяться на бэкенде
         const finalTotalCost = backendResult.finalPrice as number;
         const finalPricePerItem =
           specSnapshot.quantity > 0
@@ -1217,10 +1217,10 @@ export function useCalculatorPricingActions({
           stack: err instanceof Error ? err.stack : undefined,
         };
         
-        logger.error('❌ Ошибка расчета', errorDetails);
+        logger.error('Ошибка расчета', errorDetails);
         
         // Дополнительно выводим в консоль для отладки
-        console.error('🔴 Детали ошибки расчета:', {
+        console.error('Детали ошибки расчета:', {
           message: errorMessage,
           fullError: err,
           response: err?.response,

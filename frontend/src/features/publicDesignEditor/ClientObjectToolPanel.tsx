@@ -24,11 +24,11 @@ export const ClientObjectToolPanel: React.FC<ClientObjectToolPanelProps> = ({ se
         <div className="public-design-editor__client-tool-grid">
           {selectedObj.type === 'photoField' && selectedObj.photoFieldFilled ? (
             <>
-              <button type="button" onClick={() => onAction('replacePhoto')}>Заменить фото</button>
+              <button type="button" onClick={() =>onAction('replacePhoto')}>Заменить фото</button>
               <button
                 type="button"
                 className="public-design-editor__client-tool-danger"
-                onClick={() => onAction('clearPhoto')}
+                onClick={() =>onAction('clearPhoto')}
               >
                 Убрать фото
               </button>
@@ -37,16 +37,16 @@ export const ClientObjectToolPanel: React.FC<ClientObjectToolPanelProps> = ({ se
             <button
               type="button"
               className="public-design-editor__client-tool-danger"
-              onClick={() => onAction('delete')}
+              onClick={() =>onAction('delete')}
             >
               Удалить поле
             </button>
           ) : (
             <>
-              <button type="button" onClick={() => onAction('duplicate')}>Дублировать</button>
-              <button type="button" onClick={() => onAction('forward')}>Выше</button>
-              <button type="button" onClick={() => onAction('backward')}>Ниже</button>
-              <button type="button" className="public-design-editor__client-tool-danger" onClick={() => onAction('delete')}>
+              <button type="button" onClick={() =>onAction('duplicate')}>Дублировать</button>
+              <button type="button" onClick={() =>onAction('forward')}>Выше</button>
+              <button type="button" onClick={() =>onAction('backward')}>Ниже</button>
+              <button type="button" className="public-design-editor__client-tool-danger" onClick={() =>onAction('delete')}>
                 Удалить
               </button>
             </>

@@ -24,7 +24,7 @@ export async function up(db: Database): Promise<void> {
       DEFAULT 'draft'
     `);
     
-    console.log('✅ Добавлена колонка setup_status в таблицу products');
+    console.log('Добавлена колонка setup_status в таблицу products');
   }
 
   // Создаём таблицу для отслеживания этапов настройки
@@ -50,7 +50,7 @@ export async function up(db: Database): Promise<void> {
     ON product_setup_checklist(product_id)
   `);
 
-  console.log('✅ Создана таблица product_setup_checklist');
+  console.log('Создана таблица product_setup_checklist');
 
   // Обновляем статус существующих продуктов на основе их конфигурации
   await db.exec(`
@@ -70,12 +70,12 @@ export async function up(db: Database): Promise<void> {
     WHERE setup_status IS NULL OR setup_status = 'draft'
   `);
 
-  console.log('✅ Обновлены статусы существующих продуктов');
+  console.log('Обновлены статусы существующих продуктов');
 }
 
 export async function down(db: Database): Promise<void> {
   // SQLite не поддерживает DROP COLUMN, поэтому оставляем как есть
   await db.exec(`DROP TABLE IF EXISTS product_setup_checklist`);
-  console.log('✅ Удалена таблица product_setup_checklist');
+  console.log('Удалена таблица product_setup_checklist');
 }
 

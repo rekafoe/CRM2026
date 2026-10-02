@@ -45,9 +45,9 @@ export const PricingPage: React.FC = () => {
   const pricingModules = [
     {
       id: 'products',
-      title: '🧩 Управление продуктами калькулятора',
+      title: 'Управление продуктами калькулятора',
       description: 'Создание и настройка типов продуктов, операций и формул расчета для калькулятора',
-      icon: '🧩',
+      icon: '',
       features: ['Типы продуктов', 'Операции производства', 'Формулы расчета', 'Привязка услуг'],
       action: () => navigate('/adminpanel/products'),
       color: 'primary'
@@ -58,14 +58,14 @@ export const PricingPage: React.FC = () => {
   return (
     <AdminPageLayout
       title="Ценообразование"
-      icon="💰"
+      icon=""
       className="pricing-page"
     >
       <div className="pricing-content">
         {/* Инструкции */}
         <div className="pricing-instructions">
           <div className="instructions-header">
-            <h2>💡 Как работать с системой ценообразования</h2>
+            <h2>Как работать с системой ценообразования</h2>
             <Button
               variant="secondary"
               size="sm"
@@ -158,21 +158,21 @@ export const PricingPage: React.FC = () => {
             <Button
               variant="primary"
               onClick={() => navigate('/adminpanel/products')}
-              icon={<span>🧩</span>}
+              icon={<span></span>}
             >
               Управление продуктами
             </Button>
             <Button
               variant="success"
               onClick={() => navigate('/adminpanel/printers')}
-              icon={<span>🖨️</span>}
+              icon={<span></span>}
             >
               Принтеры и цены печати
             </Button>
             <Button
               variant="secondary"
               onClick={() => navigate('/adminpanel/services-management')}
-              icon={<span>🔧</span>}
+              icon={<span></span>}
             >
               Настройка операций
             </Button>
@@ -187,14 +187,14 @@ export const PricingPage: React.FC = () => {
           ) : (
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-icon">💰</div>
+                <div className="stat-icon"></div>
                 <div className="stat-content">
                   <div className="stat-value">{productTypesCount}</div>
                   <div className="stat-label">Типов продуктов</div>
                 </div>
               </div>
               <div className="stat-card">
-                <div className="stat-icon">⚙️</div>
+                <div className="stat-icon"></div>
                 <div className="stat-content">
                   <div className="stat-value">{operationRulesCount}</div>
                   <div className="stat-label">Операций и формул</div>

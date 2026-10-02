@@ -1,5 +1,5 @@
 /**
- * 🎯 Упрощённый калькулятор цен
+ *  Упрощённый калькулятор цен
  * 
  * Используется для продуктов с calculator_type='simplified'
  * Рассчитывает цены напрямую из config_data.simplified
@@ -136,8 +136,8 @@ export interface SimplifiedPricingResult {
   selectedMaterial?: {
     material_id: number;
     material_name: string;
-    density?: number; // 🆕 Плотность материала
-    paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType на фронтенде
+    density?: number; //  Плотность материала
+    paper_type_name?: string; //  display_name типа бумаги для установки materialType на фронтенде
   };
   /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
   selectedBaseMaterial?: {
@@ -296,8 +296,8 @@ interface SimplifiedSizeConfig {
     service_id: number;
     price_unit: 'per_cut' | 'per_item' | 'per_sheet' | 'fixed' | 'per_order' | 'per_meter';
     units_per_item: number;
-    variant_id?: number; // 🆕 ID варианта для услуг с вариантами (например, ламинация)
-    // ✅ tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
+    variant_id?: number; //  ID варианта для услуг с вариантами (например, ламинация)
+    //  tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
     // tiers оставлен только для обратной совместимости со старыми данными
     tiers?: SimplifiedQtyTier[]; // Опционально, только для чтения старых данных
   }>;
@@ -1318,8 +1318,8 @@ export class SimplifiedPricingService {
     }
     
     // 6. Рассчитываем цену отделки
-    // ⛔ Раньше брали цены из selectedSize.finishing[].tiers (локальные цены в шаблоне продукта)
-    // ✅ Теперь всегда берём цены из централизованной системы услуг (service_volume_prices / post_processing_services),
+    //  Раньше брали цены из selectedSize.finishing[].tiers (локальные цены в шаблоне продукта)
+    //  Теперь всегда берём цены из централизованной системы услуг (service_volume_prices / post_processing_services),
     //    а в simplified-конфиге используем только ссылки на service_id и конфиг units_per_item/price_unit.
     const pricingWarnings: string[] = [];
     if (resolvedMaterialPrint?.warnings.length) {
@@ -1593,7 +1593,7 @@ export class SimplifiedPricingService {
         : undefined;
 
     if (effectiveFinishingToUse.length > 0) {
-      logger.info('🔧 [SimplifiedPricingService] Используем finishing', {
+      logger.info('[SimplifiedPricingService] Используем finishing', {
         productId,
         quantity,
         finishing: effectiveFinishingToUse,
@@ -1607,7 +1607,7 @@ export class SimplifiedPricingService {
         )
       );
       
-      logger.info('🔧 [SimplifiedPricingService] Уникальные service_id для finishing', {
+      logger.info('[SimplifiedPricingService] Уникальные service_id для finishing', {
         productId,
         uniqueServiceIds,
       });
@@ -1720,7 +1720,7 @@ export class SimplifiedPricingService {
           if (isPlotterCuttingSyntheticServiceId(serviceId)) continue;
 
           try {
-            // 🆕 Если есть variantId, загружаем тарифы варианта, иначе базовые тарифы услуги
+            //  Если есть variantId, загружаем тарифы варианта, иначе базовые тарифы услуги
             let tiers =
               variantId != null
                 ? await PricingServiceRepository.listServiceTiers(serviceId, variantId)
@@ -1735,7 +1735,7 @@ export class SimplifiedPricingService {
                 unit_price: t.rate,
               }));
               serviceTiersMap.set(mapKey, simplifiedTiers);
-              logger.info('🔧 [SimplifiedPricingService] Загружены объёмные тарифы для услуги', {
+              logger.info('[SimplifiedPricingService] Загружены объёмные тарифы для услуги', {
                 productId,
                 serviceId,
                 variantId,
@@ -1751,14 +1751,14 @@ export class SimplifiedPricingService {
                   max_qty: undefined,
                   unit_price: baseService.rate,
                 }]);
-                logger.info('🔧 [SimplifiedPricingService] Используем базовую ставку услуги как единый диапазон', {
+                logger.info('[SimplifiedPricingService] Используем базовую ставку услуги как единый диапазон', {
                   productId,
                   serviceId,
                   variantId,
                   rate: baseService.rate,
                 });
               } else {
-                logger.warn('⚠️ [SimplifiedPricingService] Не найдены ни объёмные тарифы, ни базовая ставка для услуги', {
+                logger.warn('[SimplifiedPricingService] Не найдены ни объёмные тарифы, ни базовая ставка для услуги', {
                   productId,
                   serviceId,
                   variantId,
@@ -1838,7 +1838,7 @@ export class SimplifiedPricingService {
           for (const [k, w] of widthMap) finishingRollWidthMmMap.set(k, w);
         }
 
-        logger.info('🔧 [SimplifiedPricingService] Итоговая карта тарифов услуг для finishing', {
+        logger.info('[SimplifiedPricingService] Итоговая карта тарифов услуг для finishing', {
           productId,
           serviceIds: Array.from(serviceTiersMap.keys()),
         });
@@ -2078,7 +2078,7 @@ export class SimplifiedPricingService {
               meter_basis: meterBasis,
             });
             finishingPrice += servicePrice;
-            logger.info('💰 [SimplifiedPricingService] Рассчитана цена услуги отделки', {
+            logger.info('[SimplifiedPricingService] Рассчитана цена услуги отделки', {
               productId,
               service_id: finConfig.service_id,
               operationType,
@@ -2098,7 +2098,7 @@ export class SimplifiedPricingService {
           }
           
           finishingPrice += servicePrice;
-          logger.info('💰 [SimplifiedPricingService] Рассчитана цена услуги отделки', {
+          logger.info('[SimplifiedPricingService] Рассчитана цена услуги отделки', {
             productId,
             service_id: finConfig.service_id,
             operationType,
@@ -2132,7 +2132,7 @@ export class SimplifiedPricingService {
       }
     }
 
-    // ✂️ Резка по раскладке (стопой): если configuration.cutting === true, считаем резы как cutsPerSheet
+    //  Резка по раскладке (стопой): если configuration.cutting === true, считаем резы как cutsPerSheet
     // (режем стопу листов одним проходом — количество резов = число линий раскладки на лист, не × на кол-во листов)
     // Цена: сначала из markup_settings.auto_cutting_price (если > 0), иначе из услуги резки
     // Пропускаем, если резка уже учтена в finishing (selectedOperations)
@@ -2153,7 +2153,7 @@ export class SimplifiedPricingService {
           const centralPrice = centralPriceRow?.setting_value != null ? Number(centralPriceRow.setting_value) : 0;
           if (centralPrice > 0) {
             pricePerCut = centralPrice;
-            logger.info('✂️ [SimplifiedPricingService] Используем централизованную цену резки', { auto_cutting_price: centralPrice });
+            logger.info('[SimplifiedPricingService] Используем централизованную цену резки', { auto_cutting_price: centralPrice });
           } else {
             const tiers = await PricingServiceRepository.listServiceTiers(cuttingService.id);
             if (tiers && tiers.length > 0) {
@@ -2182,7 +2182,7 @@ export class SimplifiedPricingService {
             priceForQuantity: cuttingPrice,
           });
           serviceTypesMap.set(cuttingService.id, 'cut');
-          logger.info('✂️ [SimplifiedPricingService] Резка стопой (по раскладке)', {
+          logger.info('[SimplifiedPricingService] Резка стопой (по раскладке)', {
             productId,
             cutsPerSheet: layoutCheck.cutsPerSheet,
             totalCuts,
@@ -2191,7 +2191,7 @@ export class SimplifiedPricingService {
           });
         }
       } else {
-        logger.warn('✂️ [SimplifiedPricingService] Резка включена, но не найдена услуга operation_type=cut, price_unit=per_cut');
+        logger.warn('[SimplifiedPricingService] Резка включена, но не найдена услуга operation_type=cut, price_unit=per_cut');
       }
     }
 
@@ -2625,7 +2625,7 @@ export class SimplifiedPricingService {
     let materialDensity: number | undefined = undefined;
     let materialPaperTypeName: string | undefined = undefined;
     if (normalizedConfig.material_id) {
-      // 🆕 Загружаем также paper_type_name для установки materialType на фронтенде
+      //  Загружаем также paper_type_name для установки materialType на фронтенде
       const material = await db.get<{ name: string; density?: number; paper_type_id?: number }>(
         `SELECT m.name, m.density, m.paper_type_id 
          FROM materials m 
@@ -2636,7 +2636,7 @@ export class SimplifiedPricingService {
         materialName = material.name;
         materialDensity = material.density || undefined;
         
-        // 🆕 Получаем display_name типа бумаги для материала
+        //  Получаем display_name типа бумаги для материала
         if (material.paper_type_id) {
           const paperType = await db.get<{ display_name: string }>(
             `SELECT display_name FROM paper_types WHERE id = ? AND is_active = 1`,
@@ -2768,8 +2768,8 @@ export class SimplifiedPricingService {
       selectedMaterial: normalizedConfig.material_id ? {
         material_id: normalizedConfig.material_id,
         material_name: materialName,
-        density: materialDensity, // 🆕 Добавляем плотность материала
-        paper_type_name: materialPaperTypeName, // 🆕 Добавляем display_name типа бумаги для установки materialType
+        density: materialDensity, //  Добавляем плотность материала
+        paper_type_name: materialPaperTypeName, //  Добавляем display_name типа бумаги для установки materialType
       } : undefined,
       ...(resolvedMaterialPrint ? { resolvedMaterialPrint } : {}),
       selectedBaseMaterial: normalizedConfig.base_material_id && selectedBaseMaterialName ? {

@@ -217,7 +217,7 @@ export const useProductDirectoryStore = create<ProductDirectoryState>()(
         });
 
         try {
-          const products = await getAllProducts(force); // 🆕 Передаем force
+          const products = await getAllProducts(force); //  Передаем force
           set((prev) => ({
             products,
             lastFetched: { ...prev.lastFetched, products: Date.now() },

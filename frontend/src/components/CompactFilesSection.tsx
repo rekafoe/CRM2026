@@ -74,7 +74,7 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
       {/* Компактная заголовочная строка */}
       <div className="files-header">
         <div className="files-info">
-          <span className="files-title">📁 Файлы макетов</span>
+          <span className="files-title">Файлы макетов</span>
           <span className="files-count">
             {totalCount > 0 ? `${approvedCount}/${totalCount} утверждено` : 'Нет файлов'}
           </span>
@@ -86,7 +86,7 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
               onClick={handleDownloadAll}
               title="Скачать все файлы"
             >
-              📥 Все
+               Все
             </button>
           )}
           <label className="btn-upload">
@@ -96,11 +96,11 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
               disabled={isUploading}
               style={{ display: 'none' }}
             />
-            {isUploading ? '⏳' : '📤'}
+            {isUploading ? 'Загрузка…' : 'Загрузить'}
           </label>
           <button 
             className="btn-toggle"
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() =>setIsExpanded(!isExpanded)}
             title={isExpanded ? 'Скрыть детали' : 'Показать детали'}
           >
             {isExpanded ? '▲' : '▼'}
@@ -121,7 +121,7 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
                     <button
                       type="button"
                       className="file-name file-name-link"
-                      onClick={() => handleDownloadFile(file)}
+                      onClick={() =>handleDownloadFile(file)}
                     >
                       {file.originalName || file.filename}
                     </button>
@@ -132,17 +132,17 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
                   <div className="file-actions">
                     <button 
                       className="btn-download"
-                      onClick={() => handleDownloadFile(file)}
+                      onClick={() =>handleDownloadFile(file)}
                       title="Скачать файл"
                     >
-                      📥
+                      
                     </button>
                     {file.approved ? (
-                      <span className="status-approved">✔</span>
+                      <span className="status-approved"></span>
                     ) : (
                       <button 
                         className="btn-approve"
-                        onClick={() => handleApproveFile(file.id)}
+                        onClick={() =>handleApproveFile(file.id)}
                         title="Утвердить файл"
                       >
                         ✓
@@ -150,7 +150,7 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
                     )}
                     <button 
                       className="btn-delete"
-                      onClick={() => handleDeleteFile(file.id)}
+                      onClick={() =>handleDeleteFile(file.id)}
                       title="Удалить файл"
                     >
                       ✕

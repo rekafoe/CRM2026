@@ -141,17 +141,17 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
   const getCashStatusIcon = () => {
     const status = getCashStatus();
     switch (status) {
-      case 'success': return '✅';
-      case 'warning': return '⚠️';
-      case 'error': return '❌';
-      default: return '💰';
+      case 'success': return '';
+      case 'warning': return '';
+      case 'error': return '';
+      default: return '';
     }
   };
 
   if (loading) {
     return (
       <div className="counters-widget loading">
-        <span>📊 Загрузка...</span>
+        <span>Загрузка...</span>
       </div>
     );
   }
@@ -161,12 +161,12 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
       <div className="counters-header">
         <button 
           className="counters-toggle"
-          onClick={() => setShowDetails(!showDetails)}
+          onClick={() =>setShowDetails(!showDetails)}
           title="Счетчики принтеров и кассы"
         >
-          <span className="counters-icon">📊</span>
+          <span className="counters-icon"></span>
           <span className="counters-summary">
-            🖨️ {getTotalPrinterDifference()} | {getCashStatusIcon()} {cashData.actual !== null ? <MoneyAmount value={cashData.actual} decimals={0} /> : '?'}
+             {getTotalPrinterDifference()} | {getCashStatusIcon()} {cashData.actual !== null ? <MoneyAmount value={cashData.actual} decimals={0} /> : '?'}
           </span>
         </button>
       </div>
@@ -175,13 +175,13 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
         <div className="counters-details">
           {error && (
             <div className="counters-error">
-              ⚠️ {error}
+               {error}
             </div>
           )}
 
           {/* Счетчики принтеров */}
           <div className="counters-section">
-            <h4>🖨️ Принтеры (A4 листы)</h4>
+            <h4>Принтеры (A4 листы)</h4>
             <div className="printers-list">
               {printerCounters.map(printer => (
                 <div key={printer.id} className="printer-counter">
@@ -220,7 +220,7 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
 
           {/* Касса */}
           <div className="counters-section">
-            <h4>💰 Касса</h4>
+            <h4>Касса</h4>
             <div className="cash-data">
               <div className="cash-row">
                 <span className="cash-label">Фактическая:</span>
@@ -256,11 +256,11 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
           {/* Сводка */}
           <div className="counters-summary-section">
             <div className="summary-row">
-              <span>📊 Всего A4 листов:</span>
+              <span>Всего A4 листов:</span>
               <span className="summary-value">{getTotalPrinterDifference()}</span>
             </div>
             <div className="summary-row">
-              <span>💰 Статус кассы:</span>
+              <span>Статус кассы:</span>
               <span className={`summary-status ${getCashStatus()}`}>
                 {getCashStatusIcon()} {getCashStatus() === 'success' ? 'Совпадает' : 
                  getCashStatus() === 'warning' ? 'Не заполнено' : 'Расхождение'}

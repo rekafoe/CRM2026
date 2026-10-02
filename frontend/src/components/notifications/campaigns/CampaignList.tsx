@@ -61,7 +61,7 @@ export const CampaignList: React.FC = () => {
       <div className="campaign-card">
         <div className="campaign-card__header">
           <h4>Кампании</h4>
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => setSelectedId('new')}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() =>setSelectedId('new')}>
             Новая кампания
           </button>
         </div>
@@ -94,7 +94,7 @@ export const CampaignList: React.FC = () => {
                   type="button"
                   key={item.id}
                   className={`campaign-list__item ${selectedId === item.id ? 'active' : ''}`}
-                  onClick={() => setSelectedId(item.id)}
+                  onClick={() =>setSelectedId(item.id)}
                 >
                   <strong>{item.name}</strong>
                   <span>{item.channel} · {item.status}</span>

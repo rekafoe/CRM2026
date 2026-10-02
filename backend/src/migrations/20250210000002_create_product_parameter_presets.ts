@@ -26,7 +26,7 @@ export async function up(db?: Database): Promise<void> {
   `);
 
   // Базовые пресеты для визиток и плакатов
-  // ⚠️ ВАЖНО: Параметр 'material' удален - используйте вкладку "Материалы" для настройки материалов
+  //  ВАЖНО: Параметр 'material' удален - используйте вкладку "Материалы" для настройки материалов
   // Система автоматически создаст параметр material_id с актуальными данными из склада
   await database.run(
     `INSERT OR IGNORE INTO ${TABLE_NAME} (product_type, preset_key, label, field_type, options, is_required, sort_order)

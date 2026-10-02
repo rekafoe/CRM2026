@@ -5,12 +5,12 @@ const path = require('path');
 const dbPath = path.join(__dirname, '..', 'data.db');
 const db = new sqlite3.Database(dbPath);
 
-console.log('📈 Добавление дополнительных движений для демонстрации аналитики...');
+console.log('Добавление дополнительных движений для демонстрации аналитики...');
 
 // Функция для обновления остатков материалов на основе движений
 const updateMaterialQuantities = () => {
   return new Promise((resolve, reject) => {
-    console.log('🔄 Обновление остатков материалов...');
+    console.log('Обновление остатков материалов...');
     
     db.all(`
       SELECT 
@@ -52,7 +52,7 @@ const updateMaterialQuantities = () => {
 // Добавление сезонных движений для демонстрации прогнозирования
 const addSeasonalMovements = () => {
   return new Promise((resolve, reject) => {
-    console.log('🌍 Добавление сезонных движений...');
+    console.log('Добавление сезонных движений...');
     
     const movements = [];
     const now = new Date();
@@ -116,7 +116,7 @@ const addSeasonalMovements = () => {
 // Добавление движений для демонстрации ABC-анализа
 const addABCMovements = () => {
   return new Promise((resolve, reject) => {
-    console.log('📊 Добавление движений для ABC-анализа...');
+    console.log('Добавление движений для ABC-анализа...');
     
     const movements = [];
     const now = new Date();
@@ -188,15 +188,15 @@ const enhanceData = async () => {
     await addABCMovements();
     await updateMaterialQuantities();
     
-    console.log('✅ Данные для аналитики успешно добавлены!');
-    console.log('\n📈 Добавлено:');
-    console.log('🌍 Сезонные движения за 12 месяцев');
-    console.log('📊 ABC-движения для демонстрации классификации');
-    console.log('🔄 Обновлены остатки материалов');
-    console.log('\n🎯 Теперь аналитика покажет реальные инсайты!');
+    console.log('Данные для аналитики успешно добавлены!');
+    console.log('\n Добавлено:');
+    console.log('Сезонные движения за 12 месяцев');
+    console.log('ABC-движения для демонстрации классификации');
+    console.log('Обновлены остатки материалов');
+    console.log('\n Теперь аналитика покажет реальные инсайты!');
     
   } catch (error) {
-    console.error('❌ Ошибка при добавлении данных:', error);
+    console.error('Ошибка при добавлении данных:', error);
   } finally {
     db.close();
   }

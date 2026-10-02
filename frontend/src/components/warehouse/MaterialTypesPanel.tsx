@@ -509,7 +509,7 @@ export const MaterialTypesPanel: React.FC<MaterialTypesPanelProps> = ({
                             <button
                               type="button"
                               className={`material-types-print__default-button${isDefault ? ' is-active' : ''}`}
-                              onClick={() => setDefaultPrintTechnology(technology.code)}
+                              onClick={() =>setDefaultPrintTechnology(technology.code)}
                             >
                               {isDefault ? (
                                 <><AppIcon name="check" size="xs" /> Основная</>

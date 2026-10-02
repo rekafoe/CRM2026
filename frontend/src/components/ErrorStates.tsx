@@ -123,11 +123,11 @@ const getErrorInfo = (error: any): ErrorInfo => {
 // Иконки для разных типов ошибок
 const getErrorIcon = (type: ErrorType): string => {
   switch (type) {
-    case 'network': return '🌐';
-    case 'validation': return '📝';
-    case 'server': return '🔧';
-    case 'auth': return '🔐';
-    default: return '❌';
+    case 'network': return '';
+    case 'validation': return '';
+    case 'server': return '';
+    case 'auth': return '';
+    default: return '';
   }
 };
 
@@ -261,7 +261,7 @@ export const ValidationErrors: React.FC<{
   return (
     <div className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 ${className}`}>
       <div className="flex items-start">
-        <span className="text-yellow-600 mr-2">📝</span>
+        <span className="text-yellow-600 mr-2"></span>
         <div className="flex-1">
           <h4 className="text-sm font-medium text-yellow-800 mb-2">
             Ошибки валидации:
@@ -293,7 +293,7 @@ export const CriticalError: React.FC<{
   return (
     <div className={`min-h-screen flex items-center justify-center bg-gray-50 ${className}`}>
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-        <div className="text-6xl mb-4">🚨</div>
+        <div className="text-6xl mb-4"></div>
         <h1 className="text-2xl font-bold text-gray-900 mb-4">
           {errorInfo.title}
         </h1>
@@ -333,7 +333,7 @@ export const CriticalError: React.FC<{
           )}
           
           <button
-            onClick={() => window.location.reload()}
+            onClick={() =>window.location.reload()}
             className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
           >
             Обновить страницу

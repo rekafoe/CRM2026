@@ -35,9 +35,9 @@ export const useCalculatorData = () => {
       materialsState.setLoading(true);
       const response = await getMaterials();
       materialsState.setData(response.data);
-      logger.info('✅ Материалы загружены', { count: response.data.length });
+      logger.info('Материалы загружены', { count: response.data.length });
     } catch (error) {
-      logger.error('❌ Ошибка загрузки материалов', error);
+      logger.error('Ошибка загрузки материалов', error);
       materialsState.setError('Ошибка загрузки материалов');
       toast.error('Ошибка загрузки материалов');
     } finally {
@@ -51,9 +51,9 @@ export const useCalculatorData = () => {
       paperTypesState.setLoading(true);
       const response = await getPaperTypes();
       paperTypesState.setData(response.data);
-      logger.info('✅ Типы бумаги загружены', { count: response.data.length });
+      logger.info('Типы бумаги загружены', { count: response.data.length });
     } catch (error) {
-      logger.error('❌ Ошибка загрузки типов бумаги', error);
+      logger.error('Ошибка загрузки типов бумаги', error);
       paperTypesState.setError('Ошибка загрузки типов бумаги');
       toast.error('Ошибка загрузки типов бумаги');
     } finally {
@@ -67,9 +67,9 @@ export const useCalculatorData = () => {
     try {
       const paperTypes = await getPaperTypesFromWarehouse();
       setWarehousePaperTypes(paperTypes);
-      logger.info('✅ Типы бумаги загружены из склада', { count: paperTypes.length });
+      logger.info('Типы бумаги загружены из склада', { count: paperTypes.length });
     } catch (error) {
-      logger.error('❌ Ошибка загрузки типов бумаги из склада', error);
+      logger.error('Ошибка загрузки типов бумаги из склада', error);
       toast.error('Ошибка загрузки типов бумаги. Используются данные по умолчанию.');
     } finally {
       setLoadingPaperTypes(false);
@@ -81,9 +81,9 @@ export const useCalculatorData = () => {
     try {
       const configs = await getProductConfigsFromWarehouse();
       setWarehouseProductConfigs(configs);
-      logger.info('✅ Конфигурация продуктов загружена из склада', { count: Object.keys(configs).length });
+      logger.info('Конфигурация продуктов загружена из склада', { count: Object.keys(configs).length });
     } catch (error) {
-      logger.error('❌ Ошибка загрузки конфигурации продуктов из склада', error);
+      logger.error('Ошибка загрузки конфигурации продуктов из склада', error);
     }
   }, [logger]);
 
@@ -97,7 +97,7 @@ export const useCalculatorData = () => {
       const availability = await checkRealtimeAvailability(paperType, paperDensity, quantity);
       return availability;
     } catch (error) {
-      logger.error('❌ Ошибка проверки доступности материалов', error);
+      logger.error('Ошибка проверки доступности материалов', error);
       return { available: true, quantity: 0, alternatives: [] };
     }
   }, [logger]);
@@ -113,7 +113,7 @@ export const useCalculatorData = () => {
       setMaterialAlternatives(alternatives);
       return alternatives;
     } catch (error) {
-      logger.error('❌ Ошибка получения альтернативных материалов', error);
+      logger.error('Ошибка получения альтернативных материалов', error);
       return [];
     }
   }, [logger]);
@@ -123,36 +123,36 @@ export const useCalculatorData = () => {
     try {
       const updateResult = await updateMaterialPrices();
       setLastPriceUpdate(updateResult.updated.toString());
-      logger.info('✅ Цены материалов обновлены', { updateTime: updateResult.updated });
+      logger.info('Цены материалов обновлены', { updateTime: updateResult.updated });
     } catch (error) {
-      logger.error('❌ Ошибка обновления цен материалов', error);
+      logger.error('Ошибка обновления цен материалов', error);
     }
   }, [logger]);
 
   // Загрузка всех данных
   const loadAllData = useCallback(async () => {
     try {
-      logger.info('🔄 Начинаем загрузку данных калькулятора...');
+      logger.info('Начинаем загрузку данных калькулятора...');
       
       // Загружаем данные последовательно для лучшего контроля ошибок
       await loadMaterials();
-      logger.info('✅ Материалы загружены');
+      logger.info('Материалы загружены');
       
       await loadPaperTypes();
-      logger.info('✅ Типы бумаги загружены');
+      logger.info('Типы бумаги загружены');
       
       await loadPaperTypesFromWarehouse();
-      logger.info('✅ Типы бумаги из склада загружены');
+      logger.info('Типы бумаги из склада загружены');
       
       await loadProductConfigsFromWarehouse();
-      logger.info('✅ Конфигурация продуктов из склада загружена');
+      logger.info('Конфигурация продуктов из склада загружена');
       
       await updatePrices();
-      logger.info('✅ Цены обновлены');
+      logger.info('Цены обновлены');
       
-      logger.info('✅ Все данные калькулятора загружены успешно');
+      logger.info('Все данные калькулятора загружены успешно');
     } catch (error) {
-      logger.error('❌ Ошибка загрузки данных калькулятора', error);
+      logger.error('Ошибка загрузки данных калькулятора', error);
       toast.error('Ошибка загрузки данных калькулятора. Некоторые функции могут работать некорректно.');
     }
   }, []);

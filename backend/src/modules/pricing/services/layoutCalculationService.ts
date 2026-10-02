@@ -20,7 +20,7 @@ export interface LayoutResult {
     cols: number;
     actualItemsPerSheet: number;
   };
-  cutsPerSheet: number; // 🔪 Количество резов на лист
+  cutsPerSheet: number; //  Количество резов на лист
 }
 
 export class LayoutCalculationService {
@@ -130,7 +130,7 @@ export class LayoutCalculationService {
     const cols = Math.floor(availableWidth / (itemWidth + layoutGap));
     const rows = Math.floor(availableHeight / (itemHeight + layoutGap));
 
-    // console.log(`🧮 Расчет раскладки ${itemWidth}×${itemHeight} на листе ${sheetSize.width}×${sheetSize.height}`);
+    // console.log(`Расчет раскладки ${itemWidth}×${itemHeight} на листе ${sheetSize.width}×${sheetSize.height}`);
     // console.log(`   Доступный размер: ${availableWidth}×${availableHeight} (принтер: ${this.MARGINS.printerMargins}мм с каждой стороны)`);
     // console.log(`   Колонки: floor(${availableWidth} / (${itemWidth} + ${this.MARGINS.layoutGap})) = ${cols}`);
     // console.log(`   Ряды: floor(${availableHeight} / (${itemHeight} + ${this.MARGINS.layoutGap})) = ${rows}`);
@@ -145,7 +145,7 @@ export class LayoutCalculationService {
     const totalArea = availableWidth * availableHeight;
     const wastePercentage = ((totalArea - usedArea) / totalArea) * 100;
 
-    // 🔪 Расчет количества резов для гильотины
+    //  Расчет количества резов для гильотины
     // Для раскладки 2×3: 3 вертикальных + 4 горизонтальных = 7 резов
     // Формула: (cols + 1) + (rows + 1) = cols + rows + 2
     const cutsPerSheet = actualItemsPerSheet > 0 ? (cols + rows + 2) : 0;

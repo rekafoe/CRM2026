@@ -9,7 +9,7 @@
 import { Database } from 'sqlite';
 
 export async function up(db: Database): Promise<void> {
-  console.log('🔄 Fixing foreign key constraint in service_volume_prices...');
+  console.log('Fixing foreign key constraint in service_volume_prices...');
   
   // Отключаем проверку внешних ключей
   await db.exec('PRAGMA foreign_keys = OFF;');
@@ -51,7 +51,7 @@ export async function up(db: Database): Promise<void> {
       ON service_volume_prices(variant_id)
     `);
     
-    console.log('✅ Foreign key constraint fixed successfully');
+    console.log('Foreign key constraint fixed successfully');
   } finally {
     // Включаем проверку внешних ключей обратно
     await db.exec('PRAGMA foreign_keys = ON;');
@@ -60,7 +60,7 @@ export async function up(db: Database): Promise<void> {
 
 export async function down(db: Database): Promise<void> {
   // Откат миграции - возвращаем старую структуру
-  console.log('🔄 Rolling back foreign key constraint fix...');
+  console.log('Rolling back foreign key constraint fix...');
   
   await db.exec('PRAGMA foreign_keys = OFF;');
   

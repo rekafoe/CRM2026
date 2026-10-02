@@ -12,9 +12,6 @@ export const ThemeToggle: React.FC = () => {
       title={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}
       aria-label={`Переключить на ${isDark ? 'светлую' : 'темную'} тему`}
     >
-      <span className="theme-toggle-icon">
-        {isDark ? '🌙' : '☀️'}
-      </span>
       <span className="theme-toggle-text">
         {isDark ? 'Темная' : 'Светлая'}
       </span>

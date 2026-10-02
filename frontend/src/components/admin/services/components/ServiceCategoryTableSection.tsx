@@ -63,7 +63,7 @@ export const ServiceCategoryTableSection: React.FC<ServiceCategoryTableSectionPr
         aria-expanded={isOpen}
         aria-controls={regionId}
         aria-label={`${label}, ${countLabel}. ${isOpen ? 'Свернуть' : 'Показать список'}`}
-        onClick={() => onToggle(sectionKey)}
+        onClick={() =>onToggle(sectionKey)}
       >
         <span className="services-category-group__lead" aria-hidden>
           <span

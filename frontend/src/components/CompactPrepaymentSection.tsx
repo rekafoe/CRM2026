@@ -50,7 +50,7 @@ export const CompactPrepaymentSection: React.FC<CompactPrepaymentSectionProps> =
       {/* Компактная заголовочная строка */}
       <div className="prepayment-header">
         <div className="prepayment-info">
-          <span className="prepayment-title">💳 Предоплата</span>
+          <span className="prepayment-title">Предоплата</span>
           <span className="prepayment-status">
             {hasPrepayment ? (
               <span className={`status-badge ${isPaid ? 'paid' : 'pending'}`}>
@@ -67,7 +67,7 @@ export const CompactPrepaymentSection: React.FC<CompactPrepaymentSectionProps> =
             onClick={onOpenModal}
             title="Установить сумму предоплаты"
           >
-            💳 Сумма
+             Сумма
           </button>
           {hasPrepayment && !isPaid && (
             <button 
@@ -76,12 +76,12 @@ export const CompactPrepaymentSection: React.FC<CompactPrepaymentSectionProps> =
               disabled={isGenerating}
               title="Создать ссылку для оплаты"
             >
-              {isGenerating ? '⏳' : '🔗'}
+              {isGenerating ? 'Создание…' : 'Ссылка'}
             </button>
           )}
           <button 
             className="btn-toggle"
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() =>setIsExpanded(!isExpanded)}
             title={isExpanded ? 'Скрыть детали' : 'Показать детали'}
           >
             {isExpanded ? '▲' : '▼'}
@@ -108,14 +108,14 @@ export const CompactPrepaymentSection: React.FC<CompactPrepaymentSectionProps> =
                     rel="noreferrer"
                     className="btn-pay-link"
                   >
-                    🔗 Перейти к оплате
+                     Перейти к оплате
                   </a>
                   <button 
                     className="btn-copy-link"
                     onClick={handleCopyLink}
                     title="Скопировать ссылку"
                   >
-                    📋
+                    Копировать
                   </button>
                 </div>
               </div>

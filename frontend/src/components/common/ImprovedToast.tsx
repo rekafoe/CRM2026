@@ -30,11 +30,11 @@ export const ImprovedToast: React.FC<ImprovedToastProps> = ({
 
   const getIcon = () => {
     switch (type) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'warning': return '⚠️';
-      case 'info': return 'ℹ️';
-      default: return 'ℹ️';
+      case 'success': return '';
+      case 'error': return '';
+      case 'warning': return '';
+      case 'info': return '';
+      default: return '';
     }
   };
 

@@ -132,11 +132,11 @@ export const AdminProductManager: React.FC = () => {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {[
-          { key: 'products', label: '📦 Продукты' },
-          { key: 'services', label: '🛠️ Услуги' },
-          { key: 'operations', label: '⚙️ Операции' }
+          { key: 'products', label: 'Продукты' },
+          { key: 'services', label: 'Услуги' },
+          { key: 'operations', label: 'Операции' }
         ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveAdminTab(tab.key as any)} className={activeAdminTab===tab.key ? 'active' : ''}>{tab.label}</button>
+          <button key={tab.key} onClick={() =>setActiveAdminTab(tab.key as any)} className={activeAdminTab===tab.key ? 'active' : ''}>{tab.label}</button>
         ))}
       </div>
 
@@ -149,13 +149,13 @@ export const AdminProductManager: React.FC = () => {
           </div>
           <div style={{ border: '1px solid #ddd', borderRadius: 4, maxHeight: 320, overflow: 'auto' }}>
             {products.map(p => (
-              <div key={p.key} style={{ padding: 8, cursor: 'pointer', background: (selectedKey===p.key?'#f5f5f5':'#fff') }} onClick={() => onSelect(p.key)}>
+              <div key={p.key} style={{ padding: 8, cursor: 'pointer', background: (selectedKey===p.key?'#f5f5f5':'#fff') }} onClick={() =>onSelect(p.key)}>
                 <div><strong>{p.name || p.type}</strong></div>
                 <div style={{ fontSize: 12, color: '#666' }}>{p.key}</div>
               </div>
             ))}
           </div>
-          <button style={{ marginTop: 8 }} disabled={loading} onClick={() => { setSelectedKey(''); setMeta({ key: '', name: '', type: '', description: '' }); setSchema(JSON.stringify({ key: '', fields: [] }, null, 2)); }}>Новый продукт</button>
+          <button style={{ marginTop: 8 }} disabled={loading} onClick={() =>{ setSelectedKey(''); setMeta({ key: '', name: '', type: '', description: '' }); setSchema(JSON.stringify({ key: '', fields: [] }, null, 2)); }}>Новый продукт</button>
         </div>
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -189,7 +189,7 @@ export const AdminProductManager: React.FC = () => {
               <div style={{ marginBottom: 6 }}>Спецификация (JSON)</div>
               <textarea style={{ width: '100%', height: 120, fontFamily: 'monospace' }} value={specsJson} onChange={e => setSpecsJson(e.target.value)} />
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button disabled={loading} onClick={async () => {
+                <button disabled={loading} onClick={async () =>{
                   try {
                     setLoading(true);
                     const payload: CalculateRequest = {
@@ -246,7 +246,7 @@ export const AdminProductManager: React.FC = () => {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <strong>Справочник услуг</strong>
-            <button onClick={() => setServices(prev => [{ id: 0, name: '', unit: 'sheet', rate: 0, currency: 'BYN', is_active: true }, ...prev])}>+ Добавить</button>
+            <button onClick={() =>setServices(prev => [{ id: 0, name: '', unit: 'sheet', rate: 0, currency: 'BYN', is_active: true }, ...prev])}>+ Добавить</button>
           </div>
           <div style={{ border: '1px solid #ddd', borderRadius: 4 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -277,11 +277,11 @@ export const AdminProductManager: React.FC = () => {
                     </td>
                     <td style={{ padding: 8, whiteSpace: 'nowrap' }}>
                       {s.id === 0 ? (
-                        <button onClick={async () => { const saved = await createService({ name: s.name, unit: s.unit, rate: s.rate, currency: s.currency, is_active: s.is_active }); setServices(v=> v.map((x,i)=> i===idx? saved: x)); }}>💾</button>
+                        <button onClick={async () =>{ const saved = await createService({ name: s.name, unit: s.unit, rate: s.rate, currency: s.currency, is_active: s.is_active }); setServices(v=> v.map((x,i)=> i===idx? saved: x)); }}></button>
                       ) : (
                         <>
-                          <button onClick={async () => { const saved = await updateService(s.id, s); setServices(v=> v.map(x=> x.id===s.id? saved: x)); }}>💾</button>
-                          <button onClick={async () => { await deleteService(s.id); setServices(v=> v.filter(x=> x.id!==s.id)); }}>🗑️</button>
+                          <button onClick={async () =>{ const saved = await updateService(s.id, s); setServices(v=> v.map(x=> x.id===s.id? saved: x)); }}></button>
+                          <button onClick={async () =>{ await deleteService(s.id); setServices(v=> v.filter(x=> x.id!==s.id)); }}></button>
                         </>
                       )}
                     </td>
@@ -297,7 +297,7 @@ export const AdminProductManager: React.FC = () => {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <strong>Операции/нормы</strong>
-            <button onClick={() => setOperations(prev => [{ id: 0, product_type: selectedKey || (products[0]?.key || ''), operation: '', service_id: services[0]?.id || 0, formula: 'ceil(quantity/2)', is_active: true }, ...prev])}>+ Добавить</button>
+            <button onClick={() =>setOperations(prev => [{ id: 0, product_type: selectedKey || (products[0]?.key || ''), operation: '', service_id: services[0]?.id || 0, formula: 'ceil(quantity/2)', is_active: true }, ...prev])}>+ Добавить</button>
           </div>
           <div style={{ border: '1px solid #ddd', borderRadius: 4 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -326,11 +326,11 @@ export const AdminProductManager: React.FC = () => {
                     </td>
                     <td style={{ padding: 8, whiteSpace: 'nowrap' }}>
                       {o.id === 0 ? (
-                        <button onClick={async () => { const saved = await createOperationNorm({ product_type: o.product_type, operation: o.operation, service_id: o.service_id, formula: o.formula, is_active: o.is_active }); setOperations(v=> v.map((x,i)=> i===idx? saved: x)); }}>💾</button>
+                        <button onClick={async () =>{ const saved = await createOperationNorm({ product_type: o.product_type, operation: o.operation, service_id: o.service_id, formula: o.formula, is_active: o.is_active }); setOperations(v=> v.map((x,i)=> i===idx? saved: x)); }}></button>
                       ) : (
                         <>
-                          <button onClick={async () => { const saved = await updateOperationNorm(o.id, o); setOperations(v=> v.map(x=> x.id===o.id? saved: x)); }}>💾</button>
-                          <button onClick={async () => { await deleteOperationNorm(o.id); setOperations(v=> v.filter(x=> x.id!==o.id)); }}>🗑️</button>
+                          <button onClick={async () =>{ const saved = await updateOperationNorm(o.id, o); setOperations(v=> v.map(x=> x.id===o.id? saved: x)); }}></button>
+                          <button onClick={async () =>{ await deleteOperationNorm(o.id); setOperations(v=> v.filter(x=> x.id!==o.id)); }}></button>
                         </>
                       )}
                     </td>

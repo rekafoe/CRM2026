@@ -38,7 +38,7 @@ export const PublicEditorPreviewModeBar: React.FC<PublicEditorPreviewModeBarProp
           role="tab"
           className={`public-editor-preview-mode-bar__mode${item === mode ? ' public-editor-preview-mode-bar__mode--active' : ''}`}
           aria-selected={item === mode}
-          onClick={() => onModeChange(item)}
+          onClick={() =>onModeChange(item)}
         >
           {MOBILE_MODE_LABELS[item]}
         </button>

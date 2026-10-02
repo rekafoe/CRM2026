@@ -24,7 +24,7 @@ export const TestTab: React.FC<TestTabProps> = React.memo(({
     <div className="test-form-section">
       <div className="instruction-box">
         <div className="instruction-box-title">
-          <span>🧪</span>
+          <span></span>
           <span>Тестирование расчетов</span>
         </div>
         <div className="instruction-box-content">

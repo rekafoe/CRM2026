@@ -18,13 +18,13 @@ export interface UnifiedPricingResult {
   // Размеры и раскладка
   productSize: ProductSize;
   layout: any;
-  sheetsNeeded?: number; // 📄 Количество листов для печати
+  sheetsNeeded?: number; //  Количество листов для печати
   /** Объём для tier при группировке в той же оси, что и обычный calculate */
   tierVolumeForGrouping?: number;
-  metersNeeded?: number; // 📏 Погонные метры для рулонной печати
-  itemsPerSheet?: number; // 📐 Укладка: сколько изделий на лист
-  cutsPerSheet?: number; // 🔪 Количество резов на лист
-  numberOfStacks?: number; // 📚 Количество стоп для резки
+  metersNeeded?: number; //  Погонные метры для рулонной печати
+  itemsPerSheet?: number; //  Укладка: сколько изделий на лист
+  cutsPerSheet?: number; //  Количество резов на лист
+  numberOfStacks?: number; //  Количество стоп для резки
   
   // Стоимость
   materials: Array<{
@@ -34,8 +34,8 @@ export interface UnifiedPricingResult {
     unit?: string;
     unitPrice: number;
     totalCost: number;
-    density?: number; // 🆕 Плотность материала
-    paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType на фронтенде
+    density?: number; //  Плотность материала
+    paper_type_name?: string; //  display_name типа бумаги для установки materialType на фронтенде
     /** Расходник отделки (DTF и т.д.): деньги в строках операций, не в отдельной позиции материала */
     isConsumableOnly?: boolean;
   }>;
@@ -105,7 +105,7 @@ export interface UnifiedPricingResult {
 
 export class UnifiedPricingService {
   /**
-   * 🎯 Главный метод расчета цены
+   *  Главный метод расчета цены
    * Это единственный метод, который должен использоваться для расчета цен!
    */
   static async calculatePrice(
@@ -113,7 +113,7 @@ export class UnifiedPricingService {
     configuration: any,
     quantity: number
   ): Promise<UnifiedPricingResult> {
-    logger.info('💰 UnifiedPricingService: начало расчета', { productId, quantity });
+    logger.info('UnifiedPricingService: начало расчета', { productId, quantity });
 
     try {
       const db = await getDb();
@@ -127,7 +127,7 @@ export class UnifiedPricingService {
       }
 
       if (product.calculator_type === 'simplified') {
-        logger.info('✨ Используется SimplifiedPricingService (упрощённый калькулятор)', { productId });
+        logger.info('Используется SimplifiedPricingService (упрощённый калькулятор)', { productId });
         return await this.calculateViaSimplifiedSystem(productId, configuration, quantity);
       }
 
@@ -137,7 +137,7 @@ export class UnifiedPricingService {
       err.status = 422;
       throw err;
     } catch (error) {
-      logger.error('❌ Ошибка расчета цены', { productId, error });
+      logger.error('Ошибка расчета цены', { productId, error });
       throw error;
     }
   }

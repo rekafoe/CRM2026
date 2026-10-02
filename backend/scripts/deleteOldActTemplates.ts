@@ -57,7 +57,7 @@ async function deleteOldActTemplates() {
         console.error(`  ✗ Ошибка удаления файла: ${error.message}`);
       }
     } else {
-      console.log(`  ⚠ Файл не найден: ${template.file_path}`);
+      console.log(`  Файл не найден: ${template.file_path}`);
     }
     
     // Удаляем запись из БД

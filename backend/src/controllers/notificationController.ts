@@ -11,7 +11,7 @@ export class NotificationController {
   static async sendTestNotification(req: Request, res: Response) {
     try {
       const { message } = req.body;
-      const testMessage = message || '🧪 *Тестовое сообщение*\n\nСистема уведомлений работает корректно!';
+      const testMessage = message || '*Тестовое сообщение*\n\nСистема уведомлений работает корректно!';
       
       const result = await TelegramService.sendToAllUsers(testMessage);
       
@@ -21,7 +21,7 @@ export class NotificationController {
         data: result
       });
     } catch (error: any) {
-      console.error('❌ Error sending test notification:', error);
+      console.error('Error sending test notification:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Ошибка отправки уведомления',
@@ -42,7 +42,7 @@ export class NotificationController {
         data: config
       });
     } catch (error: any) {
-      console.error('❌ Error getting Telegram config:', error);
+      console.error('Error getting Telegram config:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения конфигурации Telegram',
@@ -58,7 +58,7 @@ export class NotificationController {
     try {
       const { botToken, chatId, enabled } = req.body;
       
-      console.log('🔧 Configuring Telegram:', { 
+      console.log('Configuring Telegram:', { 
         botToken: botToken ? `${botToken.substring(0, 10)}...` : 'empty',
         chatId: chatId || 'empty',
         enabled 
@@ -82,7 +82,7 @@ export class NotificationController {
         message: 'Конфигурация Telegram обновлена'
       });
     } catch (error: any) {
-      console.error('❌ Error configuring Telegram:', error);
+      console.error('Error configuring Telegram:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка настройки Telegram',
@@ -95,11 +95,11 @@ export class NotificationController {
    * Получение активных предупреждений о запасах
    */
   static async getStockAlerts(req: Request, res: Response) {
-    console.log('🔍 getStockAlerts called');
+    console.log('getStockAlerts called');
     try {
-      console.log('📊 Calling MaterialService.getLowStockMaterials()...');
+      console.log('Calling MaterialService.getLowStockMaterials()...');
       const materials = await MaterialService.getLowStockMaterials();
-      console.log(`✅ Got ${materials.length} low stock materials:`, materials);
+      console.log(`Got ${materials.length} low stock materials:`, materials);
       
       // Преобразуем в формат StockAlert
       const alerts = materials.map((material: any) => ({
@@ -118,7 +118,7 @@ export class NotificationController {
         data: alerts
       });
     } catch (error: any) {
-      console.error('❌ Error getting stock alerts:', error);
+      console.error('Error getting stock alerts:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения предупреждений',
@@ -141,7 +141,7 @@ export class NotificationController {
         message: 'Предупреждение отмечено как решенное'
       });
     } catch (error: any) {
-      console.error('❌ Error resolving stock alert:', error);
+      console.error('Error resolving stock alert:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка обновления предупреждения',
@@ -163,7 +163,7 @@ export class NotificationController {
         data: alerts
       });
     } catch (error: any) {
-      console.error('❌ Error checking stock levels:', error);
+      console.error('Error checking stock levels:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка проверки запасов',
@@ -184,7 +184,7 @@ export class NotificationController {
         data: config
       });
     } catch (error: any) {
-      console.error('❌ Error getting stock monitoring config:', error);
+      console.error('Error getting stock monitoring config:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения конфигурации',
@@ -207,7 +207,7 @@ export class NotificationController {
         message: 'Конфигурация мониторинга обновлена'
       });
     } catch (error: any) {
-      console.error('❌ Error updating stock monitoring config:', error);
+      console.error('Error updating stock monitoring config:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка обновления конфигурации',
@@ -238,7 +238,7 @@ export class NotificationController {
         });
       }
     } catch (error: any) {
-      console.error('❌ Error creating auto order:', error);
+      console.error('Error creating auto order:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка создания автоматического заказа',
@@ -261,7 +261,7 @@ export class NotificationController {
         data: orders
       });
     } catch (error: any) {
-      console.error('❌ Error getting auto orders:', error);
+      console.error('Error getting auto orders:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения автоматических заказов',
@@ -284,7 +284,7 @@ export class NotificationController {
         message: 'Заказ одобрен'
       });
     } catch (error: any) {
-      console.error('❌ Error approving auto order:', error);
+      console.error('Error approving auto order:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка одобрения заказа',
@@ -307,7 +307,7 @@ export class NotificationController {
         message: 'Заказ отправлен поставщику'
       });
     } catch (error: any) {
-      console.error('❌ Error sending auto order:', error);
+      console.error('Error sending auto order:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка отправки заказа',
@@ -330,7 +330,7 @@ export class NotificationController {
         message: 'Заказ отмечен как доставленный'
       });
     } catch (error: any) {
-      console.error('❌ Error marking auto order as delivered:', error);
+      console.error('Error marking auto order as delivered:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка обновления статуса заказа',
@@ -351,7 +351,7 @@ export class NotificationController {
         data: config
       });
     } catch (error: any) {
-      console.error('❌ Error getting auto order config:', error);
+      console.error('Error getting auto order config:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения конфигурации',
@@ -374,7 +374,7 @@ export class NotificationController {
         message: 'Конфигурация автоматических заказов обновлена'
       });
     } catch (error: any) {
-      console.error('❌ Error updating auto order config:', error);
+      console.error('Error updating auto order config:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка обновления конфигурации',

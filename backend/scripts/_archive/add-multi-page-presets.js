@@ -7,7 +7,7 @@ const { getDb } = require('../dist/src/db');
 async function addMultiPagePresets() {
   const db = await getDb();
   
-  console.log('📝 Добавляем пресеты для multi_page продуктов...');
+  console.log('Добавляем пресеты для multi_page продуктов...');
   
   try {
     await db.run(`
@@ -28,11 +28,11 @@ async function addMultiPagePresets() {
     `);
     
     const count = await db.get('SELECT COUNT(*) as count FROM product_parameter_presets WHERE product_type = ?', ['multi_page']);
-    console.log(`✅ Добавлено пресетов для multi_page: ${count.count}`);
+    console.log(`Добавлено пресетов для multi_page: ${count.count}`);
     
-    console.log('\n✅ Пресеты для multi_page успешно добавлены!');
+    console.log('\n Пресеты для multi_page успешно добавлены!');
   } catch (error) {
-    console.error('❌ Ошибка при добавлении пресетов:', error);
+    console.error('Ошибка при добавлении пресетов:', error);
     throw error;
   }
 }

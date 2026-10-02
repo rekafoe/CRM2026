@@ -97,7 +97,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
           className={`quick-filter-chip ${
             typeFilter === 'all' ? 'quick-filter-chip--active' : ''
           }`}
-          onClick={() => onTypeFilterChange('all')}
+          onClick={() =>onTypeFilterChange('all')}
         >
           <AppIcon name="clipboard" size="xs" />
           <span>Все ({services.length})</span>
@@ -108,7 +108,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
             className={`quick-filter-chip ${
               typeFilter === type ? 'quick-filter-chip--active' : ''
             }`}
-            onClick={() => onTypeFilterChange(type)}
+            onClick={() =>onTypeFilterChange(type)}
           >
             <span>{getServiceIcon(type)}</span>
             <span>

@@ -364,7 +364,7 @@ export async function createServiceVolumeTier(serviceId: number, payload: Servic
   };
   // Если есть variantId, используем специальный роут для варианта
   if (payload.variantId !== undefined) {
-    // 🆕 Нормализуем variantId
+    //  Нормализуем variantId
     const normalizedVariantId = typeof payload.variantId === 'string' 
       ? parseInt(String(payload.variantId).split(':')[0], 10) 
       : Number(payload.variantId);
@@ -417,7 +417,7 @@ export async function calculatePrice(payload: CalculatePriceRequest): Promise<Ca
 
 // Service Variants API
 const mapVariant = (data: any): ServiceVariant => {
-  // 🆕 Нормализуем id - извлекаем только числовую часть (на случай, если пришла строка типа "154:1")
+  //  Нормализуем id - извлекаем только числовую часть (на случай, если пришла строка типа "154:1")
   const rawId = data.id ?? data.variant_id;
   const normalizedId = typeof rawId === 'string' 
     ? parseInt(rawId.split(':')[0], 10) 
@@ -491,7 +491,7 @@ export async function createServiceVariant(serviceId: number, payload: ServiceVa
 }
 
 export async function updateServiceVariant(serviceId: number, variantId: number | string, payload: ServiceVariantPayload): Promise<ServiceVariant> {
-  // 🆕 Нормализуем variantId - извлекаем только числовую часть (на случай, если пришла строка типа "154:1")
+  //  Нормализуем variantId - извлекаем только числовую часть (на случай, если пришла строка типа "154:1")
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(String(variantId).split(':')[0], 10) 
     : Number(variantId);
@@ -517,7 +517,7 @@ export async function updateServiceVariant(serviceId: number, variantId: number 
 }
 
 export async function deleteServiceVariant(serviceId: number, variantId: number | string): Promise<void> {
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(String(variantId).split(':')[0], 10) 
     : Number(variantId);
@@ -530,7 +530,7 @@ export async function deleteServiceVariant(serviceId: number, variantId: number 
 }
 
 export async function getServiceVariantTiers(serviceId: number, variantId: number | string): Promise<ServiceVolumeTier[]> {
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(String(variantId).split(':')[0], 10) 
     : Number(variantId);
@@ -611,7 +611,7 @@ export async function getPricingServicesBundle(serviceIds: number[]): Promise<Re
 }
 
 export async function createServiceVariantTier(serviceId: number, variantId: number | string, payload: ServiceVolumeTierPayload): Promise<ServiceVolumeTier> {
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(String(variantId).split(':')[0], 10) 
     : Number(variantId);
@@ -630,7 +630,7 @@ export async function createServiceVariantTier(serviceId: number, variantId: num
 }
 
 export async function updateServiceVariantTier(serviceId: number, variantId: number | string, tierId: number, payload: ServiceVolumeTierPayload): Promise<ServiceVolumeTier> {
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(String(variantId).split(':')[0], 10) 
     : Number(variantId);
@@ -682,7 +682,7 @@ export async function updateRangeBoundary(serviceId: number, oldMinQuantity: num
  * Обновить цену варианта для конкретного диапазона
  */
 export async function updateVariantPrice(serviceId: number, variantId: number | string, minQuantity: number, price: number): Promise<void> {
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(String(variantId).split(':')[0], 10) 
     : Number(variantId);

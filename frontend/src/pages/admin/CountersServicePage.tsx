@@ -168,14 +168,14 @@ export const CountersServicePage: React.FC = () => {
             <button
               type="button"
               className={`cnt-mode-tab ${mode === 'day' ? 'cnt-mode-tab--active' : ''}`}
-              onClick={() => setMode('day')}
+              onClick={() =>setMode('day')}
             >
               День
             </button>
             <button
               type="button"
               className={`cnt-mode-tab ${mode === 'month' ? 'cnt-mode-tab--active' : ''}`}
-              onClick={() => setMode('month')}
+              onClick={() =>setMode('month')}
             >
               Месяц
             </button>
@@ -308,7 +308,7 @@ export const CountersServicePage: React.FC = () => {
                       <td>{counter.value ?? '—'}</td>
                       <td>
                         {counter.difference != null ? (
-                          <span className={`cnt-diff ${counter.difference > 0 ? 'cnt-diff--positive' : ''}`}>
+                          <span className={`cnt-diff ${counter.difference >0 ? 'cnt-diff--positive' : ''}`}>
                             {counter.difference > 0 ? '+' : ''}{counter.difference}
                           </span>
                         ) : '—'}

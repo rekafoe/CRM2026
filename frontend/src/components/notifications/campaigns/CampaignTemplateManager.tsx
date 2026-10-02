@@ -82,7 +82,7 @@ export const CampaignTemplateManager: React.FC = () => {
       <div className="campaign-card">
         <div className="campaign-card__header">
           <h4>Шаблоны кампаний</h4>
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => setSelected(null)}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() =>setSelected(null)}>
             Новый шаблон
           </button>
         </div>
@@ -92,7 +92,7 @@ export const CampaignTemplateManager: React.FC = () => {
               key={item.id}
               type="button"
               className={`campaign-list__item ${selected?.id === item.id ? 'active' : ''}`}
-              onClick={() => setSelected(item)}
+              onClick={() =>setSelected(item)}
             >
               <strong>{item.name}</strong>
               <span>{item.channel} · {item.slug}</span>
@@ -135,7 +135,7 @@ export const CampaignTemplateManager: React.FC = () => {
           <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))} />
           Шаблон активен
         </label>
-        <button type="button" className="lg-btn lg-btn--primary" onClick={() => void save()}>
+        <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void save()}>
           Сохранить шаблон
         </button>
       </div>

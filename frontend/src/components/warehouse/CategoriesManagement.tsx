@@ -231,11 +231,11 @@ export const CategoriesManagement: React.FC<CategoriesManagementProps> = ({ onRe
                           ) : '—'}
                         </td>
                         <td>
-                          <span className={`categories-management__count ${count > 0 ? 'categories-management__count--has' : 'categories-management__count--empty'}`}>
+                          <span className={`categories-management__count ${count >0 ? 'categories-management__count--has' : 'categories-management__count--empty'}`}>
                             {count}
                           </span>
                         </td>
-                        <td onClick={(e) => e.stopPropagation()}>
+                        <td onClick={(e) =>e.stopPropagation()}>
                           <div className="inv-actions">
                             <WarehouseButton
                               variant="secondary"
@@ -320,7 +320,7 @@ export const CategoriesManagement: React.FC<CategoriesManagementProps> = ({ onRe
                   key={c}
                   type="button"
                   className="categories-management__swatch"
-                  onClick={() => setForm((prev) => ({ ...prev, color: c }))}
+                  onClick={() =>setForm((prev) => ({ ...prev, color: c }))}
                   title={c}
                   style={{ background: c }}
                 />

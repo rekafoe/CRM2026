@@ -10,7 +10,7 @@ export class TelegramSettingsController {
       const settings = await TelegramSettingsService.getAllSettings();
       res.json({ success: true, data: settings });
     } catch (error: any) {
-      console.error('❌ Error getting Telegram settings:', error);
+      console.error('Error getting Telegram settings:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Ошибка получения настроек Telegram', 
@@ -28,7 +28,7 @@ export class TelegramSettingsController {
       await TelegramSettingsService.updateAllSettings(settings);
       res.json({ success: true, message: 'Настройки Telegram обновлены' });
     } catch (error: any) {
-      console.error('❌ Error updating Telegram settings:', error);
+      console.error('Error updating Telegram settings:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Ошибка обновления настроек Telegram', 

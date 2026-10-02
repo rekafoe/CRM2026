@@ -6,13 +6,13 @@ import { MoneyAmount } from '../../../ui';
 const defaultGetServiceIcon = (type: string) => {
   switch (type) {
     case 'print':
-      return '🖨️';
+      return '';
     case 'postprint':
-      return '✂️';
+      return '';
     case 'other':
-      return '⚙️';
+      return '';
     default:
-      return '📋';
+      return '';
   }
 };
 
@@ -100,7 +100,7 @@ const ServicesTable: React.FC<ServicesTableProps> = ({
       <div className="services-table__actions">
         {onEdit && (
           <Button variant="secondary" size="sm" onClick={() => onEdit(service)} title="Редактировать услугу">
-            ✏️ Редактировать
+             Редактировать
           </Button>
         )}
         {onToggleActive && (
@@ -110,12 +110,12 @@ const ServicesTable: React.FC<ServicesTableProps> = ({
             onClick={() => onToggleActive(service)}
             title={service.isActive ? 'Деактивировать' : 'Активировать'}
           >
-            {service.isActive ? '⏸️ Деактивировать' : '▶️ Активировать'}
+            {service.isActive ? 'Деактивировать' : 'Активировать'}
           </Button>
         )}
         {onDelete && (
           <Button variant="error" size="sm" onClick={() => onDelete(service)}>
-            🗑️
+            Удалить
           </Button>
         )}
       </div>

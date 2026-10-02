@@ -63,7 +63,7 @@ export const ClipartsPanel: React.FC<Props> = ({ onClose, onAddClipart }) => {
               className="design-editor-bg-preset"
               disabled={busyId === asset.id}
               title={asset.label}
-              onClick={() => {
+              onClick={() =>{
                 setBusyId(asset.id);
                 void Promise.resolve(onAddClipart(asset)).finally(() => setBusyId(null));
               }}

@@ -90,7 +90,7 @@ export const AlertsTable: React.FC<AlertsTableProps> = React.memo(({
                       type="button"
                       className="inv-icon-btn inv-icon-btn--in"
                       title={`Приход до минимума: +${suggestLabel}`}
-                      onClick={() => onReceive(m)}
+                      onClick={() =>onReceive(m)}
                     >
                       <AppIcon name="arrow-up" size="sm" />
                       <span>Приход +{suggestLabel}</span>
@@ -98,7 +98,7 @@ export const AlertsTable: React.FC<AlertsTableProps> = React.memo(({
                     <button
                       type="button"
                       className="inv-icon-btn"
-                      onClick={() => onViewHistory(m)}
+                      onClick={() =>onViewHistory(m)}
                     >
                       <AppIcon name="history" size="sm" />
                       <span>История</span>

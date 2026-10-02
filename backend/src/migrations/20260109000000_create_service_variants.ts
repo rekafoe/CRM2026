@@ -5,7 +5,7 @@ import { Database } from 'sqlite'
  * (например, ламинация: глянец 32 мкм, мат 50 мкм и т.д.)
  */
 export async function up(db: Database): Promise<void> {
-  console.log('🔧 Creating service_variants table...')
+  console.log('Creating service_variants table...')
   
   await db.exec(`
     CREATE TABLE IF NOT EXISTS service_variants (
@@ -35,10 +35,10 @@ export async function up(db: Database): Promise<void> {
       ALTER TABLE service_volume_prices 
       ADD COLUMN variant_id INTEGER REFERENCES service_variants(id) ON DELETE CASCADE
     `)
-    console.log('✅ Added variant_id column to service_volume_prices')
+    console.log('Added variant_id column to service_volume_prices')
   } catch (error: any) {
     if (error.message?.includes('duplicate column')) {
-      console.log('⚠️ variant_id column already exists, skipping...')
+      console.log('variant_id column already exists, skipping...')
     } else {
       throw error
     }
@@ -50,12 +50,12 @@ export async function up(db: Database): Promise<void> {
     ON service_volume_prices(variant_id)
   `)
   
-  console.log('✅ service_variants table created')
+  console.log('service_variants table created')
 }
 
 export async function down(db: Database): Promise<void> {
-  console.log('🔄 Dropping service_variants table...')
+  console.log('Dropping service_variants table...')
   await db.exec(`DROP TABLE IF EXISTS service_variants`)
-  console.log('✅ service_variants table dropped')
+  console.log('service_variants table dropped')
 }
 

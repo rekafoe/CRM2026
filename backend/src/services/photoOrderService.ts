@@ -50,7 +50,7 @@ export class PhotoOrderService {
    */
   static async createOrder(request: CreatePhotoOrderRequest): Promise<PhotoOrder> {
     try {
-      console.log(`📸 Creating photo order for ${request.chatId}`);
+      console.log(`Creating photo order for ${request.chatId}`);
       
       const db = await getDb();
       const unit = await this.getPriceFromDb(request.selectedSize.name);
@@ -94,7 +94,7 @@ export class PhotoOrderService {
           );
           processedPhotos.push(processedPhoto);
         } catch (error) {
-          console.error(`❌ Error processing photo ${photoPath}:`, error);
+          console.error(`Error processing photo ${photoPath}:`, error);
         }
       }
 
@@ -127,10 +127,10 @@ export class PhotoOrderService {
         updatedAt: new Date().toISOString()
       };
 
-      console.log(`✅ Photo order created: ${orderId}`);
+      console.log(`Photo order created: ${orderId}`);
       return order;
     } catch (error) {
-      console.error('❌ Error creating photo order:', error);
+      console.error('Error creating photo order:', error);
       throw error;
     }
   }
@@ -149,7 +149,7 @@ export class PhotoOrderService {
 
       return this.mapRowToOrder(row);
     } catch (error) {
-      console.error('❌ Error getting order by ID:', error);
+      console.error('Error getting order by ID:', error);
       return null;
     }
   }
@@ -168,7 +168,7 @@ export class PhotoOrderService {
 
       return rows.map(row => this.mapRowToOrder(row));
     } catch (error) {
-      console.error('❌ Error getting orders by chat ID:', error);
+      console.error('Error getting orders by chat ID:', error);
       return [];
     }
   }
@@ -185,10 +185,10 @@ export class PhotoOrderService {
         WHERE id = ?
       `, [status, orderId]);
 
-      console.log(`✅ Order ${orderId} status updated to ${status}`);
+      console.log(`Order ${orderId} status updated to ${status}`);
       return true;
     } catch (error) {
-      console.error('❌ Error updating order status:', error);
+      console.error('Error updating order status:', error);
       return false;
     }
   }
@@ -264,9 +264,9 @@ export class PhotoOrderService {
         CREATE INDEX IF NOT EXISTS idx_photo_orders_status ON photo_orders (status);
       `);
       
-      console.log('✅ Photo orders table created');
+      console.log('Photo orders table created');
     } catch (error) {
-      console.error('❌ Error creating photo orders table:', error);
+      console.error('Error creating photo orders table:', error);
       throw error;
     }
   }

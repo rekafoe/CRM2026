@@ -65,7 +65,7 @@ export class PDFReportService {
    */
   static async generateStockReport(generatedBy: string): Promise<Buffer> {
     try {
-      console.log(`📄 Generating stock report for ${generatedBy}...`);
+      console.log(`Generating stock report for ${generatedBy}...`);
       
       // Получаем все материалы
       const allMaterials = await MaterialService.getAllMaterials();
@@ -120,7 +120,7 @@ export class PDFReportService {
       return pdfBuffer;
       
     } catch (error) {
-      console.error('❌ Error generating stock report:', error);
+      console.error('Error generating stock report:', error);
       throw error;
     }
   }
@@ -217,7 +217,7 @@ export class PDFReportService {
 </head>
 <body>
     <div class="header">
-        <h1>📊 Отчет об остатках материалов</h1>
+        <h1> Отчет об остатках материалов</h1>
         <p>Сгенерирован: ${generated_at}</p>
         <p>Пользователь: ${generated_by}</p>
     </div>
@@ -350,7 +350,7 @@ export class PDFReportService {
           footerTemplate: options?.footerTemplate ?? defaultFooterTemplate,
         });
 
-        console.log('✅ PDF generated successfully via puppeteer');
+        console.log('PDF generated successfully via puppeteer');
         return Buffer.from(pdfBuffer);
       } finally {
         await page.close();
@@ -358,11 +358,11 @@ export class PDFReportService {
     } catch (error) {
       resetBrowserState();
       if (!isWkhtmltopdfAvailable()) {
-        console.error('❌ Error converting HTML to PDF:', error);
+        console.error('Error converting HTML to PDF:', error);
         throw error;
       }
 
-      console.warn('⚠️ Puppeteer unavailable, falling back to wkhtmltopdf', error);
+      console.warn('Puppeteer unavailable, falling back to wkhtmltopdf', error);
       const pdfBuffer = await convertHtmlToPdfWithWkhtmltopdf(html, {
         top: margin.top,
         right: margin.right,
@@ -371,7 +371,7 @@ export class PDFReportService {
         headerTemplate: options?.headerTemplate,
         footerTemplate: options?.footerTemplate,
       });
-      console.log('✅ PDF generated successfully via wkhtmltopdf');
+      console.log('PDF generated successfully via wkhtmltopdf');
       return pdfBuffer;
     }
   }
@@ -385,7 +385,7 @@ export class PDFReportService {
     executedBy?: string
   ): Promise<Buffer> {
     try {
-      console.log(`📄 Generating order blank for order ${orderId}...`);
+      console.log(`Generating order blank for order ${orderId}...`);
       
       const db = await getDb();
       
@@ -717,7 +717,7 @@ export class PDFReportService {
       
       return pdfBuffer;
     } catch (error: any) {
-      console.error('❌ Error generating order blank:', error);
+      console.error('Error generating order blank:', error);
       console.error('Error details:', {
         orderId,
         message: error?.message,
@@ -1650,7 +1650,7 @@ export class PDFReportService {
     executedBy?: string
   ): Promise<Buffer> {
     try {
-      console.log(`📄 Generating commodity receipt for order ${orderId}...`);
+      console.log(`Generating commodity receipt for order ${orderId}...`);
       const db = await getDb();
 
       const order: any = await db.get(`
@@ -1763,7 +1763,7 @@ export class PDFReportService {
       const pdfBuffer = await this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
       return pdfBuffer;
     } catch (error: any) {
-      console.error('❌ Error generating commodity receipt:', error);
+      console.error('Error generating commodity receipt:', error);
       throw new Error(`Ошибка генерации товарного чека: ${error?.message || 'Неизвестная ошибка'}`);
     }
   }
@@ -1774,7 +1774,7 @@ export class PDFReportService {
    */
   static async generateCommodityReceiptBlank(organizationId?: number | null): Promise<Buffer> {
     try {
-      console.log(`📄 Generating commodity receipt blank...`);
+      console.log(`Generating commodity receipt blank...`);
       const org = await this.getOrganizationForReceipt(organizationId);
       const db = await getDb();
       const templateRow = await db.get<{ html_content: string }>('SELECT html_content FROM receipt_templates WHERE organization_id = ?', org.id);
@@ -1821,7 +1821,7 @@ export class PDFReportService {
       const pdfBuffer = await this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
       return pdfBuffer;
     } catch (error: any) {
-      console.error('❌ Error generating commodity receipt blank:', error);
+      console.error('Error generating commodity receipt blank:', error);
       throw new Error(`Ошибка генерации бланка товарного чека: ${error?.message || 'Неизвестная ошибка'}`);
     }
   }
@@ -1940,7 +1940,7 @@ export class PDFReportService {
     receiptNumber?: number
   ): Promise<Buffer> {
     try {
-      console.log(`📄 Generating receipt for order ${orderId}...`);
+      console.log(`Generating receipt for order ${orderId}...`);
       
       const db = await getDb();
       
@@ -2045,7 +2045,7 @@ export class PDFReportService {
       
       return pdfBuffer;
     } catch (error: any) {
-      console.error('❌ Error generating receipt:', error);
+      console.error('Error generating receipt:', error);
       console.error('Error details:', {
         orderId,
         message: error?.message,
@@ -2322,10 +2322,10 @@ export class PDFReportService {
       const filePath = path.join(uploadsDir, filename);
       fs.writeFileSync(filePath, reportBuffer);
       
-      console.log(`📄 Report saved to: ${filePath}`);
+      console.log(`Report saved to: ${filePath}`);
       return filePath;
     } catch (error) {
-      console.error('❌ Error saving report to file:', error);
+      console.error('Error saving report to file:', error);
       throw error;
     }
   }

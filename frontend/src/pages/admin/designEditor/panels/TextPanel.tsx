@@ -140,7 +140,7 @@ export const TextPanel: React.FC<TextPanelProps> = ({
                     key={kind}
                     type="button"
                     className={`text-panel-v2__preset text-panel-v2__preset--${kind}`}
-                    onClick={() => onAddTextPreset(kind)}
+                    onClick={() =>onAddTextPreset(kind)}
                   >
                     <span className="text-panel-v2__preset-label">{p.label}</span>
                     <span className="text-panel-v2__preset-hint" style={{ fontSize: Math.min(22, p.fontSize * 0.45) }}>

@@ -230,23 +230,23 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
 
         {/* Модальное окно пресетов */}
         {calculatorState.showPresets && (
-          <div className="presets-modal" onClick={() => calculatorState.setShowPresets(false)}>
-            <div className="presets-content" onClick={(e) => e.stopPropagation()}>
+          <div className="presets-modal" onClick={() =>calculatorState.setShowPresets(false)}>
+            <div className="presets-content" onClick={(e) =>e.stopPropagation()}>
               <div className="presets-header">
-                <h3>⭐ Пресеты</h3>
-                <button className="presets-close-btn" onClick={() => calculatorState.setShowPresets(false)}>×</button>
+                <h3>Пресеты</h3>
+                <button className="presets-close-btn" onClick={() =>calculatorState.setShowPresets(false)}>×</button>
               </div>
               <div className="presets-body">
                 {calculatorState.savedPresets.length === 0 ? (
                   <div className="no-presets">
-                    <div className="no-presets-icon">⭐</div>
+                    <div className="no-presets-icon"></div>
                     <h4>Сохраненных пресетов нет</h4>
                     <p>Создайте пресет, чтобы быстро загружать настройки</p>
                   </div>
                 ) : (
                   <div className="presets-grid">
                     {calculatorState.savedPresets.map((preset, index) => (
-                      <div key={`preset-${index}-${preset.productType}-${preset.format}`} className="preset-card" onClick={() => {
+                      <div key={`preset-${index}-${preset.productType}-${preset.format}`} className="preset-card" onClick={() =>{
                         calculatorState.updateSpecs(preset);
                         calculatorState.setShowPresets(false);
                         toast.success('Пресет загружен');
@@ -256,7 +256,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
                           <div className="preset-actions">
                             <button 
                               className="btn btn-sm btn-danger"
-                              onClick={(e) => {
+                              onClick={(e) =>{
                                 e.stopPropagation();
                                 if (window.confirm('Удалить пресет?')) {
                                   const newPresets = calculatorState.savedPresets.filter((_, i) => i !== index);
@@ -267,7 +267,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
                               }}
                               title="Удалить пресет"
                             >
-                              🗑️
+                              
                             </button>
                           </div>
                         </div>
@@ -306,11 +306,11 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
             <div className="product-selection-content">
               <div className="product-selection-header">
                 <h2>Выбор продукта</h2>
-                <button className="product-selection-close-btn" onClick={() => calculatorState.setShowProductSelection(false)}>×</button>
+                <button className="product-selection-close-btn" onClick={() =>calculatorState.setShowProductSelection(false)}>×</button>
               </div>
               <div className="product-selection-body">
                 <p>Загрузка списка продуктов...</p>
-                <button className="calculator-btn calculator-btn-outline" onClick={() => calculatorState.setShowProductSelection(false)}>Закрыть</button>
+                <button className="calculator-btn calculator-btn-outline" onClick={() =>calculatorState.setShowProductSelection(false)}>Закрыть</button>
               </div>
             </div>
           </div>

@@ -30,13 +30,13 @@ export const OperationsList: React.FC<OperationsListProps> = React.memo(({
   return (
     <div className="schema-section">
       <div className="schema-section-title">
-        <span>⚙️</span>
+        <span></span>
         <span>Операции производства</span>
       </div>
       
       {operations.length === 0 ? (
         <EmptyState
-          icon="⚙️"
+          icon=""
           title="Нет операций"
           description="Добавьте первую операцию для этого типа продукта"
           action={{
@@ -120,7 +120,7 @@ export const OperationsList: React.FC<OperationsListProps> = React.memo(({
                   {operation.service && (
                     <div className="operation-field-full">
                       <div className="help-text">
-                        💡 Тариф и единица измерения автоматически подставляются из выбранной услуги
+                         Тариф и единица измерения автоматически подставляются из выбранной услуги
                       </div>
                     </div>
                   )}

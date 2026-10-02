@@ -88,7 +88,7 @@ export const OrderManagementPage: React.FC = () => {
         {/* Заголовок */}
         <div style={{ marginBottom: '30px' }}>
           <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#333', margin: '0 0 10px 0' }}>
-            🆕 Новая система заказов
+             Новая система заказов
           </h1>
           <p style={{ color: '#666', margin: 0 }}>
             Добро пожаловать, {user.name}! Управляйте заказами и отслеживайте свою работу.
@@ -99,7 +99,7 @@ export const OrderManagementPage: React.FC = () => {
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', gap: '10px', borderBottom: '2px solid #e0e0e0' }}>
             <button
-              onClick={() => setActiveTab('pool')}
+              onClick={() =>setActiveTab('pool')}
               style={{
                 padding: '12px 20px',
                 border: 'none',
@@ -110,10 +110,10 @@ export const OrderManagementPage: React.FC = () => {
                 fontWeight: '500'
               }}
             >
-              📋 Пул заказов
+               Пул заказов
             </button>
             <button
-              onClick={() => setActiveTab('page')}
+              onClick={() =>setActiveTab('page')}
               style={{
                 padding: '12px 20px',
                 border: 'none',
@@ -124,7 +124,7 @@ export const OrderManagementPage: React.FC = () => {
                 fontWeight: '500'
               }}
             >
-              📄 Моя страница заказов
+               Моя страница заказов
             </button>
           </div>
         </div>
@@ -178,7 +178,7 @@ export const OrderManagementPage: React.FC = () => {
                 textAlign: 'center'
               }}>
                 <p style={{ color: '#666', margin: 0 }}>
-                  🚧 Компонент UserOrderPage в разработке...
+                   Компонент UserOrderPage в разработке...
                 </p>
                 <p style={{ color: '#999', fontSize: '14px', margin: '10px 0 0 0' }}>
                   Выбранная дата: {selectedDate}
@@ -191,7 +191,7 @@ export const OrderManagementPage: React.FC = () => {
         {/* Информация о правах */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center">
-            <div className="text-blue-600 mr-3">ℹ️</div>
+            <div className="text-blue-600 mr-3"></div>
             <div>
               <h3 className="text-blue-800 font-medium">Информация о правах</h3>
               <p className="text-blue-600 text-sm">

@@ -101,10 +101,10 @@ export const MaterialsAnalytics: React.FC = () => {
   // Получение иконки для тренда
   const getTrendIcon = (trend: string) => {
     switch (trend) {
-      case 'increasing': return '📈'
-      case 'decreasing': return '📉'
-      case 'stable': return '➡️'
-      default: return '➡️'
+      case 'increasing': return ''
+      case 'decreasing': return ''
+      case 'stable': return ''
+      default: return ''
     }
   }
 
@@ -120,10 +120,10 @@ export const MaterialsAnalytics: React.FC = () => {
 
   // Получение статуса запаса
   const getStockStatus = (current: number, min: number) => {
-    if (current === 0) return { status: 'out-of-stock', icon: '🔴', text: 'Нет в наличии' }
-    if (current <= min) return { status: 'low-stock', icon: '⚠️', text: 'Низкий запас' }
-    if (current <= min * 1.5) return { status: 'medium-stock', icon: '🟡', text: 'Средний запас' }
-    return { status: 'good-stock', icon: '✅', text: 'Нормальный запас' }
+    if (current === 0) return { status: 'out-of-stock', icon: '', text: 'Нет в наличии' }
+    if (current <= min) return { status: 'low-stock', icon: '', text: 'Низкий запас' }
+    if (current <= min * 1.5) return { status: 'medium-stock', icon: '', text: 'Средний запас' }
+    return { status: 'good-stock', icon: '', text: 'Нормальный запас' }
   }
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export const MaterialsAnalytics: React.FC = () => {
     return (
       <div className="materials-analytics">
         <div className="analytics-header">
-          <h2>📊 Аналитика материалов</h2>
+          <h2>Аналитика материалов</h2>
         </div>
         <div className="loading">
           <div className="spinner"></div>
@@ -147,21 +147,21 @@ export const MaterialsAnalytics: React.FC = () => {
   return (
     <div className="materials-analytics">
       <div className="analytics-header">
-        <h2>📊 Аналитика материалов</h2>
+        <h2>Аналитика материалов</h2>
         <div className="header-actions">
           <button 
             className="btn btn-primary"
             onClick={loadAnalytics}
             disabled={loading}
           >
-            🔄 Обновить
+             Обновить
           </button>
         </div>
       </div>
 
       {error && (
         <div className="error-message">
-          <span className="error-icon">❌</span>
+          <span className="error-icon"></span>
           <span>{error}</span>
         </div>
       )}
@@ -170,27 +170,27 @@ export const MaterialsAnalytics: React.FC = () => {
       {summary && (
         <div className="analytics-summary">
           <div className="summary-card">
-            <div className="summary-icon">📦</div>
+            <div className="summary-icon"></div>
             <div className="summary-value">{summary.totalMaterials}</div>
             <div className="summary-label">Всего материалов</div>
           </div>
           <div className="summary-card">
-            <div className="summary-icon">💰</div>
+            <div className="summary-icon"></div>
             <div className="summary-value"><MoneyAmount value={summary.totalValue} decimals={0} /></div>
             <div className="summary-label">Общая стоимость</div>
           </div>
           <div className="summary-card">
-            <div className="summary-icon">⚠️</div>
+            <div className="summary-icon"></div>
             <div className="summary-value">{summary.lowStockCount}</div>
             <div className="summary-label">Низкий запас</div>
           </div>
           <div className="summary-card">
-            <div className="summary-icon">🔴</div>
+            <div className="summary-icon"></div>
             <div className="summary-value">{summary.outOfStockCount}</div>
             <div className="summary-label">Нет в наличии</div>
           </div>
           <div className="summary-card">
-            <div className="summary-icon">🔄</div>
+            <div className="summary-icon"></div>
             <div className="summary-value">{summary.averageTurnover.toFixed(2)}</div>
             <div className="summary-label">Средняя оборачиваемость</div>
           </div>
@@ -200,7 +200,7 @@ export const MaterialsAnalytics: React.FC = () => {
       {/* Тренды */}
       {trends && (
         <div className="analytics-trends">
-          <h3>📈 Тренды</h3>
+          <h3>Тренды</h3>
           <div className="trends-grid">
             <div className="trend-item">
               <div className="trend-label">Запасы</div>
@@ -227,11 +227,11 @@ export const MaterialsAnalytics: React.FC = () => {
       {/* Рекомендации */}
       {recommendations.length > 0 && (
         <div className="analytics-recommendations">
-          <h3>💡 Рекомендации</h3>
+          <h3>Рекомендации</h3>
           <div className="recommendations-list">
             {recommendations.map((rec, index) => (
               <div key={index} className="recommendation-item">
-                <span className="recommendation-icon">💡</span>
+                <span className="recommendation-icon"></span>
                 <span className="recommendation-text">{rec}</span>
               </div>
             ))}
@@ -243,27 +243,27 @@ export const MaterialsAnalytics: React.FC = () => {
       <div className="analytics-tabs">
         <button 
           className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
+          onClick={() =>setActiveTab('overview')}
         >
-          📊 Обзор
+           Обзор
         </button>
         <button 
           className={`tab-btn ${activeTab === 'materials' ? 'active' : ''}`}
-          onClick={() => setActiveTab('materials')}
+          onClick={() =>setActiveTab('materials')}
         >
-          📦 Материалы
+           Материалы
         </button>
         <button 
           className={`tab-btn ${activeTab === 'trends' ? 'active' : ''}`}
-          onClick={() => setActiveTab('trends')}
+          onClick={() =>setActiveTab('trends')}
         >
-          📈 Тренды
+           Тренды
         </button>
         <button 
           className={`tab-btn ${activeTab === 'recommendations' ? 'active' : ''}`}
-          onClick={() => setActiveTab('recommendations')}
+          onClick={() =>setActiveTab('recommendations')}
         >
-          💡 Рекомендации
+           Рекомендации
         </button>
       </div>
 
@@ -357,7 +357,7 @@ export const MaterialsAnalytics: React.FC = () => {
           <div className="trends-tab">
             <div className="trends-charts">
               <div className="chart-placeholder">
-                <div className="chart-icon">📊</div>
+                <div className="chart-icon"></div>
                 <div className="chart-text">Графики трендов</div>
                 <div className="chart-description">
                   Здесь будут отображаться графики изменения запасов, потребления и стоимости материалов
@@ -372,14 +372,14 @@ export const MaterialsAnalytics: React.FC = () => {
             <div className="recommendations-content">
               {recommendations.length === 0 ? (
                 <div className="no-recommendations">
-                  <div className="no-recommendations-icon">✅</div>
+                  <div className="no-recommendations-icon"></div>
                   <p>Нет рекомендаций</p>
                 </div>
               ) : (
                 <div className="recommendations-grid">
                   {recommendations.map((rec, index) => (
                     <div key={index} className="recommendation-card">
-                      <div className="recommendation-icon">💡</div>
+                      <div className="recommendation-icon"></div>
                       <div className="recommendation-text">{rec}</div>
                     </div>
                   ))}

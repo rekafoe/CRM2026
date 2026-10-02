@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Button, FormField, Alert } from '../../../../components/common';
+import { withoutEmoji } from '../../../../utils/withoutEmoji';
 
 interface QuickEditPanelProps {
   product: {
@@ -72,7 +73,7 @@ export const QuickEditPanel: React.FC<QuickEditPanelProps> = ({
     <div className="quick-edit-panel">
       <div className="quick-edit-panel__header">
         <div className="quick-edit-panel__title">
-          <span className="quick-edit-panel__icon">{product.icon || '📦'}</span>
+          <span className="quick-edit-panel__icon">{withoutEmoji(product.icon)}</span>
           <div>
             <div className="quick-edit-panel__name">{product.name}</div>
             <div className="quick-edit-panel__meta">ID: {product.id}</div>
@@ -94,7 +95,7 @@ export const QuickEditPanel: React.FC<QuickEditPanelProps> = ({
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
           >
-            {isExpanded ? '✕ Свернуть' : '✏️ Быстрое редактирование'}
+            {isExpanded ? '✕ Свернуть' : 'Быстрое редактирование'}
           </Button>
         </div>
       </div>
@@ -112,16 +113,6 @@ export const QuickEditPanel: React.FC<QuickEditPanelProps> = ({
                 value={quickEdit.name}
                 onChange={(e) => setQuickEdit((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="Название продукта"
-              />
-            </FormField>
-
-            <FormField label="Иконка (эмодзи)">
-              <input
-                className="form-input"
-                value={quickEdit.icon}
-                onChange={(e) => setQuickEdit((prev) => ({ ...prev, icon: e.target.value }))}
-                placeholder="📦"
-                maxLength={2}
               />
             </FormField>
 

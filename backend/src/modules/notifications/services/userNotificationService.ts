@@ -175,7 +175,7 @@ export class UserNotificationService {
    */
   static async sendLowStockAlert(materialName: string, currentQuantity: number, minStock: number, supplierName?: string): Promise<number> {
     const notification: NotificationMessage = {
-      title: '🚨 Низкий остаток материала',
+      title: 'Низкий остаток материала',
       message: this.formatLowStockMessage(materialName, currentQuantity, minStock, supplierName),
       priority: 'high',
       type: 'low_stock',
@@ -195,7 +195,7 @@ export class UserNotificationService {
    */
   static async sendNewOrderAlert(orderId: number, customerName: string, totalAmount: number): Promise<number> {
     const notification: NotificationMessage = {
-      title: '📋 Новый заказ',
+      title: 'Новый заказ',
       message: this.formatNewOrderMessage(orderId, customerName, totalAmount),
       priority: 'medium',
       type: 'new_order',
@@ -236,8 +236,8 @@ export class UserNotificationService {
       return false;
     }
     try {
-      const emoji = notification.priority === 'high' ? '🚨' : 
-                   notification.priority === 'medium' ? '⚠️' : 'ℹ️';
+      const emoji = notification.priority === 'high' ? '' : 
+                   notification.priority === 'medium' ? '' : '';
       
       const message = `${emoji} *${notification.title}*\n\n${notification.message}`;
       
@@ -273,15 +273,15 @@ export class UserNotificationService {
    * Форматирование сообщения о низких остатках
    */
   private static formatLowStockMessage(materialName: string, currentQuantity: number, minStock: number, supplierName?: string): string {
-    let message = `📦 *Материал:* ${materialName}\n`;
-    message += `📊 *Текущий остаток:* ${currentQuantity}\n`;
-    message += `⚠️ *Минимальный уровень:* ${minStock}\n`;
+    let message = `*Материал:* ${materialName}\n`;
+    message += `*Текущий остаток:* ${currentQuantity}\n`;
+    message += `*Минимальный уровень:* ${minStock}\n`;
     
     if (supplierName) {
-      message += `🏢 *Поставщик:* ${supplierName}\n`;
+      message += `*Поставщик:* ${supplierName}\n`;
     }
     
-    message += `\n💡 *Рекомендация:* Необходимо пополнить запас`;
+    message += `\n *Рекомендация:* Необходимо пополнить запас`;
     
     return message;
   }
@@ -290,10 +290,10 @@ export class UserNotificationService {
    * Форматирование сообщения о новом заказе
    */
   private static formatNewOrderMessage(orderId: number, customerName: string, totalAmount: number): string {
-    let message = `🆔 *Заказ №:* ${orderId}\n`;
-    message += `👤 *Клиент:* ${customerName}\n`;
-    message += `💰 *Сумма:* ${totalAmount.toFixed(2)} BYN\n`;
-    message += `\n📋 *Требует обработки*`;
+    let message = `*Заказ №:* ${orderId}\n`;
+    message += `*Клиент:* ${customerName}\n`;
+    message += `*Сумма:* ${totalAmount.toFixed(2)} BYN\n`;
+    message += `\n *Требует обработки*`;
     
     return message;
   }
@@ -373,7 +373,7 @@ export class UserNotificationService {
 
     for (const user of botUsers) {
       try {
-        const message = `🧪 *Тестовое сообщение*\n\nПривет, ${user.first_name}! Система уведомлений работает корректно.`;
+        const message = `*Тестовое сообщение*\n\nПривет, ${user.first_name}! Система уведомлений работает корректно.`;
         const t = this.getBotTokenFromEnv();
         if (!t) {
           logger.error('TELEGRAM_BOT_TOKEN is not set');

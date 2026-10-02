@@ -70,20 +70,20 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
   return (
     <div className="telegram-auto-settings">
       <div className="settings-header">
-        <h2>⚙️ Настройки автоматического добавления</h2>
+        <h2>Настройки автоматического добавления</h2>
         <div className="header-actions">
           <button onClick={loadSettings} className="lg-btn" disabled={loading}>
-            {loading ? '⏳' : '🔄'} Обновить
+            {loading ? 'Обновление…' : 'Обновить'}
           </button>
           <button onClick={saveSettings} className="lg-btn lg-btn--primary" disabled={saving}>
-            {saving ? '⏳' : '💾'} Сохранить
+            {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
       </div>
 
       <div className="settings-content">
         <div className="settings-section">
-          <h3>🤖 Автоматическое добавление пользователей</h3>
+          <h3>Автоматическое добавление пользователей</h3>
           
           <div className="setting-item">
             <label className="setting-label">
@@ -112,9 +112,9 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
               className="form-control"
               disabled={!settings.auto_add_users}
             >
-              <option value="client">👤 Клиент</option>
-              <option value="manager">👨‍💼 Менеджер</option>
-              <option value="admin">👑 Администратор</option>
+              <option value="client">Клиент</option>
+              <option value="manager">Менеджер</option>
+              <option value="admin">Администратор</option>
             </select>
           </div>
 
@@ -131,15 +131,15 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
               className="form-control"
               disabled={!settings.auto_add_users}
             >
-              <option value="client">👤 Клиент</option>
-              <option value="manager">👨‍💼 Менеджер</option>
-              <option value="admin">👑 Администратор</option>
+              <option value="client">Клиент</option>
+              <option value="manager">Менеджер</option>
+              <option value="admin">Администратор</option>
             </select>
           </div>
         </div>
 
         <div className="settings-section">
-          <h3>💬 Приветственные сообщения</h3>
+          <h3>Приветственные сообщения</h3>
           
           <div className="setting-item">
             <label className="setting-label">
@@ -157,7 +157,7 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
         </div>
 
         <div className="settings-section">
-          <h3>🔗 Webhook настройки</h3>
+          <h3>Webhook настройки</h3>
           
           <div className="setting-item">
             <label className="setting-label">
@@ -178,21 +178,21 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
         </div>
 
         <div className="settings-section">
-          <h3>📋 Информация о ролях</h3>
+          <h3>Информация о ролях</h3>
           
           <div className="roles-info">
             <div className="role-info">
-              <span className="role-badge role-client">👤 Клиент</span>
+              <span className="role-badge role-client">Клиент</span>
               <p>Получает уведомления о своих заказах. Автоматически добавляется при написании боту.</p>
             </div>
             
             <div className="role-info">
-              <span className="role-badge role-manager">👨‍💼 Менеджер</span>
+              <span className="role-badge role-manager">Менеджер</span>
               <p>Получает уведомления о заказах, низких остатках и системные уведомления. Назначается вручную или из групповых чатов.</p>
             </div>
             
             <div className="role-info">
-              <span className="role-badge role-admin">👑 Администратор</span>
+              <span className="role-badge role-admin">Администратор</span>
               <p>Получает все типы уведомлений. Назначается только вручную через админ панель.</p>
             </div>
           </div>

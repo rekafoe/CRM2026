@@ -50,14 +50,14 @@ export class ImageProcessingService {
     options: ProcessingOptions
   ): Promise<ProcessedPhoto> {
     try {
-      console.log(`🖼️ Processing photo: ${inputPath} to size ${size.name}`);
+      console.log(`Processing photo: ${inputPath} to size ${size.name}`);
       
       // Получаем метаданные оригинального изображения
       const originalMetadata = await sharp(inputPath).metadata();
       const originalWidth = originalMetadata.width || 0;
       const originalHeight = originalMetadata.height || 0;
       
-      console.log(`📏 Original size: ${originalWidth}x${originalHeight}`);
+      console.log(`Original size: ${originalWidth}x${originalHeight}`);
 
       let sharpInstance = sharp(inputPath);
 
@@ -114,13 +114,13 @@ export class ImageProcessingService {
         }
       };
 
-      console.log(`✅ Photo processed successfully: ${outputPath}`);
-      console.log(`📊 Processed size: ${result.metadata.processedWidth}x${result.metadata.processedHeight}`);
-      console.log(`📁 File size: ${(result.metadata.fileSize / 1024).toFixed(2)}KB`);
+      console.log(`Photo processed successfully: ${outputPath}`);
+      console.log(`Processed size: ${result.metadata.processedWidth}x${result.metadata.processedHeight}`);
+      console.log(`File size: ${(result.metadata.fileSize / 1024).toFixed(2)}KB`);
 
       return result;
     } catch (error) {
-      console.error('❌ Error processing photo:', error);
+      console.error('Error processing photo:', error);
       throw error;
     }
   }
@@ -135,7 +135,7 @@ export class ImageProcessingService {
     options: ProcessingOptions
   ): Promise<ProcessedPhoto> {
     try {
-      console.log(`🤖 Smart crop processing: ${inputPath}`);
+      console.log(`Smart crop processing: ${inputPath}`);
       
       // Пока что используем центрирование
       // В будущем здесь будет ИИ анализ изображения
@@ -199,7 +199,7 @@ export class ImageProcessingService {
         }
       };
     } catch (error) {
-      console.error('❌ Error in smart crop:', error);
+      console.error('Error in smart crop:', error);
       throw error;
     }
   }
@@ -239,7 +239,7 @@ export class ImageProcessingService {
 
       return outputPath;
     } catch (error) {
-      console.error('❌ Error creating preview:', error);
+      console.error('Error creating preview:', error);
       throw error;
     }
   }

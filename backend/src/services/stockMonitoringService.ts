@@ -47,7 +47,7 @@ export class StockMonitoringService {
       this.config = { ...this.config, ...config };
     }
 
-    console.log('📊 Stock monitoring service initialized:', this.config);
+    console.log('Stock monitoring service initialized:', this.config);
 
     if (this.config.enabled) {
       this.startMonitoring();
@@ -59,18 +59,18 @@ export class StockMonitoringService {
    */
   static startMonitoring() {
     if (this.isRunning) {
-      console.log('⚠️ Stock monitoring is already running');
+      console.log('Stock monitoring is already running');
       return;
     }
 
-    console.log(`🔄 Starting stock monitoring (interval: ${this.config.checkInterval} minutes)`);
+    console.log(`Starting stock monitoring (interval: ${this.config.checkInterval} minutes)`);
     
     this.isRunning = true;
     this.monitoringInterval = setInterval(async () => {
       try {
         await this.checkStockLevels();
       } catch (error) {
-        console.error('❌ Error in stock monitoring:', error);
+        console.error('Error in stock monitoring:', error);
       }
     }, this.config.checkInterval * 60 * 1000);
 
@@ -79,10 +79,10 @@ export class StockMonitoringService {
       0,
       parseInt(process.env.STOCK_STARTUP_DELAY_MS || '60000', 10) || 60000,
     );
-    console.log(`⏳ Stock monitoring: first check in ${startupDelayMs}ms`);
+    console.log(`Stock monitoring: first check in ${startupDelayMs}ms`);
     setTimeout(() => {
       this.checkStockLevels().catch((error) => {
-        console.error('❌ Error in initial stock monitoring:', error);
+        console.error('Error in initial stock monitoring:', error);
       });
     }, startupDelayMs);
   }
@@ -96,7 +96,7 @@ export class StockMonitoringService {
       this.monitoringInterval = null;
     }
     this.isRunning = false;
-    console.log('⏹️ Stock monitoring stopped');
+    console.log('Stock monitoring stopped');
   }
 
   /**
@@ -104,7 +104,7 @@ export class StockMonitoringService {
    */
   static async checkStockLevels(): Promise<StockAlert[]> {
     const started = Date.now();
-    console.log('🔍 Checking stock levels...');
+    console.log('Checking stock levels...');
     
     const db = await getDb();
     
@@ -168,7 +168,7 @@ export class StockMonitoringService {
         try {
           await this.saveStockAlert(alert);
         } catch (e) {
-          console.error('❌ Failed to save stock alert:', e);
+          console.error('Failed to save stock alert:', e);
         }
       }
     }
@@ -191,7 +191,7 @@ export class StockMonitoringService {
       ).catch(() => {});
     }
 
-    console.log(`📊 Stock check completed. Found ${alerts.length} alerts in ${Date.now() - started}ms`);
+    console.log(`Stock check completed. Found ${alerts.length} alerts in ${Date.now() - started}ms`);
     return alerts;
   }
 
@@ -222,7 +222,7 @@ export class StockMonitoringService {
         alert.isResolved ? 1 : 0
       ], (err: any) => {
         if (err) {
-          console.error('❌ Failed to save stock alert:', err);
+          console.error('Failed to save stock alert:', err);
           reject(err);
         } else {
           resolve();
@@ -235,12 +235,12 @@ export class StockMonitoringService {
    * Получение активных предупреждений
    */
   static async getActiveAlerts(): Promise<StockAlert[]> {
-    console.log('🔍 StockMonitoringService.getActiveAlerts() called');
+    console.log('StockMonitoringService.getActiveAlerts() called');
     const db = await getDb();
-    console.log('📊 Database connection obtained');
+    console.log('Database connection obtained');
     
     return new Promise((resolve, reject) => {
-      console.log('🔍 Executing SQL query...');
+      console.log('Executing SQL query...');
       db.all(`
         SELECT 
           id, material_id as materialId, material_name as materialName,
@@ -254,10 +254,10 @@ export class StockMonitoringService {
         ORDER BY created_at DESC
       `, (err: any, rows: any) => {
         if (err) {
-          console.error('❌ SQL error:', err);
+          console.error('SQL error:', err);
           reject(err);
         } else {
-          console.log(`✅ SQL query successful, got ${rows.length} rows`);
+          console.log(`SQL query successful, got ${rows.length} rows`);
           resolve(rows as StockAlert[]);
         }
       });
@@ -297,7 +297,7 @@ export class StockMonitoringService {
    */
   static updateConfig(newConfig: Partial<StockMonitoringConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    console.log('📊 Stock monitoring config updated:', this.config);
+    console.log('Stock monitoring config updated:', this.config);
     
     // Перезапускаем мониторинг с новой конфигурацией
     if (this.config.enabled) {

@@ -83,7 +83,7 @@ export const InboxNotifications: React.FC<InboxNotificationsProps> = ({
                     key={n.id}
                     type="button"
                     className={`inbox-notifications__item ${n.isRead ? '' : 'inbox-notifications__item--unread'}`}
-                    onClick={() => onOpenNotification(n)}
+                    onClick={() =>onOpenNotification(n)}
                   >
                     <div className="inbox-notifications__item-title">{n.title}</div>
                     <div className="inbox-notifications__item-message">{n.message}</div>

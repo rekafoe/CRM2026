@@ -34,7 +34,7 @@ export const SimplifiedTemplateSidebarDrawer: React.FC<Props> = (props) => {
       <button
         type="button"
         className="simplified-tpl-rail"
-        onClick={() => setOpen(true)}
+        onClick={() =>setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
         title="Продукт, типы бумаги, опции калькулятора, route"

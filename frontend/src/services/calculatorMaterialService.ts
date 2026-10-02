@@ -46,7 +46,7 @@ export interface PaperTypeForCalculator {
   category_color?: string;
 }
 
-// 🆕 Интерфейс для конфигурации продуктов из склада
+//  Интерфейс для конфигурации продуктов из склада
 export interface ProductConfigFromWarehouse {
   id: string;
   name: string;
@@ -67,7 +67,7 @@ export interface ProductConfigFromWarehouse {
   is_active: boolean;
 }
 
-// 🆕 Интерфейс для умных рекомендаций
+//  Интерфейс для умных рекомендаций
 export interface MaterialRecommendation {
   material_id: number;
   paper_type: string;
@@ -301,7 +301,7 @@ export async function checkMaterialAvailability(
 }
 
 /**
- * ⚠️ ТОЛЬКО ДЛЯ ПРЕДПРОСМОТРА В UI!
+ *  ТОЛЬКО ДЛЯ ПРЕДПРОСМОТРА В UI!
  * Рассчитывает ПРИМЕРНУЮ стоимость материалов для отображения в интерфейсе выбора
  * 
  * НЕ ИСПОЛЬЗУЕТСЯ для финального расчета цены!
@@ -343,7 +343,7 @@ export async function calculateMaterialCost(
     }
 
     // Рассчитываем количество листов
-    // ⚠️ ПРИМЕРНЫЙ расчет для UI-подсказки, НЕ для финальной цены!
+    //  ПРИМЕРНЫЙ расчет для UI-подсказки, НЕ для финальной цены!
     const sheetsPerItem = 1 / 2; // Примерно 2 изделия на лист SRA3
     const sheetsNeeded = Math.ceil(quantity * sheetsPerItem);
     
@@ -371,7 +371,7 @@ export async function calculateMaterialCost(
   }
 }
 
-// 🆕 УЛУЧШЕННЫЕ ФУНКЦИИ ДЛЯ ПОЛНОЙ ИНТЕГРАЦИИ СО СКЛАДОМ
+//  УЛУЧШЕННЫЕ ФУНКЦИИ ДЛЯ ПОЛНОЙ ИНТЕГРАЦИИ СО СКЛАДОМ
 
 /**
  * Получить конфигурацию продуктов из склада (ПОЛНОСТЬЮ ДИНАМИЧЕСКАЯ)
@@ -384,7 +384,7 @@ export async function getProductConfigsFromWarehouse(): Promise<Record<string, P
     // Получаем материалы для анализа доступности
     const materials = await getMaterialsForCalculator();
     
-    // 🆕 Получаем конфигурацию продуктов из API склада
+    //  Получаем конфигурацию продуктов из API склада
     const response = await api.get('/product-configs');
     const warehouseProductConfigs = (response.data as any[]) || [];
     
@@ -631,7 +631,7 @@ export default {
   getAllWarehouseMaterials,
   checkMaterialAvailability,
   calculateMaterialCost,
-  // 🆕 Новые функции
+  //  Новые функции
   getProductConfigsFromWarehouse,
   checkRealtimeAvailability,
   getMaterialAlternatives,

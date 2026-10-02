@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <h2>Что-то пошло не так</h2>
             <p>Произошла неожиданная ошибка. Пожалуйста, обновите страницу.</p>
             <button 
-              onClick={() => window.location.reload()}
+              onClick={() =>window.location.reload()}
               className="error-boundary-button"
             >
               Обновить страницу

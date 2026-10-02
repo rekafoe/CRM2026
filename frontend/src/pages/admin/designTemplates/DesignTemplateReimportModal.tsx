@@ -95,7 +95,7 @@ export const DesignTemplateReimportModal: React.FC<Props> = ({ template, isOpen,
               className="visually-hidden-file-input"
               onChange={(e) => setSvgFile(e.target.files?.[0] ?? null)}
             />
-            <button type="button" className="lg-btn" onClick={() => svgInputRef.current?.click()}>
+            <button type="button" className="lg-btn" onClick={() =>svgInputRef.current?.click()}>
               <AppIcon name="download" size="xs" /> Выбрать SVG/ZIP
             </button>
             <p className="form-hint">{svgFile ? svgFile.name : 'Конвенция слоёв photo_*, text_*, trim/bleed/safe'}</p>
@@ -112,7 +112,7 @@ export const DesignTemplateReimportModal: React.FC<Props> = ({ template, isOpen,
               className="visually-hidden-file-input"
               onChange={(e) => setSourceFile(e.target.files?.[0] ?? null)}
             />
-            <button type="button" className="lg-btn" onClick={() => sourceInputRef.current?.click()}>
+            <button type="button" className="lg-btn" onClick={() =>sourceInputRef.current?.click()}>
               Выбрать исходник
             </button>
             <p className="form-hint">{sourceFile ? sourceFile.name : 'Только исходник без SVG оставит шаблон draft'}</p>
@@ -137,7 +137,7 @@ export const DesignTemplateReimportModal: React.FC<Props> = ({ template, isOpen,
           <button type="button" className="lg-btn" onClick={handleClose} disabled={importing}>
             Отмена
           </button>
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => void handleSubmit()} disabled={importing}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void handleSubmit()} disabled={importing}>
             {importing ? 'Импорт…' : 'Обновить макет'}
           </button>
         </div>

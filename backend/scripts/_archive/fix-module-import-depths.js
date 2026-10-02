@@ -49,4 +49,4 @@ function walk(dir) {
 }
 
 walk(MODULES_DIR);
-console.log('✅ import depth fix complete');
+console.log('import depth fix complete');

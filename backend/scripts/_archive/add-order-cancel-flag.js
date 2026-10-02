@@ -32,9 +32,9 @@ function exec(sql) {
       END;
     `)
 
-    console.log('✅ orders.is_cancelled added and trigger installed')
+    console.log('orders.is_cancelled added and trigger installed')
   } catch (e) {
-    console.error('❌ Failed to install cancel flag', e)
+    console.error('Failed to install cancel flag', e)
     process.exit(1)
   } finally {
     db.close()

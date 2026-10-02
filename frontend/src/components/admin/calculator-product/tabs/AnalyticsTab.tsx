@@ -5,7 +5,7 @@ export const AnalyticsTab: React.FC = React.memo(() => {
   return (
     <div className="test-form-section">
       <EmptyState
-        icon="📊"
+        icon=""
         title="Аналитика продуктов"
         description="Раздел аналитики будет добавлен в следующих версиях системы"
       />

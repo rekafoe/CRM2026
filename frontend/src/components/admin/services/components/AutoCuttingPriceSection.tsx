@@ -104,7 +104,7 @@ export const AutoCuttingPriceSection: React.FC = () => {
     <div className="auto-cutting-price-section">
       <div className="auto-cutting-price-section__card">
         <div className="auto-cutting-price-section__header">
-          <h3>✂️ Цена автоматической резки</h3>
+          <h3>Цена автоматической резки</h3>
           <p className="auto-cutting-price-section__desc">
             Цена за рез стопой (руб) — для автоматической резки по раскладке в упрощённом калькуляторе. 0 = брать цену из услуги резки.
           </p>

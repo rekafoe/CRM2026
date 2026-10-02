@@ -66,7 +66,7 @@ export class TelegramService {
     if (this.networkFailureStreak < this.CIRCUIT_FAIL_THRESHOLD) return;
     this.networkCircuitOpenUntil = Date.now() + this.CIRCUIT_OPEN_MS;
     console.warn(
-      `⏸️ Telegram: сеть недоступна (${reason}). Пауза ${Math.round(this.CIRCUIT_OPEN_MS / 60000)} мин — polling/send пропущены, CRM не ждёт api.telegram.org.`,
+      `Telegram: сеть недоступна (${reason}). Пауза ${Math.round(this.CIRCUIT_OPEN_MS / 60000)} мин — polling/send пропущены, CRM не ждёт api.telegram.org.`,
     );
     this.stopPolling();
   }
@@ -114,12 +114,12 @@ export class TelegramService {
         useWebhook: config.useWebhook ?? this.config.useWebhook,
         chatId: config.chatId || this.config.chatId,
       };
-      console.log('🤖 Telegram service already initialized — config merged, polling not restarted');
+      console.log('Telegram service already initialized — config merged, polling not restarted');
       return;
     }
 
     this.config = config;
-    console.log('🤖 Telegram service initialized:', {
+    console.log('Telegram service initialized:', {
       enabled: config.enabled,
       use_webhook: Boolean(config.useWebhook),
       chatId: config.chatId ? `${config.chatId.substring(0, 4)}...` : 'not set'
@@ -127,13 +127,13 @@ export class TelegramService {
     
     if (config.enabled && config.botToken) {
       if (config.useWebhook) {
-        console.log('🌐 Telegram: webhook mode — getUpdates/polling in this process is not started (use POST .../api/notifications/telegram/webhook).');
+        console.log('Telegram: webhook mode — getUpdates/polling in this process is not started (use POST .../api/notifications/telegram/webhook).');
       } else if (process.env.TELEGRAM_POLLING_ENABLED === 'true') {
         this.startPolling();
       } else {
         // Railway часто не достучится до api.telegram.org — long polling вешает CRM на ConnectTimeout.
         // Входящие: TELEGRAM_USE_WEBHOOK=true. Исходящие sendMessage всё ещё работают при живой сети.
-        console.log('⏭️ Telegram polling disabled (set TELEGRAM_POLLING_ENABLED=true to enable long polling).');
+        console.log('Telegram polling disabled (set TELEGRAM_POLLING_ENABLED=true to enable long polling).');
       }
     }
   }
@@ -175,7 +175,7 @@ export class TelegramService {
    */
   static async sendOrderNotification(notification: OrderNotification): Promise<boolean> {
     if (!this.isEnabled()) {
-      console.log('⚠️ Telegram notifications disabled');
+      console.log('Telegram notifications disabled');
       return false;
     }
 
@@ -189,11 +189,11 @@ export class TelegramService {
    */
   static async sendNotification(title: string, message: string, priority: 'low' | 'medium' | 'high' = 'medium'): Promise<boolean> {
     if (!this.isEnabled()) {
-      console.log('⚠️ Telegram notifications disabled');
+      console.log('Telegram notifications disabled');
       return false;
     }
 
-    const emoji = priority === 'high' ? '🚨' : priority === 'medium' ? '⚠️' : 'ℹ️';
+    const emoji = priority === 'high' ? '' : priority === 'medium' ? '' : '';
     const formattedMessage = `${emoji} *${title}*\n\n${message}`;
     
     const result = await this.sendToAllUsers(formattedMessage);
@@ -205,7 +205,7 @@ export class TelegramService {
    */
   private static async sendMessage(message: string): Promise<boolean> {
     if (!this.config) {
-      console.error('❌ Telegram config not initialized');
+      console.error('Telegram config not initialized');
       return false;
     }
     if (!this.isNetworkAvailable()) return false;
@@ -229,14 +229,14 @@ export class TelegramService {
       const data = await response.json();
 
       if (data.ok) {
-        console.log('✅ Telegram message sent successfully');
+        console.log('Telegram message sent successfully');
         return true;
       } else {
-        console.error('❌ Telegram API error:', data);
+        console.error('Telegram API error:', data);
         return false;
       }
     } catch (error: any) {
-      console.error('❌ Failed to send Telegram message:', error.message);
+      console.error('Failed to send Telegram message:', error.message);
       return false;
     }
   }
@@ -247,24 +247,24 @@ export class TelegramService {
   private static formatLowStockMessage(notification: LowStockNotification): string {
     const { materialName, currentQuantity, minQuantity, supplierName, supplierContact, categoryName } = notification;
     
-    let message = `🚨 *Низкий остаток материала*\n\n`;
-    message += `📦 *Материал:* ${materialName}\n`;
-    message += `📊 *Текущий остаток:* ${currentQuantity}\n`;
-    message += `⚠️ *Минимальный уровень:* ${minQuantity}\n`;
+    let message = `*Низкий остаток материала*\n\n`;
+    message += `*Материал:* ${materialName}\n`;
+    message += `*Текущий остаток:* ${currentQuantity}\n`;
+    message += `*Минимальный уровень:* ${minQuantity}\n`;
     
     if (categoryName) {
-      message += `🏷️ *Категория:* ${categoryName}\n`;
+      message += `*Категория:* ${categoryName}\n`;
     }
     
     if (supplierName) {
-      message += `🏢 *Поставщик:* ${supplierName}\n`;
+      message += `*Поставщик:* ${supplierName}\n`;
     }
     
     if (supplierContact) {
-      message += `📞 *Контакт:* ${supplierContact}\n`;
+      message += `*Контакт:* ${supplierContact}\n`;
     }
     
-    message += `\n💡 *Рекомендация:* Необходимо пополнить запас`;
+    message += `\n *Рекомендация:* Необходимо пополнить запас`;
     
     return message;
   }
@@ -275,25 +275,25 @@ export class TelegramService {
   private static formatOrderMessage(notification: OrderNotification): string {
     const { orderId, supplierName, supplierContact, materials, totalAmount, deliveryDate } = notification;
     
-    let message = `📋 *Новый заказ поставщику*\n\n`;
-    message += `🆔 *Заказ №:* ${orderId}\n`;
-    message += `🏢 *Поставщик:* ${supplierName}\n`;
+    let message = `*Новый заказ поставщику*\n\n`;
+    message += `*Заказ №:* ${orderId}\n`;
+    message += `*Поставщик:* ${supplierName}\n`;
     
     if (supplierContact) {
-      message += `📞 *Контакт:* ${supplierContact}\n`;
+      message += `*Контакт:* ${supplierContact}\n`;
     }
     
     if (deliveryDate) {
-      message += `📅 *Дата поставки:* ${deliveryDate}\n`;
+      message += `*Дата поставки:* ${deliveryDate}\n`;
     }
     
-    message += `\n📦 *Материалы:*\n`;
+    message += `\n *Материалы:*\n`;
     
     materials.forEach((material, index) => {
       message += `${index + 1}. ${material.name} - ${material.quantity} ${material.unit} (${material.price} BYN)\n`;
     });
     
-    message += `\n💰 *Общая сумма:* ${totalAmount.toFixed(2)} BYN`;
+    message += `\n *Общая сумма:* ${totalAmount.toFixed(2)} BYN`;
     
     return message;
   }
@@ -302,7 +302,7 @@ export class TelegramService {
    * Тестовая отправка сообщения
    */
   static async sendTestMessage(): Promise<boolean> {
-    const testMessage = `🧪 *Тестовое сообщение*\n\nСистема уведомлений работает корректно!`;
+    const testMessage = `*Тестовое сообщение*\n\nСистема уведомлений работает корректно!`;
     const result = await this.sendToAllUsers(testMessage);
     return result.sent > 0;
   }
@@ -312,7 +312,7 @@ export class TelegramService {
    */
   static async sendToAllUsers(message: string): Promise<{ sent: number; failed: number }> {
     if (!this.isEnabled()) {
-      console.log('⚠️ Telegram service is not enabled');
+      console.log('Telegram service is not enabled');
       return { sent: 0, failed: 0 };
     }
 
@@ -326,21 +326,21 @@ export class TelegramService {
           const success = await this.sendMessageToUser(user.chat_id, message);
           if (success) {
             sent++;
-            console.log(`✅ Message sent to ${user.username || user.first_name || user.chat_id}`);
+            console.log(`Message sent to ${user.username || user.first_name || user.chat_id}`);
           } else {
             failed++;
-            console.log(`❌ Failed to send message to ${user.username || user.first_name || user.chat_id}`);
+            console.log(`Failed to send message to ${user.username || user.first_name || user.chat_id}`);
           }
         } catch (error) {
           failed++;
-          console.error(`❌ Error sending to ${user.username || user.first_name || user.chat_id}:`, error);
+          console.error(`Error sending to ${user.username || user.first_name || user.chat_id}:`, error);
         }
       }
 
-      console.log(`📊 Message delivery: ${sent} sent, ${failed} failed`);
+      console.log(`Message delivery: ${sent} sent, ${failed} failed`);
       return { sent, failed };
     } catch (error) {
-      console.error('❌ Error sending to all users:', error);
+      console.error('Error sending to all users:', error);
       return { sent: 0, failed: 0 };
     }
   }
@@ -350,7 +350,7 @@ export class TelegramService {
    */
   static async sendToRole(role: string, message: string): Promise<{ sent: number; failed: number }> {
     if (!this.isEnabled()) {
-      console.log('⚠️ Telegram service is not enabled');
+      console.log('Telegram service is not enabled');
       return { sent: 0, failed: 0 };
     }
 
@@ -364,21 +364,21 @@ export class TelegramService {
           const success = await this.sendMessageToUser(user.chat_id, message);
           if (success) {
             sent++;
-            console.log(`✅ Message sent to ${user.username || user.first_name || user.chat_id} (${role})`);
+            console.log(`Message sent to ${user.username || user.first_name || user.chat_id} (${role})`);
           } else {
             failed++;
-            console.log(`❌ Failed to send message to ${user.username || user.first_name || user.chat_id} (${role})`);
+            console.log(`Failed to send message to ${user.username || user.first_name || user.chat_id} (${role})`);
           }
         } catch (error) {
           failed++;
-          console.error(`❌ Error sending to ${user.username || user.first_name || user.chat_id} (${role}):`, error);
+          console.error(`Error sending to ${user.username || user.first_name || user.chat_id} (${role}):`, error);
         }
       }
 
-      console.log(`📊 Message delivery to ${role}: ${sent} sent, ${failed} failed`);
+      console.log(`Message delivery to ${role}: ${sent} sent, ${failed} failed`);
       return { sent, failed };
     } catch (error) {
-      console.error(`❌ Error sending to role ${role}:`, error);
+      console.error(`Error sending to role ${role}:`, error);
       return { sent: 0, failed: 0 };
     }
   }
@@ -388,7 +388,7 @@ export class TelegramService {
    */
   static async sendMessageToUser(chatId: string, message: string): Promise<boolean> {
     if (!this.isEnabled()) {
-      console.log('⚠️ Telegram service is not enabled');
+      console.log('Telegram service is not enabled');
       return false;
     }
     if (!this.isNetworkAvailable()) return false;
@@ -413,14 +413,14 @@ export class TelegramService {
       const result = await response.json();
       
       if (result.ok) {
-        console.log(`✅ Message sent to chat ${chatId}`);
+        console.log(`Message sent to chat ${chatId}`);
         return true;
       } else {
-        console.error(`❌ Telegram API error for chat ${chatId}:`, result);
+        console.error(`Telegram API error for chat ${chatId}:`, result);
         return false;
       }
     } catch (error) {
-      console.error(`❌ Error sending message to chat ${chatId}:`, error);
+      console.error(`Error sending message to chat ${chatId}:`, error);
       return false;
     }
   }
@@ -439,7 +439,7 @@ export class TelegramService {
       for (const user of users) {
         // Проверяем настройки пользователя
         if (!user.notification_preferences.low_stock) {
-          console.log(`⚠️ Low stock notifications disabled for ${user.username || user.first_name || user.chat_id}`);
+          console.log(`Low stock notifications disabled for ${user.username || user.first_name || user.chat_id}`);
           continue;
         }
 
@@ -452,14 +452,14 @@ export class TelegramService {
           }
         } catch (error) {
           failed++;
-          console.error(`❌ Error sending low stock notification to ${user.username || user.first_name || user.chat_id}:`, error);
+          console.error(`Error sending low stock notification to ${user.username || user.first_name || user.chat_id}:`, error);
         }
       }
 
-      console.log(`📊 Low stock notification delivery: ${sent} sent, ${failed} failed`);
+      console.log(`Low stock notification delivery: ${sent} sent, ${failed} failed`);
       return { sent, failed };
     } catch (error) {
-      console.error('❌ Error sending low stock notifications:', error);
+      console.error('Error sending low stock notifications:', error);
       return { sent: 0, failed: 0 };
     }
   }
@@ -472,7 +472,7 @@ export class TelegramService {
       clearInterval(this.pollingInterval);
     }
 
-    console.log('🔄 Starting Telegram polling...');
+    console.log('Starting Telegram polling...');
     
     const baseIntervalMs = this.DEFAULT_POLL_INTERVAL_MS;
 
@@ -495,7 +495,7 @@ export class TelegramService {
         this.consecutivePollingErrors = 0;
         this.nextAllowedPollAt = 0;
       } catch (error) {
-        console.error('❌ Error in Telegram polling:', error);
+        console.error('Error in Telegram polling:', error);
         this.consecutivePollingErrors = Math.min(this.consecutivePollingErrors + 1, 8);
         const backoffMs = Math.min(Math.pow(2, this.consecutivePollingErrors) * 2000, 300000);
         this.nextAllowedPollAt = Date.now() + backoffMs;
@@ -509,7 +509,7 @@ export class TelegramService {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
-      console.log('⏹️ Telegram polling stopped');
+      console.log('Telegram polling stopped');
     }
   }
 
@@ -538,7 +538,7 @@ export class TelegramService {
       const message = (error as any)?.name === 'AbortError'
         ? 'Fetch aborted by timeout'
         : (error as any)?.message || String(error);
-      console.error('❌ Error getting Telegram updates:', message);
+      console.error('Error getting Telegram updates:', message);
       throw error;
     }
   }
@@ -552,7 +552,7 @@ export class TelegramService {
     
     // Обрабатываем callback query (нажатие на кнопки)
     if (update.callback_query) {
-      console.log('🔘 Received callback query via polling:', {
+      console.log('Received callback query via polling:', {
         callback_id: update.callback_query.id,
         chat_id: update.callback_query.message?.chat?.id,
         user_id: update.callback_query.from?.id,
@@ -571,7 +571,7 @@ export class TelegramService {
     // Проверяем, что сообщение от пользователя, а не от бота
     if (from?.is_bot) return;
 
-    console.log('📨 Received message via polling:', {
+    console.log('Received message via polling:', {
       chat_id: chat.id,
       user_id: from?.id,
       text_preview: previewTelegramText(text),
@@ -587,7 +587,7 @@ export class TelegramService {
    */
   static async sendDocumentToUser(chatId: string, filePath: string, caption?: string): Promise<boolean> {
     if (!this.isEnabled()) {
-      console.log('⚠️ Telegram service is not enabled');
+      console.log('Telegram service is not enabled');
       return false;
     }
 
@@ -598,7 +598,7 @@ export class TelegramService {
       
       // Проверяем, существует ли файл
       if (!fs.existsSync(filePath)) {
-        console.error(`❌ File not found: ${filePath}`);
+        console.error(`File not found: ${filePath}`);
         return false;
       }
 
@@ -607,11 +607,11 @@ export class TelegramService {
       const fileSizeInMB = stats.size / (1024 * 1024);
       
       if (fileSizeInMB > 50) {
-        console.error(`❌ File too large: ${fileSizeInMB.toFixed(2)}MB (max 50MB)`);
+        console.error(`File too large: ${fileSizeInMB.toFixed(2)}MB (max 50MB)`);
         return false;
       }
 
-      console.log(`📤 Sending document to ${chatId}: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`);
+      console.log(`Sending document to ${chatId}: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`);
 
       const form = new FormData();
       form.append('chat_id', chatId);
@@ -639,22 +639,22 @@ export class TelegramService {
             try {
               const result = JSON.parse(data);
               if (result.ok) {
-                console.log(`✅ Document sent to ${chatId}`);
+                console.log(`Document sent to ${chatId}`);
                 resolve(true);
               } else {
-                console.error(`❌ Failed to send document to ${chatId}:`, result);
+                console.error(`Failed to send document to ${chatId}:`, result);
                 resolve(false);
               }
             } catch (error) {
-              console.error(`❌ JSON parse error: ${error}`);
-              console.error(`❌ Response data: ${data}`);
+              console.error(`JSON parse error: ${error}`);
+              console.error(`Response data: ${data}`);
               resolve(false);
             }
           });
         });
 
         req.on('error', (error: any) => {
-          console.error(`❌ Request error: ${error}`);
+          console.error(`Request error: ${error}`);
           resolve(false);
         });
 
@@ -662,7 +662,7 @@ export class TelegramService {
       });
       
     } catch (error) {
-      console.error(`❌ Error sending document to ${chatId}:`, error);
+      console.error(`Error sending document to ${chatId}:`, error);
       return false;
     }
   }
@@ -692,14 +692,14 @@ export class TelegramService {
       const result = await response.json();
       
       if (result.ok) {
-        console.log(`✅ Message with keyboard sent to ${chatId}`);
+        console.log(`Message with keyboard sent to ${chatId}`);
         return true;
       } else {
-        console.error(`❌ Failed to send message with keyboard to ${chatId}:`, result);
+        console.error(`Failed to send message with keyboard to ${chatId}:`, result);
         return false;
       }
     } catch (error) {
-      console.error(`❌ Error sending message with keyboard to ${chatId}:`, error);
+      console.error(`Error sending message with keyboard to ${chatId}:`, error);
       return false;
     }
   }
@@ -730,14 +730,14 @@ export class TelegramService {
       const result = await response.json();
       
       if (result.ok) {
-        console.log(`✅ Message with keyboard edited for ${chatId}`);
+        console.log(`Message with keyboard edited for ${chatId}`);
         return true;
       } else {
-        console.error(`❌ Failed to edit message with keyboard for ${chatId}:`, result);
+        console.error(`Failed to edit message with keyboard for ${chatId}:`, result);
         return false;
       }
     } catch (error) {
-      console.error(`❌ Error editing message with keyboard for ${chatId}:`, error);
+      console.error(`Error editing message with keyboard for ${chatId}:`, error);
       return false;
     }
   }
@@ -766,14 +766,14 @@ export class TelegramService {
       const result = await response.json();
       
       if (result.ok) {
-        console.log(`✅ Callback query answered: ${callbackQueryId}`);
+        console.log(`Callback query answered: ${callbackQueryId}`);
         return true;
       } else {
-        console.error(`❌ Failed to answer callback query ${callbackQueryId}:`, result);
+        console.error(`Failed to answer callback query ${callbackQueryId}:`, result);
         return false;
       }
     } catch (error) {
-      console.error(`❌ Error answering callback query ${callbackQueryId}:`, error);
+      console.error(`Error answering callback query ${callbackQueryId}:`, error);
       return false;
     }
   }

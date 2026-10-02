@@ -36,7 +36,7 @@ const PriceRulesSection: React.FC<PriceRulesSectionProps> = ({
               <input className="form-input" type="number" placeholder="Макс. тираж (опц.)" value={r.max_qty ?? ''} onChange={(e)=> onChangeRule(idx, { max_qty: e.target.value === '' ? undefined : Number(e.target.value) })} />
               <input className="form-input" type="number" step="0.01" placeholder="Цена за ед. (опц.)" value={r.unit_price ?? ''} onChange={(e)=> onChangeRule(idx, { unit_price: e.target.value === '' ? undefined : Number(e.target.value) })} />
               <input className="form-input" type="number" step="0.1" placeholder="Скидка % (опц.)" value={r.discount_percent ?? ''} onChange={(e)=> onChangeRule(idx, { discount_percent: e.target.value === '' ? undefined : Number(e.target.value) })} />
-              <button className="btn-quick-action" onClick={()=> onRemoveRule(idx)}>Удалить</button>
+              <button className="btn-quick-action" onClick={()=>onRemoveRule(idx)}>Удалить</button>
             </div>
           </div>
         ))}

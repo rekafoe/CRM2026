@@ -8,7 +8,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const { DB_PATH } = require('./db-config');
 
-console.log(`📂 Используем БД: ${DB_PATH}\n`);
+console.log(`Используем БД: ${DB_PATH}\n`);
 
 async function runQuery(db, sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -22,11 +22,11 @@ async function runQuery(db, sql, params = []) {
 async function seedProducts() {
   const db = new sqlite3.Database(DB_PATH);
   
-  console.log('🚀 Начинаем создание шаблонов продуктов...\n');
+  console.log('Начинаем создание шаблонов продуктов...\n');
   
   try {
     // Создаем таблицы, если их нет
-    console.log('🔧 Проверка и создание таблиц...');
+    console.log('Проверка и создание таблиц...');
     
     await runQuery(db, `
       CREATE TABLE IF NOT EXISTS product_categories (
@@ -78,25 +78,25 @@ async function seedProducts() {
       )
     `);
     
-    console.log('✅ Таблицы готовы\n');
+    console.log('Таблицы готовы\n');
     
     // Создаем категорию
-    console.log('📁 Создание категории...');
+    console.log('Создание категории...');
     const categoryId = await runQuery(db, `
       INSERT OR IGNORE INTO product_categories (name, icon, description, sort_order, is_active)
       VALUES (?, ?, ?, ?, ?)
-    `, ['Печатная продукция', '🖨️', 'Листовки, визитки, документы', 1, 1]);
+    `, ['Печатная продукция', '', 'Листовки, визитки, документы', 1, 1]);
     
-    console.log(`✅ Категория создана (ID: ${categoryId || 1})\n`);
+    console.log(`Категория создана (ID: ${categoryId || 1})\n`);
     
     // =============================================
     // 1. ЛИСТОВКИ
     // =============================================
-    console.log('📄 Создание продукта: Листовки...');
+    console.log('Создание продукта: Листовки...');
     const flyersId = await runQuery(db, `
       INSERT INTO products (name, description, category_id, icon, calculator_type, product_type, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, ['Листовки', 'Цветные листовки различных форматов', categoryId || 1, '📄', 'product', 'sheet_single', 1]);
+    `, ['Листовки', 'Цветные листовки различных форматов', categoryId || 1, '', 'product', 'sheet_single', 1]);
     
     const flyersParams = [
       { name: 'format', label: 'Формат', type: 'select', options: ['A6', 'A5', 'A4', 'A3'], required: 1, sort: 1 },
@@ -115,16 +115,16 @@ async function seedProducts() {
       `, [flyersId, param.name, param.label, param.type, param.options ? JSON.stringify(param.options) : null, 
           param.min || null, param.max || null, param.required, param.sort]);
     }
-    console.log(`✅ Листовки созданы (ID: ${flyersId}, параметров: ${flyersParams.length})\n`);
+    console.log(`Листовки созданы (ID: ${flyersId}, параметров: ${flyersParams.length})\n`);
     
     // =============================================
     // 2. ВИЗИТКИ
     // =============================================
-    console.log('💳 Создание продукта: Визитки...');
+    console.log('Создание продукта: Визитки...');
     const cardsId = await runQuery(db, `
       INSERT INTO products (name, description, category_id, icon, calculator_type, product_type, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, ['Визитки', 'Визитные карточки различных типов', categoryId || 1, '💳', 'product', 'sheet_item', 1]);
+    `, ['Визитки', 'Визитные карточки различных типов', categoryId || 1, '', 'product', 'sheet_item', 1]);
     
     const cardsParams = [
       { name: 'card_type', label: 'Тип визитки', type: 'select', options: ['Стандартные', 'Ламинированные', 'Черно-белые', 'Магнитные', 'На пластике'], required: 1, sort: 1 },
@@ -148,16 +148,16 @@ async function seedProducts() {
       `, [cardsId, param.name, param.label, param.type, param.options ? JSON.stringify(param.options) : null,
           param.min || null, param.max || null, param.required, param.sort]);
     }
-    console.log(`✅ Визитки созданы (ID: ${cardsId}, параметров: ${cardsParams.length})\n`);
+    console.log(`Визитки созданы (ID: ${cardsId}, параметров: ${cardsParams.length})\n`);
     
     // =============================================
     // 3. ПЕЧАТЬ ДОКУМЕНТОВ
     // =============================================
-    console.log('📚 Создание продукта: Печать документов...');
+    console.log('Создание продукта: Печать документов...');
     const docsId = await runQuery(db, `
       INSERT INTO products (name, description, category_id, icon, calculator_type, product_type, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, ['Печать и переплет документов', 'Печать многостраничных документов с переплетом', categoryId || 1, '📚', 'product', 'multi_page', 1]);
+    `, ['Печать и переплет документов', 'Печать многостраничных документов с переплетом', categoryId || 1, '', 'product', 'multi_page', 1]);
     
     const docsParams = [
       { name: 'pages', label: 'Количество страниц в файле', type: 'number', min: 1, max: 1000, required: 1, sort: 1 },
@@ -180,16 +180,16 @@ async function seedProducts() {
       `, [docsId, param.name, param.label, param.type, param.options ? JSON.stringify(param.options) : null,
           param.min || null, param.max || null, param.required, param.sort]);
     }
-    console.log(`✅ Печать документов создана (ID: ${docsId}, параметров: ${docsParams.length})\n`);
+    console.log(`Печать документов создана (ID: ${docsId}, параметров: ${docsParams.length})\n`);
     
     // =============================================
     // 4. БРОШЮРЫ
     // =============================================
-    console.log('📖 Создание продукта: Брошюры...');
+    console.log('Создание продукта: Брошюры...');
     const brochuresId = await runQuery(db, `
       INSERT INTO products (name, description, category_id, icon, calculator_type, product_type, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, ['Брошюры', 'Цветные брошюры с различными вариантами переплета', categoryId || 1, '📖', 'product', 'multi_page_item', 1]);
+    `, ['Брошюры', 'Цветные брошюры с различными вариантами переплета', categoryId || 1, '', 'product', 'multi_page_item', 1]);
     
     const brochuresParams = [
       { name: 'pages', label: 'Количество страниц', type: 'number', min: 4, max: 500, required: 1, sort: 1 },
@@ -210,22 +210,22 @@ async function seedProducts() {
       `, [brochuresId, param.name, param.label, param.type, param.options ? JSON.stringify(param.options) : null,
           param.min || null, param.max || null, param.required, param.sort]);
     }
-    console.log(`✅ Брошюры созданы (ID: ${brochuresId}, параметров: ${brochuresParams.length})\n`);
+    console.log(`Брошюры созданы (ID: ${brochuresId}, параметров: ${brochuresParams.length})\n`);
     
     // Итоговая статистика
     console.log('=' .repeat(50));
-    console.log('✅ ВСЕ ШАБЛОНЫ ПРОДУКТОВ СОЗДАНЫ УСПЕШНО!');
+    console.log('ВСЕ ШАБЛОНЫ ПРОДУКТОВ СОЗДАНЫ УСПЕШНО!');
     console.log('=' .repeat(50));
     console.log(`
-📊 Создано продуктов: 4
+ Создано продуктов: 4
   - Листовки (ID: ${flyersId})
   - Визитки (ID: ${cardsId})
   - Печать документов (ID: ${docsId})
   - Брошюры (ID: ${brochuresId})
 
-📋 Всего параметров: ${flyersParams.length + cardsParams.length + docsParams.length + brochuresParams.length}
+ Всего параметров: ${flyersParams.length + cardsParams.length + docsParams.length + brochuresParams.length}
 
-🎯 Следующие шаги:
+ Следующие шаги:
   1. Связать продукты с материалами (product_materials)
   2. Добавить операции к продуктам (product_operations_link)
   3. Настроить ценообразование (price_rules)
@@ -233,7 +233,7 @@ async function seedProducts() {
     `);
     
   } catch (error) {
-    console.error('❌ Ошибка при создании продуктов:', error);
+    console.error('Ошибка при создании продуктов:', error);
     throw error;
   } finally {
     db.close();
@@ -244,11 +244,11 @@ async function seedProducts() {
 if (require.main === module) {
   seedProducts()
     .then(() => {
-      console.log('\n🎉 Готово! Можно тестировать калькулятор!');
+      console.log('\n Готово! Можно тестировать калькулятор!');
       process.exit(0);
     })
     .catch(err => {
-      console.error('\n💥 Ошибка:', err);
+      console.error('\n Ошибка:', err);
       process.exit(1);
     });
 }

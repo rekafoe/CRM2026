@@ -1,4 +1,4 @@
-// ⚠️ DEPRECATED: Этот хук НЕ используется в новом калькуляторе (ImprovedPrintingCalculatorModal)
+//  DEPRECATED: Этот хук НЕ используется в новом калькуляторе (ImprovedPrintingCalculatorModal)
 // Используется только useCalculatorPricingActions
 // TODO: Удалить этот файл после проверки, что он нигде не импортируется
 
@@ -102,12 +102,12 @@ export function useCalculatorPricing({ specs, backendProductSchema, currentConfi
       const materials = backendMaterials.map(m => ({ material: m.name, quantity: m.quantity, unit: m.unit || 'шт', price: m.rate, total: m.total }));
       const services = backendServices.map(s => ({ service: s.name, price: s.rate, total: s.total }));
 
-      // ❌ УБРАН ФОЛЛБЭК: Если бэкенд не вернул материалы - это ОШИБКА настройки продукта
+      //  УБРАН ФОЛЛБЭК: Если бэкенд не вернул материалы - это ОШИБКА настройки продукта
       if (materials.length === 0) {
         throw new Error('Бэкенд не вернул материалы. Проверьте настройку продукта в админке: убедитесь, что добавлены материалы и операции.');
       }
 
-      // ✅ Используем ТОЛЬКО цену от бэкенда, без корректировок на фронтенде
+      //  Используем ТОЛЬКО цену от бэкенда, без корректировок на фронтенде
       const backendTotal = (data.breakdown?.total ?? data.final ?? 0) as number;
       
       if (backendTotal <= 0) {
@@ -116,7 +116,7 @@ export function useCalculatorPricing({ specs, backendProductSchema, currentConfi
 
       const adjustedTotal = backendTotal;
 
-      // ✅ Проверяем, что бэкенд вернул цену за единицу
+      //  Проверяем, что бэкенд вернул цену за единицу
       if (typeof data.finalPrice !== 'number') {
         throw new Error('Бэкенд не вернул цену за единицу (finalPrice)');
       }
@@ -127,7 +127,7 @@ export function useCalculatorPricing({ specs, backendProductSchema, currentConfi
         materials,
         services,
         totalCost: adjustedTotal,
-        pricePerItem: data.finalPrice, // ✅ ТОЛЬКО от бэкенда, без фоллбэков
+        pricePerItem: data.finalPrice, //  ТОЛЬКО от бэкенда, без фоллбэков
         productionTime: getProductionTime()
       };
       setResult(calculation);

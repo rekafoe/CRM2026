@@ -56,7 +56,7 @@ export const DetailSection: React.FC<DetailSectionProps> = ({
             <div className="empty-state--error">
               <p>Заказ с ID {selectedId} не найден в списке</p>
               <p>Всего заказов: {orders.length}</p>
-              <button onClick={() => onSetSelectedId(null)}>
+              <button onClick={() =>onSetSelectedId(null)}>
                 Сбросить выбор
               </button>
             </div>

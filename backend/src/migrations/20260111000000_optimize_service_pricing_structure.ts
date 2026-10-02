@@ -15,7 +15,7 @@
 import { Database } from 'sqlite';
 
 export async function up(db: Database): Promise<void> {
-  console.log('🔄 Optimizing service pricing structure...');
+  console.log('Optimizing service pricing structure...');
   
   await db.exec('PRAGMA foreign_keys = OFF;');
   
@@ -67,7 +67,7 @@ export async function up(db: Database): Promise<void> {
     `);
     
     // 4. Переносим данные из service_volume_prices
-    console.log('📦 Migrating data from service_volume_prices...');
+    console.log('Migrating data from service_volume_prices...');
     
     // 4.1. Извлекаем уникальные границы диапазонов по сервисам
     const services = await db.all(`
@@ -111,7 +111,7 @@ export async function up(db: Database): Promise<void> {
       WHERE svp.variant_id IS NOT NULL
     `);
     
-    console.log(`📊 Migrating ${allPrices.length} price records...`);
+    console.log(`Migrating ${allPrices.length} price records...`);
     
     for (const price of allPrices) {
       // Находим соответствующий range_id
@@ -135,9 +135,9 @@ export async function up(db: Database): Promise<void> {
       }
     }
     
-    console.log('✅ Service pricing structure optimized successfully');
-    console.log(`📈 Created ${await db.get('SELECT COUNT(*) as count FROM service_range_boundaries')} range boundaries`);
-    console.log(`📈 Created ${await db.get('SELECT COUNT(*) as count FROM service_variant_prices')} variant prices`);
+    console.log('Service pricing structure optimized successfully');
+    console.log(`Created ${await db.get('SELECT COUNT(*) as count FROM service_range_boundaries')} range boundaries`);
+    console.log(`Created ${await db.get('SELECT COUNT(*) as count FROM service_variant_prices')} variant prices`);
     
   } finally {
     await db.exec('PRAGMA foreign_keys = ON;');
@@ -145,7 +145,7 @@ export async function up(db: Database): Promise<void> {
 }
 
 export async function down(db: Database): Promise<void> {
-  console.log('🔄 Rolling back service pricing structure optimization...');
+  console.log('Rolling back service pricing structure optimization...');
   
   await db.exec('PRAGMA foreign_keys = OFF;');
   
@@ -154,7 +154,7 @@ export async function down(db: Database): Promise<void> {
     await db.exec('DROP TABLE IF EXISTS service_variant_prices');
     await db.exec('DROP TABLE IF EXISTS service_range_boundaries');
     
-    console.log('✅ Rollback completed');
+    console.log('Rollback completed');
   } finally {
     await db.exec('PRAGMA foreign_keys = ON;');
   }

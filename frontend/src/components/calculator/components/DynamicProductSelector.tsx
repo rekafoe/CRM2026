@@ -256,7 +256,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                 <button
                   key={category.id}
                   className={`category-button ${selectedCategoryId === category.id ? 'active' : ''}`}
-                  onClick={() => handleCategorySelect(category.id)}
+                  onClick={() =>handleCategorySelect(category.id)}
                   disabled={loadingCategories}
                 >
                   <span className="category-icon"><AppIcon name={getCategoryIconName(category)} size="sm" /></span>
@@ -322,7 +322,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                 <>
                   <div
                     className={`product-card custom-product-card ${isProductSelected(postprintProduct) ? 'selected' : ''}`}
-                    onClick={() => handleProductSelect(postprintProduct)}
+                    onClick={() =>handleProductSelect(postprintProduct)}
                   >
                     <div className="product-icon">{renderProductIcon(postprintProduct)}</div>
                     <div className="product-info">
@@ -342,7 +342,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                   </div>
                   <div
                     className={`product-card custom-product-card ${isProductSelected(customProduct) ? 'selected' : ''}`}
-                    onClick={() => handleProductSelect(customProduct)}
+                    onClick={() =>handleProductSelect(customProduct)}
                   >
                     <div className="product-icon">{renderProductIcon(customProduct)}</div>
                     <div className="product-info">
@@ -366,7 +366,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                 <div
                   key={product.id}
                   className={`product-card ${isProductSelected(product) ? 'selected' : ''}`}
-                  onClick={() => handleProductSelect(product)}
+                  onClick={() =>handleProductSelect(product)}
                 >
                   <div className="product-icon">
                     {renderProductIcon(product)}

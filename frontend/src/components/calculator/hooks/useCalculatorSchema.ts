@@ -3,7 +3,7 @@ import { getEnhancedProductTypes, getEnhancedProductSchema, getProductSchemaById
 
 interface UseCalculatorSchemaParams {
   productType: string;
-  productId?: number | null; // 🆕 Добавляем productId
+  productId?: number | null; //  Добавляем productId
   log: { info: Function; warn: Function; error?: Function };
   setSpecs: (updater: (prev: any) => any) => void;
 }
@@ -28,9 +28,9 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
         if (cancelled) return;
         const list = Array.isArray(resp?.data?.data) ? resp.data.data : (resp.data || []);
         setBackendProductTypes(list);
-        log.info('✅ Список типов продуктов загружен', { count: list.length });
+        log.info('Список типов продуктов загружен', { count: list.length });
       } catch (e) {
-        if (!cancelled) log.warn('⚠️ Не удалось загрузить список типов продуктов');
+        if (!cancelled) log.warn('Не удалось загрузить список типов продуктов');
       }
     })();
     return () => { cancelled = true; };
@@ -40,11 +40,11 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
   useEffect(() => {
     mountedRef.current = true;
     
-    // 🎯 Приоритет: сначала загружаем по productId, если он есть
+    //  Приоритет: сначала загружаем по productId, если он есть
     const key = productId ? `product_${productId}` : productType;
     
-    // 🆕 Явное логирование для диагностики
-    console.log('🔍 [useCalculatorSchema] useEffect вызван', {
+    //  Явное логирование для диагностики
+    console.log('[useCalculatorSchema] useEffect вызван', {
       productId,
       productType,
       key,
@@ -52,7 +52,7 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
     });
     
     if (!key) {
-      log.warn('⚠️ Нет productId и productType, схема не будет загружена');
+      log.warn('Нет productId и productType, схема не будет загружена');
       return;
     }
     
@@ -60,8 +60,8 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
     const cached = globalSchemaCache.get(key);
     const now = Date.now();
     if (cached && (now - cached.timestamp) < SCHEMA_CACHE_TTL) {
-      // 🆕 Логируем использование кэша
-      console.log('🔍 [useCalculatorSchema] Используем кэшированную схему', {
+      //  Логируем использование кэша
+      console.log('[useCalculatorSchema] Используем кэшированную схему', {
         key,
         cachedOperations: cached.schema?.operations?.length || 0
       });
@@ -91,24 +91,24 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
         let resp;
         let schema;
         
-        // 🆕 Если есть productId, загружаем схему по ID продукта (из параметров)
+        //  Если есть productId, загружаем схему по ID продукта (из параметров)
         if (productId) {
-          console.log('🔍 [useCalculatorSchema] Загружаем схему по ID продукта', { productId, productType });
-          log.info('📦 Загружаем схему по ID продукта', { productId, productType });
+          console.log('[useCalculatorSchema] Загружаем схему по ID продукта', { productId, productType });
+          log.info('Загружаем схему по ID продукта', { productId, productType });
           resp = await getProductSchemaById(productId);
           schema = resp?.data?.data || resp?.data;
-          console.log('🔍 [useCalculatorSchema] Схема загружена по ID', {
+          console.log('[useCalculatorSchema] Схема загружена по ID', {
             productId,
             hasSchema: !!schema,
             operationsCount: schema?.operations?.length || 0
           });
         } else {
           // Иначе загружаем старую схему по типу продукта
-          console.log('🔍 [useCalculatorSchema] Загружаем схему по типу продукта (фоллбек)', { productType, productId });
-          log.info('📋 Загружаем схему по типу продукта (БЕЗ constraints!)', { productType, productId });
+          console.log('[useCalculatorSchema] Загружаем схему по типу продукта (фоллбек)', { productType, productId });
+          log.info('Загружаем схему по типу продукта (БЕЗ constraints!)', { productType, productId });
           resp = await getEnhancedProductSchema(productType);
           schema = resp?.data?.data || resp?.data;
-          console.log('🔍 [useCalculatorSchema] Схема загружена по типу', {
+          console.log('[useCalculatorSchema] Схема загружена по типу', {
             productType,
             hasSchema: !!schema,
             operationsCount: schema?.operations?.length || 0
@@ -121,7 +121,7 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
         globalSchemaCache.set(key, { schema: schema || null, timestamp: Date.now() });
         
         setBackendProductSchema(schema || null);
-        log.info('✅ Схема продукта загружена', { 
+        log.info('Схема продукта загружена', { 
           key, 
           productId, 
           productType,
@@ -137,7 +137,7 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
               const hasValue = prev[f.name] !== undefined && prev[f.name] !== null;
               if (hasValue) continue;
               
-              // 🔧 Обрабатываем разные типы значений по умолчанию
+              //  Обрабатываем разные типы значений по умолчанию
               if (Array.isArray(f.enum) && f.enum.length > 0) {
                 // Для enum берем первое значение или value из объекта
                 const firstOption = f.enum[0];
@@ -161,7 +161,7 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
         // Сохраняем null в кэш на 1 минуту, чтобы не спамить
         globalSchemaCache.set(key, { schema: null, timestamp: Date.now() });
         
-        log.warn('⚠️ Не удалось загрузить схему продукта (запросы временно остановлены)', {
+        log.warn('Не удалось загрузить схему продукта (запросы временно остановлены)', {
           key,
           productId,
           productType,

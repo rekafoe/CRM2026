@@ -12,7 +12,7 @@ export class NotificationController {
   static async sendTestNotification(req: Request, res: Response) {
     try {
       const { message } = req.body;
-      const testMessage = message || '🧪 *Тестовое сообщение*\n\nСистема уведомлений работает корректно!';
+      const testMessage = message || '*Тестовое сообщение*\n\nСистема уведомлений работает корректно!';
       
       const result = await TelegramService.sendToAllUsers(testMessage);
       

@@ -256,7 +256,7 @@ export class MaterialReservationService {
     try {
       await this.db.run(historySql, [id, changedBy, reason || 'Manual cancellation']);
     } catch (err) {
-      console.error('❌ [MaterialReservationService] logCancellation error:', err);
+      console.error('[MaterialReservationService] logCancellation error:', err);
     }
   }
 
@@ -300,7 +300,7 @@ export class MaterialReservationService {
     try {
       await this.db.run(historySql, [id, changedBy]);
     } catch (err) {
-      console.error('❌ [MaterialReservationService] logFulfillment error:', err);
+      console.error('[MaterialReservationService] logFulfillment error:', err);
     }
   }
 
@@ -367,7 +367,7 @@ export class MaterialReservationService {
 
     const result = await this.db.run(sql);
     const expiredCount = result.changes || 0;
-    console.log(`🧹 [MaterialReservationService] Cleaned up ${expiredCount} expired reservations`);
+    console.log(`[MaterialReservationService] Cleaned up ${expiredCount} expired reservations`);
     return expiredCount;
   }
 }

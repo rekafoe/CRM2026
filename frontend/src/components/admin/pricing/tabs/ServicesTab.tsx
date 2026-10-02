@@ -63,7 +63,7 @@ const ServicesTabComponent: React.FC<ServicesTabProps> = ({
 
       {filteredItems.length === 0 ? (
         <EmptyState
-          icon="🔧"
+          icon=""
           title="Нет дополнительных услуг"
           description="Добавьте услуги для различных операций"
         />

@@ -7,7 +7,7 @@ export async function up(db?: Database): Promise<void> {
   // ОТКЛЮЧЕНО: Эта миграция запускалась каждый раз и удаляла данные!
   // Теперь таблицы создаются в initial_schema и enable_flexible_pricing_system
   
-  console.log('⏭️ Skipping remove_legacy_pricing_tables - migration already applied or not needed');
+  console.log('Skipping remove_legacy_pricing_tables - migration already applied or not needed');
   
   // Удаляем только реально устаревшие таблицы, которых точно нет в production
   // await database.exec('DROP TABLE IF EXISTS print_prices');

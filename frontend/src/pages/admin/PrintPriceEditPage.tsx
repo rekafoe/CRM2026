@@ -1001,7 +1001,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                 <div className="cell">
                                   <span
                                     className="simplified-table__range-cell--clickable"
-                                    onClick={(e) => {
+                                    onClick={(e) =>{
                                       setTierModal({
                                         type: 'edit',
                                         tierIndex: ti,
@@ -1017,7 +1017,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                     <button
                                       type="button"
                                       className="simplified-table__remove-range"
-                                      onClick={(e) => {
+                                      onClick={(e) =>{
                                         e.stopPropagation();
                                         updateAllModesRanges(removeRange(commonRanges, ti));
                                       }}
@@ -1165,16 +1165,16 @@ export const PrintPriceEditPage: React.FC = () => {
                       <div
                         ref={tierModalFloatingRef(tierModalRef, tierRangeFloating.setFloating, Boolean(tierModal.anchorElement))}
                         className="simplified-tier-modal pricing-glass"
-                        onMouseDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) =>e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
+                        <div className="simplified-tier-modal__content" onClick={(e) =>e.stopPropagation()}>
                           <div className="simplified-tier-modal__header">
                             <strong>{tierModal.type === 'add' ? 'Добавить диапазон' : 'Редактировать диапазон'}</strong>
                             <button
                               type="button"
                               className="simplified-tier-modal__close"
-                              onClick={(e) => {
+                              onClick={(e) =>{
                                 e.stopPropagation();
                                 setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined, anchorElement: undefined });
                               }}
@@ -1198,7 +1198,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                 onFocus={(e) => e.stopPropagation()}
                               />
                             </FormField>
-                            <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
+                            <div className="simplified-tier-modal__actions" onClick={(e) =>e.stopPropagation()}>
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -1269,7 +1269,7 @@ export const PrintPriceEditPage: React.FC = () => {
                         key={layer}
                         type="button"
                         className={`print-price-m2-layer-tab ${m2LayerTab === layer ? 'print-price-m2-layer-tab--active' : ''}`}
-                        onClick={() => setM2LayerTab(layer)}
+                        onClick={() =>setM2LayerTab(layer)}
                       >
                         {M2_LAYER_LABELS[layer]}
                         {' '}
@@ -1391,7 +1391,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                   <div className="cell">
                                     <span
                                       className="simplified-table__range-cell--clickable"
-                                      onClick={(e) => {
+                                      onClick={(e) =>{
                                         setRollTierModal({
                                           type: 'edit',
                                           tierIndex,
@@ -1407,7 +1407,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                       <button
                                         type="button"
                                         className="simplified-table__remove-range"
-                                        onClick={(e) => {
+                                        onClick={(e) =>{
                                           e.stopPropagation();
                                           updateRollM2Ranges(removeRollM2Range(rollRanges, tierIndex));
                                         }}
@@ -1487,16 +1487,16 @@ export const PrintPriceEditPage: React.FC = () => {
                         Boolean(rollTierModal.anchorElement),
                       )}
                       className="simplified-tier-modal pricing-glass"
-                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) =>e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
+                      <div className="simplified-tier-modal__content" onClick={(e) =>e.stopPropagation()}>
                         <div className="simplified-tier-modal__header">
                           <strong>{rollTierModal.type === 'add' ? 'Добавить диапазон m²' : 'Редактировать диапазон m²'}</strong>
                           <button
                             type="button"
                             className="simplified-tier-modal__close"
-                            onClick={(e) => {
+                            onClick={(e) =>{
                               e.stopPropagation();
                               setRollTierModal({
                                 type: 'add',
@@ -1526,7 +1526,7 @@ export const PrintPriceEditPage: React.FC = () => {
                               onFocus={(e) => e.stopPropagation()}
                             />
                           </FormField>
-                          <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
+                          <div className="simplified-tier-modal__actions" onClick={(e) =>e.stopPropagation()}>
                             <Button
                               variant="secondary"
                               size="sm"

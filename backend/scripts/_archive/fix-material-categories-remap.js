@@ -13,7 +13,7 @@ async function run() {
   const all = (sql) => new Promise((res, rej) => db.all(sql, (e, r) => e ? rej(e) : res(r)));
 
   try {
-    console.log('🔧 Rebuilding material_categories with PK and remapping materials...');
+    console.log('Rebuilding material_categories with PK and remapping materials...');
 
     await exec('PRAGMA foreign_keys=OFF; BEGIN;');
 
@@ -86,9 +86,9 @@ async function run() {
     const countCat = await all('SELECT COUNT(*) as c FROM material_categories');
     console.log('Categories count:', countCat[0].c);
 
-    console.log('✅ material_categories rebuilt and materials remapped.');
+    console.log('material_categories rebuilt and materials remapped.');
   } catch (e) {
-    console.error('❌ Failed to rebuild material_categories:', e);
+    console.error('Failed to rebuild material_categories:', e);
     try { await exec('ROLLBACK; PRAGMA foreign_keys=ON;'); } catch {}
     process.exit(1);
   } finally {

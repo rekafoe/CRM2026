@@ -103,7 +103,7 @@ export const SpecificationsForm: React.FC<SpecificationsFormProps> = ({
               onChange={(e) => handleCustomFormatChange('height', e.target.value)}
               className={!formatValidation.isValid ? 'error' : ''}
             />
-            <button onClick={() => onCustomFormatToggle(false)}>Отмена</button>
+            <button onClick={() =>onCustomFormatToggle(false)}>Отмена</button>
           </div>
         )}
         {validationErrors.format && (

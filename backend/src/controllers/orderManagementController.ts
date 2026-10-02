@@ -15,7 +15,7 @@ export class OrderManagementController {
         data: pool
       });
     } catch (error) {
-      console.error('❌ Error getting order pool:', error);
+      console.error('Error getting order pool:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при получении пула заказов'
@@ -57,7 +57,7 @@ export class OrderManagementController {
         });
       }
     } catch (error: any) {
-      console.error('❌ Error assigning order:', error);
+      console.error('Error assigning order:', error);
       res.status(500).json({
         success: false,
         message: error.message || 'Ошибка при назначении заказа'
@@ -93,7 +93,7 @@ export class OrderManagementController {
         });
       }
     } catch (error) {
-      console.error('❌ Error completing order:', error);
+      console.error('Error completing order:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при завершении заказа'
@@ -127,7 +127,7 @@ export class OrderManagementController {
         data: order
       });
     } catch (error) {
-      console.error('❌ Error searching order:', error);
+      console.error('Error searching order:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при поиске заказа'
@@ -163,7 +163,7 @@ export class OrderManagementController {
         message: 'Заказ выдан и закрыт'
       });
     } catch (error) {
-      console.error('❌ Error issuing order:', error);
+      console.error('Error issuing order:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при выдаче заказа'
@@ -202,7 +202,7 @@ export class OrderManagementController {
         data: order
       });
     } catch (error) {
-      console.error('❌ Error getting order details:', error);
+      console.error('Error getting order details:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при получении деталей заказа'
@@ -251,7 +251,7 @@ export class OrderManagementController {
         }
       });
     } catch (error) {
-      console.error('❌ Error getting user order page:', error);
+      console.error('Error getting user order page:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при получении страницы заказов пользователя'
@@ -273,7 +273,7 @@ export class OrderManagementController {
         data: pages
       });
     } catch (error) {
-      console.error('❌ Error getting all order pages:', error);
+      console.error('Error getting all order pages:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при получении страниц заказов'
@@ -302,7 +302,7 @@ export class OrderManagementController {
         data: page
       });
     } catch (error) {
-      console.error('❌ Error creating user order page:', error);
+      console.error('Error creating user order page:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при создании страницы заказов'

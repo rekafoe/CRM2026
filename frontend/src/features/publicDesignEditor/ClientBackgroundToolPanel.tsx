@@ -35,7 +35,7 @@ export const ClientBackgroundToolPanel: React.FC<ClientBackgroundToolPanelProps>
           key={color.id}
           type="button"
           className={`public-design-editor__client-color public-design-editor__client-color--${color.id}`}
-          onClick={() => onSetBackground(CLIENT_BACKGROUND_COLOR_VALUES[color.id])}
+          onClick={() =>onSetBackground(CLIENT_BACKGROUND_COLOR_VALUES[color.id])}
           aria-label={`Фон: ${color.label}`}
         />
       ))}

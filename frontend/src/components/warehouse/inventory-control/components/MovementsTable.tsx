@@ -33,21 +33,21 @@ export const MovementsTable: React.FC<MovementsTableProps> = React.memo(({
                 <div className="inv-actions">
                   <button 
                     className="action-btn small"
-                    onClick={() => onMaterialAction(material, 'in')}
+                    onClick={() =>onMaterialAction(material, 'in')}
                   >
-                    📥
+                    
                   </button>
                   <button 
                     className="action-btn small"
-                    onClick={() => onMaterialAction(material, 'out')}
+                    onClick={() =>onMaterialAction(material, 'out')}
                   >
-                    📤
+                    
                   </button>
                   <button 
                     className="action-btn small"
-                    onClick={() => onMaterialAction(material, 'adjustment')}
+                    onClick={() =>onMaterialAction(material, 'adjustment')}
                   >
-                    🔧
+                    
                   </button>
                 </div>
               </td>

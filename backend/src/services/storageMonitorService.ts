@@ -47,7 +47,7 @@ export async function checkStorageAndNotify(): Promise<void> {
     if (shouldNotify && TelegramService.isEnabled()) {
       const message = `Заполнено ${usedPercent}% хранилища (порог: ${THRESHOLD_PERCENT}%)\n\nПуть: ${checkPath}\n\nРекомендуется освободить место.`
       const sent = await TelegramService.sendNotification(
-        '⚠️ Хранилище почти заполнено',
+        'Хранилище почти заполнено',
         message,
         'high'
       )

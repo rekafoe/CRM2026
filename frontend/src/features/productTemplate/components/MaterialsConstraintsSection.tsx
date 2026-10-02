@@ -34,7 +34,7 @@ const MaterialsConstraintsSection: React.FC<{
           <input className="form-input" value={finishesCsv} onChange={(e)=> onChange({ finishesCsv: e.target.value })} placeholder="финиш1,финиш2" />
         </div>
         <div>
-          <button className="btn-primary" disabled={saving} onClick={()=> onSave()}>Сохранить ограничения</button>
+          <button className="btn-primary" disabled={saving} onClick={()=>onSave()}>Сохранить ограничения</button>
         </div>
       </div>
     </div>

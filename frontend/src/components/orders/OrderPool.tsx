@@ -151,19 +151,19 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
 
   const getOrderTypeLabel = (type: string) => {
     switch (type) {
-      case 'telegram': return '📱 Telegram';
-      case 'website': return '🌐 Сайт';
-      case 'manual': return '✋ Ручной';
+      case 'telegram': return 'Telegram';
+      case 'website': return 'Сайт';
+      case 'manual': return 'Ручной';
       default: return type;
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending': return '⏳ Ожидает';
-      case 'in_progress': return '🔄 В работе';
-      case 'completed': return '✅ Завершен';
-      case 'cancelled': return '❌ Отменен';
+      case 'pending': return 'Ожидает';
+      case 'in_progress': return 'В работе';
+      case 'completed': return 'Завершен';
+      case 'cancelled': return 'Отменен';
       default: return status;
     }
   };
@@ -196,7 +196,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
         <div className="flex items-center">
-          <div className="text-red-600 mr-3">❌</div>
+          <div className="text-red-600 mr-3"></div>
           <div>
             <h3 className="text-red-800 font-medium">Ошибка</h3>
             <p className="text-red-600 text-sm">{error}</p>
@@ -220,7 +220,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
           onClick={loadOrderPool}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          🔄 Обновить
+           Обновить
         </button>
       </div>
 
@@ -252,7 +252,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
             disabled={searching}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {searching ? '⏳ Поиск...' : '🔍 Найти'}
+            {searching ? 'Поиск...' : 'Найти'}
           </button>
         </div>
         {searchError && (
@@ -305,18 +305,18 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
               </div>
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => issueOrder(searchResult)}
+                  onClick={() =>issueOrder(searchResult)}
                   disabled={issuingOrder || isOrderIssued(searchResult)}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isOrderIssued(searchResult)
-                    ? '✅ Заказ уже выдан'
+                    ? 'Заказ уже выдан'
                     : issuingOrder
-                      ? '⏳ Обработка...'
+                      ? 'Обработка...'
                       : searchResult.type !== 'telegram' &&
                         (searchResult.totalAmount || 0) > (searchResult.prepaymentAmount || 0)
-                          ? '💰 Закрыть долг и выдать'
-                          : '✅ Выдать заказ'}
+                          ? 'Закрыть долг и выдать'
+                          : 'Выдать заказ'}
                 </button>
               </div>
             </div>
@@ -371,11 +371,11 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                     </div>
                     <div className="ml-4">
                       <button
-                        onClick={() => assignOrder(order.id, order.type)}
+                        onClick={() =>assignOrder(order.id, order.type)}
                         disabled={assigningOrder === order.id}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        {assigningOrder === order.id ? '⏳' : '📋'} Взять в работу
+                        {assigningOrder === order.id ? 'Берём…' : 'Взять в работу'}
                       </button>
                     </div>
                   </div>

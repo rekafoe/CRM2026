@@ -18,7 +18,7 @@ export const CalculationHistoryList: React.FC<Props> = ({ items, onApply }) => {
 
   return (
     <div className="form-section compact">
-      <h3>🕘 Недавние расчёты</h3>
+      <h3>Недавние расчёты</h3>
       <div className="history-list">
         {items.slice(0, 5).map((item, idx) => (
           <div key={idx} className="history-row">
@@ -29,7 +29,7 @@ export const CalculationHistoryList: React.FC<Props> = ({ items, onApply }) => {
               </div>
             </div>
             <div className="history-actions">
-              <button className="btn btn-sm btn-outline" onClick={() => onApply(item.specifications)}>Применить</button>
+              <button className="btn btn-sm btn-outline" onClick={() =>onApply(item.specifications)}>Применить</button>
             </div>
           </div>
         ))}

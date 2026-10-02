@@ -183,7 +183,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
 
   return (
     <div className="pp-overlay" onClick={onClose}>
-      <div className="pp-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="pp-modal" onClick={(e) =>e.stopPropagation()}>
         <div className="pp-header">
           <h3 className="pp-title">
             <AppIcon name="card" size="sm" className="pp-title-icon" />
@@ -233,7 +233,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
                     key={p}
                     type="button"
                     className={`pp-quick-percent${percentNum === p ? ' pp-quick-percent--active' : ''}`}
-                    onClick={() => applyQuickPercent(p)}
+                    onClick={() =>applyQuickPercent(p)}
                   >
                     {p}%
                   </button>

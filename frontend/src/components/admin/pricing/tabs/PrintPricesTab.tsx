@@ -110,7 +110,7 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
 
       {filteredItems.length === 0 ? (
         <EmptyState
-          icon="📄"
+          icon=""
           title="Нет данных о ценах печати"
           description="Добавьте центральные ставки для технологий печати"
         />

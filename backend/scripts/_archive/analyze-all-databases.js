@@ -61,37 +61,37 @@ async function analyzeDB(dbPath) {
 }
 
 (async () => {
-  console.log('🔍 АНАЛИЗ ВСЕХ БД В ПРОЕКТЕ\n');
+  console.log('АНАЛИЗ ВСЕХ БД В ПРОЕКТЕ\n');
   console.log('='.repeat(70));
   
   for (const dbInfo of databases) {
     const analysis = await analyzeDB(dbInfo.path);
     
-    console.log(`\n📂 ${dbInfo.name}`);
+    console.log(`\n ${dbInfo.name}`);
     console.log(`   Путь: ${dbInfo.path}`);
     
     if (!analysis.exists) {
-      console.log('   ❌ НЕ СУЩЕСТВУЕТ');
+      console.log('   НЕ СУЩЕСТВУЕТ');
       continue;
     }
     
-    console.log(`   💾 Размер: ${analysis.size}`);
-    console.log(`   📅 Изменен: ${analysis.modified}`);
-    console.log('   📊 Данные:');
+    console.log(`   Размер: ${analysis.size}`);
+    console.log(`   Изменен: ${analysis.modified}`);
+    console.log('   Данные:');
     
     Object.entries(analysis.tables).forEach(([table, count]) => {
       if (count === 'НЕТ') {
-        console.log(`      ❌ ${table}: таблица отсутствует`);
+        console.log(`      ${table}: таблица отсутствует`);
       } else if (count === 0) {
-        console.log(`      ⚪ ${table}: 0 записей`);
+        console.log(`      ${table}: 0 записей`);
       } else {
-        console.log(`      ✅ ${table}: ${count} записей`);
+        console.log(`      ${table}: ${count} записей`);
       }
     });
   }
   
   console.log('\n' + '='.repeat(70));
-  console.log('💡 РЕКОМЕНДАЦИЯ:');
+  console.log('РЕКОМЕНДАЦИЯ:');
   console.log('='.repeat(70));
   console.log('\nОставьте ТОЛЬКО одну БД - backend/data.db (самая большая)');
   console.log('\nУдалите лишние:');

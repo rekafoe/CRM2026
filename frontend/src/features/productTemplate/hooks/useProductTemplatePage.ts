@@ -237,7 +237,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
             })
           }
 
-          // 🆕 Упрощённый калькулятор (конфиг по размерам)
+          //  Упрощённый калькулятор (конфиг по размерам)
           if (cfgData.simplified && typeof cfgData.simplified === 'object') {
             dispatch({ type: 'setSimplified', value: cfgData.simplified as any })
           } else {

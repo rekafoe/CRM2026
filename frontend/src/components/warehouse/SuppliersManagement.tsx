@@ -229,7 +229,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
             className="action-btn primary"
             onClick={handleAdd}
           >
-            ➕ Добавить поставщика
+             Добавить поставщика
           </button>
         </div>
       </div>
@@ -237,21 +237,21 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
       {/* Статистика */}
       <div className="suppliers-stats">
         <div className="stat-card">
-          <div className="stat-icon">🏭</div>
+          <div className="stat-icon"></div>
           <div className="stat-content">
             <div className="stat-value">{stats.total}</div>
             <div className="stat-label">Всего поставщиков</div>
           </div>
         </div>
         <div className="stat-card success">
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon"></div>
           <div className="stat-content">
             <div className="stat-value">{stats.active}</div>
             <div className="stat-label">Активных</div>
           </div>
         </div>
         <div className="stat-card warning">
-          <div className="stat-icon">⏸️</div>
+          <div className="stat-icon"></div>
           <div className="stat-content">
             <div className="stat-value">{stats.inactive}</div>
             <div className="stat-label">Неактивных</div>
@@ -270,7 +270,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
             />
-            <span className="search-icon">🔍</span>
+            <span className="search-icon"></span>
           </div>
         </div>
 
@@ -322,7 +322,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
           <div className="filter-group">
             <button 
               className="reset-filters-btn"
-              onClick={() => {
+              onClick={() =>{
                 setSearchQuery('');
                 setFilterActive('all');
                 setFilterRegion('all');
@@ -330,7 +330,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
               }}
               title="Сбросить все фильтры"
             >
-              🔄 Сбросить
+               Сбросить
             </button>
           </div>
         </div>
@@ -357,7 +357,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
             {filteredSuppliers.map(supplier => (
               <tr key={supplier.id} className={!supplier.is_active ? 'row-inactive' : ''}>
                 <td>{supplier.id}</td>
-                <td>{supplier.is_active ? '✅' : '⏸️'}</td>
+                <td>{supplier.is_active ? 'Да' : 'Нет'}</td>
                 <td style={{ textAlign: 'left' }}>{supplier.name}</td>
                 <td style={{ textAlign: 'left' }}>{supplier.contact || '—'}</td>
                 <td>{supplier.phone ? (<a href={`tel:${supplier.phone}`}>{supplier.phone}</a>) : '—'}</td>
@@ -370,7 +370,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
                     <button
                       type="button"
                       className="action-btn small"
-                      onClick={() => handleViewMaterials(supplier)}
+                      onClick={() =>handleViewMaterials(supplier)}
                       title="Материалы"
                     >
                       <AppIcon name="package" size="sm" />
@@ -378,7 +378,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
                     <button
                       type="button"
                       className="action-btn small"
-                      onClick={() => handleViewAnalytics(supplier)}
+                      onClick={() =>handleViewAnalytics(supplier)}
                       title="Аналитика"
                     >
                       <AppIcon name="chart-bar" size="sm" />
@@ -386,7 +386,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
                     <button
                       type="button"
                       className="action-btn small"
-                      onClick={() => handleEdit(supplier)}
+                      onClick={() =>handleEdit(supplier)}
                       title="Редактировать"
                     >
                       <AppIcon name="pencil" size="sm" />
@@ -394,7 +394,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
                     <button
                       type="button"
                       className="action-btn small"
-                      onClick={() => handleToggleActive(supplier)}
+                      onClick={() =>handleToggleActive(supplier)}
                       title={supplier.is_active ? 'Деактивировать' : 'Активировать'}
                     >
                       <AppIcon name={supplier.is_active ? 'ban' : 'check'} size="sm" />
@@ -402,7 +402,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
                     <button
                       type="button"
                       className="action-btn small danger"
-                      onClick={() => handleDelete(supplier)}
+                      onClick={() =>handleDelete(supplier)}
                       title="Удалить"
                     >
                       <AppIcon name="trash" size="sm" />
@@ -419,14 +419,14 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
       {filteredSuppliers.length === 0 && (
         <div className="suppliers-empty">
           <div className="empty-content">
-            <div className="empty-icon">🏭</div>
+            <div className="empty-icon"></div>
             <h3>Поставщики не найдены</h3>
             <p>Добавьте новых поставщиков или измените фильтры поиска</p>
             <button 
               className="action-btn primary"
               onClick={handleAdd}
             >
-              ➕ Добавить поставщика
+               Добавить поставщика
             </button>
           </div>
         </div>

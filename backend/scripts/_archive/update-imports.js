@@ -35,7 +35,7 @@ function updateImports(filePath) {
   
   if (updated) {
     fs.writeFileSync(filePath, content);
-    console.log(`✅ Updated: ${filePath}`);
+    console.log(`Updated: ${filePath}`);
   }
 }
 
@@ -55,7 +55,7 @@ function scanDirectory(dir) {
   }
 }
 
-console.log('🔄 Updating imports...');
+console.log('Updating imports...');
 scanDirectory(path.join(__dirname, '../src'));
-console.log('✅ Done!');
+console.log('Done!');
 

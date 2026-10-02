@@ -88,19 +88,19 @@ export const TierRow: React.FC<TierRowProps> = ({
         {isEditing ? (
           <div className="flex gap-2 justify-end">
             <Button variant="primary" size="sm" onClick={onEditSave} disabled={editBusy}>
-              💾 Сохранить
+               Сохранить
             </Button>
             <Button variant="secondary" size="sm" onClick={onEditCancel} disabled={editBusy}>
-              ❌ Отмена
+               Отмена
             </Button>
           </div>
         ) : (
           <div className="flex gap-2 justify-end">
             <Button variant="info" size="sm" onClick={() => onEditStart(tier)} disabled={deleteBusy}>
-              ✏️
+              Изменить
             </Button>
             <Button variant="error" size="sm" onClick={() => onDelete(tier.id)} disabled={deleteBusy}>
-              {deleteBusy ? '…' : '🗑️'}
+              {deleteBusy ? '…' : 'Удалить'}
             </Button>
           </div>
         )}

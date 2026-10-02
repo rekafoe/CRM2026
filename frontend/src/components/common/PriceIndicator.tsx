@@ -19,9 +19,9 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
   };
 
   const getIcon = (percent: number) => {
-    if (percent > 0) return '📈';
-    if (percent < 0) return '📉';
-    return '➡️';
+    if (percent > 0) return '';
+    if (percent < 0) return '';
+    return '';
   };
 
   const formatPercent = (percent: number) => `${percent.toFixed(2)}%`;

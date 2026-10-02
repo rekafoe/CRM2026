@@ -195,13 +195,13 @@ export const PhotoBatchEditorCore: React.FC<PhotoBatchEditorCoreProps> = ({
                   />
                 </label>
                 <div className="photo-batch-card__crop-presets">
-                  <button type="button" onClick={() => onUpdateItem(item.id, { crop: { x: 0, y: 0, w: 1, h: 1 } })}>
+                  <button type="button" onClick={() =>onUpdateItem(item.id, { crop: { x: 0, y: 0, w: 1, h: 1 } })}>
                     Центр
                   </button>
-                  <button type="button" onClick={() => onUpdateItem(item.id, { crop: { x: 0, y: 0.12, w: 1, h: 0.88 } })}>
+                  <button type="button" onClick={() =>onUpdateItem(item.id, { crop: { x: 0, y: 0.12, w: 1, h: 0.88 } })}>
                     Лица выше
                   </button>
-                  <button type="button" onClick={() => onUpdateItem(item.id, { crop: { x: 0, y: 0, w: 1, h: 0.88 } })}>
+                  <button type="button" onClick={() =>onUpdateItem(item.id, { crop: { x: 0, y: 0, w: 1, h: 0.88 } })}>
                     Safe crop
                   </button>
                 </div>
@@ -216,7 +216,7 @@ export const PhotoBatchEditorCore: React.FC<PhotoBatchEditorCoreProps> = ({
                   Повторить
                 </Button>
               )}
-              <button type="button" className="photo-batch-card__delete" onClick={() => onRemoveItem(item.id)}>
+              <button type="button" className="photo-batch-card__delete" onClick={() =>onRemoveItem(item.id)}>
                 <AppIcon name="trash" size="xs" /> Удалить
               </button>
             </div>

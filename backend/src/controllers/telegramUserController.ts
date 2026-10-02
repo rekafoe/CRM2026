@@ -14,7 +14,7 @@ export class TelegramUserController {
         data: users
       });
     } catch (error: any) {
-      console.error('❌ Error getting telegram users:', error);
+      console.error('Error getting telegram users:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения пользователей Telegram',
@@ -35,7 +35,7 @@ export class TelegramUserController {
         data: users
       });
     } catch (error: any) {
-      console.error('❌ Error getting active telegram users:', error);
+      console.error('Error getting active telegram users:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения активных пользователей Telegram',
@@ -57,7 +57,7 @@ export class TelegramUserController {
         data: users
       });
     } catch (error: any) {
-      console.error('❌ Error getting telegram users by role:', error);
+      console.error('Error getting telegram users by role:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения пользователей Telegram по роли',
@@ -86,7 +86,7 @@ export class TelegramUserController {
         data: user
       });
     } catch (error: any) {
-      console.error('❌ Error getting telegram user by chat_id:', error);
+      console.error('Error getting telegram user by chat_id:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения пользователя Telegram',
@@ -117,7 +117,7 @@ export class TelegramUserController {
         message: 'Пользователь Telegram создан успешно'
       });
     } catch (error: any) {
-      console.error('❌ Error creating telegram user:', error);
+      console.error('Error creating telegram user:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка создания пользователя Telegram',
@@ -142,7 +142,7 @@ export class TelegramUserController {
         message: 'Пользователь Telegram обновлен успешно'
       });
     } catch (error: any) {
-      console.error('❌ Error updating telegram user:', error);
+      console.error('Error updating telegram user:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка обновления пользователя Telegram',
@@ -172,7 +172,7 @@ export class TelegramUserController {
         message: 'Пользователь Telegram удален успешно'
       });
     } catch (error: any) {
-      console.error('❌ Error deleting telegram user:', error);
+      console.error('Error deleting telegram user:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка удаления пользователя Telegram',
@@ -193,7 +193,7 @@ export class TelegramUserController {
         data: stats
       });
     } catch (error: any) {
-      console.error('❌ Error getting telegram users stats:', error);
+      console.error('Error getting telegram users stats:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка получения статистики пользователей Telegram',

@@ -136,7 +136,7 @@ export const PostprintServiceCard: React.FC<PostprintServiceCardProps> = ({
               <button
                 type="button"
                 className="quantity-btn quantity-btn-minus"
-                onClick={() => handleQtyStep(-1)}
+                onClick={() =>handleQtyStep(-1)}
               >
                 -
               </button>
@@ -152,7 +152,7 @@ export const PostprintServiceCard: React.FC<PostprintServiceCardProps> = ({
               <button
                 type="button"
                 className="quantity-btn quantity-btn-plus"
-                onClick={() => handleQtyStep(1)}
+                onClick={() =>handleQtyStep(1)}
               >
                 +
               </button>

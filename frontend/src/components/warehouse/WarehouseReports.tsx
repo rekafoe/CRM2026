@@ -275,11 +275,11 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
       </div>
 
       <div className="tabs-header" role="tablist" aria-label="Разделы отчётов">
-        <button type="button" className={`tab-btn ${topTab === 'summary' ? 'active' : ''}`} onClick={() => setTopTab('summary')}>Итоги</button>
-        <button type="button" className={`tab-btn ${topTab === 'low-stock' ? 'active' : ''}`} onClick={() => setTopTab('low-stock')}>Дефицит</button>
-        <button type="button" className={`tab-btn ${topTab === 'movements' ? 'active' : ''}`} onClick={() => setTopTab('movements')}>Движения</button>
-        <button type="button" className={`tab-btn ${topTab === 'suppliers' ? 'active' : ''}`} onClick={() => setTopTab('suppliers')}>Поставщики</button>
-        <button type="button" className={`tab-btn ${topTab === 'analytics' ? 'active' : ''}`} onClick={() => setTopTab('analytics')}>Аналитика</button>
+        <button type="button" className={`tab-btn ${topTab === 'summary' ? 'active' : ''}`} onClick={() =>setTopTab('summary')}>Итоги</button>
+        <button type="button" className={`tab-btn ${topTab === 'low-stock' ? 'active' : ''}`} onClick={() =>setTopTab('low-stock')}>Дефицит</button>
+        <button type="button" className={`tab-btn ${topTab === 'movements' ? 'active' : ''}`} onClick={() =>setTopTab('movements')}>Движения</button>
+        <button type="button" className={`tab-btn ${topTab === 'suppliers' ? 'active' : ''}`} onClick={() =>setTopTab('suppliers')}>Поставщики</button>
+        <button type="button" className={`tab-btn ${topTab === 'analytics' ? 'active' : ''}`} onClick={() =>setTopTab('analytics')}>Аналитика</button>
       </div>
 
       {topTab === 'analytics' && (
@@ -289,7 +289,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
               key={tab.id}
               type="button"
               className={`tab-btn tab-btn--sub ${analyticsTab === tab.id ? 'active' : ''}`}
-              onClick={() => setAnalyticsTab(tab.id)}
+              onClick={() =>setAnalyticsTab(tab.id)}
             >
               {tab.label}
             </button>
@@ -455,10 +455,10 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                   <td>{row.materials_count}</td>
                   <td>{row.total_quantity}</td>
                   <td><MoneyAmount value={row.total_value} decimals={0} /></td>
-                  <td style={{ color: row.low_stock_count > 0 ? '#e74c3c' : '#27ae60' }}>
+                  <td style={{ color: row.low_stock_count >0 ? '#e74c3c' : '#27ae60' }}>
                     {row.low_stock_count}
                   </td>
-                  <td style={{ color: row.out_of_stock_count > 0 ? '#e74c3c' : '#27ae60' }}>
+                  <td style={{ color: row.out_of_stock_count >0 ? '#e74c3c' : '#27ae60' }}>
                     {row.out_of_stock_count}
                   </td>
                 </tr>

@@ -15,7 +15,7 @@ const seed: SeedTemplate[] = [
     id: 'flyers_a6_1000',
     name: 'Листовки A6, 1000 шт',
     description: 'Стандартные листовки для рекламы',
-    icon: '📄',
+    icon: '',
     category: 'popular',
     popularity: 95,
     specs: {
@@ -34,7 +34,7 @@ const seed: SeedTemplate[] = [
     id: 'business_cards_500',
     name: 'Визитки, 500 шт',
     description: 'Стандартные визитки с ламинацией',
-    icon: '💳',
+    icon: '',
     category: 'popular',
     popularity: 90,
     specs: {
@@ -53,7 +53,7 @@ const seed: SeedTemplate[] = [
     id: 'urgent_flyers',
     name: 'Срочные листовки',
     description: 'Листовки с ускоренным производством',
-    icon: '⚡',
+    icon: '',
     category: 'urgent',
     popularity: 75,
     specs: {
@@ -72,7 +72,7 @@ const seed: SeedTemplate[] = [
     id: 'vip_brochures',
     name: 'VIP брошюры',
     description: 'Премиум брошюры для VIP клиентов',
-    icon: '👑',
+    icon: '',
     category: 'vip',
     popularity: 65,
     specs: {
@@ -93,7 +93,7 @@ const seed: SeedTemplate[] = [
     id: 'promo_stickers',
     name: 'Промо наклейки',
     description: 'Наклейки по акционной цене',
-    icon: '🏷️',
+    icon: '',
     category: 'promo',
     popularity: 85,
     specs: {

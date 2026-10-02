@@ -21,7 +21,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Ошибка подключения к базе данных:', err.message);
     process.exit(1);
   }
-  console.log('✅ Подключение к базе данных установлено');
+  console.log('Подключение к базе данных установлено');
 });
 
 // Функция для выполнения SQL запроса
@@ -55,39 +55,39 @@ function getQuery(sql, params = []) {
 // Основная функция заполнения данными
 async function seedProducts() {
   try {
-    console.log('🌱 Начинаем заполнение базы данных продуктами...');
+    console.log('Начинаем заполнение базы данных продуктами...');
 
     // 1. Создаем категории продуктов
-    console.log('📁 Создаем категории продуктов...');
+    console.log('Создаем категории продуктов...');
     
     const categories = [
       {
         name: 'Печатная продукция',
-        icon: '🖨️',
+        icon: '',
         description: 'Листовки, буклеты, каталоги и другая печатная продукция',
         sort_order: 1
       },
       {
         name: 'Визитки',
-        icon: '💳',
+        icon: '',
         description: 'Визитные карточки различных типов',
         sort_order: 2
       },
       {
         name: 'Наклейки',
-        icon: '🏷️',
+        icon: '',
         description: 'Наклейки и стикеры',
         sort_order: 3
       },
       {
         name: 'Баннеры',
-        icon: '📢',
+        icon: '',
         description: 'Баннеры и растяжки',
         sort_order: 4
       },
       {
         name: 'Брошюры',
-        icon: '📚',
+        icon: '',
         description: 'Брошюры и каталоги',
         sort_order: 5
       }
@@ -100,7 +100,7 @@ async function seedProducts() {
       `, [category.name, category.icon, category.description, category.sort_order]);
     }
 
-    console.log('✅ Категории созданы');
+    console.log('Категории созданы');
 
     // 2. Получаем ID категорий
     const categoryMap = {};
@@ -110,7 +110,7 @@ async function seedProducts() {
     }
 
     // 3. Создаем продукты
-    console.log('📄 Создаем продукты...');
+    console.log('Создаем продукты...');
     
     const products = [
       // Печатная продукция
@@ -118,19 +118,19 @@ async function seedProducts() {
         category: 'Печатная продукция',
         name: 'Листовки',
         description: 'Рекламные листовки различных форматов',
-        icon: '📄'
+        icon: ''
       },
       {
         category: 'Печатная продукция',
         name: 'Буклеты',
         description: 'Информационные буклеты',
-        icon: '📖'
+        icon: ''
       },
       {
         category: 'Печатная продукция',
         name: 'Каталоги',
         description: 'Каталоги товаров и услуг',
-        icon: '📋'
+        icon: ''
       },
       
       // Визитки
@@ -138,19 +138,19 @@ async function seedProducts() {
         category: 'Визитки',
         name: 'Визитки стандартные',
         description: 'Классические визитные карточки',
-        icon: '💳'
+        icon: ''
       },
       {
         category: 'Визитки',
         name: 'Визитки премиум',
         description: 'Премиальные визитные карточки',
-        icon: '💎'
+        icon: ''
       },
       {
         category: 'Визитки',
         name: 'Визитки магнитные',
         description: 'Визитки на магнитной основе',
-        icon: '🧲'
+        icon: ''
       },
       
       // Наклейки
@@ -158,13 +158,13 @@ async function seedProducts() {
         category: 'Наклейки',
         name: 'Наклейки',
         description: 'Самоклеящиеся наклейки',
-        icon: '🏷️'
+        icon: ''
       },
       {
         category: 'Наклейки',
         name: 'Стикеры',
         description: 'Декоративные стикеры',
-        icon: '✨'
+        icon: ''
       },
       
       // Баннеры
@@ -172,13 +172,13 @@ async function seedProducts() {
         category: 'Баннеры',
         name: 'Баннеры',
         description: 'Рекламные баннеры',
-        icon: '📢'
+        icon: ''
       },
       {
         category: 'Баннеры',
         name: 'Растяжки',
         description: 'Растяжки для улиц',
-        icon: '🏁'
+        icon: ''
       },
       
       // Брошюры
@@ -186,13 +186,13 @@ async function seedProducts() {
         category: 'Брошюры',
         name: 'Брошюры',
         description: 'Информационные брошюры',
-        icon: '📚'
+        icon: ''
       },
       {
         category: 'Брошюры',
         name: 'Каталоги',
         description: 'Каталоги товаров',
-        icon: '📖'
+        icon: ''
       }
     ];
 
@@ -203,7 +203,7 @@ async function seedProducts() {
       `, [categoryMap[product.category], product.name, product.description, product.icon]);
     }
 
-    console.log('✅ Продукты созданы');
+    console.log('Продукты созданы');
 
     // 4. Получаем ID продуктов
     const productMap = {};
@@ -213,7 +213,7 @@ async function seedProducts() {
     }
 
     // 5. Создаем параметры продуктов
-    console.log('⚙️ Создаем параметры продуктов...');
+    console.log('Создаем параметры продуктов...');
     
     const parameters = [
       // Листовки
@@ -319,10 +319,10 @@ async function seedProducts() {
       }
     }
 
-    console.log('✅ Параметры продуктов созданы');
+    console.log('Параметры продуктов созданы');
 
     // 6. Создаем послепечатные услуги
-    console.log('🔧 Создаем послепечатные услуги...');
+    console.log('Создаем послепечатные услуги...');
     
     const services = [
       {
@@ -370,10 +370,10 @@ async function seedProducts() {
       `, [service.name, service.description, service.price, service.unit, service.operation_type]);
     }
 
-    console.log('✅ Послепечатные услуги созданы');
+    console.log('Послепечатные услуги созданы');
 
     // 7. Создаем скидки по тиражам
-    console.log('💰 Создаем скидки по тиражам...');
+    console.log('Создаем скидки по тиражам...');
     
     const discounts = [
       { min_quantity: 100, max_quantity: 499, discount_percent: 5 },
@@ -390,9 +390,9 @@ async function seedProducts() {
       `, [discount.min_quantity, discount.max_quantity, discount.discount_percent]);
     }
 
-    console.log('✅ Скидки по тиражам созданы');
+    console.log('Скидки по тиражам созданы');
 
-    console.log('🎉 Заполнение базы данных продуктами завершено!');
+    console.log('Заполнение базы данных продуктами завершено!');
     
     // Выводим статистику
     const categoryCount = await getQuery('SELECT COUNT(*) as count FROM product_categories');
@@ -401,7 +401,7 @@ async function seedProducts() {
     const serviceCount = await getQuery('SELECT COUNT(*) as count FROM post_processing_services');
     const discountCount = await getQuery('SELECT COUNT(*) as count FROM quantity_discounts');
     
-    console.log('\n📊 Статистика:');
+    console.log('\n Статистика:');
     console.log(`- Категорий: ${categoryCount[0].count}`);
     console.log(`- Продуктов: ${productCount[0].count}`);
     console.log(`- Параметров: ${parameterCount[0].count}`);
@@ -409,14 +409,14 @@ async function seedProducts() {
     console.log(`- Скидок: ${discountCount[0].count}`);
 
   } catch (error) {
-    console.error('❌ Ошибка заполнения базы данных:', error);
+    console.error('Ошибка заполнения базы данных:', error);
     process.exit(1);
   } finally {
     db.close((err) => {
       if (err) {
         console.error('Ошибка закрытия базы данных:', err.message);
       } else {
-        console.log('✅ Соединение с базой данных закрыто');
+        console.log('Соединение с базой данных закрыто');
       }
     });
   }

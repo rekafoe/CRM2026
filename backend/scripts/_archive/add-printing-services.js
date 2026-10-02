@@ -18,7 +18,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Ошибка подключения к базе данных:', err.message);
     process.exit(1);
   }
-  console.log('✅ Подключение к базе данных установлено');
+  console.log('Подключение к базе данных установлено');
 });
 
 // Функция для выполнения SQL запроса
@@ -38,7 +38,7 @@ function runQuery(sql, params = []) {
 // Основная функция добавления услуг
 async function addPrintingServices() {
   try {
-    console.log('🖨️ Добавляем услуги печати...');
+    console.log('Добавляем услуги печати...');
 
     // Список услуг для добавления
     const services = [
@@ -118,7 +118,7 @@ async function addPrintingServices() {
       });
 
       if (existing) {
-        console.log(`⚠️ Услуга "${service.service_name}" уже существует`);
+        console.log(`Услуга "${service.service_name}" уже существует`);
         continue;
       }
 
@@ -129,10 +129,10 @@ async function addPrintingServices() {
         VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))
       `, [service.service_name, service.price_per_unit, service.unit]);
 
-      console.log(`✅ Добавлена услуга: ${service.service_name} - ${service.price_per_unit} ${service.unit}`);
+      console.log(`Добавлена услуга: ${service.service_name} - ${service.price_per_unit} ${service.unit}`);
     }
 
-    console.log('🎉 Услуги печати добавлены успешно!');
+    console.log('Услуги печати добавлены успешно!');
     
     // Выводим статистику
     const serviceCount = await new Promise((resolve, reject) => {
@@ -142,17 +142,17 @@ async function addPrintingServices() {
       });
     });
     
-    console.log(`📊 Всего активных услуг: ${serviceCount}`);
+    console.log(`Всего активных услуг: ${serviceCount}`);
 
   } catch (error) {
-    console.error('❌ Ошибка добавления услуг:', error);
+    console.error('Ошибка добавления услуг:', error);
     process.exit(1);
   } finally {
     db.close((err) => {
       if (err) {
         console.error('Ошибка закрытия базы данных:', err.message);
       } else {
-        console.log('✅ Соединение с базой данных закрыто');
+        console.log('Соединение с базой данных закрыто');
       }
     });
   }

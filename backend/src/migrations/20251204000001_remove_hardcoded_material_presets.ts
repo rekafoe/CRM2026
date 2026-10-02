@@ -13,21 +13,21 @@ import { getDb } from '../db';
 export async function up(db?: Database): Promise<void> {
   const database = db || await getDb();
 
-  console.log('🗑️ Удаляем захардкоженные пресеты параметра "material"...');
+  console.log('Удаляем захардкоженные пресеты параметра "material"...');
   
   // Удаляем все пресеты с ключом "material"
   const result = await database.run(
     `DELETE FROM product_parameter_presets WHERE preset_key = 'material'`
   );
 
-  console.log(`✅ Удалено ${result.changes} захардкоженных пресетов "material"`);
+  console.log(`Удалено ${result.changes} захардкоженных пресетов "material"`);
   
   // Также удаляем устаревший параметр density, так как он теперь включен в material_id
   // (опционально - можно оставить для обратной совместимости)
-  console.log('ℹ️ Параметр "density" оставлен для обратной совместимости');
+  console.log('Параметр "density" оставлен для обратной совместимости');
   
   console.log('');
-  console.log('📋 Инструкция:');
+  console.log('Инструкция:');
   console.log('1. Перейдите на страницу шаблона продукта');
   console.log('2. Откройте вкладку "Материалы"');
   console.log('3. Добавьте материалы из склада с нужными типами бумаги');
@@ -38,7 +38,7 @@ export async function up(db?: Database): Promise<void> {
 export async function down(db?: Database): Promise<void> {
   const database = db || await getDb();
   
-  console.log('⚠️ Откат миграции: восстанавливаем хардкоженные пресеты...');
+  console.log('Откат миграции: восстанавливаем хардкоженные пресеты...');
   
   // Восстанавливаем пресеты (для отката)
   await database.run(
@@ -51,6 +51,6 @@ export async function down(db?: Database): Promise<void> {
     `
   );
   
-  console.log('✅ Хардкоженные пресеты восстановлены (не рекомендуется!)');
+  console.log('Хардкоженные пресеты восстановлены (не рекомендуется!)');
 }
 

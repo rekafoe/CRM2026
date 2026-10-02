@@ -15,7 +15,7 @@ const Slot: React.FC<{ children?: React.ReactNode }> = ({ children }) => (
 );
 
 /**
- * Кнопки в колонке «Действия»: всегда три слота — дочерняя (↘), соседняя (↓), удалить (×).
+ * Кнопки в колонке «Действия»: всегда три слота — дочерняя (), соседняя (↓), удалить (×).
  * Порядок одинаковый на всех уровнях; где кнопки нет — пустой слот.
  */
 export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
@@ -36,7 +36,7 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 onClick={onAddChild}
                 title="Добавить дочернюю строку"
               >
-                <span style={{ fontSize: '14px' }}>↘</span>
+                <span style={{ fontSize: '14px' }}></span>
               </button>
             </Slot>
             <Slot>
@@ -71,7 +71,7 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 onClick={onAddChild}
                 title="Добавить дочернюю строку (уровень 2)"
               >
-                <span style={{ fontSize: '14px' }}>↘</span>
+                <span style={{ fontSize: '14px' }}></span>
               </button>
             </Slot>
             <Slot>

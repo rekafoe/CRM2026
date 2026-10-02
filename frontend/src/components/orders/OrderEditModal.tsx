@@ -166,10 +166,10 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
 
   return (
     <div className="order-edit-modal-overlay" onClick={handleClose}>
-      <div className="order-edit-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="order-edit-modal" onClick={(e) =>e.stopPropagation()}>
         {/* Заголовок */}
         <div className="modal-header">
-          <h2>✏️ Редактирование заказа {order.number}</h2>
+          <h2>Редактирование заказа {order.number}</h2>
           <button 
             className="close-btn"
             onClick={handleClose}
@@ -187,7 +187,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
             <div className="form-grid">
               {/* Информация о клиенте */}
               <div className="form-section">
-                <h3>👤 Информация о клиенте</h3>
+                <h3>Информация о клиенте</h3>
                 
                 <div className="form-group">
                   <label htmlFor="customerName">
@@ -242,7 +242,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
 
               {/* Статус и оплата */}
               <div className="form-section">
-                <h3>📋 Статус и оплата</h3>
+                <h3>Статус и оплата</h3>
                 
                 <div className="form-group">
                   <label htmlFor="status">Статус заказа</label>
@@ -288,16 +288,16 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
                     className="form-control"
                     disabled={loading}
                   >
-                    <option value="online">🌐 Онлайн</option>
-                    <option value="offline">🏪 Оффлайн</option>
-                    <option value="telegram">💬 Telegram</option>
+                    <option value="online">Онлайн</option>
+                    <option value="offline">Оффлайн</option>
+                    <option value="telegram">Telegram</option>
                   </select>
                 </div>
               </div>
 
               {/* Информация о заказе */}
               <div className="form-section">
-                <h3>📊 Информация о заказе</h3>
+                <h3>Информация о заказе</h3>
                 
                 <div className="info-grid">
                   <div className="info-item">

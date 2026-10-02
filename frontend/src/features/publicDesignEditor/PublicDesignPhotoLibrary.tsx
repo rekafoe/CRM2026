@@ -65,7 +65,7 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
         <button
           type="button"
           className="public-design-editor__photo-library-upload"
-          onClick={() => inputRef.current?.click()}
+          onClick={() =>inputRef.current?.click()}
         >
           Загрузить
         </button>
@@ -75,7 +75,7 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
       </p>
       <button
         type="button"
-        className={`public-design-editor__photo-dropzone${photos.length > 0 ? ' public-design-editor__photo-dropzone--compact' : ''}`}
+        className={`public-design-editor__photo-dropzone${photos.length >0 ? ' public-design-editor__photo-dropzone--compact' : ''}`}
         onClick={() => inputRef.current?.click()}
       >
         <span>{photos.length > 0 ? 'Добавить ещё фото' : 'Перетащите фото сюда'}</span>
@@ -99,7 +99,7 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
                   type="button"
                   className="public-design-editor__photo-thumb"
                   draggable
-                  onDragStart={(event) => {
+                  onDragStart={(event) =>{
                     event.dataTransfer.setData(SIDEBAR_PHOTO_DRAG_MIME, JSON.stringify({ id: photo.id }));
                     event.dataTransfer.effectAllowed = 'copy';
                   }}
@@ -124,7 +124,7 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
                 <button
                   type="button"
                   className="public-design-editor__photo-remove"
-                  onClick={(event) => {
+                  onClick={(event) =>{
                     event.stopPropagation();
                     onPhotoRemove(photo.id);
                   }}
@@ -144,7 +144,7 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
                     <button
                       type="button"
                       className={`public-design-editor__photo-select${selectedPhotoId === photo.id ? ' public-design-editor__photo-select--active' : ''}`}
-                      onClick={() => onPhotoSelect(photo.id)}
+                      onClick={() =>onPhotoSelect(photo.id)}
                     >
                       {selectedPhotoId === photo.id ? 'Выбрано' : 'Для поля'}
                     </button>
@@ -153,7 +153,7 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
                     <button
                       type="button"
                       className="public-design-editor__photo-retry"
-                      onClick={() => onPhotoRetry(photo.id)}
+                      onClick={() =>onPhotoRetry(photo.id)}
                     >
                       Повторить
                     </button>

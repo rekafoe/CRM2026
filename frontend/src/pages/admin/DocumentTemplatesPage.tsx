@@ -314,7 +314,7 @@ const DocumentTemplatesPage: React.FC = () => {
               <button
                 type="button"
                 className="lg-btn lg-btn--primary"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() =>fileInputRef.current?.click()}
                 disabled={uploading || !uploadForm.name.trim()}
               >
                 {uploading ? 'Загрузка...' : 'Выбрать файл'}
@@ -369,7 +369,7 @@ const DocumentTemplatesPage: React.FC = () => {
                                     type="button"
                                     className="lg-btn"
                                     title="Скачать шаблон"
-                                    onClick={() => handleDownload(template)}
+                                    onClick={() =>handleDownload(template)}
                                   >
                                     Скачать
                                   </button>
@@ -377,7 +377,7 @@ const DocumentTemplatesPage: React.FC = () => {
                                     type="button"
                                     className="lg-btn"
                                     title="Система сама сопоставляет стандартные поля"
-                                    onClick={() => handleConfigureMapping(template)}
+                                    onClick={() =>handleConfigureMapping(template)}
                                   >
                                     Поля
                                   </button>
@@ -385,7 +385,7 @@ const DocumentTemplatesPage: React.FC = () => {
                                     <button
                                       type="button"
                                       className="lg-btn"
-                                      onClick={() => handleSetDefault(template.id)}
+                                      onClick={() =>handleSetDefault(template.id)}
                                     >
                                       По умолчанию
                                     </button>
@@ -393,7 +393,7 @@ const DocumentTemplatesPage: React.FC = () => {
                                   <button
                                     type="button"
                                     className="lg-btn lg-btn--danger"
-                                    onClick={() => handleDelete(template.id)}
+                                    onClick={() =>handleDelete(template.id)}
                                   >
                                     Удалить
                                   </button>
@@ -495,7 +495,7 @@ const DocumentTemplatesPage: React.FC = () => {
               <button
                 type="button"
                 className="lg-btn"
-                onClick={() => {
+                onClick={() =>{
                   setMappingModalOpen(false);
                   setSelectedTemplate(null);
                   setAnalysis(null);

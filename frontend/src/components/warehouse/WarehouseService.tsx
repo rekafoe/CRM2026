@@ -30,79 +30,79 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
   const warehouseSections = [
     { 
       id: 'materials' as WarehouseSection, 
-      title: '📦 Материалы', 
-      icon: '📦', 
+      title: 'Материалы', 
+      icon: '', 
       description: 'Управление материалами и расходниками',
       color: '#4CAF50'
     },
     { 
       id: 'inventory' as WarehouseSection, 
-      title: '📋 Инвентарь', 
-      icon: '📋', 
+      title: 'Инвентарь', 
+      icon: '', 
       description: 'Учет и контроль инвентаря',
       color: '#2196F3'
     },
     { 
       id: 'suppliers' as WarehouseSection, 
-      title: '🏭 Поставщики', 
-      icon: '🏭', 
+      title: 'Поставщики', 
+      icon: '', 
       description: 'Управление поставщиками и закупками',
       color: '#FF9800'
     },
     { 
       id: 'alerts' as WarehouseSection, 
-      title: '🚨 Алерты', 
-      icon: '🚨', 
+      title: 'Алерты', 
+      icon: '', 
       description: 'Уведомления о низких остатках и проблемах',
       color: '#F44336',
       badge: lowStockCount
     },
   { 
     id: 'user-roles' as WarehouseSection, 
-    title: '👥 Роли пользователей', 
-    icon: '👥', 
+    title: 'Роли пользователей', 
+    icon: '', 
     description: 'Управление ролями и разрешениями пользователей',
     color: '#6f42c1'
   },
     { 
       id: 'analytics' as WarehouseSection, 
-      title: '📈 Аналитика', 
-      icon: '📈', 
+      title: 'Аналитика', 
+      icon: '', 
       description: 'Умная аналитика и прогнозы',
       color: '#9C27B0'
     },
     { 
       id: 'automation' as WarehouseSection, 
-      title: '🤖 Автоматизация', 
-      icon: '🤖', 
+      title: 'Автоматизация', 
+      icon: '', 
       description: 'Автозаказы и умные процессы',
       color: '#00BCD4'
     },
     { 
       id: 'mobile' as WarehouseSection, 
-      title: '📱 Мобильное', 
-      icon: '📱', 
+      title: 'Мобильное', 
+      icon: '', 
       description: 'QR-коды и мобильные операции',
       color: '#795548'
     },
     { 
       id: 'reports' as WarehouseSection, 
-      title: '📊 Отчеты склада', 
-      icon: '📊', 
+      title: 'Отчеты склада', 
+      icon: '', 
       description: 'Аналитика и отчетность по складу',
       color: '#9C27B0'
     },
     { 
       id: 'settings' as WarehouseSection, 
-      title: '⚙️ Настройки', 
-      icon: '⚙️', 
+      title: 'Настройки', 
+      icon: '', 
       description: 'Конфигурация складских процессов',
       color: '#607D8B'
     },
     { 
       id: 'user-roles' as WarehouseSection, 
-      title: '👥 Роли пользователей', 
-      icon: '👥', 
+      title: 'Роли пользователей', 
+      icon: '', 
       description: 'Управление ролями и разрешениями пользователей',
       color: '#6f42c1'
     },
@@ -132,10 +132,10 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
     <div className="warehouse-service">
       <button 
         className={`warehouse-service-toggle-btn ${isOpen ? 'active' : ''}`} 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() =>setIsOpen(!isOpen)}
         title="Сервис управления складом"
       >
-        🏪 Склад
+         Склад
         {lowStockCount > 0 && (
           <span className="warehouse-notification-badge">{lowStockCount}</span>
         )}
@@ -144,20 +144,20 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
       {isOpen && (
         <div className="warehouse-service-dropdown">
           <div className="warehouse-service-header">
-            <h3>🏪 Управление складом</h3>
+            <h3>Управление складом</h3>
             <div className="warehouse-stats">
               <div className="stat-item">
-                <span className="stat-icon">📦</span>
+                <span className="stat-icon"></span>
                 <span className="stat-value">{totalOrders}</span>
                 <span className="stat-label">Заказов</span>
               </div>
               <div className="stat-item">
-                <span className="stat-icon">⚠️</span>
+                <span className="stat-icon"></span>
                 <span className="stat-value">{lowStockCount}</span>
                 <span className="stat-label">Низкий запас</span>
               </div>
               <div className="stat-item">
-                <span className="stat-icon">💰</span>
+                <span className="stat-icon"></span>
                 <span className="stat-value"><MoneyAmount value={totalRevenue} decimals={0} /></span>
                 <span className="stat-label">Оборот</span>
               </div>
@@ -169,7 +169,7 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
               <button
                 key={section.id}
                 className={`warehouse-section-btn ${activeSection === section.id ? 'active' : ''}`}
-                onClick={() => handleSectionClick(section.id)}
+                onClick={() =>handleSectionClick(section.id)}
                 style={{ '--section-color': section.color } as React.CSSProperties}
               >
                 <div className="section-icon">{section.icon}</div>
@@ -190,7 +190,7 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
           <div className="warehouse-service-footer">
             <button 
               className="warehouse-close-btn" 
-              onClick={() => setIsOpen(false)}
+              onClick={() =>setIsOpen(false)}
             >
               ✕ Закрыть
             </button>

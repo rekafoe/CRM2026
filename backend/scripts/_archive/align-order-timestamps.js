@@ -49,9 +49,9 @@ function exec(sql) {
       END;
     `)
 
-    console.log('✅ Aligned orders timestamps (createdAt/updatedAt)')
+    console.log('Aligned orders timestamps (createdAt/updatedAt)')
   } catch (e) {
-    console.error('❌ Align failed', e)
+    console.error('Align failed', e)
     process.exit(1)
   } finally {
     db.close()

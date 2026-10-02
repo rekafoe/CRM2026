@@ -90,7 +90,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
 
   return (
     <div className="form-section advanced-settings compact">
-      <h3>🔧 Настройки</h3>
+      <h3>Настройки</h3>
       <div className="advanced-grid compact">
         <div className="param-group param-group--narrow">
           <label>Тип цены</label>
@@ -135,7 +135,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
             <label>Страниц:</label>
             <select
               value={specs.pages || 4}
-              onChange={(e) => updateSpecs({ pages: parseInt(e.target.value) }, true)} // 🆕 instant
+              onChange={(e) => updateSpecs({ pages: parseInt(e.target.value) }, true)} //  instant
               className="form-control"
             >
               {((backendProductSchema?.fields || []).find((f: any) => f.name === 'pages')?.enum || []).map((pages: number) => (
@@ -151,7 +151,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
               <input
                 type="checkbox"
                 checked={!!specs.magnetic}
-                onChange={(e) => updateSpecs({ magnetic: e.target.checked }, true)} // 🆕 instant для checkbox
+                onChange={(e) => updateSpecs({ magnetic: e.target.checked }, true)} //  instant для checkbox
               />
               Магнитные
             </label>
@@ -172,7 +172,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
               <input
                 type="checkbox"
                 checked={!!specs.folding}
-                onChange={(e) => updateSpecs({ folding: e.target.checked }, true)} // 🆕 instant
+                onChange={(e) => updateSpecs({ folding: e.target.checked }, true)} //  instant
               />
               Фальцовка
             </label>
@@ -182,7 +182,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
               <input
                 type="checkbox"
                 checked={!!specs.roundCorners}
-                onChange={(e) => updateSpecs({ roundCorners: e.target.checked }, true)} // 🆕 instant
+                onChange={(e) => updateSpecs({ roundCorners: e.target.checked }, true)} //  instant
               />
               Скругление углов
             </label>

@@ -18,10 +18,10 @@ function formatDate(value?: string): string {
 }
 
 const reactionOptions: Array<{ type: KnowledgeReactionType; emoji: string; label: string }> = [
-  { type: 'like', emoji: '👍', label: 'Полезно' },
-  { type: 'heart', emoji: '❤️', label: 'Нравится' },
-  { type: 'celebrate', emoji: '🎉', label: 'Отлично' },
-  { type: 'insightful', emoji: '💡', label: 'Познавательно' },
+  { type: 'like', emoji: '', label: 'Полезно' },
+  { type: 'heart', emoji: '', label: 'Нравится' },
+  { type: 'celebrate', emoji: '', label: 'Отлично' },
+  { type: 'insightful', emoji: '', label: 'Познавательно' },
 ];
 
 export const KnowledgeArticlePage: React.FC = () => {
@@ -87,14 +87,14 @@ export const KnowledgeArticlePage: React.FC = () => {
     }
   };
 
-  if (articleQuery.isLoading) return <KnowledgeShell><div className="kb-state"><span className="kb-spinner" /> Загружаем статью…</div></KnowledgeShell>;
+  if (articleQuery.isLoading) return <KnowledgeShell><div className="kb-state"><span className="kb-spinner" />Загружаем статью…</div></KnowledgeShell>;
   if (articleQuery.isError || !article) {
     return (
       <KnowledgeShell>
         <div className="kb-state kb-state--error">
           <AppIcon name="warning" size="xl" />
           <h2>Статья не найдена</h2>
-          <button className="kb-button" onClick={() => navigate('/knowledge')}>Вернуться в каталог</button>
+          <button className="kb-button" onClick={() =>navigate('/knowledge')}>Вернуться в каталог</button>
         </div>
       </KnowledgeShell>
     );
@@ -124,17 +124,17 @@ export const KnowledgeArticlePage: React.FC = () => {
                 <span className="kb-avatar">{article.author?.name?.charAt(0) ?? '?'}</span>
                 <span><strong>{article.author?.name ?? 'Команда'}</strong><small>Обновлено {formatDate(article.updatedAt)}</small></span>
                 <div className="kb-article-actions">
-                  <button className="kb-button" type="button" onClick={() => navigate(`/knowledge/articles/${article.id}/edit`)}>
+                  <button className="kb-button" type="button" onClick={() =>navigate(`/knowledge/articles/${article.id}/edit`)}>
                     <AppIcon name={canEditDirectly ? 'edit' : 'pencil'} size="sm" />
                     {canEditDirectly ? 'Редактировать' : 'Предложить правку'}
                   </button>
                   {canEditDirectly && article.status === 'draft' && (
-                    <button className="kb-button kb-button--primary" disabled={Boolean(busy)} onClick={() => run('publish', () => knowledgeApi.publishArticle(article.id), 'Статья опубликована')}>
+                    <button className="kb-button kb-button--primary" disabled={Boolean(busy)} onClick={() =>run('publish', () => knowledgeApi.publishArticle(article.id), 'Статья опубликована')}>
                       <AppIcon name="check" size="sm" /> Опубликовать
                     </button>
                   )}
                   {canEditDirectly && article.status === 'published' && (
-                    <button className="kb-button" disabled={Boolean(busy)} onClick={() => run('archive', () => knowledgeApi.archiveArticle(article.id), 'Статья перемещена в архив')}>
+                    <button className="kb-button" disabled={Boolean(busy)} onClick={() =>run('archive', () => knowledgeApi.archiveArticle(article.id), 'Статья перемещена в архив')}>
                       <AppIcon name="ban" size="sm" /> В архив
                     </button>
                   )}
@@ -161,7 +161,7 @@ export const KnowledgeArticlePage: React.FC = () => {
                         aria-pressed={active}
                         disabled={reactionBusy !== null}
                         title={names || option.label}
-                        onClick={() => void toggleReaction(option.type)}
+                        onClick={() =>void toggleReaction(option.type)}
                       >
                         <span>{option.emoji}</span>
                         <span>{option.label}</span>
@@ -172,7 +172,7 @@ export const KnowledgeArticlePage: React.FC = () => {
                 </div>
               </div>
               <div className="kb-viewers">
-                <button className="kb-link-button" type="button" onClick={() => setShowViewers((value) => !value)}>
+                <button className="kb-link-button" type="button" onClick={() =>setShowViewers((value) => !value)}>
                   <AppIcon name="users" size="sm" />
                   Прочитали: {article.engagement.uniqueViewers}
                   {article.engagement.totalViews > article.engagement.uniqueViewers && ` · ${article.engagement.totalViews} просмотров`}
@@ -197,7 +197,7 @@ export const KnowledgeArticlePage: React.FC = () => {
                 <button
                   className="kb-link-button"
                   type="button"
-                  onClick={() => {
+                  onClick={() =>{
                     const next = !showRevisions;
                     setShowRevisions(next);
                     if (next) revisionsQuery.refetch();
@@ -214,7 +214,7 @@ export const KnowledgeArticlePage: React.FC = () => {
                         <button
                           className="kb-button kb-button--small"
                           disabled={Boolean(busy)}
-                          onClick={() => run(
+                          onClick={() =>run(
                             `restore-${revision.id}`,
                             () => knowledgeApi.restoreRevision(article.id, revision.id, article.currentRevisionId!),
                             'Версия восстановлена',
@@ -277,7 +277,7 @@ export const KnowledgeArticlePage: React.FC = () => {
                       <div>
                         <button className="kb-button kb-button--small" disabled={!replyDrafts[item.id]?.trim()}>Ответить</button>
                         {!item.isResolved && (canEditDirectly || item.authorUserId === currentUser?.id) && (
-                          <button className="kb-link-button" type="button" onClick={() => run(`resolve-${item.id}`, () => knowledgeApi.resolveQuestion(item.id), 'Вопрос отмечен решённым')}>
+                          <button className="kb-link-button" type="button" onClick={() =>run(`resolve-${item.id}`, () => knowledgeApi.resolveQuestion(item.id), 'Вопрос отмечен решённым')}>
                             Отметить решённым
                           </button>
                         )}

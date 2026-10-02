@@ -219,18 +219,18 @@ const PhotoFieldTargets: React.FC<{
               <button
                 type="button"
                 className="public-design-editor__photo-target-main"
-                onClick={() => onFieldFocus(field, 'photo')}
+                onClick={() =>onFieldFocus(field, 'photo')}
               >
                 <span>{field.label}</span>
                 <strong>{PHOTO_FIELD_STATUS_LABELS[field.status]}</strong>
               </button>
               <div className="public-design-editor__photo-target-actions">
                 {hasSelectedPhoto && onPlaceSelectedPhoto && (
-                  <button type="button" onClick={() => onPlaceSelectedPhoto(field)}>
+                  <button type="button" onClick={() =>onPlaceSelectedPhoto(field)}>
                     Поставить
                   </button>
                 )}
-                <button type="button" onClick={() => onPhotoReplace(field)}>
+                <button type="button" onClick={() =>onPhotoReplace(field)}>
                   {field.status === 'ready' ? 'Заменить' : 'Выбрать'}
                 </button>
               </div>
@@ -271,13 +271,13 @@ const TextFieldTargets: React.FC<{
               <button
                 type="button"
                 className="public-design-editor__photo-target-main"
-                onClick={() => onFieldFocus(field, 'text')}
+                onClick={() =>onFieldFocus(field, 'text')}
               >
                 <span title={field.label}>{field.label}</span>
                 <strong>{TEXT_FIELD_STATUS_LABELS[field.status]}</strong>
               </button>
               <div className="public-design-editor__photo-target-actions">
-                <button type="button" onClick={() => onFieldFocus(field, 'text')}>
+                <button type="button" onClick={() =>onFieldFocus(field, 'text')}>
                   {field.status === 'ready' ? 'Изменить' : 'Заполнить'}
                 </button>
               </div>

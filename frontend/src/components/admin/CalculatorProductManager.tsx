@@ -327,13 +327,13 @@ const CalculatorProductManager: React.FC = () => {
       <div className="tabs-container">
         <nav className="tabs-nav">
           {[
-            { key: 'products', label: 'Продукты', icon: '📦' },
-            { key: 'test', label: 'Тестирование', icon: '🧪' },
-            { key: 'analytics', label: 'Аналитика', icon: '📊' }
+            { key: 'products', label: 'Продукты', icon: '' },
+            { key: 'test', label: 'Тестирование', icon: '' },
+            { key: 'analytics', label: 'Аналитика', icon: '' }
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
+              onClick={() =>setActiveTab(tab.key as any)}
               className={`tab-button ${activeTab === tab.key ? 'active' : ''}`}
             >
               <span>{tab.icon}</span>

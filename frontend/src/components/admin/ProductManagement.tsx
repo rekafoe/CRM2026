@@ -11,6 +11,7 @@ import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { useUIStore } from '../../stores/uiStore';
 import { StatusBadge, LoadingState } from '../common';
 import { AppIcon } from '../ui/AppIcon';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 import { ProductCreateModal } from './ProductCreateModal';
 import { ProductDuplicateModal, productCanBeDuplicated } from './ProductDuplicateModal';
 import { ProductSetupStatus } from './ProductSetupStatus';
@@ -139,7 +140,7 @@ const ProductManagement: React.FC = () => {
     try {
       setDeletingProductId(product.id);
       await deleteProduct(product.id);
-      clearProductCache(); // 🆕 Очищаем кэш перед обновлением
+      clearProductCache(); //  Очищаем кэш перед обновлением
       await fetchProducts(true); // Обновляем список
       showToast(`Продукт «${product.name}» удален`, 'success');
     } catch (error: unknown) {
@@ -273,7 +274,7 @@ const ProductManagement: React.FC = () => {
       {/* Заголовок */}
       <div className="product-management__header">
         <div className="product-management__header-left">
-          <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel')}>
+          <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel')}>
             ← Назад
           </button>
           <div className="product-management__title-row">
@@ -285,10 +286,10 @@ const ProductManagement: React.FC = () => {
           </div>
         </div>
         <div className="product-management__header-actions">
-          <button type="button" className="lg-btn" onClick={() => setShowCategoryModal(true)}>
+          <button type="button" className="lg-btn" onClick={() =>setShowCategoryModal(true)}>
             <AppIcon name="folder" size="xs" /> Категории
           </button>
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => openCreateWizard()}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() =>openCreateWizard()}>
             <AppIcon name="plus" size="xs" /> Создать продукт
           </button>
         </div>
@@ -316,14 +317,14 @@ const ProductManagement: React.FC = () => {
               <option value="">Все категории ({products.length})</option>
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
-                  {cat.icon} {cat.name} ({products.filter(p => p.category_id === cat.id).length})
+                  {[withoutEmoji(cat.icon), cat.name].filter(Boolean).join(' ')} ({products.filter(p => p.category_id === cat.id).length})
                 </option>
               ))}
             </select>
 
             <button
               className={`product-controls__toggle ${state.showOnlyActive ? 'product-controls__toggle--active' : ''}`}
-              onClick={() => setShowOnlyActive(!state.showOnlyActive)}
+              onClick={() =>setShowOnlyActive(!state.showOnlyActive)}
             >
               <AppIcon name={state.showOnlyActive ? 'check' : 'ban'} size="xs" />
               <span>Только активные</span>
@@ -334,7 +335,7 @@ const ProductManagement: React.FC = () => {
         <div className="product-quick-filters">
           <button
             className={`product-filter-chip ${!state.selectedCategoryId ? 'product-filter-chip--active' : ''}`}
-            onClick={() => setSelectedCategoryId(null)}
+            onClick={() =>setSelectedCategoryId(null)}
           >
             <AppIcon name="package" size="xs" />
             <span>Все</span>
@@ -347,7 +348,7 @@ const ProductManagement: React.FC = () => {
               <button
                 key={cat.id}
                 className={`product-filter-chip ${state.selectedCategoryId === cat.id ? 'product-filter-chip--active' : ''}`}
-                onClick={() => setSelectedCategoryId(cat.id)}
+                onClick={() =>setSelectedCategoryId(cat.id)}
               >
                 <AppIcon name="folder" size="xs" />
                 <span>{cat.name}</span>
@@ -393,10 +394,10 @@ const ProductManagement: React.FC = () => {
                     />
                   </th>
                   <th></th>
-                  <th className="sortable-header" onClick={() => toggleSort('name')}>
+                  <th className="sortable-header" onClick={() =>toggleSort('name')}>
                     Название {state.sortField === 'name' && (state.sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="sortable-header" onClick={() => toggleSort('category')}>
+                  <th className="sortable-header" onClick={() =>toggleSort('category')}>
                     Категория {state.sortField === 'category' && (state.sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th>Статус</th>
@@ -436,7 +437,7 @@ const ProductManagement: React.FC = () => {
                       <button
                         type="button"
                         className={`lg-btn ${product.active_for_site === true || product.active_for_site === 1 ? 'lg-btn--success' : ''}`}
-                        onClick={() => toggleProductSite(product)}
+                        onClick={() =>toggleProductSite(product)}
                         disabled={!product.is_active || togglingSiteProductId === product.id}
                         title={product.is_active
                           ? (product.active_for_site ? 'Скрыть с сайта' : 'Показать на сайте')
@@ -449,7 +450,7 @@ const ProductManagement: React.FC = () => {
                       <button
                         type="button"
                         className="btn-setup-status"
-                        onClick={() => setSetupStatusModal(product.id)}
+                        onClick={() =>setSetupStatusModal(product.id)}
                         title="Проверить статус настройки"
                       >
                         <AppIcon name="wrench" size="xs" />
@@ -462,35 +463,35 @@ const ProductManagement: React.FC = () => {
                           <button
                             type="button"
                             className="lg-btn"
-                            onClick={() => setDuplicateSource(product)}
+                            onClick={() =>setDuplicateSource(product)}
                             title="Полная копия шаблона и настроек"
                           >
                             <AppIcon name="copy" size="xs" /> Копировать
                           </button>
                         )}
-                        <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}>
+                        <button type="button" className="lg-btn" onClick={() =>navigate(`/adminpanel/products/${product.id}/edit`)}>
                           <AppIcon name="clipboard" size="xs" /> Инфо
                         </button>
                         <button
                           type="button"
                           className="lg-btn"
-                          onClick={() => openProductImagePicker(product)}
+                          onClick={() =>openProductImagePicker(product)}
                           disabled={uploadingImageProductId !== null}
                           title={product.image_url ? 'Заменить изображение продукта' : 'Загрузить изображение продукта'}
                         >
                           <AppIcon name="camera" size="xs" />
                           {uploadingImageProductId === product.id ? 'Загрузка…' : 'Фото'}
                         </button>
-                        <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}>
+                        <button type="button" className="lg-btn" onClick={() =>navigate(`/adminpanel/products/${product.id}/template`)}>
                           <AppIcon name="edit" size="xs" /> Шаблон
                         </button>
-                        <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/tech-process`)}>
+                        <button type="button" className="lg-btn" onClick={() =>navigate(`/adminpanel/products/${product.id}/tech-process`)}>
                           <AppIcon name="cog" size="xs" /> Процесс
                         </button>
                         <button
                           type="button"
                           className={`lg-btn row-actions__toggle-btn ${product.is_active ? 'lg-btn--warning' : 'lg-btn--success'}`}
-                          onClick={() => toggleProductActive(product)}
+                          onClick={() =>toggleProductActive(product)}
                           disabled={directoryLoading.toggleProduct}
                         >
                           {product.is_active ? <><AppIcon name="ban" size="xs" /> Выкл</> : <><AppIcon name="check" size="xs" /> Вкл</>}
@@ -498,7 +499,7 @@ const ProductManagement: React.FC = () => {
                         <button
                           type="button"
                           className="lg-btn lg-btn--danger"
-                          onClick={() => handleDeleteProduct(product)}
+                          onClick={() =>handleDeleteProduct(product)}
                           disabled={state.deletingProductId === product.id}
                         >
                           <AppIcon name="trash" size="xs" />

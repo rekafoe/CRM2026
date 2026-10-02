@@ -149,8 +149,8 @@ export class OrderItemController {
         : undefined
       const authUser = (req as AuthenticatedRequest).user as { id: number } | undefined
       
-      // 🆕 Детальное логирование входящих данных для отладки
-      logger.info('📥 [addItem] Входящие данные', {
+      //  Детальное логирование входящих данных для отладки
+      logger.info('[addItem] Входящие данные', {
         orderId,
         type,
         price,
@@ -291,10 +291,10 @@ export class OrderItemController {
 
         const clicks = computeClicks(sheets, sides)
         
-        // 🆕 Безопасная сериализация params с обработкой циклических ссылок и несериализуемых данных
+        //  Безопасная сериализация params с обработкой циклических ссылок и несериализуемых данных
         let paramsJson: string
         try {
-          // 🆕 Очищаем params от потенциально проблемных полей перед сериализацией
+          //  Очищаем params от потенциально проблемных полей перед сериализацией
           const cleanParams: any = {}
           if (params) {
             for (const [key, value] of Object.entries(params)) {
@@ -307,7 +307,7 @@ export class OrderItemController {
                 JSON.stringify(value)
                 cleanParams[key] = value
               } catch (e) {
-                logger.warn(`⚠️ [addItem] Пропускаем поле ${key} из-за проблем с сериализацией`, {
+                logger.warn(`[addItem] Пропускаем поле ${key} из-за проблем с сериализацией`, {
                   key,
                   valueType: typeof value,
                   error: (e as Error).message
@@ -359,13 +359,13 @@ export class OrderItemController {
             return value
           })
           
-          logger.info('✅ [addItem] params успешно сериализованы', {
+          logger.info('[addItem] params успешно сериализованы', {
             paramsJsonLength: paramsJson.length,
             hasComponents: Array.isArray(paramsToSave.components),
             componentsCount: Array.isArray(paramsToSave.components) ? paramsToSave.components.length : 0
           })
         } catch (serializeError: any) {
-          logger.error('❌ [addItem] Ошибка сериализации params', {
+          logger.error('[addItem] Ошибка сериализации params', {
             error: serializeError,
             message: serializeError?.message,
             stack: serializeError?.stack,
@@ -388,7 +388,7 @@ export class OrderItemController {
           })
         }
         
-        logger.info('💾 [addItem] Вставляем позицию в БД', {
+        logger.info('[addItem] Вставляем позицию в БД', {
           orderId,
           type,
           price: priceToStore,
@@ -420,7 +420,7 @@ export class OrderItemController {
         )
         const itemId = insertItem.lastID!
 
-        // 🆕 Пересчёт предоплаты при изменении итога: первая позиция или синк при offline
+        //  Пересчёт предоплаты при изменении итога: первая позиция или синк при offline
         const qty = Math.max(1, Number(quantity) || 1)
         const paymentRow = await db.get<{
           prepaymentAmount?: number | null
@@ -474,7 +474,7 @@ export class OrderItemController {
           await db.run(updateSql, newTotal, orderId)
         }
         
-        logger.info('✅ [addItem] Позиция вставлена', { itemId })
+        logger.info('[addItem] Позиция вставлена', { itemId })
 
         // Если заказ не в первом статусе (0 или 1) — прибавляем клики позиции в счётчик принтера на дату добавления
         const notFirstStatus = orderStatus !== 0 && orderStatus !== 1
@@ -493,7 +493,7 @@ export class OrderItemController {
             today,
             newValue
           )
-          logger.info('🖨️ [addItem] Счётчик принтера обновлён', { printerId, counter_date: today, addedClicks: clicks, newValue })
+          logger.info('[addItem] Счётчик принтера обновлён', { printerId, counter_date: today, addedClicks: clicks, newValue })
         }
         
         const rawItem = await db.get(
@@ -503,20 +503,20 @@ export class OrderItemController {
 
         await db.run('COMMIT')
         
-        logger.info('✅ [addItem] Транзакция завершена успешно', { itemId, orderId })
+        logger.info('[addItem] Транзакция завершена успешно', { itemId, orderId })
 
         // Итог с калькулятора (totalCost) не перезаписываем tier-пересчётом — иначе 92,95 → 110,50
         if (effectiveTotal == null) {
           try {
             await OrderPricingService.recalculateOrderPrices(orderId)
           } catch (recalcErr) {
-            logger.warn('⚠️ [addItem] пересчёт цен по группам не выполнен', {
+            logger.warn('[addItem] пересчёт цен по группам не выполнен', {
               orderId,
               error: (recalcErr as Error).message,
             })
           }
         } else {
-          logger.info('✅ [addItem] tier-пересчёт пропущен: итог задан калькулятором (totalCost)', {
+          logger.info('[addItem] tier-пересчёт пропущен: итог задан калькулятором (totalCost)', {
             orderId,
             effectiveTotal,
           })
@@ -529,7 +529,7 @@ export class OrderItemController {
         if (orderRow?.created_date) {
           const date = String(orderRow.created_date).slice(0, 10)
           void EarningsService.recalculateForDate(date).catch((recalcError) => {
-            logger.error('❌ [addItem] Ошибка перерасчета выручки', {
+            logger.error('[addItem] Ошибка перерасчета выручки', {
               date,
               error: recalcError,
               message: (recalcError as Error)?.message
@@ -549,13 +549,13 @@ export class OrderItemController {
         throw e
       }
     } catch (error: any) {
-      // 🆕 Определяем статус ошибки: 400 для бизнес-ошибок (недостаток материалов), 500 для системных
+      //  Определяем статус ошибки: 400 для бизнес-ошибок (недостаток материалов), 500 для системных
       const isBusinessError = error?.code === 'INSUFFICIENT_MATERIAL' || 
                               error?.message?.includes('Недостаточно материала') ||
                               error?.message?.includes('не найден')
       const status = error.status || (isBusinessError ? 400 : 500)
       
-      logger.error('❌ [addItem] Ошибка добавления позиции в заказ', {
+      logger.error('[addItem] Ошибка добавления позиции в заказ', {
         error,
         errorMessage: error?.message,
         errorStack: error?.stack,
@@ -607,7 +607,7 @@ export class OrderItemController {
         if (orderRow?.created_date) {
           const date = String(orderRow.created_date).slice(0, 10)
           void EarningsService.recalculateForDate(date).catch((recalcError) => {
-            logger.error('❌ [deleteItem] Ошибка перерасчета выручки', {
+            logger.error('[deleteItem] Ошибка перерасчета выручки', {
               date,
               error: recalcError,
               message: (recalcError as Error)?.message
@@ -622,7 +622,7 @@ export class OrderItemController {
       try {
         paramsObj = JSON.parse(it.params || '{}')
       } catch (parseError) {
-        logger.warn('⚠️ [deleteItem] Не удалось распарсить params, пропускаем состав', {
+        logger.warn('[deleteItem] Не удалось распарсить params, пропускаем состав', {
           itemId,
           orderId,
           error: parseError,
@@ -676,7 +676,7 @@ export class OrderItemController {
 
         await db.run('DELETE FROM items WHERE orderId = ? AND id = ?', orderId, itemId)
         
-        // 🆕 Пересчитываем предоплату после удаления позиции (итог с учётом скидки)
+        //  Пересчитываем предоплату после удаления позиции (итог с учётом скидки)
         const paymentRow = await db.get<{
           prepaymentAmount?: number | null
           prepaymentStatus?: string | null
@@ -702,7 +702,7 @@ export class OrderItemController {
             ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
             : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
           await db.run(updateSql, newTotal, orderId)
-          logger.info('💰 [deleteItem] Предоплата пересчитана', {
+          logger.info('[deleteItem] Предоплата пересчитана', {
             orderId,
             oldPrepayment: currentPrepayment,
             newPrepayment: newTotal
@@ -713,7 +713,7 @@ export class OrderItemController {
         try {
           await OrderPricingService.recalculateOrderPrices(orderId)
         } catch (recalcErr) {
-          logger.warn('⚠️ [deleteItem] пересчёт цен по группам не выполнен', {
+          logger.warn('[deleteItem] пересчёт цен по группам не выполнен', {
             orderId,
             error: (recalcErr as Error).message,
           })
@@ -725,7 +725,7 @@ export class OrderItemController {
         if (orderRow?.created_date) {
           const date = String(orderRow.created_date).slice(0, 10)
           void EarningsService.recalculateForDate(date).catch((recalcError) => {
-            logger.error('❌ [deleteItem] Ошибка перерасчета выручки', {
+            logger.error('[deleteItem] Ошибка перерасчета выручки', {
               date,
               error: recalcError,
               message: (recalcError as Error)?.message
@@ -767,7 +767,7 @@ export class OrderItemController {
           ? parseMoneyInput((body.params as Record<string, unknown>).storedTotalCost)
           : null)
       if (body.printerId !== undefined) {
-        logger.info('🖨️ [updateItem] Обновление принтера позиции', { orderId, itemId, printerId: body.printerId })
+        logger.info('[updateItem] Обновление принтера позиции', { orderId, itemId, printerId: body.printerId })
       }
       const db = await getDb()
 
@@ -778,7 +778,7 @@ export class OrderItemController {
         const printerCol = cols.find((c) => c.toLowerCase().includes('printer'))
         if (printerCol) printerIdCol = printerCol
       } catch (_) {}
-      logger.info('🖨️ [updateItem] Колонка принтера в items', { printerIdCol })
+      logger.info('[updateItem] Колонка принтера в items', { printerIdCol })
 
       let hasExecutorUserIdEarly = false
       try {
@@ -1042,7 +1042,7 @@ export class OrderItemController {
               clicks = ?
            WHERE id = ? AND orderId = ?`
         if (body.printerId !== undefined) {
-          logger.info('🖨️ [updateItem] UPDATE SQL', { printerIdCol, printerIdClause: printerIdClause || '(none)', printerIdVal })
+          logger.info('[updateItem] UPDATE SQL', { printerIdCol, printerIdClause: printerIdClause || '(none)', printerIdVal })
         }
         const bindings = [
           ...(typeClause ? [nextType] : []),
@@ -1059,7 +1059,7 @@ export class OrderItemController {
           orderId,
         ]
         if (body.printerId !== undefined) {
-          logger.info('🖨️ [updateItem] Bindings (printerId index)', {
+          logger.info('[updateItem] Bindings (printerId index)', {
             printerIdCol,
             bindingsLength: bindings.length,
             printerIdBinding: printerIdVal[0],
@@ -1098,7 +1098,7 @@ export class OrderItemController {
           try {
             await OrderPricingService.recalculateOrderPrices(orderId)
           } catch (recalcErr) {
-            logger.warn('⚠️ [updateItem] пересчёт цен по группам не выполнен', {
+            logger.warn('[updateItem] пересчёт цен по группам не выполнен', {
               orderId,
               error: (recalcErr as Error).message,
             })
@@ -1121,7 +1121,7 @@ export class OrderItemController {
       const updated = await db.get<any>(`SELECT id, orderId, type, params, price, quantity, ${printerIdCol} AS printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?`, itemId, orderId)
       const rawRow = await db.get<any>(`SELECT id, ${printerIdCol} FROM items WHERE id = ? AND orderId = ?`, itemId, orderId)
       if (body.printerId !== undefined) {
-        logger.info('🖨️ [updateItem] Прочитано из БД после COMMIT', { itemId, printerIdCol, rawPrinterValue: rawRow?.[printerIdCol], rawRowKeys: rawRow ? Object.keys(rawRow) : [] })
+        logger.info('[updateItem] Прочитано из БД после COMMIT', { itemId, printerIdCol, rawPrinterValue: rawRow?.[printerIdCol], rawRowKeys: rawRow ? Object.keys(rawRow) : [] })
       }
       const printerIdKey = updated && Object.keys(updated).find((k) => k.toLowerCase() === 'printerid')
       let printerIdVal = printerIdKey != null ? updated[printerIdKey] : (updated?.printerId ?? updated?.printer_id ?? undefined)
@@ -1129,7 +1129,7 @@ export class OrderItemController {
       if ((printerIdVal == null || printerIdVal === '') && typeof (parsedParams as any).printerId === 'number') {
         printerIdVal = (parsedParams as any).printerId
       }
-      logger.info('🖨️ [updateItem] После UPDATE', { itemId, orderId, printerIdVal, printerIdKey: printerIdKey ?? 'none', fromParams: (parsedParams as any).printerId })
+      logger.info('[updateItem] После UPDATE', { itemId, orderId, printerIdVal, printerIdKey: printerIdKey ?? 'none', fromParams: (parsedParams as any).printerId })
 
       if (hasExecutorUserIdEarly && body.executor_user_id !== undefined) {
         try {
@@ -1151,7 +1151,7 @@ export class OrderItemController {
             itemType: updated?.type ?? existing.type,
           })
         } catch (notifyErr: any) {
-          logger.warn('⚠️ [updateItem] Не удалось отправить уведомление исполнителю', {
+          logger.warn('[updateItem] Не удалось отправить уведомление исполнителю', {
             orderId,
             itemId,
             message: notifyErr?.message || String(notifyErr),

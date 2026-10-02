@@ -222,7 +222,7 @@ const AdminPanelHome: React.FC = () => {
               key={item.id}
               type="button"
               className={`settings-nav__btn${item.id === groupId ? ' settings-nav__btn--active' : ''}`}
-              onClick={() => setSearchParams({ group: item.id })}
+              onClick={() =>setSearchParams({ group: item.id })}
               aria-current={item.id === groupId ? 'page' : undefined}
             >
               <span className="settings-nav__icon">
@@ -247,7 +247,7 @@ const AdminPanelHome: React.FC = () => {
           {group.links && (
             <div className="settings-links">
               {group.links.map((link) => (
-                <button key={link.to} type="button" className="settings-link" onClick={() => navigate(link.to)}>
+                <button key={link.to} type="button" className="settings-link" onClick={() =>navigate(link.to)}>
                   <span className="settings-link__icon">
                     <AppIcon name={link.icon} size="md" circle />
                   </span>

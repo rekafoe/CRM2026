@@ -441,10 +441,10 @@ export const ExpensesPage: React.FC = () => {
                       <span className="expenses-muted">За весь календарный квартал</span>
                     ) : (
                       <div className="expenses-table-actions">
-                        <button type="button" className="lg-btn" onClick={() => handleEdit(expense)}>
+                        <button type="button" className="lg-btn" onClick={() =>handleEdit(expense)}>
                           Изменить
                         </button>
-                        <button type="button" className="lg-btn lg-btn--danger" onClick={() => void handleDelete(expense)}>
+                        <button type="button" className="lg-btn lg-btn--danger" onClick={() =>void handleDelete(expense)}>
                           Удалить
                         </button>
                       </div>

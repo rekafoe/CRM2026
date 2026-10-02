@@ -208,43 +208,43 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
       </td>
       <td>
         <span className={`role-badge role-${user.role}`}>
-          {user.role === 'admin' ? '👑 Админ' : 
-           user.role === 'manager' ? '👨‍💼 Менеджер' : 
-           user.role === 'client' ? '👤 Клиент' : '👤 Пользователь'}
+          {user.role === 'admin' ? 'Админ' : 
+           user.role === 'manager' ? 'Менеджер' : 
+           user.role === 'client' ? 'Клиент' : 'Пользователь'}
         </span>
       </td>
       <td>
         <div className="status-indicators">
           <span className={`status ${user.is_active ? 'active' : 'inactive'}`}>
-            {user.is_active ? '✅ Активен' : '❌ Неактивен'}
+            {user.is_active ? 'Активен' : 'Неактивен'}
           </span>
           <span className={`status ${user.notifications_enabled ? 'enabled' : 'disabled'}`}>
-            {user.notifications_enabled ? '🔔 Уведомления' : '🔕 Без уведомлений'}
+            {user.notifications_enabled ? 'Уведомления' : 'Без уведомлений'}
           </span>
         </div>
       </td>
       <td>
         <div className="preferences">
-          {user.notification_preferences.low_stock && <span className="pref">📦 Остатки</span>}
-          {user.notification_preferences.new_orders && <span className="pref">🛒 Заказы</span>}
-          {user.notification_preferences.system_alerts && <span className="pref">⚠️ Система</span>}
+          {user.notification_preferences.low_stock && <span className="pref">Остатки</span>}
+          {user.notification_preferences.new_orders && <span className="pref">Заказы</span>}
+          {user.notification_preferences.system_alerts && <span className="pref">Система</span>}
         </div>
       </td>
       <td>
         <div className="actions">
           <button
             className="lg-btn lg-btn--primary"
-            onClick={() => setEditingUser(user)}
+            onClick={() =>setEditingUser(user)}
             title="Редактировать"
           >
-            ✏️
+            
           </button>
           <button
             className="lg-btn lg-btn--danger"
-            onClick={() => deleteUser(user.id)}
+            onClick={() =>deleteUser(user.id)}
             title="Удалить"
           >
-            🗑️
+            
           </button>
         </div>
       </td>
@@ -259,7 +259,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
         <div className="modal">
           <div className="modal-header">
             <h3>Редактировать пользователя Telegram</h3>
-            <button onClick={() => setEditingUser(null)} className="close-btn">✕</button>
+            <button onClick={() =>setEditingUser(null)} className="close-btn">✕</button>
           </div>
           <div className="modal-body">
             <div className="form-group">
@@ -308,9 +308,9 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                 onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
                 className="form-control"
               >
-                <option value="client">👤 Клиент</option>
-                <option value="manager">👨‍💼 Менеджер</option>
-                <option value="admin">👑 Администратор</option>
+                <option value="client">Клиент</option>
+                <option value="manager">Менеджер</option>
+                <option value="admin">Администратор</option>
               </select>
             </div>
             <div className="form-group">
@@ -348,7 +348,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                       }
                     })}
                   />
-                  📦 Низкие остатки
+                   Низкие остатки
                 </label>
                 <label>
                   <input
@@ -362,7 +362,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                       }
                     })}
                   />
-                  🛒 Новые заказы
+                   Новые заказы
                 </label>
                 <label>
                   <input
@@ -376,16 +376,16 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                       }
                     })}
                   />
-                  ⚠️ Системные уведомления
+                   Системные уведомления
                 </label>
               </div>
             </div>
           </div>
           <div className="modal-footer">
-            <button onClick={() => setEditingUser(null)} className="lg-btn">
+            <button onClick={() =>setEditingUser(null)} className="lg-btn">
               Отмена
             </button>
-            <button onClick={() => updateUser(editingUser)} className="lg-btn lg-btn--primary">
+            <button onClick={() =>updateUser(editingUser)} className="lg-btn lg-btn--primary">
               Сохранить
             </button>
           </div>
@@ -402,7 +402,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
         <div className="modal">
           <div className="modal-header">
             <h3>Добавить пользователя Telegram</h3>
-            <button onClick={() => setShowAddModal(false)} className="close-btn">✕</button>
+            <button onClick={() =>setShowAddModal(false)} className="close-btn">✕</button>
           </div>
           <div className="modal-body">
             <div className="form-group">
@@ -453,9 +453,9 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                 onChange={(e) => setNewUser({...newUser, role: e.target.value})}
                 className="form-control"
               >
-                <option value="client">👤 Клиент</option>
-                <option value="manager">👨‍💼 Менеджер</option>
-                <option value="admin">👑 Администратор</option>
+                <option value="client">Клиент</option>
+                <option value="manager">Менеджер</option>
+                <option value="admin">Администратор</option>
               </select>
             </div>
             <div className="form-group">
@@ -483,7 +483,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                       }
                     })}
                   />
-                  📦 Низкие остатки
+                   Низкие остатки
                 </label>
                 <label>
                   <input
@@ -497,7 +497,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                       }
                     })}
                   />
-                  🛒 Новые заказы
+                   Новые заказы
                 </label>
                 <label>
                   <input
@@ -511,13 +511,13 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
                       }
                     })}
                   />
-                  ⚠️ Системные уведомления
+                   Системные уведомления
                 </label>
               </div>
             </div>
           </div>
           <div className="modal-footer">
-            <button onClick={() => setShowAddModal(false)} className="lg-btn">
+            <button onClick={() =>setShowAddModal(false)} className="lg-btn">
               Отмена
             </button>
             <button onClick={createUser} className="lg-btn lg-btn--primary">
@@ -532,20 +532,20 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
   return (
     <div className="telegram-users-manager">
       <div className="telegram-users-header">
-        <h2>👥 Управление пользователями Telegram</h2>
+        <h2>Управление пользователями Telegram</h2>
         <div className="header-actions">
           <button onClick={loadUsers} className="lg-btn" disabled={loading}>
-            {loading ? '⏳' : '🔄'} Обновить
+            {loading ? 'Обновление…' : 'Обновить'}
           </button>
-          <button onClick={() => setShowAddModal(true)} className="lg-btn lg-btn--primary">
-            ➕ Добавить пользователя
+          <button onClick={() =>setShowAddModal(true)} className="lg-btn lg-btn--primary">
+             Добавить пользователя
           </button>
         </div>
       </div>
 
       {error && (
         <div className="error-message">
-          ❌ {error}
+           {error}
         </div>
       )}
 
@@ -565,13 +565,13 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
             {loading ? (
               <tr>
                 <td colSpan={6} className="loading-cell">
-                  ⏳ Загрузка пользователей...
+                   Загрузка пользователей...
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
                 <td colSpan={6} className="empty-cell">
-                  📭 Пользователи не найдены
+                   Пользователи не найдены
                 </td>
               </tr>
             ) : (

@@ -145,8 +145,8 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
   const renderRules = () => (
     <div className="automation-rules">
       <div className="rules-header">
-        <h3>🤖 Правила автоматизации</h3>
-        <button className="add-rule-btn">➕ Добавить правило</button>
+        <h3>Правила автоматизации</h3>
+        <button className="add-rule-btn">Добавить правило</button>
       </div>
       
       <div className="rules-list">
@@ -193,21 +193,21 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
             <div className="rule-actions">
               <button 
                 className={`toggle-btn ${rule.is_active ? 'deactivate' : 'activate'}`}
-                onClick={() => handleToggleRule(rule.id)}
+                onClick={() =>handleToggleRule(rule.id)}
               >
-                {rule.is_active ? '⏸️ Отключить' : '▶️ Включить'}
+                {rule.is_active ? 'Отключить' : 'Включить'}
               </button>
               <button 
                 className="edit-btn"
-                onClick={() => {/* Редактировать правило */}}
+                onClick={() =>{/* Редактировать правило */}}
               >
-                ✏️ Редактировать
+                 Редактировать
               </button>
               <button 
                 className="delete-btn"
-                onClick={() => handleDeleteRule(rule.id)}
+                onClick={() =>handleDeleteRule(rule.id)}
               >
-                🗑️ Удалить
+                 Удалить
               </button>
             </div>
           </div>
@@ -218,7 +218,7 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
 
   const renderSettings = () => (
     <div className="automation-settings">
-      <h3>⚙️ Настройки автоматизации</h3>
+      <h3>Настройки автоматизации</h3>
       
       <div className="settings-section">
         <h4>Общие настройки</h4>
@@ -308,22 +308,22 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
 
   const renderHistory = () => (
     <div className="automation-history">
-      <h3>📜 История автоматизации</h3>
+      <h3>История автоматизации</h3>
       <div className="history-list">
         <div className="history-item">
           <div className="history-time">2025-01-20 10:30</div>
           <div className="history-action">Автозаказ NEVIA 150г/м² (1000 шт)</div>
-          <div className="history-status success">✅ Выполнено</div>
+          <div className="history-status success">Выполнено</div>
         </div>
         <div className="history-item">
           <div className="history-time">2025-01-18 14:15</div>
           <div className="history-action">Автозаказ Color Copy 200г/м² (500 шт)</div>
-          <div className="history-status pending">⏳ Ожидает подтверждения</div>
+          <div className="history-status pending">Ожидает подтверждения</div>
         </div>
         <div className="history-item">
           <div className="history-time">2025-01-15 09:45</div>
           <div className="history-action">Автозаказ NEVIA 150г/м² (1000 шт)</div>
-          <div className="history-status success">✅ Выполнено</div>
+          <div className="history-status success">Выполнено</div>
         </div>
       </div>
     </div>
@@ -333,7 +333,7 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
     return (
       <div className="warehouse-automation">
         <div className="automation-header">
-          <h2>🤖 Автоматизация склада</h2>
+          <h2>Автоматизация склада</h2>
           <button onClick={onClose} className="close-btn">✕</button>
         </div>
         <div className="loading">Загрузка данных автоматизации...</div>
@@ -344,28 +344,28 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
   return (
     <div className="warehouse-automation">
       <div className="automation-header">
-        <h2>🤖 Автоматизация склада</h2>
+        <h2>Автоматизация склада</h2>
         <button onClick={onClose} className="close-btn">✕</button>
       </div>
 
       <div className="automation-tabs">
         <button 
           className={activeTab === 'rules' ? 'active' : ''}
-          onClick={() => setActiveTab('rules')}
+          onClick={() =>setActiveTab('rules')}
         >
-          🤖 Правила
+           Правила
         </button>
         <button 
           className={activeTab === 'settings' ? 'active' : ''}
-          onClick={() => setActiveTab('settings')}
+          onClick={() =>setActiveTab('settings')}
         >
-          ⚙️ Настройки
+           Настройки
         </button>
         <button 
           className={activeTab === 'history' ? 'active' : ''}
-          onClick={() => setActiveTab('history')}
+          onClick={() =>setActiveTab('history')}
         >
-          📜 История
+           История
         </button>
       </div>
 
@@ -378,15 +378,15 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
       <div className="automation-footer">
         <button 
           className="test-btn"
-          onClick={() => {/* Тестировать автоматизацию */}}
+          onClick={() =>{/* Тестировать автоматизацию */}}
         >
-          🧪 Тестировать
+           Тестировать
         </button>
         <button 
           className="export-btn"
-          onClick={() => {/* Экспорт правил */}}
+          onClick={() =>{/* Экспорт правил */}}
         >
-          📊 Экспорт
+           Экспорт
         </button>
       </div>
     </div>

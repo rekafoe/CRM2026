@@ -162,7 +162,7 @@ export const OrderPoolFilters: React.FC<OrderPoolFiltersProps> = ({
         <button
           type="button"
           className="filters-secondary__sort-dir"
-          onClick={() => dispatchFilters({ type: 'toggleSortDirection' })}
+          onClick={() =>dispatchFilters({ type: 'toggleSortDirection' })}
           title="Направление сортировки"
           aria-label="Направление сортировки"
         >

@@ -740,7 +740,7 @@ router.get('/commodity-receipt-blank-pdf', asyncHandler(async (req, res) => {
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
   } catch (error: any) {
-    console.error('❌ Error generating commodity receipt blank PDF:', error);
+    console.error('Error generating commodity receipt blank PDF:', error);
     res.status(500).json({
       message: 'Ошибка генерации бланка товарного чека',
       error: error?.message || 'Неизвестная ошибка',
@@ -833,7 +833,7 @@ router.get('/:id/blank-pdf', asyncHandler(async (req, res) => {
     
     res.send(pdfBuffer);
   } catch (error: any) {
-    console.error('❌ Error generating order blank PDF:', error);
+    console.error('Error generating order blank PDF:', error);
     console.error('Error stack:', error?.stack);
     res.status(500).json({ 
       message: 'Ошибка генерации PDF бланка заказа',
@@ -864,7 +864,7 @@ router.get('/:id/commodity-receipt-pdf', asyncHandler(async (req, res) => {
 
     res.send(pdfBuffer);
   } catch (error: any) {
-    console.error('❌ Error generating commodity receipt PDF:', error);
+    console.error('Error generating commodity receipt PDF:', error);
     res.status(500).json({
       message: 'Ошибка генерации товарного чека',
       error: error?.message || 'Неизвестная ошибка',

@@ -37,16 +37,16 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
   // Обновляем локальное состояние при загрузке конфигурации
   React.useEffect(() => {
     if (telegramConfig) {
-      console.log('📱 Telegram config loaded:', telegramConfig);
+      console.log('Telegram config loaded:', telegramConfig);
       setConfig(telegramConfig);
     }
   }, [telegramConfig]);
 
   // Отладочная информация
   React.useEffect(() => {
-    console.log('🔧 Current config state:', config);
-    console.log('📊 Telegram config from API:', telegramConfig);
-    console.log('⏳ Config loading:', configLoading);
+    console.log('Current config state:', config);
+    console.log('Telegram config from API:', telegramConfig);
+    console.log('Config loading:', configLoading);
   }, [config, telegramConfig, configLoading]);
 
   const handleSaveConfig = async () => {
@@ -99,7 +99,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
 
   const renderConfig = () => (
     <div className="telegram-config">
-      <h3>⚙️ Настройка Telegram бота</h3>
+      <h3>Настройка Telegram бота</h3>
       
       <div className="config-section">
         <div className="config-item">
@@ -125,7 +125,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
             />
           </label>
           <small className="config-help">
-            💡 Токен можно получить у @BotFather в Telegram. Chat ID не требуется - система автоматически найдет пользователей.
+             Токен можно получить у @BotFather в Telegram. Chat ID не требуется - система автоматически найдет пользователей.
           </small>
         </div>
         
@@ -137,7 +137,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
           onClick={handleSaveConfig}
           disabled={configureTelegram.isPending}
         >
-          {configureTelegram.isPending ? 'Сохранение...' : '💾 Сохранить'}
+          {configureTelegram.isPending ? 'Сохранение...' : 'Сохранить'}
         </button>
       </div>
 
@@ -149,7 +149,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
 
   const renderTest = () => (
     <div className="telegram-test">
-      <h3>🧪 Тестирование Telegram</h3>
+      <h3>Тестирование Telegram</h3>
       
       <div className="test-section">
         <div className="test-item">
@@ -170,14 +170,14 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
             onClick={handleTestMessage}
             disabled={testTelegram.isPending || !config.enabled}
           >
-            {testTelegram.isPending ? 'Отправка...' : '📤 Отправить тест'}
+            {testTelegram.isPending ? 'Отправка...' : 'Отправить тест'}
           </button>
         </div>
       </div>
 
       {!config.enabled && (
         <div className="warning">
-          ⚠️ Telegram уведомления отключены. Включите их в настройках.
+           Telegram уведомления отключены. Включите их в настройках.
           <br />
           <small>Debug: config.enabled = {config.enabled ? 'true' : 'false'}</small>
         </div>
@@ -187,7 +187,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
 
   const renderUsers = () => (
     <div className="telegram-users">
-      <h3>👥 Управление пользователями</h3>
+      <h3>Управление пользователями</h3>
       
       <div className="users-section">
         <div className="users-stats">
@@ -237,7 +237,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
                 onClick={handleSendToRole}
                 disabled={sendToRole.isPending || !userMessage.trim()}
               >
-                {sendToRole.isPending ? 'Отправка...' : `📤 Отправить ${selectedRole}`}
+                {sendToRole.isPending ? 'Отправка...' : `Отправить ${selectedRole}`}
               </button>
               
               <button
@@ -245,7 +245,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
                 onClick={handleSendToAll}
                 disabled={sendToAllUsers.isPending || !userMessage.trim()}
               >
-                {sendToAllUsers.isPending ? 'Отправка...' : '📤 Отправить всем'}
+                {sendToAllUsers.isPending ? 'Отправка...' : 'Отправить всем'}
               </button>
             </div>
           </div>
@@ -266,9 +266,9 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
                   </div>
                   <div className="user-telegram">
                     {user.telegramChatId ? (
-                      <span className="telegram-connected">✅ Telegram подключен</span>
+                      <span className="telegram-connected">Telegram подключен</span>
                     ) : (
-                      <span className="telegram-disconnected">❌ Telegram не подключен</span>
+                      <span className="telegram-disconnected">Telegram не подключен</span>
                     )}
                   </div>
                 </div>
@@ -285,33 +285,33 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
       <div className="telegram-tabs">
         <button
           className={activeTab === 'config' ? 'active' : ''}
-          onClick={() => setActiveTab('config')}
+          onClick={() =>setActiveTab('config')}
         >
-          ⚙️ Настройки
+           Настройки
         </button>
         <button
           className={activeTab === 'test' ? 'active' : ''}
-          onClick={() => setActiveTab('test')}
+          onClick={() =>setActiveTab('test')}
         >
-          🧪 Тест
+           Тест
         </button>
         <button
           className={activeTab === 'users' ? 'active' : ''}
-          onClick={() => setActiveTab('users')}
+          onClick={() =>setActiveTab('users')}
         >
-          👥 Пользователи
+           Пользователи
         </button>
         <button
           className={activeTab === 'telegram-users' ? 'active' : ''}
-          onClick={() => setActiveTab('telegram-users')}
+          onClick={() =>setActiveTab('telegram-users')}
         >
-          📱 Telegram пользователи
+           Telegram пользователи
         </button>
         <button
           className={activeTab === 'auto-settings' ? 'active' : ''}
-          onClick={() => setActiveTab('auto-settings')}
+          onClick={() =>setActiveTab('auto-settings')}
         >
-          ⚙️ Автонастройки
+           Автонастройки
         </button>
       </div>
 

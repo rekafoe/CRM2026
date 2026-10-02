@@ -33,7 +33,7 @@ function all(sql, params = []) {
     await run("INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, description) VALUES ('Бумага A3 130г','шт',20,15,0.35,NULL,2,'Тестовая бумага A3')");
 
     const mats = await all('SELECT id, name, supplier_id FROM materials ORDER BY id DESC LIMIT 2');
-    console.log('✅ Seeded materials:', mats);
+    console.log('Seeded materials:', mats);
   } catch (e) {
     console.error('Seed error:', e.message);
     process.exit(1);

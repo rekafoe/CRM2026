@@ -11,7 +11,7 @@ export async function up(db: Database): Promise<void> {
     ['Рулонная бумага']
   )
   if (row) {
-    console.log('ℹ️ Категория «Рулонная бумага» уже существует')
+    console.log('Категория «Рулонная бумага» уже существует')
     return
   }
 
@@ -29,10 +29,10 @@ export async function up(db: Database): Promise<void> {
       ['Рулонная бумага', 'Рулонная бумага для рулонной печати (учёт в метрах, без раскладки)']
     )
   }
-  console.log('✅ Добавлена категория материалов «Рулонная бумага»')
+  console.log('Добавлена категория материалов «Рулонная бумага»')
 }
 
 export async function down(db: Database): Promise<void> {
   await db.run('DELETE FROM material_categories WHERE name = ?', ['Рулонная бумага'])
-  console.log('✅ Категория «Рулонная бумага» удалена')
+  console.log('Категория «Рулонная бумага» удалена')
 }

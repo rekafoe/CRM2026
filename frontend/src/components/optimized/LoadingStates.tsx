@@ -89,7 +89,7 @@ export const EmptyState: React.FC<{
   title: string;
   description?: string;
   action?: React.ReactNode;
-}> = ({ icon = '📋', title, description, action }) => (
+}> = ({ icon = '', title, description, action }) => (
   <div className="empty-state">
     <div className="empty-state-icon">{icon}</div>
     <h3 className="empty-state-title">{title}</h3>
@@ -109,7 +109,7 @@ export const ErrorState: React.FC<{
   onRetry 
 }) => (
   <div className="error-state">
-    <div className="error-state-icon">⚠️</div>
+    <div className="error-state-icon"></div>
     <h3 className="error-state-title">{title}</h3>
     <p className="error-state-message">{message}</p>
     {onRetry && (

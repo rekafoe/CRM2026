@@ -70,7 +70,7 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
 
       {filteredItems.length === 0 ? (
         <EmptyState
-          icon="📈"
+          icon=""
           title="Нет настроек наценок"
           description={
             error

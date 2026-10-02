@@ -298,7 +298,7 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
       {typeof productId === 'number' && !configLoading && !configError && subtypeSizes.length === 0 && (
         <p className="design-bindings-empty">
           Нет размеров — добавьте в{' '}
-          <button type="button" className="subtype-designs-card__matrix-link" onClick={() => navigate(`/adminpanel/products/${productId}`)}>
+          <button type="button" className="subtype-designs-card__matrix-link" onClick={() =>navigate(`/adminpanel/products/${productId}`)}>
             карточке продукта
           </button>
           .
@@ -373,7 +373,7 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
                         <button
                           type="button"
                           className="subtype-designs-item__remove"
-                          onClick={() => void handleRemove(link.id)}
+                          onClick={() =>void handleRemove(link.id)}
                           title="Отвязать"
                         >
                           <AppIcon name="x" size="xs" />
@@ -389,13 +389,13 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
       )}
 
       {modalOpen && modalSizeId && (
-        <div className="subtype-designs-modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="subtype-designs-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="subtype-designs-modal-overlay" onClick={() =>setModalOpen(false)}>
+          <div className="subtype-designs-modal" onClick={(e) =>e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="subtype-designs-modal__header">
               <h3 className="subtype-designs-modal__title">
                 {modalSize?.label ?? modalSizeId}
               </h3>
-              <button type="button" className="subtype-designs-modal__close" onClick={() => setModalOpen(false)}>
+              <button type="button" className="subtype-designs-modal__close" onClick={() =>setModalOpen(false)}>
                 <AppIcon name="x" size="sm" />
               </button>
             </div>

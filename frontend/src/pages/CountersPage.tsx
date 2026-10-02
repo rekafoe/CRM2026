@@ -327,10 +327,10 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const getCashStatusIcon = () => {
     const status = getCashStatus();
     switch (status) {
-      case 'success': return '✅';
-      case 'warning': return '⚠️';
-      case 'error': return '❌';
-      default: return '💰';
+      case 'success': return '';
+      case 'warning': return '';
+      case 'error': return '';
+      default: return '';
     }
   };
 
@@ -396,7 +396,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       <div className="counters-page">
         <div className="counters-error">
           <p>Ошибка загрузки пользователя</p>
-          <button onClick={() => navigate('/')}>Вернуться на главную</button>
+          <button onClick={() =>navigate('/')}>Вернуться на главную</button>
         </div>
       </div>
     );
@@ -408,7 +408,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         <div className="header-content">
           {!isModal && (
             <button 
-              onClick={() => navigate('/')} 
+              onClick={() =>navigate('/')} 
               className="back-btn"
               title="Вернуться на главную"
             >
@@ -456,7 +456,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       {error && (
         <div className="counters-error-banner">
           <AppIcon name="warning" size="xs" /> {error}
-          <button onClick={() => setError(null)} aria-label="Закрыть"><AppIcon name="x" size="xs" /></button>
+          <button onClick={() =>setError(null)} aria-label="Закрыть"><AppIcon name="x" size="xs" /></button>
         </div>
       )}
 
@@ -470,14 +470,14 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         <button
           type="button"
           className={`counters-tab ${activeTab === 'cash' ? 'active' : ''}`}
-          onClick={() => setActiveTab('cash')}
+          onClick={() =>setActiveTab('cash')}
         >
           <AppIcon name="wallet" size="xs" /> Касса
         </button>
         <button
           type="button"
           className={`counters-tab ${activeTab === 'printers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('printers')}
+          onClick={() =>setActiveTab('printers')}
         >
           <AppIcon name="printer" size="xs" /> Принтеры
         </button>
@@ -637,7 +637,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                   </div>
                   <button
                     className="edit-btn"
-                    onClick={() => handlePrinterEdit(printer.id)}
+                    onClick={() =>handlePrinterEdit(printer.id)}
                     disabled={saving}
                     title="Редактировать"
                   >
@@ -715,7 +715,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                     </button>
                     <button
                       className="cancel-btn"
-                      onClick={() => {
+                      onClick={() =>{
                         setEditingPrinter(null);
                         setNewCounterValue('');
                       }}

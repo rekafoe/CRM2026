@@ -400,7 +400,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({
     <div className={`pricing-management pricing-glass${variant === 'embedded' ? ' pricing-management--embedded' : ''}`}>
       {variant === 'standalone' && (
         <div className="pricing-header">
-          <h2>💰 Управление ценами</h2>
+          <h2>Управление ценами</h2>
           <p>Настройте цены печати, услуг и наценки для различных категорий продуктов</p>
         </div>
       )}
@@ -439,21 +439,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({
             <button
               type="button"
               className={`orders-list-tab ${activeTab === 'tech' ? 'active' : ''}`}
-              onClick={() => switchTab('tech')}
+              onClick={() =>switchTab('tech')}
             >
               Типы печати
             </button>
             <button
               type="button"
               className={`orders-list-tab ${activeTab === 'printers' ? 'active' : ''}`}
-              onClick={() => switchTab('printers')}
+              onClick={() =>switchTab('printers')}
             >
               Принтеры
             </button>
             <button
               type="button"
               className={`orders-list-tab ${activeTab === 'print' ? 'active' : ''}`}
-              onClick={() => switchTab('print')}
+              onClick={() =>switchTab('print')}
             >
               Цены печати
             </button>
@@ -466,28 +466,28 @@ const PricingManagement: React.FC<PricingManagementProps> = ({
               <button
                 type="button"
                 className={`orders-list-tab ${activeTab === 'services' ? 'active' : ''}`}
-                onClick={() => switchTab('services')}
+                onClick={() =>switchTab('services')}
               >
                 Услуги
               </button>
               <button
                 type="button"
                 className={`orders-list-tab ${activeTab === 'markup' ? 'active' : ''}`}
-                onClick={() => switchTab('markup')}
+                onClick={() =>switchTab('markup')}
               >
                 Наценки
               </button>
               <button
                 type="button"
                 className={`orders-list-tab ${activeTab === 'discounts' ? 'active' : ''}`}
-                onClick={() => switchTab('discounts')}
+                onClick={() =>switchTab('discounts')}
               >
                 Скидки за объём
               </button>
               <button
                 type="button"
                 className={`orders-list-tab ${activeTab === 'price-types' ? 'active' : ''}`}
-                onClick={() => switchTab('price-types')}
+                onClick={() =>switchTab('price-types')}
               >
                 Типы цен
               </button>

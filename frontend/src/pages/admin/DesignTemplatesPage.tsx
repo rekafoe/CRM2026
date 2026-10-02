@@ -771,7 +771,7 @@ export const DesignTemplatesPage: React.FC = () => {
               <span className="design-template-royalty" title="Плата и % — на всю семью (синхронизируются при сохранении)">
                 <BynSymbol className="design-template-royalty__sign" />
                 {formatAuthorRoyaltyLine(t)}
-                <span className="design-template-royalty-hint"> · на семью</span>
+                <span className="design-template-royalty-hint">· на семью</span>
               </span>
             )}
             <div className="design-template-actions design-template-actions--family-top">
@@ -780,7 +780,7 @@ export const DesignTemplatesPage: React.FC = () => {
                   <button
                     type="button"
                     className="lg-btn"
-                    onClick={() => openImportIntoFamily(family)}
+                    onClick={() =>openImportIntoFamily(family)}
                     title="Импорт ещё одного размера в эту семью"
                   >
                     <AppIcon name="plus" size="xs" /> Добавить размер
@@ -789,25 +789,25 @@ export const DesignTemplatesPage: React.FC = () => {
                 <button
                   type="button"
                   className="lg-btn lg-btn--icon"
-                  onClick={() => openEdit(t)}
+                  onClick={() =>openEdit(t)}
                   title="Карточка семьи (автор, плата Y, % Z)"
                   aria-label="Карточка"
                 >
                   <AppIcon name="edit" size="xs" />
                 </button>
-                <button type="button" className="lg-btn lg-btn--icon" onClick={() => setInfoTemplate(t)} title="Импорт и метаданные" aria-label="Инфо">
+                <button type="button" className="lg-btn lg-btn--icon" onClick={() =>setInfoTemplate(t)} title="Импорт и метаданные" aria-label="Инфо">
                   <AppIcon name="info" size="xs" />
                 </button>
-                <button type="button" className="lg-btn lg-btn--icon" onClick={() => setReimportTemplate(t)} title="Обновить из SVG (первый вариант)" aria-label="Обновить SVG">
+                <button type="button" className="lg-btn lg-btn--icon" onClick={() =>setReimportTemplate(t)} title="Обновить из SVG (первый вариант)" aria-label="Обновить SVG">
                   <AppIcon name="download" size="xs" />
                 </button>
-                <button type="button" className="lg-btn lg-btn--icon" onClick={() => void handleDuplicate(t)} title="Копия с новым кодом семьи" aria-label="Копия">
+                <button type="button" className="lg-btn lg-btn--icon" onClick={() =>void handleDuplicate(t)} title="Копия с новым кодом семьи" aria-label="Копия">
                   <AppIcon name="copy" size="xs" />
                 </button>
                 <button
                   type="button"
                   className="lg-btn lg-btn--icon lg-btn--danger"
-                  onClick={() => void handleDeleteFamily(family)}
+                  onClick={() =>void handleDeleteFamily(family)}
                   title="Удалить всю семью"
                   aria-label="Удалить семью"
                 >
@@ -852,7 +852,7 @@ export const DesignTemplatesPage: React.FC = () => {
             type="button"
             role="tab"
             className={`lg-btn${pageTab === 'catalog' ? ' lg-btn--primary' : ''}`}
-            onClick={() => setPageTab('catalog')}
+            onClick={() =>setPageTab('catalog')}
           >
             Каталог
             <span className="design-templates-tab__count">{groupTemplatesIntoFamilies(templates).length}</span>
@@ -861,7 +861,7 @@ export const DesignTemplatesPage: React.FC = () => {
             type="button"
             role="tab"
             className={`lg-btn${pageTab === 'bindings' ? ' lg-btn--primary' : ''}`}
-            onClick={() => setPageTab('bindings')}
+            onClick={() =>setPageTab('bindings')}
           >
             Привязки
           </button>
@@ -869,7 +869,7 @@ export const DesignTemplatesPage: React.FC = () => {
             type="button"
             role="tab"
             className={`lg-btn${pageTab === 'analytics' ? ' lg-btn--primary' : ''}`}
-            onClick={() => setPageTab('analytics')}
+            onClick={() =>setPageTab('analytics')}
           >
             Аналитика
           </button>
@@ -889,7 +889,7 @@ export const DesignTemplatesPage: React.FC = () => {
           <button
             type="button"
             className="design-templates-help__toggle"
-            onClick={() => setHelpOpen((v) => !v)}
+            onClick={() =>setHelpOpen((v) => !v)}
             aria-expanded={helpOpen}
           >
             <span className="design-templates-help__chevron" aria-hidden>{helpOpen ? '▾' : '▸'}</span>
@@ -913,13 +913,13 @@ export const DesignTemplatesPage: React.FC = () => {
           <button type="button" className="lg-btn" onClick={openCreate}>
             <AppIcon name="plus" size="xs" /> Вручную
           </button>
-          <button type="button" className="lg-btn" onClick={() => setCategoriesModalOpen(true)}>
+          <button type="button" className="lg-btn" onClick={() =>setCategoriesModalOpen(true)}>
             <AppIcon name="folder" size="xs" /> Категории
           </button>
-          <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/design-fonts')}>
+          <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-fonts')}>
             <AppIcon name="document" size="xs" /> Шрифты
           </button>
-          <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/design-assets')}>
+          <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-assets')}>
             <AppIcon name="puzzle" size="xs" /> Клипарты
           </button>
           <input
@@ -1011,7 +1011,7 @@ export const DesignTemplatesPage: React.FC = () => {
                   <button
                     type="button"
                     className="design-templates-category-card__header"
-                    onClick={() => toggleSectionCollapsed(section.key)}
+                    onClick={() =>toggleSectionCollapsed(section.key)}
                     aria-expanded={!collapsed}
                   >
                     <span className="design-templates-category-card__chevron" aria-hidden>
@@ -1129,11 +1129,11 @@ export const DesignTemplatesPage: React.FC = () => {
                     {form.site_preview_url ? (
                       <div className="preview-preview">
                         <img src={resolveTemplatePreviewUrl(form.site_preview_url, API_BASE_URL) ?? ''} alt="" />
-                        <button type="button" onClick={() => setForm((p) => ({ ...p, site_preview_url: '' }))}>×</button>
+                        <button type="button" onClick={() =>setForm((p) => ({ ...p, site_preview_url: '' }))}>×</button>
                       </div>
                     ) : null}
                     <input ref={sitePreviewFileInputRef} type="file" accept="image/*" onChange={handleSitePreviewUpload} className="visually-hidden-file-input" />
-                    <button type="button" className="lg-btn" onClick={() => sitePreviewFileInputRef.current?.click()}>Загрузить превью сайта</button>
+                    <button type="button" className="lg-btn" onClick={() =>sitePreviewFileInputRef.current?.click()}>Загрузить превью сайта</button>
                     <p className="form-hint">Основная картинка на сайте. Если пусто — сайт возьмёт авто-превью импорта.</p>
                   </div>
                 </div>
@@ -1143,11 +1143,11 @@ export const DesignTemplatesPage: React.FC = () => {
                     {form.preview_url ? (
                       <div className="preview-preview">
                         <img src={resolveTemplatePreviewUrl(form.preview_url, API_BASE_URL) ?? ''} alt="" />
-                        <button type="button" onClick={() => setForm((p) => ({ ...p, preview_url: '' }))}>×</button>
+                        <button type="button" onClick={() =>setForm((p) => ({ ...p, preview_url: '' }))}>×</button>
                       </div>
                     ) : null}
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePreviewUpload} className="visually-hidden-file-input" />
-                    <button type="button" className="lg-btn" onClick={() => fileInputRef.current?.click()}>Загрузить изображение</button>
+                    <button type="button" className="lg-btn" onClick={() =>fileInputRef.current?.click()}>Загрузить изображение</button>
                   </div>
                 </div>
               </div>
@@ -1213,7 +1213,7 @@ export const DesignTemplatesPage: React.FC = () => {
                 <p className="royalty-preview">
                   <BynSymbol />
                   {formatBynAmount(royaltyPreview.fee)} × {royaltyPreview.pct}% → {formatBynAmount(royaltyPreview.payout)}/ед.
-                  <span className="design-template-royalty-hint"> (не в цене клиента)</span>
+                  <span className="design-template-royalty-hint">(не в цене клиента)</span>
                 </p>
               )}
             </section>
@@ -1244,8 +1244,8 @@ export const DesignTemplatesPage: React.FC = () => {
             </section>
           </div>
           <div className="form-actions">
-            <button type="button" className="lg-btn" onClick={() => setModalOpen(false)}>Отмена</button>
-            <button type="button" className="lg-btn lg-btn--primary" onClick={() => void handleSave()}>Сохранить</button>
+            <button type="button" className="lg-btn" onClick={() =>setModalOpen(false)}>Отмена</button>
+            <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void handleSave()}>Сохранить</button>
           </div>
         </div>
       </Modal>
@@ -1268,7 +1268,7 @@ export const DesignTemplatesPage: React.FC = () => {
             <label>Исходник для CRM</label>
             <div className="preview-upload">
               <input ref={importSourceFileInputRef} type="file" accept=".ai,.cdr,.indd,.indt,.pdf,.svg" onChange={(e) => setImportForm((p) => ({ ...p, sourceFile: e.target.files?.[0] ?? null }))} className="visually-hidden-file-input" />
-              <button type="button" className="lg-btn" onClick={() => importSourceFileInputRef.current?.click()}>Выбрать исходник</button>
+              <button type="button" className="lg-btn" onClick={() =>importSourceFileInputRef.current?.click()}>Выбрать исходник</button>
               <p className="form-hint">{importForm.sourceFile ? importForm.sourceFile.name : 'AI, CDR, PDF…'}</p>
             </div>
           </div>
@@ -1276,7 +1276,7 @@ export const DesignTemplatesPage: React.FC = () => {
             <label>SVG/ZIP для редактора *</label>
             <div className="preview-upload">
               <input ref={importFileInputRef} type="file" accept=".svg,.zip" onChange={(e) => setImportForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))} className="visually-hidden-file-input" />
-              <button type="button" className="lg-btn" onClick={() => importFileInputRef.current?.click()}>Выбрать SVG/ZIP</button>
+              <button type="button" className="lg-btn" onClick={() =>importFileInputRef.current?.click()}>Выбрать SVG/ZIP</button>
               <p className="form-hint">
                 {importForm.file
                   ? importForm.file.name
@@ -1387,8 +1387,8 @@ export const DesignTemplatesPage: React.FC = () => {
             </div>
           )}
           <div className="form-actions">
-            <button type="button" className="lg-btn" onClick={() => setImportModalOpen(false)}>Закрыть</button>
-            <button type="button" className="lg-btn lg-btn--primary" onClick={() => void handleImport()} disabled={importing}>
+            <button type="button" className="lg-btn" onClick={() =>setImportModalOpen(false)}>Закрыть</button>
+            <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void handleImport()} disabled={importing}>
               {importing ? 'Импорт…' : 'Импортировать'}
             </button>
           </div>
@@ -1433,7 +1433,7 @@ export const DesignTemplatesPage: React.FC = () => {
                 {!infoParsed.fontsResolved && (
                   <p className="design-template-fonts-panel__hint">
                     Загрузите недостающие шрифты в{' '}
-                    <button type="button" className="design-template-link-btn" onClick={() => { setInfoTemplate(null); navigate('/adminpanel/design-fonts'); }}>
+                    <button type="button" className="design-template-link-btn" onClick={() =>{ setInfoTemplate(null); navigate('/adminpanel/design-fonts'); }}>
                       библиотеку шрифтов
                     </button>
                     {' '}или приложите папку fonts/ к ZIP при reimport.
@@ -1448,13 +1448,13 @@ export const DesignTemplatesPage: React.FC = () => {
               </div>
             )}
             <div className="form-actions">
-              <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); setReimportTemplate(infoTemplate); }}>
+              <button type="button" className="lg-btn" onClick={() =>{ setInfoTemplate(null); setReimportTemplate(infoTemplate); }}>
                 Обновить из SVG
               </button>
               <button
                 type="button"
                 className="lg-btn lg-btn--primary"
-                onClick={() => {
+                onClick={() =>{
                   const id = infoTemplate.id;
                   setInfoTemplate(null);
                   navigate(`/adminpanel/design-editor/${id}`);
@@ -1462,16 +1462,16 @@ export const DesignTemplatesPage: React.FC = () => {
               >
                 Редактировать макет
               </button>
-              <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); openEdit(infoTemplate); }}>Редактировать карточку</button>
+              <button type="button" className="lg-btn" onClick={() =>{ setInfoTemplate(null); openEdit(infoTemplate); }}>Редактировать карточку</button>
               {(infoParsed.productId != null || infoParsed.typeId != null) && (
-                <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); openBindingsForTemplate(infoTemplate); }}>
+                <button type="button" className="lg-btn" onClick={() =>{ setInfoTemplate(null); openBindingsForTemplate(infoTemplate); }}>
                   Привязки к продукту
                 </button>
               )}
               <button
                 type="button"
                 className="lg-btn"
-                onClick={() => {
+                onClick={() =>{
                   void openSiteSandboxForDesignTemplate(infoTemplate).catch((err) => {
                     window.alert(err instanceof Error ? err.message : 'Не удалось открыть редактор на сайте');
                   });

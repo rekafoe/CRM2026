@@ -117,7 +117,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="app-icon-btn__label">Счётчики</span>
         </button>
         <button
-          onClick={() => navigate('/earnings')}
+          onClick={() =>navigate('/earnings')}
           title="Мои проценты"
           aria-label="Мои проценты"
           className="app-icon-btn app-icon-btn--with-label"
@@ -126,7 +126,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="app-icon-btn__label">Мои проценты</span>
         </button>
         <button
-          onClick={() => navigate('/clients')}
+          onClick={() =>navigate('/clients')}
           title="Клиенты CRM"
           aria-label="Клиенты CRM"
           className="app-icon-btn app-icon-btn--with-label"
@@ -135,7 +135,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="app-icon-btn__label">Клиенты</span>
         </button>
         <button
-          onClick={() => navigate('/knowledge')}
+          onClick={() =>navigate('/knowledge')}
           title="База знаний"
           aria-label="База знаний"
           className="app-icon-btn app-icon-btn--with-label"
@@ -146,7 +146,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {isAdmin && (
           <>
             <button 
-              onClick={() => window.location.href = '/adminpanel/reports'}
+              onClick={() =>window.location.href = '/adminpanel/reports'}
               title="Аналитика и отчёты" 
               aria-label="Аналитика и отчёты" 
               className="app-icon-btn app-icon-btn--with-label"
@@ -155,7 +155,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               <span className="app-icon-btn__label">Отчёты</span>
             </button>
             <button 
-              onClick={() => window.location.href = '/adminpanel'}
+              onClick={() =>window.location.href = '/adminpanel'}
               title="Админ панель" 
               aria-label="Админ панель" 
               className="app-icon-btn"

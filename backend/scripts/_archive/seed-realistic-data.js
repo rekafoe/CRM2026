@@ -5,12 +5,12 @@ const path = require('path');
 const dbPath = path.join(__dirname, '..', 'data.db');
 const db = new sqlite3.Database(dbPath);
 
-console.log('🌱 Заполнение CRM реалистичными тестовыми данными...');
+console.log('Заполнение CRM реалистичными тестовыми данными...');
 
 // Очистка существующих данных
 const clearData = () => {
   return new Promise((resolve, reject) => {
-    console.log('🧹 Очистка существующих данных...');
+    console.log('Очистка существующих данных...');
     
     const tables = [
       'material_moves',
@@ -38,7 +38,7 @@ const clearData = () => {
 // Создание пользователей
 const createUsers = () => {
   return new Promise((resolve, reject) => {
-    console.log('👥 Создание пользователей...');
+    console.log('Создание пользователей...');
     
     const users = [
       { name: 'Администратор', email: 'admin@printcore.by', role: 'admin', api_token: 'admin-token-123' },
@@ -62,7 +62,7 @@ const createUsers = () => {
 // Создание категорий материалов
 const createCategories = () => {
   return new Promise((resolve, reject) => {
-    console.log('📂 Создание категорий материалов...');
+    console.log('Создание категорий материалов...');
     
     const categories = [
       { name: 'Бумага офсетная', color: '#3b82f6', description: 'Основная бумага для печати' },
@@ -91,7 +91,7 @@ const createCategories = () => {
 // Создание поставщиков
 const createSuppliers = () => {
   return new Promise((resolve, reject) => {
-    console.log('🏢 Создание поставщиков...');
+    console.log('Создание поставщиков...');
     
     const suppliers = [
       { 
@@ -172,7 +172,7 @@ const createSuppliers = () => {
 // Создание материалов с реалистичными данными
 const createMaterials = () => {
   return new Promise((resolve, reject) => {
-    console.log('📦 Создание материалов...');
+    console.log('Создание материалов...');
     
     const materials = [
       // Бумага офсетная
@@ -244,7 +244,7 @@ const createMaterials = () => {
 // Создание движений материалов для демонстрации аналитики
 const createMaterialMovements = () => {
   return new Promise((resolve, reject) => {
-    console.log('📊 Создание движений материалов...');
+    console.log('Создание движений материалов...');
     
     const movements = [];
     const now = new Date();
@@ -331,17 +331,17 @@ const seedData = async () => {
     await createMaterials();
     await createMaterialMovements();
     
-    console.log('✅ Тестовые данные успешно созданы!');
-    console.log('\n📊 Создано:');
-    console.log('👥 3 пользователя (админ, менеджер, оператор)');
-    console.log('📂 8 категорий материалов');
-    console.log('🏢 6 поставщиков (5 активных, 1 неактивный)');
-    console.log('📦 27 материалов с разными остатками');
-    console.log('📈 ~500 движений материалов за 6 месяцев');
-    console.log('\n🎯 Теперь можно протестировать всю аналитику!');
+    console.log('Тестовые данные успешно созданы!');
+    console.log('\n Создано:');
+    console.log('3 пользователя (админ, менеджер, оператор)');
+    console.log('8 категорий материалов');
+    console.log('6 поставщиков (5 активных, 1 неактивный)');
+    console.log('27 материалов с разными остатками');
+    console.log('~500 движений материалов за 6 месяцев');
+    console.log('\n Теперь можно протестировать всю аналитику!');
     
   } catch (error) {
-    console.error('❌ Ошибка при создании тестовых данных:', error);
+    console.error('Ошибка при создании тестовых данных:', error);
   } finally {
     db.close();
   }

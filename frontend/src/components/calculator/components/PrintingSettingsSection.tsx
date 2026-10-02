@@ -310,7 +310,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     return orderModes(fromTemplate);
   }, [printTechnology, isColorOnly, backendProductSchema, effectiveSizesProp, selectedSizeId, isRollWideM2Mode]);
 
-  // 🆕 Устанавливаем дефолтные значения для селекторов печати
+  //  Устанавливаем дефолтные значения для селекторов печати
   useEffect(() => {
     if (!selectedProduct?.id) return;
 
@@ -323,7 +323,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     }
   }, [selectedProduct?.id, allowedPrintTechnologies, printTechnology, onPrintTechnologyChange]);
 
-  // 🆕 Устанавливаем первый режим цвета, если тип печати выбран, но режим не выбран или недопустим
+  //  Устанавливаем первый режим цвета, если тип печати выбран, но режим не выбран или недопустим
   useEffect(() => {
     if (!printTechnology) return;
 

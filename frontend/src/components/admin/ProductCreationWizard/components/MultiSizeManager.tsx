@@ -132,7 +132,7 @@ export const MultiSizeManager: React.FC<MultiSizeManagerProps> = ({
 
       {productType === 'multi_page' && sizes.length > 0 && (
         <div className="text-xs text-secondary p-3 bg-info/10 rounded border border-info/20">
-          💡 Для многостраничных изделий все размеры будут доступны при выборе параметра "format"
+           Для многостраничных изделий все размеры будут доступны при выборе параметра "format"
         </div>
       )}
     </div>

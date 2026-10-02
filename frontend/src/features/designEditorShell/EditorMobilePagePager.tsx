@@ -83,7 +83,7 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
           className="editor-mobile-page-pager__nav"
           disabled={!prevItem || transitionBusy}
           aria-label="Предыдущая страница"
-          onClick={() => prevItem && onGoTo(prevItem.goToPage)}
+          onClick={() =>prevItem && onGoTo(prevItem.goToPage)}
         >
           ‹
         </button>
@@ -108,7 +108,7 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
           className="editor-mobile-page-pager__nav"
           disabled={!nextItem || transitionBusy}
           aria-label="Следующая страница"
-          onClick={() => nextItem && onGoTo(nextItem.goToPage)}
+          onClick={() =>nextItem && onGoTo(nextItem.goToPage)}
         >
           ›
         </button>

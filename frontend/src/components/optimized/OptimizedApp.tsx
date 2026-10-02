@@ -387,7 +387,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           />
 
           {showTopPicker && (
-            <div className="topbar-picker" onMouseLeave={() => setShowTopPicker(false)}>
+            <div className="topbar-picker" onMouseLeave={() =>setShowTopPicker(false)}>
               <div className="row">
                 <span style={{ width: 90 }}>Дата:</span>
                 <input 
@@ -419,7 +419,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 className="icon-btn"
                 title="Добавить заказ"
                 aria-label="Добавить заказ"
-                onClick={async () => {
+                onClick={async () =>{
                   try {
                     const order = await orderHandlers.handleCreateOrder();
                     if (order?.id) {
@@ -438,7 +438,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 title="Вернуть выбранный заказ в пул"
                 aria-label="Вернуть выбранный заказ в пул"
                 disabled={!selectedOrder}
-                onClick={async () => {
+                onClick={async () =>{
                   if (!selectedOrder) return;
                   await handleReturnOrderToPool(selectedOrder);
                 }}
@@ -448,14 +448,14 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               <button
                 type="button"
                 className={`orders-list-tab ${ordersListTab === 'orders' ? 'active' : ''}`}
-                onClick={() => setOrdersListTab('orders')}
+                onClick={() =>setOrdersListTab('orders')}
               >
                 Заказы
               </button>
               <button
                 type="button"
                 className={`orders-list-tab ${ordersListTab === 'issued' ? 'active' : ''}`}
-                onClick={() => setOrdersListTab('issued')}
+                onClick={() =>setOrdersListTab('issued')}
               >
                 Выданные
               </button>
@@ -503,7 +503,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                     <p>За выбранную дату выданных заказов нет</p>
                     {selectedId && (
                       <button 
-                        onClick={() => setSelectedId(null)}
+                        onClick={() =>setSelectedId(null)}
                         style={{ 
                           marginTop: '10px', 
                           padding: '8px 16px', 
@@ -525,7 +525,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                         <p>Заказ с ID {selectedId} не найден в списке</p>
                         <p>Всего заказов: {orders.length}</p>
                         <button 
-                          onClick={() => setSelectedId(null)}
+                          onClick={() =>setSelectedId(null)}
                           style={{ 
                             marginTop: '10px', 
                             padding: '8px 16px', 
@@ -816,33 +816,33 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           <div className="new-order-management-container">
             <div className="new-order-management-header">
               <div className="flex items-center gap-4">
-                <h2>📋 Управление заказами</h2>
+                <h2>Управление заказами</h2>
                 <div className="flex bg-gray-100 rounded-lg p-1">
                   <button
-                    onClick={() => setOrderManagementTab('pool')}
+                    onClick={() =>setOrderManagementTab('pool')}
                     className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                       orderManagementTab === 'pool'
                         ? 'bg-white text-blue-600 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    📋 Пул заказов
+                     Пул заказов
                   </button>
                   <button
-                    onClick={() => setOrderManagementTab('page')}
+                    onClick={() =>setOrderManagementTab('page')}
                     className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                       orderManagementTab === 'page'
                         ? 'bg-white text-green-600 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    📄 Мои заказы
+                     Мои заказы
                   </button>
                 </div>
               </div>
               <button 
                 className="close-btn"
-                onClick={() => {
+                onClick={() =>{
                   setShowOrderPool(false);
                   setShowUserOrderPage(false);
                 }}
@@ -883,7 +883,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               <h2><AppIcon name="chart-bar" size="sm" /> Счётчики принтеров и кассы</h2>
               <button 
                 className="close-btn"
-                onClick={() => setShowCountersPage(false)}
+                onClick={() =>setShowCountersPage(false)}
                 type="button"
                 aria-label="Закрыть"
               >

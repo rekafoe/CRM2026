@@ -111,7 +111,7 @@ const TrimSizeSection: React.FC<TrimSizeSectionProps> = ({
             <button
               type="button"
               className="link-button"
-              onClick={() => setShowHelp((v) => !v)}
+              onClick={() =>setShowHelp((v) => !v)}
             >
               {showHelp ? 'Скрыть подсказку' : 'Как вводить нестандарт?'}
             </button>
@@ -123,7 +123,7 @@ const TrimSizeSection: React.FC<TrimSizeSectionProps> = ({
               onClick={handleSwap}
               disabled={!isValid}
             >
-              ↔️ Поменять ширину/высоту
+               Поменять ширину/высоту
             </Button>
           </div>
         </div>
@@ -192,7 +192,7 @@ const TrimSizeSection: React.FC<TrimSizeSectionProps> = ({
                   key={index}
                   type="button"
                   className="format-chip format-chip--existing"
-                  onClick={() => applyFormat(format)}
+                  onClick={() =>applyFormat(format)}
                   title={`Применить ${format.display}`}
                 >
                   {format.display}
@@ -211,7 +211,7 @@ const TrimSizeSection: React.FC<TrimSizeSectionProps> = ({
                 key={format.label}
                 type="button"
                 className="format-chip"
-                onClick={() => applyFormat(format)}
+                onClick={() =>applyFormat(format)}
                 title={`Применить ${format.label}: ${format.width}×${format.height} мм`}
               >
                 {format.label}
@@ -232,7 +232,7 @@ const TrimSizeSection: React.FC<TrimSizeSectionProps> = ({
             onClick={onSave}
             disabled={saving || !isValid}
           >
-            {saving ? 'Сохранение…' : '💾 Сохранить и добавить в параметры'}
+            {saving ? 'Сохранение…' : 'Сохранить и добавить в параметры'}
           </Button>
         </div>
       </div>

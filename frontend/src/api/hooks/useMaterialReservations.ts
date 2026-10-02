@@ -52,7 +52,7 @@ export const useCreateMaterialReservation = () => {
     mutationFn: (data: CreateMaterialReservationRequest) => 
       materialReservationApi.createReservation(data),
     onSuccess: (data) => {
-      console.log('✅ [useCreateMaterialReservation] Created reservation:', data.id);
+      console.log('[useCreateMaterialReservation] Created reservation:', data.id);
       
       // Обновляем кэш
       queryClient.invalidateQueries({ queryKey: materialReservationKeys.lists() });
@@ -63,7 +63,7 @@ export const useCreateMaterialReservation = () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
     },
     onError: (error) => {
-      console.error('❌ [useCreateMaterialReservation] Error:', error);
+      console.error('[useCreateMaterialReservation] Error:', error);
     },
   });
 };
@@ -75,7 +75,7 @@ export const useUpdateMaterialReservation = () => {
     mutationFn: ({ id, data }: { id: number; data: UpdateMaterialReservationRequest }) => 
       materialReservationApi.updateReservation(id, data),
     onSuccess: (data) => {
-      console.log('✅ [useUpdateMaterialReservation] Updated reservation:', data.id);
+      console.log('[useUpdateMaterialReservation] Updated reservation:', data.id);
       
       // Обновляем кэш
       queryClient.invalidateQueries({ queryKey: materialReservationKeys.lists() });
@@ -87,7 +87,7 @@ export const useUpdateMaterialReservation = () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
     },
     onError: (error) => {
-      console.error('❌ [useUpdateMaterialReservation] Error:', error);
+      console.error('[useUpdateMaterialReservation] Error:', error);
     },
   });
 };
@@ -99,7 +99,7 @@ export const useCancelMaterialReservation = () => {
     mutationFn: ({ id, reason }: { id: number; reason?: string }) => 
       materialReservationApi.cancelReservation(id, reason),
     onSuccess: (_, variables) => {
-      console.log('✅ [useCancelMaterialReservation] Cancelled reservation:', variables.id);
+      console.log('[useCancelMaterialReservation] Cancelled reservation:', variables.id);
       
       // Обновляем кэш
       queryClient.invalidateQueries({ queryKey: materialReservationKeys.lists() });
@@ -109,7 +109,7 @@ export const useCancelMaterialReservation = () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
     },
     onError: (error) => {
-      console.error('❌ [useCancelMaterialReservation] Error:', error);
+      console.error('[useCancelMaterialReservation] Error:', error);
     },
   });
 };
@@ -120,7 +120,7 @@ export const useFulfillMaterialReservation = () => {
   return useMutation({
     mutationFn: (id: number) => materialReservationApi.fulfillReservation(id),
     onSuccess: (_, id) => {
-      console.log('✅ [useFulfillMaterialReservation] Fulfilled reservation:', id);
+      console.log('[useFulfillMaterialReservation] Fulfilled reservation:', id);
       
       // Обновляем кэш
       queryClient.invalidateQueries({ queryKey: materialReservationKeys.lists() });
@@ -130,7 +130,7 @@ export const useFulfillMaterialReservation = () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
     },
     onError: (error) => {
-      console.error('❌ [useFulfillMaterialReservation] Error:', error);
+      console.error('[useFulfillMaterialReservation] Error:', error);
     },
   });
 };
@@ -141,7 +141,7 @@ export const useCleanupExpiredReservations = () => {
   return useMutation({
     mutationFn: () => materialReservationApi.cleanupExpiredReservations(),
     onSuccess: (data) => {
-      console.log('✅ [useCleanupExpiredReservations] Cleaned up:', data.expired_count, 'expired reservations');
+      console.log('[useCleanupExpiredReservations] Cleaned up:', data.expired_count, 'expired reservations');
       
       // Обновляем кэш
       queryClient.invalidateQueries({ queryKey: materialReservationKeys.lists() });
@@ -150,7 +150,7 @@ export const useCleanupExpiredReservations = () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
     },
     onError: (error) => {
-      console.error('❌ [useCleanupExpiredReservations] Error:', error);
+      console.error('[useCleanupExpiredReservations] Error:', error);
     },
   });
 };

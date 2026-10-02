@@ -55,7 +55,7 @@ export class ErrorBoundary extends Component<Props, State> {
           margin: '20px 0',
         }}>
           <h3 style={{ margin: '0 0 10px 0', color: '#c62828' }}>
-            ⚠️ Произошла ошибка
+             Произошла ошибка
           </h3>
           <p style={{ margin: '0 0 10px 0' }}>
             Что-то пошло не так. Пожалуйста, попробуйте обновить страницу.
@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </details>
           )}
           <button
-            onClick={() => window.location.reload()}
+            onClick={() =>window.location.reload()}
             style={{
               marginTop: '10px',
               padding: '8px 16px',
@@ -150,7 +150,7 @@ export const ApiErrorDisplay: React.FC<ApiErrorDisplayProps> = ({
       alignItems: 'flex-start',
       gap: '12px',
     }}>
-      <div style={{ fontSize: '20px', flexShrink: 0 }}>⚠️</div>
+      <div style={{ fontSize: '20px', flexShrink: 0 }}></div>
       <div style={{ flex: 1 }}>
         <h4 style={{ margin: '0 0 8px 0', color: '#c62828' }}>
           {title}
@@ -236,7 +236,7 @@ export const ValidationErrorDisplay: React.FC<ValidationErrorDisplayProps> = ({
       margin: '10px 0',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-        <span style={{ fontSize: '20px', marginRight: '8px' }}>⚠️</span>
+        <span style={{ fontSize: '20px', marginRight: '8px' }}></span>
         <h4 style={{ margin: 0, color: '#e65100' }}>
           Ошибки валидации
         </h4>

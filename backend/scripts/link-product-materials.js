@@ -8,7 +8,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const { DB_PATH } = require('./db-config');
 
-console.log(`📂 Используем БД: ${DB_PATH}\n`);
+console.log(`Используем БД: ${DB_PATH}\n`);
 
 async function runQuery(db, sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -40,11 +40,11 @@ async function getRow(db, sql, params = []) {
 async function linkMaterials() {
   const db = new sqlite3.Database(DB_PATH);
   
-  console.log('🔗 Начинаем связывание продуктов с материалами...\n');
+  console.log('Начинаем связывание продуктов с материалами...\n');
   
   try {
     // Создаем таблицу product_materials если её нет
-    console.log('🔧 Создание таблицы product_materials...');
+    console.log('Создание таблицы product_materials...');
     await runQuery(db, `
       CREATE TABLE IF NOT EXISTS product_materials (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,14 +57,14 @@ async function linkMaterials() {
         UNIQUE(product_id, material_id)
       )
     `);
-    console.log('✅ Таблица product_materials готова\n');
+    console.log('Таблица product_materials готова\n');
     
     // Получаем список продуктов
     const products = await getAllRows(db, 'SELECT id, name FROM products ORDER BY id');
-    console.log(`📦 Найдено продуктов: ${products.length}`);
+    console.log(`Найдено продуктов: ${products.length}`);
     
     if (products.length === 0) {
-      console.log('⚠️  Продукты не найдены! Запустите сначала seed-product-templates.js');
+      console.log(' Продукты не найдены! Запустите сначала seed-product-templates.js');
       return;
     }
     
@@ -78,21 +78,21 @@ async function linkMaterials() {
         ORDER BY category_name, name
       `);
     } catch (error) {
-      console.log('⚠️  Таблица materials не найдена в БД.');
-      console.log('💡 Материалы можно добавить позже через админ-панель.');
-      console.log('📦 Продукты созданы и готовы к использованию!\n');
+      console.log(' Таблица materials не найдена в БД.');
+      console.log('Материалы можно добавить позже через админ-панель.');
+      console.log('Продукты созданы и готовы к использованию!\n');
       return;
     }
     
-    console.log(`📋 Найдено материалов: ${materials.length}`);
+    console.log(`Найдено материалов: ${materials.length}`);
     
     if (materials.length === 0) {
-      console.log('⚠️  Материалы не найдены! Добавьте материалы через админ-панель.');
-      console.log('📦 Продукты созданы и готовы к использованию!\n');
+      console.log(' Материалы не найдены! Добавьте материалы через админ-панель.');
+      console.log('Продукты созданы и готовы к использованию!\n');
       return;
     }
     
-    console.log('\n📊 Доступные материалы:');
+    console.log('\n Доступные материалы:');
     const materialsByCategory = {};
     materials.forEach(m => {
       const cat = m.category_name || 'Без категории';
@@ -105,11 +105,11 @@ async function linkMaterials() {
       mats.forEach(m => console.log(`    - ${m.name} (ID: ${m.id}, ${m.price} BYN)`));
     });
     
-    console.log('\n🔗 Связывание материалов с продуктами...\n');
+    console.log('\n Связывание материалов с продуктами...\n');
     
     // Связываем каждый продукт
     for (const product of products) {
-      console.log(`\n📦 Продукт: ${product.name} (ID: ${product.id})`);
+      console.log(`\n Продукт: ${product.name} (ID: ${product.id})`);
       
       let linkedCount = 0;
       
@@ -128,10 +128,10 @@ async function linkMaterials() {
                 INSERT OR IGNORE INTO product_materials (product_id, material_id, is_required)
                 VALUES (?, ?, ?)
               `, [product.id, material.id, linkedCount === 0 ? 1 : 0]);
-              console.log(`  ✅ ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
+              console.log(`  ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
               linkedCount++;
             } catch (e) {
-              console.log(`  ⚠️  ${material.name} - уже связан`);
+              console.log(`   ${material.name} - уже связан`);
             }
           }
           break;
@@ -150,10 +150,10 @@ async function linkMaterials() {
                 INSERT OR IGNORE INTO product_materials (product_id, material_id, is_required)
                 VALUES (?, ?, ?)
               `, [product.id, material.id, linkedCount === 0 ? 1 : 0]);
-              console.log(`  ✅ ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
+              console.log(`  ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
               linkedCount++;
             } catch (e) {
-              console.log(`  ⚠️  ${material.name} - уже связан`);
+              console.log(`   ${material.name} - уже связан`);
             }
           }
           break;
@@ -173,10 +173,10 @@ async function linkMaterials() {
                 INSERT OR IGNORE INTO product_materials (product_id, material_id, is_required)
                 VALUES (?, ?, ?)
               `, [product.id, material.id, linkedCount === 0 ? 1 : 0]);
-              console.log(`  ✅ ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
+              console.log(`  ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
               linkedCount++;
             } catch (e) {
-              console.log(`  ⚠️  ${material.name} - уже связан`);
+              console.log(`   ${material.name} - уже связан`);
             }
           }
           break;
@@ -195,10 +195,10 @@ async function linkMaterials() {
                 INSERT OR IGNORE INTO product_materials (product_id, material_id, is_required)
                 VALUES (?, ?, ?)
               `, [product.id, material.id, linkedCount === 0 ? 1 : 0]);
-              console.log(`  ✅ ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
+              console.log(`  ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
               linkedCount++;
             } catch (e) {
-              console.log(`  ⚠️  ${material.name} - уже связан`);
+              console.log(`   ${material.name} - уже связан`);
             }
           }
           break;
@@ -211,18 +211,18 @@ async function linkMaterials() {
                 INSERT OR IGNORE INTO product_materials (product_id, material_id, is_required)
                 VALUES (?, ?, ?)
               `, [product.id, material.id, linkedCount === 0 ? 1 : 0]);
-              console.log(`  ✅ ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
+              console.log(`  ${material.name} ${linkedCount === 0 ? '(обязательный)' : ''}`);
               linkedCount++;
             } catch (e) {
-              console.log(`  ⚠️  ${material.name} - уже связан`);
+              console.log(`   ${material.name} - уже связан`);
             }
           }
       }
       
       if (linkedCount === 0) {
-        console.log(`  ⚠️  Не удалось связать ни одного материала`);
+        console.log(`   Не удалось связать ни одного материала`);
       } else {
-        console.log(`  📊 Связано материалов: ${linkedCount}`);
+        console.log(`  Связано материалов: ${linkedCount}`);
       }
     }
     
@@ -239,9 +239,9 @@ async function linkMaterials() {
     `);
     
     console.log('\n' + '='.repeat(60));
-    console.log('✅ СВЯЗЫВАНИЕ ЗАВЕРШЕНО!');
+    console.log('СВЯЗЫВАНИЕ ЗАВЕРШЕНО!');
     console.log('='.repeat(60));
-    console.log('\n📊 Статистика:\n');
+    console.log('\n Статистика:\n');
     
     stats.forEach(s => {
       console.log(`  ${s.product_name}:`);
@@ -249,13 +249,13 @@ async function linkMaterials() {
       console.log(`    - Обязательных: ${s.required_count}`);
     });
     
-    console.log('\n🎯 Следующие шаги:');
+    console.log('\n Следующие шаги:');
     console.log('  1. Добавьте операции к продуктам');
     console.log('  2. Протестируйте продукты в калькуляторе');
     console.log('  3. Настройте ценообразование\n');
     
   } catch (error) {
-    console.error('❌ Ошибка:', error);
+    console.error('Ошибка:', error);
     throw error;
   } finally {
     db.close();
@@ -266,11 +266,11 @@ async function linkMaterials() {
 if (require.main === module) {
   linkMaterials()
     .then(() => {
-      console.log('🎉 Готово!');
+      console.log('Готово!');
       process.exit(0);
     })
     .catch(err => {
-      console.error('\n💥 Ошибка:', err);
+      console.error('\n Ошибка:', err);
       process.exit(1);
     });
 }

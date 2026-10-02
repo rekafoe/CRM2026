@@ -170,7 +170,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
               key={item.id}
               type="button"
               className={`settings-nav__btn${item.id === section ? ' settings-nav__btn--active' : ''}`}
-              onClick={() => openSection(item.id)}
+              onClick={() =>openSection(item.id)}
               aria-current={item.id === section ? 'page' : undefined}
             >
               <span className="settings-nav__icon">
@@ -198,7 +198,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
                   role="tab"
                   aria-selected={teamTab === 'users'}
                   className={`lg-btn${teamTab === 'users' ? ' lg-btn--primary' : ''}`}
-                  onClick={() => openTeam('users')}
+                  onClick={() =>openTeam('users')}
                 >
                   Пользователи
                 </button>
@@ -207,7 +207,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
                   role="tab"
                   aria-selected={teamTab === 'departments'}
                   className={`lg-btn${teamTab === 'departments' ? ' lg-btn--primary' : ''}`}
-                  onClick={() => openTeam('departments')}
+                  onClick={() =>openTeam('departments')}
                 >
                   Точки и департаменты
                 </button>
@@ -308,7 +308,7 @@ const PayrollSettings: React.FC<{ onOpenEarnings: () => void }> = ({ onOpenEarni
 const SettingsLinkGrid: React.FC<{ links: SettingsLink[]; onOpen: (to: string) => void }> = ({ links, onOpen }) => (
   <div className="settings-links">
     {links.map((link) => (
-      <button key={link.to} type="button" className="settings-link" onClick={() => onOpen(link.to)}>
+      <button key={link.to} type="button" className="settings-link" onClick={() =>onOpen(link.to)}>
         <span className="settings-link__icon">
           <AppIcon name={link.icon} size="md" circle />
         </span>

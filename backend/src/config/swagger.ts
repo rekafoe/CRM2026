@@ -50,7 +50,7 @@ const options: swaggerJsdoc.Options = {
           in: 'header',
           name: 'X-API-Key',
           description:
-            'API-ключ сайта ↔ CRM (WEBSITE_ORDER_API_KEY). Альтернатива: Authorization: Bearer <key>. Только на backend сайта (BFF), не в браузере.',
+            'API-ключ сайта  CRM (WEBSITE_ORDER_API_KEY). Альтернатива: Authorization: Bearer <key>. Только на backend сайта (BFF), не в браузере.',
         },
       },
       schemas: {

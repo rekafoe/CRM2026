@@ -169,7 +169,7 @@ export const PriceRangeCells = React.memo(({
           <td
             key={range.minQty}
             className={`range-cell${isHovered ? ' range-cell--active' : ''}`}
-            onMouseEnter={() => onRangeHover?.(rangeIndex)}
+            onMouseEnter={() =>onRangeHover?.(rangeIndex)}
             onMouseLeave={() => onRangeHover?.(null)}
           >
             <div className="cell range-cell-content">
@@ -265,13 +265,13 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
           <th
             key={idx}
             className={`is-center range-header-cell${isHovered ? ' range-header-cell--active' : ''}`}
-            onMouseEnter={() => onRangeHover?.(idx)}
+            onMouseEnter={() =>onRangeHover?.(idx)}
             onMouseLeave={() => onRangeHover?.(null)}
           >
             <div className="cell range-header-content">
               <span
                 className="range-header-label"
-                onClick={() => onEditRange?.(idx, range.minQty)}
+                onClick={() =>onEditRange?.(idx, range.minQty)}
                 title={rangeLabel}
               >
                 {rangeLabel}
@@ -281,7 +281,7 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
                   type="button"
                   className={`el-button el-button--text el-button--mini range-remove-btn${isPendingRemove ? ' range-remove-btn--pending' : ''}`}
                   aria-label={isPendingRemove ? `Подтвердить удаление диапазона ${rangeLabel}` : `Удалить диапазон ${rangeLabel}`}
-                  onClick={(e) => {
+                  onClick={(e) =>{
                     e.stopPropagation();
                     if (isPendingRemove) {
                       setPendingRemoveIndex(null);

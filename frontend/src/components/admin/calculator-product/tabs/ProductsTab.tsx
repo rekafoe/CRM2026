@@ -38,7 +38,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = React.memo(({
     <>
       <div className="instruction-box">
         <div className="instruction-box-title">
-          <span>💡</span>
+          <span></span>
           <span>Как работать с продуктами калькулятора</span>
         </div>
         <div className="instruction-box-content">

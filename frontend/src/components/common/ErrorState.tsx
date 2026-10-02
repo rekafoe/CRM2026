@@ -17,12 +17,12 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   return (
     <div className={`error-state ${fullScreen ? 'fullscreen' : ''}`}>
       <div className="error-content">
-        <div className="error-icon">❌</div>
+        <div className="error-icon"></div>
         <h3 className="error-title">{title}</h3>
         <p className="error-message">{message}</p>
         {onRetry && (
           <button className="retry-button" onClick={onRetry}>
-            🔄 Попробовать снова
+             Попробовать снова
           </button>
         )}
       </div>

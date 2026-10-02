@@ -61,7 +61,7 @@ export class PhotoOrderController {
         data: sizesWithPrices
       });
     } catch (error) {
-      console.error('❌ Error getting available sizes:', error);
+      console.error('Error getting available sizes:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при получении размеров'
@@ -120,7 +120,7 @@ export class PhotoOrderController {
         data: order
       });
     } catch (error) {
-      console.error('❌ Error creating photo order:', error);
+      console.error('Error creating photo order:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при создании заказа'
@@ -149,7 +149,7 @@ export class PhotoOrderController {
         data: orders
       });
     } catch (error) {
-      console.error('❌ Error getting user orders:', error);
+      console.error('Error getting user orders:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при получении заказов'
@@ -185,7 +185,7 @@ export class PhotoOrderController {
         data: order
       });
     } catch (error) {
-      console.error('❌ Error getting order by ID:', error);
+      console.error('Error getting order by ID:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при получении заказа'
@@ -230,7 +230,7 @@ export class PhotoOrderController {
         message: 'Статус заказа обновлен'
       });
     } catch (error) {
-      console.error('❌ Error updating order status:', error);
+      console.error('Error updating order status:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при обновлении статуса'
@@ -275,31 +275,31 @@ export class PhotoOrderController {
           const success = await TelegramService.sendDocumentToUser(
             order.chatId,
             processedPhoto.processedPath,
-            `📸 Обработанное фото ${order.selectedSize.name}\n\n` +
-            `📏 Размер: ${processedPhoto.metadata.processedWidth}x${processedPhoto.metadata.processedHeight}\n` +
-            `📁 Размер файла: ${(processedPhoto.metadata.fileSize / 1024).toFixed(2)}KB\n` +
-            `🎨 Режим: ${processedPhoto.options.cropMode === 'crop' ? 'Кроп' : 'Вписать с полями'}`
+            `Обработанное фото ${order.selectedSize.name}\n\n` +
+            `Размер: ${processedPhoto.metadata.processedWidth}x${processedPhoto.metadata.processedHeight}\n` +
+            `Размер файла: ${(processedPhoto.metadata.fileSize / 1024).toFixed(2)}KB\n` +
+            `Режим: ${processedPhoto.options.cropMode === 'crop' ? 'Кроп' : 'Вписать с полями'}`
           );
           
           if (success) {
             sentCount++;
           }
         } catch (error) {
-          console.error(`❌ Error sending photo ${processedPhoto.processedPath}:`, error);
+          console.error(`Error sending photo ${processedPhoto.processedPath}:`, error);
         }
       }
 
       // Отправляем сообщение с информацией о заказе
       const totalPriceRub = (order.totalPrice / 100).toFixed(0);
-      const message = `📸 *ВАШ ЗАКАЗ ГОТОВ К ПОДТВЕРЖДЕНИЮ*\n\n` +
-                     `🆔 Заказ #${order.id}\n` +
-                     `📏 Размер: ${order.selectedSize.name}\n` +
-                     `📸 Фотографий: ${order.originalPhotos.length}\n` +
-                     `📦 Копий: ${order.quantity}\n` +
-                     `💰 Стоимость: ${totalPriceRub} руб.\n` +
-                     `📤 Отправлено фото: ${sentCount}/${order.processedPhotos.length}\n\n` +
-                     `✅ Для подтверждения заказа ответьте "Подтвердить #${order.id}"\n` +
-                     `❌ Для отмены заказа ответьте "Отменить #${order.id}"`;
+      const message = `*ВАШ ЗАКАЗ ГОТОВ К ПОДТВЕРЖДЕНИЮ*\n\n` +
+                     `Заказ #${order.id}\n` +
+                     `Размер: ${order.selectedSize.name}\n` +
+                     `Фотографий: ${order.originalPhotos.length}\n` +
+                     `Копий: ${order.quantity}\n` +
+                     `Стоимость: ${totalPriceRub} руб.\n` +
+                     `Отправлено фото: ${sentCount}/${order.processedPhotos.length}\n\n` +
+                     `Для подтверждения заказа ответьте "Подтвердить #${order.id}"\n` +
+                     `Для отмены заказа ответьте "Отменить #${order.id}"`;
 
       await TelegramService.sendToAllUsers(message);
 
@@ -309,7 +309,7 @@ export class PhotoOrderController {
         data: { sentCount, totalCount: order.processedPhotos.length }
       });
     } catch (error) {
-      console.error('❌ Error sending processed photos:', error);
+      console.error('Error sending processed photos:', error);
       res.status(500).json({
         success: false,
         message: 'Ошибка при отправке фотографий'

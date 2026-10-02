@@ -110,7 +110,7 @@ export default function AddItemModal({ order, onSave, onClose, initialCategory, 
       <h3>Добавить позицию</h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <button
-          onClick={() => setShowFlyersCalc(true)}
+          onClick={() =>setShowFlyersCalc(true)}
           style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontWeight: 600 }}
         >Листовки</button>
         {/* другие продукты добавим позже кнопками здесь */}
@@ -145,7 +145,7 @@ export default function AddItemModal({ order, onSave, onClose, initialCategory, 
           {product && (
             <button
               className="btn-danger"
-              onClick={() => setProduct(null)}
+              onClick={() =>setProduct(null)}
             >Очистить</button>
           )}
         </div>
@@ -189,7 +189,7 @@ export default function AddItemModal({ order, onSave, onClose, initialCategory, 
                   </select>
                 </label>
                 <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                  <button onClick={async () => {
+                  <button onClick={async () =>{
                     if (!calcParams.format || !calcParams.qty || !calcParams.sides) { alert('Заполните формат/тираж/стороны'); return }
                   const r = await axios.post('/api/calculators/flyers-color/price', calcParams)
                     setCalcResult(r.data)
@@ -302,7 +302,7 @@ export default function AddItemModal({ order, onSave, onClose, initialCategory, 
                   (e.target as HTMLInputElement).value = '';
                 }
               }} />
-              <button onClick={() => setCustomComponents([])}>Очистить</button>
+              <button onClick={() =>setCustomComponents([])}>Очистить</button>
             </div>
             {customComponents.length > 0 && (
               <div style={{ marginTop: 6, fontSize: 12 }}>
@@ -310,7 +310,7 @@ export default function AddItemModal({ order, onSave, onClose, initialCategory, 
                   <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <span>Материал #{c.materialId}</span>
                     <input type="number" value={c.qtyPerItem} min={0} step={0.01} onChange={e => setCustomComponents(list => list.map((v,i) => i===idx ? { ...v, qtyPerItem: Number(e.target.value) } : v))} />
-                    <button className="btn-danger" onClick={() => setCustomComponents(list => list.filter((_,i) => i!==idx))}>Удалить</button>
+                    <button className="btn-danger" onClick={() =>setCustomComponents(list => list.filter((_,i) => i!==idx))}>Удалить</button>
                   </div>
                 ))}
               </div>

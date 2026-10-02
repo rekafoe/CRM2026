@@ -14,7 +14,7 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
       {/* Эффективность менеджеров */}
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
         <h4 className="reports-chart-title">
-          👥 Эффективность менеджеров
+           Эффективность менеджеров
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {data.managerEfficiency.slice(0, 5).map((manager, index) => (
@@ -71,7 +71,7 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
                   </div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: manager.cancelled_orders > 0 ? '#dc3545' : 'var(--accent-primary)' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: manager.cancelled_orders >0 ? '#dc3545' : 'var(--accent-primary)' }}>
                     {manager.cancelled_orders}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -107,7 +107,7 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
       {/* Конверсия менеджеров */}
       <div className="reports-metrics" style={{ marginBottom: '20px' }}>
         <h4 className="reports-metrics-title">
-          🎯 Конверсия менеджеров
+           Конверсия менеджеров
         </h4>
         <div className="reports-metrics-grid">
           {data.managerConversion.slice(0, 4).map((manager) => (

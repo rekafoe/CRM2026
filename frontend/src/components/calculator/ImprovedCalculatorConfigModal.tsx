@@ -366,17 +366,17 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
     <div className="config-modal-overlay">
       <div className="config-modal improved-config-modal">
         <div className="config-header">
-          <h2>⚙️ Настройка калькулятора</h2>
+          <h2>Настройка калькулятора</h2>
           <div className="header-actions">
             <button 
               className="btn btn-sm btn-outline"
               onClick={exportSettings}
               title="Экспорт настроек"
             >
-              📤 Экспорт
+               Экспорт
             </button>
             <label className="btn btn-sm btn-outline" title="Импорт настроек">
-              📥 Импорт
+               Импорт
               <input
                 type="file"
                 accept=".json"
@@ -390,14 +390,14 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
 
         <div className="config-tabs">
           {[ 
-            { key: 'products', label: '📦 Продукты', icon: '📦' },
-            { key: 'create', label: '➕ Создать', icon: '➕' },
-            { key: 'presets', label: '⭐ Пресеты', icon: '⭐' }
+            { key: 'products', label: 'Продукты', icon: '' },
+            { key: 'create', label: 'Создать', icon: '' },
+            { key: 'presets', label: 'Пресеты', icon: '' }
           ].map(tab => (
             <button 
               key={tab.key}
               className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.key as ConfigTab)}
+              onClick={() =>setActiveTab(tab.key as ConfigTab)}
             >
               {tab.icon} {tab.label}
             </button>
@@ -410,7 +410,7 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
             <div className="search-input">
               <input
                 type="text"
-                placeholder="🔍 Поиск..."
+                placeholder="Поиск..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -425,7 +425,7 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
                 <button
                   key={filter.key}
                   className={`filter-btn ${filterType === filter.key ? 'active' : ''}`}
-                  onClick={() => setFilterType(filter.key as any)}
+                  onClick={() =>setFilterType(filter.key as any)}
                 >
                   {filter.label}
                 </button>
@@ -437,11 +437,11 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
           {activeTab === 'products' && (
             <div className="products-tab">
               <div className="tab-header">
-                <h3>📦 Управление продуктами</h3>
+                <h3>Управление продуктами</h3>
                 <div className="stats">
                   <span className="stat">Всего: {Object.keys(productConfigs).length}</span>
                   <span className="stat">Показано: {filteredProducts.length}</span>
-                  {loadingStates.products && <span className="loading-indicator">⏳ Загрузка...</span>}
+                  {loadingStates.products && <span className="loading-indicator">Загрузка...</span>}
                 </div>
               </div>
               
@@ -457,9 +457,9 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
                     <div className="product-header">
                       <h4>{config.name}</h4>
                       <div className="product-badges">
-                        {config.magnetic && <span className="badge">🧲 Магнитные</span>}
-                        {config.cutting && <span className="badge">✂️ Резка</span>}
-                        {config.folding && <span className="badge">📄 Фальцовка</span>}
+                        {config.magnetic && <span className="badge">Магнитные</span>}
+                        {config.cutting && <span className="badge">Резка</span>}
+                        {config.folding && <span className="badge">Фальцовка</span>}
                       </div>
                     </div>
                     
@@ -483,17 +483,17 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
                     <div className="product-actions">
                       <button 
                         className="btn btn-sm btn-primary"
-                        onClick={() => startEditingProduct(key)}
+                        onClick={() =>startEditingProduct(key)}
                         title="Редактировать"
                       >
-                        ✏️
+                        
                       </button>
                       <button 
                         className="btn btn-sm btn-danger"
-                        onClick={() => deleteProduct(key)}
+                        onClick={() =>deleteProduct(key)}
                         title="Удалить"
                       >
-                        🗑️
+                        
                       </button>
                     </div>
                   </div>
@@ -506,7 +506,7 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
           {/* Вкладка создания продукта */}
           {activeTab === 'create' && (
             <div className="create-product-tab">
-              <h3>➕ Создать новый продукт</h3>
+              <h3>Создать новый продукт</h3>
               <div className="new-product-form">
                 <div className="form-group">
                   <label>Название продукта:</label>
@@ -648,11 +648,11 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
           {/* Вкладка пресетов */}
           {activeTab === 'presets' && (
             <div className="presets-tab">
-              <h3>⭐ Управление пресетами</h3>
+              <h3>Управление пресетами</h3>
               
               {filteredPresets.length === 0 ? (
                 <div className="no-presets">
-                  <div className="no-presets-icon">⭐</div>
+                  <div className="no-presets-icon"></div>
                   <h5>Сохраненных пресетов пока нет</h5>
                   <p>Создайте пресеты в калькуляторе, чтобы управлять ими здесь</p>
                 </div>
@@ -676,17 +676,17 @@ export const ImprovedCalculatorConfigModal: React.FC<ImprovedCalculatorConfigMod
                       <div className="preset-actions">
                         <button 
                           className="btn btn-sm btn-info"
-                          onClick={() => duplicatePreset(index)}
+                          onClick={() =>duplicatePreset(index)}
                           title="Создать копию пресета"
                         >
-                          📋
+                          
                         </button>
                         <button 
                           className="btn btn-sm btn-danger"
-                          onClick={() => deletePreset(index)}
+                          onClick={() =>deletePreset(index)}
                           title="Удалить пресет"
                         >
-                          🗑️
+                          
                         </button>
                       </div>
                     </div>

@@ -26,9 +26,9 @@ export function useCalculatorMaterials({ specs, setSpecs, log, toast }: UseCalcu
     try {
       const paperTypes = await getPaperTypesFromWarehouse();
       setWarehousePaperTypes(paperTypes);
-      log.info('✅ Типы бумаги загружены из склада', { count: paperTypes.length });
+      log.info('Типы бумаги загружены из склада', { count: paperTypes.length });
     } catch (error) {
-      log.error('❌ Ошибка загрузки типов бумаги из склада', error);
+      log.error('Ошибка загрузки типов бумаги из склада', error);
       toast.error('Ошибка загрузки типов бумаги. Используются данные по умолчанию.');
     } finally {
       setLoadingPaperTypes(false);
@@ -42,12 +42,12 @@ export function useCalculatorMaterials({ specs, setSpecs, log, toast }: UseCalcu
     try {
       const densities = await getPaperDensitiesForType(paperType);
       setDynamicDensities(densities);
-      logRef.current.info('✅ Плотности загружены для типа бумаги', { paperType, count: densities.length });
+      logRef.current.info('Плотности загружены для типа бумаги', { paperType, count: densities.length });
       if (densities.length > 0 && !densities.find(d => d.value === specs.paperDensity)) {
         setSpecs(prev => ({ ...prev, paperDensity: densities[0].value }));
       }
     } catch (error) {
-      logRef.current.error('❌ Ошибка загрузки плотностей', error);
+      logRef.current.error('Ошибка загрузки плотностей', error);
       setDynamicDensities([]);
     }
   }, [specs.paperDensity, setSpecs]);
@@ -67,14 +67,14 @@ export function useCalculatorMaterials({ specs, setSpecs, log, toast }: UseCalcu
     try {
       const result = await updateMaterialPrices();
       setLastPriceUpdate(new Date().toISOString());
-      log.info('✅ Цены материалов обновлены', { updated: result.updated, errors: result.errors.length });
+      log.info('Цены материалов обновлены', { updated: result.updated, errors: result.errors.length });
       if (result.errors.length > 0) {
         toast.warning(`Обновлено ${result.updated} цен, ошибок: ${result.errors.length}`);
       } else {
         toast.success(`Успешно обновлено ${result.updated} цен`);
       }
     } catch (error) {
-      log.error('❌ Ошибка обновления цен', error);
+      log.error('Ошибка обновления цен', error);
       toast.error('Ошибка обновления цен материалов');
     }
   }, [log, toast]);
@@ -90,10 +90,10 @@ export function useCalculatorMaterials({ specs, setSpecs, log, toast }: UseCalcu
         setMaterialAvailability(availability);
         if (availability.alternatives && availability.alternatives.length > 0) {
           setMaterialAlternatives(availability.alternatives);
-          log.info('🔄 Найдены альтернативные материалы', { count: availability.alternatives.length });
+          log.info('Найдены альтернативные материалы', { count: availability.alternatives.length });
         }
       } catch (error) {
-        log.error('❌ Ошибка проверки доступности материалов', error);
+        log.error('Ошибка проверки доступности материалов', error);
       }
     }, 600);
     return () => {
@@ -111,7 +111,7 @@ export function useCalculatorMaterials({ specs, setSpecs, log, toast }: UseCalcu
   }, [specs.paperType, warehousePaperTypes.length]);
 
   // Не переключаем автоматически на другой тип материала при отсутствии плотностей:
-  // связка материал↔плотность иначе входит в рекурсию (materialType ↔ result).
+  // связка материалплотность иначе входит в рекурсию (materialType  result).
 
   // Initial paper type set
   useEffect(() => {

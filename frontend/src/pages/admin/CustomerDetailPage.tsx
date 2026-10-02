@@ -22,7 +22,7 @@ const CustomerDetailPage: React.FC = () => {
     <div className="product-management">
       <div className="product-management__header">
         <div className="product-management__header-left">
-          <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/clients')}>
+          <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/clients')}>
             ← Назад
           </button>
           <div className="product-management__title-row">

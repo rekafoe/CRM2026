@@ -45,7 +45,7 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
       <div className="flex items-center gap-1" role="group" aria-label="Вид списка материалов">
         <button
           type="button"
-          onClick={() => onViewModeChange('grid')}
+          onClick={() =>onViewModeChange('grid')}
           className={`action-btn small ${viewMode === 'grid' ? 'primary' : ''}`}
           title="Сетка"
           aria-pressed={viewMode === 'grid'}
@@ -54,7 +54,7 @@ export const MaterialsToolbar: React.FC<MaterialsToolbarProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => onViewModeChange('cards')}
+          onClick={() =>onViewModeChange('cards')}
           className={`action-btn small ${viewMode === 'cards' ? 'primary' : ''}`}
           title="Строки"
           aria-pressed={viewMode === 'cards'}

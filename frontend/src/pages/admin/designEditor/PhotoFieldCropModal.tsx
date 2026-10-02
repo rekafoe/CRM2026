@@ -249,7 +249,7 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
         <div
           className="photo-field-source-crop"
           role="presentation"
-          onPointerDown={(event) => {
+          onPointerDown={(event) =>{
             if (fitMode === 'contain') return;
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -273,7 +273,7 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
               type="button"
               className="photo-field-source-resize"
               aria-label="Изменить размер видимой области"
-              onPointerDown={(event) => {
+              onPointerDown={(event) =>{
                 event.preventDefault();
                 event.stopPropagation();
                 event.currentTarget.setPointerCapture(event.pointerId);

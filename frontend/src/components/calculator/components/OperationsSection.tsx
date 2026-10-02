@@ -124,7 +124,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     });
   }, [backendProductSchema?.operations, allowedSet]);
 
-  // 🆕 Состояние для вариантов услуг (типы и подтипы)
+  //  Состояние для вариантов услуг (типы и подтипы)
   const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map());
   const [loadingVariants, setLoadingVariants] = useState<Set<number>>(new Set());
 
@@ -134,10 +134,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     return Array.isArray(ops) ? ops : [];
   }, [specs.selectedOperations]);
 
-  // 🆕 Загружаем варианты для операций, которые их поддерживают (например, ламинация)
+  //  Загружаем варианты для операций, которые их поддерживают (например, ламинация)
   useEffect(() => {
     const loadVariantsForOperations = async () => {
-      console.log('🔍 [OperationsSection] Начинаем загрузку вариантов', {
+      console.log('[OperationsSection] Начинаем загрузку вариантов', {
         operationsCount: operations.length,
         operations: operations.map((op: Operation) => ({
           id: op.operation_id || op.id,
@@ -151,7 +151,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
         const operationId = op.operation_id || op.id;
         if (!operationId) return false;
         
-        // 🆕 Проверяем несколько условий для определения операций с вариантами:
+        //  Проверяем несколько условий для определения операций с вариантами:
         // 1. Тип операции 'laminate'
         // 2. Название операции содержит "Ламинация" или "lamination" (case-insensitive)
         // 3. В parameters указано, что есть варианты
@@ -162,7 +162,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
         
         const shouldLoad = opType === 'laminate' || isLamination || hasVariantsFlag;
         
-        console.log('🔍 [OperationsSection] Проверка операции для загрузки вариантов', {
+        console.log('[OperationsSection] Проверка операции для загрузки вариантов', {
           operationId,
           operationName: op.operation_name || op.name,
           opType,
@@ -176,7 +176,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
         return shouldLoad;
       });
 
-      console.log('🔍 [OperationsSection] Операции для загрузки вариантов', {
+      console.log('[OperationsSection] Операции для загрузки вариантов', {
         count: operationsToLoad.length,
         operations: operationsToLoad.map((op: Operation) => ({
           id: op.operation_id || op.id,
@@ -187,15 +187,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       for (const op of operationsToLoad) {
         const operationId = op.operation_id || op.id;
         if (!operationId || serviceVariants.has(operationId) || loadingVariants.has(operationId)) {
-          console.log('🔍 [OperationsSection] Пропускаем операцию (уже загружена или загружается)', { operationId });
+          console.log('[OperationsSection] Пропускаем операцию (уже загружена или загружается)', { operationId });
           continue;
         }
 
-        console.log('🔍 [OperationsSection] Загружаем варианты для операции', { operationId, name: op.operation_name || op.name });
+        console.log('[OperationsSection] Загружаем варианты для операции', { operationId, name: op.operation_name || op.name });
         setLoadingVariants(prev => new Set(prev).add(operationId));
         try {
           const variants = await getServiceVariants(operationId);
-          console.log('🔍 [OperationsSection] Варианты загружены', {
+          console.log('[OperationsSection] Варианты загружены', {
             operationId,
             variantsCount: variants.length,
             variants: variants.map(v => ({ id: v.id, name: v.variantName, active: v.isActive }))
@@ -206,7 +206,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
             return next;
           });
         } catch (error) {
-          console.error(`❌ [OperationsSection] Ошибка загрузки вариантов для операции ${operationId}:`, error);
+          console.error(`[OperationsSection] Ошибка загрузки вариантов для операции ${operationId}:`, error);
         } finally {
           setLoadingVariants(prev => {
             const next = new Set(prev);
@@ -405,9 +405,9 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     updateSpecs({ selectedOperations: updated }, true);
   }, [selectedOperations, updateSpecs, clampOperationQuantity]);
 
-  // 🆕 Логирование для отладки
+  //  Логирование для отладки
   useEffect(() => {
-    console.log('🔍 [OperationsSection] Рендер компонента', {
+    console.log('[OperationsSection] Рендер компонента', {
       operationsCount: operations.length,
       operationsWithSubtypesCount: operationsWithSubtypes.length,
       serviceVariantsCount: serviceVariants.size,
@@ -420,13 +420,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   }, [operations.length, operationsWithSubtypes.length, serviceVariants.size, selectedOperations.length, backendProductSchema?.operations]);
 
   if (operations.length === 0) {
-    console.log('🔍 [OperationsSection] Нет операций для отображения');
+    console.log('[OperationsSection] Нет операций для отображения');
     return null;
   }
 
   return (
     <div className="form-section compact operations-section">
-      <h3>🔧 Операции</h3>
+      <h3>Операции</h3>
       <div className="advanced-grid compact operations-grid">
         {operationsWithSubtypes.map(({ operation, subtypes }: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => {
           const operationId = operation.operation_id || operation.id;
@@ -457,7 +457,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
               </div>
 
               {isSelected && (() => {
-                // 🆕 Проверяем, есть ли варианты для этой операции (например, ламинация)
+                //  Проверяем, есть ли варианты для этой операции (например, ламинация)
                 const allVariants = serviceVariants.get(operationId) || [];
                 const hasVariants = allVariants.length > 0;
                 
@@ -471,7 +471,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                     ? Array.from(new Map(typeVariants.map(v => [v.parameters?.type, v])).values())
                     : Array.from(new Map(allVariants.map(v => [v.variantName, v])).values());
                   
-                  // 🆕 Находим выбранный тип по variantId или используем первый
+                  //  Находим выбранный тип по variantId или используем первый
                   const selectedVariantId = selectedData?.variantId;
                   let selectedVariant = allVariants.find(v => v.id === selectedVariantId);
                   
@@ -495,19 +495,19 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       })() || typeVariants[0]
                     : selectedVariant || uniqueTypes[0];
 
-                  // 🆕 Определяем выбранный тип: из выбранного варианта или первый доступный
+                  //  Определяем выбранный тип: из выбранного варианта или первый доступный
                   const selectedTypeName = hasTypeHierarchy
                     ? selectedTypeVariant?.parameters?.type || selectedTypeVariant?.variantName || ''
                     : selectedTypeVariant?.variantName || '';
                   
-                  // 🆕 Собираем все подтипы ТОЛЬКО из вариантов выбранного типа
+                  //  Собираем все подтипы ТОЛЬКО из вариантов выбранного типа
                   const variantsOfSelectedType = hasTypeHierarchy
                     ? allVariants.filter((v) => isVariantChildOf(selectedTypeVariant?.id, v))
                     : allVariants.filter(v => v.variantName === selectedTypeName);
                   
-                  // 🆕 Детальное логирование для отладки
+                  //  Детальное логирование для отладки
                   const firstVariant = variantsOfSelectedType[0];
-                  console.log('🔍 [OperationsSection] Варианты выбранного типа', {
+                  console.log('[OperationsSection] Варианты выбранного типа', {
                     selectedTypeName,
                     variantsOfSelectedTypeCount: variantsOfSelectedType.length,
                     firstVariant: firstVariant ? {
@@ -516,7 +516,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       hasParameters: !!firstVariant.parameters,
                       parametersType: typeof firstVariant.parameters,
                       parametersKeys: firstVariant.parameters ? Object.keys(firstVariant.parameters) : [],
-                      fullParameters: firstVariant.parameters, // 🆕 Полные parameters для анализа
+                      fullParameters: firstVariant.parameters, //  Полные parameters для анализа
                       hasSubtypes: !!(firstVariant.parameters?.subtypes),
                       subtypesCount: firstVariant.parameters?.subtypes?.length || 0,
                       subtypes: firstVariant.parameters?.subtypes
@@ -528,7 +528,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                     }))
                   });
                   
-                  // 🆕 Подтипы формируются из parameters.subType / density
+                  //  Подтипы формируются из parameters.subType / density
                   const allSubtypes = variantsOfSelectedType
                     .filter(v => {
                       return v.parameters?.subType || v.parameters?.density || v.parameters?.type;
@@ -550,12 +550,12 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       };
                     });
                   
-                  // 🆕 Дедуплицируем подтипы по value
+                  //  Дедуплицируем подтипы по value
                   const uniqueSubtypes = Array.from(
                     new Map(allSubtypes.map(st => [st.value, st])).values()
                   );
                   
-                  console.log('🔍 [OperationsSection] Отображение подтипов для ламинации', {
+                  console.log('[OperationsSection] Отображение подтипов для ламинации', {
                     operationId,
                     selectedTypeName,
                     variantsOfSelectedTypeCount: variantsOfSelectedType.length,
@@ -571,7 +571,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   
                   return (
                     <div className="operation-fields">
-                      {/* 🆕 1-й уровень: Селектор типа ламинации */}
+                      {/*  1-й уровень: Селектор типа ламинации */}
                       <div className="param-group">
                         <label className="operation-field-label">
                           1. Тип ламинации:
@@ -624,7 +624,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         </select>
                       </div>
                       
-                      {/* 🆕 2-й уровень: Селектор плотности */}
+                      {/*  2-й уровень: Селектор плотности */}
                       {uniqueSubtypes.length > 0 ? (
                         <div className="param-group">
                           <label className="operation-field-label">
@@ -677,7 +677,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       <button
                         type="button"
                         className="quantity-btn quantity-btn-minus"
-                        onClick={() => {
+                        onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)
@@ -702,7 +702,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       <button
                         type="button"
                         className="quantity-btn quantity-btn-plus"
-                        onClick={() => {
+                        onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)
@@ -759,7 +759,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         <button
                           type="button"
                           className="quantity-btn quantity-btn-minus"
-                          onClick={() => {
+                          onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)
@@ -784,7 +784,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         <button
                           type="button"
                           className="quantity-btn quantity-btn-plus"
-                          onClick={() => {
+                          onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
                             ? Number(selectedData?.quantity)

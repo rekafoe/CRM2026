@@ -150,7 +150,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
   const createButton = (
     <button
       type="button"
-      onClick={() => setShowCreateModal(true)}
+      onClick={() =>setShowCreateModal(true)}
       className="lg-btn lg-btn--primary"
     >
       Создать
@@ -262,19 +262,19 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                 </div>
                 <div className="user-actions">
                   <button
-                    onClick={() => setEditingUser(user)}
+                    onClick={() =>setEditingUser(user)}
                     className="lg-btn"
                   >
                     Изменить
                   </button>
                   <button
-                    onClick={() => setShowTokenModal(user)}
+                    onClick={() =>setShowTokenModal(user)}
                     className="lg-btn"
                   >
                     Токен
                   </button>
                   <button
-                    onClick={() => handleDeleteUser(user.id)}
+                    onClick={() =>handleDeleteUser(user.id)}
                     className="lg-btn lg-btn--danger"
                   >
                     Удалить
@@ -322,7 +322,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                 Управление API токеном
               </h3>
               <button
-                onClick={() => setShowTokenModal(null)}
+                onClick={() =>setShowTokenModal(null)}
                 className="user-modal-close"
               >
                 ×
@@ -340,13 +340,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
               </p>
               <div className="user-form-actions">
                 <button
-                  onClick={() => setShowTokenModal(null)}
+                  onClick={() =>setShowTokenModal(null)}
                   className="lg-btn"
                 >
                   Отмена
                 </button>
                 <button
-                  onClick={() => handleResetToken(showTokenModal)}
+                  onClick={() =>handleResetToken(showTokenModal)}
                   className="lg-btn lg-btn--primary"
                 >
                   Сбросить токен

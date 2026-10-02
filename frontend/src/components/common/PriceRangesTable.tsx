@@ -190,7 +190,7 @@ export const PriceRangesTable: React.FC<PriceRangesTableProps> = ({
                       variant="secondary"
                       size="sm"
                     >
-                      ✏️
+                      Изменить
                     </Button>
                     {commonRanges.length > 1 && (
                       <Button
@@ -198,7 +198,7 @@ export const PriceRangesTable: React.FC<PriceRangesTableProps> = ({
                         variant="secondary"
                         size="sm"
                       >
-                        🗑️
+                        Удалить
                       </Button>
                     )}
                   </td>
@@ -211,8 +211,8 @@ export const PriceRangesTable: React.FC<PriceRangesTableProps> = ({
 
       {/* Модальное окно для добавления/редактирования границы */}
       {boundaryModal.isOpen && (
-        <div className="modal-overlay" onClick={() => setBoundaryModal({ isOpen: false, type: 'add', boundary: '' })}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() =>setBoundaryModal({ isOpen: false, type: 'add', boundary: '' })}>
+          <div className="modal-content" onClick={(e) =>e.stopPropagation()}>
             <h3>
               {boundaryModal.type === 'add' ? 'Добавить границу диапазона' : 'Редактировать границу диапазона'}
             </h3>

@@ -177,7 +177,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
               key={days}
               type="button"
               className={`daily-activity-overview__pill${period === days ? ' daily-activity-overview__pill--active' : ''}`}
-              onClick={() => setPeriod(days)}
+              onClick={() =>setPeriod(days)}
               aria-pressed={period === days}
             >
               {days} дней
@@ -188,7 +188,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
           <button
             type="button"
             className={`daily-activity-overview__pill${chartMode === 'revenue' ? ' daily-activity-overview__pill--active' : ''}`}
-            onClick={() => setChartMode('revenue')}
+            onClick={() =>setChartMode('revenue')}
             aria-pressed={chartMode === 'revenue'}
           >
             Выручка
@@ -196,7 +196,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
           <button
             type="button"
             className={`daily-activity-overview__pill${chartMode === 'orders' ? ' daily-activity-overview__pill--active' : ''}`}
-            onClick={() => setChartMode('orders')}
+            onClick={() =>setChartMode('orders')}
             aria-pressed={chartMode === 'orders'}
           >
             Заказы
@@ -242,7 +242,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
                     <div className="daily-activity-overview__chart-track">
                       <div
                         className={`daily-activity-overview__chart-bar${value <= 0 ? ' daily-activity-overview__chart-bar--zero' : ''}`}
-                        style={value > 0 ? { height: `${Math.max(height, 8)}%` } : undefined}
+                        style={value >0 ? { height: `${Math.max(height, 8)}%` } : undefined}
                       />
                     </div>
                     <div className="daily-activity-overview__chart-label">
@@ -266,7 +266,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
                   <div key={dayTotal.date} className="daily-activity-overview__day">
                     <button
                       type="button"
-                      onClick={() => handleDateClick(dayTotal.date)}
+                      onClick={() =>handleDateClick(dayTotal.date)}
                       className={`daily-activity-overview__day-btn${isExpanded ? ' daily-activity-overview__day-btn--expanded' : ''}`}
                       aria-expanded={isExpanded}
                     >

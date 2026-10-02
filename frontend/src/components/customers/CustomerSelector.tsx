@@ -152,7 +152,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
                     key={customer.id}
                     type="button"
                     className="customer-selector__suggestion"
-                    onClick={() => {
+                    onClick={() =>{
                       handleCustomerChange(customer.id, customer);
                       setSearchQuery('');
                     }}
@@ -170,7 +170,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
           )}
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() =>setShowCreateModal(true)}
           className="customer-selector__create"
         >
           Создать
@@ -298,7 +298,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
     <div className="customer-modal-overlay" onClick={onClose}>
       <div
         className="customer-modal"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) =>e.stopPropagation()}
       >
         <h3 className="customer-modal__title">Создать клиента</h3>
         

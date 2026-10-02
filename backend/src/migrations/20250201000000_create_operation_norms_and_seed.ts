@@ -149,7 +149,7 @@ export async function up(db?: Database): Promise<void> {
   try {
     await seedDefaultNorms(database)
   } catch (error) {
-    console.warn('⚠️  Failed to seed default operation norms:', error)
+    console.warn(' Failed to seed default operation norms:', error)
   }
 }
 

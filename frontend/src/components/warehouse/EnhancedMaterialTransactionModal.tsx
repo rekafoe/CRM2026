@@ -220,7 +220,7 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
     : null;
 
   return (
-    <div className="modal-overlay" onMouseDown={(e) => {
+    <div className="modal-overlay" onMouseDown={(e) =>{
       if (e.target === e.currentTarget && !loading) onClose();
     }}>
       <div className="modal-content enhanced-transaction-modal" role="dialog" aria-modal="true">
@@ -272,7 +272,7 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
                   <button
                     type="button"
                     className="qty-chip"
-                    onClick={() => handleChange('quantity', String(suggestedInQty))}
+                    onClick={() =>handleChange('quantity', String(suggestedInQty))}
                   >
                     До минимума (+{formatQtyHint(suggestedInQty, material)})
                   </button>
@@ -374,7 +374,7 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
             <button
               type="button"
               className="action-btn action-btn--text inv-link-btn"
-              onClick={() => setShowNotes(true)}
+              onClick={() =>setShowNotes(true)}
             >
               + Примечание
             </button>

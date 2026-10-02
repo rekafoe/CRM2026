@@ -38,7 +38,7 @@ export const ProductTypesList: React.FC<ProductTypesListProps> = React.memo(({
           <LoadingState message="Загрузка типов продуктов..." />
         ) : productTypes.length === 0 ? (
           <EmptyState
-            icon="📦"
+            icon=""
             title="Нет типов продуктов"
             description="Создайте первый тип продукта для настройки калькулятора"
             action={{
@@ -52,14 +52,14 @@ export const ProductTypesList: React.FC<ProductTypesListProps> = React.memo(({
               <div
                 key={type.key}
                 className={`product-type-card ${selectedType === type.key ? 'selected' : ''}`}
-                onClick={() => onSelectType(type.key)}
+                onClick={() =>onSelectType(type.key)}
               >
                 <div className="product-type-header">
                   <div className="product-type-info">
                     <h3>{type.name}</h3>
                     <div className="product-key">{type.key}</div>
                   </div>
-                  <div className="product-type-actions" onClick={(e) => e.stopPropagation()}>
+                  <div className="product-type-actions" onClick={(e) =>e.stopPropagation()}>
                     <StatusBadge status={type.status === 'active' ? 'active' : 'inactive'} />
                     <Button
                       variant="error"

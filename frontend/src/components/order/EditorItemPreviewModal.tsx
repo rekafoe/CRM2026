@@ -326,7 +326,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
 
   return (
     <div className="editor-preview-modal__overlay" onClick={onClose}>
-      <div className="editor-preview-modal" onClick={(event) => event.stopPropagation()}>
+      <div className="editor-preview-modal" onClick={(event) =>event.stopPropagation()}>
         <header className="editor-preview-modal__header">
           <div>
             <h3>{summary.label}</h3>
@@ -342,7 +342,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
             <button
               type="button"
               className="editor-preview-modal__primary"
-              onClick={() => void handleExportPdf()}
+              onClick={() =>void handleExportPdf()}
               disabled={exporting || loading}
             >
               {exporting ? 'Экспорт…' : 'Скачать PDF'}
@@ -368,7 +368,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
                   <button
                     type="button"
                     className="editor-preview-modal__link-btn"
-                    onClick={() => handleDownloadProductionFile(latestProductionFile)}
+                    onClick={() =>handleDownloadProductionFile(latestProductionFile)}
                   >
                     Скачать
                   </button>
@@ -382,7 +382,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
               <button
                 type="button"
                 className="editor-preview-modal__secondary"
-                onClick={() => void handleRegenerateProduction()}
+                onClick={() =>void handleRegenerateProduction()}
                 disabled={productionRegenerating || productionLoading}
               >
                 {productionRegenerating ? 'В очереди…' : 'Перегенерировать'}

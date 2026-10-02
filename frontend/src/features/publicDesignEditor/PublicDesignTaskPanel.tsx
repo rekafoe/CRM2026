@@ -111,7 +111,7 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
             key={tab.id}
             type="button"
             className={`public-design-editor__task-tab${activeTab === tab.id ? ' public-design-editor__task-tab--active' : ''}`}
-            onClick={() => onTabChange(tab.id)}
+            onClick={() =>onTabChange(tab.id)}
           >
             <span className="public-design-editor__task-tab-icon">{tab.icon}</span>
             <span>{tab.label}</span>
@@ -142,7 +142,7 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
               <button
                 type="button"
                 className="public-design-editor__task-main"
-                onClick={() => onFieldFocus(field, fieldKind)}
+                onClick={() =>onFieldFocus(field, fieldKind)}
               >
                 <i aria-hidden="true" />
                 <strong>{field.label}</strong>
@@ -150,17 +150,17 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
                 <b className="public-design-editor__task-status">{FIELD_STATUS_LABELS[field.status]}</b>
               </button>
               <div className="public-design-editor__task-actions">
-                <button type="button" onClick={() => onFieldFocus(field, fieldKind)}>
+                <button type="button" onClick={() =>onFieldFocus(field, fieldKind)}>
                   Показать
                 </button>
                 {activeTab === 'photo' && (
                   <>
                   {onPlaceSelectedPhoto && (
-                    <button type="button" onClick={() => onPlaceSelectedPhoto(field)}>
+                    <button type="button" onClick={() =>onPlaceSelectedPhoto(field)}>
                       Поставить выбранное
                     </button>
                   )}
-                  <button type="button" onClick={() => onPhotoReplace(field)}>
+                  <button type="button" onClick={() =>onPhotoReplace(field)}>
                     {field.status === 'ready' ? 'Заменить' : 'Добавить'}
                   </button>
                   </>
@@ -185,7 +185,7 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
               key={issue.id}
               type="button"
               className={`public-design-editor__task-issue public-design-editor__task-issue--${issue.level}`}
-              onClick={() => onIssueFocus(issue)}
+              onClick={() =>onIssueFocus(issue)}
             >
               {issue.message}
             </button>

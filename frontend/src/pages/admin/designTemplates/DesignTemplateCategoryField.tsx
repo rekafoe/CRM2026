@@ -49,10 +49,10 @@ export const DesignTemplateCategoryField: React.FC<Props> = ({
           }}
           autoFocus
         />
-        <button type="button" className="lg-btn lg-btn--primary" onClick={() => void handleCreate()} disabled={creating || !newName.trim()}>
+        <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void handleCreate()} disabled={creating || !newName.trim()}>
           Создать
         </button>
-        <button type="button" className="lg-btn" onClick={() => setAdding(false)}>
+        <button type="button" className="lg-btn" onClick={() =>setAdding(false)}>
           Отмена
         </button>
       </div>
@@ -73,7 +73,7 @@ export const DesignTemplateCategoryField: React.FC<Props> = ({
           <option key={c.id} value={String(c.id)}>{c.name}</option>
         ))}
       </select>
-      <button type="button" className="design-category-field__add-link" onClick={() => setAdding(true)}>
+      <button type="button" className="design-category-field__add-link" onClick={() =>setAdding(true)}>
         <AppIcon name="plus" size="xs" /> Новая
       </button>
     </div>

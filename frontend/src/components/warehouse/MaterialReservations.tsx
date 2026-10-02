@@ -93,7 +93,7 @@ const MaterialReservations: React.FC = () => {
         <h2>Резервирование материалов</h2>
         <button 
           className="btn btn-primary"
-          onClick={() => setShowCreateModal(true)}
+          onClick={() =>setShowCreateModal(true)}
         >
           <i className="icon-plus"></i>
           Создать резервирование
@@ -138,14 +138,14 @@ const MaterialReservations: React.FC = () => {
                       <>
                         <button
                           className="btn btn-sm btn-success"
-                          onClick={() => handleFulfillReservation(reservation.id)}
+                          onClick={() =>handleFulfillReservation(reservation.id)}
                           title="Выполнить резервирование"
                         >
                           <i className="icon-check"></i>
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
-                          onClick={() => handleCancelReservation(reservation.id)}
+                          onClick={() =>handleCancelReservation(reservation.id)}
                           title="Отменить резервирование"
                         >
                           <i className="icon-x"></i>
@@ -174,7 +174,7 @@ const MaterialReservations: React.FC = () => {
               <h3>Создать резервирование</h3>
               <button 
                 className="btn-close"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() =>setShowCreateModal(false)}
               >
                 ×
               </button>
@@ -246,7 +246,7 @@ const MaterialReservations: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() =>setShowCreateModal(false)}
                 >
                   Отмена
                 </button>

@@ -87,7 +87,7 @@ export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBa
           </div>
         </div>
         <div className="user-management-header-actions">
-          <button onClick={() => { setShowCreate(true); setEditingDept(null); }} className="lg-btn lg-btn--primary">
+          <button onClick={() =>{ setShowCreate(true); setEditingDept(null); }} className="lg-btn lg-btn--primary">
             Создать точку
           </button>
         </div>
@@ -121,8 +121,8 @@ export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBa
                   {d.sort_order != null && <div className="user-details">Порядок: {d.sort_order}</div>}
                 </div>
                 <div className="user-actions">
-                  <button onClick={() => { setEditingDept(d); setShowCreate(false); }} className="lg-btn">Редактировать</button>
-                  <button onClick={() => handleDelete(d.id)} className="lg-btn lg-btn--danger">Удалить</button>
+                  <button onClick={() =>{ setEditingDept(d); setShowCreate(false); }} className="lg-btn">Редактировать</button>
+                  <button onClick={() =>handleDelete(d.id)} className="lg-btn lg-btn--danger">Удалить</button>
                 </div>
               </div>
             ))}

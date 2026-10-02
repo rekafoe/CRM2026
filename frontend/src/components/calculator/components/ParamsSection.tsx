@@ -26,7 +26,7 @@ interface ParamsSectionProps {
   customFormat: { width: string; height: string };
   setIsCustomFormat: (v: boolean) => void;
   setCustomFormat: (updater: (prev: { width: string; height: string }) => { width: string; height: string }) => void;
-  updateSpecs: (updates: Partial<any>, instant?: boolean) => void; // 🆕 Добавили instant параметр
+  updateSpecs: (updates: Partial<any>, instant?: boolean) => void; //  Добавили instant параметр
   schema?: { 
     fields?: Array<{ name: string; type?: string; enum?: any[]; label?: string; required?: boolean; min?: number; max?: number; placeholder?: string }>; 
     template?: { simplified?: { sizes?: Array<{ id: string; label: string; width_mm: number; height_mm: number }> } } | null;
@@ -124,7 +124,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
     setPagesCustomMode(false);
   }, [selectedSizeId, isMultiPageProduct, effectivePagesProp?.options?.join(',')]);
 
-  // 🆕 Устанавливаем первый размер и мин. количество для упрощённых продуктов
+  //  Устанавливаем первый размер и мин. количество для упрощённых продуктов
   React.useEffect(() => {
     if (isSimplifiedProduct && simplifiedSizes.length > 0) {
       const isValidSizeId = specs.size_id != null && simplifiedSizes.some((s: any) => String(s.id) === String(specs.size_id));
@@ -146,7 +146,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
       <div
         className={`params-grid compact${isMultiPageProduct ? ' params-grid--multipage' : ''}`}
       >
-        {/* 🆕 Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
+        {/*  Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
         {isSimplifiedProduct && !hideSimplifiedSizeSelect && (() => {
           const sizeOptionLabel = selectedSize ? `${selectedSize.label} (${selectedSize.width_mm}×${selectedSize.height_mm} мм)` : '';
           return (
@@ -287,7 +287,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         <div className="param-group param-group--narrow">
           <label>
             {getLabel('format', 'Формат')}
-            {isRequired('format') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+            {isRequired('format') && <span style={{ color: 'var(--danger, #c53030)' }}>*</span>}
           </label>
           <select
             value={isCustomFormat ? 'custom' : (specs.format || (getEnum('format').length ? getEnum('format')[0] : availableFormats[0] || ''))}
@@ -296,7 +296,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 setIsCustomFormat(true);
               } else {
                 setIsCustomFormat(false);
-                updateSpecs({ format: e.target.value }, true); // 🆕 instant=true для select
+                updateSpecs({ format: e.target.value }, true); //  instant=true для select
               }
             }}
             className="form-control"
@@ -316,7 +316,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 onChange={(e) => {
                   const newWidth = e.target.value;
                   setCustomFormat(prev => ({ ...prev, width: newWidth }));
-                  // ✅ Обновляем specs при изменении кастомного формата
+                  //  Обновляем specs при изменении кастомного формата
                   if (newWidth && customFormat.height) {
                     updateSpecs({
                       format: `${newWidth}×${customFormat.height}`,
@@ -334,7 +334,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 onChange={(e) => {
                   const newHeight = e.target.value;
                   setCustomFormat(prev => ({ ...prev, height: newHeight }));
-                  // ✅ Обновляем specs при изменении кастомного формата
+                  //  Обновляем specs при изменении кастомного формата
                   if (customFormat.width && newHeight) {
                     updateSpecs({
                       format: `${customFormat.width}×${newHeight}`,
@@ -363,7 +363,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <button 
               type="button"
               className="quantity-btn quantity-btn-minus"
-                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty - 1) }, true)}
+                  onClick={() =>updateSpecs({ quantity: Math.max(minQty, safeQty - 1) }, true)}
             >
               −
             </button>
@@ -382,7 +382,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <button 
               type="button"
               className="quantity-btn quantity-btn-plus"
-                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty) + 1 }, true)}
+                  onClick={() =>updateSpecs({ quantity: Math.max(minQty, safeQty) + 1 }, true)}
             >
               +
             </button>
@@ -433,11 +433,11 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         <div className="param-group">
           <label>
             {getLabel('sides', 'Стороны')}
-            {isRequired('sides') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+            {isRequired('sides') && <span style={{ color: 'var(--danger, #c53030)' }}>*</span>}
           </label>
           <select
             value={specs.sides}
-            onChange={(e) => updateSpecs({ sides: parseInt(e.target.value) as 1 | 2 }, true)} // 🆕 instant
+            onChange={(e) => updateSpecs({ sides: parseInt(e.target.value) as 1 | 2 }, true)} //  instant
             className="form-control"
             required={isRequired('sides')}
           >
@@ -493,7 +493,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 <div className="param-group">
                   <label>
                     {getLabel('pages', 'Страницы')}
-                    {isRequired('pages') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+                    {isRequired('pages') && <span style={{ color: 'var(--danger, #c53030)' }}>*</span>}
                   </label>
                   <select
                     value={specs.pages ?? fe[0]}
@@ -527,7 +527,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <div className="param-group param-group--pages">
               <label>
                 {getLabel('pages', 'Страницы')}
-                {isRequired('pages') && <span className="param-required-mark"> *</span>}
+                {isRequired('pages') && <span className="param-required-mark">*</span>}
               </label>
               {pagesBoundsHint && <p className="param-hint">{pagesBoundsHint}</p>}
               {allowedOptions.length > 0 && (

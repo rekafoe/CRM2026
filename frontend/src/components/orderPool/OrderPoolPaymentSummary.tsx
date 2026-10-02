@@ -37,7 +37,7 @@ export const OrderPoolPaymentSummary: React.FC<OrderPoolPaymentSummaryProps> = (
         </div>
         <div className="order-detail-payment__chip">
           <span className="order-detail-payment__label">Долг</span>
-          <span className={`order-detail-payment__debt ${debt > 0 ? 'is-due' : 'is-paid'}`}>
+          <span className={`order-detail-payment__debt ${debt >0 ? 'is-due' : 'is-paid'}`}>
             <MoneyAmount value={debt} />
           </span>
         </div>

@@ -11,7 +11,7 @@ type MaterialOption = {
   unit?: string
   quantity?: number
   min_quantity?: number | null
-  paper_type_id?: number | null // 🆕 Добавляем paper_type_id
+  paper_type_id?: number | null //  Добавляем paper_type_id
 }
 
 type ProductMaterial = {
@@ -27,13 +27,13 @@ interface MaterialsSectionProps {
   materials: ProductMaterial[]
   allMaterials: MaterialOption[]
   productId?: number
-  allowedPaperTypes?: string[] // 🆕 Разрешенные типы бумаги (имена, например ['polumat', 'mel'])
+  allowedPaperTypes?: string[] //  Разрешенные типы бумаги (имена, например ['polumat', 'mel'])
   trimSize?: { width: string; height: string }
   printSheet?: { preset?: 'SRA3' | 'A3' | 'А4' | ''; width: string; height: string }
   testQty?: number
   defaultPages?: number
   defaultSides?: 1 | 2
-  productType?: string // 🆕 Тип продукта (sheet_single, multi_page, etc.)
+  productType?: string //  Тип продукта (sheet_single, multi_page, etc.)
   onAdd: (payload: { material_id: number; qty_per_sheet: number; is_required?: boolean }) => Promise<void> | void
   onUpdate: (materialId: number, qty: number, isRequired?: boolean) => Promise<void> | void
   onBulkAdd?: (materials: Array<{ material_id: number; qty_per_sheet?: number; is_required?: boolean }>) => Promise<void> | void
@@ -54,7 +54,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
   const [bulkQty, setBulkQty] = useState<Record<number, number | string>>({})
   const [bulkRequired, setBulkRequired] = useState<Record<number, boolean>>({})
   const [bulkAdding, setBulkAdding] = useState(false)
-  const [paperTypes, setPaperTypes] = useState<Array<{ id: number; name: string }>>([]) // 🆕 Типы бумаги для фильтрации
+  const [paperTypes, setPaperTypes] = useState<Array<{ id: number; name: string }>>([]) //  Типы бумаги для фильтрации
   const [loadingPaperTypes, setLoadingPaperTypes] = useState(false)
   const [pagesPerProduct, setPagesPerProduct] = useState(() => (Number(defaultPages) || 0) || 8)
   const [multiPageQty, setMultiPageQty] = useState(() => Number(testQty) || 100)
@@ -71,7 +71,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
   useEffect(() => {
     setPrintSides(defaultSides === 1 ? 1 : 2)
   }, [defaultSides])
-  // 🆕 Загружаем типы бумаги для фильтрации
+  //  Загружаем типы бумаги для фильтрации
   useEffect(() => {
     if (allowedPaperTypes.length === 0) {
       setPaperTypes([])
@@ -93,7 +93,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
         
         if (!cancelled) {
           setPaperTypes(typeMap)
-          console.log('📋 [MaterialsSection] Загружены типы бумаги для фильтрации:', {
+          console.log('[MaterialsSection] Загружены типы бумаги для фильтрации:', {
             allowedPaperTypes,
             loadedTypes: typeMap,
             totalTypes: types.length
@@ -124,7 +124,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
     setEditingQty(map)
   }, [materials])
 
-  // 🆕 Фильтруем материалы по разрешенным типам бумаги
+  //  Фильтруем материалы по разрешенным типам бумаги
   const filteredMaterials = useMemo(() => {
     let materialsToShow = allMaterials
     
@@ -137,7 +137,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
           .map(pt => Number(pt.id))
       )
       
-      console.log('🔍 [MaterialsSection] Фильтрация материалов:', {
+      console.log('[MaterialsSection] Фильтрация материалов:', {
         allowedPaperTypes,
         allowedPaperTypeIds: Array.from(allowedPaperTypeIds),
         paperTypes,
@@ -153,20 +153,20 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
         const isAllowed = allowedPaperTypeIds.has(Number(material.paper_type_id))
         
         if (!isAllowed) {
-          console.log(`❌ [MaterialsSection] Материал "${material.name}" (paper_type_id: ${material.paper_type_id}) не разрешен`)
+          console.log(`[MaterialsSection] Материал "${material.name}" (paper_type_id: ${material.paper_type_id}) не разрешен`)
         }
         
         return isAllowed
       })
       
-      console.log('✅ [MaterialsSection] Отфильтровано материалов:', {
+      console.log('[MaterialsSection] Отфильтровано материалов:', {
         before: allMaterials.length,
         after: materialsToShow.length,
         filtered: materialsToShow.map(m => ({ id: m.id, name: m.name, paper_type_id: m.paper_type_id }))
       })
     } else if (allowedPaperTypes.length > 0 && paperTypes.length === 0 && !loadingPaperTypes) {
       // Если ограничения есть, но типы бумаги еще не загружены - показываем все (временно)
-      console.warn('⚠️ [MaterialsSection] Ограничения есть, но типы бумаги не загружены')
+      console.warn('[MaterialsSection] Ограничения есть, но типы бумаги не загружены')
     }
     
     // Применяем поиск
@@ -314,14 +314,14 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
           </p>
           {allowedPaperTypes.length > 0 && (
             <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#3b82f6' }}>
-              ℹ️ Показаны только материалы с разрешенными типами бумаги: {allowedPaperTypes.join(', ')}
+               Показаны только материалы с разрешенными типами бумаги: {allowedPaperTypes.join(',')}
             </p>
           )}
 
           {/* Подсказки для разных типов продуктов */}
           {productType === 'multi_page' && (
             <div className="alert alert-info" style={{ margin: '8px 0', padding: '8px 12px', fontSize: 12 }}>
-              <strong>📚 Многостраничные изделия</strong>
+              <strong>Многостраничные изделия</strong>
               <p style={{ margin: '4px 0 0 0' }}>
                 Для буклетов и брошюр часто используют разные материалы для обложки и внутренних страниц.
                 Добавьте материалы с пометками "Обложка" и "Внутренние страницы".
@@ -331,7 +331,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
 
           {productType === 'universal' && (
             <div className="alert alert-warning" style={{ margin: '8px 0', padding: '8px 12px', fontSize: 12 }}>
-              <strong>🔧 Универсальный продукт</strong>
+              <strong>Универсальный продукт</strong>
               <p style={{ margin: '4px 0 0 0' }}>
                 Укажите все необходимые материалы для вашего специального продукта.
               </p>
@@ -339,7 +339,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
           )}
           {productType === 'multi_page' && (
             <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#3b82f6', fontWeight: 500 }}>
-              ⚠️ Для многостраничных изделий: учитывайте, что на одном печатном листе может быть несколько страниц (4, 8, 16). 
+               Для многостраничных изделий: учитывайте, что на одном печатном листе может быть несколько страниц (4, 8, 16). 
               Поле "Расход, шт/лист" критично для правильного расчета!
             </p>
           )}
@@ -347,10 +347,10 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
         {onBulkAdd && availableForBulk.length > 0 && (
           <button
             className="btn-secondary"
-            onClick={() => setShowBulkModal(true)}
+            onClick={() =>setShowBulkModal(true)}
             style={{ fontSize: 13, padding: '6px 12px' }}
           >
-            📦 Массовое добавление ({availableForBulk.length})
+             Массовое добавление ({availableForBulk.length})
           </button>
         )}
       </div>
@@ -442,7 +442,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                   Расход (шт/лист)
                   {productType === 'multi_page' && (
                     <span style={{ display: 'block', fontSize: '10px', fontWeight: 'normal', color: '#3b82f6', marginTop: '2px' }}>
-                      ⚠️ Важно для многостраничных
+                       Важно для многостраничных
                     </span>
                   )}
                   {productType === 'sheet_single' && (
@@ -475,7 +475,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                       {material.material_name || option?.name || `Материал #${materialId}`}
                     </td>
                     <td style={{ padding: 8, color: '#475569' }}>{material.category_name || option?.category_name || '—'}</td>
-                    <td style={{ padding: 8, textAlign: 'center' }}>{required ? '✅' : '—'}</td>
+                    <td style={{ padding: 8, textAlign: 'center' }}>{required ? '' : '—'}</td>
                     <td style={{ padding: 8, textAlign: 'center' }}>
                       <input
                         type="number"
@@ -497,7 +497,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                     <td style={{ padding: 8, textAlign: 'center' }}>
                       <button
                         className="btn-quick-action"
-                        onClick={() => onRemove(material)}
+                        onClick={() =>onRemove(material)}
                         disabled={updatingId === materialId}
                       >
                         Удалить
@@ -556,7 +556,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                 Расход, шт/лист
                 {productType === 'multi_page' && (
                   <span style={{ marginLeft: '6px', fontSize: '11px', color: '#3b82f6', fontWeight: 'normal' }}>
-                    ⚠️ Важно: на одном листе может быть несколько страниц
+                     Важно: на одном листе может быть несколько страниц
                   </span>
                 )}
                 {productType === 'sheet_single' && (
@@ -596,7 +596,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
             <div style={{ alignSelf: 'end' }}>
               <button
                 className="btn-primary"
-                onClick={() => void handleAddMaterial()}
+                onClick={() =>void handleAddMaterial()}
                 disabled={!selectedMaterialId || newQtyPerSheet === '' || Number(newQtyPerSheet) <= 0}
               >
                 Добавить
@@ -637,7 +637,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                   />
                   <button
                     className="btn-secondary"
-                    onClick={() => {
+                    onClick={() =>{
                       const all = new Set(availableForBulk.map((m) => Number(m.id)))
                       setBulkSelected(all)
                       const qtyMap: Record<number, number> = {}
@@ -654,7 +654,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                   </button>
                   <button
                     className="btn-secondary"
-                    onClick={() => {
+                    onClick={() =>{
                       setBulkSelected(new Set())
                       setBulkQty({})
                       setBulkRequired({})
@@ -719,7 +719,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                                 />
                                 {productType === 'multi_page' && (
                                   <span style={{ fontSize: '9px', color: '#3b82f6', lineHeight: '1.2' }}>
-                                    ⚠️ Важно
+                                     Важно
                                   </span>
                                 )}
                                 {productType === 'sheet_single' && (
@@ -749,7 +749,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
                   <button
                     className="btn-secondary"
-                    onClick={() => {
+                    onClick={() =>{
                       setShowBulkModal(false)
                       setBulkSelected(new Set())
                       setBulkQty({})
@@ -760,7 +760,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                   </button>
                   <button
                     className="btn-primary"
-                    onClick={() => void handleBulkAdd()}
+                    onClick={() =>void handleBulkAdd()}
                     disabled={bulkSelected.size === 0 || bulkAdding}
                   >
                     {bulkAdding ? 'Добавление...' : `Добавить ${bulkSelected.size} материал(ов)`}

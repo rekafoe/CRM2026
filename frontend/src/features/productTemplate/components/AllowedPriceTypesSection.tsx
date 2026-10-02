@@ -77,7 +77,7 @@ export const AllowedPriceTypesSection: React.FC<AllowedPriceTypesSectionProps> =
           type="button"
           className="btn-primary"
           disabled={saving}
-          onClick={() => void onSave()}
+          onClick={() =>void onSave()}
         >
           {saving ? 'Сохранение…' : 'Сохранить'}
         </button>

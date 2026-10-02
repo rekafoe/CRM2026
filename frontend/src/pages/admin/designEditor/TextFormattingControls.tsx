@@ -95,7 +95,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
           : 'По ширине';
 
   const alignGlyph = (align: string) =>
-    align === 'left' ? '⬅' : align === 'center' ? '↔' : align === 'right' ? '➡' : '⇔';
+    align === 'left' ? '←' : align === 'center' ? '≡' : align === 'right' ? '→' : '⇔';
 
   const controls = (
     <>
@@ -147,10 +147,10 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
           title="Размер шрифта"
         />
         <div className="text-floating-toolbar__size-step">
-          <button type="button" className="text-floating-toolbar__step" onClick={() => bumpSize(1)} title="Крупнее">
+          <button type="button" className="text-floating-toolbar__step" onClick={() =>bumpSize(1)} title="Крупнее">
             +
           </button>
-          <button type="button" className="text-floating-toolbar__step" onClick={() => bumpSize(-1)} title="Мельче">
+          <button type="button" className="text-floating-toolbar__step" onClick={() =>bumpSize(-1)} title="Мельче">
             −
           </button>
         </div>
@@ -206,7 +206,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
             key={align}
             type="button"
             className={`text-floating-toolbar__icon-btn${selectedObj.textAlign === align ? ' is-active' : ''}`}
-            onClick={() => onTextAlignChange(align)}
+            onClick={() =>onTextAlignChange(align)}
             title={alignTitle(align)}
           >
             {alignGlyph(align)}
@@ -215,9 +215,6 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
       </div>
 
       <button type="button" className="text-floating-toolbar__fx" disabled title="Скоро">
-        <span className="text-floating-toolbar__wand" aria-hidden>
-          ✦
-        </span>
         Эффекты
       </button>
 
@@ -309,10 +306,10 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
             onChange={(e) => onFontSizeChange(clampSize(parseInt(e.target.value, 10) || size))}
           />
           <div className="text-panel-format__size-step">
-            <button type="button" className="text-panel-format__step" onClick={() => bumpSize(1)}>
+            <button type="button" className="text-panel-format__step" onClick={() =>bumpSize(1)}>
               +
             </button>
-            <button type="button" className="text-panel-format__step" onClick={() => bumpSize(-1)}>
+            <button type="button" className="text-panel-format__step" onClick={() =>bumpSize(-1)}>
               −
             </button>
           </div>
@@ -387,7 +384,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
               key={align}
               type="button"
               className={`text-panel-format__fmt${selectedObj.textAlign === align ? ' is-active' : ''}`}
-              onClick={() => onTextAlignChange(align)}
+              onClick={() =>onTextAlignChange(align)}
               title={alignTitle(align)}
             >
               {alignGlyph(align)}
@@ -397,7 +394,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
       </div>
 
       <button type="button" className="text-panel-format__fx" disabled>
-        ✦ Эффекты (скоро)
+        Эффекты (скоро)
       </button>
 
       <div className="text-panel-format__row">

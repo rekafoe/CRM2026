@@ -432,21 +432,21 @@ export const EarningsAdminPage: React.FC = () => {
         <button
           type="button"
           className={`earn-tab ${activeTab === 'summary' ? 'earn-tab--active' : ''}`}
-          onClick={() => setActiveTab('summary')}
+          onClick={() =>setActiveTab('summary')}
         >
           Сводка
         </button>
         <button
           type="button"
           className={`earn-tab ${activeTab === 'analytics' ? 'earn-tab--active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
+          onClick={() =>setActiveTab('analytics')}
         >
           Аналитика
         </button>
         <button
           type="button"
           className={`earn-tab ${activeTab === 'employee' ? 'earn-tab--active' : ''}`}
-          onClick={() => setActiveTab('employee')}
+          onClick={() =>setActiveTab('employee')}
         >
           По сотруднику
         </button>
@@ -491,13 +491,13 @@ export const EarningsAdminPage: React.FC = () => {
                         type="button"
                         className="earn-month-link"
                         title="Заказы, по которым начислены проценты"
-                        onClick={() => openMonthOrders(row, month)}
+                        onClick={() =>openMonthOrders(row, month)}
                       >
                         <MoneyAmount value={row.totalCurrentMonth} />
                       </button>
                     </td>
                     <td className="earn-cell-money" title={
-                      Number(row.hourlyRate) > 0
+                      Number(row.hourlyRate) >0
                         ? `${Number(row.hours).toFixed(1)} ч × ${Number(row.hourlyRate).toFixed(2)} BYN`
                         : 'Ставка не задана'
                     }>
@@ -625,7 +625,7 @@ export const EarningsAdminPage: React.FC = () => {
                             <button
                               type="button"
                               className="earn-month-link"
-                              onClick={() => analyticsUser && openMonthOrders(analyticsUser, entry.month)}
+                              onClick={() =>analyticsUser && openMonthOrders(analyticsUser, entry.month)}
                             >
                               {entry.month}
                             </button>
@@ -634,7 +634,7 @@ export const EarningsAdminPage: React.FC = () => {
                             <button
                               type="button"
                               className="earn-month-link"
-                              onClick={() => analyticsUser && openMonthOrders(analyticsUser, entry.month)}
+                              onClick={() =>analyticsUser && openMonthOrders(analyticsUser, entry.month)}
                             >
                               <MoneyAmount value={entry.total} />
                             </button>
@@ -668,7 +668,7 @@ export const EarningsAdminPage: React.FC = () => {
                       <button
                         type="button"
                         className="earn-month-link"
-                        onClick={() => openMonthOrders(detailUser, h.month)}
+                        onClick={() =>openMonthOrders(detailUser, h.month)}
                       >
                         {h.month}
                       </button>
@@ -677,7 +677,7 @@ export const EarningsAdminPage: React.FC = () => {
                       <button
                         type="button"
                         className="earn-month-link"
-                        onClick={() => openMonthOrders(detailUser, h.month)}
+                        onClick={() =>openMonthOrders(detailUser, h.month)}
                       >
                         <MoneyAmount value={h.total} />
                       </button>

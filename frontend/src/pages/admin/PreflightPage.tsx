@@ -9,7 +9,7 @@ export const PreflightPage: React.FC = () => {
   return (
     <div className="admin-page-layout preflight-page">
       <div className="admin-page-header">
-        <button onClick={() => navigate('/adminpanel')} className="back-btn">
+        <button onClick={() =>navigate('/adminpanel')} className="back-btn">
           ← Назад
         </button>
         <h1>

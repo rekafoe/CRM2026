@@ -191,7 +191,7 @@ export const EarningsPage: React.FC = () => {
           <div
             className="earnings-summary-card"
             title={
-              hourlyRate > 0
+              hourlyRate >0
                 ? `${hours.toFixed(1)} ч × ${hourlyRate.toFixed(2)} BYN`
                 : 'Почасовая ставка не задана'
             }
@@ -202,7 +202,7 @@ export const EarningsPage: React.FC = () => {
           <button
             type="button"
             className="earnings-summary-card earnings-summary-card--bonus earnings-summary-card--clickable"
-            onClick={() => setShowBonusesModal(true)}
+            onClick={() =>setShowBonusesModal(true)}
           >
             <div className="earnings-summary-title">Премии</div>
             <div className="earnings-summary-value"><MoneyAmount value={totalBonuses} signed /></div>
@@ -210,7 +210,7 @@ export const EarningsPage: React.FC = () => {
           <button
             type="button"
             className="earnings-summary-card earnings-summary-card--penalty earnings-summary-card--clickable"
-            onClick={() => setShowPenaltiesModal(true)}
+            onClick={() =>setShowPenaltiesModal(true)}
           >
             <div className="earnings-summary-title">Штрафы</div>
             <div className="earnings-summary-value">−<MoneyAmount value={totalPenalties} /></div>

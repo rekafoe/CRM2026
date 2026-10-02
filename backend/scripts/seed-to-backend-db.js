@@ -10,12 +10,12 @@ const fs = require('fs');
 const DB_PATH = path.resolve(process.cwd(), 'backend/data.db');
 
 if (!fs.existsSync(DB_PATH)) {
-  console.error('❌ Файл backend/data.db не найден!');
+  console.error('Файл backend/data.db не найден!');
   process.exit(1);
 }
 
-console.log(`📂 Используем БД: ${DB_PATH}`);
-console.log(`💾 Размер: ${(fs.statSync(DB_PATH).size / 1024).toFixed(2)} KB\n`);
+console.log(`Используем БД: ${DB_PATH}`);
+console.log(`Размер: ${(fs.statSync(DB_PATH).size / 1024).toFixed(2)} KB\n`);
 
 async function runQuery(db, sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -38,12 +38,12 @@ async function getAllRows(db, sql, params = []) {
 async function seedProducts() {
   const db = new sqlite3.Database(DB_PATH);
   
-  console.log('🚀 Создание продуктов в РАБОЧЕЙ БД...\n');
+  console.log('Создание продуктов в РАБОЧЕЙ БД...\n');
   
   try {
     // Проверяем существующие продукты
     const existing = await getAllRows(db, 'SELECT id, name FROM products');
-    console.log(`📦 Существующих продуктов: ${existing.length}`);
+    console.log(`Существующих продуктов: ${existing.length}`);
     existing.forEach(p => console.log(`   - ${p.name} (ID: ${p.id})`));
     console.log('');
     
@@ -57,15 +57,15 @@ async function seedProducts() {
     
     let categoryId;
     if (!category) {
-      console.log('📁 Создание категории "Печатная продукция"...');
+      console.log('Создание категории "Печатная продукция"...');
       categoryId = await runQuery(db, `
         INSERT INTO product_categories (name, icon, description, sort_order, is_active)
         VALUES (?, ?, ?, ?, ?)
-      `, ['Печатная продукция', '🖨️', 'Листовки, визитки, документы', 1, 1]);
-      console.log(`✅ Категория создана (ID: ${categoryId})\n`);
+      `, ['Печатная продукция', '', 'Листовки, визитки, документы', 1, 1]);
+      console.log(`Категория создана (ID: ${categoryId})\n`);
     } else {
       categoryId = category.id;
-      console.log(`✅ Категория уже существует (ID: ${categoryId})\n`);
+      console.log(`Категория уже существует (ID: ${categoryId})\n`);
     }
     
     // Шаблоны продуктов
@@ -73,7 +73,7 @@ async function seedProducts() {
       {
         name: 'Листовки (Тест)',
         description: 'Цветные листовки различных форматов',
-        icon: '📄',
+        icon: '',
         params: [
           { name: 'format', label: 'Формат', type: 'select', options: ['A6', 'A5', 'A4', 'A3'], required: 1, sort: 1 },
           { name: 'quantity', label: 'Количество', type: 'number', min: 1, max: 100000, required: 1, sort: 2 },
@@ -87,7 +87,7 @@ async function seedProducts() {
       {
         name: 'Визитки (Тест)',
         description: 'Визитные карточки различных типов',
-        icon: '💳',
+        icon: '',
         params: [
           { name: 'card_type', label: 'Тип визитки', type: 'select', options: ['Стандартные', 'Ламинированные', 'Магнитные'], required: 1, sort: 1 },
           { name: 'size', label: 'Размер', type: 'select', options: ['85x55', '90x50'], required: 1, sort: 2 },
@@ -100,7 +100,7 @@ async function seedProducts() {
       {
         name: 'Печать документов (Тест)',
         description: 'Многостраничные документы с переплетом',
-        icon: '📚',
+        icon: '',
         params: [
           { name: 'pages', label: 'Количество страниц', type: 'number', min: 1, max: 1000, required: 1, sort: 1 },
           { name: 'quantity', label: 'Экземпляров', type: 'number', min: 1, max: 1000, required: 1, sort: 2 },
@@ -114,7 +114,7 @@ async function seedProducts() {
     
     // Создаем продукты
     for (const template of templates) {
-      console.log(`\n📦 Создание: ${template.name}`);
+      console.log(`\n Создание: ${template.name}`);
       
       // Проверяем существование
       const exists = await new Promise((resolve, reject) => {
@@ -126,7 +126,7 @@ async function seedProducts() {
       
       let productId;
       if (exists) {
-        console.log(`   ⚠️  Продукт уже существует (ID: ${exists.id}), пропускаем...`);
+        console.log(`    Продукт уже существует (ID: ${exists.id}), пропускаем...`);
         continue;
       }
       
@@ -137,7 +137,7 @@ async function seedProducts() {
       `, [template.name, template.description, categoryId, template.icon, 'product', 
           template.name.includes('документ') ? 'multi_page' : 'sheet_single', 1]);
       
-      console.log(`   ✅ Продукт создан (ID: ${productId})`);
+      console.log(`   Продукт создан (ID: ${productId})`);
       
       // Создаем параметры
       for (const param of template.params) {
@@ -148,7 +148,7 @@ async function seedProducts() {
             param.options ? JSON.stringify(param.options) : null,
             param.min || null, param.max || null, param.required, param.sort]);
       }
-      console.log(`   ✅ Параметров добавлено: ${template.params.length}`);
+      console.log(`   Параметров добавлено: ${template.params.length}`);
     }
     
     // Итоговая статистика
@@ -156,22 +156,22 @@ async function seedProducts() {
     const finalParams = await getAllRows(db, 'SELECT COUNT(*) as count FROM product_parameters');
     
     console.log('\n' + '='.repeat(60));
-    console.log('✅ ГОТОВО!');
+    console.log('ГОТОВО!');
     console.log('='.repeat(60));
-    console.log(`\n📦 Всего продуктов в БД: ${finalProducts.length}`);
+    console.log(`\n Всего продуктов в БД: ${finalProducts.length}`);
     finalProducts.forEach(p => {
-      console.log(`   ${p.is_active ? '✅' : '❌'} ID ${p.id}: ${p.name}`);
+      console.log(`  ${p.is_active ? '' : ''} ID ${p.id}: ${p.name}`);
     });
-    console.log(`\n📋 Всего параметров: ${finalParams[0].count}`);
+    console.log(`\n Всего параметров: ${finalParams[0].count}`);
     
-    console.log('\n🎯 Следующие шаги:');
+    console.log('\n Следующие шаги:');
     console.log('  1. Перезапустите backend (Ctrl+C, затем npm run dev)');
     console.log('  2. Откройте админку: http://localhost:5173/adminpanel/products');
     console.log('  3. Очистите кэш: Ctrl+Shift+R');
     console.log('  4. Проверьте продукты!\n');
     
   } catch (error) {
-    console.error('❌ Ошибка:', error);
+    console.error('Ошибка:', error);
   } finally {
     db.close();
   }

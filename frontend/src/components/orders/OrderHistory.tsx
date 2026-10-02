@@ -143,23 +143,23 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
   // Получение иконки для действия
   const getActionIcon = (action: string): string => {
     const icons: Record<string, string> = {
-      created: '🆕',
-      status_changed: '🔄',
-      customer_updated: '👤',
-      item_added: '➕',
-      item_updated: '✏️',
-      item_removed: '➖',
-      prepayment_created: '💳',
-      prepayment_updated: '💳',
-      prepayment_cancelled: '❌',
-      file_uploaded: '📁',
-      file_approved: '✅',
-      file_rejected: '❌',
-      comment_added: '💬',
-      assigned: '👥',
-      unassigned: '👤'
+      created: '',
+      status_changed: '',
+      customer_updated: '',
+      item_added: '',
+      item_updated: '',
+      item_removed: '',
+      prepayment_created: '',
+      prepayment_updated: '',
+      prepayment_cancelled: '',
+      file_uploaded: '',
+      file_approved: '',
+      file_rejected: '',
+      comment_added: '',
+      assigned: '',
+      unassigned: ''
     };
-    return icons[action] || '📝';
+    return icons[action] || '';
   };
 
   // Получение цвета для действия
@@ -208,7 +208,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
       <div className="order-history-modal">
         <div>
           <div className="modal-header">
-            <h2>📋 История заказа {order.number}</h2>
+            <h2>История заказа {order.number}</h2>
             <button className="close-btn" onClick={onClose}>×</button>
           </div>
           <div className="modal-content">
@@ -224,12 +224,12 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
       <div className="order-history-modal">
         <div>
           <div className="modal-header">
-            <h2>📋 История заказа {order.number}</h2>
+            <h2>История заказа {order.number}</h2>
             <button className="close-btn" onClick={onClose}>×</button>
           </div>
           <div className="modal-content">
             <div className="error-state">
-              <div className="error-icon">⚠️</div>
+              <div className="error-icon"></div>
               <h3>Ошибка загрузки</h3>
               <p>{error}</p>
               <button className="btn btn-primary" onClick={loadHistory}>
@@ -247,7 +247,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
       <div>
         {/* Заголовок */}
         <div className="modal-header">
-          <h2>📋 История заказа {order.number}</h2>
+          <h2>История заказа {order.number}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
@@ -256,31 +256,31 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
         <div className="filter-buttons">
           <button 
             className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
+            onClick={() =>setFilter('all')}
           >
             Все
           </button>
           <button 
             className={`filter-btn ${filter === 'status' ? 'active' : ''}`}
-            onClick={() => setFilter('status')}
+            onClick={() =>setFilter('status')}
           >
             Статусы
           </button>
           <button 
             className={`filter-btn ${filter === 'customer' ? 'active' : ''}`}
-            onClick={() => setFilter('customer')}
+            onClick={() =>setFilter('customer')}
           >
             Клиент
           </button>
           <button 
             className={`filter-btn ${filter === 'items' ? 'active' : ''}`}
-            onClick={() => setFilter('items')}
+            onClick={() =>setFilter('items')}
           >
             Позиции
           </button>
           <button 
             className={`filter-btn ${filter === 'payment' ? 'active' : ''}`}
-            onClick={() => setFilter('payment')}
+            onClick={() =>setFilter('payment')}
           >
             Оплата
           </button>
@@ -291,7 +291,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
       <div className="modal-content">
         {filteredHistory.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📝</div>
+            <div className="empty-icon"></div>
             <h3>История пуста</h3>
             <p>Нет записей для выбранного фильтра</p>
           </div>
@@ -319,7 +319,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
                   
                   <div className="entry-details">
                     <div className="entry-user">
-                      👤 {entry.userName}
+                       {entry.userName}
                     </div>
                     
                     {entry.oldValue && entry.newValue && (

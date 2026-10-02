@@ -276,10 +276,10 @@ export class PhotoOrderController {
           const success = await TelegramService.sendDocumentToUser(
             order.chatId,
             processedPhoto.processedPath,
-            `📸 Обработанное фото ${order.selectedSize.name}\n\n` +
-            `📏 Размер: ${processedPhoto.metadata.processedWidth}x${processedPhoto.metadata.processedHeight}\n` +
-            `📁 Размер файла: ${(processedPhoto.metadata.fileSize / 1024).toFixed(2)}KB\n` +
-            `🎨 Режим: ${processedPhoto.options.cropMode === 'crop' ? 'Кроп' : 'Вписать с полями'}`
+            `Обработанное фото ${order.selectedSize.name}\n\n` +
+            `Размер: ${processedPhoto.metadata.processedWidth}x${processedPhoto.metadata.processedHeight}\n` +
+            `Размер файла: ${(processedPhoto.metadata.fileSize / 1024).toFixed(2)}KB\n` +
+            `Режим: ${processedPhoto.options.cropMode === 'crop' ? 'Кроп' : 'Вписать с полями'}`
           );
           
           if (success) {
@@ -292,15 +292,15 @@ export class PhotoOrderController {
 
       // Отправляем сообщение с информацией о заказе
       const totalPriceRub = (order.totalPrice / 100).toFixed(0);
-      const message = `📸 *ВАШ ЗАКАЗ ГОТОВ К ПОДТВЕРЖДЕНИЮ*\n\n` +
-                     `🆔 Заказ #${order.id}\n` +
-                     `📏 Размер: ${order.selectedSize.name}\n` +
-                     `📸 Фотографий: ${order.originalPhotos.length}\n` +
-                     `📦 Копий: ${order.quantity}\n` +
-                     `💰 Стоимость: ${totalPriceRub} руб.\n` +
-                     `📤 Отправлено фото: ${sentCount}/${order.processedPhotos.length}\n\n` +
-                     `✅ Для подтверждения заказа ответьте "Подтвердить #${order.id}"\n` +
-                     `❌ Для отмены заказа ответьте "Отменить #${order.id}"`;
+      const message = `*ВАШ ЗАКАЗ ГОТОВ К ПОДТВЕРЖДЕНИЮ*\n\n` +
+                     `Заказ #${order.id}\n` +
+                     `Размер: ${order.selectedSize.name}\n` +
+                     `Фотографий: ${order.originalPhotos.length}\n` +
+                     `Копий: ${order.quantity}\n` +
+                     `Стоимость: ${totalPriceRub} руб.\n` +
+                     `Отправлено фото: ${sentCount}/${order.processedPhotos.length}\n\n` +
+                     `Для подтверждения заказа ответьте "Подтвердить #${order.id}"\n` +
+                     `Для отмены заказа ответьте "Отменить #${order.id}"`;
 
       await TelegramService.sendMessageToUser(order.chatId, message);
 

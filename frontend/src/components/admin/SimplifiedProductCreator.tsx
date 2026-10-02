@@ -3,6 +3,7 @@ import { Modal, Button, FormField, Alert } from '../common';
 import { ProductCategory } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 import './ProductManagement.css';
 
 interface SimplifiedProductCreatorProps {
@@ -12,11 +13,11 @@ interface SimplifiedProductCreatorProps {
   onCreated: (productId: number) => void;
 }
 
-// 🎯 Умные шаблоны продуктов
+//  Умные шаблоны продуктов
 const PRODUCT_TEMPLATES = {
   flyers: {
     name: 'Листовки',
-    icon: '📄',
+    icon: '',
     description: 'Рекламные листовки различных форматов',
     product_type: 'sheet_single',
     calculator_type: 'product' as const,
@@ -30,7 +31,7 @@ const PRODUCT_TEMPLATES = {
   },
   business_cards: {
     name: 'Визитки',
-    icon: '💳',
+    icon: '',
     description: 'Визитные карточки',
     product_type: 'sheet_item',
     calculator_type: 'product' as const,
@@ -46,7 +47,7 @@ const PRODUCT_TEMPLATES = {
   },
   booklets: {
     name: 'Буклеты',
-    icon: '📖',
+    icon: '',
     description: 'Многостраничные буклеты',
     product_type: 'multi_page',
     calculator_type: 'product' as const,
@@ -62,7 +63,7 @@ const PRODUCT_TEMPLATES = {
   },
   stickers: {
     name: 'Наклейки',
-    icon: '🏷️',
+    icon: '',
     description: 'Самоклеящиеся наклейки',
     product_type: 'sheet_item',
     calculator_type: 'product' as const,
@@ -76,7 +77,7 @@ const PRODUCT_TEMPLATES = {
   },
   custom: {
     name: 'Пользовательский продукт',
-    icon: '📦',
+    icon: '',
     description: 'Продукт с настраиваемыми параметрами',
     product_type: 'universal',
     calculator_type: 'product' as const,
@@ -207,9 +208,9 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
                   <button
                     key={key}
                     className="template-card"
-                    onClick={() => handleTemplateSelect(key)}
+                    onClick={() =>handleTemplateSelect(key)}
                   >
-                    <div className="template-icon">{template.icon}</div>
+                    <div className="template-icon">{withoutEmoji(template.icon)}</div>
                     <div className="template-name">{template.name}</div>
                     <div className="template-description">{template.description}</div>
                   </button>
@@ -232,7 +233,7 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
 
             <div className="selected-template-info mb-5">
               <div className="text-2xl mb-2">
-                {PRODUCT_TEMPLATES[selectedTemplate].icon}
+                {withoutEmoji(PRODUCT_TEMPLATES[selectedTemplate].icon)}
               </div>
               <h3>{PRODUCT_TEMPLATES[selectedTemplate].name}</h3>
               <p className="text-sm text-muted">
@@ -249,7 +250,7 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
                 <option value="">Выберите категорию</option>
                 {categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
+                    {[withoutEmoji(cat.icon), cat.name].filter(Boolean).join(' ')}
                   </option>
                 ))}
               </select>

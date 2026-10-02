@@ -158,7 +158,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
       }}>
         <div>
           <h1 style={{ margin: 0, color: '#333' }}>
-            📊 Отчёт за {reportDate}
+             Отчёт за {reportDate}
           </h1>
           <p style={{ margin: '8px 0 0 0', color: '#666' }}>
             Пользователь: {report.user_name || 'Неизвестный'} | 
@@ -283,7 +283,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        onClick={() => setEditingOrder(editingOrder?.id === order.id ? null : order)}
+                        onClick={() =>setEditingOrder(editingOrder?.id === order.id ? null : order)}
                         style={{
                           padding: '6px 12px',
                           backgroundColor: editingOrder?.id === order.id ? '#ff9800' : '#2196f3',
@@ -294,10 +294,10 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                           fontSize: '12px'
                         }}
                       >
-                        {editingOrder?.id === order.id ? '✏️ Закрыть' : '✏️ Редактировать'}
+                        {editingOrder?.id === order.id ? 'Закрыть' : 'Редактировать'}
                       </button>
                       <button
-                        onClick={() => handleDuplicateOrder(order.id)}
+                        onClick={() =>handleDuplicateOrder(order.id)}
                         style={{
                           padding: '6px 12px',
                           backgroundColor: '#4caf50',
@@ -308,10 +308,10 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                           fontSize: '12px'
                         }}
                       >
-                        📋 Дублировать
+                         Дублировать
                       </button>
                       <button
-                        onClick={() => handleDeleteOrder(order.id)}
+                        onClick={() =>handleDeleteOrder(order.id)}
                         style={{
                           padding: '6px 12px',
                           backgroundColor: '#f44336',
@@ -322,7 +322,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                           fontSize: '12px'
                         }}
                       >
-                        🗑️ Удалить
+                         Удалить
                       </button>
                     </div>
                   </div>

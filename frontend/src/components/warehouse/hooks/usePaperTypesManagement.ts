@@ -70,12 +70,12 @@ export const usePaperTypesManagement = (onRefresh?: () => void) => {
   // Загрузка типов бумаги
   const loadPaperTypes = useCallback(async () => {
     try {
-      console.log('🔄 Loading paper types...');
+      console.log('Loading paper types...');
       setLoading(true);
       const response = await getPaperTypes();
-      console.log('📥 Paper types response:', response);
+      console.log('Paper types response:', response);
       const newPaperTypes = response.data || [];
-      console.log('📋 Setting paper types:', newPaperTypes.length, 'items');
+      console.log('Setting paper types:', newPaperTypes.length, 'items');
       
       // Дедупликация по id - оставляем только первое вхождение каждого id
       const uniquePaperTypes = newPaperTypes.reduce((acc: PaperType[], paperType: PaperType) => {
@@ -87,7 +87,7 @@ export const usePaperTypesManagement = (onRefresh?: () => void) => {
       
       setPaperTypes(uniquePaperTypes);
     } catch (error) {
-      console.error('❌ Ошибка загрузки типов бумаги:', error);
+      console.error('Ошибка загрузки типов бумаги:', error);
       showToast('Ошибка загрузки типов бумаги', 'error');
     } finally {
       setLoading(false);
@@ -121,14 +121,14 @@ export const usePaperTypesManagement = (onRefresh?: () => void) => {
   };
 
   const handleUpdatePaperType = async () => {
-    console.log('🔍 handleUpdatePaperType called', modals.editingPaperType);
+    console.log('handleUpdatePaperType called', modals.editingPaperType);
     if (!modals.editingPaperType) {
-      console.log('❌ No editingPaperType');
+      console.log('No editingPaperType');
       return;
     }
 
     try {
-      console.log('📤 Sending update request:', {
+      console.log('Sending update request:', {
         id: modals.editingPaperType.id,
         data: {
           name: modals.editingPaperType.name,
@@ -145,44 +145,44 @@ export const usePaperTypesManagement = (onRefresh?: () => void) => {
         is_active: modals.editingPaperType.is_active
       });
       
-      console.log('✅ Update successful');
+      console.log('Update successful');
       showToast('Тип бумаги обновлен', 'success');
       setModals(prev => ({ ...prev, editingPaperType: null }));
       
       // Принудительно обновляем данные
-      console.log('🔄 Forcing data reload after update...');
+      console.log('Forcing data reload after update...');
       // Инвалидируем кэш перед перезагрузкой
       try { localStorage.removeItem('paper-types'); } catch {}
       await loadPaperTypes();
       onRefresh?.();
     } catch (error) {
-      console.error('❌ Ошибка обновления типа бумаги:', error);
+      console.error('Ошибка обновления типа бумаги:', error);
       showToast('Ошибка обновления типа бумаги', 'error');
     }
   };
 
   const handleDeletePaperType = async (id: number) => {
-    console.log('🔍 handleDeletePaperType called', id);
+    console.log('handleDeletePaperType called', id);
     
     if (!confirm('Удалить тип бумаги?')) {
-      console.log('❌ User cancelled deletion');
+      console.log('User cancelled deletion');
       return;
     }
 
     try {
-      console.log('📤 Sending delete request for ID:', id);
+      console.log('Sending delete request for ID:', id);
       await deletePaperType(id);
-      console.log('✅ Delete successful');
+      console.log('Delete successful');
       showToast('Тип бумаги удален', 'success');
       
       // Принудительно обновляем данные
-      console.log('🔄 Forcing data reload after delete...');
+      console.log('Forcing data reload after delete...');
       // Инвалидируем кэш перед перезагрузкой
       try { localStorage.removeItem('paper-types'); } catch {}
       await loadPaperTypes();
       onRefresh?.();
     } catch (error) {
-      console.error('❌ Ошибка удаления типа бумаги:', error);
+      console.error('Ошибка удаления типа бумаги:', error);
       showToast('Ошибка удаления типа бумаги', 'error');
     }
   };

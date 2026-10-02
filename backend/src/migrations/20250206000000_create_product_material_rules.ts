@@ -40,11 +40,11 @@ export async function up(db: Database): Promise<void> {
     ON product_material_rules(material_id)
   `);
 
-  console.log('✅ Создана таблица product_material_rules');
+  console.log('Создана таблица product_material_rules');
 }
 
 export async function down(db: Database): Promise<void> {
   await db.exec(`DROP TABLE IF EXISTS product_material_rules`);
-  console.log('✅ Удалена таблица product_material_rules');
+  console.log('Удалена таблица product_material_rules');
 }
 

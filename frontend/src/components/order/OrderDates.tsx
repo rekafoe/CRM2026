@@ -144,7 +144,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
         ) : (
           <span 
             style={{ fontSize: 11, color: '#333', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => setEditingCreatedDate(true)}
+            onClick={() =>setEditingCreatedDate(true)}
             title="Кликните для редактирования"
           >
             {formatDateDDMMYYYY(createdDate)}
@@ -172,7 +172,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
         ) : (
           <span 
             style={{ fontSize: 11, color: '#333', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => setEditingReadyDate(true)}
+            onClick={() =>setEditingReadyDate(true)}
             title="Кликните для редактирования"
           >
             {formatDateTimeDDMMYYYY(readyDate)}

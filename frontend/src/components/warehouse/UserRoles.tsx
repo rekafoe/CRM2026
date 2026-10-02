@@ -235,7 +235,7 @@ export const UserRoles: React.FC = () => {
   return (
     <div className="user-roles">
       <div className="user-roles-header">
-        <h2>👥 Управление ролями и пользователями</h2>
+        <h2>Управление ролями и пользователями</h2>
         <div className="header-actions">
           <button 
             className="btn btn-primary"
@@ -255,19 +255,19 @@ export const UserRoles: React.FC = () => {
       <div className="tabs">
         <button 
           className={`tab ${activeTab === 'roles' ? 'active' : ''}`}
-          onClick={() => setActiveTab('roles')}
+          onClick={() =>setActiveTab('roles')}
         >
           Роли
         </button>
         <button 
           className={`tab ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
+          onClick={() =>setActiveTab('users')}
         >
           Пользователи
         </button>
         <button 
           className={`tab ${activeTab === 'permissions' ? 'active' : ''}`}
-          onClick={() => setActiveTab('permissions')}
+          onClick={() =>setActiveTab('permissions')}
         >
           Разрешения
         </button>
@@ -280,7 +280,7 @@ export const UserRoles: React.FC = () => {
             <h3>Роли системы</h3>
             <button 
               className="btn btn-primary"
-              onClick={() => {
+              onClick={() =>{
                 setEditingRole(null)
                 setRoleForm({ name: '', description: '', permissions: [] })
                 setShowRoleForm(true)
@@ -298,7 +298,7 @@ export const UserRoles: React.FC = () => {
                   <div className="role-actions">
                     <button 
                       className="btn btn-sm btn-secondary"
-                      onClick={() => {
+                      onClick={() =>{
                         setEditingRole(role)
                         setRoleForm({
                           name: role.name,
@@ -312,7 +312,7 @@ export const UserRoles: React.FC = () => {
                     </button>
                     <button 
                       className="btn btn-sm btn-danger"
-                      onClick={() => handleDeleteRole(role.id)}
+                      onClick={() =>handleDeleteRole(role.id)}
                     >
                       Удалить
                     </button>
@@ -417,7 +417,7 @@ export const UserRoles: React.FC = () => {
               <h3>{editingRole ? 'Редактировать роль' : 'Создать роль'}</h3>
               <button 
                 className="close-btn"
-                onClick={() => {
+                onClick={() =>{
                   setShowRoleForm(false)
                   setEditingRole(null)
                   setRoleForm({ name: '', description: '', permissions: [] })
@@ -483,7 +483,7 @@ export const UserRoles: React.FC = () => {
             <div className="modal-footer">
               <button 
                 className="btn btn-secondary"
-                onClick={() => {
+                onClick={() =>{
                   setShowRoleForm(false)
                   setEditingRole(null)
                   setRoleForm({ name: '', description: '', permissions: [] })

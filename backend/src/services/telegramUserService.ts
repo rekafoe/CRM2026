@@ -181,7 +181,7 @@ export class TelegramUserService {
    * Создание нового Telegram пользователя
    */
   static async createUser(userData: CreateTelegramUserRequest): Promise<TelegramUser> {
-    console.log(`💾 Creating Telegram user in database:`, userData);
+    console.log(`Creating Telegram user in database:`, userData);
     const db = await getDb();
     
     const defaultPreferences = {
@@ -191,7 +191,7 @@ export class TelegramUserService {
     };
 
     const preferences = userData.notification_preferences || defaultPreferences;
-    console.log(`📋 Using preferences:`, preferences);
+    console.log(`Using preferences:`, preferences);
 
     const result = await db.run(`
       INSERT INTO telegram_users (
@@ -208,7 +208,7 @@ export class TelegramUserService {
       JSON.stringify(preferences)
     ]);
 
-    console.log(`💾 Database insert result:`, result);
+    console.log(`Database insert result:`, result);
 
     const newUser = await this.getUserByChatId(userData.chat_id);
     if (!newUser) {

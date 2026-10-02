@@ -5,13 +5,13 @@
 export const getServiceIcon = (type: string): string => {
   switch (type) {
     case 'print':
-      return '🖨️';
+      return '';
     case 'postprint':
-      return '✂️';
+      return '';
     case 'other':
-      return '⚙️';
+      return '';
     default:
-      return '📋';
+      return '';
   }
 };
 

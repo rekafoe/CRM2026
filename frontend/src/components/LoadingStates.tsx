@@ -107,7 +107,7 @@ export const LoadingState: React.FC<StateComponentProps> = ({
   if (state === 'error') {
     return (
       <div className={`flex flex-col items-center justify-center p-8 ${className}`}>
-        <div className="text-red-500 text-4xl mb-4">⚠️</div>
+        <div className="text-red-500 text-4xl mb-4"></div>
         <p className="text-red-600 mb-4">{errorText}</p>
         {onRetry && (
           <button
@@ -124,7 +124,7 @@ export const LoadingState: React.FC<StateComponentProps> = ({
   if (state === 'success') {
     return (
       <div className={`flex flex-col items-center justify-center p-8 ${className}`}>
-        <div className="text-green-500 text-4xl mb-4">✅</div>
+        <div className="text-green-500 text-4xl mb-4"></div>
         <p className="text-green-600">{successText}</p>
       </div>
     );
@@ -157,7 +157,7 @@ export const StateWrapper: React.FC<StateComponentProps> = ({
     return (
       <div className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
         <div className="flex items-center">
-          <div className="text-red-500 mr-3">⚠️</div>
+          <div className="text-red-500 mr-3"></div>
           <div className="flex-1">
             <p className="text-red-800 font-medium">Ошибка</p>
             <p className="text-red-600 text-sm">{errorText}</p>
@@ -278,7 +278,7 @@ export const EmptyState: React.FC<{
   };
   className?: string;
 }> = ({
-  icon = '📋',
+  icon = '',
   title,
   description,
   action,

@@ -54,7 +54,7 @@ const UsageRow: React.FC<UsageRowProps> = ({ row, rank, maxLines, onOpen }) => {
         )}
       </div>
       <div className="design-usage-row__main">
-        <button type="button" className="design-usage-row__name" onClick={() => onOpen(row.design_template_id)}>
+        <button type="button" className="design-usage-row__name" onClick={() =>onOpen(row.design_template_id)}>
           <span className="design-usage-row__id">#{row.design_template_id}</span> {row.name}
         </button>
         <div className="design-usage-row__meta">
@@ -128,12 +128,12 @@ export const DesignTemplateUsagePanel: React.FC = () => {
               key={opt.key}
               type="button"
               className={`lg-btn${period === opt.key ? ' lg-btn--primary' : ''}`}
-              onClick={() => setPeriod(opt.key)}
+              onClick={() =>setPeriod(opt.key)}
             >
               {opt.label}
             </button>
           ))}
-          <button type="button" className="lg-btn" onClick={() => void load()} disabled={loading}>
+          <button type="button" className="lg-btn" onClick={() =>void load()} disabled={loading}>
             <AppIcon name="refresh" size="xs" /> Обновить
           </button>
         </div>
@@ -213,7 +213,7 @@ export const DesignTemplateUsagePanel: React.FC = () => {
               <button
                 type="button"
                 className="design-usage-section__toggle"
-                onClick={() => setShowUnused((v) => !v)}
+                onClick={() =>setShowUnused((v) => !v)}
                 aria-expanded={showUnused}
               >
                 <span className="design-templates-help__chevron" aria-hidden>{showUnused ? '▾' : '▸'}</span>
@@ -226,7 +226,7 @@ export const DesignTemplateUsagePanel: React.FC = () => {
                       <button
                         type="button"
                         className="design-usage-unused-item__name"
-                        onClick={() => openOnSite(t.id)}
+                        onClick={() =>openOnSite(t.id)}
                       >
                         #{t.id} {t.name}
                       </button>

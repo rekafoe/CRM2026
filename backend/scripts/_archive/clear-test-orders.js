@@ -10,7 +10,7 @@ async function clearTestOrders() {
   const db = new sqlite3.Database(DB_FILE);
   
   try {
-    console.log('🧹 Очистка тестовых заказов...');
+    console.log('Очистка тестовых заказов...');
     
     // Удаляем тестовые заказы с сайта (по номеру заказа)
     const result1 = await new Promise((resolve, reject) => {
@@ -40,12 +40,12 @@ async function clearTestOrders() {
       });
     });
     
-    console.log(`✅ Удалено заказов с сайта: ${result1}`);
-    console.log(`✅ Удалено заказов фото: ${result2}`);
-    console.log('🎉 Очистка завершена!');
+    console.log(`Удалено заказов с сайта: ${result1}`);
+    console.log(`Удалено заказов фото: ${result2}`);
+    console.log('Очистка завершена!');
     
   } catch (error) {
-    console.error('❌ Ошибка при очистке тестовых заказов:', error);
+    console.error('Ошибка при очистке тестовых заказов:', error);
   } finally {
     db.close();
   }

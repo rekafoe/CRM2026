@@ -18,7 +18,7 @@ const FinishingSection: React.FC<FinishingSectionProps> = ({ items, saving, onCh
           <div key={idx} className="parameter-item">
             <div className="parameter-info"><h5>{f.name}</h5></div>
             <div style={{ display:'flex', gap: 10 }}>
-              <button className="btn-quick-action" onClick={()=> onChange(items.filter((_,i)=>i!==idx))}>Удалить</button>
+              <button className="btn-quick-action" onClick={()=>onChange(items.filter((_,i)=>i!==idx))}>Удалить</button>
             </div>
           </div>
         ))}

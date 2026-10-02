@@ -24,7 +24,7 @@ import {
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
 import { useCalculatorEditContext } from './hooks/useCalculatorEditContext';
 import { useCalculatorPricingActions, productRequiresPrint } from './hooks/useCalculatorPricingActions';
-import { useAutoCalculate } from './hooks/useAutoCalculate'; // 🆕 Автопересчет
+import { useAutoCalculate } from './hooks/useAutoCalculate'; //  Автопересчет
 import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
 import { isMultipageLikeProduct, resolveCalculatorPagesBounds } from '../../utils/multipageProduct';
@@ -184,7 +184,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   const { backendProductSchema, currentConfig, availableFormats, getDefaultFormat } = useCalculatorSchema({
     productType: specs.productType,
-    productId: isCustomProduct || isPostprintProduct ? null : (selectedProduct?.id || null), // 🆕 Передаем ID выбранного продукта
+    productId: isCustomProduct || isPostprintProduct ? null : (selectedProduct?.id || null), //  Передаем ID выбранного продукта
     log: logger,
     setSpecs
   });
@@ -618,7 +618,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     logger,
   });
 
-  // 🆕 Автоматический пересчет при изменении параметров
+  //  Автоматический пересчет при изменении параметров
   // Не запускаем, если продукт требует печать, но параметры печати ещё не выбраны (избегаем лишних вызовов и логов)
   const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes?.length ? effectiveSizes : undefined);
   const isUvFlatbed = isUvFlatbedProduct(
@@ -636,8 +636,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       && (!requiresPrint || hasPrintParams),
     onCalculate: calculateCost,
     debounceMs: 500,
-    customFormat, // ✅ Передаем кастомный формат для отслеживания изменений
-    isCustomFormat, // ✅ Передаем флаг кастомного формата
+    customFormat, //  Передаем кастомный формат для отслеживания изменений
+    isCustomFormat, //  Передаем флаг кастомного формата
     printTechnology,
     printColorMode,
   });
@@ -683,7 +683,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setSpecs,
   ]);
 
-  // 🆕 При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
+  //  При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
   // чтобы новые allowed_* и размеры/материалы подтянулись корректно
   const prevProductIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -710,7 +710,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       if (next.material_id) {
         delete next.material_id;
       }
-      // 🆕 Сбрасываем выбранные операции при смене продукта
+      //  Сбрасываем выбранные операции при смене продукта
       next.selectedOperations = [];
       // Для обычных продуктов сбрасываем paperType, чтобы MaterialsSection
       // мог выбрать первый разрешённый тип бумаги из нового продукта
@@ -750,7 +750,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setUserInteracted(false);
   }, [selectedProduct?.id, editContext, backendProductSchema, setSpecs, setUserInteracted]);
 
-  // 🆕 При смене продукта сбрасываем параметры печати,
+  //  При смене продукта сбрасываем параметры печати,
   // чтобы PrintingSettingsSection смог проставить корректные дефолты по новым ограничениям
   useEffect(() => {
     if (!selectedProduct?.id || editContext?.item) {
@@ -847,7 +847,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
   }, [isOpen, editContext, setResult, setUserInteracted]);
 
-  // 🆕 При открытии в режиме редактирования — запускаем расчёт после загрузки продукта и параметров
+  //  При открытии в режиме редактирования — запускаем расчёт после загрузки продукта и параметров
   useEffect(() => {
     if (!isOpen || !editContext?.item || !selectedProduct?.id || !isValid || isCustomProduct || isPostprintProduct) {
       return;
@@ -860,7 +860,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     return () => clearTimeout(t);
   }, [isOpen, editContext?.item, selectedProduct?.id, isValid, isCustomProduct, isPostprintProduct, instantCalculate]);
 
-  // 🆕 useEffect для загрузки данных при открытии (однократно на открытие)
+  //  useEffect для загрузки данных при открытии (однократно на открытие)
   const didOpenInitRef = useRef(false);
   useEffect(() => {
     if (isOpen && !didOpenInitRef.current) {
@@ -878,12 +878,12 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       // Сбрасываем тип печати и режим цвета при закрытии
       setPrintTechnology('');
       setPrintColorMode(null);
-      // 🆕 Сбрасываем выбранные операции при закрытии
+      //  Сбрасываем выбранные операции при закрытии
       setSpecs(prev => ({ ...prev, selectedOperations: [] }));
     }
   }, [isOpen]);
 
-  // 🆕 Устанавливаем дефолтные значения для всех селекторов (первый элемент). Один вызов setSpecs и только при необходимости — иначе цикл перерисовок и смена типа материала.
+  //  Устанавливаем дефолтные значения для всех селекторов (первый элемент). Один вызов setSpecs и только при необходимости — иначе цикл перерисовок и смена типа материала.
   useEffect(() => {
     if (!isOpen || editContext?.item) return;
     setSpecs(prev => {
@@ -923,7 +923,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   }, [isOpen, safeWarehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext, backendProductSchema]);
 
   // Устанавливаем materialType только для обычных продуктов (из paperType).
-  // Для упрощённых продуктов materialType задаёт только MaterialsSection (тип+плотность → material_id + materialType), чтобы не было рекурсии result ↔ materialType.
+  // Для упрощённых продуктов materialType задаёт только MaterialsSection (тип+плотность → material_id + materialType), чтобы не было рекурсии result  materialType.
   useEffect(() => {
     if (safeWarehousePaperTypes.length === 0) return;
     if (specs.material_id && backendProductSchema?.template?.simplified) return;
@@ -1058,14 +1058,14 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       ('target' in value || 'currentTarget' in value);
 
     if (isSyntheticEvent(updates)) {
-      logger.warn('⚠️ updateSpecs получил SyntheticEvent, пропускаем', { updates });
+      logger.warn('updateSpecs получил SyntheticEvent, пропускаем', { updates });
       return;
     }
 
     const normalizedUpdates = Object.entries(updates || {}).reduce<Partial<ProductSpecs>>(
       (acc, [key, value]) => {
         if (isSyntheticEvent(value)) {
-          logger.warn('⚠️ updateSpecs получил SyntheticEvent в поле', { key });
+          logger.warn('updateSpecs получил SyntheticEvent в поле', { key });
           return acc;
         }
         acc[key as keyof ProductSpecs] = value as any;
@@ -1153,7 +1153,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           errorMessage = error.response.data.error;
           if (errorMessage.includes('Недостаточно материала') ||
               error?.response?.data?.code === 'INSUFFICIENT_MATERIAL') {
-            errorMessage = `⚠️ ${errorMessage}\n\nПожалуйста, пополните склад или выберите другой материал.`;
+            errorMessage = `${errorMessage}\n\nПожалуйста, пополните склад или выберите другой материал.`;
           }
         } else if (error?.message) {
           errorMessage = error.message;
@@ -1190,7 +1190,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       onClick={
         embedded
           ? undefined
-          : (e) => {
+          : (e) =>{
               // Закрываем модалку при клике на overlay
               if (e.target === e.currentTarget) {
                 onClose();

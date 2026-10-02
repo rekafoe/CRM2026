@@ -52,7 +52,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content" onClick={(e) =>e.stopPropagation()}>
         <div className="modal-header">
           <h2>{supplier ? 'Редактировать поставщика' : 'Добавить поставщика'}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>

@@ -160,7 +160,7 @@ export const CollagesPanel: React.FC<CollagesPanelProps> = ({
                 key={t.id}
                 type="button"
                 className={`design-editor-collage-thumb ${isSelected ? 'design-editor-collage-thumb--selected' : ''}`}
-                onClick={() => onSelectTemplate(isSelected ? null : t.id)}
+                onClick={() =>onSelectTemplate(isSelected ? null : t.id)}
                 title={t.name ?? `Шаблон ${t.id}`}
               >
                 <LayoutPreview layout={layout} paddingPercent={paddingPercent} />

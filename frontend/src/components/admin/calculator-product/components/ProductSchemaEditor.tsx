@@ -58,7 +58,7 @@ export const ProductSchemaEditor: React.FC<ProductSchemaEditorProps> = React.mem
           </>
         ) : (
           <EmptyState
-            icon="📋"
+            icon=""
             title="Выберите тип продукта"
             description="Выберите тип продукта из списка слева для редактирования его схемы"
           />

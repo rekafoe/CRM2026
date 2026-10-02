@@ -184,7 +184,7 @@ export class PDFReportService {
 </head>
 <body>
     <div class="header">
-        <h1>📊 Отчет об остатках материалов</h1>
+        <h1> Отчет об остатках материалов</h1>
         <p>Сгенерирован: ${generated_at}</p>
         <p>Пользователь: ${generated_by}</p>
     </div>

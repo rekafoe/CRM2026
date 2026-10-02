@@ -139,6 +139,6 @@ export async function buildTelegramActiveOrdersText(chatId: string): Promise<str
     const statusName = order.status_name || `Статус ${order.status}`;
     return `• ${number} — ${statusName} — ${formatOrderDate(order.created_at)} — ${formatOrderSource(order.source)}`;
   });
-  return `📋 Активные заказы:\n${lines.join('\n')}`;
+  return `Активные заказы:\n${lines.join('\n')}`;
 }
 

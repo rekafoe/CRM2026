@@ -161,7 +161,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
               <button
                 type="button"
                 className="public-design-editor__client-aside-check-item-main"
-                onClick={() => onFieldFocus(field, kind)}
+                onClick={() =>onFieldFocus(field, kind)}
               >
                 <i className="public-design-editor__client-aside-check-item-dot" aria-hidden="true" />
                 <span className="public-design-editor__client-aside-check-item-copy">
@@ -173,17 +173,17 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
                 </b>
               </button>
               <div className="public-design-editor__client-aside-check-item-actions">
-                <button type="button" onClick={() => onFieldFocus(field, kind)}>
+                <button type="button" onClick={() =>onFieldFocus(field, kind)}>
                   Показать
                 </button>
                 {kind === 'photo' && (
                   <>
                     {onPlaceSelectedPhoto && (
-                      <button type="button" onClick={() => onPlaceSelectedPhoto(field)}>
+                      <button type="button" onClick={() =>onPlaceSelectedPhoto(field)}>
                         Поставить выбранное
                       </button>
                     )}
-                    <button type="button" onClick={() => onPhotoReplace(field)}>
+                    <button type="button" onClick={() =>onPhotoReplace(field)}>
                       {field.status === 'ready' ? 'Заменить' : 'Добавить'}
                     </button>
                   </>
@@ -207,7 +207,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
           type="button"
           title={collapsed ? 'Показать панель' : 'Скрыть панель'}
           className="public-design-editor__client-aside-rail-btn public-design-editor__client-aside-collapse"
-          onClick={() => onCollapsedChange?.(!collapsed)}
+          onClick={() =>onCollapsedChange?.(!collapsed)}
           aria-label={collapsed ? 'Показать панель' : 'Скрыть панель'}
         >
           <span className="public-design-editor__client-aside-rail-icon" aria-hidden="true">
@@ -226,7 +226,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
               type="button"
               title={tab.title}
               className={`public-design-editor__client-aside-rail-btn${activeTab === tab.id ? ' is-active' : ''}`}
-              onClick={() => handleRailTabClick(tab.id)}
+              onClick={() =>handleRailTabClick(tab.id)}
               aria-current={activeTab === tab.id ? 'page' : undefined}
             >
               <span className="public-design-editor__client-aside-rail-icon" aria-hidden="true">
@@ -331,7 +331,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
                       <button
                         type="button"
                         className={`public-design-editor__client-aside-check-issue public-design-editor__client-aside-check-issue--${issue.level}`}
-                        onClick={() => onIssueFocus(issue)}
+                        onClick={() =>onIssueFocus(issue)}
                       >
                         {issue.message}
                       </button>

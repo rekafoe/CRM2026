@@ -68,7 +68,7 @@ export const Modal: React.FC<ModalProps> = ({
     <div className={overlayClasses} onClick={onClose}>
       <div 
         className={`modal-content ${sizeClasses} ${className}`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) =>e.stopPropagation()}
       >
         {title && (
           <div className={`modal-header flex items-center gap-3 border-b border-color ${headerClassName ?? 'p-6'}`}>

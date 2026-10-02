@@ -300,15 +300,15 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
           <button
             type="button"
             className="lg-btn"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() =>fileInputRef.current?.click()}
             disabled={importing}
           >
             {importing ? 'Импорт…' : 'Импорт'}
           </button>
-          <button type="button" className="lg-btn" onClick={() => void handleExport()} disabled={loading}>
+          <button type="button" className="lg-btn" onClick={() =>void handleExport()} disabled={loading}>
             Экспорт
           </button>
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => void loadCustomers()} disabled={loading}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void loadCustomers()} disabled={loading}>
             {loading ? 'Загрузка…' : 'Обновить'}
           </button>
         </div>
@@ -328,7 +328,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
             <button
               type="button"
               className={`lg-btn${activeTab === 'individual' ? ' lg-btn--primary' : ''}`}
-              onClick={() => {
+              onClick={() =>{
                 setActiveTab('individual');
                 setPage(0);
               }}
@@ -339,7 +339,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
             <button
               type="button"
               className={`lg-btn${activeTab === 'legal' ? ' lg-btn--primary' : ''}`}
-              onClick={() => {
+              onClick={() =>{
                 setActiveTab('legal');
                 setPage(0);
               }}
@@ -429,7 +429,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
                 type="button"
                 className="lg-btn"
                 disabled={page <= 0 || loading}
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
+                onClick={() =>setPage((current) => Math.max(0, current - 1))}
               >
                 Назад
               </button>

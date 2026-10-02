@@ -384,8 +384,8 @@ export const ReceiptTemplateEditor: React.FC<ReceiptTemplateEditorProps> = ({
               onChange={handleLogoUpload}
               style={{ display: 'none' }}
             />
-            <button type="button" className="rte-ph-btn" onClick={() => fileInputRef.current?.click()} disabled={logoUploading}>
-              {logoUploading ? 'Загрузка…' : '📷 Загрузить логотип'}
+            <button type="button" className="rte-ph-btn" onClick={() =>fileInputRef.current?.click()} disabled={logoUploading}>
+              {logoUploading ? 'Загрузка…' : 'Загрузить логотип'}
             </button>
             {orgData.logo_url && (
               <button type="button" className="rte-ph-btn" onClick={handleLogoRemove} disabled={logoUploading}>
@@ -402,21 +402,21 @@ export const ReceiptTemplateEditor: React.FC<ReceiptTemplateEditorProps> = ({
             <button
               type="button"
               className={activeTab === 'split' ? 'active' : ''}
-              onClick={() => setActiveTab('split')}
+              onClick={() =>setActiveTab('split')}
             >
               Раздельно
             </button>
             <button
               type="button"
               className={activeTab === 'code' ? 'active' : ''}
-              onClick={() => setActiveTab('code')}
+              onClick={() =>setActiveTab('code')}
             >
               Код
             </button>
             <button
               type="button"
               className={activeTab === 'preview' ? 'active' : ''}
-              onClick={() => setActiveTab('preview')}
+              onClick={() =>setActiveTab('preview')}
             >
               Превью
             </button>
@@ -447,10 +447,10 @@ export const ReceiptTemplateEditor: React.FC<ReceiptTemplateEditorProps> = ({
             <button
               type="button"
               className="rte-ph-btn rte-load-default"
-              onClick={() => onChange(templateType === 'receipt' ? DEFAULT_RECEIPT_TEMPLATE : DEFAULT_ORDER_BLANK_TEMPLATE)}
+              onClick={() =>onChange(templateType === 'receipt' ? DEFAULT_RECEIPT_TEMPLATE : DEFAULT_ORDER_BLANK_TEMPLATE)}
               title="Загрузить шаблон по умолчанию"
             >
-              📄 Шаблон по умолчанию
+               Шаблон по умолчанию
             </button>
           )}
           {placeholders.map((ph) => (
@@ -458,7 +458,7 @@ export const ReceiptTemplateEditor: React.FC<ReceiptTemplateEditorProps> = ({
               key={ph}
               type="button"
               className="rte-ph-btn"
-              onClick={() => insertPlaceholder(ph)}
+              onClick={() =>insertPlaceholder(ph)}
               title={`Вставить ${ph}`}
             >
               {ph}

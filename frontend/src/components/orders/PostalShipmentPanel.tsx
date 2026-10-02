@@ -289,7 +289,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
         type="button"
         className={`order-detail-action-btn order-detail-action-btn--neutral${open ? ' postal-shipment__toggle--open' : ''}`}
         title="Трек и бланк приходят от Белпочты или Европочты"
-        onClick={(event) => {
+        onClick={(event) =>{
           event.stopPropagation();
           setOpen((value) => !value);
         }}
@@ -435,7 +435,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
               <div className="postal-shipment__row-actions">
                 <button
                   type="button"
-                  onClick={() => reprint(shipment)}
+                  onClick={() =>reprint(shipment)}
                   disabled={busy || (!shipment.has_blank && shipment.blank_status !== 'processing')}
                 >
                   {shipment.has_blank ? 'Бланк перевозчика' : 'Забрать бланк'}

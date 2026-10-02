@@ -123,14 +123,14 @@ export const useOrderHandlers = ({
       } catch (error: any) {
         logger.error('Failed to add item to order', error);
         
-        // 🆕 Улучшенная обработка ошибок: различаем бизнес-ошибки (недостаток материалов) и системные
+        //  Улучшенная обработка ошибок: различаем бизнес-ошибки (недостаток материалов) и системные
         let errorMessage = 'Ошибка добавления товара';
         if (error?.response?.data?.error) {
           errorMessage = error.response.data.error;
           // Если это ошибка недостатка материалов, делаем сообщение более заметным
           if (errorMessage.includes('Недостаточно материала') || 
               error?.response?.data?.code === 'INSUFFICIENT_MATERIAL') {
-            errorMessage = `⚠️ ${errorMessage}\n\nПожалуйста, пополните склад или выберите другой материал.`;
+            errorMessage = `${errorMessage}\n\nПожалуйста, пополните склад или выберите другой материал.`;
           }
         } else if (error?.message) {
           errorMessage = error.message;

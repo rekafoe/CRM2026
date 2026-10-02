@@ -11,7 +11,7 @@ export const LocationRevenueAnalytics: React.FC<LocationRevenueAnalyticsProps> =
 
   return (
     <div className="reports-metrics" style={{ marginBottom: '20px' }}>
-      <h4 className="reports-metrics-title">📍 Выручка по точкам</h4>
+      <h4 className="reports-metrics-title">Выручка по точкам</h4>
       <div className="reports-metrics-grid">
         <div className="reports-metric">
           <div className="reports-metric-value">

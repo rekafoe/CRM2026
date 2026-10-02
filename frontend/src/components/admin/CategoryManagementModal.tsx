@@ -8,6 +8,7 @@ import {
   uploadCategoryImage,
 } from '../../services/products';
 import './CategoryManagementModal.css';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 
 interface CategoryManagementModalProps {
   isOpen: boolean;
@@ -159,7 +160,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                     {cat.image_url ? (
                       <img src={cat.image_url} alt="" className="cat-mgmt__item-thumb" />
                     ) : (
-                      <div className="cat-mgmt__item-icon">{cat.icon || '📁'}</div>
+                      <div className="cat-mgmt__item-icon">{withoutEmoji(cat.icon)}</div>
                     )}
                     <div className="cat-mgmt__item-body">
                       <div className="cat-mgmt__item-name">
@@ -203,17 +204,6 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                 />
               </div>
 
-              <div className="cat-mgmt__field">
-                <label className="cat-mgmt__label">Иконка (эмодзи)</label>
-                <input
-                  className="form-input"
-                  value={form.icon}
-                  onChange={(e) => setForm({ ...form, icon: e.target.value })}
-                  placeholder="📇"
-                  style={{ maxWidth: 100 }}
-                />
-              </div>
-
               <div className="cat-mgmt__field cat-mgmt__field--full">
                 <label className="cat-mgmt__label">Описание</label>
                 <textarea
@@ -254,7 +244,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                         <span className="cat-mgmt__image-loading">Загрузка...</span>
                       ) : (
                         <>
-                          <span className="cat-mgmt__image-icon">📷</span>
+                          <span className="cat-mgmt__image-icon"></span>
                           <span>Нажмите для загрузки</span>
                           <span className="cat-mgmt__image-hint">JPEG, PNG, WebP, GIF, SVG — до 5 МБ</span>
                         </>

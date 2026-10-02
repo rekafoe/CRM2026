@@ -142,7 +142,7 @@ function createAuthenticatedImage(options: KnowledgeImageOptions = {}) {
 
       const controlEntries = options.editableControls ? [
         createControl('←', 'По левому краю', { alignment: 'left', wrap: 'none' }, () => currentNode.attrs.wrap === 'none' && currentNode.attrs.alignment === 'left'),
-        createControl('↔', 'По центру', { alignment: 'center', wrap: 'none' }, () => currentNode.attrs.wrap === 'none' && currentNode.attrs.alignment === 'center'),
+        createControl('', 'По центру', { alignment: 'center', wrap: 'none' }, () => currentNode.attrs.wrap === 'none' && currentNode.attrs.alignment === 'center'),
         createControl('→', 'По правому краю', { alignment: 'right', wrap: 'none' }, () => currentNode.attrs.wrap === 'none' && currentNode.attrs.alignment === 'right'),
         createControl('▧L', 'Изображение слева, текст справа', { wrap: 'left', width: 50 }, () => currentNode.attrs.wrap === 'left'),
         createControl('R▧', 'Изображение справа, текст слева', { wrap: 'right', width: 50 }, () => currentNode.attrs.wrap === 'right'),

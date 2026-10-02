@@ -263,15 +263,15 @@ if (fs.existsSync(outputPath)) {
   try {
     fs.unlinkSync(outputPath);
   } catch (e) {
-    console.log(`⚠️  Не удалось удалить старый файл: ${(e as Error).message}`);
+    console.log(` Не удалось удалить старый файл: ${(e as Error).message}`);
   }
 }
 
 // Сохраняем файл
 workbook.xlsx.writeFile(outputPath)
   .then(() => {
-    console.log(`✅ Шаблон акта создан: ${outputPath}`);
-    console.log('\n📋 Доступные плейсхолдеры:');
+    console.log(`Шаблон акта создан: ${outputPath}`);
+    console.log('\n Доступные плейсхолдеры:');
     console.log('  - ${contractNumber} - Номер акта');
     console.log('  - ${contractDate} - Дата акта');
     console.log('  - ${legalName} - Наименование заказчика');
@@ -295,6 +295,6 @@ workbook.xlsx.writeFile(outputPath)
     console.log('  - ${executorAuthorizedPerson} - Уполномоченное лицо исполнителя');
   })
   .catch((error) => {
-    console.error('❌ Ошибка при создании шаблона:', error);
+    console.error('Ошибка при создании шаблона:', error);
     process.exit(1);
   });

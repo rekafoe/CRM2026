@@ -105,7 +105,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
                 type="button"
                 className="order-pool-detail-header__phone-btn"
                 title="Скопировать телефон"
-                onClick={() => onCopyPhone?.(order.customerPhone!)}
+                onClick={() =>onCopyPhone?.(order.customerPhone!)}
               >
                 {order.customerPhone}
               </button>

@@ -187,19 +187,19 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
 
   const getOrderTypeLabel = (type: string) => {
     switch (type) {
-      case 'telegram': return '📱 Telegram';
-      case 'website': return '🌐 Сайт';
-      case 'manual': return '✋ Ручной';
+      case 'telegram': return 'Telegram';
+      case 'website': return 'Сайт';
+      case 'manual': return 'Ручной';
       default: return type;
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending': return '⏳ Ожидает';
-      case 'in_progress': return '🔄 В работе';
-      case 'completed': return '✅ Завершен';
-      case 'cancelled': return '❌ Отменен';
+      case 'pending': return 'Ожидает';
+      case 'in_progress': return 'В работе';
+      case 'completed': return 'Завершен';
+      case 'cancelled': return 'Отменен';
       default: return status;
     }
   };
@@ -238,7 +238,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
         <div className="flex items-center">
-          <div className="text-red-600 mr-3">❌</div>
+          <div className="text-red-600 mr-3"></div>
           <div>
             <h3 className="text-red-800 font-medium">Ошибка</h3>
             <p className="text-red-600 text-sm">{error}</p>
@@ -258,7 +258,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
     return (
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
         <div className="flex items-center">
-          <div className="text-yellow-600 mr-3">⚠️</div>
+          <div className="text-yellow-600 mr-3"></div>
           <div>
             <h3 className="text-yellow-800 font-medium">Страница заказов не найдена</h3>
             <p className="text-yellow-600 text-sm">
@@ -287,7 +287,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
               {/* Быстрая навигация по датам */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
+                  onClick={() =>{
                     const yesterday = new Date(page.date);
                     yesterday.setDate(yesterday.getDate() - 1);
                     onDateChange?.(yesterday.toISOString().split('T')[0]);
@@ -299,18 +299,18 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                 </button>
                 
                 <button
-                  onClick={() => {
+                  onClick={() =>{
                     const today = new Date().toISOString().split('T')[0];
                     onDateChange?.(today);
                   }}
                   className="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded text-blue-600"
                   title="Сегодня"
                 >
-                  🏠 Сегодня
+                   Сегодня
                 </button>
                 
                 <button
-                  onClick={() => {
+                  onClick={() =>{
                     const tomorrow = new Date(page.date);
                     tomorrow.setDate(tomorrow.getDate() + 1);
                     onDateChange?.(tomorrow.toISOString().split('T')[0]);
@@ -323,10 +323,10 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
               </div>
               
               <button
-                onClick={() => setShowDateSelector(!showDateSelector)}
+                onClick={() =>setShowDateSelector(!showDateSelector)}
                 className="text-blue-600 hover:text-blue-800 text-sm underline"
               >
-                📅 Выбрать дату
+                 Выбрать дату
               </button>
               
               {lastUpdate && (
@@ -335,7 +335,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                   className="text-green-600 hover:text-green-800 text-sm underline"
                   title={`Показать изменения с ${new Date(lastUpdate).toLocaleString('ru-RU')}`}
                 >
-                  🔄 Изменения с последнего обновления
+                   Изменения с последнего обновления
                 </button>
               )}
               
@@ -356,7 +356,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                     className="px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
                   <button
-                    onClick={() => {
+                    onClick={() =>{
                       onDateChange?.(selectedDate);
                       setShowDateSelector(false);
                     }}
@@ -365,7 +365,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                     Перейти
                   </button>
                   <button
-                    onClick={() => setShowDateSelector(false)}
+                    onClick={() =>setShowDateSelector(false)}
                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-400"
                   >
                     Отмена
@@ -414,10 +414,10 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-blue-900">
-              🔄 Изменения с последнего обновления
+               Изменения с последнего обновления
             </h3>
             <button
-              onClick={() => setShowChanges(false)}
+              onClick={() =>setShowChanges(false)}
               className="text-blue-600 hover:text-blue-800 text-sm"
             >
               ✕ Скрыть
@@ -426,7 +426,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="bg-white rounded-lg p-3 border border-blue-100">
-              <h4 className="font-medium text-green-700 mb-2">🆕 Новые заказы ({changes.newOrders.length})</h4>
+              <h4 className="font-medium text-green-700 mb-2">Новые заказы ({changes.newOrders.length})</h4>
               {changes.newOrders.length > 0 ? (
                 <div className="space-y-1">
                   {changes.newOrders.map(order => (
@@ -441,7 +441,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
             </div>
             
             <div className="bg-white rounded-lg p-3 border border-blue-100">
-              <h4 className="font-medium text-blue-700 mb-2">🔄 Обновленные заказы ({changes.updatedOrders.length})</h4>
+              <h4 className="font-medium text-blue-700 mb-2">Обновленные заказы ({changes.updatedOrders.length})</h4>
               {changes.updatedOrders.length > 0 ? (
                 <div className="space-y-1">
                   {changes.updatedOrders.map(order => (
@@ -456,7 +456,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
             </div>
             
             <div className="bg-white rounded-lg p-3 border border-blue-100">
-              <h4 className="font-medium text-purple-700 mb-2">✅ Завершенные заказы ({changes.completedOrders.length})</h4>
+              <h4 className="font-medium text-purple-700 mb-2">Завершенные заказы ({changes.completedOrders.length})</h4>
               {changes.completedOrders.length > 0 ? (
                 <div className="space-y-1">
                   {changes.completedOrders.map(order => (
@@ -472,7 +472,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
           </div>
           
           <div className="bg-white rounded-lg p-3 border border-blue-100">
-            <h4 className="font-medium text-gray-700 mb-2">📊 Обновленная статистика</h4>
+            <h4 className="font-medium text-gray-700 mb-2">Обновленная статистика</h4>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-gray-500">Всего заказов:</span>
@@ -501,7 +501,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
         <div className="p-6">
           {orders.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-gray-400 text-6xl mb-4">📋</div>
+              <div className="text-gray-400 text-6xl mb-4"></div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Нет заказов</h3>
               <p className="text-gray-500">На этой странице пока нет заказов</p>
             </div>
@@ -511,7 +511,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                 <div 
                   key={order.id} 
                   className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => handleOrderClick(order)}
+                  onClick={() =>handleOrderClick(order)}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-lg font-semibold text-gray-900">
@@ -547,18 +547,18 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                   <div className="mt-4 pt-3 border-t border-gray-200 flex gap-2">
                     {order.status === 'in_progress' && (
                       <button
-                        onClick={(e) => {
+                        onClick={(e) =>{
                           e.stopPropagation();
                           completeOrder(order.orderId, order.orderType);
                         }}
                         disabled={completingOrder === order.orderId}
                         className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        {completingOrder === order.orderId ? '⏳' : '✅'} Завершить заказ
+                        {completingOrder === order.orderId ? 'Завершаем…' : 'Завершить заказ'}
                       </button>
                     )}
                     <button
-                      onClick={(e) => {
+                      onClick={(e) =>{
                         e.stopPropagation();
                         setMovingOrder(order.orderId);
                         setShowDateSelector(true);
@@ -566,7 +566,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                       disabled={movingOrder === order.orderId}
                       className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                     >
-                      📅 Переместить
+                       Переместить
                     </button>
                   </div>
                 </div>
@@ -585,7 +585,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
                 Детали заказа #{selectedOrder.orderId}
               </h3>
               <button
-                onClick={() => setShowOrderDetails(false)}
+                onClick={() =>setShowOrderDetails(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
                 ✕
@@ -626,21 +626,21 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
             
             <div className="mt-6 flex justify-end space-x-3">
               <button
-                onClick={() => setShowOrderDetails(false)}
+                onClick={() =>setShowOrderDetails(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Закрыть
               </button>
               {selectedOrder.status === 'in_progress' && (
                 <button
-                  onClick={() => {
+                  onClick={() =>{
                     completeOrder(selectedOrder.orderId, selectedOrder.orderType);
                     setShowOrderDetails(false);
                   }}
                   disabled={completingOrder === selectedOrder.orderId}
                   className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
                 >
-                  {completingOrder === selectedOrder.orderId ? '⏳' : '✅'} Завершить
+                  {completingOrder === selectedOrder.orderId ? 'Завершаем…' : 'Завершить'}
                 </button>
               )}
             </div>

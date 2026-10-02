@@ -96,7 +96,7 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
               role="tab"
               className={`souvenir3d-editor__area-btn${area.id === active.id ? ' souvenir3d-editor__area-btn--active' : ''}`}
               aria-selected={area.id === active.id}
-              onClick={() => void editor.switchArea(area.id)}
+              onClick={() =>void editor.switchArea(area.id)}
             >
               {area.label}
               {editor.usedPrintAreaIds.includes(area.id) && <span aria-label="Область используется">●</span>}
@@ -105,7 +105,7 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
         </div>
         <div className="souvenir3d-editor__insert-tools">
           <button type="button" onClick={editor.addText} disabled={editor.loading}>+ Текст</button>
-          <button type="button" onClick={() => photoInputRef.current?.click()} disabled={editor.loading}>+ Фото</button>
+          <button type="button" onClick={() =>photoInputRef.current?.click()} disabled={editor.loading}>+ Фото</button>
           <input
             ref={photoInputRef}
             type="file"
@@ -120,11 +120,11 @@ export const Souvenir3dEditor: React.FC<Souvenir3dEditorProps> = ({
         </div>
         {showActions && (
           <div className="souvenir3d-editor__actions">
-            <button type="button" disabled={editor.saving} onClick={() => void editor.save().catch(() => undefined)}>
+            <button type="button" disabled={editor.saving} onClick={() =>void editor.save().catch(() => undefined)}>
               {editor.saving ? 'Сохранение…' : 'Сохранить'}
             </button>
             {onReadyForCart && (
-              <button type="button" className="souvenir3d-editor__order" disabled={editor.saving} onClick={() => void editor.readyForCart()}>
+              <button type="button" className="souvenir3d-editor__order" disabled={editor.saving} onClick={() =>void editor.readyForCart()}>
                 {orderButtonLabel || 'Заказать'}
               </button>
             )}

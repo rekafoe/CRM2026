@@ -427,7 +427,7 @@ const SubtypeImageUploader: React.FC<{
         <button
           type="button"
           className="subtype-image-upload__remove"
-          onClick={() => onUploaded('')}
+          onClick={() =>onUploaded('')}
           title="Удалить"
         >
           ✕
@@ -448,7 +448,7 @@ const SubtypeImageUploader: React.FC<{
       />
       {uploading
         ? <span className="subtype-image-upload__loading">Загрузка...</span>
-        : <><span>📷</span><span>Загрузить фото</span></>
+        : <><span></span><span>Загрузить фото</span></>
       }
     </label>
   );
@@ -565,7 +565,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
           <strong>Типы продукта</strong>
           <div className="text-muted text-sm">
             Варианты внутри продукта (например: односторонние, с ламинацией). У каждого типа — свой набор размеров и цен.
-            Ключ подтипа для URL (key) задаётся в модалке по кнопке ✎ — поле «Ключ URL (подтип)» вверху.
+            Ключ подтипа для URL (key) задаётся в модалке по кнопке  — поле «Ключ URL (подтип)» вверху.
           </div>
         </div>
         <Button type="button" variant="secondary" size="sm" onClick={onAddType}>
@@ -582,7 +582,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
               >
                 <div
                   className="simplified-template__type-tab-btn"
-                  onClick={() => onSelectType(t.id)}
+                  onClick={() =>onSelectType(t.id)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
@@ -621,7 +621,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                   ) : (
                     <span
                       className="simplified-template__type-tab-name"
-                      onDoubleClick={(e) => {
+                      onDoubleClick={(e) =>{
                         e.stopPropagation()
                         startInlineNameEdit(t.id, t.name)
                       }}
@@ -640,19 +640,19 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                     <button
                       type="button"
                       className="simplified-template__type-icon-btn"
-                      onClick={(e) => {
+                      onClick={(e) =>{
                         e.stopPropagation()
                         openEditType(t.id)
                       }}
                       title="Редактировать подтип"
                       aria-label="Редактировать подтип"
                     >
-                      ✎
+                      
                     </button>
                     <button
                       type="button"
                       className="simplified-template__type-icon-btn simplified-template__type-icon-btn--danger"
-                      onClick={(e) => {
+                      onClick={(e) =>{
                         e.stopPropagation()
                         removeType(t.id)
                         if (editingTypeId === t.id) closeEditType()

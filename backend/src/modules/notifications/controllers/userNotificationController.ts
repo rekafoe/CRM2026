@@ -335,12 +335,12 @@ export class UserNotificationController {
 
       for (const user of botUsers) {
         try {
-          const message = `🚨 *Низкий остаток материала*\n\n` +
-                         `📦 *Материал:* ${materialName}\n` +
-                         `📊 *Текущий остаток:* ${currentQuantity}\n` +
-                         `⚠️ *Минимальный уровень:* ${minStock}\n` +
-                         (supplierName ? `🏢 *Поставщик:* ${supplierName}\n` : '') +
-                         `\n💡 *Рекомендация:* Необходимо пополнить запас`;
+          const message = `*Низкий остаток материала*\n\n` +
+                         `*Материал:* ${materialName}\n` +
+                         `*Текущий остаток:* ${currentQuantity}\n` +
+                         `*Минимальный уровень:* ${minStock}\n` +
+                         (supplierName ? `*Поставщик:* ${supplierName}\n` : '') +
+                         `\n *Рекомендация:* Необходимо пополнить запас`;
           
           const url = `https://api.telegram.org/bot${token}/sendMessage`;
           const response = await fetch(url, {

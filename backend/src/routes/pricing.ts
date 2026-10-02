@@ -1780,7 +1780,7 @@ router.post('/services/:serviceId/variants', asyncHandler(async (req, res) => {
 
 router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, res) => {
   const { variantId } = req.params
-  // 🆕 Нормализуем variantId - извлекаем только числовую часть (на случай, если пришла строка типа "154:1")
+  //  Нормализуем variantId - извлекаем только числовую часть (на случай, если пришла строка типа "154:1")
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(variantId.split(':')[0], 10) 
     : Number(variantId);
@@ -1826,7 +1826,7 @@ router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, 
 
 router.delete('/services/:serviceId/variants/:variantId', asyncHandler(async (req, res) => {
   const { variantId } = req.params
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(variantId.split(':')[0], 10) 
     : Number(variantId);
@@ -1844,7 +1844,7 @@ router.delete('/services/:serviceId/variants/:variantId', asyncHandler(async (re
 router.get('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
   const { serviceId, variantId } = req.params
   const serviceIdNum = Number(serviceId)
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(variantId.split(':')[0], 10) 
     : Number(variantId);
@@ -1863,7 +1863,7 @@ router.post('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async
   const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
   
   const serviceIdNum = Number(serviceId)
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(variantId.split(':')[0], 10) 
     : Number(variantId);
@@ -2016,7 +2016,7 @@ router.put('/services/:serviceId/variants/:variantId/prices/:minQuantity', async
   const { serviceId, variantId, minQuantity } = req.params
   const { price } = req.body
   const serviceIdNum = Number(serviceId)
-  // 🆕 Нормализуем variantId
+  //  Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
     ? parseInt(variantId.split(':')[0], 10) 
     : Number(variantId);

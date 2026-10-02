@@ -262,7 +262,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       unit: state.editingServiceForm.unit,
       rate: Number(state.editingServiceForm.rate || 0),
       isActive: state.editingServiceForm.isActive,
-      operationType: state.editingServiceForm.operationType || 'other', // 🆕
+      operationType: state.editingServiceForm.operationType || 'other', // 
       minQuantity: state.editingServiceForm.minQuantity
         ? Number(state.editingServiceForm.minQuantity)
         : undefined,
@@ -569,7 +569,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       {showHeader && (
         <div className="services-header">
           <div className="services-header__title-row">
-            <span className="services-header__icon">💰</span>
+            <span className="services-header__icon"></span>
             <h1 className="services-header__title">Управление услугами</h1>
           </div>
           <p className="services-header__subtitle">Создание услуг и установка базовой стоимости</p>
@@ -608,7 +608,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               role="tab"
               aria-selected={workspaceTab === 'ordinary'}
               className={`sm-workspace-tabs__tab${workspaceTab === 'ordinary' ? ' is-active' : ''}`}
-              onClick={() => setWorkspaceTab('ordinary')}
+              onClick={() =>setWorkspaceTab('ordinary')}
             >
               Обычные
               <span className="sm-workspace-tabs__count">{workspaceCounts.ordinary}</span>
@@ -618,7 +618,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               role="tab"
               aria-selected={workspaceTab === 'bindings'}
               className={`sm-workspace-tabs__tab${workspaceTab === 'bindings' ? ' is-active' : ''}`}
-              onClick={() => setWorkspaceTab('bindings')}
+              onClick={() =>setWorkspaceTab('bindings')}
             >
               Переплёты
               <span className="sm-workspace-tabs__count">{workspaceCounts.bindings}</span>
@@ -628,7 +628,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               role="tab"
               aria-selected={workspaceTab === 'wideformat'}
               className={`sm-workspace-tabs__tab${workspaceTab === 'wideformat' ? ' is-active' : ''}`}
-              onClick={() => setWorkspaceTab('wideformat')}
+              onClick={() =>setWorkspaceTab('wideformat')}
             >
               ШФП
               <span className="sm-workspace-tabs__count">{workspaceCounts.wideformat}</span>
@@ -778,7 +778,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               role="tab"
               aria-selected={createMode === 'service'}
               className={`services-create-modal__tab${createMode === 'service' ? ' is-active' : ''}`}
-              onClick={() => {
+              onClick={() =>{
                 void openCreateModal('service');
               }}
             >
@@ -789,7 +789,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               role="tab"
               aria-selected={createMode === 'binding'}
               className={`services-create-modal__tab${createMode === 'binding' ? ' is-active' : ''}`}
-              onClick={() => {
+              onClick={() =>{
                 void openCreateModal('binding');
               }}
             >
@@ -800,7 +800,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               role="tab"
               aria-selected={createMode === 'wideformat'}
               className={`services-create-modal__tab${createMode === 'wideformat' ? ' is-active' : ''}`}
-              onClick={() => {
+              onClick={() =>{
                 void openCreateModal('wideformat');
               }}
             >

@@ -26,5 +26,5 @@ export async function up(db: any): Promise<void> {
 }
 
 export async function down(_db: any): Promise<void> {
-  console.log('ℹ️ down() skipped: SQLite table is left in place')
+  console.log('down() skipped: SQLite table is left in place')
 }

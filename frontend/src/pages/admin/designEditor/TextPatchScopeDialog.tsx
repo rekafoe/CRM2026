@@ -36,14 +36,14 @@ export const TextPatchScopeDialog: React.FC<TextPatchScopeDialogProps> = ({
         <button
           type="button"
           className="text-patch-scope-dialog__btn text-patch-scope-dialog__btn--secondary"
-          onClick={() => onChoose('currentPage')}
+          onClick={() =>onChoose('currentPage')}
         >
           Текущая страница
         </button>
         <button
           type="button"
           className="text-patch-scope-dialog__btn text-patch-scope-dialog__btn--primary"
-          onClick={() => onChoose('wholeDocument')}
+          onClick={() =>onChoose('wholeDocument')}
         >
           Весь макет
         </button>

@@ -12,7 +12,7 @@ export async function seedDemoData(): Promise<void> {
   await seedPresets(db)
   await seedMaterials(db)
 
-  console.log('✅ Demo data seeded')
+  console.log('Demo data seeded')
 }
 
 async function seedOrderStatuses(db: Database): Promise<void> {
@@ -37,7 +37,7 @@ async function seedOrderStatuses(db: Database): Promise<void> {
       status.sort
     )
   }
-  console.log('✅ Order statuses seeded')
+  console.log('Order statuses seeded')
 }
 
 async function seedPrinters(db: Database): Promise<void> {
@@ -52,7 +52,7 @@ async function seedPrinters(db: Database): Promise<void> {
   for (const printer of printers) {
     await db.run('INSERT OR IGNORE INTO printers (code, name) VALUES (?, ?)', printer.code, printer.name)
   }
-  console.log('✅ Printers seeded')
+  console.log('Printers seeded')
 }
 
 async function seedUsers(db: Database): Promise<void> {
@@ -86,7 +86,7 @@ async function seedUsers(db: Database): Promise<void> {
     )
   }
 
-  console.log('✅ Users seeded')
+  console.log('Users seeded')
 }
 
 async function ensureSpecialUser(db: Database): Promise<void> {
@@ -103,7 +103,7 @@ async function ensureSpecialUser(db: Database): Promise<void> {
     'manager-token-maksim',
     hp('maksim123')
   )
-  console.log('🌱 Created user: Войтюшкевич Максим (email: maxim@example.com)')
+  console.log('Created user: Войтюшкевич Максим (email: maxim@example.com)')
 }
 
 async function seedPresets(db: Database): Promise<void> {
@@ -210,7 +210,7 @@ async function seedPresets(db: Database): Promise<void> {
     }
   }
 
-  console.log('✅ Presets seeded')
+  console.log('Presets seeded')
 }
 
 async function seedMaterials(db: Database): Promise<void> {
@@ -246,7 +246,7 @@ async function seedMaterials(db: Database): Promise<void> {
       ? productMaterialsColumns.some((col) => col.name === 'presetCategory')
       : false
     if (!hasPresetCategory) {
-      console.log('ℹ️ product_materials использует новую структуру, пресеты не связываем')
+      console.log('product_materials использует новую структуру, пресеты не связываем')
       return
     }
 
@@ -274,14 +274,14 @@ async function seedMaterials(db: Database): Promise<void> {
     }
   }
 
-  console.log('✅ Materials seeded')
+  console.log('Materials seeded')
 }
 
 if (require.main === module) {
   seedDemoData()
     .then(() => process.exit(0))
     .catch((error) => {
-      console.error('❌ Failed to seed demo data', error)
+      console.error('Failed to seed demo data', error)
       process.exit(1)
     })
 }

@@ -284,7 +284,7 @@ export const DesignFontsPage: React.FC = () => {
           <button
             type="button"
             className="design-fonts-help__toggle"
-            onClick={() => setHelpOpen((v) => !v)}
+            onClick={() =>setHelpOpen((v) => !v)}
             aria-expanded={helpOpen}
           >
             <span className="design-fonts-help__chevron" aria-hidden>{helpOpen ? '▾' : '▸'}</span>
@@ -309,12 +309,12 @@ export const DesignFontsPage: React.FC = () => {
             <button
               type="button"
               className="lg-btn lg-btn--primary"
-              onClick={() => setUploadOpen((v) => !v)}
+              onClick={() =>setUploadOpen((v) => !v)}
             >
               <AppIcon name="plus" size="xs" />
               {uploadOpen ? 'Скрыть форму' : 'Добавить шрифт'}
             </button>
-            <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/design-templates')}>
+            <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-templates')}>
               <AppIcon name="layers" size="xs" /> К шаблонам
             </button>
             <input
@@ -381,7 +381,7 @@ export const DesignFontsPage: React.FC = () => {
                       <button
                         type="button"
                         className="design-fonts-detected__edit"
-                        onClick={() => setEditFamilyName(true)}
+                        onClick={() =>setEditFamilyName(true)}
                       >
                         Изменить имя
                       </button>
@@ -443,7 +443,7 @@ export const DesignFontsPage: React.FC = () => {
                 <button
                   type="button"
                   className="lg-btn"
-                  onClick={() => {
+                  onClick={() =>{
                     setUploadOpen(false);
                     setForm({ family_name: '', files: [] });
                     setEditFamilyName(false);
@@ -530,7 +530,7 @@ export const DesignFontsPage: React.FC = () => {
                       <button
                         type="button"
                         className="lg-btn lg-btn--primary lg-btn--sm"
-                        onClick={() => void handleReplace(font.id)}
+                        onClick={() =>void handleReplace(font.id)}
                         disabled={saving}
                       >
                         Сохранить
@@ -538,7 +538,7 @@ export const DesignFontsPage: React.FC = () => {
                       <button
                         type="button"
                         className="lg-btn lg-btn--sm"
-                        onClick={() => { setReplaceId(null); setReplaceFile(null); }}
+                        onClick={() =>{ setReplaceId(null); setReplaceFile(null); }}
                       >
                         Отмена
                       </button>
@@ -548,7 +548,7 @@ export const DesignFontsPage: React.FC = () => {
                       <button
                         type="button"
                         className="lg-btn lg-btn--sm"
-                        onClick={() => void handleCopyFamily(font)}
+                        onClick={() =>void handleCopyFamily(font)}
                       >
                         <AppIcon name="copy" size="xs" />
                         {copiedId === font.id ? 'Скопировано' : 'family_name'}
@@ -556,7 +556,7 @@ export const DesignFontsPage: React.FC = () => {
                       <button
                         type="button"
                         className="lg-btn lg-btn--sm"
-                        onClick={() => setReplaceId(font.id)}
+                        onClick={() =>setReplaceId(font.id)}
                       >
                         <AppIcon name="refresh" size="xs" /> Заменить файл
                       </button>
@@ -564,7 +564,7 @@ export const DesignFontsPage: React.FC = () => {
                         <button
                           type="button"
                           className="lg-btn lg-btn--sm"
-                          onClick={() => void handleDeactivate(font.id)}
+                          onClick={() =>void handleDeactivate(font.id)}
                         >
                           <AppIcon name="ban" size="xs" /> Отключить
                         </button>

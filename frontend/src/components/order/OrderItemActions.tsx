@@ -39,7 +39,7 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(
             <button
               type="button"
               className="order-item-toolbar-btn order-item-toolbar-btn--primary"
-              onClick={() => onEditParameters(orderId, item)}
+              onClick={() =>onEditParameters(orderId, item)}
               title="Редактировать параметры позиции"
               aria-label="Редактировать параметры позиции"
             >
@@ -49,7 +49,7 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(
             <button
               type="button"
               className="order-item-btn order-item-btn--primary"
-              onClick={() => onEditParameters(orderId, item)}
+              onClick={() =>onEditParameters(orderId, item)}
             >
               Редактировать
             </button>

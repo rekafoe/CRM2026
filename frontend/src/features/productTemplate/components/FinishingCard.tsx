@@ -71,7 +71,7 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
   }, [services])
   return (
   <div className={`simplified-card simplified-card--collapsible ${!expanded ? 'simplified-card--collapsed' : ''}`}>
-    <div className="simplified-card__header" onClick={() => setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
+    <div className="simplified-card__header" onClick={() =>setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
       <div>
         {titleWithHint(
           'Отделка (послепечатные услуги)',
@@ -89,7 +89,7 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
           <button
             type="button"
             className="el-button el-button--text el-button--mini"
-            onClick={() => void loadLists()}
+            onClick={() =>void loadLists()}
             style={{ marginTop: '8px' }}
           >
             Попробовать снова

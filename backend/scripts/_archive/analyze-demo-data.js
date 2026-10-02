@@ -5,12 +5,12 @@ const path = require('path');
 const dbPath = path.join(__dirname, '..', 'data.db');
 const db = new sqlite3.Database(dbPath);
 
-console.log('🔍 Анализ созданных данных для демонстрации возможностей CRM...\n');
+console.log('Анализ созданных данных для демонстрации возможностей CRM...\n');
 
 // Анализ материалов по категориям
 const analyzeByCategories = () => {
   return new Promise((resolve, reject) => {
-    console.log('📂 АНАЛИЗ ПО КАТЕГОРИЯМ:');
+    console.log('АНАЛИЗ ПО КАТЕГОРИЯМ:');
     console.log('========================');
     
     db.all(`
@@ -33,12 +33,12 @@ const analyzeByCategories = () => {
       }
       
       categories.forEach(category => {
-        console.log(`🏷️  ${category.category_name}`);
-        console.log(`   📦 Материалов: ${category.materials_count}`);
-        console.log(`   📊 Общий остаток: ${category.total_quantity}`);
-        console.log(`   💰 Стоимость: ${Math.round(category.total_value)} BYN`);
-        console.log(`   ⚠️  Низкий остаток: ${category.low_stock_count}`);
-        console.log(`   ❌ Нет в наличии: ${category.out_of_stock_count}`);
+        console.log(` ${category.category_name}`);
+        console.log(`   Материалов: ${category.materials_count}`);
+        console.log(`   Общий остаток: ${category.total_quantity}`);
+        console.log(`   Стоимость: ${Math.round(category.total_value)} BYN`);
+        console.log(`    Низкий остаток: ${category.low_stock_count}`);
+        console.log(`   Нет в наличии: ${category.out_of_stock_count}`);
         console.log('');
       });
       
@@ -50,7 +50,7 @@ const analyzeByCategories = () => {
 // Анализ поставщиков
 const analyzeSuppliers = () => {
   return new Promise((resolve, reject) => {
-    console.log('🏢 АНАЛИЗ ПОСТАВЩИКОВ:');
+    console.log('АНАЛИЗ ПОСТАВЩИКОВ:');
     console.log('=====================');
     
     db.all(`
@@ -72,12 +72,12 @@ const analyzeSuppliers = () => {
       }
       
       suppliers.forEach(supplier => {
-        const status = supplier.is_active ? '✅ Активен' : '❌ Неактивен';
-        console.log(`🏭 ${supplier.supplier_name} ${status}`);
-        console.log(`   📦 Материалов: ${supplier.materials_count}`);
-        console.log(`   📊 Общий остаток: ${supplier.total_quantity}`);
-        console.log(`   💰 Стоимость: ${Math.round(supplier.total_value)} BYN`);
-        console.log(`   💵 Средняя цена: ${supplier.avg_price ? supplier.avg_price.toFixed(2) : 0} BYN`);
+        const status = supplier.is_active ? 'Активен' : 'Неактивен';
+        console.log(`${supplier.supplier_name} ${status}`);
+        console.log(`   Материалов: ${supplier.materials_count}`);
+        console.log(`   Общий остаток: ${supplier.total_quantity}`);
+        console.log(`   Стоимость: ${Math.round(supplier.total_value)} BYN`);
+        console.log(`   Средняя цена: ${supplier.avg_price ? supplier.avg_price.toFixed(2) : 0} BYN`);
         console.log('');
       });
       
@@ -89,7 +89,7 @@ const analyzeSuppliers = () => {
 // Анализ движений материалов
 const analyzeMovements = () => {
   return new Promise((resolve, reject) => {
-    console.log('📈 АНАЛИЗ ДВИЖЕНИЙ МАТЕРИАЛОВ:');
+    console.log('АНАЛИЗ ДВИЖЕНИЙ МАТЕРИАЛОВ:');
     console.log('==============================');
     
     db.all(`
@@ -108,12 +108,12 @@ const analyzeMovements = () => {
       }
       
       movements.forEach(movement => {
-        const typeName = movement.type === 'in' ? '📥 Приход' : 
-                        movement.type === 'out' ? '📤 Расход' : '🔄 Корректировка';
+        const typeName = movement.type === 'in' ? 'Приход' : 
+                        movement.type === 'out' ? 'Расход' : 'Корректировка';
         console.log(`${typeName}:`);
-        console.log(`   🔢 Количество операций: ${movement.movements_count}`);
-        console.log(`   📊 Общий объем: ${movement.total_quantity}`);
-        console.log(`   📈 Средний объем: ${movement.avg_quantity.toFixed(1)}`);
+        console.log(`   Количество операций: ${movement.movements_count}`);
+        console.log(`   Общий объем: ${movement.total_quantity}`);
+        console.log(`   Средний объем: ${movement.avg_quantity.toFixed(1)}`);
         console.log('');
       });
       
@@ -125,7 +125,7 @@ const analyzeMovements = () => {
 // Анализ материалов с критическим остатком
 const analyzeCriticalStock = () => {
   return new Promise((resolve, reject) => {
-    console.log('⚠️  МАТЕРИАЛЫ С КРИТИЧЕСКИМ ОСТАТКОМ:');
+    console.log(' МАТЕРИАЛЫ С КРИТИЧЕСКИМ ОСТАТКОМ:');
     console.log('=====================================');
     
     db.all(`
@@ -149,16 +149,16 @@ const analyzeCriticalStock = () => {
       }
       
       if (materials.length === 0) {
-        console.log('✅ Нет материалов с критическим остатком');
+        console.log('Нет материалов с критическим остатком');
       } else {
         materials.forEach(material => {
-          const status = material.quantity === 0 ? '❌ НЕТ В НАЛИЧИИ' : '⚠️  КРИТИЧЕСКИЙ';
+          const status = material.quantity === 0 ? 'НЕТ В НАЛИЧИИ' : ' КРИТИЧЕСКИЙ';
           console.log(`${status} ${material.name}`);
-          console.log(`   📦 Остаток: ${material.quantity} (мин: ${material.min_quantity})`);
-          console.log(`   📂 Категория: ${material.category_name}`);
-          console.log(`   🏭 Поставщик: ${material.supplier_name}`);
-          console.log(`   📍 Местоположение: ${material.location}`);
-          console.log(`   💰 Цена: ${material.sheet_price_single} BYN`);
+          console.log(`   Остаток: ${material.quantity} (мин: ${material.min_quantity})`);
+          console.log(`   Категория: ${material.category_name}`);
+          console.log(`   Поставщик: ${material.supplier_name}`);
+          console.log(`   Местоположение: ${material.location}`);
+          console.log(`   Цена: ${material.sheet_price_single} BYN`);
           console.log('');
         });
       }
@@ -171,7 +171,7 @@ const analyzeCriticalStock = () => {
 // Топ материалов по стоимости
 const analyzeTopMaterials = () => {
   return new Promise((resolve, reject) => {
-    console.log('💰 ТОП-10 МАТЕРИАЛОВ ПО СТОИМОСТИ:');
+    console.log('ТОП-10 МАТЕРИАЛОВ ПО СТОИМОСТИ:');
     console.log('==================================');
     
     db.all(`
@@ -196,11 +196,11 @@ const analyzeTopMaterials = () => {
       
       materials.forEach((material, index) => {
         console.log(`${index + 1}. ${material.name}`);
-        console.log(`   💰 Стоимость: ${Math.round(material.total_value)} BYN`);
-        console.log(`   📦 Остаток: ${material.quantity}`);
-        console.log(`   💵 Цена за единицу: ${material.sheet_price_single} BYN`);
-        console.log(`   📂 Категория: ${material.category_name}`);
-        console.log(`   🏭 Поставщик: ${material.supplier_name}`);
+        console.log(`   Стоимость: ${Math.round(material.total_value)} BYN`);
+        console.log(`   Остаток: ${material.quantity}`);
+        console.log(`   Цена за единицу: ${material.sheet_price_single} BYN`);
+        console.log(`   Категория: ${material.category_name}`);
+        console.log(`   Поставщик: ${material.supplier_name}`);
         console.log('');
       });
       
@@ -212,7 +212,7 @@ const analyzeTopMaterials = () => {
 // Сезонный анализ
 const analyzeSeasonalPatterns = () => {
   return new Promise((resolve, reject) => {
-    console.log('🌍 СЕЗОННЫЙ АНАЛИЗ ПОТРЕБЛЕНИЯ:');
+    console.log('СЕЗОННЫЙ АНАЛИЗ ПОТРЕБЛЕНИЯ:');
     console.log('===============================');
     
     db.all(`
@@ -238,10 +238,10 @@ const analyzeSeasonalPatterns = () => {
       
       months.forEach(month => {
         const monthName = monthNames[parseInt(month.month) - 1];
-        console.log(`📅 ${monthName}:`);
-        console.log(`   🔢 Операций: ${month.movements_count}`);
-        console.log(`   📊 Общий расход: ${month.total_quantity}`);
-        console.log(`   📈 Средний расход: ${month.avg_quantity.toFixed(1)}`);
+        console.log(`${monthName}:`);
+        console.log(`   Операций: ${month.movements_count}`);
+        console.log(`   Общий расход: ${month.total_quantity}`);
+        console.log(`   Средний расход: ${month.avg_quantity.toFixed(1)}`);
         console.log('');
       });
       
@@ -260,18 +260,18 @@ const analyzeData = async () => {
     await analyzeTopMaterials();
     await analyzeSeasonalPatterns();
     
-    console.log('🎯 ЗАКЛЮЧЕНИЕ:');
+    console.log('ЗАКЛЮЧЕНИЕ:');
     console.log('==============');
-    console.log('✅ CRM заполнена реалистичными данными');
-    console.log('📊 Созданы паттерны для демонстрации всех видов аналитики');
-    console.log('🌍 Добавлены сезонные колебания для прогнозирования');
-    console.log('📈 Сформированы ABC-классы для приоритизации');
-    console.log('⚠️  Выявлены критические остатки для алертов');
-    console.log('💰 Определены топовые материалы по стоимости');
-    console.log('\n🚀 Теперь можно полноценно тестировать все возможности аналитики!');
+    console.log('CRM заполнена реалистичными данными');
+    console.log('Созданы паттерны для демонстрации всех видов аналитики');
+    console.log('Добавлены сезонные колебания для прогнозирования');
+    console.log('Сформированы ABC-классы для приоритизации');
+    console.log(' Выявлены критические остатки для алертов');
+    console.log('Определены топовые материалы по стоимости');
+    console.log('\n Теперь можно полноценно тестировать все возможности аналитики!');
     
   } catch (error) {
-    console.error('❌ Ошибка при анализе данных:', error);
+    console.error('Ошибка при анализе данных:', error);
   } finally {
     db.close();
   }

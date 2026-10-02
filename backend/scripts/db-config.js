@@ -6,7 +6,7 @@
 
 const path = require('path');
 
-// 🎯 ЕДИНСТВЕННАЯ РАБОЧАЯ БД
+//  ЕДИНСТВЕННАЯ РАБОЧАЯ БД
 const DB_PATH = path.resolve(__dirname, '../data.db');
 
 module.exports = {

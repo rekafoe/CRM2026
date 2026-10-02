@@ -101,7 +101,7 @@ export const OrderMailLogPanel: React.FC<{ orderId: number }> = ({ orderId }) =>
                   type="button"
                   className="order-mail-log__bounce"
                   disabled={bounceBusy === j.id}
-                  onClick={() => onBounce(j.id)}
+                  onClick={() =>onBounce(j.id)}
                 >
                   {bounceBusy === j.id ? '…' : 'Отметить bounce'}
                 </button>

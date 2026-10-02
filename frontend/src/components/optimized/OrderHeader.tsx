@@ -34,14 +34,14 @@ export const OrderHeader: React.FC<OrderHeaderProps> = ({
             className="action-btn"
             title="Файлы макетов"
           >
-            📁 Файлы
+             Файлы
           </button>
           <button 
             onClick={onShowPrepaymentModal}
             className="action-btn action-btn--green"
             title="Предоплата"
           >
-            💳 Предоплата
+             Предоплата
           </button>
         </div>
       </div>

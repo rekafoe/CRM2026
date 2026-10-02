@@ -50,7 +50,7 @@ export const MultiPagePagesTab: React.FC<Props> = ({ pagesConfig, onChange }) =>
                     <button
                       type="button"
                       className="simplified-pages-chip__remove"
-                      onClick={() => {
+                      onClick={() =>{
                         const nextOptions = (pagesConfig.options || []).filter((n) => n !== num)
                         const nextDefault =
                           pagesConfig.default === num

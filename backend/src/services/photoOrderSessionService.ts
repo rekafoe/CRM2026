@@ -23,7 +23,7 @@ export class PhotoOrderSessionService {
     };
 
     this.sessions.set(chatId, session);
-    console.log(`💾 Saved photo order session for ${chatId}: ${sizeName}, ${mode}, ${quantity}`);
+    console.log(`Saved photo order session for ${chatId}: ${sizeName}, ${mode}, ${quantity}`);
   }
 
   /**
@@ -39,7 +39,7 @@ export class PhotoOrderSessionService {
     // Проверяем, не истекла ли сессия
     if (Date.now() - session.timestamp > this.SESSION_TIMEOUT) {
       this.sessions.delete(chatId);
-      console.log(`⏰ Photo order session expired for ${chatId}`);
+      console.log(`Photo order session expired for ${chatId}`);
       return null;
     }
 
@@ -51,7 +51,7 @@ export class PhotoOrderSessionService {
    */
   static clearSession(chatId: string): void {
     this.sessions.delete(chatId);
-    console.log(`🗑️ Cleared photo order session for ${chatId}`);
+    console.log(`Cleared photo order session for ${chatId}`);
   }
 
   /**
@@ -62,7 +62,7 @@ export class PhotoOrderSessionService {
     for (const [chatId, session] of this.sessions.entries()) {
       if (now - session.timestamp > this.SESSION_TIMEOUT) {
         this.sessions.delete(chatId);
-        console.log(`🧹 Cleaned up expired session for ${chatId}`);
+        console.log(`Cleaned up expired session for ${chatId}`);
       }
     }
   }

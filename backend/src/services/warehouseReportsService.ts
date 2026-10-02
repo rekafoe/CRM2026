@@ -909,7 +909,7 @@ export class WarehouseReportsService {
    */
   static async generatePdfReport(reportType: string, generatedBy: string): Promise<Buffer> {
     try {
-      console.log(`📄 Generating ${reportType} PDF report for ${generatedBy}...`)
+      console.log(`Generating ${reportType} PDF report for ${generatedBy}...`)
       
       let data: any = {}
       let title = ''
@@ -968,7 +968,7 @@ export class WarehouseReportsService {
       return pdfBuffer
       
     } catch (error) {
-      console.error('❌ Error generating PDF report:', error)
+      console.error('Error generating PDF report:', error)
       throw error
     }
   }
@@ -1446,7 +1446,7 @@ export class WarehouseReportsService {
 </head>
 <body>
     <div class="header">
-        <div class="logo">🖨️ PRINT CORE</div>
+        <div class="logo"> PRINT CORE</div>
         <div class="subtitle">CRM - Печатный центр</div>
         <div class="date-info">Отчет: ${title} | ${currentDate} ${currentTime}</div>
     </div>
@@ -1490,7 +1490,7 @@ export class WarehouseReportsService {
     let browser;
     
     try {
-      console.log('🔄 Starting PDF generation...');
+      console.log('Starting PDF generation...');
       
       const { launchPuppeteerBrowser } = await import('../utils/puppeteerLaunch');
       
@@ -1527,11 +1527,11 @@ export class WarehouseReportsService {
         `
       });
 
-      console.log('✅ PDF generated successfully');
+      console.log('PDF generated successfully');
       return Buffer.from(pdfBuffer);
       
     } catch (error) {
-      console.error('❌ Error converting HTML to PDF:', error);
+      console.error('Error converting HTML to PDF:', error);
       throw error;
     } finally {
       if (browser) {

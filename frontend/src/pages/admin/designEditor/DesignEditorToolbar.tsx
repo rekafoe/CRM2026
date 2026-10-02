@@ -189,10 +189,10 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
                 key={align}
                 type="button"
                 className={`design-editor-toolbar-icon-btn${selectedObj.textAlign === align ? ' is-active' : ''}`}
-                onClick={() => onTextAlignChange(align)}
+                onClick={() =>onTextAlignChange(align)}
                 title={align === 'left' ? 'По левому краю' : align === 'center' ? 'По центру' : 'По правому краю'}
               >
-                {align === 'left' ? '⬅' : align === 'center' ? '↔' : '➡'}
+                {align === 'left' ? '←' : align === 'center' ? '≡' : '→'}
               </button>
             ))}
           </div>

@@ -9,7 +9,7 @@ const api = axios.create({
   timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000),
 });
 
-// 🆕 Экспортируем api для использования в других компонентах
+//  Экспортируем api для использования в других компонентах
 export { api };
 
 // FormData: не фиксировать Content-Type — нужен boundary (см. api/client.ts)
@@ -1422,7 +1422,7 @@ export const getSupplierSummary = (filters?: any) => api.get<any[]>('/warehouse-
 export const getMaterialMovements = (filters?: any) => api.get<any[]>('/warehouse-reports/movements', { params: filters });
 export const getCategorySummary = (filters?: any) => api.get<any[]>('/warehouse-reports/categories', { params: filters });
 export const generatePdfReport = (reportType: string) => {
-  console.log('📄 API: Generating PDF report for type:', reportType);
+  console.log('API: Generating PDF report for type:', reportType);
   return api.get(`/warehouse-reports/pdf/${reportType}`, { responseType: 'blob' });
 };
 

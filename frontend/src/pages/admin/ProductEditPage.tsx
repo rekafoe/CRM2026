@@ -15,6 +15,7 @@ import { PriceTypesTab } from './product-edit/PriceTypesTab';
 import { AddServiceModal } from './product-edit/AddServiceModal';
 import { ProductDuplicateModal, productCanBeDuplicated } from '../../components/admin/ProductDuplicateModal';
 import { useUIStore } from '../../stores/uiStore';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 
 interface ProductDto {
   id: number;
@@ -96,7 +97,7 @@ const ProductEditPage: React.FC = () => {
     setForm({
       name: product.name || '',
       description: product.description || '',
-      icon: product.icon || '',
+      icon: withoutEmoji(product.icon),
       image_url: (product as any)?.image_url || '',
       calculator_type: (product as any)?.calculator_type || '',
       product_type: (product as any)?.product_type || '',
@@ -190,7 +191,7 @@ const ProductEditPage: React.FC = () => {
               ← К списку продуктов
             </Button>
             <div className="product-edit__title">
-              <span className="product-edit__icon">🔒</span>
+              <span className="product-edit__icon"></span>
               <div>
                 <h1>Редактирование продукта</h1>
                 <p>Нет доступа к данным</p>
@@ -211,7 +212,7 @@ const ProductEditPage: React.FC = () => {
             ← К списку продуктов
           </Button>
           <div className="product-edit__title">
-            <span className="product-edit__icon">{form.icon || (product as any)?.icon || '📦'}</span>
+            <span className="product-edit__icon">{withoutEmoji(form.icon || (product as any)?.icon)}</span>
             <div>
               <h1>Редактирование продукта</h1>
               <p>{product?.name || form.name || 'Новый продукт'}</p>
@@ -240,7 +241,7 @@ const ProductEditPage: React.FC = () => {
       <div className="product-edit__body">
         <aside className="product-edit__sidebar">
           <div className="product-summary-card">
-            <div className="product-summary-card__icon">{form.icon || (product as any)?.icon || '📦'}</div>
+            <div className="product-summary-card__icon">{withoutEmoji(form.icon || (product as any)?.icon)}</div>
             <div className="product-summary-card__name">{product?.name || form.name || 'Без названия'}</div>
             <ul className="product-summary-card__list">
               {summaryData.map((item) => (
@@ -262,7 +263,7 @@ const ProductEditPage: React.FC = () => {
               <button
                 key={tab.key}
                 className={`product-tab ${activeTab === tab.key ? 'product-tab--active' : ''}`}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() =>setActiveTab(tab.key)}
                 type="button"
               >
                 {tab.label}

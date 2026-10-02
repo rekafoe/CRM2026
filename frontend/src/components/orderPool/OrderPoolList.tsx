@@ -125,7 +125,7 @@ const OrderCard = React.memo<{
               type="button"
               className="order-pool-card__phone"
               title="Скопировать телефон"
-              onClick={(e) => {
+              onClick={(e) =>{
                 e.stopPropagation();
                 onCopyPhone?.(order.customerPhone!);
               }}
@@ -147,7 +147,7 @@ const OrderCard = React.memo<{
             )}
           </div>
           <div className="order-pool-card__money">
-            <span className={`order-pool-card__debt ${debt > 0 ? 'is-due' : ''}`}>
+            <span className={`order-pool-card__debt ${debt >0 ? 'is-due' : ''}`}>
               долг <MoneyAmount value={debt} />
             </span>
             <span className="order-pool-card__total">
@@ -162,7 +162,7 @@ const OrderCard = React.memo<{
           type="button"
           className="order-pool-card__take"
           title="Назначить себя ответственным"
-          onClick={(e) => {
+          onClick={(e) =>{
             e.stopPropagation();
             onTakeOrder(order);
           }}

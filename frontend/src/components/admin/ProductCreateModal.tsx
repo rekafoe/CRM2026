@@ -26,7 +26,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [icon, setIcon] = useState('📦');
+  const [icon, setIcon] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(
     categories.length > 0 ? categories[0].id : null
   );
@@ -42,7 +42,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
       // Сброс формы при открытии
       setName('');
       setDescription('');
-      setIcon('📦');
+      setIcon('');
       setCategoryId(categories.length > 0 ? categories[0].id : null);
       setCalculatorType('product');
       setProductType('sheet_single');
@@ -96,7 +96,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
   const handleClose = () => {
     setName('');
     setDescription('');
-    setIcon('📦');
+    setIcon('');
     setCategoryId(categories.length > 0 ? categories[0].id : null);
       setCalculatorType('product');
     setProductType('sheet_single');
@@ -175,15 +175,6 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         </FormField>
 
         <div className="form-row">
-          <FormField label="Иконка (эмодзи)" className="flex-1">
-            <input
-              className="form-input"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              maxLength={2}
-              placeholder="📦"
-            />
-          </FormField>
           <FormField label="Тип калькулятора" className="flex-1">
             <select
               className="form-select form-select--full"
@@ -218,7 +209,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         {productType === 'sheet_single' && (
           <Alert type="info">
             <div className="flex flex-column gap-1">
-              <strong>📄 Листовое изделие</strong>
+              <strong>Листовое изделие</strong>
               <span className="text-sm">Один лист бумаги с печатью. Примеры: визитки, листовки, флаеры, наклейки.</span>
             </div>
           </Alert>
@@ -227,7 +218,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         {productType === 'multi_page' && (
           <Alert type="info">
             <div className="flex flex-column gap-1">
-              <strong>📚 Многостраничное изделие</strong>
+              <strong>Многостраничное изделие</strong>
               <span className="text-sm">
                 Изделие из нескольких страниц с переплетом. Примеры: буклеты, брошюры, каталоги, фотоальбомы.
               </span>
@@ -242,7 +233,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         {productType === 'universal' && (
           <Alert type="info">
             <div className="flex flex-column gap-1">
-              <strong>🔧 Универсальное изделие</strong>
+              <strong>Универсальное изделие</strong>
               <span className="text-sm">Гибкая настройка для нестандартных продуктов.</span>
             </div>
           </Alert>

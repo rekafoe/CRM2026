@@ -61,7 +61,7 @@ export const SupplierMaterialsModal: React.FC<SupplierMaterialsModalProps> = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="supplier-materials-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="supplier-materials-modal" onClick={(e) =>e.stopPropagation()}>
         <div className="modal-header">
           <h3>Материалы поставщика: {supplier?.name}</h3>
           <button className="close-btn" onClick={onClose}>×</button>
@@ -77,7 +77,7 @@ export const SupplierMaterialsModal: React.FC<SupplierMaterialsModalProps> = ({
 
           {error && (
             <div className="error-state">
-              <div className="error-icon">⚠️</div>
+              <div className="error-icon"></div>
               <p>{error}</p>
             </div>
           )}
@@ -97,7 +97,7 @@ export const SupplierMaterialsModal: React.FC<SupplierMaterialsModalProps> = ({
 
               {materials.length === 0 ? (
                 <div className="empty-state">
-                  <div className="empty-icon">📦</div>
+                  <div className="empty-icon"></div>
                   <p>У этого поставщика нет материалов</p>
                 </div>
               ) : (

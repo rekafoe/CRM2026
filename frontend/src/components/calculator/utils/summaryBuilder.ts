@@ -5,7 +5,7 @@ export interface BuildSummaryOptions {
   customFormat: { width: string; height: string };
   warehousePaperTypes?: Array<{ name: string; display_name: string }>;
   productTypeLabels?: Record<string, string>;
-  schema?: any | null; // 🆕 Схема продукта для определения multi_page
+  schema?: any | null; //  Схема продукта для определения multi_page
 }
 
 type SummaryFormatter = (
@@ -27,7 +27,7 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
     key: 'format',
     label: 'Формат печати',
     formatter: (value, { options, specs }) => {
-      // ⚠️ ВАЖНО: Если формат уже в формате "50×90 мм", используем его напрямую
+      //  ВАЖНО: Если формат уже в формате "50×90 мм", используем его напрямую
       // Проверяем разные варианты символа умножения (×, x, X) и наличие "мм"
       if (typeof value === 'string') {
         const hasMultiplication = value.includes('×') || value.includes('x') || value.includes('X');
@@ -80,7 +80,7 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
     formatter: (value, { options, specs }) => {
       if (!value) return null;
       
-      // 🆕 Для упрощённых продуктов: если есть materialType, используем его вместо paperType
+      //  Для упрощённых продуктов: если есть materialType, используем его вместо paperType
       // materialType содержит правильный тип бумаги из paper_type_id выбранного материала
       // paperType может быть не установлен или установлен неправильно для упрощённых продуктов
       if (specs.materialType && specs.material_id) {
@@ -138,7 +138,7 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
       const num = Number(value);
       if (!Number.isFinite(num) || num <= 0) return null;
       
-      // ⚠️ Показываем количество страниц только для multi_page продуктов
+      //  Показываем количество страниц только для multi_page продуктов
       // Проверяем наличие поля 'pages' в схеме продукта
       // Если поле 'pages' есть в схеме с enum - это multi_page продукт
       const schema = options.schema;
@@ -177,7 +177,7 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
     label: 'Тип материала',
     formatter: (value, { options }) => {
       if (!value) return null;
-      // 🆕 Используем display_name из типов бумаги со склада для транслирования
+      //  Используем display_name из типов бумаги со склада для транслирования
       // Это позволяет оператору видеть понятное название типа бумаги (например, "Глянцевая" вместо "glossy")
       // Плотности для материалов разных типов могут быть одинаковыми, поэтому нужен именно тип бумаги
       const paperType = options.warehousePaperTypes?.find(pt => pt.name === String(value));
@@ -231,7 +231,7 @@ export const buildParameterSummary = (
   const summary: Array<{ key: string; label: string; value: string }> = [];
   const seenKeys = new Set<string>();
 
-  // 🆕 Передаем schema в options для использования в formatters
+  //  Передаем schema в options для использования в formatters
   const optionsWithSchema = {
     ...options,
     schema
@@ -241,9 +241,9 @@ export const buildParameterSummary = (
     const value = specs[field.key];
     if (value === undefined || value === null || value === '') continue;
     
-    // 🔍 Детальное логирование для формата
+    //  Детальное логирование для формата
     if (field.key === 'format') {
-      console.log('🔍 [buildParameterSummary] Обработка формата:', {
+      console.log('[buildParameterSummary] Обработка формата:', {
         value,
         valueType: typeof value,
         isCustomFormat: options.isCustomFormat,
@@ -257,9 +257,9 @@ export const buildParameterSummary = (
       ? field.formatter(value, { specs, options: optionsWithSchema })
       : String(value);
     
-    // 🔍 Логирование результата для формата
+    //  Логирование результата для формата
     if (field.key === 'format') {
-      console.log('✅ [buildParameterSummary] Результат форматирования формата:', {
+      console.log('[buildParameterSummary] Результат форматирования формата:', {
         originalValue: value,
         formatted,
         willBeAdded: !!formatted

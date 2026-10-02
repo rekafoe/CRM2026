@@ -10,7 +10,7 @@ async function ensureColumn(db: any, table: string, name: string, ddl: string): 
   const has = columns.some((c) => c.name === name)
   if (has) return
   await db.exec(ddl)
-  console.log(`✅ Added ${table}.${name}`)
+  console.log(`Added ${table}.${name}`)
 }
 
 export async function up(db: any): Promise<void> {
@@ -23,5 +23,5 @@ export async function up(db: any): Promise<void> {
 }
 
 export async function down(_db: any): Promise<void> {
-  console.log('ℹ️ down() skipped: SQLite does not support DROP COLUMN easily')
+  console.log('down() skipped: SQLite does not support DROP COLUMN easily')
 }

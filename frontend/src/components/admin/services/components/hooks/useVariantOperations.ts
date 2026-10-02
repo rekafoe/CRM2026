@@ -363,7 +363,7 @@ export function useVariantOperations(
         // Если новый API недоступен (404) или падает с ошибкой (500), используем старую логику синхронизации
         if (apiErr?.response?.status === 404 || apiErr?.response?.status === 500) {
           // Это ожидаемо - новый API еще не развернут на продакшене или есть проблемы, используется fallback
-          console.info(`ℹ️ Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
+          console.info(`Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {
@@ -482,7 +482,7 @@ export function useVariantOperations(
         // Если новый API недоступен (404) или падает с ошибкой (500), используем старую логику синхронизации
         if (apiErr?.response?.status === 404 || apiErr?.response?.status === 500) {
           // Это ожидаемо - новый API еще не развернут на продакшене или есть проблемы, используется fallback
-          console.info(`ℹ️ Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
+          console.info(`Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {
@@ -613,7 +613,7 @@ export function useVariantOperations(
         // Если новый API недоступен (404) или падает с ошибкой (500), используем старую логику синхронизации
         if (apiErr?.response?.status === 404 || apiErr?.response?.status === 500) {
           // Это ожидаемо - новый API еще не развернут на продакшене или есть проблемы, используется fallback
-          console.info(`ℹ️ Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
+          console.info(`Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {

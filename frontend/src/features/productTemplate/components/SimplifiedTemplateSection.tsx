@@ -738,14 +738,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             <button
               type="button"
               className={`product-tab ${editorTab === 'pages' ? 'product-tab--active' : ''}`}
-              onClick={() => setEditorTab('pages')}
+              onClick={() =>setEditorTab('pages')}
             >
               Страницы
             </button>
             <button
               type="button"
               className={`product-tab ${editorTab === 'assembly' ? 'product-tab--active' : ''}`}
-              onClick={() => setEditorTab('assembly')}
+              onClick={() =>setEditorTab('assembly')}
             >
               Сборка
             </button>
@@ -754,21 +754,21 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         <button
           type="button"
           className={`product-tab ${editorTab === 'print' ? 'product-tab--active' : ''}`}
-          onClick={() => setEditorTab('print')}
+          onClick={() =>setEditorTab('print')}
         >
           Печать
         </button>
         <button
           type="button"
           className={`product-tab ${editorTab === 'materials' ? 'product-tab--active' : ''}`}
-          onClick={() => setEditorTab('materials')}
+          onClick={() =>setEditorTab('materials')}
         >
           Материалы
         </button>
         <button
           type="button"
           className={`product-tab ${editorTab === 'finishing' ? 'product-tab--active' : ''}`}
-          onClick={() => setEditorTab('finishing')}
+          onClick={() =>setEditorTab('finishing')}
         >
           Отделка
         </button>
@@ -776,7 +776,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <button
             type="button"
             className={`product-tab ${editorTab === 'design' ? 'product-tab--active' : ''}`}
-            onClick={() => setEditorTab('design')}
+            onClick={() =>setEditorTab('design')}
           >
             Дизайны
           </button>
@@ -784,7 +784,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         <button
           type="button"
           className={`product-tab ${editorTab === 'check' ? 'product-tab--active' : ''}`}
-          onClick={() => setEditorTab('check')}
+          onClick={() =>setEditorTab('check')}
         >
           Проверка
         </button>
@@ -860,7 +860,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                 role="button"
                 tabIndex={0}
                 className={`simplified-size ${String(selectedSizeId) === String(s.id) ? 'simplified-size--active' : ''}`}
-                onClick={() => setSelectedSizeId(s.id)}
+                onClick={() =>setSelectedSizeId(s.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
@@ -874,7 +874,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                     type="button"
                     className="simplified-size__delete"
                     title="Удалить размер"
-                    onClick={(e) => {
+                    onClick={(e) =>{
                       e.stopPropagation()
                       removeSize(s.id)
                     }}
@@ -1027,7 +1027,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           ) : (
                             <>
                               {layoutPreview.matName && (
-                                <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
+                                <span className="text-muted">· {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
                               )}
                               {(selected.cut_margin_mm != null && selected.cut_margin_mm !== 5) && (
                                 <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>

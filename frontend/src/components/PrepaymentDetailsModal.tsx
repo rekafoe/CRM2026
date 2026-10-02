@@ -62,10 +62,10 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
 
   return (
     <div className="prepayment-modal-overlay" onClick={onClose}>
-      <div className="prepayment-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="prepayment-modal" onClick={(e) =>e.stopPropagation()}>
         {/* Заголовок */}
         <div className="prepayment-modal-header">
-          <h3>💳 Предоплата - Заказ #{order.number}</h3>
+          <h3>Предоплата - Заказ #{order.number}</h3>
           <button className="btn-close" onClick={onClose}>✕</button>
         </div>
 
@@ -73,14 +73,14 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
         <div className="prepayment-content">
           {!hasPrepayment ? (
             <div className="no-prepayment">
-              <div className="no-prepayment-icon">💳</div>
+              <div className="no-prepayment-icon"></div>
               <div className="no-prepayment-text">Предоплата не установлена</div>
               <div className="no-prepayment-hint">Установите сумму предоплаты для этого заказа</div>
               <button 
                 className="btn-set-prepayment"
                 onClick={onOpenPrepaymentModal}
               >
-                💳 Установить предоплату
+                 Установить предоплату
               </button>
             </div>
           ) : (
@@ -101,7 +101,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                   <div className="payment-method-display">
                     <span className="method-label">Способ оплаты:</span>
                     <span className={`method-badge ${order.paymentMethod === 'online' ? 'online' : order.paymentMethod === 'telegram' ? 'telegram' : 'offline'}`}>
-                      {order.paymentMethod === 'online' ? '🌐 Онлайн' : order.paymentMethod === 'telegram' ? '📱 Telegram' : '🏪 Оффлайн'}
+                      {order.paymentMethod === 'online' ? 'Онлайн' : order.paymentMethod === 'telegram' ? 'Telegram' : 'Оффлайн'}
                     </span>
                   </div>
                 </div>
@@ -111,7 +111,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
               <div className="debt-info">
                 <div className="debt-card">
                   <div className="debt-header">
-                    <h4>💰 Финансовая информация</h4>
+                    <h4>Финансовая информация</h4>
                   </div>
                   <div className="debt-details">
                     <div className="debt-row">
@@ -124,7 +124,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                     </div>
                     <div className="debt-row debt-total">
                       <span className="debt-label">Долг клиента:</span>
-                      <span className={`debt-value debt ${debtAmount > 0 ? 'positive' : 'zero'}`}>
+                      <span className={`debt-value debt ${debtAmount >0 ? 'positive' : 'zero'}`}>
                         {debtAmount > 0 ? <MoneyAmount value={debtAmount} /> : 'Оплачено полностью'}
                       </span>
                     </div>
@@ -140,7 +140,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                     onClick={onOpenPrepaymentModal}
                     title="Изменить сумму предоплаты"
                   >
-                    ✏️ Изменить предоплату
+                     Изменить предоплату
                   </button>
                   {order.paymentUrl && (
                     <button 
@@ -149,7 +149,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                       disabled={isGenerating}
                       title="Пересоздать ссылку для оплаты"
                     >
-                      🔄 Пересоздать ссылку
+                       Пересоздать ссылку
                     </button>
                   )}
                 </div>
@@ -159,7 +159,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
               {order.paymentUrl ? (
                 <div className="payment-link-section">
                   <div className="section-header">
-                    <h4>🔗 Ссылка для оплаты</h4>
+                    <h4>Ссылка для оплаты</h4>
                     <div className="link-actions">
                       <a 
                         href={order.paymentUrl}
@@ -167,13 +167,13 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                         rel="noreferrer"
                         className="btn-pay-link"
                       >
-                        🔗 Перейти к оплате
+                         Перейти к оплате
                       </a>
                       <button 
                         className="btn-copy-link"
                         onClick={handleCopyLink}
                       >
-                        📋 Копировать
+                         Копировать
                       </button>
                     </div>
                   </div>
@@ -184,7 +184,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
               ) : (
                 <div className="no-link-section">
                   <div className="section-header">
-                    <h4>🔗 Ссылка для оплаты</h4>
+                    <h4>Ссылка для оплаты</h4>
                     <span className="no-link-text">Ссылка не создана</span>
                   </div>
                   <div className="no-link-actions">
@@ -193,13 +193,13 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                       onClick={handleGenerateLink}
                       disabled={isGenerating}
                     >
-                      {isGenerating ? '⏳ Создание...' : '🔗 Создать ссылку'}
+                      {isGenerating ? 'Создание...' : 'Создать ссылку'}
                     </button>
                     <button 
                       className="btn-change-amount"
                       onClick={onOpenPrepaymentModal}
                     >
-                      💳 Изменить сумму
+                       Изменить сумму
                     </button>
                   </div>
                 </div>
@@ -211,7 +211,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                   className="btn-change-amount"
                   onClick={onOpenPrepaymentModal}
                 >
-                  💳 Изменить сумму предоплаты
+                   Изменить сумму предоплаты
                 </button>
                 {!order.paymentUrl && !isPaid && (
                   <button 
@@ -219,7 +219,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                     onClick={handleGenerateLink}
                     disabled={isGenerating}
                   >
-                    {isGenerating ? '⏳ Создание...' : '🔗 Создать ссылку для оплаты'}
+                    {isGenerating ? 'Создание...' : 'Создать ссылку для оплаты'}
                   </button>
                 )}
               </div>

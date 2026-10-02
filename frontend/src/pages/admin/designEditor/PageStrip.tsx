@@ -247,7 +247,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
             <button
               type="button"
               className={`ps-mode-btn${!spreadMode ? ' is-active' : ''}`}
-              onClick={() => spreadMode && onSpreadModeToggle()}
+              onClick={() =>spreadMode && onSpreadModeToggle()}
               title={labels?.pagesMode ?? 'Режим страниц'}
             >
               <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
@@ -257,7 +257,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
             <button
               type="button"
               className={`ps-mode-btn${spreadMode ? ' is-active' : ''}`}
-              onClick={() => !spreadMode && onSpreadModeToggle()}
+              onClick={() =>!spreadMode && onSpreadModeToggle()}
               title={labels?.spreadsMode ?? 'Режим разворотов'}
             >
               <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
@@ -274,7 +274,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
         <button
           type="button"
           className="ps-scroll-btn ps-scroll-btn--left"
-          onClick={() => handleStripScroll(-1)}
+          onClick={() =>handleStripScroll(-1)}
           disabled={!canScrollLeft}
           aria-label="Прокрутить страницы влево"
           title="Прокрутить страницы влево"
@@ -303,7 +303,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
               <button
                 type="button"
                 className="psitem-delete"
-                onClick={() => runStripAction(() => onDeletePage(item.pages[0]))}
+                onClick={() =>runStripAction(() => onDeletePage(item.pages[0]))}
                 disabled={isBusy}
                 title={`Удалить ${item.label}`}
                 aria-label={`Удалить ${item.label}`}
@@ -319,7 +319,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
                 <button
                   type="button"
                   className="psitem-main"
-                  onClick={() => runStripAction(() => onGoTo(item.goToPage))}
+                  onClick={() =>runStripAction(() => onGoTo(item.goToPage))}
                   disabled={isBusy}
                 >
                   <div
@@ -368,7 +368,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
                   <button
                     type="button"
                     className="psitem-delete-action"
-                    onClick={() => runStripAction(() => onDeletePage(item.pages[0]))}
+                    onClick={() =>runStripAction(() => onDeletePage(item.pages[0]))}
                     disabled={isBusy}
                   >
                     Удалить
@@ -455,7 +455,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
           <button
             type="button"
             className="ps-del-btn"
-            onClick={() => runStripAction(onDeleteLast)}
+            onClick={() =>runStripAction(onDeleteLast)}
             disabled={isBusy}
             title={spreadMode ? (labels?.deleteSpread ?? 'Удалить последний разворот') : (labels?.deletePage ?? 'Удалить последнюю страницу')}
           >
@@ -469,7 +469,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
         <button
           type="button"
           className="ps-scroll-btn ps-scroll-btn--right"
-          onClick={() => handleStripScroll(1)}
+          onClick={() =>handleStripScroll(1)}
           disabled={!canScrollRight}
           aria-label="Прокрутить страницы вправо"
           title="Прокрутить страницы вправо"

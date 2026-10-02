@@ -14,6 +14,7 @@ import ParametersSection from './components/ParametersSection';
 import MetaSection from './components/MetaSection';
 import { ProductSetupStatus } from '../../components/admin/ProductSetupStatus';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 import './ProductTemplateLayout.css';
 import useProductTemplatePage from './hooks/useProductTemplatePage';
 import { useProductOperations } from './hooks/useProductOperations';
@@ -291,42 +292,42 @@ const ProductTemplatePage: React.FC = () => {
           <button
             type="button"
             className={`product-tab ${activeTab === 'base' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('base')}
+            onClick={() =>setActiveTab('base')}
           >
             База <span style={{ color: tabStatusColor[tabStatus.base], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.base]}</span>
           </button>
           <button
             type="button"
             className={`product-tab ${activeTab === 'print' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('print')}
+            onClick={() =>setActiveTab('print')}
           >
             Печать <span style={{ color: tabStatusColor[tabStatus.print], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.print]}</span>
           </button>
           <button
             type="button"
             className={`product-tab ${activeTab === 'materials' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('materials')}
+            onClick={() =>setActiveTab('materials')}
           >
             Материалы <span style={{ color: tabStatusColor[tabStatus.materials], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.materials]}</span>
           </button>
           <button
             type="button"
             className={`product-tab ${activeTab === 'pricing' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('pricing')}
+            onClick={() =>setActiveTab('pricing')}
           >
             Тираж и цена <span style={{ color: tabStatusColor[tabStatus.pricing], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.pricing]}</span>
           </button>
           <button
             type="button"
             className={`product-tab ${activeTab === 'operations' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('operations')}
+            onClick={() =>setActiveTab('operations')}
           >
             Операции <span style={{ color: tabStatusColor[tabStatus.operations], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.operations]}</span>
           </button>
           <button
             type="button"
             className={`product-tab ${activeTab === 'review' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('review')}
+            onClick={() =>setActiveTab('review')}
           >
             Проверка <span style={{ color: tabStatusColor[tabStatus.review], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.review]}</span>
           </button>
@@ -347,7 +348,7 @@ const ProductTemplatePage: React.FC = () => {
                     className="template-summary-card__image"
                   />
                 ) : (
-                  state.meta.icon || product?.icon || <AppIcon name="package" size="md" />
+                  withoutEmoji(state.meta.icon || product?.icon) || <AppIcon name="package" size="md" />
                 )}
               </div>
               <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>

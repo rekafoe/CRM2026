@@ -32,13 +32,13 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
         <div className="paper-tabs">
           <button 
             className={`tab-button ${activeTab === 'types' ? 'active' : ''}`}
-            onClick={() => setActiveTab('types')}
+            onClick={() =>setActiveTab('types')}
           >
             Типы бумаги ({paperTypes.length})
           </button>
           <button 
             className={`tab-button ${activeTab === 'materials' ? 'active' : ''}`}
-            onClick={() => setActiveTab('materials')}
+            onClick={() =>setActiveTab('materials')}
           >
             Материалы
           </button>
@@ -48,7 +48,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
           {activeTab === 'types' && (
             <button 
               className="btn btn-primary"
-              onClick={() => updateModal('showAdd', true)}
+              onClick={() =>updateModal('showAdd', true)}
             >
               Добавить тип
             </button>
@@ -58,7 +58,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
               Материалы связываются с типами бумаги через форму материала
               <button 
                 className="btn btn-primary paper-actions__price-btn"
-                onClick={() => updateModal('showPrice', true)}
+                onClick={() =>updateModal('showPrice', true)}
               >
                 Добавить цену
               </button>
@@ -81,7 +81,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
                     type="button"
                     className="btn btn-sm btn-secondary paper-type-action-btn"
                     title="Редактировать"
-                    onClick={() => updateModal('editingPaperType', paperType)}
+                    onClick={() =>updateModal('editingPaperType', paperType)}
                   >
                     <AppIcon name="pencil" size="sm" />
                   </button>
@@ -89,7 +89,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
                     type="button"
                     className="btn btn-sm btn-danger paper-type-action-btn"
                     title="Удалить"
-                    onClick={() => handleDeletePaperType(paperType.id)}
+                    onClick={() =>handleDeletePaperType(paperType.id)}
                   >
                     <AppIcon name="trash" size="sm" />
                   </button>
@@ -185,11 +185,11 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
 
       {/* Модальное окно добавления типа бумаги */}
       {modals.showAdd && (
-        <div className="modal-overlay" onClick={() => updateModal('showAdd', false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() =>updateModal('showAdd', false)}>
+          <div className="modal-content" onClick={e =>e.stopPropagation()}>
             <div className="modal-header">
               <h2>Добавить тип бумаги</h2>
-              <button className="close-btn" onClick={() => updateModal('showAdd', false)}>✕</button>
+              <button className="close-btn" onClick={() =>updateModal('showAdd', false)}>✕</button>
             </div>
             
             <div className="modal-body">
@@ -225,7 +225,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
             </div>
             
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => updateModal('showAdd', false)}>
+              <button className="btn btn-secondary" onClick={() =>updateModal('showAdd', false)}>
                 Отмена
               </button>
               <button className="btn btn-primary" onClick={handleCreatePaperType}>
@@ -238,11 +238,11 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
 
       {/* Модальное окно редактирования типа бумаги */}
       {modals.editingPaperType && (
-        <div className="modal-overlay" onClick={() => updateModal('editingPaperType', null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() =>updateModal('editingPaperType', null)}>
+          <div className="modal-content" onClick={e =>e.stopPropagation()}>
             <div className="modal-header">
               <h2>Редактировать тип бумаги</h2>
-              <button className="close-btn" onClick={() => updateModal('editingPaperType', null)}>✕</button>
+              <button className="close-btn" onClick={() =>updateModal('editingPaperType', null)}>✕</button>
             </div>
             
             <div className="modal-body">
@@ -286,11 +286,11 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
             </div>
             
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => updateModal('editingPaperType', null)}>
+              <button className="btn btn-secondary" onClick={() =>updateModal('editingPaperType', null)}>
                 Отмена
               </button>
-              <button className="btn btn-primary" onClick={() => {
-                console.log('💾 Save button clicked');
+              <button className="btn btn-primary" onClick={() =>{
+                console.log('Save button clicked');
                 handleUpdatePaperType();
               }}>
                 Сохранить
@@ -302,11 +302,11 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
 
       {/* Модальное окно добавления цены */}
       {modals.showPrice && (
-        <div className="modal-overlay" onClick={() => updateModal('showPrice', false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() =>updateModal('showPrice', false)}>
+          <div className="modal-content" onClick={e =>e.stopPropagation()}>
             <div className="modal-header">
               <h2>Добавить цену</h2>
-              <button className="close-btn" onClick={() => updateModal('showPrice', false)}>✕</button>
+              <button className="close-btn" onClick={() =>updateModal('showPrice', false)}>✕</button>
             </div>
             
             <div className="modal-body">
@@ -346,7 +346,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
             </div>
             
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => updateModal('showPrice', false)}>
+              <button className="btn btn-secondary" onClick={() =>updateModal('showPrice', false)}>
                 Отмена
               </button>
               <button className="btn btn-primary" onClick={handleAddPrice}>

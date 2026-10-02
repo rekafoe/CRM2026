@@ -153,7 +153,7 @@ export const DesignAssetsPage: React.FC = () => {
           <button
             type="button"
             className="design-assets-help__toggle"
-            onClick={() => setHelpOpen((open) => !open)}
+            onClick={() =>setHelpOpen((open) => !open)}
             aria-expanded={helpOpen}
           >
             <span className="design-assets-help__chevron" aria-hidden>{helpOpen ? '▾' : '▸'}</span>
@@ -178,12 +178,12 @@ export const DesignAssetsPage: React.FC = () => {
             <button
               type="button"
               className="lg-btn lg-btn--primary"
-              onClick={() => setUploadOpen((open) => !open)}
+              onClick={() =>setUploadOpen((open) => !open)}
             >
               <AppIcon name="plus" size="xs" />
               {uploadOpen ? 'Скрыть форму' : 'Добавить файлы'}
             </button>
-            <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/design-templates')}>
+            <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-templates')}>
               <AppIcon name="layers" size="xs" /> К шаблонам
             </button>
             <input
@@ -203,7 +203,7 @@ export const DesignAssetsPage: React.FC = () => {
                   key={value}
                   type="button"
                   className={`design-assets-pill${kindFilter === value ? ' is-active' : ''}`}
-                  onClick={() => setKindFilter(value)}
+                  onClick={() =>setKindFilter(value)}
                 >
                   {label}
                 </button>
@@ -223,7 +223,7 @@ export const DesignAssetsPage: React.FC = () => {
             <form className="design-assets-upload" onSubmit={(event) => void handleUpload(event)}>
               <label
                 className={`design-assets-dropzone${dragOver ? ' is-dragover' : ''}${files.length ? ' has-files' : ''}`}
-                onDragEnter={(event) => {
+                onDragEnter={(event) =>{
                   event.preventDefault();
                   setDragOver(true);
                 }}
@@ -278,7 +278,7 @@ export const DesignAssetsPage: React.FC = () => {
                         type="button"
                         className="design-assets-file-preview__remove"
                         aria-label={`Убрать ${file.name}`}
-                        onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        onClick={() =>setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
                       >
                         <AppIcon name="x" size="xs" />
                       </button>
@@ -294,14 +294,14 @@ export const DesignAssetsPage: React.FC = () => {
                     <button
                       type="button"
                       className={`design-assets-pill${uploadKind === 'clipart' ? ' is-active' : ''}`}
-                      onClick={() => setUploadKind('clipart')}
+                      onClick={() =>setUploadKind('clipart')}
                     >
                       Клипарт
                     </button>
                     <button
                       type="button"
                       className={`design-assets-pill${uploadKind === 'background' ? ' is-active' : ''}`}
-                      onClick={() => setUploadKind('background')}
+                      onClick={() =>setUploadKind('background')}
                     >
                       Фон
                     </button>
@@ -329,7 +329,7 @@ export const DesignAssetsPage: React.FC = () => {
                 <button
                   type="button"
                   className="lg-btn"
-                  onClick={() => {
+                  onClick={() =>{
                     setUploadOpen(false);
                     setFiles([]);
                     setUploadCategory('');
@@ -423,7 +423,7 @@ export const DesignAssetsPage: React.FC = () => {
                   <button
                     type="button"
                     className="lg-btn lg-btn--sm"
-                    onClick={() => void handleUpdate(asset, { is_active: !asset.is_active })}
+                    onClick={() =>void handleUpdate(asset, { is_active: !asset.is_active })}
                   >
                     {asset.is_active ? 'Отключить' : 'Включить'}
                   </button>
@@ -432,7 +432,7 @@ export const DesignAssetsPage: React.FC = () => {
                       type="button"
                       className="lg-btn lg-btn--sm design-assets-card__remove"
                       aria-label="Удалить из библиотеки"
-                      onClick={() => void deactivateDesignAsset(asset.id).then(() => {
+                      onClick={() =>void deactivateDesignAsset(asset.id).then(() => {
                         invalidateCrmDesignAssetsCache();
                         return loadAssets();
                       })}

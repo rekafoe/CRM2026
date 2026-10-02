@@ -42,6 +42,6 @@ export async function up(db: Database): Promise<void> {
 }
 
 export async function down(_db: Database): Promise<void> {
-  console.log('ℹ️ down() skipped: SQLite column drop not applied');
+  console.log('down() skipped: SQLite column drop not applied');
 }
 

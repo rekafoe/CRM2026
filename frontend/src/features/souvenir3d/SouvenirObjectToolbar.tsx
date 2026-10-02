@@ -32,7 +32,7 @@ function GestureButton({
       type="button"
       className={className}
       title={title}
-      onPointerDown={(event) => {
+      onPointerDown={(event) =>{
         event.preventDefault();
         event.stopPropagation();
         lastRef.current = { x: event.clientX, y: event.clientY };
@@ -80,7 +80,7 @@ export const SouvenirObjectToolbar: React.FC<Props> = ({
       style={{ left, top }}
       role="dialog"
       aria-label="Настройки выбранного объекта"
-      onPointerDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) =>event.stopPropagation()}
     >
       {selected.kind === 'text' && (
         <>
@@ -115,7 +115,7 @@ export const SouvenirObjectToolbar: React.FC<Props> = ({
 
       {selected.kind === 'image' && (
         <div className="souvenir3d-object-toolbar__row">
-          <button type="button" onClick={() => replaceRef.current?.click()}>Заменить</button>
+          <button type="button" onClick={() =>replaceRef.current?.click()}>Заменить</button>
           <button type="button" onClick={onCrop}>Обрезать</button>
           <input
             ref={replaceRef}
@@ -146,7 +146,7 @@ export const SouvenirObjectToolbar: React.FC<Props> = ({
         <GestureButton
           className="souvenir3d-object-toolbar__gesture"
           title="Потяните для изменения размера"
-          label="↔ Размер"
+          label="Размер"
           onDelta={(dx, dy) => onScale(Math.max(0.85, Math.min(1.15, 1 + (dx - dy) / 180)))}
         />
         <GestureButton

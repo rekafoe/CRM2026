@@ -339,25 +339,25 @@ export class TelegramWebhookController {
       // Импортируем TelegramService динамически, чтобы избежать циклических зависимостей
       const { TelegramService } = await import('../services/telegramService');
       
-      const welcomeMessage = `👋 Привет, ${firstName}!
+      const welcomeMessage = `Привет, ${firstName}!
 
 Добро пожаловать в систему уведомлений нашей типографии!
 
-🤖 *Что я умею:*
-• 🛒 Уведомления о статусе ваших заказов
-• 📋 Информация о готовности продукции
-• 💬 Связь с менеджерами
+ *Что я умею:*
+•  Уведомления о статусе ваших заказов
+•  Информация о готовности продукции
+•  Связь с менеджерами
 
-👤 *Ваш статус:* Клиент
+ *Ваш статус:* Клиент
 Вы будете получать уведомления о ваших заказах.
 
-⚙️ *Настройки:*
+ *Настройки:*
 Администратор может настроить ваши уведомления в системе.
 
-📞 *Поддержка:*
+ *Поддержка:*
 Если у вас есть вопросы, обратитесь к менеджеру.
 
-Спасибо за выбор нашей типографии! 🎉`;
+Спасибо за выбор нашей типографии! `;
 
       await TelegramService.sendMessageToUser(chatId, welcomeMessage);
     } catch (error) {
@@ -455,7 +455,7 @@ export class TelegramWebhookController {
         // Создаем заказ с параметрами из сессии
         const size = ImageProcessingService.getSizeByName(session.sizeName);
         if (!size) {
-          await this.sendMessageToUser(chatId, '❌ Ошибка: неверный размер фотографии');
+          await this.sendMessageToUser(chatId, 'Ошибка: неверный размер фотографии');
           PhotoOrderSessionService.clearSession(chatId);
           return;
         }
@@ -482,15 +482,15 @@ export class TelegramWebhookController {
         PhotoOrderSessionService.clearSession(chatId);
 
         await this.sendMessageToUser(chatId, 
-          `✅ *Заказ создан!*\n\n` +
-          `🆔 Заказ #${order.id}\n` +
-          `📏 Размер: ${size.name}\n` +
-          `🎨 Режим: ${session.mode === 'crop' ? 'Кроп' : session.mode === 'fit' ? 'Вписать с полями' : 'Умный кроп'}\n` +
-          `📦 Копий: ${session.quantity}\n` +
-          `💰 Стоимость: ${(order.totalPrice / 100).toFixed(0)} руб.\n\n` +
-          `📸 Фотография будет обработана в течение 1-2 минут.\n` +
-          `📱 Вы получите обработанное фото для проверки.\n\n` +
-          `💡 Используйте /my_orders для отслеживания статуса заказа.`
+          `*Заказ создан!*\n\n` +
+          `Заказ #${order.id}\n` +
+          `Размер: ${size.name}\n` +
+          `Режим: ${session.mode === 'crop' ? 'Кроп' : session.mode === 'fit' ? 'Вписать с полями' : 'Умный кроп'}\n` +
+          `Копий: ${session.quantity}\n` +
+          `Стоимость: ${(order.totalPrice / 100).toFixed(0)} руб.\n\n` +
+          `Фотография будет обработана в течение 1-2 минут.\n` +
+          `Вы получите обработанное фото для проверки.\n\n` +
+          `Используйте /my_orders для отслеживания статуса заказа.`
         );
         
         return;
@@ -504,21 +504,21 @@ export class TelegramWebhookController {
       
       if (activeOrder) {
         await this.sendMessageToUser(chatId, 
-          `📸 Фотография получена! Добавлена к заказу #${activeOrder.id}\n\n` +
-          `📋 Текущий заказ:\n` +
+          `Фотография получена! Добавлена к заказу #${activeOrder.id}\n\n` +
+          `Текущий заказ:\n` +
           `• Размер: ${activeOrder.selectedSize.name}\n` +
           `• Фотографий: ${activeOrder.originalPhotos.length + 1}\n` +
           `• Копий: ${activeOrder.quantity}\n\n` +
-          `💡 Отправьте еще фотографии или напишите "Готово" для завершения заказа.`
+          `Отправьте еще фотографии или напишите "Готово" для завершения заказа.`
         );
         return;
       }
       
       // Если нет активного заказа, отправляем инструкции
       await this.sendMessageToUser(chatId, 
-        `📸 Фотография получена!\n\n` +
-        `💡 Для создания заказа используйте команду /order_photo\n` +
-        `📋 Или отправьте сообщение в формате:\n` +
+        `Фотография получена!\n\n` +
+        `Для создания заказа используйте команду /order_photo\n` +
+        `Или отправьте сообщение в формате:\n` +
         `"Заказ: 10x15, 2 копии, кроп"\n` +
         `+ прикрепите фотографии`
       );
@@ -526,7 +526,7 @@ export class TelegramWebhookController {
     } catch (error) {
       logger.error('Error handling photo upload', error);
       await this.sendMessageToUser(chatId, 
-        '❌ Произошла ошибка при обработке фотографии. Попробуйте позже.'
+        'Произошла ошибка при обработке фотографии. Попробуйте позже.'
       );
     }
   }
@@ -546,21 +546,21 @@ export class TelegramWebhookController {
       
       if (activeOrder) {
         await this.sendMessageToUser(chatId, 
-          `📄 Файл получен! Добавлен к заказу #${activeOrder.id}\n\n` +
-          `📋 Текущий заказ:\n` +
+          `Файл получен! Добавлен к заказу #${activeOrder.id}\n\n` +
+          `Текущий заказ:\n` +
           `• Размер: ${activeOrder.selectedSize.name}\n` +
           `• Фотографий: ${activeOrder.originalPhotos.length + 1}\n` +
           `• Копий: ${activeOrder.quantity}\n\n` +
-          `💡 Отправьте еще файлы или напишите "Готово" для завершения заказа.`
+          `Отправьте еще файлы или напишите "Готово" для завершения заказа.`
         );
         return;
       }
       
       // Если нет активного заказа, отправляем инструкции
       await this.sendMessageToUser(chatId, 
-        `📄 Файл получен!\n\n` +
-        `💡 Для создания заказа используйте команду /order_photo\n` +
-        `📋 Или отправьте сообщение в формате:\n` +
+        `Файл получен!\n\n` +
+        `Для создания заказа используйте команду /order_photo\n` +
+        `Или отправьте сообщение в формате:\n` +
         `"Заказ: 10x15, 2 копии, кроп"\n` +
         `+ прикрепите файлы`
       );
@@ -568,7 +568,7 @@ export class TelegramWebhookController {
     } catch (error) {
       logger.error('Error handling document upload', error);
       await this.sendMessageToUser(chatId, 
-        '❌ Произошла ошибка при обработке файла. Попробуйте позже.'
+        'Произошла ошибка при обработке файла. Попробуйте позже.'
       );
     }
   }
@@ -638,7 +638,7 @@ export class TelegramWebhookController {
     const size = ImageProcessingService.getSizeByName(sizeName);
     
     if (!size) {
-      await TelegramService.sendMessageToUser(chatId, '❌ Неверный размер фотографии');
+      await TelegramService.sendMessageToUser(chatId, 'Неверный размер фотографии');
       return;
     }
 
@@ -646,10 +646,10 @@ export class TelegramWebhookController {
     const price = prices[sizeName] || 0;
     const priceRub = (price / 100).toFixed(0);
 
-    const message = `📏 *Выбран размер: ${sizeName}*\n\n` +
-                   `📐 Размеры: ${size.width}x${size.height} пикселей\n` +
-                   `💰 Цена: ${priceRub} руб. за копию\n\n` +
-                   `💡 *Выберите режим обработки:*`;
+    const message = `*Выбран размер: ${sizeName}*\n\n` +
+                   `Размеры: ${size.width}x${size.height} пикселей\n` +
+                   `Цена: ${priceRub} руб. за копию\n\n` +
+                   `*Выберите режим обработки:*`;
 
     const keyboard = TelegramBotCommands.getProcessingModeKeyboard(sizeName);
     await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
@@ -664,14 +664,14 @@ export class TelegramWebhookController {
     const sizeName = parts[2];
 
     const modeText = {
-      'crop': '✂️ Кроп (обрезать под размер)',
-      'fit': '📐 Вписать (с белыми полями)',
-      'smart': '🤖 Умный кроп (ИИ)'
+      'crop': 'Кроп (обрезать под размер)',
+      'fit': 'Вписать (с белыми полями)',
+      'smart': 'Умный кроп (ИИ)'
     }[mode] || mode;
 
-    const message = `🎨 *Режим обработки: ${modeText}*\n\n` +
-                   `📏 Размер: ${sizeName}\n\n` +
-                   `💡 *Выберите количество копий:*`;
+    const message = `*Режим обработки: ${modeText}*\n\n` +
+                   `Размер: ${sizeName}\n\n` +
+                   `*Выберите количество копий:*`;
 
     const keyboard = TelegramBotCommands.getQuantityKeyboard(sizeName, mode);
     await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
@@ -693,18 +693,18 @@ export class TelegramWebhookController {
     const totalPriceRub = (totalPrice / 100).toFixed(0);
 
     const modeText = {
-      'crop': '✂️ Кроп',
-      'fit': '📐 Вписать с полями',
-      'smart': '🤖 Умный кроп'
+      'crop': 'Кроп',
+      'fit': 'Вписать с полями',
+      'smart': 'Умный кроп'
     }[mode] || mode;
 
-    const message = `📋 *Параметры заказа:*\n\n` +
-                   `📏 Размер: ${sizeName}\n` +
-                   `🎨 Режим: ${modeText}\n` +
-                   `📦 Копий: ${quantity}\n` +
-                   `💰 Цена за копию: ${(pricePerCopy / 100).toFixed(0)} руб.\n` +
-                   `💰 Общая стоимость: ${totalPriceRub} руб.\n\n` +
-                   `📸 *Теперь отправьте фотографии для обработки!*\n` +
+    const message = `*Параметры заказа:*\n\n` +
+                   `Размер: ${sizeName}\n` +
+                   `Режим: ${modeText}\n` +
+                   `Копий: ${quantity}\n` +
+                   `Цена за копию: ${(pricePerCopy / 100).toFixed(0)} руб.\n` +
+                   `Общая стоимость: ${totalPriceRub} руб.\n\n` +
+                   `*Теперь отправьте фотографии для обработки!*\n` +
                    `(до 10 фотографий)`;
 
     // Убираем клавиатуру и показываем финальное сообщение
@@ -721,10 +721,10 @@ export class TelegramWebhookController {
     const orderId = data.replace('confirm_', '');
     
     await TelegramService.sendMessageToUser(chatId, 
-      `✅ *Заказ #${orderId} подтвержден!*\n\n` +
-      `📸 Ваши фотографии будут обработаны в течение 1-2 минут.\n` +
-      `📱 Вы получите обработанные фото для проверки.\n\n` +
-      `💡 Используйте /my_orders для отслеживания статуса заказа.`
+      `*Заказ #${orderId} подтвержден!*\n\n` +
+      `Ваши фотографии будут обработаны в течение 1-2 минут.\n` +
+      `Вы получите обработанные фото для проверки.\n\n` +
+      `Используйте /my_orders для отслеживания статуса заказа.`
     );
   }
 
@@ -735,8 +735,8 @@ export class TelegramWebhookController {
     const orderId = data.replace('cancel_', '');
     
     await TelegramService.sendMessageToUser(chatId, 
-      `❌ *Заказ #${orderId} отменен.*\n\n` +
-      `💡 Вы можете создать новый заказ с помощью /order_photo`
+      `*Заказ #${orderId} отменен.*\n\n` +
+      `Вы можете создать новый заказ с помощью /order_photo`
     );
   }
 
@@ -744,9 +744,9 @@ export class TelegramWebhookController {
    * Возврат к выбору размеров
    */
   private static async handleBackToSizes(chatId: string, messageId: number) {
-    const message = `📸 *ЗАКАЗ ПЕЧАТИ ФОТОГРАФИЙ*\n\n` +
-                   `💡 *Выберите размер фотографии:*\n` +
-                   `Нажмите на кнопку с нужным размером ниже ⬇️`;
+    const message = `*ЗАКАЗ ПЕЧАТИ ФОТОГРАФИЙ*\n\n` +
+                   `*Выберите размер фотографии:*\n` +
+                   `Нажмите на кнопку с нужным размером ниже`;
 
     const keyboard = await TelegramBotCommands.getSizeSelectionKeyboard();
     await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
@@ -758,8 +758,8 @@ export class TelegramWebhookController {
   private static async handleBackToMode(chatId: string, data: string, messageId: number) {
     const sizeName = data.replace('back_to_mode_', '');
     
-    const message = `📏 *Размер: ${sizeName}*\n\n` +
-                   `💡 *Выберите режим обработки:*`;
+    const message = `*Размер: ${sizeName}*\n\n` +
+                   `*Выберите режим обработки:*`;
 
     const keyboard = TelegramBotCommands.getProcessingModeKeyboard(sizeName);
     await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);

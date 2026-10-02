@@ -72,7 +72,7 @@ const DiscountsTabComponent: React.FC<DiscountsTabProps> = ({
         {onAddNew && (
           <div className="mt-2">
             <Button variant="primary" size="sm" onClick={onAddNew}>
-              ➕ Добавить скидку
+               Добавить скидку
             </Button>
           </div>
         )}
@@ -137,7 +137,7 @@ const DiscountsTabComponent: React.FC<DiscountsTabProps> = ({
 
       {filteredItems.length === 0 ? (
         <EmptyState
-          icon="🎯"
+          icon=""
           title="Нет скидок за объем"
           description="Добавьте скидки для различных объемов заказов"
         />

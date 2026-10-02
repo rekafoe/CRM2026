@@ -23,7 +23,7 @@ export interface ServicePricing {
   service_id: number
   price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order' | 'per_meter'
   units_per_item: number
-  // 🆕 tiers больше не храним в шаблоне продукта - цены берутся из централизованной системы услуг
+  //  tiers больше не храним в шаблоне продукта - цены берутся из централизованной системы услуг
   // tiers оставлен только для обратной совместимости со старыми данными, но не используется при сохранении
   tiers?: Tier[] // Опционально, только для чтения старых данных
   // Поля для услуг с вариантами (любой тип)
@@ -339,10 +339,10 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
     }
   }, [tierModal.isOpen])
 
-  // ⛔ handlePriceChange больше не используется - цены редактируются только в services-management
+  //  handlePriceChange больше не используется - цены редактируются только в services-management
   // Оставлено для обратной совместимости, но не вызывается при allowPriceOverride={false}
   const handlePriceChange = (serviceId: number, tierIndex: number, newPrice: number) => {
-    // ⚠️ Эта функция больше не должна вызываться, т.к. цены берутся из централизованной системы
+    //  Эта функция больше не должна вызываться, т.к. цены берутся из централизованной системы
     console.warn('handlePriceChange called but prices should be edited in services-management, not in product template')
     // Если всё же нужно переопределение цен для продукта (в будущем), можно раскомментировать:
     /*
@@ -381,7 +381,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
 
     const newRanges = addRangeBoundary(commonRanges, boundary)
     
-    // ✅ Обновляем только структуру диапазонов через onRangesUpdate
+    //  Обновляем только структуру диапазонов через onRangesUpdate
     // tiers больше не сохраняем в шаблоне продукта - цены берутся из services-management
     if (onRangesUpdate) {
       onRangesUpdate(newRanges)
@@ -398,7 +398,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
 
     const newRanges = editRangeBoundary(commonRanges, tierModal.tierIndex, boundary)
     
-    // ✅ Обновляем только структуру диапазонов через onRangesUpdate
+    //  Обновляем только структуру диапазонов через onRangesUpdate
     // tiers больше не сохраняем в шаблоне продукта
     if (onRangesUpdate) {
       onRangesUpdate(newRanges)
@@ -410,7 +410,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
   const handleRemoveRange = (tierIndex: number) => {
     const newRanges = removeRange(commonRanges, tierIndex)
     
-    // ✅ Обновляем только структуру диапазонов через onRangesUpdate
+    //  Обновляем только структуру диапазонов через onRangesUpdate
     // tiers больше не сохраняем в шаблоне продукта
     if (onRangesUpdate) {
       onRangesUpdate(newRanges)
@@ -465,7 +465,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
           placeholder="Поиск по услуге, категории, типу или ID"
         />
         {serviceSearchQuery && (
-          <button type="button" onClick={() => setServiceSearchQuery('')} aria-label="Очистить поиск услуг">
+          <button type="button" onClick={() =>setServiceSearchQuery('')} aria-label="Очистить поиск услуг">
             <AppIcon name="x" size="xs" />
           </button>
         )}
@@ -484,7 +484,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                       <>
                         <span
                           style={{ cursor: 'pointer' }}
-                          onClick={(e) => {
+                          onClick={(e) =>{
                             setTierModal({
                               type: 'edit',
                               tierIndex: ti,
@@ -501,7 +501,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                             type="button"
                             className="el-button remove-range el-button--text el-button--mini"
                             style={{ color: 'red', marginRight: '-15px' }}
-                            onClick={() => handleRemoveRange(ti)}
+                            onClick={() =>handleRemoveRange(ti)}
                           >
                             ×
                           </button>
@@ -522,7 +522,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                       type="button"
                       className="el-button el-button--info el-button--mini is-plain"
                       style={{ width: '100%', marginLeft: '0px' }}
-                      onClick={(e) => {
+                      onClick={(e) =>{
                         const button = e.currentTarget as HTMLElement
                         setTierModal({
                           type: 'add',
@@ -707,13 +707,13 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                       )}
                     </td>
                   {commonRanges.map((t, ti) => {
-                    // ✅ Всегда показываем цены из presetTiers (централизованная система услуг)
+                    //  Всегда показываем цены из presetTiers (централизованная система услуг)
                     // tiers из pricing.tiers больше не используются для отображения
                     const priceTier = presetTiers.find(rt => rt.min_qty === t.min_qty) || { ...t, unit_price: 0 }
                     
                     return (
                       <td key={ti}>
-                        {/* ✅ Цены только для чтения - редактируются в services-management */}
+                        {/*  Цены только для чтения - редактируются в services-management */}
                         <div 
                           style={{ 
                             padding: '4px 8px', 
@@ -763,16 +763,16 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               transform: 'translate(-50%, -50%)',
               zIndex: TIER_RANGE_POPOVER_Z_INDEX
             }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) =>e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
+            <div className="simplified-tier-modal__content" onClick={(e) =>e.stopPropagation()}>
               <div className="simplified-tier-modal__header">
                 <strong>{tierModal.type === 'add' ? 'Добавить диапазон' : 'Редактировать диапазон'}</strong>
                 <button
                   type="button"
                   className="simplified-tier-modal__close"
-                  onClick={(e: React.MouseEvent) => {
+                  onClick={(e: React.MouseEvent) =>{
                     e.stopPropagation()
                     setTierModal({ type: 'add', isOpen: false, boundary: '' })
                   }}

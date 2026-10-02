@@ -110,10 +110,10 @@ export const ServiceCategoriesBlock: React.FC<ServiceCategoriesBlockProps> = ({ 
           aria-expanded={panelExpanded}
           aria-controls={panelId}
           id={`${panelId}-toggle`}
-          onClick={() => setPanelExpanded((v) => !v)}
+          onClick={() =>setPanelExpanded((v) => !v)}
         >
           <span className="service-categories-block__chevron" aria-hidden>
-            {panelExpanded ? '▼' : '▶'}
+            {panelExpanded ? '▼' : ''}
           </span>
           <span className="service-categories-block__title">Категории услуг</span>
           <span className="service-categories-block__count" title="Число категорий">

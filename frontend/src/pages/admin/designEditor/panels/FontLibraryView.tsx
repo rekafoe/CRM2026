@@ -180,7 +180,7 @@ export const FontLibraryView: React.FC<FontLibraryViewProps> = ({
                     className={`font-library__row${
                       currentFontFamily === f.value ? ' font-library__row--active' : ''
                     }`}
-                    onClick={() => onSelectFont(f.value)}
+                    onClick={() =>onSelectFont(f.value)}
                   >
                     <span className="font-library__name">{f.label}</span>
                     <span className="font-library__meta">Normal</span>
@@ -210,7 +210,7 @@ export const FontLibraryView: React.FC<FontLibraryViewProps> = ({
                     className={`font-library__row${
                       currentFontFamily === f.value ? ' font-library__row--active' : ''
                     }`}
-                    onClick={() => onSelectFont(f.value)}
+                    onClick={() =>onSelectFont(f.value)}
                   >
                     <span className="font-library__name">{f.label}</span>
                     <span
@@ -238,7 +238,7 @@ export const FontLibraryView: React.FC<FontLibraryViewProps> = ({
                   className={`font-library__row${
                     currentFontFamily === f.value ? ' font-library__row--active' : ''
                   }`}
-                  onClick={() => onSelectFont(f.value)}
+                  onClick={() =>onSelectFont(f.value)}
                 >
                   <span className="font-library__name">{f.label}</span>
                   <span

@@ -103,7 +103,7 @@ export const ProductSetupWizard: React.FC<ProductSetupWizardProps> = ({
     <Modal
       isOpen={showWizard}
       onClose={handleClose}
-      title="🎯 Мастер настройки продукта"
+      title="Мастер настройки продукта"
       size="lg"
     >
       <div className="setup-wizard">
@@ -136,9 +136,9 @@ export const ProductSetupWizard: React.FC<ProductSetupWizardProps> = ({
                   <div className="step-header">
                     <h4>{stepInfo.label}</h4>
                     {isCompleted ? (
-                      <span className="step-status completed">✅ Завершено</span>
+                      <span className="step-status completed">Завершено</span>
                     ) : (
-                      <span className="step-status incomplete">⭕ Не завершено</span>
+                      <span className="step-status incomplete">Не завершено</span>
                     )}
                   </div>
                   <p className="step-description">{stepInfo.description}</p>
@@ -159,7 +159,7 @@ export const ProductSetupWizard: React.FC<ProductSetupWizardProps> = ({
 
         {setupState.canActivate && (
           <Alert type="success" className="mt-4">
-            🎉 Все шаги завершены! Продукт готов к использованию.
+             Все шаги завершены! Продукт готов к использованию.
           </Alert>
         )}
 

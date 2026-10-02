@@ -1,7 +1,7 @@
 import { Database } from 'sqlite'
 
 export async function up(db: Database): Promise<void> {
-  console.log('⬆️ Adding sheet and printable fields to materials...')
+  console.log('Adding sheet and printable fields to materials...')
 
   const addColumn = async (sql: string) => {
     try {
@@ -26,7 +26,7 @@ export async function up(db: Database): Promise<void> {
 }
 
 export async function down(db: Database): Promise<void> {
-  console.log('⬇️ Reverting added sheet/printable fields on materials (SQLite limitation: recreating table)')
+  console.log('Reverting added sheet/printable fields on materials (SQLite limitation: recreating table)')
 
   // SQLite does not support DROP COLUMN; recreate table without the added columns
   await db.exec(`

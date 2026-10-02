@@ -482,7 +482,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                           <div className="cell">
                             <span
                               style={{ cursor: 'pointer' }}
-                              onClick={(e) => {
+                              onClick={(e) =>{
                                 setTierModal({
                                   type: 'edit',
                                   tierIndex: ti,
@@ -499,7 +499,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                                 type="button"
                                 className="el-button remove-range el-button--text el-button--mini"
                                 style={{ color: 'red', marginRight: '-15px' }}
-                                onClick={() => {
+                                onClick={() =>{
                                   const newRanges = removeRange(commonRanges, ti)
                                   updateSizeRanges(selected.id, newRanges)
                                 }}
@@ -519,7 +519,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                             type="button"
                             className="el-button el-button--info el-button--mini is-plain"
                             style={{ width: '100%', marginLeft: '0px' }}
-                            onClick={(e) => {
+                            onClick={(e) =>{
                               const button = e.currentTarget as HTMLElement
                               setTierModal({
                                 type: 'add',
@@ -596,7 +596,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                           type="button"
                           className="el-button el-button--text el-button--mini"
                           style={{ color: 'var(--primary, #409eff)' }}
-                          onClick={() => addVariant(m.color_mode, m.sides_mode)}
+                          onClick={() =>addVariant(m.color_mode, m.sides_mode)}
                         >
                           {m.label}
                         </button>
@@ -621,16 +621,16 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                 transform: 'translate(-50%, -50%)',
                 zIndex: TIER_RANGE_POPOVER_Z_INDEX
               }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) =>e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
+              <div className="simplified-tier-modal__content" onClick={(e) =>e.stopPropagation()}>
                 <div className="simplified-tier-modal__header">
                   <strong>{tierModal.type === 'add' ? 'Добавить диапазон' : 'Редактировать диапазон'}</strong>
                   <button
                     type="button"
                     className="simplified-tier-modal__close"
-                    onClick={(e: React.MouseEvent) => {
+                    onClick={(e: React.MouseEvent) =>{
                       e.stopPropagation()
                       setTierModal({ type: 'add', isOpen: false, boundary: '' })
                     }}
@@ -654,7 +654,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                       onFocus={(e) => e.stopPropagation()}
                     />
                   </FormField>
-                  <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
+                  <div className="simplified-tier-modal__actions" onClick={(e) =>e.stopPropagation()}>
                     <Button
                       variant="secondary"
                       size="sm"

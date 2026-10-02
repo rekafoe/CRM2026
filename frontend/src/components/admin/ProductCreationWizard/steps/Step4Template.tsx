@@ -314,7 +314,7 @@ export const Step4Template: React.FC<Step4TemplateProps> = ({
                 onClick={() => onAddPresetParameter(preset)}
                 className={preset.is_required ? 'border-warning' : ''}
               >
-                {preset.is_required ? '⚠️ ' : ''}+ {preset.label}
+                {preset.is_required ? 'Обязательно: ' : ''}{preset.label}
               </Button>
             ))}
           </div>
@@ -342,7 +342,7 @@ export const Step4Template: React.FC<Step4TemplateProps> = ({
           </label>
           {!isMultiPage && trimSizes.length === 0 && (
             <span className="text-xs text-muted">
-              💡 Можно добавить несколько вариантов размеров
+               Можно добавить несколько вариантов размеров
             </span>
           )}
         </div>

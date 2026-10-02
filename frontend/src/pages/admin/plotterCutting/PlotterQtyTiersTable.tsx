@@ -99,7 +99,7 @@ export const PlotterQtyTiersTable: React.FC<Props> = ({
                             className="plotter-tier-table__remove"
                             aria-label="Удалить диапазон"
                             title="Удалить"
-                            onClick={() => removeRow(idx)}
+                            onClick={() =>removeRow(idx)}
                           >
                             ×
                           </button>

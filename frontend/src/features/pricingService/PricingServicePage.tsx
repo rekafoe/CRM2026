@@ -7,7 +7,7 @@ const PricingServicePage: React.FC = () => {
     <div className="product-management">
       <div className="management-header">
         <div>
-          <h2>💰 Pricing Service</h2>
+          <h2>Pricing Service</h2>
           <p className="subtitle">Единый центр ценообразования (Unified + Simplified)</p>
         </div>
       </div>

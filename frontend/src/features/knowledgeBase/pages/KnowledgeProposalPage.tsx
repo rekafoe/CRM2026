@@ -39,10 +39,10 @@ export const KnowledgeProposalPage: React.FC = () => {
   };
 
   if (proposalQuery.isLoading || (proposal && articleQuery.isLoading && !proposal.article)) {
-    return <KnowledgeShell><div className="kb-state"><span className="kb-spinner" /> Загружаем предложение…</div></KnowledgeShell>;
+    return <KnowledgeShell><div className="kb-state"><span className="kb-spinner" />Загружаем предложение…</div></KnowledgeShell>;
   }
   if (proposalQuery.isError || !proposal || !article) {
-    return <KnowledgeShell><div className="kb-state kb-state--error"><AppIcon name="warning" size="xl" /><h2>Предложение не найдено</h2><button className="kb-button" onClick={() => navigate('/knowledge')}>В каталог</button></div></KnowledgeShell>;
+    return <KnowledgeShell><div className="kb-state kb-state--error"><AppIcon name="warning" size="xl" /><h2>Предложение не найдено</h2><button className="kb-button" onClick={() =>navigate('/knowledge')}>В каталог</button></div></KnowledgeShell>;
   }
   const proposedCategory = categoriesQuery.data?.find((item) => item.id === proposal.categoryId);
 
@@ -51,7 +51,7 @@ export const KnowledgeProposalPage: React.FC = () => {
       <div className="kb-proposal-page">
         <header className="kb-proposal-header">
           <div>
-            <button className="kb-link-button" onClick={() => navigate(`/knowledge/articles/${article.id}`)}><AppIcon name="arrow-left" size="sm" /> К статье</button>
+            <button className="kb-link-button" onClick={() =>navigate(`/knowledge/articles/${article.id}`)}><AppIcon name="arrow-left" size="sm" /> К статье</button>
             <p className="kb-eyebrow">Предложение от {proposal.author?.name ?? 'пользователя'}</p>
             <h1>Проверка изменений</h1>
             {proposal.note && <p className="kb-proposal-note">«{proposal.note}»</p>}
@@ -88,8 +88,8 @@ export const KnowledgeProposalPage: React.FC = () => {
               <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Необязательно. Объясните решение автору правки." />
             </label>
             <div>
-              <button className="kb-button kb-button--danger" disabled={reviewing} onClick={() => review('reject')}><AppIcon name="x" size="sm" /> Отклонить</button>
-              <button className="kb-button kb-button--primary" disabled={reviewing} onClick={() => review('approve')}><AppIcon name="check" size="sm" /> Принять изменения</button>
+              <button className="kb-button kb-button--danger" disabled={reviewing} onClick={() =>review('reject')}><AppIcon name="x" size="sm" /> Отклонить</button>
+              <button className="kb-button kb-button--primary" disabled={reviewing} onClick={() =>review('approve')}><AppIcon name="check" size="sm" /> Принять изменения</button>
             </div>
           </section>
         )}

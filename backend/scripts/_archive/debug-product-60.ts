@@ -10,12 +10,12 @@ async function debugProduct60() {
   const db = await getDb();
 
   console.log('='.repeat(80));
-  console.log('🔍 ОТЛАДКА ПРОДУКТА ID 60');
+  console.log('ОТЛАДКА ПРОДУКТА ID 60');
   console.log('='.repeat(80));
   console.log('');
 
   // 1. Информация о продукте
-  console.log('📦 1. ИНФОРМАЦИЯ О ПРОДУКТЕ:');
+  console.log('1. ИНФОРМАЦИЯ О ПРОДУКТЕ:');
   console.log('-'.repeat(80));
   const product = await db.get(`
     SELECT p.*, pc.name as category_name 
@@ -27,7 +27,7 @@ async function debugProduct60() {
   console.log('');
 
   // 2. Шаблон продукта
-  console.log('📋 2. ШАБЛОН ПРОДУКТА:');
+  console.log('2. ШАБЛОН ПРОДУКТА:');
   console.log('-'.repeat(80));
   const templateConfig = await db.get(`
     SELECT config_data FROM product_template_configs 
@@ -43,17 +43,17 @@ async function debugProduct60() {
     console.log('Config data:', JSON.stringify(configData, null, 2));
     
     if (configData?.trim_size) {
-      console.log(`\n✅ trim_size найден: ${configData.trim_size.width}×${configData.trim_size.height}`);
+      console.log(`\n trim_size найден: ${configData.trim_size.width}×${configData.trim_size.height}`);
     } else {
-      console.log('\n❌ trim_size НЕ найден в шаблоне!');
+      console.log('\n trim_size НЕ найден в шаблоне!');
     }
   } else {
-    console.log('❌ Шаблон не найден!');
+    console.log('Шаблон не найден!');
   }
   console.log('');
 
   // 3. Расчет раскладки для размера 50×90
-  console.log('📊 3. РАСЧЕТ РАСКЛАДКИ ДЛЯ 50×90:');
+  console.log('3. РАСЧЕТ РАСКЛАДКИ ДЛЯ 50×90:');
   console.log('-'.repeat(80));
   
   const productSize = { width: 50, height: 90 };
@@ -71,7 +71,7 @@ async function debugProduct60() {
   console.log('');
 
   // 4. Расчет для 100 шт
-  console.log('🧮 4. РАСЧЕТ ДЛЯ 100 ШТ:');
+  console.log('4. РАСЧЕТ ДЛЯ 100 ШТ:');
   console.log('-'.repeat(80));
   const quantity = 100;
   const sheetsNeeded = Math.ceil(quantity / layout.itemsPerSheet);
@@ -81,7 +81,7 @@ async function debugProduct60() {
   console.log('');
 
   // 5. Проверка для размера 90×50 (перевернутый)
-  console.log('🔄 5. ПРОВЕРКА ДЛЯ 90×50 (перевернутый):');
+  console.log('5. ПРОВЕРКА ДЛЯ 90×50 (перевернутый):');
   console.log('-'.repeat(80));
   const productSizeRotated = { width: 90, height: 50 };
   const layoutRotated = LayoutCalculationService.findOptimalSheetSize(productSizeRotated);
@@ -91,7 +91,7 @@ async function debugProduct60() {
   console.log('');
 
   // 6. Детальный расчет для SRA3
-  console.log('📐 6. ДЕТАЛЬНЫЙ РАСЧЕТ ДЛЯ SRA3 (320×450):');
+  console.log('6. ДЕТАЛЬНЫЙ РАСЧЕТ ДЛЯ SRA3 (320×450):');
   console.log('-'.repeat(80));
   const sra3Size = { width: 320, height: 450 };
   const layoutSRA3 = LayoutCalculationService.calculateLayout(productSize, sra3Size);

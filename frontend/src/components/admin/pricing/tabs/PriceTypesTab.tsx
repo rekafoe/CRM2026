@@ -145,14 +145,14 @@ export const PriceTypesTab: React.FC<PriceTypesTabProps> = ({
         <p>Стандартная (×1) и Онлайн (−17,5%) всегда доступны. Остальные настраиваются для каждого продукта.</p>
         <div className="mt-2">
           <Button variant="primary" size="sm" onClick={handleAddNew} disabled={editingId !== null}>
-            ➕ Добавить тип цены
+             Добавить тип цены
           </Button>
         </div>
       </div>
 
       {filteredItems.length === 0 ? (
         <EmptyState
-          icon="💰"
+          icon=""
           title="Нет типов цен"
           description="Типы цен загружаются из базы. Проверьте миграции."
         />

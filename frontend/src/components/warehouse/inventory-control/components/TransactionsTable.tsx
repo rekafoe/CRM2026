@@ -69,7 +69,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = React.memo(({
                   <td>{mm.created_at ? new Date(mm.created_at).toLocaleString() : '—'}</td>
                   <td className="col-name">{mat?.name || mm.materialId}</td>
                   <td>
-                    <span className={`delta ${mm.delta > 0 ? 'delta-in' : 'delta-out'}`}>
+                    <span className={`delta ${mm.delta >0 ? 'delta-in' : 'delta-out'}`}>
                       {mm.delta > 0 ? `+${mm.delta}` : mm.delta}
                     </span>
                   </td>

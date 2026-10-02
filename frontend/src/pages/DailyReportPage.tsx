@@ -145,7 +145,7 @@ export const DailyReportPage: React.FC = () => {
           {history.map(r => (
             <div
               key={r.id}
-              onClick={() => { setSelectedDate(r.report_date); setSelectedUserId(r.user_id ?? null); }}
+              onClick={() =>{ setSelectedDate(r.report_date); setSelectedUserId(r.user_id ?? null); }}
               style={{
                 padding: 8,
                 cursor: 'pointer',
@@ -173,7 +173,7 @@ export const DailyReportPage: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ margin: 0 }}>Отчёт за {selectedDate}</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => {
+                <button onClick={() =>{
                   if (!selectedDate) return;
                   const d = new Date(selectedDate);
                   d.setDate(d.getDate() - 1);
@@ -185,7 +185,7 @@ export const DailyReportPage: React.FC = () => {
                   value={selectedDate || ''}
                   onChange={e => setSelectedDate(e.target.value)}
                 />
-                <button onClick={() => {
+                <button onClick={() =>{
                   if (!selectedDate) return;
                   const d = new Date(selectedDate);
                   d.setDate(d.getDate() + 1);
@@ -226,7 +226,7 @@ export const DailyReportPage: React.FC = () => {
                   <label style={{ fontSize: 12, color: '#666' }}>Δ Расхождение (<BynSymbol />)</label>
                   <input type="number" value={((report.cash_actual ?? 0) - (report.total_revenue || 0)).toFixed(2)} disabled style={{ marginLeft: 8 }} />
                 </div>
-                <button onClick={async () => {
+                <button onClick={async () =>{
                   try {
                     const res = await updateDailyReport(
                       report.report_date,
@@ -255,11 +255,11 @@ export const DailyReportPage: React.FC = () => {
                 </div>
                 <div className="order-total">
                   <div className="order-total__line">
-                    <span>🌐 Онлайн</span>
+                    <span>Онлайн</span>
                     <span><MoneyAmount value={summary.prepayment?.online_paid_amount || 0} decimals={0} /></span>
                   </div>
                   <div className="order-total__line">
-                    <span>🏪 Оффлайн</span>
+                    <span>Оффлайн</span>
                     <span><MoneyAmount value={summary.prepayment?.offline_paid_amount || 0} decimals={0} /></span>
                   </div>
                 </div>
@@ -270,7 +270,7 @@ export const DailyReportPage: React.FC = () => {
                   </div>
                   <div className="order-total__line">
                     <span>Долг клиентов</span>
-                    <span style={{ color: (summary.debt?.total_debt||0) > 0 ? '#dc3545' : '#28a745' }}>
+                    <span style={{ color: (summary.debt?.total_debt||0) >0 ? '#dc3545' : '#28a745' }}>
                       <MoneyAmount value={summary.debt?.total_debt || 0} decimals={0} />
                     </span>
                   </div>
@@ -286,11 +286,11 @@ export const DailyReportPage: React.FC = () => {
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button onClick={() => setModalOpen(true)}>
+              <button onClick={() =>setModalOpen(true)}>
                 Редактировать
               </button>
               {currentUser?.role === 'admin' && (
-                <button onClick={async () => {
+                <button onClick={async () =>{
                   if (!selectedDate) return;
                   const uid = selectedUserId ?? currentUser?.id;
                   const full = await getFullDailyReport(selectedDate, uid || undefined);
@@ -328,7 +328,7 @@ export const DailyReportPage: React.FC = () => {
                     <div>{p.name}</div>
                     <div>{printerCounters.find(pc => pc.id === p.id)?.prev_value ?? '—'}</div>
                     <input type="number" value={counters[p.id] || ''} onChange={e => setCounters(s => ({ ...s, [p.id]: e.target.value }))} />
-                    <button onClick={async () => {
+                    <button onClick={async () =>{
                       if (!counters[p.id]) return;
                       try {
                         await submitPrinterCounter(p.id, { counter_date: counterDate, value: Number(counters[p.id]) });

@@ -37,10 +37,10 @@ export async function savePhotoOrderSessionSimplified(
   )
 
   const text =
-    `✅ Размер: ${sizeName} (${size.width}×${size.height} px)\n` +
-    `🎨 Режим: ${MODE_LABEL[PHOTO_ORDER_DEFAULT_MODE] ?? PHOTO_ORDER_DEFAULT_MODE}\n` +
-    `📦 Копий: ${PHOTO_ORDER_DEFAULT_QTY} · ~${totalRub} руб. (${priceRub} руб. за копию)\n\n` +
-    `📸 Пришлите фото в этот чат — одним или несколькими сообщениями.\n` +
+    `Размер: ${sizeName} (${size.width}×${size.height} px)\n` +
+    `Режим: ${MODE_LABEL[PHOTO_ORDER_DEFAULT_MODE] ?? PHOTO_ORDER_DEFAULT_MODE}\n` +
+    `Копий: ${PHOTO_ORDER_DEFAULT_QTY} · ~${totalRub} руб. (${priceRub} руб. за копию)\n\n` +
+    `Пришлите фото в этот чат — одним или несколькими сообщениями.\n` +
     `Чтобы вернуться к основному клиентскому сценарию, используйте /miniapp\n\n` +
     `Нужен другой режим или число копий — напишите менеджеру или в CRM.`
 

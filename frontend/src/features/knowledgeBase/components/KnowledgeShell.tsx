@@ -42,7 +42,7 @@ export const KnowledgeShell: React.FC<KnowledgeShellProps> = ({ children }) => {
   return (
     <div className="kb-app">
       <header className="kb-topbar">
-        <button type="button" className="kb-brand" onClick={() => navigate('/knowledge')}>
+        <button type="button" className="kb-brand" onClick={() =>navigate('/knowledge')}>
           <span className={`kb-brand-mark${hasLogo ? ' kb-brand-mark--logo' : ''}`}>
             {hasLogo
               ? <img src={logoUrl!} alt={organization?.name || 'Логотип организации'} onError={() => setLogoError(true)} />
@@ -66,7 +66,7 @@ export const KnowledgeShell: React.FC<KnowledgeShellProps> = ({ children }) => {
         <div className="kb-user">
           <span className="kb-avatar">{user?.name?.charAt(0).toLocaleUpperCase('ru') || 'Я'}</span>
           <span>{user?.name || 'Пользователь'}</span>
-          <button type="button" className="kb-icon-button" onClick={() => navigate('/')} title="Вернуться в CRM">
+          <button type="button" className="kb-icon-button" onClick={() =>navigate('/')} title="Вернуться в CRM">
             <AppIcon name="x" size="sm" />
           </button>
         </div>

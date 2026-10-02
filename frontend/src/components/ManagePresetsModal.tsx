@@ -140,7 +140,7 @@ export default function ManagePresetsModal({ onClose, onSave }: Props) {
   return (
     <div className="modal">
       <h3>Manage Presets</h3>
-      <button onClick={addCategory} disabled={!isAdmin}>➕ Add Category</button>
+      <button onClick={addCategory} disabled={!isAdmin}>Add Category</button>
 
       {presets.map((cat, idx) => (
         <div key={idx} style={{ border: `2px solid ${cat.color}`, padding: 8, margin: '8px 0' }}>
@@ -156,7 +156,7 @@ export default function ManagePresetsModal({ onClose, onSave }: Props) {
               value={cat.color}
               onChange={e => updateCategoryField(idx, 'color', e.target.value)}
             />
-            <button onClick={() => removeCategory(idx)} disabled={!isAdmin}>🗑 Delete Category</button>
+            <button onClick={() =>removeCategory(idx)} disabled={!isAdmin}> Delete Category</button>
           </div>
 
           {/* Items */}
@@ -173,7 +173,7 @@ export default function ManagePresetsModal({ onClose, onSave }: Props) {
                   value={it.price}
                   onChange={e => updateItemField(idx, i, 'price', e.target.value)}
                 />
-                <button onClick={() => removeItem(idx, i)}>✖</button>
+                <button onClick={() =>removeItem(idx, i)}></button>
               </div>
             ))}
             <div>
@@ -194,7 +194,7 @@ export default function ManagePresetsModal({ onClose, onSave }: Props) {
                   [idx]: { ...(newItem[idx] || { desc: '', price: '' }), price: e.target.value }
                 })}
               />
-              <button onClick={() => addItem(idx)} disabled={!isAdmin}>➕ Add Item</button>
+              <button onClick={() =>addItem(idx)} disabled={!isAdmin}> Add Item</button>
             </div>
           </div>
 
@@ -226,7 +226,7 @@ export default function ManagePresetsModal({ onClose, onSave }: Props) {
                     onChange={e => updateExtraField(idx, i, 'unit', e.target.value)}
                   />
                 )}
-                <button onClick={() => removeExtra(idx, i)} disabled={!isAdmin}>✖</button>
+                <button onClick={() =>removeExtra(idx, i)} disabled={!isAdmin}></button>
               </div>
             ))}
             <div>
@@ -267,7 +267,7 @@ export default function ManagePresetsModal({ onClose, onSave }: Props) {
                   })}
                 />
               )}
-              <button onClick={() => addExtra(idx)} disabled={!isAdmin}>➕ Add Extra</button>
+              <button onClick={() =>addExtra(idx)} disabled={!isAdmin}> Add Extra</button>
             </div>
           </div>
         </div>

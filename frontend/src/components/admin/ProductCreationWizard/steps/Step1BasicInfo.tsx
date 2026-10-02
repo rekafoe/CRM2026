@@ -79,15 +79,6 @@ export const Step1BasicInfo: React.FC<Step1BasicInfoProps> = ({
       </FormField>
 
       <div className="flex flex-wrap gap-4">
-        <FormField label="Иконка (эмодзи)" className="flex-1">
-          <input
-            className="form-input"
-            value={form.icon}
-            onChange={(e) => updateFormField('icon', e.target.value)}
-            maxLength={2}
-            placeholder="📦"
-          />
-        </FormField>
         <FormField label="Тип калькулятора" className="flex-1">
           <select
             className="form-select"
@@ -138,7 +129,7 @@ export const Step1BasicInfo: React.FC<Step1BasicInfoProps> = ({
       {form.product_type === 'sheet_single' && (
         <Alert type="info">
           <div className="flex flex-col gap-1">
-            <strong>📄 Листовое изделие</strong>
+            <strong>Листовое изделие</strong>
             <span className="text-sm">Один лист бумаги с печатью. Может иметь несколько форматов. Примеры: визитки, листовки, флаеры, наклейки.</span>
           </div>
         </Alert>
@@ -147,7 +138,7 @@ export const Step1BasicInfo: React.FC<Step1BasicInfoProps> = ({
       {form.product_type === 'multi_page' && (
         <Alert type="info">
           <div className="flex flex-col gap-1">
-            <strong>📚 Многостраничное изделие</strong>
+            <strong>Многостраничное изделие</strong>
             <span className="text-sm">Изделие из нескольких страниц с переплетом. Обязательны параметры: количество страниц и тип скрепления. Примеры: буклеты, брошюры, каталоги, журналы.</span>
           </div>
         </Alert>
@@ -156,7 +147,7 @@ export const Step1BasicInfo: React.FC<Step1BasicInfoProps> = ({
       {form.product_type === 'universal' && (
         <Alert type="info">
           <div className="flex flex-col gap-1">
-            <strong>🔧 Универсальное изделие</strong>
+            <strong>Универсальное изделие</strong>
             <span className="text-sm">Гибкая настройка для нестандартных продуктов. Все параметры задаются вручную.</span>
           </div>
         </Alert>
@@ -165,7 +156,7 @@ export const Step1BasicInfo: React.FC<Step1BasicInfoProps> = ({
       {form.product_type === 'sheet_item' && (
         <Alert type="info">
           <div className="flex flex-col gap-1">
-            <strong>📄 Листовое изделие (операционный калькулятор)</strong>
+            <strong>Листовое изделие (операционный калькулятор)</strong>
             <span className="text-sm">Расчет стоимости на основе операций для листовой продукции.</span>
           </div>
         </Alert>
@@ -174,7 +165,7 @@ export const Step1BasicInfo: React.FC<Step1BasicInfoProps> = ({
       {form.product_type === 'multi_page_item' && (
         <Alert type="info">
           <div className="flex flex-col gap-1">
-            <strong>📚 Многостраничное изделие (операционный калькулятор)</strong>
+            <strong>Многостраничное изделие (операционный калькулятор)</strong>
             <span className="text-sm">Расчет стоимости на основе операций для многостраничной продукции.</span>
           </div>
         </Alert>

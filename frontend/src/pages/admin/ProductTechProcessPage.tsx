@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import '../../components/admin/ProductManagement.css';
 import { getProductDetails, updateProduct, ProductWithDetails } from '../../services/products';
 import { apiClient } from '../../api/client';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 
 interface Operation {
   id: number;
@@ -124,11 +125,11 @@ const ProductTechProcessPage: React.FC = () => {
     <div className="product-management">
       <div className="management-header">
         <div className="header-content">
-          <button onClick={() => navigate('/adminpanel/products')} className="btn-quick-action" style={{ marginRight: 12 }}>
+          <button onClick={() =>navigate('/adminpanel/products')} className="btn-quick-action" style={{ marginRight: 12 }}>
             ← Назад к списку
           </button>
-          <h2>⚙️ Технологический процесс</h2>
-          {product && <p>{(product as any).icon || '📦'} {(product as any).name}</p>}
+          <h2>Технологический процесс</h2>
+          {product && <p>{[withoutEmoji((product as any).icon), (product as any).name].filter(Boolean).join(' ')}</p>}
         </div>
       </div>
 
@@ -164,7 +165,7 @@ const ProductTechProcessPage: React.FC = () => {
               </div>
 
               <div className="form-section">
-                <h3>⚙️ Операции продукта</h3>
+                <h3>Операции продукта</h3>
                 
                 {loadingOps ? (
                   <p>Загрузка операций...</p>
@@ -198,15 +199,15 @@ const ProductTechProcessPage: React.FC = () => {
                                   </span>
                                 </td>
                                 <td style={{ padding: 8, textAlign: 'center' }}>
-                                  {op.is_required ? '✅' : '⭕'}
+                                  {op.is_required ? 'Да' : 'Нет'}
                                 </td>
                                 <td style={{ padding: 8, textAlign: 'center' }}>
                                   <button 
                                     className="btn btn-danger"
                                     style={{ fontSize: 12, padding: '4px 12px' }}
-                                    onClick={() => handleRemoveOperation(op.id)}
+                                    onClick={() =>handleRemoveOperation(op.id)}
                                   >
-                                    🗑️ Удалить
+                                     Удалить
                                   </button>
                                 </td>
                               </tr>
@@ -222,7 +223,7 @@ const ProductTechProcessPage: React.FC = () => {
                         borderRadius: 4,
                         marginBottom: 20
                       }}>
-                        <p>⚠️ У продукта нет операций. Добавьте хотя бы одну операцию для расчета цены.</p>
+                        <p>У продукта нет операций. Добавьте хотя бы одну операцию для расчета цены.</p>
                       </div>
                     )}
 
@@ -234,7 +235,7 @@ const ProductTechProcessPage: React.FC = () => {
                         borderRadius: 4,
                         marginTop: 20
                       }}>
-                        <p>❌ В системе нет доступных операций. Сначала создайте операции в разделе "Операции".</p>
+                        <p>В системе нет доступных операций. Сначала создайте операции в разделе "Операции".</p>
                       </div>
                     ) : (
                       <div className="parameter-item">
@@ -260,7 +261,7 @@ const ProductTechProcessPage: React.FC = () => {
                             onClick={handleAddOperation}
                             disabled={!selectedOperationId || saving}
                           >
-                            {saving ? '⏳ Добавление...' : '➕ Добавить'}
+                            {saving ? 'Добавление...' : 'Добавить'}
                           </button>
                         </div>
                       </div>
@@ -270,7 +271,7 @@ const ProductTechProcessPage: React.FC = () => {
               </div>
 
               <div className="list-section">
-                <p>💡 Совет: После добавления операций вернитесь к <Link to={`/adminpanel/products/${productId}/template`}>редактору шаблона</Link> и проверьте расчет цены.</p>
+                <p>Совет: После добавления операций вернитесь к <Link to={`/adminpanel/products/${productId}/template`}>редактору шаблона</Link> и проверьте расчет цены.</p>
               </div>
             </>
           )}

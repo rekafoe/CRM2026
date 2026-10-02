@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, FormField, Alert } from '../../../../components/common';
 import type { ProductCategory } from '../../../../services/products';
+import { withoutEmoji } from '../../../../utils/withoutEmoji';
 
 interface MetaSectionProps {
   name: string;
@@ -60,7 +61,7 @@ const MetaSection: React.FC<MetaSectionProps> = ({
 
         {showSubtypeUrlKeyHint && (
           <Alert type="info">
-            Ключ продукта для URL (route_key) задаётся в левой колонке над карточкой сводки. Ключ подтипа (key) — в модалке подтипа (кнопка ✎ у типа), затем сохраните шаблон.
+            Ключ продукта для URL (route_key) задаётся в левой колонке над карточкой сводки. Ключ подтипа (key) — в модалке подтипа, затем сохраните шаблон.
           </Alert>
         )}
 
@@ -71,23 +72,6 @@ const MetaSection: React.FC<MetaSectionProps> = ({
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Например: Визитки"
           />
-        </FormField>
-
-        <FormField label="Иконка (эмодзи)" help="Один или два символа для визуального обозначения">
-          <div className="icon-input-wrapper">
-            <input
-              className="form-input"
-              value={icon}
-              onChange={(e) => onChange({ icon: e.target.value })}
-              placeholder="📦"
-              maxLength={2}
-            />
-            {icon && (
-              <div className="icon-preview">
-                <span>{icon}</span>
-              </div>
-            )}
-          </div>
         </FormField>
 
         <FormField label="Описание" help="Краткое описание для менеджеров и клиентов">
@@ -121,7 +105,7 @@ const MetaSection: React.FC<MetaSectionProps> = ({
             <option value="">— Без категории —</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                {[withoutEmoji(cat.icon), cat.name].filter(Boolean).join(' ')}
               </option>
             ))}
           </select>
@@ -139,7 +123,7 @@ const MetaSection: React.FC<MetaSectionProps> = ({
             onClick={() => void onSave()}
             disabled={saving || !hasChanges}
           >
-            {saving ? 'Сохранение…' : '💾 Сохранить изменения'}
+            {saving ? 'Сохранение…' : 'Сохранить изменения'}
           </Button>
         </div>
       </div>

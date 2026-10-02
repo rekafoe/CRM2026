@@ -1,6 +1,6 @@
 // Pricing module exports
 
-// 🎯 ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ для ценообразования
+//  ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ для ценообразования
 export { UnifiedPricingService } from './services/unifiedPricingService';
 
 // Services (для внутреннего использования)

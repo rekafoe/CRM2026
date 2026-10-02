@@ -1011,14 +1011,14 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   );
 
   const canvasStageColumn = (
-    <div className={`public-design-editor__canvas-column${!isMobile && navigation.stripItems.length > 1 ? ' public-design-editor__canvas-column--with-edge-nav' : ''}`}>
+    <div className={`public-design-editor__canvas-column${!isMobile && navigation.stripItems.length >1 ? ' public-design-editor__canvas-column--with-edge-nav' : ''}`}>
       {!isMobile && navigation.stripItems.length > 1 && (
         <button
           type="button"
           className="public-design-editor__edge-page-nav public-design-editor__edge-page-nav--prev"
           disabled={!prevStripItem || pageTransitionBusy}
           aria-label="Предыдущая страница"
-          onClick={() => {
+          onClick={() =>{
             if (!prevStripItem) return;
             void handleGoToPage(prevStripItem.goToPage);
           }}
@@ -1136,7 +1136,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           className="public-design-editor__edge-page-nav public-design-editor__edge-page-nav--next"
           disabled={!nextStripItem || pageTransitionBusy}
           aria-label="Следующая страница"
-          onClick={() => {
+          onClick={() =>{
             if (!nextStripItem) return;
             void handleGoToPage(nextStripItem.goToPage);
           }}
@@ -1161,7 +1161,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         <button
           type="button"
           className="public-design-editor__client-action public-design-editor__client-action--save"
-          onClick={() => void handleSaveDraft(false)}
+          onClick={() =>void handleSaveDraft(false)}
           disabled={saving}
         >
           <AppIcon name="save" size="sm" />
@@ -1181,7 +1181,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       <button
         type="button"
         className="public-design-editor__client-action public-design-editor__client-action--order"
-        onClick={() => void handleReadyForCart()}
+        onClick={() =>void handleReadyForCart()}
         disabled={saving}
       >
         {saving ? (

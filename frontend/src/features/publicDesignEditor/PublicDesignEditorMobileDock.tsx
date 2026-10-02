@@ -77,7 +77,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
         className={`public-design-editor__mobile-dock-tab${activePanel === 'canvas' ? ' is-active' : ''}`}
         aria-selected={activePanel === 'canvas'}
         disabled={disabled}
-        onClick={() => onPanelChange('canvas')}
+        onClick={() =>onPanelChange('canvas')}
       >
         <span>Макет</span>
       </button>
@@ -87,7 +87,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
         className={`public-design-editor__mobile-dock-tab${activePanel === 'photos' ? ' is-active' : ''}`}
         aria-selected={activePanel === 'photos'}
         disabled={disabled}
-        onClick={() => onPanelChange('photos')}
+        onClick={() =>onPanelChange('photos')}
       >
         <span>Фото</span>
         {photoCount > 0 && <em>{photoCount}</em>}
@@ -100,7 +100,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
           className={`public-design-editor__mobile-dock-tab${activePanel === 'text' ? ' is-active' : ''}`}
           aria-selected={activePanel === 'text'}
           disabled={disabled}
-          onClick={() => onPanelChange('text')}
+          onClick={() =>onPanelChange('text')}
         >
           <span>Текст</span>
           {missingTextCount > 0 && <b aria-label={`Не заполнено ${missingTextCount} полей`}>{missingTextCount}</b>}
@@ -112,7 +112,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
         className={`public-design-editor__mobile-dock-tab${activePanel === 'check' ? ' is-active' : ''}`}
         aria-selected={activePanel === 'check'}
         disabled={disabled}
-        onClick={() => onPanelChange('check')}
+        onClick={() =>onPanelChange('check')}
       >
         <span>Проверка</span>
         {checkIssueCount > 0 && <b aria-label={`Замечаний: ${checkIssueCount}`}>{checkIssueCount}</b>}

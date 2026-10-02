@@ -60,15 +60,15 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: (id: string) => void }> = ({
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return '✅';
+        return '';
       case 'error':
-        return '❌';
+        return '';
       case 'warning':
-        return '⚠️';
+        return '';
       case 'info':
-        return 'ℹ️';
+        return '';
       default:
-        return 'ℹ️';
+        return '';
     }
   };
 

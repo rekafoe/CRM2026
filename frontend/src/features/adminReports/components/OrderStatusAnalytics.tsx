@@ -12,7 +12,7 @@ export const OrderStatusAnalytics: React.FC<OrderStatusAnalyticsProps> = ({ data
   return (
     <div className="reports-chart" style={{ marginBottom: '20px' }}>
       <h4 className="reports-chart-title">
-        📋 Воронка статусов заказов
+         Воронка статусов заказов
       </h4>
 
       {/* Визуальная воронка */}

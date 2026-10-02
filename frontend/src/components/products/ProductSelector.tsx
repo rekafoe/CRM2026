@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product, ProductCategory } from '../../../../shared/types/products';
 import { api } from '../../api';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 import './ProductSelector.css';
 
 interface ProductSelectorProps {
@@ -39,7 +40,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
   const loadProducts = async () => {
     try {
       setLoading(true);
-      // ✅ Загружаем только активные продукты для заказов
+      //  Загружаем только активные продукты для заказов
       const response = await api.get('/products', { params: { activeOnly: 'true' } });
       setProducts(response.data);
     } catch (error) {
@@ -98,9 +99,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                 <button
                   key={category.id}
                   className={`category-card ${selectedCategory === category.id ? 'selected' : ''}`}
-                  onClick={() => handleCategorySelect(category.id)}
+                  onClick={() =>handleCategorySelect(category.id)}
                 >
-                  <span className="category-icon">{category.icon}</span>
+                  <span className="category-icon">{withoutEmoji(category.icon)}</span>
                   <span className="category-name">{category.name}</span>
                 </button>
               ))}
@@ -118,9 +119,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   <button
                     key={product.id}
                     className="product-card"
-                    onClick={() => handleProductSelect(product)}
+                    onClick={() =>handleProductSelect(product)}
                   >
-                    <div className="product-icon">{product.icon}</div>
+                    <div className="product-icon">{withoutEmoji(product.icon)}</div>
                     <div className="product-info">
                       <h4 className="product-name">{product.name}</h4>
                       {product.description && (

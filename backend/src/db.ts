@@ -19,19 +19,19 @@ function resolveDatabasePath(): string {
         fs.mkdirSync(dir, { recursive: true })
       }
     } catch (e) {
-      console.log('⚠️ Не удалось создать директорию для DB_FILE:', resolved, e)
+      console.log('Не удалось создать директорию для DB_FILE:', resolved, e)
     }
-    console.log('✅ Используется БД из DB_FILE:', resolved)
+    console.log('Используется БД из DB_FILE:', resolved)
     return resolved
   }
 
   // По умолчанию храним БД в рабочей директории процесса (в dev это backend/, в Docker/Railway — WORKDIR)
   const defaultPath = path.resolve(process.cwd(), 'data.db')
   if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
-    console.log('⚠️ DB_FILE не задан. В production на Railway без Volume SQLite файл может теряться при рестартах/деплоях.')
+    console.log('DB_FILE не задан. В production на Railway без Volume SQLite файл может теряться при рестартах/деплоях.')
     console.log('   Рекомендуется подключить Railway Volume и выставить DB_FILE=/data/data.db')
   }
-  console.log('✅ Используется БД:', defaultPath)
+  console.log('Используется БД:', defaultPath)
   return defaultPath
 }
 
@@ -50,7 +50,7 @@ export async function initDB(): Promise<Database> {
   if (initPromise) return initPromise
 
   initPromise = (async () => {
-    console.log('📂 Opening database at', DB_FILE)
+    console.log('Opening database at', DB_FILE)
     const db = await open({
       filename: DB_FILE,
       driver: sqlite3.Database
@@ -63,7 +63,7 @@ export async function initDB(): Promise<Database> {
       await db.exec('PRAGMA journal_mode = WAL;')
       await db.exec('PRAGMA busy_timeout = 30000;')
     } catch (e) {
-      console.log('⚠️ PRAGMA WAL/busy_timeout не применены:', e)
+      console.log('PRAGMA WAL/busy_timeout не применены:', e)
     }
 
     await runMigrations(db)
@@ -74,7 +74,7 @@ export async function initDB(): Promise<Database> {
     const hasPrinterCol = itemsCols.some((c) => c.name.toLowerCase().includes('printer'))
     if (!hasPrinterCol) {
       await db.exec('ALTER TABLE items ADD COLUMN printerId INTEGER')
-      console.log('✅ Added missing column items.printerId')
+      console.log('Added missing column items.printerId')
     }
 
     dbInstance = db
@@ -134,7 +134,7 @@ async function runMigrations(db: Database): Promise<void> {
       )
     `);
 
-    console.log('🌱 Applying migrations...')
+    console.log('Applying migrations...')
     const migrationsDir = path.resolve(__dirname, './migrations')
     const migrationFiles = fs
       .readdirSync(migrationsDir)
@@ -145,7 +145,7 @@ async function runMigrations(db: Database): Promise<void> {
       const migrationName = migrationFile.replace(/\.(ts|js)$/i, '')
       
       if (DISABLED_MIGRATIONS.has(migrationName)) {
-        console.log(`⏭️  Skipping disabled migration: ${migrationName}`)
+        console.log(` Skipping disabled migration: ${migrationName}`)
         continue
       }
 
@@ -163,23 +163,23 @@ async function runMigrations(db: Database): Promise<void> {
         if (typeof runner === 'function') {
           await runner(db)
           await db.run('INSERT OR IGNORE INTO migrations (name) VALUES (?)', [migrationName]);
-          console.log(`✅ Migration applied: ${migrationFile}`)
+          console.log(`Migration applied: ${migrationFile}`)
         }
       } catch (error: any) {
         const msg = String(error?.message || error || '')
         const isDuplicateColumn = msg.includes('duplicate column')
         if (isDuplicateColumn) {
           await db.run('INSERT OR IGNORE INTO migrations (name) VALUES (?)', [migrationName]);
-          console.log(`✅ Migration applied (column exists): ${migrationFile}`)
+          console.log(`Migration applied (column exists): ${migrationFile}`)
         } else {
-          console.log(`⚠️ Migration failed: ${migrationFile}`, error)
+          console.log(`Migration failed: ${migrationFile}`, error)
         }
       }
     }
     invalidateTableSchemaCache()
-    console.log('✅ Migrations completed')
+    console.log('Migrations completed')
   } catch (error) {
-    console.log('⚠️ Failed to apply migrations', error)
+    console.log('Failed to apply migrations', error)
   }
 }
 

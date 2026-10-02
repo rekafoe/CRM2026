@@ -7,7 +7,7 @@ async function ensureColumn(db: Database, table: string, name: string, ddl: stri
   const has = columns.some((c) => c.name === name)
   if (has) return
   await db.exec(ddl)
-  console.log(`✅ Added missing column ${table}.${name}`)
+  console.log(`Added missing column ${table}.${name}`)
 }
 
 export async function up(db: Database) {
@@ -21,7 +21,7 @@ export async function up(db: Database) {
 
 export async function down(db: Database) {
   // SQLite не поддерживает DROP COLUMN без пересоздания таблицы — откат пропускаем
-  console.log('ℹ️ down() skipped for 20260105030000_add_item_print_fields (SQLite DROP COLUMN not supported)')
+  console.log('down() skipped for 20260105030000_add_item_print_fields (SQLite DROP COLUMN not supported)')
 }
 
 

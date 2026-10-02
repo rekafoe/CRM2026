@@ -35,13 +35,13 @@ function resolveOrgLogoUrl(logo: string, apiBase: string): string {
 
 function miniappHeaderLogoBlock(logoUrl: string | null | undefined, apiBase: string): string {
   if (!logoUrl) {
-    return '<div class="ipc-pm-header__icon" aria-hidden="true">🧩</div>';
+    return '<div class="ipc-pm-header__icon" aria-hidden="true"></div>';
   }
   const full = resolveOrgLogoUrl(logoUrl, apiBase);
   if (isSafeOrgLogoUrlForMiniappHeader(full)) {
     return `<div class="ipc-pm-header__logo-wrap"><img class="ipc-pm-header__logo-img" src="${escapeAttr(full)}" alt="" decoding="async" loading="eager" /></div>`;
   }
-  return '<div class="ipc-pm-header__icon" aria-hidden="true">🧩</div>';
+  return '<div class="ipc-pm-header__icon" aria-hidden="true"></div>';
 }
 
 export function renderMiniappIndexHtml(

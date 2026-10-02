@@ -69,7 +69,7 @@ export const BookletPresetHelper: React.FC<BookletPresetHelperProps> = ({
     <div className="booklet-preset-helper flex flex-col gap-3">
       <Alert type="info">
         <div className="flex flex-col gap-2">
-          <strong>💡 Упрощенное создание буклетов</strong>
+          <strong>Упрощенное создание буклетов</strong>
           <p className="text-sm">
             Выберите готовый пресет для автоматической настройки параметров и операций:
           </p>

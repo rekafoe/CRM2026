@@ -63,25 +63,25 @@ export const PageModals: React.FC<PageModalsProps> = ({
           <div className="new-order-management-container">
             <div className="new-order-management-header">
               <div className="flex items-center gap-4">
-                <h2>📋 Управление заказами</h2>
+                <h2>Управление заказами</h2>
                 <div className="tab-switcher">
                   <button
-                    onClick={() => onSetOrderManagementTab('pool')}
+                    onClick={() =>onSetOrderManagementTab('pool')}
                     className={orderManagementTab === 'pool' ? 'active' : ''}
                   >
-                    📋 Пул заказов
+                     Пул заказов
                   </button>
                   <button
-                    onClick={() => onSetOrderManagementTab('page')}
+                    onClick={() =>onSetOrderManagementTab('page')}
                     className={orderManagementTab === 'page' ? 'active' : ''}
                   >
-                    📄 Мои заказы
+                     Мои заказы
                   </button>
                 </div>
               </div>
               <button
                 className="close-btn"
-                onClick={() => {
+                onClick={() =>{
                   onCloseOrderPool();
                   onCloseUserOrderPage();
                 }}

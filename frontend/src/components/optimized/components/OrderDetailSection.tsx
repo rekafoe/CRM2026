@@ -340,7 +340,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               </button>
               {orderAmounts.prepayment > 0 && onRemovePrepayment && (
                 <button 
-                  onClick={() => onRemovePrepayment(selectedOrder.id)}
+                  onClick={() =>onRemovePrepayment(selectedOrder.id)}
                   className="order-detail-action-btn order-detail-action-btn--danger"
                   title="Удалить предоплату по заказу"
                 >
@@ -349,7 +349,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               )}
               {onIssueOrder && (orderAmounts.debt > 0 || (orderAmounts.debt === 0 && orderAmounts.total > 0)) && Number(selectedOrder.status) !== 7 && (
                 <button 
-                  onClick={() => onIssueOrder(selectedOrder.id)}
+                  onClick={() =>onIssueOrder(selectedOrder.id)}
                   className="order-detail-action-btn order-detail-action-btn--info"
                   title="Выдать заказ (100% остатка, долг закрыт)"
                 >
@@ -376,7 +376,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                 <div ref={docsMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                   <button
                     type="button"
-                    onClick={(e) => {
+                    onClick={(e) =>{
                       e.stopPropagation();
                       if (!generatingKind) setDocsMenuOpen((v) => !v);
                     }}
@@ -395,7 +395,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     >
                       <button
                         type="button"
-                        onClick={() => generateLegalDocument('contract')}
+                        onClick={() =>generateLegalDocument('contract')}
                         className="order-detail-action-menu__item"
                         role="menuitem"
                       >
@@ -403,7 +403,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                       </button>
                       <button
                         type="button"
-                        onClick={() => generateLegalDocument('act')}
+                        onClick={() =>generateLegalDocument('act')}
                         className="order-detail-action-menu__item"
                         role="menuitem"
                       >
@@ -411,7 +411,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                       </button>
                       <button
                         type="button"
-                        onClick={() => generateLegalDocument('invoice')}
+                        onClick={() =>generateLegalDocument('invoice')}
                         className="order-detail-action-menu__item"
                         role="menuitem"
                       >
@@ -424,7 +424,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               <div ref={receiptMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={(e) =>{
                     e.stopPropagation();
                     if (!isGeneratingReceipt) setReceiptMenuOpen((v) => !v);
                   }}
@@ -491,7 +491,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               <div ref={discountMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={(e) =>{
                     e.stopPropagation();
                     setDiscountMenuOpen((v) => !v);
                   }}
@@ -520,7 +520,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                       <button
                         key={p}
                         type="button"
-                        onClick={() => handleSetDiscount(p)}
+                        onClick={() =>handleSetDiscount(p)}
                         style={{
                           display: 'block',
                           width: '100%',
@@ -543,7 +543,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               <div ref={paymentChannelMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={(e) =>{
                     e.stopPropagation();
                     setPaymentChannelMenuOpen((v) => !v);
                   }}
@@ -575,7 +575,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                       <button
                         key={p.value}
                         type="button"
-                        onClick={() => handleSetPaymentChannel(p.value)}
+                        onClick={() =>handleSetPaymentChannel(p.value)}
                         style={{
                           display: 'block',
                           width: '100%',
@@ -708,7 +708,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
           />
         </div>
         <div className="detail-actions detail-actions--align-right">
-          <button onClick={() => onOpenCalculator()}>Добавить продукт</button>
+          <button onClick={() =>onOpenCalculator()}>Добавить продукт</button>
         </div>
       </div>
 

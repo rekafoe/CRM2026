@@ -480,7 +480,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             <button
               type="button"
               className="fm-file__name"
-              onClick={() => void handleDownloadFile(file)}
+              onClick={() =>void handleDownloadFile(file)}
               title={
                 !canDownload
                   ? 'Подготовка файла завершилась ошибкой'
@@ -553,7 +553,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               <button
                 type="button"
                 className="fm-icon-btn"
-                onClick={() => void handlePreflight(file)}
+                onClick={() =>void handlePreflight(file)}
                 title={cached ? 'Отчёт префлайта' : 'Проверить макет'}
               >
                 <AppIcon name="shield" size="xs" />
@@ -562,7 +562,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             <button
               type="button"
               className="fm-icon-btn"
-              onClick={() => void handleDownloadFile(file)}
+              onClick={() =>void handleDownloadFile(file)}
               title={
                 !canDownload
                   ? 'Подготовка файла завершилась ошибкой'
@@ -582,7 +582,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               <button
                 type="button"
                 className="fm-icon-btn"
-                onClick={() => void handleAccessLogs(file)}
+                onClick={() =>void handleAccessLogs(file)}
                 title="Журнал скачиваний"
               >
                 <AppIcon name="folder" size="xs" />
@@ -592,7 +592,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               <button
                 type="button"
                 className="fm-icon-btn fm-icon-btn--ok"
-                onClick={() => void handleApproveFile(file.id)}
+                onClick={() =>void handleApproveFile(file.id)}
                 title="Утвердить"
               >
                 <AppIcon name="check" size="xs" />
@@ -601,7 +601,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             <button
               type="button"
               className="fm-icon-btn fm-icon-btn--danger"
-              onClick={() => void handleDeleteFile(file.id)}
+              onClick={() =>void handleDeleteFile(file.id)}
               title="Удалить"
             >
               <AppIcon name="x" size="xs" />
@@ -615,7 +615,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
 
   return (
     <div className="files-modal-overlay" onClick={onClose}>
-      <div className="files-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="files-modal" onClick={(e) =>e.stopPropagation()}>
         <header className="fm-header">
           <div>
             <h3>Файлы макетов</h3>
@@ -661,7 +661,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             <button
               type="button"
               className="fm-btn fm-btn--secondary"
-              onClick={() => void handleDownloadAll()}
+              onClick={() =>void handleDownloadAll()}
               disabled={isDownloadingAll}
               aria-busy={isDownloadingAll}
             >
@@ -718,7 +718,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                 <button
                   type="button"
                   className="fm-btn fm-btn--ghost"
-                  onClick={() => setPreviewItem(selectedOrderItem)}
+                  onClick={() =>setPreviewItem(selectedOrderItem)}
                 >
                   Preview
                 </button>
@@ -727,7 +727,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                 <button
                   type="button"
                   className="fm-btn fm-btn--ghost"
-                  onClick={() => void handleDownloadProductionManifest(selectedOrderItem)}
+                  onClick={() =>void handleDownloadProductionManifest(selectedOrderItem)}
                   disabled={editorActionLoading}
                 >
                   Manifest

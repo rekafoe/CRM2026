@@ -14,7 +14,7 @@ export const useCalculatorLogic = () => {
   // Расчет стоимости печати
   const calculatePrintingPrice = useCallback(async (specs: ProductSpecs): Promise<CalculationResult | null> => {
     try {
-      logger.info('🧮 Начинаем расчет стоимости', { specs });
+      logger.info('Начинаем расчет стоимости', { specs });
       
       const response = await calcUniversalPrice({
         productType: specs.productType,
@@ -34,7 +34,7 @@ export const useCalculatorLogic = () => {
         customerType: specs.customerType
       });
 
-      // ⚠️ DEPRECATED: Этот код НЕ должен использоваться!
+      //  DEPRECATED: Этот код НЕ должен использоваться!
       // В новом калькуляторе (ImprovedPrintingCalculatorModal) используется useCalculatorPricingActions
       
       const priceTotal = Number((response as any)?.finalPrice ?? (response as any)?.price_total ?? 0);
@@ -50,7 +50,7 @@ export const useCalculatorLogic = () => {
           quantity: m.quantity || 0,
           unit: m.unit || 'шт',
           price: m.cost || m.price || m.unitPrice || 0,
-          // ❌ НЕПРАВИЛЬНО: считаем total на фронте! Должно быть m.total от бэкенда!
+          //  НЕПРАВИЛЬНО: считаем total на фронте! Должно быть m.total от бэкенда!
           total: m.total || ((m.cost || m.price || m.unitPrice || 0) * (m.quantity || 0))
         })),
         services: (Array.isArray((response as any)?.operations) ? (response as any).operations : []).map((op: any) => ({
@@ -65,7 +65,7 @@ export const useCalculatorLogic = () => {
         deliveryDate: new Date().toISOString()
       };
 
-      logger.info('✅ Расчет завершен', { 
+      logger.info('Расчет завершен', { 
         productName: result.productName,
         pricePerItem: result.pricePerItem,
         totalCost: result.totalCost
@@ -73,7 +73,7 @@ export const useCalculatorLogic = () => {
 
       return result;
     } catch (error) {
-      logger.error('❌ Ошибка расчета стоимости', error);
+      logger.error('Ошибка расчета стоимости', error);
       toast.error('Ошибка расчета стоимости', error instanceof Error ? error.message : 'Неизвестная ошибка');
       return null;
     }
@@ -162,14 +162,14 @@ export const useCalculatorLogic = () => {
   // Получение иконки продукта
   const getProductIcon = useCallback((productType: string): string => {
     const icons: Record<string, string> = {
-      'Визитки': '💳',
-      'Листовки': '📄',
-      'Буклеты': '📖',
-      'Баннеры': '🏷️',
-      'Наклейки': '🏷️',
-      'Брошюры': '📚'
+      'Визитки': '',
+      'Листовки': '',
+      'Буклеты': '',
+      'Баннеры': '',
+      'Наклейки': '',
+      'Брошюры': ''
     };
-    return icons[productType] || '📄';
+    return icons[productType] || '';
   }, []);
 
   // Получение цвета статуса

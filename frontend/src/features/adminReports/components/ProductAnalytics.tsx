@@ -14,7 +14,7 @@ export const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ data }) => {
       {/* Топ продуктов */}
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
         <h4 className="reports-chart-title">
-          🏆 Популярность продуктов (Топ-10 за {data.period.days} дней)
+           Популярность продуктов (Топ-10 за {data.period.days} дней)
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {data.productPopularity.map((product, index) => (
@@ -69,7 +69,7 @@ export const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ data }) => {
       {/* Категории продуктов */}
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
         <h4 className="reports-chart-title">
-          📂 Распределение по категориям продуктов
+           Распределение по категориям продуктов
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           {data.categoryStats.map((category) => {

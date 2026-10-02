@@ -183,7 +183,7 @@ export const useProducts = (): UseProductsReturn => {
       }
       return data;
     } catch (error) {
-      logger.error(`❌ ${errorMessage}: ${error}`);
+      logger.error(`${errorMessage}: ${error}`);
       dispatch(errorAction);
       toast.error(errorMessage);
       return null;
@@ -198,9 +198,9 @@ export const useProducts = (): UseProductsReturn => {
   const loadCategories = useCallback(async () => {
     await executeAsync(
       async () => {
-        logger.info('🔄 Загружаем категории продуктов...');
+        logger.info('Загружаем категории продуктов...');
         const categoriesData = await getProductCategories();
-        logger.info(`✅ Категории загружены (${categoriesData.length})`);
+        logger.info(`Категории загружены (${categoriesData.length})`);
         return categoriesData;
       },
       { type: 'SET_LOADING_CATEGORIES', payload: true },
@@ -215,9 +215,9 @@ export const useProducts = (): UseProductsReturn => {
   const loadProductsByCategory = useCallback(async (categoryId: number) => {
     await executeAsync(
       async () => {
-        logger.info('🔄 Загружаем продукты по категории...', { categoryId });
+        logger.info('Загружаем продукты по категории...', { categoryId });
         const productsData = await getProductsByCategory(categoryId);
-        logger.info(`✅ Продукты загружены (${productsData.length})`);
+        logger.info(`Продукты загружены (${productsData.length})`);
         return productsData;
       },
       { type: 'SET_LOADING_PRODUCTS', payload: true },
@@ -232,9 +232,9 @@ export const useProducts = (): UseProductsReturn => {
   const loadAllProducts = useCallback(async (activeOnly: boolean = true) => {
     await executeAsync(
       async () => {
-        logger.info('🔄 Загружаем все продукты...', { activeOnly });
+        logger.info('Загружаем все продукты...', { activeOnly });
         const productsData = await getAllProducts(false, activeOnly);
-        logger.info(`✅ Все продукты загружены (${productsData.length})`, { activeOnly });
+        logger.info(`Все продукты загружены (${productsData.length})`, { activeOnly });
         return productsData;
       },
       { type: 'SET_LOADING_PRODUCTS', payload: true },
@@ -249,9 +249,9 @@ export const useProducts = (): UseProductsReturn => {
   const loadProductDetails = useCallback(async (productId: number) => {
     await executeAsync(
       async () => {
-        logger.info('🔄 Загружаем детали продукта...', { productId });
+        logger.info('Загружаем детали продукта...', { productId });
         const productDetails = await getProductDetails(productId);
-        logger.info(`✅ Детали продукта загружены (${productId})`);
+        logger.info(`Детали продукта загружены (${productId})`);
         return productDetails;
       },
       { type: 'SET_LOADING_PRODUCT_DETAILS', payload: true },
@@ -265,12 +265,12 @@ export const useProducts = (): UseProductsReturn => {
   // Поиск продуктов (только активные для калькулятора/заказов)
   const searchProductsHandler = useCallback(async (query: string): Promise<Product[]> => {
     try {
-      logger.info(`🔍 Поиск продуктов: ${query}`);
-      const searchResults = await searchProducts(query, true); // ✅ Ищем только активные продукты
-      logger.info(`✅ Поиск завершен (${searchResults.length})`);
+      logger.info(`Поиск продуктов: ${query}`);
+      const searchResults = await searchProducts(query, true); //  Ищем только активные продукты
+      logger.info(`Поиск завершен (${searchResults.length})`);
       return searchResults;
     } catch (error) {
-      logger.error('❌ Ошибка поиска продуктов', error);
+      logger.error('Ошибка поиска продуктов', error);
       toast.error('Ошибка поиска продуктов');
       return [];
     }
@@ -278,18 +278,18 @@ export const useProducts = (): UseProductsReturn => {
 
   // Очистка кэша
   const clearCache = useCallback(() => {
-    logger.info('🗑️ Очищаем кэш продуктов');
+    logger.info('Очищаем кэш продуктов');
     clearProductCache();
     dispatch({ type: 'CLEAR_ALL' });
   }, [logger]);
 
   // Обновление всех данных
   const refreshData = useCallback(async () => {
-    logger.info('🔄 Обновляем данные продуктов...');
+    logger.info('Обновляем данные продуктов...');
     clearProductCache();
     await loadCategories();
-    await loadAllProducts(true); // ✅ Загружаем только активные продукты
-    logger.info('✅ Данные продуктов обновлены');
+    await loadAllProducts(true); //  Загружаем только активные продукты
+    logger.info('Данные продуктов обновлены');
   }, [logger, loadCategories, loadAllProducts]);
 
   // Утилиты (мемоизированы для производительности)
@@ -313,9 +313,9 @@ export const useProducts = (): UseProductsReturn => {
   useEffect(() => {
     if (!initializationRef.current) {
       initializationRef.current = true;
-      logger.info('🚀 Инициализация хука useProducts');
+      logger.info('Инициализация хука useProducts');
       void loadCategories();
-      void loadAllProducts(true); // ✅ Загружаем только активные продукты для калькулятора/заказов
+      void loadAllProducts(true); //  Загружаем только активные продукты для калькулятора/заказов
       dispatch({ type: 'SET_INITIALIZED', payload: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -27,11 +27,11 @@ export const EditModeToggle: React.FC<EditModeToggleProps> = ({
       >
         {isEditMode ? (
           <>
-            👁️ Режим просмотра
+             Режим просмотра
             {hasUnsavedChanges && <span className="unsaved-indicator">●</span>}
           </>
         ) : (
-          '✏️ Режим редактирования'
+          'Режим редактирования'
         )}
       </Button>
     </div>

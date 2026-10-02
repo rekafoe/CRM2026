@@ -232,7 +232,7 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
                       <button
                         type="button"
                         className="subtype-designs-item__remove"
-                        onClick={() => void handleRemove(link.id)}
+                        onClick={() =>void handleRemove(link.id)}
                         title="Убрать с этого размера"
                       >
                         <AppIcon name="x" size="xs" />
@@ -256,7 +256,7 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
             {legacyLinks.map((link) => (
               <div key={link.id} className="subtype-designs-item">
                 <div className="subtype-designs-item__name">{link.name}</div>
-                <button type="button" className="subtype-designs-item__remove" onClick={() => void handleRemove(link.id)}>
+                <button type="button" className="subtype-designs-item__remove" onClick={() =>void handleRemove(link.id)}>
                   <AppIcon name="x" size="xs" />
                 </button>
               </div>
@@ -266,13 +266,13 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
       )}
 
       {modalOpen && modalSizeId && (
-        <div className="subtype-designs-modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="subtype-designs-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="subtype-designs-modal-overlay" onClick={() =>setModalOpen(false)}>
+          <div className="subtype-designs-modal" onClick={(e) =>e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="subtype-designs-modal__header">
               <h3 className="subtype-designs-modal__title">
                 Дизайн для «{modalSize?.label ?? modalSizeId}»
               </h3>
-              <button type="button" className="subtype-designs-modal__close" onClick={() => setModalOpen(false)}>
+              <button type="button" className="subtype-designs-modal__close" onClick={() =>setModalOpen(false)}>
                 <AppIcon name="x" size="sm" />
               </button>
             </div>

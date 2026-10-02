@@ -20,7 +20,7 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
           <div
             key={key}
             className="product-card"
-            onClick={() => onSelectProduct(key)}
+            onClick={() =>onSelectProduct(key)}
           >
             <h4>{config.name}</h4>
             <p>{config.description || 'Описание отсутствует'}</p>

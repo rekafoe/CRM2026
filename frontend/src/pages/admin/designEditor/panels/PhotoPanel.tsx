@@ -190,7 +190,7 @@ export const PhotoPanel: React.FC<PhotoPanelProps> = ({
           onClick={onAddImage}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onAddImage()}
+          onKeyDown={(e) =>e.key === 'Enter' && onAddImage()}
           aria-label="Нажмите или перенесите изображение для загрузки"
         >
           <UploadZoneIcon className="photo-panel__dropzone-icon" />
@@ -210,7 +210,7 @@ export const PhotoPanel: React.FC<PhotoPanelProps> = ({
                     type="button"
                     className="photo-panel__gallery-thumb"
                     draggable
-                    onDragStart={(e) => {
+                    onDragStart={(e) =>{
                       e.dataTransfer.setData(SIDEBAR_PHOTO_DRAG_MIME, JSON.stringify({ id: p.id }));
                       e.dataTransfer.effectAllowed = 'copy';
                       const el = e.currentTarget.querySelector('img');
@@ -234,7 +234,7 @@ export const PhotoPanel: React.FC<PhotoPanelProps> = ({
                     <button
                       type="button"
                       className="photo-panel__gallery-remove"
-                      onClick={(e) => {
+                      onClick={(e) =>{
                         e.stopPropagation();
                         onLibraryPhotoRemove(p.id);
                       }}

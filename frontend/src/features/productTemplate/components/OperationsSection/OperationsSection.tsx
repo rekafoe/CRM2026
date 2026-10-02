@@ -83,7 +83,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
       return (
         <div className="flex items-center gap-1 mt-1">
           <span className="text-xs px-2 py-1 bg-warning-light text-warning rounded">
-            🔀 Условная: {param?.label || paramName} = {paramValue}
+             Условная: {param?.label || paramName} = {paramValue}
           </span>
         </div>
       );
@@ -95,14 +95,14 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
     <div className="template-tab-grid">
       <div className="template-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h4 className="template-card__title" style={{ margin: 0 }}>⚙️ Операции продукта</h4>
+          <h4 className="template-card__title" style={{ margin: 0 }}>Операции продукта</h4>
           {availableForBulk.length > 0 && (
             <button
               className="btn-secondary"
-              onClick={() => onShowBulkModal(true)}
+              onClick={() =>onShowBulkModal(true)}
               style={{ fontSize: 13, padding: '6px 12px' }}
             >
-              📦 Массовое добавление ({availableForBulk.length})
+               Массовое добавление ({availableForBulk.length})
             </button>
           )}
         </div>
@@ -121,21 +121,21 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
         {/* Подсказки для разных типов продуктов */}
         {productType === 'sheet_single' && (
           <Alert type="info" className="mb-4">
-            <strong>📄 Листовые изделия</strong>
+            <strong>Листовые изделия</strong>
             <p className="text-sm mt-1">Автоматически добавляются операции: печать и резка. При необходимости добавьте отделку (ламинация, скругление углов).</p>
           </Alert>
         )}
 
         {productType === 'multi_page' && (
           <Alert type="info" className="mb-4">
-            <strong>📚 Многостраничные изделия</strong>
+            <strong>Многостраничные изделия</strong>
             <p className="text-sm mt-1">Автоматически добавляются операции: печать, резка/фальцовка и переплет. Формулы расчета учитывают количество страниц и сторон печати.</p>
           </Alert>
         )}
 
         {productType === 'universal' && (
           <Alert type="warning" className="mb-4">
-            <strong>🔧 Универсальные изделия</strong>
+            <strong>Универсальные изделия</strong>
             <p className="text-sm mt-1">Выберите и настройте все необходимые операции для вашего специального продукта. Формулы расчета настраиваются индивидуально.</p>
           </Alert>
         )}
@@ -186,14 +186,14 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
                   </td>
                   <td style={{ padding: 8, textAlign: 'center' }}>
                     <div className="flex flex-col items-center gap-1">
-                      <div>{op.is_required ? '✅ Обяз.' : '⭕ Опц.'}</div>
+                      <div>{op.is_required ? 'Обяз.' : 'Опц.'}</div>
                       {!op.is_required && (
                         <span className="text-xs text-secondary">
                           {(op.is_default === true || op.is_default === 1) ? '✓ По умолч.' : '— Выкл.'}
                         </span>
                       )}
                       {(op.linked_parameter_name || (op.conditions && Object.keys(op.conditions).length > 0)) ? (
-                        <span className="text-xs text-warning">🔀 Условная</span>
+                        <span className="text-xs text-warning">Условная</span>
                       ) : (
                         <span className="text-xs text-success">✓ Всегда</span>
                       )}
@@ -204,19 +204,19 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
                       <button 
                         className="btn btn-secondary"
                         style={{ fontSize: 12, padding: '4px 12px' }}
-                        onClick={() => setEditingOperation(op)}
+                        onClick={() =>setEditingOperation(op)}
                         title="Настроить условия"
                       >
-                        ⚙️ Настроить
+                         Настроить
                       </button>
                       <button 
                         className="btn btn-secondary"
                         style={{ fontSize: 12, padding: '4px 12px' }}
-                        onClick={() => onRemoveOperation(op.id)}
+                        onClick={() =>onRemoveOperation(op.id)}
                         disabled={deletingOperationId === op.id}
                         title="Удалить операцию"
                       >
-                        {deletingOperationId === op.id ? '⏳' : '🗑️'}
+                        {deletingOperationId === op.id ? 'Удаление…' : 'Удалить'}
                       </button>
                     </div>
                   </td>
@@ -226,7 +226,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
           </table>
         ) : (
           <div className="alert alert-warning" style={{ marginBottom: 20, textAlign: 'center' }}>
-            <p style={{ margin: 0 }}>⚠️ У продукта нет операций</p>
+            <p style={{ margin: 0 }}>У продукта нет операций</p>
             <p style={{ margin: '8px 0 0 0', fontSize: 14 }}>
               Добавьте хотя бы одну операцию для расчета цены
             </p>
@@ -238,7 +238,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
           {availableOperations.length === 0 ? (
             <div className="alert alert-error">
               <p style={{ margin: 0 }}>
-                ❌ В системе нет доступных операций. Обратитесь к администратору.
+                 В системе нет доступных операций. Обратитесь к администратору.
               </p>
             </div>
           ) : (
@@ -268,7 +268,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
                 onClick={onAddOperation}
                 disabled={!selectedOperationId || addingOperation}
               >
-                {addingOperation ? '⏳ Добавление...' : '➕ Добавить'}
+                {addingOperation ? 'Добавление...' : 'Добавить'}
               </Button>
             </div>
           )}
@@ -276,7 +276,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
 
         <div className="alert alert-success" style={{ marginTop: 20 }}>
           <p style={{ margin: 0, fontSize: 14 }}>
-            💡 <strong>Совет:</strong> Рекомендуем добавить минимум 2 операции:
+             <strong>Совет:</strong> Рекомендуем добавить минимум 2 операции:
           </p>
           <ul style={{ margin: '8px 0 0 20px', fontSize: 14 }}>
             <li>Цифровая цветная печать (SRA3) - для печати</li>

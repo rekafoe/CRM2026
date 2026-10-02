@@ -113,7 +113,7 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
             key={t}
             type="button"
             className={`design-editor-bg-tab${tab === t ? ' is-active' : ''}`}
-            onClick={() => setTab(t)}
+            onClick={() =>setTab(t)}
           >
             {t === 'color' ? 'Цвет' : t === 'pattern' ? 'Паттерн' : t === 'library' ? 'Библиотека' : 'Свой файл'}
           </button>
@@ -149,7 +149,7 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
                   className="design-editor-bg-preset"
                   style={{ background: c, border: c === '#ffffff' ? '1px solid #d1d5db' : 'none' }}
                   title={c}
-                  onClick={() => { setCustomColor(c); onSetBackground(c); }}
+                  onClick={() =>{ setCustomColor(c); onSetBackground(c); }}
                 />
               ))}
             </div>
@@ -210,7 +210,7 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
                   type="button"
                   className={`design-editor-pattern-btn${applying ? ' is-loading' : ''}`}
                   disabled={applying}
-                  onClick={() => void applyPattern(pat.id)}
+                  onClick={() =>void applyPattern(pat.id)}
                   title={pat.label}
                 >
                   <img
@@ -244,7 +244,7 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
                   className="design-editor-bg-preset"
                   title={asset.label}
                   disabled={applying}
-                  onClick={() => {
+                  onClick={() =>{
                     setApplying(true);
                     void onSetBackgroundImage(asset.url).finally(() => setApplying(false));
                   }}
@@ -268,7 +268,7 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
             <button
               type="button"
               className="design-editor-custom-bg-btn"
-              onClick={() => svgInputRef.current?.click()}
+              onClick={() =>svgInputRef.current?.click()}
             >
               <AppIcon name="layers" size="sm" />
               <span>Загрузить SVG</span>
@@ -276,7 +276,7 @@ export const BackgroundPanel: React.FC<BackgroundPanelProps> = ({
             <button
               type="button"
               className="design-editor-custom-bg-btn"
-              onClick={() => imgInputRef.current?.click()}
+              onClick={() =>imgInputRef.current?.click()}
             >
               <AppIcon name="image" size="sm" />
               <span>Загрузить PNG / JPG</span>

@@ -13,7 +13,7 @@ export const PnLAnalytics: React.FC<PnLAnalyticsProps> = ({ data, includePayroll
 
   return (
     <div className="reports-metrics" style={{ marginBottom: '20px' }}>
-      <h4 className="reports-metrics-title">📊 P&L по точкам</h4>
+      <h4 className="reports-metrics-title">P&L по точкам</h4>
       <div className="reports-metrics-grid">
         <div className="reports-metric">
           <div className="reports-metric-value">

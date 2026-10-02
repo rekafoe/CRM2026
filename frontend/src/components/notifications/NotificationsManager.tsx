@@ -113,7 +113,7 @@ export const NotificationsManager: React.FC<NotificationsManagerProps> = () => {
             role="tab"
             aria-selected={activeTab === id}
             className={`lg-btn${activeTab === id ? ' lg-btn--primary' : ''}`}
-            onClick={() => goTab(id)}
+            onClick={() =>goTab(id)}
           >
             {label}
           </button>
@@ -158,11 +158,11 @@ const NotificationsSettings: React.FC = () => {
 
   return (
     <div className="notifications-settings">
-      <h3>⚙️ Настройки уведомлений</h3>
+      <h3>Настройки уведомлений</h3>
       
       <div className="settings-sections">
         <div className="settings-section">
-          <h4>📊 Мониторинг запасов</h4>
+          <h4>Мониторинг запасов</h4>
           <div className="setting-item">
             <label>
               <input
@@ -227,7 +227,7 @@ const NotificationsSettings: React.FC = () => {
         </div>
 
         <div className="settings-section">
-          <h4>🛒 Автоматические заказы</h4>
+          <h4>Автоматические заказы</h4>
           <div className="setting-item">
             <label>
               <input
@@ -286,7 +286,7 @@ const NotificationsSettings: React.FC = () => {
         </div>
 
         <div className="settings-section">
-          <h4>📱 Каналы уведомлений</h4>
+          <h4>Каналы уведомлений</h4>
           <div className="setting-item">
             <label>
               <input

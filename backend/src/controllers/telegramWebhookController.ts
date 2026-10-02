@@ -82,7 +82,7 @@ export class TelegramWebhookController {
 
       const update: TelegramUpdate = req.body;
       
-      console.log('📨 Received Telegram webhook:', {
+      console.log('Received Telegram webhook:', {
         update_id: update.update_id,
         has_message: !!update.message,
         chat_id: update.message?.chat.id,
@@ -117,7 +117,7 @@ export class TelegramWebhookController {
 
       res.json({ success: true, message: 'Webhook processed successfully' });
     } catch (error: any) {
-      console.error('❌ Error processing Telegram webhook:', error);
+      console.error('Error processing Telegram webhook:', error);
       res.status(500).json({
         success: false,
         message: 'Error processing webhook',
@@ -132,20 +132,20 @@ export class TelegramWebhookController {
   private static async handleUserMessage(from: any, chat: any, text?: string, photo?: any[], document?: any) {
     const chatId = chat.id.toString();
     
-    console.log(`🔍 Processing user message for chat_id: ${chatId}, user: ${from.first_name}, text: ${text}`);
+    console.log(`Processing user message for chat_id: ${chatId}, user: ${from.first_name}, text: ${text}`);
     
     try {
       // Проверяем, существует ли пользователь
       const existingUser = await TelegramUserService.getUserByChatId(chatId);
-      console.log(`👤 Existing user check for ${chatId}:`, existingUser ? 'EXISTS' : 'NOT FOUND');
+      console.log(`Existing user check for ${chatId}:`, existingUser ? 'EXISTS' : 'NOT FOUND');
       
       if (existingUser) {
-        console.log(`🔄 Updating existing user: ${from.first_name} (${chatId})`);
+        console.log(`Updating existing user: ${from.first_name} (${chatId})`);
         await this.updateUserInfo(existingUser, from, chat);
-        console.log(`✅ Updated existing user: ${from.first_name} (${chatId})`);
+        console.log(`Updated existing user: ${from.first_name} (${chatId})`);
 
         if (text && String(text).trim() !== '') {
-          console.log(`🤖 Processing text input: ${text}`);
+          console.log(`Processing text input: ${text}`);
           const response = await TelegramBotCommands.handleMessage(chatId, from.id.toString(), text);
           if (response) {
             await this.sendMessageToUser(chatId, response);
@@ -156,7 +156,7 @@ export class TelegramWebhookController {
       } else {
         // Создаем нового пользователя
         await this.createNewUser(from, chat);
-        console.log(`🆕 Created new user: ${from.first_name} (${chatId})`);
+        console.log(`Created new user: ${from.first_name} (${chatId})`);
         
         // Отправляем приветственное сообщение с командами
         const welcomeMessage = await TelegramBotCommands.handleStart(chatId, from.id.toString());
@@ -166,30 +166,30 @@ export class TelegramWebhookController {
       // Отправляем приветственное сообщение для новых пользователей
       if (!existingUser) {
         try {
-          console.log('⏰ Getting welcome_message_enabled with timeout...');
+          console.log('Getting welcome_message_enabled with timeout...');
           const welcomePromise = TelegramSettingsService.getSetting('welcome_message_enabled');
           const welcomeTimeoutPromise = new Promise<string>((resolve) => {
             setTimeout(() => {
-              console.log('⏰ welcome_message_enabled timeout, using default: true');
+              console.log('welcome_message_enabled timeout, using default: true');
               resolve('true');
             }, 2000); // 2 секунды таймаут
           });
           
           const welcomeEnabled = await Promise.race([welcomePromise, welcomeTimeoutPromise]) || 'true';
-          console.log(`💬 Welcome message enabled: ${welcomeEnabled}`);
+          console.log(`Welcome message enabled: ${welcomeEnabled}`);
           
           if (welcomeEnabled === 'true') {
             await this.sendWelcomeMessage(chatId, from.first_name);
           }
         } catch (error) {
-          console.error('❌ Error getting welcome_message_enabled:', error);
+          console.error('Error getting welcome_message_enabled:', error);
           // Отправляем приветствие по умолчанию
           await this.sendWelcomeMessage(chatId, from.first_name);
         }
       }
 
     } catch (error) {
-      console.error(`❌ Error handling user message for ${chatId}:`, error);
+      console.error(`Error handling user message for ${chatId}:`, error);
     }
   }
 
@@ -199,61 +199,61 @@ export class TelegramWebhookController {
   private static async createNewUser(from: any, chat: any) {
     const chatId = chat.id.toString();
     
-    console.log(`🆕 Creating new user for chat_id: ${chatId}, name: ${from.first_name}`);
+    console.log(`Creating new user for chat_id: ${chatId}, name: ${from.first_name}`);
     
     // Проверяем настройки автоматического добавления
     let autoAddUsers: string | null = null;
     
     try {
-      console.log('⏰ Starting settings check with timeout...');
+      console.log('Starting settings check with timeout...');
       const settingsPromise = TelegramSettingsService.getSetting('auto_add_users');
       const timeoutPromise = new Promise<string>((resolve) => {
         setTimeout(() => {
-          console.log('⏰ Settings check timeout, using default: true');
+          console.log('Settings check timeout, using default: true');
           resolve('true');
         }, 5000); // 5 секунд таймаут
       });
       
       autoAddUsers = await Promise.race([settingsPromise, timeoutPromise]);
-      console.log(`⚙️ Auto-add users setting: ${autoAddUsers}`);
+      console.log(`Auto-add users setting: ${autoAddUsers}`);
     } catch (error) {
-      console.error('❌ Error getting auto_add_users setting:', error);
+      console.error('Error getting auto_add_users setting:', error);
       autoAddUsers = 'true';
     }
     
     // Если не удалось получить настройку, используем значение по умолчанию
     if (autoAddUsers === null || autoAddUsers === undefined) {
-      console.log('⚠️ Could not get auto_add_users setting, using default: true');
+      console.log('Could not get auto_add_users setting, using default: true');
       autoAddUsers = 'true';
     }
     
     // Дополнительная проверка - если все еще null, принудительно устанавливаем true
     if (!autoAddUsers) {
-      console.log('⚠️ autoAddUsers is falsy, forcing to true');
+      console.log('autoAddUsers is falsy, forcing to true');
       autoAddUsers = 'true';
     }
     
     if (autoAddUsers !== 'true') {
-      console.log('⚠️ Auto-add users is disabled, skipping user creation');
+      console.log('Auto-add users is disabled, skipping user creation');
       return;
     }
     
     // Получаем роль по умолчанию из настроек
     let defaultRole = 'client';
     try {
-      console.log('⏰ Getting default_role with timeout...');
+      console.log('Getting default_role with timeout...');
       const rolePromise = TelegramSettingsService.getSetting('default_role');
       const roleTimeoutPromise = new Promise<string>((resolve) => {
         setTimeout(() => {
-          console.log('⏰ default_role timeout, using default: client');
+          console.log('default_role timeout, using default: client');
           resolve('client');
         }, 3000); // 3 секунды таймаут
       });
       
       defaultRole = await Promise.race([rolePromise, roleTimeoutPromise]) || 'client';
-      console.log(`🎭 Default role: ${defaultRole}`);
+      console.log(`Default role: ${defaultRole}`);
     } catch (error) {
-      console.error('❌ Error getting default_role:', error);
+      console.error('Error getting default_role:', error);
       defaultRole = 'client';
     }
     
@@ -277,7 +277,7 @@ export class TelegramWebhookController {
       notificationPreferences.system_alerts = true;
     }
 
-    console.log(`👤 Creating user with data:`, {
+    console.log(`Creating user with data:`, {
       chat_id: chatId,
       username: from.username,
       first_name: from.first_name,
@@ -298,9 +298,9 @@ export class TelegramWebhookController {
         notification_preferences: notificationPreferences
       });
 
-      console.log(`✅ User created successfully:`, newUser);
+      console.log(`User created successfully:`, newUser);
     } catch (error) {
-      console.error(`❌ Error creating user:`, error);
+      console.error(`Error creating user:`, error);
       // Не выбрасываем ошибку, чтобы не прерывать процесс
     }
   }
@@ -324,10 +324,10 @@ export class TelegramWebhookController {
     }
 
     if (Object.keys(updates).length > 0) {
-      console.log(`🔄 Updating user info:`, updates);
+      console.log(`Updating user info:`, updates);
       await TelegramUserService.updateUser(user.id, updates);
     } else {
-      console.log(`✅ User info is up to date, no updates needed`);
+      console.log(`User info is up to date, no updates needed`);
     }
   }
 
@@ -336,11 +336,11 @@ export class TelegramWebhookController {
    */
   private static async sendWelcomeMessage(chatId: string, firstName: string) {
     try {
-      const welcomeMessage = `👋 Привет, ${firstName}!
+      const welcomeMessage = `Привет, ${firstName}!
 
 Добро пожаловать в Telegram-бот типографии.
 
-🤖 *Что я умею:*
+ *Что я умею:*
 • показать активные заказы
 • открыть PrintCore App для нового заказа
 
@@ -348,7 +348,7 @@ export class TelegramWebhookController {
 
       await this.sendMessageToUser(chatId, welcomeMessage);
     } catch (error) {
-      console.error('❌ Error sending welcome message:', error);
+      console.error('Error sending welcome message:', error);
     }
   }
 
@@ -362,7 +362,7 @@ export class TelegramWebhookController {
         await TelegramService.sendMessageToUser(chatId, message);
       }
     } catch (error) {
-      console.error(`❌ Error sending message to ${chatId}:`, error);
+      console.error(`Error sending message to ${chatId}:`, error);
     }
   }
 
@@ -392,7 +392,7 @@ export class TelegramWebhookController {
         }
       });
     } catch (error: any) {
-      console.error('❌ Error getting webhook info:', error);
+      console.error('Error getting webhook info:', error);
       res.status(500).json({
         success: false,
         message: 'Error getting webhook info',
@@ -460,7 +460,7 @@ export class TelegramWebhookController {
         });
       }
 
-      console.log(`🔗 setWebhook ok: ${urlRaw}`);
+      console.log(`setWebhook ok: ${urlRaw}`);
 
       res.json({
         success: true,
@@ -468,7 +468,7 @@ export class TelegramWebhookController {
         data: { webhook_url: urlRaw, has_secret: Boolean(secret) }
       });
     } catch (error: any) {
-      console.error('❌ Error setting webhook:', error);
+      console.error('Error setting webhook:', error);
       res.status(500).json({
         success: false,
         message: 'Error setting webhook',
@@ -486,17 +486,17 @@ export class TelegramWebhookController {
       const { id, from, message } = callbackQuery;
       const chatId = message?.chat?.id?.toString();
       
-      console.log(`🔘 Legacy callback query from ${from.first_name}`);
+      console.log(`Legacy callback query from ${from.first_name}`);
 
       if (!chatId) {
-        console.error('❌ No chat ID in callback query');
+        console.error('No chat ID in callback query');
         return;
       }
 
       await TelegramService.answerCallbackQuery(id, 'Сценарий перенесён в PrintCore App');
       await this.sendMiniappFlowHint(chatId);
     } catch (error) {
-      console.error('❌ Error handling callback query:', error);
+      console.error('Error handling callback query:', error);
     }
   }
 

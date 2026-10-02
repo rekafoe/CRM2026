@@ -67,7 +67,7 @@ export const ShapesPanel: React.FC<ShapesPanelProps> = ({ onAddShape, onClose })
           key={s.type}
           type="button"
           className="design-editor-shape-btn"
-          onClick={() => onAddShape(s.type)}
+          onClick={() =>onAddShape(s.type)}
           title={s.label}
         >
           <span className="design-editor-shape-preview">{s.preview}</span>

@@ -97,7 +97,7 @@ export class ProductSetupService {
       );
       return !!product?.product_type;
     } catch (error) {
-      logger.error('❌ Error in hasProductType', { productId, error });
+      logger.error('Error in hasProductType', { productId, error });
       return false;
     }
   }
@@ -151,7 +151,7 @@ export class ProductSetupService {
 
       return false;
     } catch (error) {
-      logger.error('❌ Error in hasMaterials', { productId, error });
+      logger.error('Error in hasMaterials', { productId, error });
       return false;
     }
   }
@@ -170,7 +170,7 @@ export class ProductSetupService {
 
       return operations && operations.length > 0;
     } catch (error) {
-      logger.error('❌ Error in hasOperations', { productId, error });
+      logger.error('Error in hasOperations', { productId, error });
       return false;
     }
   }
@@ -184,7 +184,7 @@ export class ProductSetupService {
       // В будущем можно добавить проверку operation_pricing_rules
       return true;
     } catch (error) {
-      logger.error('❌ Error in hasPricingRules', { productId, error });
+      logger.error('Error in hasPricingRules', { productId, error });
       return true; // Возвращаем true, так как правила опциональны
     }
   }
@@ -213,7 +213,7 @@ export class ProductSetupService {
       [newStatus, productId]
     );
 
-    logger.info('🔄 Обновлен статус настройки продукта', {
+    logger.info('Обновлен статус настройки продукта', {
       productId,
       newStatus,
       hasMaterials,
@@ -242,7 +242,7 @@ export class ProductSetupService {
       productId
     );
 
-    logger.info('✅ Продукт активирован', { productId, productName: state.productName });
+    logger.info('Продукт активирован', { productId, productName: state.productName });
 
     return {
       success: true,
@@ -266,7 +266,7 @@ export class ProductSetupService {
       );
     }
 
-    logger.info('📋 Инициализирован чеклист настройки продукта', { productId });
+    logger.info('Инициализирован чеклист настройки продукта', { productId });
   }
 
   /**
@@ -291,7 +291,7 @@ export class ProductSetupService {
       [validatedBy, notes, productId, step]
     );
 
-    logger.info('✅ Этап настройки продукта выполнен', { productId, step });
+    logger.info('Этап настройки продукта выполнен', { productId, step });
 
     // Автоматически обновляем общий статус
     await this.updateSetupStatus(productId);

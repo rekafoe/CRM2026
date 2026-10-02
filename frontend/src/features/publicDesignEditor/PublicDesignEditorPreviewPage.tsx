@@ -121,7 +121,7 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
             key={item}
             type="button"
             className={item === mode ? 'public-editor-preview-crm__mode public-editor-preview-crm__mode--active' : 'public-editor-preview-crm__mode'}
-            onClick={() => handleModeChange(item)}
+            onClick={() =>handleModeChange(item)}
           >
             {MODE_LABELS[item]}
           </button>
@@ -203,7 +203,7 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
             <button
               type="button"
               className="public-editor-preview-floating-chrome__btn"
-              onClick={() => navigate('/adminpanel/design-templates')}
+              onClick={() =>navigate('/adminpanel/design-templates')}
             >
               ← Назад
             </button>
@@ -211,7 +211,7 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
               type="button"
               className={`public-editor-preview-floating-chrome__btn public-editor-preview-floating-chrome__btn--crm${crmChromeOpen ? ' is-active' : ''}`}
               aria-expanded={crmChromeOpen}
-              onClick={() => setCrmChromeOpen((open) => !open)}
+              onClick={() =>setCrmChromeOpen((open) => !open)}
             >
               {crmChromeOpen ? 'Скрыть CRM' : 'CRM'}
             </button>

@@ -93,7 +93,7 @@ export const ObjectPropsPanel: React.FC<ObjectPropsPanelProps> = ({
                     type="button"
                     className="design-editor-panel-hint-btn"
                     title="Убрать заливку"
-                    onClick={() => onSetObjProp('fill', 'transparent')}
+                    onClick={() =>onSetObjProp('fill', 'transparent')}
                   >
                     ✕
                   </button>
@@ -114,7 +114,7 @@ export const ObjectPropsPanel: React.FC<ObjectPropsPanelProps> = ({
                       type="button"
                       className="design-editor-panel-hint-btn"
                       title="Убрать обводку"
-                      onClick={() => { onSetObjProp('stroke', 'transparent'); onSetObjProp('strokeWidth', 0); }}
+                      onClick={() =>{ onSetObjProp('stroke', 'transparent'); onSetObjProp('strokeWidth', 0); }}
                     >
                       ✕
                     </button>

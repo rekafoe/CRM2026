@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           aria-label="Добавить заказ" 
           onClick={onCreateOrder}
         >
-          ＋
+          Добавить
         </button>
         <button
           className="icon-btn"
@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           disabled={!selectedId}
           onClick={onDeleteOrder}
         >
-          🗑️
+          Удалить
         </button>
       </div>
 

@@ -12,7 +12,7 @@ async function run() {
   const all = (sql) => new Promise((res, rej) => db.all(sql, (e, r) => e ? rej(e) : res(r)));
 
   try {
-    console.log('🔧 Fixing material_categories: adding PRIMARY KEY(id)...');
+    console.log('Fixing material_categories: adding PRIMARY KEY(id)...');
 
     const tiBefore = await all('PRAGMA table_info(material_categories)');
     console.log('Before table_info(material_categories):', tiBefore);
@@ -46,9 +46,9 @@ async function run() {
 
     const tiAfter = await all('PRAGMA table_info(material_categories)');
     console.log('After table_info(material_categories):', tiAfter);
-    console.log('✅ material_categories fixed.');
+    console.log('material_categories fixed.');
   } catch (e) {
-    console.error('❌ Failed to fix material_categories:', e);
+    console.error('Failed to fix material_categories:', e);
     try { await exec('ROLLBACK; PRAGMA foreign_keys=ON;'); } catch {}
     process.exit(1);
   } finally {

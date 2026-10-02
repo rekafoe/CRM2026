@@ -121,7 +121,7 @@ export const OrderTransferModal: React.FC<OrderTransferModalProps> = ({
             role="tab"
             aria-selected={mode === 'colleague'}
             className={`order-transfer-modal__tab ${mode === 'colleague' ? 'is-active' : ''}`}
-            onClick={() => setMode('colleague')}
+            onClick={() =>setMode('colleague')}
           >
             Коллеге
           </button>
@@ -130,7 +130,7 @@ export const OrderTransferModal: React.FC<OrderTransferModalProps> = ({
             role="tab"
             aria-selected={mode === 'pavilion'}
             className={`order-transfer-modal__tab ${mode === 'pavilion' ? 'is-active' : ''}`}
-            onClick={() => setMode('pavilion')}
+            onClick={() =>setMode('pavilion')}
           >
             В павильон
           </button>

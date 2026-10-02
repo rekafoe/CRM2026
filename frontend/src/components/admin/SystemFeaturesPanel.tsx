@@ -598,7 +598,7 @@ const SystemFeaturesPanel: React.FC = () => {
   return (
     <div className="system-features-panel">
       <div className="features-header">
-        <h2>🚀 Модули системы</h2>
+        <h2>Модули системы</h2>
         <p>План развития функционала CRM</p>
       </div>
 
@@ -611,7 +611,7 @@ const SystemFeaturesPanel: React.FC = () => {
                 <div
                   key={feature.id}
                   className="feature-card"
-                  onClick={() => handleFeatureClick(feature)}
+                  onClick={() =>handleFeatureClick(feature)}
                 >
                   <div className="feature-header">
                     <h4>{feature.title}</h4>
@@ -633,7 +633,7 @@ const SystemFeaturesPanel: React.FC = () => {
 
       {showModal && selectedFeature && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) =>e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedFeature.title}</h2>
               <button className="modal-close" onClick={closeModal}>×</button>

@@ -388,7 +388,7 @@ export function useLocalRangeChanges(
     [deleteVariants],
   );
 
-  // 🆕 Локальное обновление имени варианта (для новых и существующих вариантов)
+  //  Локальное обновление имени варианта (для новых и существующих вариантов)
   const updateVariantName = useCallback((variantId: number, newName: string) => {
     let oldNameForQueue: string | undefined;
     let parametersSnapshot: Record<string, any> | undefined;
@@ -440,7 +440,7 @@ export function useLocalRangeChanges(
     setHasUnsavedChanges(true);
   }, []);
 
-  // 🆕 Локальное обновление параметров варианта (для новых и существующих вариантов)
+  //  Локальное обновление параметров варианта (для новых и существующих вариантов)
   const updateVariantParams = useCallback((variantId: number, params: Record<string, any>) => {
     setLocalVariants(prev =>
       prev.map(v =>
@@ -531,8 +531,8 @@ export function useLocalRangeChanges(
     createVariant,
     deleteVariant,
     deleteVariants,
-    updateVariantName, // 🆕
-    updateVariantParams, // 🆕
+    updateVariantName, // 
+    updateVariantParams, // 
 
     // Функции для сохранения/отмены
     saveChanges,

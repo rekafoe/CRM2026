@@ -63,7 +63,7 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
           paginatedDates.map(({ date, orderCount }) => (
             <button
               key={date}
-              onClick={() => handleDateSelect(date)}
+              onClick={() =>handleDateSelect(date)}
               className={`date-switcher-option ${
                 date === currentDate
                   ? 'date-switcher-option--active'
@@ -89,7 +89,7 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
           <button
             type="button"
             className="date-switcher-pagination__btn"
-            onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+            onClick={() =>setCurrentPage((p) => Math.max(0, p - 1))}
             disabled={currentPage === 0}
             aria-label="Предыдущая страница"
           >
@@ -101,7 +101,7 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
           <button
             type="button"
             className="date-switcher-pagination__btn"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+            onClick={() =>setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={currentPage >= totalPages - 1}
             aria-label="Следующая страница"
           >

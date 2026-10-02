@@ -919,7 +919,7 @@ export const CustomerDetailView: React.FC<{
                 type="button"
                 role="tab"
                 aria-selected={activeTab === tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() =>setActiveTab(tab.key)}
                 className={`product-filter-chip ${activeTab === tab.key ? 'product-filter-chip--active' : ''}`}
               >
                 {tab.label}

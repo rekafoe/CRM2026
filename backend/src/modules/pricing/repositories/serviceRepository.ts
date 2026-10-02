@@ -721,7 +721,7 @@ export class PricingServiceRepository {
   static async createService(payload: CreatePricingServiceDTO): Promise<PricingServiceDTO> {
     const db = await this.getConnection();
     // ИЗМЕНЕНО: Создаем в post_processing_services
-    // 🆕 Используем operationType из payload, если есть, иначе из type
+    //  Используем operationType из payload, если есть, иначе из type
     const operationType = normalizeOperationType(payload.operationType || payload.type);
     if (typeof payload.type === 'string' && payload.type.trim() && !ALLOWED_OPERATION_TYPES.has(payload.type.trim()) && payload.type.trim() !== 'postprint' && payload.type.trim() !== 'generic') {
       const err: any = new Error(
@@ -866,7 +866,7 @@ export class PricingServiceRepository {
       return null;
     }
 
-    // 🆕 Используем operationType из payload, если есть, иначе из type, иначе текущее значение
+    //  Используем operationType из payload, если есть, иначе из type, иначе текущее значение
     const operationType = payload.operationType !== undefined
       ? normalizeOperationType(payload.operationType)
       : (payload.type !== undefined
@@ -1913,7 +1913,7 @@ export class PricingServiceRepository {
   
   /**
    * Обновляет цену для конкретного диапазона (общие tiers для всех вариантов услуги)
-   * 🆕 Tiers теперь общие для всех вариантов одной услуги
+   *  Tiers теперь общие для всех вариантов одной услуги
    */
   static async updateVariantPrice(variantId: number, minQuantity: number, price: number): Promise<void> {
     const db = await this.getConnection();

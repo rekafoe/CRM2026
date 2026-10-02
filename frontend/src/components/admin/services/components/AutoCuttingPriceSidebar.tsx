@@ -32,13 +32,13 @@ export const AutoCuttingPriceSidebar: React.FC = () => {
       <button
         type="button"
         className="sm-ac-rail"
-        onClick={() => setOpen(true)}
+        onClick={() =>setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
         title="Настройка цены автоматической резки"
       >
         <span className="sm-ac-rail__icon" aria-hidden>
-          ✂
+          
         </span>
         <span className="sm-ac-rail__label">Авто-резка</span>
       </button>

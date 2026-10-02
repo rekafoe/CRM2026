@@ -375,7 +375,7 @@ export const OrderClientNotifyTab: React.FC = () => {
             <button
               type="button"
               className="lg-btn"
-              onClick={() => void handleDiagnostics()}
+              onClick={() =>void handleDiagnostics()}
               disabled={diagnosticsLoading}
             >
               {diagnosticsLoading ? 'Проверяем...' : 'Проверить SMTP-соединение'}
@@ -407,7 +407,7 @@ export const OrderClientNotifyTab: React.FC = () => {
             <button
               type="button"
               className="lg-btn lg-btn--primary"
-              onClick={() => void handleTest()}
+              onClick={() =>void handleTest()}
               disabled={testSending}
             >
               {testSending ? 'Отправка...' : 'Отправить тест'}
@@ -433,7 +433,7 @@ export const OrderClientNotifyTab: React.FC = () => {
               <span className="client-notify-bad">выключено (SMS_ENABLED)</span>
             )}
             {smsDebounce != null && smsDebounce > 0 && (
-              <span className="client-notify-meta"> · дебаунс {smsDebounce} с</span>
+              <span className="client-notify-meta">· дебаунс {smsDebounce} с</span>
             )}
           </p>
           <div className="client-notify-table-wrap">
@@ -557,7 +557,7 @@ export const OrderClientNotifyTab: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <button type="button" className="lg-btn" onClick={() => void handleCreateRule()}>
+              <button type="button" className="lg-btn" onClick={() =>void handleCreateRule()}>
                 Добавить
               </button>
             </div>
@@ -629,7 +629,7 @@ export const OrderClientNotifyTab: React.FC = () => {
             type="button"
             className="lg-btn lg-btn--primary"
             disabled={savingTemplate || selectedTemplateId == null}
-            onClick={() => void handleSaveTemplate()}
+            onClick={() =>void handleSaveTemplate()}
           >
             {savingTemplate ? 'Сохранение…' : 'Сохранить шаблон'}
           </button>

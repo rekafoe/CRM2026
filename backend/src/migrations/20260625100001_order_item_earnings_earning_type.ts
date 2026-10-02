@@ -52,5 +52,5 @@ export async function up(db: Database): Promise<void> {
 }
 
 export async function down(_db: Database): Promise<void> {
-  console.log('ℹ️ down() skipped: order_item_earnings earning_type migration is not reversible')
+  console.log('down() skipped: order_item_earnings earning_type migration is not reversible')
 }

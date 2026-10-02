@@ -38,7 +38,7 @@ export class UserNotificationService {
   static async initialize() {
     if (this.isInitialized) return;
 
-    console.log('👥 Initializing User Notification Service...');
+    console.log('Initializing User Notification Service...');
     // TelegramService уже поднимается из index.ts — повторный initialize() раньше
     // стартовал второй long-poll («Starting Telegram polling» ×2) и сбрасывал useWebhook.
     if (!TelegramService.getConfig()?.botToken) {
@@ -53,7 +53,7 @@ export class UserNotificationService {
     }
 
     this.isInitialized = true;
-    console.log('✅ User Notification Service initialized');
+    console.log('User Notification Service initialized');
   }
 
   /**
@@ -105,12 +105,12 @@ export class UserNotificationService {
     `, userId);
 
     if (!user) {
-      console.log(`❌ User ${userId} not found`);
+      console.log(`User ${userId} not found`);
       return false;
     }
 
     if (!user.notifications_enabled) {
-      console.log(`⚠️ Notifications disabled for user ${user.name}`);
+      console.log(`Notifications disabled for user ${user.name}`);
       return false;
     }
 
@@ -120,7 +120,7 @@ export class UserNotificationService {
 
     // Проверяем, включены ли уведомления для этого типа
     if (!preferences[notification.type]) {
-      console.log(`⚠️ ${notification.type} notifications disabled for user ${user.name}`);
+      console.log(`${notification.type} notifications disabled for user ${user.name}`);
       return false;
     }
 
@@ -128,12 +128,12 @@ export class UserNotificationService {
     if (user.telegram_chat_id) {
       const success = await this.sendTelegramMessage(user.telegram_chat_id, notification);
       if (success) {
-        console.log(`✅ Notification sent to user ${user.name} (${user.role})`);
+        console.log(`Notification sent to user ${user.name} (${user.role})`);
         return true;
       }
     }
 
-    console.log(`⚠️ No Telegram chat_id for user ${user.name}`);
+    console.log(`No Telegram chat_id for user ${user.name}`);
     return false;
   }
 
@@ -144,14 +144,14 @@ export class UserNotificationService {
     const users = await this.getUsersByRole(role);
     let sentCount = 0;
 
-    console.log(`📤 Sending notification to ${users.length} ${role} users...`);
+    console.log(`Sending notification to ${users.length} ${role} users...`);
 
     for (const user of users) {
       const success = await this.sendToUser(user.id, notification);
       if (success) sentCount++;
     }
 
-    console.log(`✅ Notification sent to ${sentCount}/${users.length} ${role} users`);
+    console.log(`Notification sent to ${sentCount}/${users.length} ${role} users`);
     return sentCount;
   }
 
@@ -162,14 +162,14 @@ export class UserNotificationService {
     const users = await this.getAllUsers();
     let sentCount = 0;
 
-    console.log(`📤 Sending notification to ${users.length} users...`);
+    console.log(`Sending notification to ${users.length} users...`);
 
     for (const user of users) {
       const success = await this.sendToUser(user.id, notification);
       if (success) sentCount++;
     }
 
-    console.log(`✅ Notification sent to ${sentCount}/${users.length} users`);
+    console.log(`Notification sent to ${sentCount}/${users.length} users`);
     return sentCount;
   }
 
@@ -178,7 +178,7 @@ export class UserNotificationService {
    */
   static async sendLowStockAlert(materialName: string, currentQuantity: number, minStock: number, supplierName?: string): Promise<number> {
     const notification: NotificationMessage = {
-      title: '🚨 Низкий остаток материала',
+      title: 'Низкий остаток материала',
       message: this.formatLowStockMessage(materialName, currentQuantity, minStock, supplierName),
       priority: 'high',
       type: 'low_stock',
@@ -198,7 +198,7 @@ export class UserNotificationService {
    */
   static async sendNewOrderAlert(orderId: number, customerName: string, totalAmount: number): Promise<number> {
     const notification: NotificationMessage = {
-      title: '📋 Новый заказ',
+      title: 'Новый заказ',
       message: this.formatNewOrderMessage(orderId, customerName, totalAmount),
       priority: 'medium',
       type: 'new_order',
@@ -236,8 +236,8 @@ export class UserNotificationService {
     if (!TelegramService.isNetworkAvailable()) {
       return false;
     }
-    const emoji = notification.priority === 'high' ? '🚨' : 
-                 notification.priority === 'medium' ? '⚠️' : 'ℹ️';
+    const emoji = notification.priority === 'high' ? '' : 
+                 notification.priority === 'medium' ? '' : '';
     const message = `${emoji} *${notification.title}*\n\n${notification.message}`;
     return TelegramService.sendMessageToUser(chatId, message);
   }
@@ -246,15 +246,15 @@ export class UserNotificationService {
    * Форматирование сообщения о низких остатках
    */
   private static formatLowStockMessage(materialName: string, currentQuantity: number, minStock: number, supplierName?: string): string {
-    let message = `📦 *Материал:* ${materialName}\n`;
-    message += `📊 *Текущий остаток:* ${currentQuantity}\n`;
-    message += `⚠️ *Минимальный уровень:* ${minStock}\n`;
+    let message = `*Материал:* ${materialName}\n`;
+    message += `*Текущий остаток:* ${currentQuantity}\n`;
+    message += `*Минимальный уровень:* ${minStock}\n`;
     
     if (supplierName) {
-      message += `🏢 *Поставщик:* ${supplierName}\n`;
+      message += `*Поставщик:* ${supplierName}\n`;
     }
     
-    message += `\n💡 *Рекомендация:* Необходимо пополнить запас`;
+    message += `\n *Рекомендация:* Необходимо пополнить запас`;
     
     return message;
   }
@@ -263,10 +263,10 @@ export class UserNotificationService {
    * Форматирование сообщения о новом заказе
    */
   private static formatNewOrderMessage(orderId: number, customerName: string, totalAmount: number): string {
-    let message = `🆔 *Заказ №:* ${orderId}\n`;
-    message += `👤 *Клиент:* ${customerName}\n`;
-    message += `💰 *Сумма:* ${totalAmount.toFixed(2)} BYN\n`;
-    message += `\n📋 *Требует обработки*`;
+    let message = `*Заказ №:* ${orderId}\n`;
+    message += `*Клиент:* ${customerName}\n`;
+    message += `*Сумма:* ${totalAmount.toFixed(2)} BYN\n`;
+    message += `\n *Требует обработки*`;
     
     return message;
   }
@@ -285,10 +285,10 @@ export class UserNotificationService {
       //   WHERE id = ?
       // `, chatId, userId);
       
-      console.log(`⚠️ Telegram chat_id update skipped - column doesn't exist for user ${userId}`);
+      console.log(`Telegram chat_id update skipped - column doesn't exist for user ${userId}`);
       return true;
     } catch (error) {
-      console.error(`❌ Failed to update Telegram chat_id for user ${userId}:`, error);
+      console.error(`Failed to update Telegram chat_id for user ${userId}:`, error);
       return false;
     }
   }
@@ -299,7 +299,7 @@ export class UserNotificationService {
   static async getBotUsers(): Promise<any[]> {
     const token = this.getBotTokenFromEnv();
     if (!token) {
-      console.error('❌ TELEGRAM_BOT_TOKEN is not set, getBotUsers returns []');
+      console.error('TELEGRAM_BOT_TOKEN is not set, getBotUsers returns []');
       return [];
     }
     try {
@@ -330,7 +330,7 @@ export class UserNotificationService {
       
       return [];
     } catch (error) {
-      console.error('❌ Failed to get bot users:', error);
+      console.error('Failed to get bot users:', error);
       return [];
     }
   }
@@ -342,14 +342,14 @@ export class UserNotificationService {
     const botUsers = await this.getBotUsers();
     let sentCount = 0;
 
-    console.log(`📤 Sending test message to ${botUsers.length} bot users...`);
+    console.log(`Sending test message to ${botUsers.length} bot users...`);
 
     for (const user of botUsers) {
       try {
-        const message = `🧪 *Тестовое сообщение*\n\nПривет, ${user.first_name}! Система уведомлений работает корректно.`;
+        const message = `*Тестовое сообщение*\n\nПривет, ${user.first_name}! Система уведомлений работает корректно.`;
         const t = this.getBotTokenFromEnv();
         if (!t) {
-          console.error('❌ TELEGRAM_BOT_TOKEN is not set');
+          console.error('TELEGRAM_BOT_TOKEN is not set');
           return 0;
         }
         const url = `https://api.telegram.org/bot${t}/sendMessage`;
@@ -369,16 +369,16 @@ export class UserNotificationService {
         
         if (result.ok) {
           sentCount++;
-          console.log(`✅ Test message sent to ${user.first_name} (@${user.username || 'no_username'})`);
+          console.log(`Test message sent to ${user.first_name} (@${user.username || 'no_username'})`);
         } else {
-          console.error(`❌ Failed to send to ${user.first_name}:`, result);
+          console.error(`Failed to send to ${user.first_name}:`, result);
         }
       } catch (error) {
-        console.error(`❌ Error sending to ${user.first_name}:`, error);
+        console.error(`Error sending to ${user.first_name}:`, error);
       }
     }
 
-    console.log(`✅ Test messages sent to ${sentCount}/${botUsers.length} users`);
+    console.log(`Test messages sent to ${sentCount}/${botUsers.length} users`);
     return sentCount;
   }
 }

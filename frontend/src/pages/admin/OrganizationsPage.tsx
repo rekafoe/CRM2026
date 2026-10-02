@@ -144,7 +144,7 @@ export const OrganizationsPage: React.FC = () => {
   }, [templateOrg, loadOrganizations]);
 
   return (
-    <AdminPageLayout title="Организации" icon="🏢" onBack={() => navigate('/adminpanel')}>
+    <AdminPageLayout title="Организации" icon="" onBack={() => navigate('/adminpanel')}>
       <div className="organizations-page">
         {error && <Alert type="error" onClose={() => setError(null)}>{error}</Alert>}
 
@@ -161,7 +161,7 @@ export const OrganizationsPage: React.FC = () => {
                 {(form.logo_url || editingOrg?.logo_url) ? (
                   <div className="org-logo-preview">
                     <img src={form.logo_url || editingOrg?.logo_url} alt="Логотип" style={{ maxWidth: 120, maxHeight: 50, objectFit: 'contain' }} />
-                    <button type="button" className="btn-link danger" onClick={() => setForm({ ...form, logo_url: '' })}>Удалить</button>
+                    <button type="button" className="btn-link danger" onClick={() =>setForm({ ...form, logo_url: '' })}>Удалить</button>
                   </div>
                 ) : null}
                 <input
@@ -220,14 +220,14 @@ export const OrganizationsPage: React.FC = () => {
                     <td>{org.unp || '—'}</td>
                     <td>{org.is_default ? 'Да' : ''}</td>
                     <td>
-                      <button className="btn-link" onClick={() => handleEdit(org)}>Изменить</button>
+                      <button className="btn-link" onClick={() =>handleEdit(org)}>Изменить</button>
                       {' '}
-                      <button className="btn-link" onClick={() => openTemplateEditor(org, 'receipt')}>Чек</button>
+                      <button className="btn-link" onClick={() =>openTemplateEditor(org, 'receipt')}>Чек</button>
                       {' '}
-                      <button className="btn-link" onClick={() => openTemplateEditor(org, 'order-blank')}>Бланк</button>
+                      <button className="btn-link" onClick={() =>openTemplateEditor(org, 'order-blank')}>Бланк</button>
                       {' '}
                       {!org.is_default && (
-                        <button className="btn-link danger" onClick={() => handleDelete(org.id)}>Удалить</button>
+                        <button className="btn-link danger" onClick={() =>handleDelete(org.id)}>Удалить</button>
                       )}
                     </td>
                   </tr>

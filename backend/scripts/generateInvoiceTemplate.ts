@@ -277,14 +277,14 @@ if (fs.existsSync(outputPath)) {
   try {
     fs.unlinkSync(outputPath);
   } catch (e) {
-    console.log(`⚠️  Не удалось удалить старый файл: ${(e as Error).message}`);
+    console.log(` Не удалось удалить старый файл: ${(e as Error).message}`);
   }
 }
 
 workbook.xlsx.writeFile(outputPath)
   .then(() => {
-    console.log(`✅ Шаблон счёта успешно создан: ${outputPath}`);
-    console.log('\n📋 Структура шаблона:');
+    console.log(`Шаблон счёта успешно создан: ${outputPath}`);
+    console.log('\n Структура шаблона:');
     console.log('  - Строки 1-3: Информация об исполнителе (merged A-J)');
     console.log('  - Строка 6: Заголовок "Счет № ... от ..." (merged A-J, центрировано, жирный)');
     console.log('  - Строки 9-11: Информация о заказчике/плательщике');
@@ -294,7 +294,7 @@ workbook.xlsx.writeFile(outputPath)
     console.log('  - Строка 18: Итого (с ${totalAmount})');
     console.log('  - Строки 23-24: Сумма НДС и всего к оплате');
     console.log('  - Строка 27: Подпись');
-    console.log('\n📝 Доступные плейсхолдеры:');
+    console.log('\n Доступные плейсхолдеры:');
     console.log('  - ${contractNumber} - Номер счёта');
     console.log('  - ${contractDate} - Дата счёта');
     console.log('  - ${legalName} - Наименование заказчика');
@@ -313,6 +313,6 @@ workbook.xlsx.writeFile(outputPath)
     console.log('  - ${totalAmountInWords} - Сумма прописью');
   })
   .catch((error) => {
-    console.error('❌ Ошибка при создании шаблона:', error);
+    console.error('Ошибка при создании шаблона:', error);
     process.exit(1);
   });

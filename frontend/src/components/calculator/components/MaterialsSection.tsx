@@ -29,9 +29,9 @@ interface MaterialsSectionProps {
     paperDensity: number;
     lamination: 'none' | 'matte' | 'glossy';
     quantity: number;
-    material_id?: number; // 🆕 ID материала из схемы
-    base_material_id?: number; // 🆕 Материал-основа (заготовка)
-    size_id?: number | string; // 🆕 ID размера для упрощённых продуктов
+    material_id?: number; //  ID материала из схемы
+    base_material_id?: number; //  Материал-основа (заготовка)
+    size_id?: number | string; //  ID размера для упрощённых продуктов
     usage_context?: 'indoor' | 'outdoor';
     [key: string]: any; // Для других полей
   };
@@ -50,7 +50,7 @@ interface MaterialsSectionProps {
   availableDensities: Array<{ value: number; label: string }>;
   loadingPaperTypes: boolean;
   getDefaultPaperDensity: (paperType: string) => number;
-  updateSpecs: (updates: Partial<any>, instant?: boolean) => void; // 🆕 Добавили instant
+  updateSpecs: (updates: Partial<any>, instant?: boolean) => void; //  Добавили instant
   schema?: { 
     fields?: Array<{
       name: string;
@@ -355,7 +355,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   const calculateCost = async () => {
     try {
-      // ⚠️ ВАЖНО: Используем реальные данные из результата бэкенда, если они есть
+      //  ВАЖНО: Используем реальные данные из результата бэкенда, если они есть
       if (
         result?.materials &&
         result.materials.length > 0 &&
@@ -425,7 +425,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return paperType?.densities?.find(d => d.value === density);
   };
 
-  // 🆕 Фильтруем типы бумаги на основе constraints из схемы продукта
+  //  Фильтруем типы бумаги на основе constraints из схемы продукта
   const allowedPaperTypes = schema?.constraints?.allowed_paper_types;
   
   const filteredPaperTypes = useMemo(() => {
@@ -438,12 +438,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       return allowedPaperTypes.includes(pt.name);
     });
     if (filtered.length === 0) {
-      console.warn('⚠️ [MaterialsSection] После фильтрации не осталось типов бумаги!');
+      console.warn('[MaterialsSection] После фильтрации не осталось типов бумаги!');
     }
     return filtered;
   }, [warehousePaperTypes, allowedPaperTypes]);
 
-  // 🆕 Если текущий тип бумаги не входит в разрешенные - сбрасываем на первый разрешенный
+  //  Если текущий тип бумаги не входит в разрешенные - сбрасываем на первый разрешенный
   // Также устанавливаем первый тип бумаги, если paperType не установлен, но есть разрешённые типы
   useEffect(() => {
     if (filteredPaperTypes.length === 0) return;
@@ -462,7 +462,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     );
   }, [filteredPaperTypes, specs.paperType, specs.paperDensity, updateSpecs, getDefaultPaperDensity]);
 
-  // 🆕 Получаем разрешённые материалы для выбранного размера
+  //  Получаем разрешённые материалы для выбранного размера
   // Важно: порядок как в шаблоне (allowed_material_ids), а не порядок строк в ответе /materials —
   // иначе дефолт «первый тип / первая плотность» уезжает на чужой тип (например DTF), если он раньше в API.
   const allowedMaterialsForSize = useMemo(() => {
@@ -499,7 +499,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     usageContext,
   ]);
 
-  // 🆕 Разрешённые материалы-основы (заготовки) для выбранного размера — порядок как в шаблоне
+  //  Разрешённые материалы-основы (заготовки) для выбранного размера — порядок как в шаблоне
   const allowedBaseMaterialsForSize = useMemo(() => {
     if (!isSimplifiedProduct || !sizeIdForMaterials) return [];
     const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(sizeIdForMaterials)) as { allowed_base_material_ids?: number[] } | undefined;
@@ -662,7 +662,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               type="button"
               className={usageContext === 'indoor' ? 'is-active' : ''}
               aria-pressed={usageContext === 'indoor'}
-              onClick={() => changeUsageContext('indoor')}
+              onClick={() =>changeUsageContext('indoor')}
             >
               В помещении
             </button>
@@ -670,7 +670,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               type="button"
               className={usageContext === 'outdoor' ? 'is-active' : ''}
               aria-pressed={usageContext === 'outdoor'}
-              onClick={() => changeUsageContext('outdoor')}
+              onClick={() =>changeUsageContext('outdoor')}
             >
               На улице
             </button>
@@ -738,7 +738,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       <div className="param-group param-group--narrow">
         <label>
           {selectedWarehouseType?.variantLabel ?? 'Материал'}
-          <span style={{ color: 'var(--danger, #c53030)' }}> *</span>
+          <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
         </label>
         {loadingMaterials ? (
           <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
@@ -793,7 +793,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         <div className="param-group param-group--narrow">
           <label>
             {getLabel('paperType', 'Тип бумаги')}
-            {isRequired('paperType') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+            {isRequired('paperType') && <span style={{ color: 'var(--danger, #c53030)' }}>*</span>}
           </label>
           {loadingPaperTypes ? (
             <div className="form-control" style={{ color: '#666' }}>
@@ -809,7 +809,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               onChange={(e) => updateSpecs({ 
                 paperType: e.target.value as any,
                 paperDensity: getDefaultPaperDensity(e.target.value)
-              }, true)} // 🆕 instant для select
+              }, true)} //  instant для select
               className="form-control"
               required={isRequired('paperType')}
             >
@@ -828,12 +828,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         <div className="param-group">
           <label>
             {getLabel('paperDensity', 'Плотность')}
-            {isRequired('paperDensity') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+            {isRequired('paperDensity') && <span style={{ color: 'var(--danger, #c53030)' }}>*</span>}
           </label>
           {availableDensities.length > 0 ? (
             <select
               value={specs.paperDensity}
-              onChange={(e) => updateSpecs({ paperDensity: parseInt(e.target.value) }, true)} // 🆕 instant
+              onChange={(e) => updateSpecs({ paperDensity: parseInt(e.target.value) }, true)} //  instant
               className="form-control"
               required={isRequired('paperDensity')}
             >
@@ -867,11 +867,11 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         <div className="param-group">
           <label>
             {getLabel('lamination', 'Ламинация')}
-            {isRequired('lamination') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+            {isRequired('lamination') && <span style={{ color: 'var(--danger, #c53030)' }}>*</span>}
           </label>
           <select
             value={specs.lamination}
-            onChange={(e) => updateSpecs({ lamination: e.target.value as any }, true)} // 🆕 instant
+            onChange={(e) => updateSpecs({ lamination: e.target.value as any }, true)} //  instant
             className="form-control"
           >
             <option value="none">Без ламинации</option>
@@ -902,7 +902,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             <div className="param-group param-group--narrow">
               <label>
                 {materialField.label || 'Материал'}
-                {materialField.required && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+                {materialField.required && <span style={{ color: 'var(--danger, #c53030)' }}>*</span>}
               </label>
               <select
                 value={value ? String(value) : ''}

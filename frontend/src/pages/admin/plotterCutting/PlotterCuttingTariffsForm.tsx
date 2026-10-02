@@ -47,7 +47,7 @@ export const PlotterCuttingTariffsForm: React.FC = () => {
             role="tab"
             className={`orders-list-tab ${activeTab === 'roll' ? 'active' : ''}`}
             aria-selected={activeTab === 'roll'}
-            onClick={() => setActiveTab('roll')}
+            onClick={() =>setActiveTab('roll')}
           >
             Рулонная резка
           </button>
@@ -56,7 +56,7 @@ export const PlotterCuttingTariffsForm: React.FC = () => {
             role="tab"
             className={`orders-list-tab ${activeTab === 'sheet' ? 'active' : ''}`}
             aria-selected={activeTab === 'sheet'}
-            onClick={() => setActiveTab('sheet')}
+            onClick={() =>setActiveTab('sheet')}
           >
             Листовая
           </button>

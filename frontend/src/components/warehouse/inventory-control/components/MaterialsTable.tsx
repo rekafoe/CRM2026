@@ -79,7 +79,7 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
                       type="button"
                       className="inv-icon-btn inv-icon-btn--in"
                       title="Приход"
-                      onClick={() => onMaterialAction(m, 'in')}
+                      onClick={() =>onMaterialAction(m, 'in')}
                     >
                       <AppIcon name="arrow-up" size="sm" />
                       <span>Приход</span>
@@ -88,7 +88,7 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
                       type="button"
                       className="inv-icon-btn inv-icon-btn--out"
                       title="Списание"
-                      onClick={() => onMaterialAction(m, 'out')}
+                      onClick={() =>onMaterialAction(m, 'out')}
                     >
                       <AppIcon name="arrow-down" size="sm" />
                       <span>Списание</span>
@@ -97,7 +97,7 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
                       type="button"
                       className="inv-icon-btn"
                       title="История движений"
-                      onClick={() => onViewTransactions(m.id!)}
+                      onClick={() =>onViewTransactions(m.id!)}
                     >
                       <AppIcon name="history" size="sm" />
                       <span>История</span>

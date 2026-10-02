@@ -100,28 +100,28 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     sku: '',
     notes: '',
     is_active: true,
-    paper_type_id: undefined, // 🆕 Добавляем поле для связи с типом бумаги
+    paper_type_id: undefined, //  Добавляем поле для связи с типом бумаги
     material_type_id: undefined,
     material_kind: 'consumable',
-    density: undefined, // 🆕 Добавляем поле плотности
-    finish: '', // 🆕 Отделка (для ламинации)
+    density: undefined, //  Добавляем поле плотности
+    finish: '', //  Отделка (для ламинации)
     sheet_width: '',
     sheet_height: ''
   });
 
-  // 🆕 Состояние для типов бумаги
+  //  Состояние для типов бумаги
   const [paperTypes, setPaperTypes] = useState<PaperType[]>([]);
   const [loadingPaperTypes, setLoadingPaperTypes] = useState(false);
   
-  // 🆕 Состояние для поставщиков
+  //  Состояние для поставщиков
   const [suppliers, setSuppliers] = useState<{id: number, name: string}[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   
-  // 🆕 Состояние для категорий
+  //  Состояние для категорий
   const [categories, setCategories] = useState<{id: number, name: string}[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
-  // 🆕 Состояние для типов материалов (внутри категорий)
+  //  Состояние для типов материалов (внутри категорий)
   const [materialTypes, setMaterialTypes] = useState<MaterialTypeOption[]>([]);
   const [loadingMaterialTypes, setLoadingMaterialTypes] = useState(false);
   const [showQuickTypeModal, setShowQuickTypeModal] = useState(false);
@@ -181,7 +181,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     return name.includes('лам') || name.includes('пленк');
   }, [selectedCategory]);
 
-  // 🆕 Загрузка типов бумаги
+  //  Загрузка типов бумаги
   const loadPaperTypes = async () => {
     try {
       setLoadingPaperTypes(true);
@@ -203,7 +203,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
   };
 
-  // 🆕 Загрузка типов материалов
+  //  Загрузка типов материалов
   const loadMaterialTypes = async (categoryId?: number) => {
     try {
       setLoadingMaterialTypes(true);
@@ -224,7 +224,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
   };
 
-  // 🆕 Загрузка поставщиков
+  //  Загрузка поставщиков
   const loadSuppliers = async () => {
     try {
       setLoadingSuppliers(true);
@@ -246,7 +246,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
   };
 
-  // 🆕 Загрузка категорий
+  //  Загрузка категорий
   const loadCategories = async () => {
     try {
       setLoadingCategories(true);
@@ -268,7 +268,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
   };
 
-  // 🆕 Загружаем типы бумаги, поставщиков и категории при монтировании компонента
+  //  Загружаем типы бумаги, поставщиков и категории при монтировании компонента
   useEffect(() => {
     loadPaperTypes();
     loadSuppliers();
@@ -419,7 +419,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
   return (
     <div className="modal-overlay material-form-modal-overlay" onClick={requestClose}>
-      <div className="modal-content material-form-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content material-form-modal" onClick={(e) =>e.stopPropagation()}>
         <div className="modal-header material-form-modal__header">
           <h2>{material ? 'Редактировать материал' : 'Добавить материал'}</h2>
           <button type="button" className="modal-close" onClick={requestClose} aria-label="Закрыть">×</button>
@@ -493,7 +493,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                   className="material-type-add-btn"
                   disabled={!formData.category_id || creatingType}
                   title="Создать новый тип в этой категории"
-                  onClick={() => {
+                  onClick={() =>{
                     setQuickTypeName('');
                     setShowQuickTypeModal(true);
                   }}
@@ -722,8 +722,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             <div className="form-group">
               <label>
                 <span>{materialPurchasePriceFieldLabel(formData.unit)}</span>
-                <span className="material-form__currency"> (<BynSymbol />)</span>
-                <span className="material-form__required" aria-hidden="true"> *</span>
+                <span className="material-form__currency">(<BynSymbol />)</span>
+                <span className="material-form__required" aria-hidden="true">*</span>
               </label>
               <input
                 type="number"
@@ -742,8 +742,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             <div className="form-group">
               <label>
                 <span>{materialPriceFieldLabel(formData.unit)}</span>
-                <span className="material-form__currency"> (<BynSymbol />)</span>
-                <span className="material-form__required" aria-hidden="true"> *</span>
+                <span className="material-form__currency">(<BynSymbol />)</span>
+                <span className="material-form__required" aria-hidden="true">*</span>
               </label>
               <input
                 type="number"
@@ -890,8 +890,8 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
       />
 
       {showQuickTypeModal && (
-        <div className="modal-overlay material-type-quick-overlay" onClick={() => !creatingType && setShowQuickTypeModal(false)}>
-          <div className="modal-content material-type-quick-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay material-type-quick-overlay" onClick={() =>!creatingType && setShowQuickTypeModal(false)}>
+          <div className="modal-content material-type-quick-modal" onClick={(e) =>e.stopPropagation()}>
             <h3>Новый тип материала</h3>
             <p className="form-hint">
               Тип будет создан в выбранной категории и сразу выбран в форме.
@@ -911,7 +911,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 type="button"
                 className="btn btn-secondary"
                 disabled={creatingType}
-                onClick={() => setShowQuickTypeModal(false)}
+                onClick={() =>setShowQuickTypeModal(false)}
               >
                 Отмена
               </button>
@@ -919,7 +919,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 type="button"
                 className="btn btn-primary"
                 disabled={creatingType || !quickTypeName.trim() || !formData.category_id}
-                onClick={async () => {
+                onClick={async () =>{
                   if (!formData.category_id || !quickTypeName.trim()) return;
                   try {
                     setCreatingType(true);

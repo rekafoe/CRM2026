@@ -15,23 +15,23 @@ function siteBase(): string {
 }
 
 const PAIRS: ReadonlyArray<readonly [string, string]> = [
-  ['📇 Визитки', '/services/vizitki'],
-  ['📄 Листовки', '/services/listovki'],
-  ['📑 Буклеты', '/services/buklety'],
-  ['📚 Каталоги', '/services/katalogi'],
-  ['🗓 Календари', '/services/kalendari'],
-  ['🪧 Флаеры', '/services/flaery'],
-  ['📖 Брошюры', '/services/brosjury'],
-  ['💌 Открытки', '/services/otkrytki'],
-  ['🏅 Грамоты', '/services/gramoty'],
-  ['🍽 Меню', '/services/menyu'],
-  ['🖨️ Полиграфия', '/services/poligrafy'],
-  ['📋 Все услуги', '/services'],
+  ['Визитки', '/services/vizitki'],
+  ['Листовки', '/services/listovki'],
+  ['Буклеты', '/services/buklety'],
+  ['Каталоги', '/services/katalogi'],
+  ['Календари', '/services/kalendari'],
+  ['Флаеры', '/services/flaery'],
+  ['Брошюры', '/services/brosjury'],
+  ['Открытки', '/services/otkrytki'],
+  ['Грамоты', '/services/gramoty'],
+  ['Меню', '/services/menyu'],
+  ['Полиграфия', '/services/poligrafy'],
+  ['Все услуги', '/services'],
 ];
 
 export function getPrintcorePoligraphyIntroText(): string {
   return (
-    `🖨️ *Полиграфия на сайте Printcore*\n\n` +
+    `*Полиграфия на сайте Printcore*\n\n` +
     `Ниже — быстрые ссылки на виды продукции и на каталог. ` +
     `Оформление заказа — на сайте (как и у Mini App: это веб-интерфейс).`
   );

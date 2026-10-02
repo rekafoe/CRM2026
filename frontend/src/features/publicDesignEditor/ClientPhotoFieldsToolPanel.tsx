@@ -28,7 +28,7 @@ export const ClientPhotoFieldsToolPanel: React.FC<ClientPhotoFieldsToolPanelProp
           key={preset.label}
           type="button"
           className="public-design-editor__client-photo-preset"
-          onClick={() => {
+          onClick={() =>{
             onAddPhotoField({ aspectW: preset.aspectW, aspectH: preset.aspectH });
             onClose();
           }}

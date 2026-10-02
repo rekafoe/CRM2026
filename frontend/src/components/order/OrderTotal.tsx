@@ -104,7 +104,7 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
           </div>
           <div className="order-total__line debt">
             <span>Долг клиента:</span>
-            <span className={debt > 0 ? 'debt-amount' : 'paid-amount'}>
+            <span className={debt >0 ? 'debt-amount' : 'paid-amount'}>
               {debt > 0 ? (
                 <BynValue>{debt}</BynValue>
               ) : (

@@ -12,7 +12,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ data }) 
   return (
     <div className="reports-metrics" style={{ marginBottom: '20px' }}>
       <h4 className="reports-metrics-title">
-        💰 Финансовая аналитика
+         Финансовая аналитика
       </h4>
       <div className="reports-metrics-grid">
         <div className="reports-metric">
@@ -52,7 +52,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ data }) 
       {/* Способы оплаты */}
       <div style={{ marginTop: '16px' }}>
         <h5 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)', fontSize: '14px' }}>
-          💳 Способы оплаты
+           Способы оплаты
         </h5>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{ textAlign: 'center', flex: '1', minWidth: '120px' }}>

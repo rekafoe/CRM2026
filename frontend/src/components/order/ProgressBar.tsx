@@ -91,7 +91,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
                 flex: 1,
                 position: 'relative'
               }}
-              onClick={() => handleStatusClick(status.id)}
+              onClick={() =>handleStatusClick(status.id)}
             >
               {/* Status number circle */}
               <div

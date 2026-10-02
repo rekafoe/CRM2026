@@ -12,7 +12,7 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ 
-  icon = '📭',
+  icon = '',
   title,
   description,
   action

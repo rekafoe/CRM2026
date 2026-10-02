@@ -81,7 +81,7 @@ export const CampaignSegmentManager: React.FC = () => {
       <div className="campaign-card">
         <div className="campaign-card__header">
           <h4>Сегменты</h4>
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => setSelected(null)}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() =>setSelected(null)}>
             Новый сегмент
           </button>
         </div>
@@ -91,7 +91,7 @@ export const CampaignSegmentManager: React.FC = () => {
               key={item.id}
               type="button"
               className={`campaign-list__item ${selected?.id === item.id ? 'active' : ''}`}
-              onClick={() => setSelected(item)}
+              onClick={() =>setSelected(item)}
             >
               <strong>{item.name}</strong>
               <span>{item.channel_scope}</span>
@@ -127,10 +127,10 @@ export const CampaignSegmentManager: React.FC = () => {
           onChange={(e) => setForm((prev) => ({ ...prev, filters_json: e.target.value }))}
         />
         <div className="campaign-actions">
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => void save()}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void save()}>
             Сохранить сегмент
           </button>
-          <button type="button" className="lg-btn" onClick={() => void estimate()}>
+          <button type="button" className="lg-btn" onClick={() =>void estimate()}>
             Оценить
           </button>
         </div>

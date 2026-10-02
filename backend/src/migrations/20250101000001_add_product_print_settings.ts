@@ -21,15 +21,15 @@ export async function up(db: Database): Promise<void> {
       ALTER TABLE products 
       ADD COLUMN print_settings TEXT
     `);
-    console.log('✅ Добавлено поле print_settings в таблицу products');
+    console.log('Добавлено поле print_settings в таблицу products');
   } else {
-    console.log('ℹ️ Поле print_settings уже существует в таблице products');
+    console.log('Поле print_settings уже существует в таблице products');
   }
 }
 
 export async function down(db: Database): Promise<void> {
   // SQLite не поддерживает DROP COLUMN напрямую
   // В реальном проекте нужно было бы пересоздать таблицу
-  console.log('⚠️ SQLite не поддерживает DROP COLUMN. Поле print_settings оставлено в таблице.');
+  console.log('SQLite не поддерживает DROP COLUMN. Поле print_settings оставлено в таблице.');
 }
 

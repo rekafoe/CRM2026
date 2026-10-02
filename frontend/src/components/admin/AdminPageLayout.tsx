@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAdminBack } from '../../hooks/useAdminBack';
+import { withoutEmoji } from '../../utils/withoutEmoji';
 import '../../styles/admin-page-layout.css';
 
 interface AdminPageLayoutProps {
@@ -32,6 +33,8 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
   description,
 }) => {
   const goBack = useAdminBack(backTo);
+  const renderedIcon = typeof icon === 'string' ? withoutEmoji(icon) : icon;
+  const showIcon = renderedIcon != null && renderedIcon !== '';
 
   return (
     <div className={`admin-page-layout ${className}`}>
@@ -41,7 +44,7 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
         </button>
         <div className="admin-page-header__title-block">
         <h1>
-          {icon != null && <span className="admin-page-header__title-icon">{icon}</span>}
+          {showIcon && <span className="admin-page-header__title-icon">{renderedIcon}</span>}
           <span className="admin-page-header__title-main">{title}</span>
           {titleSuffix && (
             <>

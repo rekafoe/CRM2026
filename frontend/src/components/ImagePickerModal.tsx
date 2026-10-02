@@ -109,7 +109,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 
   const overlay = isOpen ? (
     <div className="image-picker-overlay" onClick={handleClose}>
-          <div className="image-picker-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="image-picker-modal" onClick={(e) =>e.stopPropagation()}>
         <header className="image-picker-header">
           <ul className="image-picker-tabs" role="tablist">
             {TABS.map((tab) => (
@@ -119,7 +119,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                   role="tab"
                   aria-selected={activeTab === tab.id}
                   className={`image-picker-tab ${activeTab === tab.id ? 'image-picker-tab--active' : ''}`}
-                  onClick={() => tab.id === 'my-files' && setActiveTab(tab.id)}
+                  onClick={() =>tab.id === 'my-files' && setActiveTab(tab.id)}
                   disabled={tab.id !== 'my-files'}
                 >
                   {tab.label}
@@ -213,7 +213,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                     {selectedFiles.map((file, i) => (
                       <li key={`${file.name}-${i}`} className="image-picker-selected-item">
                         <span className="image-picker-selected-name" title={file.name}>{file.name}</span>
-                        <button type="button" className="image-picker-selected-remove" onClick={() => handleRemoveFile(i)} aria-label="Удалить">
+                        <button type="button" className="image-picker-selected-remove" onClick={() =>handleRemoveFile(i)} aria-label="Удалить">
                           <AppIcon name="x" size="xs" />
                         </button>
                       </li>

@@ -6,7 +6,7 @@ const AdminDashboard: React.FC = () => {
   return (
     <AdminPageLayout
       title="Настройка операций"
-      icon="🔧"
+      icon=""
     >
       <ServicesManagement showHeader={false} />
     </AdminPageLayout>

@@ -21,7 +21,7 @@ export const InboxFunnelPlanPage: React.FC = () => {
   return (
     <div className="admin-page-layout preflight-page">
       <div className="admin-page-header">
-        <button type="button" onClick={() => navigate('/adminpanel')} className="back-btn">
+        <button type="button" onClick={() =>navigate('/adminpanel')} className="back-btn">
           ← Назад
         </button>
         <h1>

@@ -192,13 +192,13 @@ export const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, templa
       />
 
       <div className="campaign-actions">
-        <button type="button" className="lg-btn lg-btn--primary" onClick={() => void save()} disabled={busy === 'save'}>
+        <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void save()} disabled={busy === 'save'}>
           {busy === 'save' ? 'Сохранение...' : 'Сохранить'}
         </button>
-        <button type="button" className="lg-btn" onClick={() => void estimate()} disabled={!campaign?.id || busy === 'estimate'}>
+        <button type="button" className="lg-btn" onClick={() =>void estimate()} disabled={!campaign?.id || busy === 'estimate'}>
           Оценить сегмент
         </button>
-        <button type="button" className="lg-btn" onClick={() => void run()} disabled={!campaign?.id || busy === 'run'}>
+        <button type="button" className="lg-btn" onClick={() =>void run()} disabled={!campaign?.id || busy === 'run'}>
           Запуск / планирование
         </button>
       </div>
@@ -217,7 +217,7 @@ export const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, templa
           placeholder="Необязательная тестовая подмена текста"
           rows={3}
         />
-        <button type="button" className="lg-btn lg-btn--primary" onClick={() => void sendTest()} disabled={!campaign?.id || busy === 'test'}>
+        <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void sendTest()} disabled={!campaign?.id || busy === 'test'}>
           {busy === 'test' ? 'Отправка...' : 'Тестовый запуск'}
         </button>
       </div>

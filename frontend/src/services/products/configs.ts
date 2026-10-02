@@ -152,7 +152,7 @@ export async function getProductParameterPresets(params: {
   } catch (error: any) {
     // Если получили 400 ошибку - возвращаем пустой массив вместо выбрасывания ошибки
     if (error?.response?.status === 400) {
-      console.warn('⚠️ Не удалось загрузить пресеты параметров: productType не указан или неверен', { productType, params });
+      console.warn('Не удалось загрузить пресеты параметров: productType не указан или неверен', { productType, params });
       return [];
     }
     // Для других ошибок пробрасываем дальше

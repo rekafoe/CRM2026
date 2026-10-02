@@ -27,9 +27,9 @@ interface ProductSetupStatusProps {
 }
 
 const STEP_LABELS: Record<string, string> = {
-  materials: '📦 Материалы',
-  operations: '⚙️ Операции',
-  pricing_rules: '💰 Правила ценообразования'
+  materials: 'Материалы',
+  operations: 'Операции',
+  pricing_rules: 'Правила ценообразования'
 };
 
 const STATUS_LABELS: Record<SetupStatus, string> = {
@@ -152,7 +152,7 @@ export const ProductSetupStatus: React.FC<ProductSetupStatusProps> = ({ productI
         {state.steps.map((step) => (
           <div key={step.step} className={`setup-step ${step.isCompleted ? 'completed' : 'incomplete'}`}>
             <div className="setup-step-icon">
-              {step.isCompleted ? '✅' : '⭕'}
+              {step.isCompleted ? 'Готово' : 'Не готово'}
             </div>
             <div className="setup-step-content">
               <div className="setup-step-label">
@@ -181,7 +181,7 @@ export const ProductSetupStatus: React.FC<ProductSetupStatusProps> = ({ productI
 
       {error && (
         <div className="setup-error">
-          ⚠️ {error}
+           {error}
         </div>
       )}
 
@@ -191,7 +191,7 @@ export const ProductSetupStatus: React.FC<ProductSetupStatusProps> = ({ productI
           onClick={handleUpdateStatus}
           disabled={updating}
         >
-          {updating ? '🔄 Обновление...' : '🔄 Обновить статус'}
+          {updating ? 'Обновление...' : 'Обновить статус'}
         </button>
 
         <button
@@ -200,13 +200,13 @@ export const ProductSetupStatus: React.FC<ProductSetupStatusProps> = ({ productI
           disabled={!state.canActivate || activating}
           title={!state.canActivate ? 'Завершите все этапы настройки' : 'Активировать продукт'}
         >
-          {activating ? '⏳ Активация...' : '✅ Активировать продукт'}
+          {activating ? 'Активация...' : 'Активировать продукт'}
         </button>
       </div>
 
       <div className="setup-help">
         <details>
-          <summary>❓ Как настроить продукт?</summary>
+          <summary> Как настроить продукт?</summary>
           <ol>
             <li><strong>Материалы:</strong> Настройте через вкладку "Материалы" в шаблоне продукта</li>
             <li><strong>Операции:</strong> Добавьте операции во вкладке "Операции и цена"</li>

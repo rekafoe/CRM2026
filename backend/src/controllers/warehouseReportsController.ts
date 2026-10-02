@@ -274,10 +274,10 @@ export class WarehouseReportsController {
    */
   static async generatePdfReport(req: Request, res: Response) {
     try {
-      console.log('📄 PDF generation request:', req.params, req.query);
+      console.log('PDF generation request:', req.params, req.query);
       const { reportType = 'summary' } = req.params;
       const user = (req as any).user;
-      console.log('👤 User:', user);
+      console.log('User:', user);
       const generatedBy = user?.name || user?.email || 'Система';
 
       let pdfBuffer: Buffer;

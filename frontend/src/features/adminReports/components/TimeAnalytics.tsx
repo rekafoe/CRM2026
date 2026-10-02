@@ -11,10 +11,10 @@ interface TimeAnalyticsProps {
 
 export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
   const periods = [
-    { key: 'morning', label: '🌅 Утро (9:00–12:00)', color: 'var(--accent-light)' },
-    { key: 'afternoon', label: '☀️ День (12:00–15:00)', color: 'var(--accent-primary)' },
-    { key: 'evening', label: '🌆 Вечер (15:00–18:00)', color: '#6c757d' },
-    { key: 'night', label: '🌙 Конец дня (18:00–20:00)', color: '#343a40' }
+    { key: 'morning', label: 'Утро (9:00–12:00)', color: 'var(--accent-light)' },
+    { key: 'afternoon', label: 'День (12:00–15:00)', color: 'var(--accent-primary)' },
+    { key: 'evening', label: 'Вечер (15:00–18:00)', color: '#6c757d' },
+    { key: 'night', label: 'Конец дня (18:00–20:00)', color: '#343a40' }
   ] as const satisfies ReadonlyArray<{ key: keyof TimeOfDayTrends; label: string; color: string }>;
 
   return (
@@ -22,7 +22,7 @@ export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
       {/* Почасовое распределение */}
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
         <h4 className="reports-chart-title">
-          🕐 Распределение заказов по часам
+           Распределение заказов по часам
         </h4>
         <div style={{ height: '200px', display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: '2px' }}>
           {data.hourlyAnalysis.map((hour) => {
@@ -61,7 +61,7 @@ export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
       {/* Статистика по каждому часу */}
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
         <h4 className="reports-chart-title">
-          📊 Статистика по часам
+           Статистика по часам
         </h4>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -98,7 +98,7 @@ export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
       {/* Пиковые периоды */}
       <div className="reports-metrics" style={{ marginBottom: '20px' }}>
         <h4 className="reports-metrics-title">
-          ⚡ Пиковые периоды
+           Пиковые периоды
         </h4>
         <div className="reports-metrics-grid">
           <div className="reports-metric">
@@ -143,7 +143,7 @@ export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
       {/* Анализ времени суток */}
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
         <h4 className="reports-chart-title">
-          🌅 Активность по времени суток
+           Активность по времени суток
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
           {periods.map((period) => (

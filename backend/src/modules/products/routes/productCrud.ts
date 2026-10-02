@@ -580,7 +580,7 @@ router.post('/', async (req, res) => {
         const insert = await db.run(
           `INSERT INTO product_categories (name, icon, description, sort_order, is_active, created_at, updated_at)
            VALUES (?, ?, ?, 0, 1, datetime('now'), datetime('now'))`,
-          ['Без категории', '📦', 'Системная категория по умолчанию']
+          ['Без категории', '', 'Системная категория по умолчанию']
         );
         resolvedCategoryId = insert.lastID ?? null;
         invalidateCacheByPattern('product_categories');

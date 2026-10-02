@@ -276,7 +276,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
         />
 
-        <button type="button" className="lg-btn lg-btn--primary" onClick={() => void handleAdd()} disabled={saving || !newName.trim()}>
+        <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void handleAdd()} disabled={saving || !newName.trim()}>
 
           <AppIcon name="plus" size="xs" /> Добавить
 
@@ -322,7 +322,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
                   />
 
-                  <button type="button" className="lg-btn lg-btn--primary" onClick={() => void saveRename(cat)} disabled={saving}>
+                  <button type="button" className="lg-btn lg-btn--primary" onClick={() =>void saveRename(cat)} disabled={saving}>
 
                     OK
 
@@ -354,7 +354,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
                     className="lg-btn lg-btn--icon"
 
-                    onClick={() => startRename(cat)}
+                    onClick={() =>startRename(cat)}
 
                     title="Переименовать"
 
@@ -376,7 +376,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
                   disabled={index === 0}
 
-                  onClick={() => void move(cat, -1)}
+                  onClick={() =>void move(cat, -1)}
 
                   title="Выше"
 
@@ -396,7 +396,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
                   disabled={index === list.length - 1}
 
-                  onClick={() => void move(cat, 1)}
+                  onClick={() =>void move(cat, 1)}
 
                   title="Ниже"
 
@@ -414,7 +414,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
                   className="lg-btn lg-btn--icon lg-btn--danger"
 
-                  onClick={() => void handleDelete(cat)}
+                  onClick={() =>void handleDelete(cat)}
 
                   title="Удалить"
 

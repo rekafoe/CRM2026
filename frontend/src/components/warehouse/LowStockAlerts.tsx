@@ -110,10 +110,10 @@ export const LowStockAlerts: React.FC = () => {
   // Получение иконки для уровня предупреждения
   const getAlertIcon = (level: string) => {
     switch (level) {
-      case 'out_of_stock': return '🚫'
-      case 'critical': return '⚠️'
-      case 'warning': return '⚠️'
-      default: return '⚠️'
+      case 'out_of_stock': return ''
+      case 'critical': return ''
+      case 'warning': return ''
+      default: return ''
     }
   }
 
@@ -168,7 +168,7 @@ export const LowStockAlerts: React.FC = () => {
 
       {error && (
         <div className="error-message">
-          <span className="error-icon">❌</span>
+          <span className="error-icon"></span>
           <span>{error.message}</span>
         </div>
       )}
@@ -204,19 +204,19 @@ export const LowStockAlerts: React.FC = () => {
         <div className="filter-buttons">
           <button 
             className={`filter-btn ${filter === 'active' ? 'active' : ''}`}
-            onClick={() => setFilter('active')}
+            onClick={() =>setFilter('active')}
           >
             Активные ({alertsArray.filter(a => !a.isResolved).length})
           </button>
           <button 
             className={`filter-btn ${filter === 'resolved' ? 'active' : ''}`}
-            onClick={() => setFilter('resolved')}
+            onClick={() =>setFilter('resolved')}
           >
             Решенные ({alertsArray.filter(a => a.isResolved).length})
           </button>
           <button 
             className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
+            onClick={() =>setFilter('all')}
           >
             Все ({alerts.length})
           </button>
@@ -227,7 +227,7 @@ export const LowStockAlerts: React.FC = () => {
       <div className="alerts-list">
         {filteredAlerts.length === 0 ? (
           <div className="no-alerts">
-            <div className="no-alerts-icon">✅</div>
+            <div className="no-alerts-icon"></div>
             <p>Нет уведомлений для отображения</p>
           </div>
         ) : (
@@ -261,7 +261,7 @@ export const LowStockAlerts: React.FC = () => {
 
                 {alert.isResolved && (
                   <div className="alert-resolved">
-                    <span className="resolved-icon">✅</span>
+                    <span className="resolved-icon"></span>
                     <span>Решено {alert.resolvedAt && new Date(alert.resolvedAt).toLocaleString('ru-RU')}</span>
                     {alert.resolvedByName && (
                       <span className="resolved-by">пользователем {alert.resolvedByName}</span>
@@ -275,7 +275,7 @@ export const LowStockAlerts: React.FC = () => {
                   <button
                     type="button"
                     className="lg-btn lg-btn--success"
-                    onClick={() => handleResolveAlert(alert.id)}
+                    onClick={() =>handleResolveAlert(alert.id)}
                     disabled={resolveStockAlert.isPending}
                   >
                     {resolveStockAlert.isPending ? 'Сохранение...' : 'Отметить решённым'}

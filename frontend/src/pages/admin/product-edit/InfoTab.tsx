@@ -3,6 +3,7 @@ import { Button, Alert, FormField } from '../../../components/common';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import type { ProductCategory } from '../../../services/products';
 import { uploadProductImage } from '../../../services/products';
+import { withoutEmoji } from '../../../utils/withoutEmoji';
 
 interface InfoTabProps {
   loading: boolean;
@@ -60,7 +61,7 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
     <div className="product-tab-panel">
       <Alert type="info">
         Измените базовые данные продукта. После сохранения они сразу будут доступны в каталоге и модулях расчёта.
-        ЧПУ для калькулятора на сайте: поле «Ключ URL (продукт)» ниже (route_key). Ключ подтипа (key) задаётся в шаблоне продукта → типы → ✎ у подтипа.
+        ЧПУ для калькулятора на сайте: поле «Ключ URL (продукт)» ниже (route_key). Ключ подтипа (key) задаётся в шаблоне продукта → типы →  у подтипа.
       </Alert>
       {loading && <Alert type="info">Загружаем данные продукта…</Alert>}
       <div className="product-form-grid">
@@ -81,13 +82,6 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             onChange={(e) => onFormChange('route_key', e.target.value)}
             placeholder="например: fotopechat"
             autoComplete="off"
-          />
-        </FormField>
-        <FormField label="Иконка" help="Эмодзи или короткий символ">
-          <input
-            className="form-input form-input--full"
-            value={form.icon || ''}
-            onChange={(e) => onFormChange('icon', e.target.value)}
           />
         </FormField>
         <FormField label="Изображение" help="Загрузите фото продукта для сайта и каталога">
@@ -168,7 +162,7 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             <option value="">— Без категории —</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+                {[withoutEmoji(cat.icon), cat.name].filter(Boolean).join(' ')}
               </option>
             ))}
           </select>

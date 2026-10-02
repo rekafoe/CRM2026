@@ -241,7 +241,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
           <p>
             <strong>Не удалось загрузить данные.</strong> {error.message}
           </p>
-          <button type="button" className="lg-btn" onClick={() => refetch()}>
+          <button type="button" className="lg-btn" onClick={() =>refetch()}>
             Повторить
           </button>
         </div>
@@ -258,7 +258,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
               type="button"
               className="compact-stat success"
               title="В наличии — открыть остатки"
-              onClick={() => openInventory('stock')}
+              onClick={() =>openInventory('stock')}
             >
               <AppIcon name="check" size="xs" />
               <span className="compact-value">{warehouseStats.inStock}</span>
@@ -267,7 +267,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
               type="button"
               className="compact-stat warning"
               title="Низкий запас — открыть дефицит"
-              onClick={() => openInventory('deficit')}
+              onClick={() =>openInventory('deficit')}
             >
               <AppIcon name="info" size="xs" />
               <span className="compact-value">{warehouseStats.lowStock}</span>
@@ -276,7 +276,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
               type="button"
               className="compact-stat danger"
               title="Нет в наличии — открыть дефицит"
-              onClick={() => openInventory('deficit')}
+              onClick={() =>openInventory('deficit')}
             >
               <AppIcon name="x" size="xs" />
               <span className="compact-value">{warehouseStats.outOfStock}</span>
@@ -285,7 +285,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
               type="button"
               className="compact-stat info"
               title="Оценка остатка по закупу — отчёты"
-              onClick={() => handleTabChange('reports')}
+              onClick={() =>handleTabChange('reports')}
             >
               <AppIcon name="wallet" size="xs" />
               <span className="compact-value">
@@ -328,7 +328,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
         )}
 
         <div
-          className={`product-quick-filters${selectedMaterials.length > 0 ? '' : ' product-quick-filters--flush-top'}`}
+          className={`product-quick-filters${selectedMaterials.length >0 ? '' : ' product-quick-filters--flush-top'}`}
           role="tablist"
           aria-label="Разделы склада"
         >
@@ -340,7 +340,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
               aria-selected={activeTab === tab.id}
               title={tab.hint}
               className={`product-filter-chip ${activeTab === tab.id ? 'product-filter-chip--active' : ''}`}
-              onClick={() => handleTabChange(tab.id)}
+              onClick={() =>handleTabChange(tab.id)}
             >
               <AppIcon name={tab.icon} size="xs" />
               <span>{tab.title}</span>

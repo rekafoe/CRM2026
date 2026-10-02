@@ -64,10 +64,10 @@ export const ClientTextToolPanel: React.FC<ClientTextToolPanelProps> = ({
       <>
         <p>Выберите текст на макете или добавьте новый блок.</p>
         <div className="public-design-editor__client-tool-actions">
-          <button type="button" className="public-design-editor__client-tool-primary" onClick={() => onAddTextPreset('body')}>
+          <button type="button" className="public-design-editor__client-tool-primary" onClick={() =>onAddTextPreset('body')}>
             + Текст
           </button>
-          <button type="button" className="public-design-editor__client-tool-secondary" onClick={() => onAddTextPreset('heading')}>
+          <button type="button" className="public-design-editor__client-tool-secondary" onClick={() =>onAddTextPreset('heading')}>
             + Заголовок
           </button>
         </div>

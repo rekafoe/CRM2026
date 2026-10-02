@@ -212,7 +212,7 @@ export const MultiPagePresetHelper: React.FC<MultiPagePresetHelperProps> = ({
     <div className="multi-page-preset-helper flex flex-col gap-3">
       <Alert type="info">
         <div className="flex flex-col gap-2">
-          <strong>💡 Упрощенное создание многостраничных изделий</strong>
+          <strong>Упрощенное создание многостраничных изделий</strong>
           <p className="text-sm">
             Выберите готовый пресет для автоматической настройки параметров и операций:
           </p>

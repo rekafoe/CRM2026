@@ -249,7 +249,7 @@ async function createTestOrders() {
   const db = new sqlite3.Database(DB_FILE);
   
   try {
-    console.log('🚀 Создание тестовых заказов...');
+    console.log('Создание тестовых заказов...');
     
     // Создаем заказы с сайта
     for (let i = 0; i < testOrders.length; i++) {
@@ -300,7 +300,7 @@ async function createTestOrders() {
         });
       });
       
-      console.log(`✅ Создан заказ: ${orderNumber} (${order.customerName})`);
+      console.log(`Создан заказ: ${orderNumber} (${order.customerName})`);
     }
     
     // Создаем заказы фото из Telegram
@@ -335,15 +335,15 @@ async function createTestOrders() {
       });
       
       const photoOrderNumber = generateOrderNumber('telegram');
-      console.log(`✅ Создан заказ фото: ${photoOrderNumber} (${photoOrder.first_name})`);
+      console.log(`Создан заказ фото: ${photoOrderNumber} (${photoOrder.first_name})`);
     }
     
-    console.log('🎉 Все тестовые заказы созданы успешно!');
-    console.log(`📊 Создано заказов с сайта: ${testOrders.length}`);
-    console.log(`📸 Создано заказов фото: ${testPhotoOrders.length}`);
+    console.log('Все тестовые заказы созданы успешно!');
+    console.log(`Создано заказов с сайта: ${testOrders.length}`);
+    console.log(`Создано заказов фото: ${testPhotoOrders.length}`);
     
   } catch (error) {
-    console.error('❌ Ошибка при создании тестовых заказов:', error);
+    console.error('Ошибка при создании тестовых заказов:', error);
   } finally {
     db.close();
   }

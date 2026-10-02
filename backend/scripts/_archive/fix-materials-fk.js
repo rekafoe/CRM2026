@@ -12,7 +12,7 @@ async function run() {
   const all = (sql) => new Promise((res, rej) => db.all(sql, (e, r) => e ? rej(e) : res(r)));
 
   try {
-    console.log('🔧 Fixing materials FK to material_categories...');
+    console.log('Fixing materials FK to material_categories...');
 
     const pragma = await all('PRAGMA foreign_keys');
     console.log('PRAGMA foreign_keys =', pragma);
@@ -73,9 +73,9 @@ async function run() {
     `);
 
     await exec('COMMIT; PRAGMA foreign_keys=ON;');
-    console.log('✅ materials table recreated with correct FK.');
+    console.log('materials table recreated with correct FK.');
   } catch (e) {
-    console.error('❌ Failed to fix materials FK:', e);
+    console.error('Failed to fix materials FK:', e);
     try { await exec('ROLLBACK; PRAGMA foreign_keys=ON;'); } catch {}
     process.exit(1);
   } finally {

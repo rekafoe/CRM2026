@@ -25,7 +25,7 @@ describe('Product template configs API', () => {
        VALUES (?, ?, ?, ?, 1)`,
       'Тестовая категория',
       'Категория для тестов',
-      '🧪',
+      '',
       1
     )
 
@@ -35,7 +35,7 @@ describe('Product template configs API', () => {
       category.lastID,
       'Тестовый продукт',
       'Используется в юнит-тестах',
-      '📦'
+      ''
     )
 
     productId = product.lastID!

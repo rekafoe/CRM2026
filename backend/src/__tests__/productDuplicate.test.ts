@@ -23,7 +23,7 @@ describe('POST /products/:id/duplicate', () => {
        VALUES (?, ?, ?, ?, 1)`,
       `Dup test cat ${suiteKey}`,
       '',
-      '🧪',
+      '',
       0,
     );
     const catId = cat.lastID!;
@@ -35,7 +35,7 @@ describe('POST /products/:id/duplicate', () => {
       catId,
       sourceProductName,
       '',
-      '📦',
+      '',
     );
     sourceId = ins.lastID!;
 
@@ -66,7 +66,7 @@ describe('POST /products/:id/duplicate', () => {
       cat!.id,
       'Non simplified for dup test',
       '',
-      '📦',
+      '',
     );
     const id = ins.lastID!;
     const res = await request(app).post(`/products/${id}/duplicate`).send({ name: 'Should fail' });

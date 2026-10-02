@@ -323,10 +323,10 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   const sheetSize = item.params.layout?.sheetSize ?? null;
   
   // Извлекаем данные о материале для отображения
-  // 🆕 Приоритет: materialType (тип материала, например 'coated'), затем paperType (тип бумаги, например 'glossy')
+  //  Приоритет: materialType (тип материала, например 'coated'), затем paperType (тип бумаги, например 'glossy')
   const materialTypeRaw = specsAny?.materialType || specsAny?.paperType || null;
   const materialFormat = specsAny?.format || item.params.formatInfo || sheetSize || null;
-  // 🆕 Приоритет: плотность из specifications (то, что выбрал пользователь), затем из parameterSummary, затем из params
+  //  Приоритет: плотность из specifications (то, что выбрал пользователь), затем из parameterSummary, затем из params
   const densityFromSummary = parameterSummary.find((p) => p.label === 'Плотность бумаги' || p.label === 'Плотность')?.value;
   const densityFromSummaryNum = densityFromSummary ? Number(densityFromSummary.replace(/[^\d]/g, '')) : null;
   const materialDensity = specsAny?.paperDensity || densityFromSummaryNum || item.params.paperDensity || null;
@@ -543,7 +543,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
               {!showPositionBreakdown ? (
                 <>
                   <strong>{itemDisplayName}</strong>
-                  <span className="order-item-title-meta"> | {titleParts.metaInline}</span>
+                  <span className="order-item-title-meta">| {titleParts.metaInline}</span>
                 </>
               ) : null}
               {showDesc ? <> — {display}</> : null}
@@ -570,7 +570,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
                     <button
                       type="button"
                       className="order-item-editor-preview-btn"
-                      onClick={() => setShowEditorPreview(true)}
+                      onClick={() =>setShowEditorPreview(true)}
                     >
                       Открыть preview
                     </button>

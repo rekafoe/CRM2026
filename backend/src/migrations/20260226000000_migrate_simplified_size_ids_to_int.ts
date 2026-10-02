@@ -101,7 +101,7 @@ export async function up(db: Database): Promise<void> {
     }
   }
 
-  console.log(`✅ [migrate_simplified_size_ids] Обновлено конфигов: ${totalUpdated}`);
+  console.log(`[migrate_simplified_size_ids] Обновлено конфигов: ${totalUpdated}`);
 }
 
 export async function down(): Promise<void> {

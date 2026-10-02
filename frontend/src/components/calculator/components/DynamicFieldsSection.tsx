@@ -4,7 +4,7 @@ import { AppIcon } from '../../ui/AppIcon';
 interface DynamicFieldsSectionProps {
   schema: any | null;
   specs: Record<string, any>;
-  updateSpecs: (updates: Record<string, any>, instant?: boolean) => void; // 🆕 Добавили instant
+  updateSpecs: (updates: Record<string, any>, instant?: boolean) => void; //  Добавили instant
   /** Не показывать эти поля (например, выборка/накатка вне рулонного плоттера). */
   hiddenFieldNames?: Set<string>;
 }
@@ -18,7 +18,7 @@ const RESERVED_FIELDS = new Set([
   'paperType',
   'paperDensity',
   'lamination',
-  'material_id', // 🆕 Обрабатывается в MaterialsSection
+  'material_id', //  Обрабатывается в MaterialsSection
   // Поля печати обрабатываются в PrintingSettingsSection
   'print_technology',
   'printTechnology',
@@ -65,7 +65,7 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
               const newValue = isObjectEnum
                   ? (shouldCastToNumber ? Number(e.target.value) : e.target.value)
                   : e.target.value;
-              updateSpecs({ [field.name]: newValue }, true); // 🆕 instant для select
+              updateSpecs({ [field.name]: newValue }, true); //  instant для select
             }}
             className="form-control"
           >
@@ -93,7 +93,7 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
             <input
               type="checkbox"
               checked={!!value}
-              onChange={(e) => updateSpecs({ [field.name]: e.target.checked }, true)} // 🆕 instant
+              onChange={(e) => updateSpecs({ [field.name]: e.target.checked }, true)} //  instant
             />
             {field.label || field.name}
             {field.required ? ' *' : ''}

@@ -19,7 +19,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
   if (!hasData) {
     return (
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
-        <h4 className="reports-chart-title">📦 ABC-анализ материалов (по стоимости)</h4>
+        <h4 className="reports-chart-title">ABC-анализ материалов (по стоимости)</h4>
         <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
           Нет движений материалов за выбранный период. Измените период или диапазон дат.
         </div>
@@ -32,7 +32,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
       {/* ABC-анализ материалов */}
       <div className="reports-chart" style={{ marginBottom: '20px' }}>
         <h4 className="reports-chart-title">
-          📦 ABC-анализ материалов (по стоимости)
+           ABC-анализ материалов (по стоимости)
         </h4>
 
         {/* Сводка ABC */}
@@ -104,7 +104,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
       {/* Анализ по категориям материалов */}
       <div className="reports-metrics" style={{ marginBottom: '20px' }}>
         <h4 className="reports-metrics-title">
-          📂 Анализ по категориям материалов
+           Анализ по категориям материалов
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           {categoryAnalysis.slice(0, 6).map((category, idx) => (

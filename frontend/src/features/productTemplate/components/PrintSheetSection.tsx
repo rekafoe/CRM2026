@@ -142,14 +142,14 @@ const PrintSheetSection: React.FC<{
             <button
               type="button"
               className={`template-toggle ${usingPreset ? 'template-toggle--active' : ''}`}
-              onClick={() => onChange({ preset: preset || 'SRA3' })}
+              onClick={() =>onChange({ preset: preset || 'SRA3' })}
             >
               типовых листов
             </button>
             <button
               type="button"
               className={`template-toggle ${!usingPreset ? 'template-toggle--active' : ''}`}
-              onClick={() => onChange({ preset: '' as Preset })}
+              onClick={() =>onChange({ preset: '' as Preset })}
             >
               индивидуальных листов
             </button>

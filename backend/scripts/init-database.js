@@ -16,11 +16,11 @@ const args = process.argv.slice(2);
 const force = args.includes('--force');
 
 async function initDatabase() {
-  console.log('🗄️  Database Initialization Script\n');
+  console.log(' Database Initialization Script\n');
 
   // Проверяем существование БД
   if (fs.existsSync(DB_PATH) && !force) {
-    console.log('⚠️  Database already exists!');
+    console.log(' Database already exists!');
     console.log('   Use --force to recreate it');
     console.log(`   Path: ${DB_PATH}\n`);
     process.exit(1);
@@ -28,30 +28,30 @@ async function initDatabase() {
 
   // Удаляем старую БД если --force
   if (force && fs.existsSync(DB_PATH)) {
-    console.log('🗑️  Removing old database...');
+    console.log(' Removing old database...');
     fs.unlinkSync(DB_PATH);
   }
 
   // Читаем SQL файлы
-  console.log('📄 Reading schema...');
+  console.log('Reading schema...');
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   
-  console.log('📄 Reading seed data...');
+  console.log('Reading seed data...');
   const seedData = fs.readFileSync(SEED_PATH, 'utf8');
 
   // Создаем БД
-  console.log('🔨 Creating database...');
+  console.log('Creating database...');
   const db = new sqlite3.Database(DB_PATH);
 
   // Применяем схему
   await new Promise((resolve, reject) => {
-    console.log('📊 Applying schema...');
+    console.log('Applying schema...');
     db.exec(schema, (err) => {
       if (err) {
-        console.error('❌ Schema error:', err);
+        console.error('Schema error:', err);
         reject(err);
       } else {
-        console.log('✅ Schema applied');
+        console.log('Schema applied');
         resolve();
       }
     });
@@ -59,13 +59,13 @@ async function initDatabase() {
 
   // Заполняем данными
   await new Promise((resolve, reject) => {
-    console.log('🌱 Seeding data...');
+    console.log('Seeding data...');
     db.exec(seedData, (err) => {
       if (err) {
-        console.error('❌ Seed error:', err);
+        console.error('Seed error:', err);
         reject(err);
       } else {
-        console.log('✅ Data seeded');
+        console.log('Data seeded');
         resolve();
       }
     });
@@ -80,7 +80,7 @@ async function initDatabase() {
       GROUP BY name
     `, (err, tables) => {
       if (err) reject(err);
-      console.log(`\n📋 Created ${tables.length} tables:`);
+      console.log(`\n Created ${tables.length} tables:`);
       resolve();
     });
   });
@@ -103,15 +103,15 @@ async function initDatabase() {
 
   db.close();
 
-  console.log('\n🎉 Database initialized successfully!');
-  console.log(`📍 Location: ${DB_PATH}`);
-  console.log('\n💡 Next steps:');
+  console.log('\n Database initialized successfully!');
+  console.log(`Location: ${DB_PATH}`);
+  console.log('\n Next steps:');
   console.log('   1. npm start - to start the server');
   console.log('   2. Visit http://localhost:3001/api/products');
 }
 
 initDatabase().catch((err) => {
-  console.error('\n❌ Initialization failed:', err);
+  console.error('\n Initialization failed:', err);
   process.exit(1);
 });
 

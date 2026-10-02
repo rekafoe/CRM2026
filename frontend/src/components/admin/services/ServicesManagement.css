@@ -716,7 +716,7 @@
   max-width: 100%;
 }
 
-/* 🆕 Стили для развернутых строк с ServiceVariantsTable */
+/*  Стили для развернутых строк с ServiceVariantsTable */
 .services-table-container td[colspan] {
   width: 100% !important;
   max-width: 0 !important;

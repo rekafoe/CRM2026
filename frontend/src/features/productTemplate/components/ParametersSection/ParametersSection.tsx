@@ -12,7 +12,7 @@ const REQUIRED_PARAMETER_KEYS = [
   'duplex',
   // Старый параметр (оставляем для обратной совместимости)
   'print_method',
-  // 🆕 Новый справочник печати
+  //  Новый справочник печати
   'print_technology',
   'print_color_mode',
   'material',
@@ -92,7 +92,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
           setAvailableOperations(ops)
         })
         .catch(err => {
-          console.error('❌ Failed to load operations:', err)
+          console.error('Failed to load operations:', err)
           setAvailableOperations([])
         })
     }
@@ -230,7 +230,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
     
     if (isRequired) {
       const confirmed = window.confirm(
-        `⚠️ Внимание!\n\n` +
+        `Внимание!\n\n` +
         `Параметр "${paramLabel}" является рекомендуемым параметром.\n\n` +
         `Вы уверены, что хотите его удалить? Это может повлиять на работу калькулятора.`
       )
@@ -275,7 +275,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
       {productType === 'universal' && (
         <div className="mb-4">
           <div className="alert alert-info">
-            <strong>🔧 Универсальный продукт</strong>
+            <strong>Универсальный продукт</strong>
             <p className="text-sm mt-1">Все параметры настраиваются вручную. Добавьте нужные параметры для вашего продукта.</p>
           </div>
         </div>
@@ -292,7 +292,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
                 key={preset.key}
                 type="button"
                 className="btn-secondary text-sm"
-                onClick={() => void handleAddPreset(preset)}
+                onClick={() =>void handleAddPreset(preset)}
               >
                 + {preset.label}
               </button>
@@ -370,10 +370,10 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
                 )}
                 <div className="flex gap-2" style={{ marginTop: 12 }}>
                   <button className="btn-primary" onClick={handleSaveEdit}>
-                    💾 Сохранить
+                     Сохранить
                   </button>
                   <button className="btn-secondary" onClick={handleCancelEdit}>
-                    ✖️ Отмена
+                     Отмена
                   </button>
                 </div>
               </div>
@@ -393,21 +393,21 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
                   )}
                   {param.type === 'checkbox' && (param as any).linked_operation_id && (
                     <span className="preview-chip" style={{ fontSize: 11 }}>
-                      🔗 Связана с операцией
+                       Связана с операцией
                     </span>
                   )}
                 </div>
               </div>
               <div className="flex gap-3 items-center">
-                <button className="btn-quick-action" onClick={() => handleStartEdit(param)}>
-                  ✏️ Редактировать
+                <button className="btn-quick-action" onClick={() =>handleStartEdit(param)}>
+                   Редактировать
                 </button>
                 <button 
                   className={`btn-quick-action ${REQUIRED_PARAMETER_KEYS.includes(param.name) ? 'btn-quick-action--warning' : 'btn-quick-action--danger'}`}
-                  onClick={() => handleDeleteParam(param)}
+                  onClick={() =>handleDeleteParam(param)}
                   title={REQUIRED_PARAMETER_KEYS.includes(param.name) ? 'Удалить рекомендуемый параметр' : 'Удалить параметр'}
                 >
-                  🗑️ Удалить
+                   Удалить
                 </button>
               </div>
             </div>
@@ -417,7 +417,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
         <div className="parameter-item add-param-trigger">
           <button 
             className="btn-primary" 
-            onClick={(e) => {
+            onClick={(e) =>{
               e.preventDefault();
               e.stopPropagation();
               setShowAddModal(true);
@@ -425,7 +425,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
             type="button"
             style={{ width: '100%' }}
           >
-            ➕ Добавить свой параметр
+             Добавить свой параметр
           </button>
         </div>
       </div>
@@ -462,27 +462,27 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
               <button
                 type="button"
                 className={`type-option ${customParam.type === 'select' ? 'active' : ''}`}
-                onClick={() => setCustomParam((prev) => ({ ...prev, type: 'select' }))}
+                onClick={() =>setCustomParam((prev) => ({ ...prev, type: 'select' }))}
               >
-                <span className="type-icon">📋</span>
+                <span className="type-icon"></span>
                 <span className="type-name">Список</span>
                 <span className="type-desc">Выбор из вариантов</span>
               </button>
               <button
                 type="button"
                 className={`type-option ${customParam.type === 'checkbox' ? 'active' : ''}`}
-                onClick={() => setCustomParam((prev) => ({ ...prev, type: 'checkbox' }))}
+                onClick={() =>setCustomParam((prev) => ({ ...prev, type: 'checkbox' }))}
               >
-                <span className="type-icon">☑️</span>
+                <span className="type-icon"></span>
                 <span className="type-name">Да/Нет</span>
                 <span className="type-desc">Включить/выключить</span>
               </button>
               <button
                 type="button"
                 className={`type-option ${customParam.type === 'number' ? 'active' : ''}`}
-                onClick={() => setCustomParam((prev) => ({ ...prev, type: 'number' }))}
+                onClick={() =>setCustomParam((prev) => ({ ...prev, type: 'number' }))}
               >
-                <span className="type-icon">🔢</span>
+                <span className="type-icon"></span>
                 <span className="type-name">Число</span>
                 <span className="type-desc">Ввод числа</span>
               </button>
@@ -522,7 +522,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
               
               {availableOperations.length === 0 ? (
                 <div className="alert alert-warning" style={{ marginTop: 8, padding: 12 }}>
-                  ⚠️ У продукта нет операций. Сначала добавьте операции на вкладке "Операции"
+                   У продукта нет операций. Сначала добавьте операции на вкладке "Операции"
                 </div>
               ) : (
                 <>
@@ -540,7 +540,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
                   </select>
                   {selectedOperationId && (
                     <div className="alert alert-info" style={{ marginTop: 8, padding: 10 }}>
-                      💡 При включении параметра "{customParam.label}" будет автоматически добавлена выбранная операция
+                       При включении параметра "{customParam.label}" будет автоматически добавлена выбранная операция
                     </div>
                   )}
                 </>
@@ -552,7 +552,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
             <button 
               type="button"
               className="btn-secondary" 
-              onClick={() => setShowAddModal(false)}
+              onClick={() =>setShowAddModal(false)}
             >
               Отмена
             </button>
@@ -560,9 +560,9 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
               type="button"
               className="btn-primary" 
               disabled={!customParam.label?.trim()} 
-              onClick={() => void handleAddCustom()}
+              onClick={() =>void handleAddCustom()}
             >
-              ✅ Добавить параметр
+               Добавить параметр
             </button>
           </div>
         </div>

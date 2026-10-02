@@ -94,14 +94,14 @@ export function useReasonPrompt() {
         justifyContent: 'center',
         zIndex: 2000,
         padding: 16,
-      }} onClick={() => closeWith(null)}>
+      }} onClick={() =>closeWith(null)}>
         <div style={{
           width: 'min(560px, 96vw)',
           background: '#fff',
           borderRadius: 12,
           border: '1px solid #e2e8f0',
           padding: 16,
-        }} onClick={(e) => e.stopPropagation()}>
+        }} onClick={(e) =>e.stopPropagation()}>
           <h3 style={{ marginTop: 0, marginBottom: 12 }}>{state.title}</h3>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
@@ -109,7 +109,7 @@ export function useReasonPrompt() {
               <button
                 key={preset}
                 type="button"
-                onClick={() => setState((prev) => ({ ...prev, value: preset }))}
+                onClick={() =>setState((prev) => ({ ...prev, value: preset }))}
                 style={{
                   border: '1px solid #cbd5e0',
                   borderRadius: 8,
@@ -141,7 +141,7 @@ export function useReasonPrompt() {
           />
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" onClick={() => closeWith(null)} style={{
+            <button type="button" onClick={() =>closeWith(null)} style={{
               border: '1px solid #cbd5e0',
               borderRadius: 8,
               background: '#fff',
@@ -153,7 +153,7 @@ export function useReasonPrompt() {
             <button
               type="button"
               disabled={confirmDisabled}
-              onClick={() => {
+              onClick={() =>{
                 const normalized = state.value.trim();
                 if (state.rememberKey) {
                   try {

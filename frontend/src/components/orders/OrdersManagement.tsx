@@ -349,7 +349,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
       {/* Заголовок и статистика */}
       <div className="orders-header">
         <div className="orders-title">
-          <h2>📋 Управление заказами</h2>
+          <h2>Управление заказами</h2>
           <div className="orders-count">
             {orders.length} заказов • <MoneyAmount value={totalAmount} decimals={0} />
           </div>
@@ -358,28 +358,28 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
         <div className="orders-actions">
           <button 
             className="btn btn-outline"
-            onClick={() => setShowStats(!showStats)}
+            onClick={() =>setShowStats(!showStats)}
           >
-            📊 Статистика
+             Статистика
           </button>
           <button 
             className="btn btn-outline"
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={() =>setShowFilters(!showFilters)}
           >
-            🔍 Фильтры
+             Фильтры
           </button>
           <div className="export-buttons">
             <button 
               className="btn btn-outline"
-              onClick={() => handleExport('csv')}
+              onClick={() =>handleExport('csv')}
             >
-              📄 CSV
+               CSV
             </button>
             <button 
               className="btn btn-outline"
-              onClick={() => handleExport('json')}
+              onClick={() =>handleExport('json')}
             >
-              📋 JSON
+               JSON
             </button>
           </div>
         </div>
@@ -527,10 +527,10 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
           
           <div className="filters-actions">
             <button className="btn btn-primary" onClick={handleSearch}>
-              🔍 Поиск
+               Поиск
             </button>
             <button className="btn btn-outline" onClick={handleResetFilters}>
-              🗑️ Сбросить
+               Сбросить
             </button>
           </div>
         </div>
@@ -561,7 +561,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
               className="btn btn-danger"
               onClick={handleBulkDelete}
             >
-              🗑️ Удалить
+               Удалить
             </button>
           </div>
         </div>
@@ -571,7 +571,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
       <div className="orders-list">
         {orders.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📋</div>
+            <div className="empty-icon"></div>
             <h3>Заказы не найдены</h3>
             <p>Попробуйте изменить фильтры поиска</p>
           </div>
@@ -608,7 +608,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                 <div 
                   key={order.id}
                   className={`order-row ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''}`}
-                  onClick={() => handleOrderSelect(order)}
+                  onClick={() =>handleOrderSelect(order)}
                 >
                   <div className="order-checkbox">
                     <input
@@ -650,7 +650,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                     <div className="amount-value"><MoneyAmount value={orderTotal} decimals={0} /></div>
                     {order.prepaymentAmount && order.prepaymentAmount > 0 && (
                       <div className="prepayment-info">
-                        💳 <MoneyAmount value={order.prepaymentAmount} />
+                         <MoneyAmount value={order.prepaymentAmount} />
                       </div>
                     )}
                   </div>
@@ -671,7 +671,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
           <button 
             className="btn btn-outline"
             disabled={currentPage === 1}
-            onClick={() => loadOrders(currentPage - 1)}
+            onClick={() =>loadOrders(currentPage - 1)}
           >
             ← Назад
           </button>
@@ -683,7 +683,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
           <button 
             className="btn btn-outline"
             disabled={currentPage === totalPages}
-            onClick={() => loadOrders(currentPage + 1)}
+            onClick={() =>loadOrders(currentPage + 1)}
           >
             Вперед →
           </button>

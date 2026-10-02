@@ -18,7 +18,7 @@ export const DesignEditorSidebar: React.FC<DesignEditorSidebarProps> = ({
         key={item.id}
         type="button"
         className={`design-editor-sidebar-item ${activeSection === item.id ? 'is-active' : ''}`}
-        onClick={() => onSectionChange(activeSection === item.id ? null : item.id)}
+        onClick={() =>onSectionChange(activeSection === item.id ? null : item.id)}
         title={item.label}
       >
         <AppIcon name={item.icon} size="sm" />

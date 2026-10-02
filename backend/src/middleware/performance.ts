@@ -72,7 +72,7 @@ export function performanceMiddleware(req: Request, res: Response, next: NextFun
     
     // Логируем медленные запросы
     if (duration > performanceMonitor['slowRequestThreshold']) {
-      console.warn(`🐌 Медленный запрос: ${req.method} ${req.path} - ${duration}ms`)
+      console.warn(`Медленный запрос: ${req.method} ${req.path} - ${duration}ms`)
     }
 
     // Добавляем заголовки производительности
@@ -99,7 +99,7 @@ export function performanceLoggingMiddleware(req: Request, res: Response, next: 
   
   res.on('finish', () => {
     const duration = Date.now() - startTime
-    const statusColor = res.statusCode >= 400 ? '🔴' : res.statusCode >= 300 ? '🟡' : '🟢'
+    const statusColor = res.statusCode >= 400 ? '' : res.statusCode >= 300 ? '' : ''
     
     console.log(`${statusColor} ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`)
   })

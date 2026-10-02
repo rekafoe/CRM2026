@@ -119,7 +119,7 @@ const BaseMaterialsCollapsible: React.FC<{
   const [expanded, setExpanded] = useState(false)
   return (
     <div className={`simplified-subsection simplified-subsection--collapsible mt-4 pt-4 materials-card__base ${!expanded ? 'simplified-subsection--collapsed' : ''}`}>
-      <div className="simplified-subsection__header" onClick={() => setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
+      <div className="simplified-subsection__header" onClick={() =>setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
         <div>
           <div className="text-sm font-medium">
             {titleWithHint(

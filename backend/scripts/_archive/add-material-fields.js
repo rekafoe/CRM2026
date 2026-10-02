@@ -9,7 +9,7 @@ const path = require('path');
 const DB_PATH = path.join(__dirname, '../data.db');
 
 async function addMissingFields() {
-  console.log('🔧 Adding missing fields to materials table...\n');
+  console.log('Adding missing fields to materials table...\n');
 
   const db = new sqlite3.Database(DB_PATH);
 
@@ -22,7 +22,7 @@ async function addMissingFields() {
       });
     });
 
-    console.log('📋 Current columns in materials table:');
+    console.log('Current columns in materials table:');
     columns.forEach(col => console.log(`   - ${col.name} (${col.type})`));
 
     // Добавляем недостающие поля
@@ -38,7 +38,7 @@ async function addMissingFields() {
     for (const field of fieldsToAdd) {
       const exists = columns.some(col => col.name === field.name);
       if (!exists) {
-        console.log(`➕ Adding field: ${field.name}`);
+        console.log(`Adding field: ${field.name}`);
         await new Promise((resolve, reject) => {
           db.run(field.sql, (err) => {
             if (err) reject(err);
@@ -46,7 +46,7 @@ async function addMissingFields() {
           });
         });
       } else {
-        console.log(`✅ Field already exists: ${field.name}`);
+        console.log(`Field already exists: ${field.name}`);
       }
     }
 
@@ -58,19 +58,19 @@ async function addMissingFields() {
       });
     });
 
-    console.log('\n📋 Updated columns in materials table:');
+    console.log('\n Updated columns in materials table:');
     newColumns.forEach(col => console.log(`   - ${col.name} (${col.type})`));
 
-    console.log('\n🎉 Fields added successfully!');
+    console.log('\n Fields added successfully!');
 
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('Error:', error);
   } finally {
     db.close();
   }
 }
 
 addMissingFields().catch((err) => {
-  console.error('\n❌ Script failed:', err);
+  console.error('\n Script failed:', err);
   process.exit(1);
 });

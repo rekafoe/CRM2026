@@ -106,44 +106,44 @@ const LayoutWorkSection: React.FC<LayoutWorkSectionProps> = ({ ranges, saving, o
             <button
               type="button"
               className="btn-icon"
-              onClick={() => {/* Документ */}}
+              onClick={() =>{/* Документ */}}
               title="Файл"
             >
-              📄
+              
             </button>
             <button
               type="button"
               className="btn-icon"
-              onClick={() => moveRange(range.id, 'down')}
+              onClick={() =>moveRange(range.id, 'down')}
               disabled={index === ranges.length - 1}
               title="Вниз"
             >
-              ⬇️
+              
             </button>
             <button
               type="button"
               className="btn-icon"
-              onClick={() => moveRange(range.id, 'up')}
+              onClick={() =>moveRange(range.id, 'up')}
               disabled={index === 0}
               title="Вверх"
             >
-              ⬆️
+              
             </button>
             <button
               type="button"
               className="btn-icon"
-              onClick={() => {/* Оранжевый кружок */}}
+              onClick={() =>{/* Оранжевый кружок */}}
               title="Настройки"
             >
-              🟠
+              
             </button>
             <button
               type="button"
               className="btn-icon btn-icon--danger"
-              onClick={() => removeRange(range.id)}
+              onClick={() =>removeRange(range.id)}
               title="Удалить"
             >
-              🗑️
+              
             </button>
           </div>
         </div>

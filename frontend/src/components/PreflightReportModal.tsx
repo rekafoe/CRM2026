@@ -170,7 +170,7 @@ export const PreflightReportModal: React.FC<PreflightReportModalProps> = ({
 
   return (
     <div className="preflight-modal-overlay" onClick={onClose}>
-      <div className="preflight-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="preflight-modal" onClick={(e) =>e.stopPropagation()}>
         <div className="preflight-modal-header">
           <h3>
             <AppIcon name="shield" size="sm" className="preflight-title-icon" />
@@ -246,13 +246,13 @@ export const PreflightReportModal: React.FC<PreflightReportModalProps> = ({
               )}
               <div
                 className="preflight-preview-wrap"
-                data-bleed-ratio={bleedWidth > 0 && bleedHeight > 0 ? (bleedWidth / bleedHeight).toFixed(2) : undefined}
+                data-bleed-ratio={bleedWidth >0 && bleedHeight > 0 ? (bleedWidth / bleedHeight).toFixed(2) : undefined}
               >
               {previewUrl && isImage && (
                 <div
                   className="preflight-preview"
                   style={{
-                    aspectRatio: bleedWidth > 0 && bleedHeight > 0 ? `${bleedWidth} / ${bleedHeight}` : undefined,
+                    aspectRatio: bleedWidth >0 && bleedHeight > 0 ? `${bleedWidth} / ${bleedHeight}` : undefined,
                   }}
                 >
                   <img src={previewUrl} alt="Макет" className="preflight-preview-img" />
@@ -273,7 +273,7 @@ export const PreflightReportModal: React.FC<PreflightReportModalProps> = ({
                 <div
                   className="preflight-preview preflight-preview-pdf"
                   style={{
-                    aspectRatio: bleedWidth > 0 && bleedHeight > 0 ? `${bleedWidth} / ${bleedHeight}` : undefined,
+                    aspectRatio: bleedWidth >0 && bleedHeight > 0 ? `${bleedWidth} / ${bleedHeight}` : undefined,
                   }}
                 >
                   <div ref={pdfContainerRef} className="preflight-preview-pdf-canvas" />

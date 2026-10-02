@@ -183,7 +183,7 @@ export const WarehouseMaterialsAllowedEditor: React.FC<WarehouseMaterialsAllowed
         <button
           type="button"
           className={`warehouse-material-picker__selected-toggle${showSelectedOnly ? ' is-active' : ''}`}
-          onClick={() => setShowSelectedOnly((value) => !value)}
+          onClick={() =>setShowSelectedOnly((value) => !value)}
           aria-pressed={showSelectedOnly}
         >
           <AppIcon name="check" size="xs" />
@@ -200,7 +200,7 @@ export const WarehouseMaterialsAllowedEditor: React.FC<WarehouseMaterialsAllowed
           placeholder="Поиск по названию, категории, типу или ID"
         />
         {query && (
-          <button type="button" onClick={() => setQuery('')} aria-label="Очистить поиск">
+          <button type="button" onClick={() =>setQuery('')} aria-label="Очистить поиск">
             <AppIcon name="x" size="xs" />
           </button>
         )}
@@ -241,7 +241,7 @@ export const WarehouseMaterialsAllowedEditor: React.FC<WarehouseMaterialsAllowed
                     <strong>{group.name}</strong>
                     <span>{selectedCount} из {group.materials.length}</span>
                   </div>
-                  <button type="button" onClick={() => toggleGroup(group)} disabled={selectableIds.length === 0}>
+                  <button type="button" onClick={() =>toggleGroup(group)} disabled={selectableIds.length === 0}>
                     {allSelected ? 'Снять категорию' : 'Выбрать категорию'}
                   </button>
                 </div>

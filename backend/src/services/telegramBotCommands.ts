@@ -79,26 +79,26 @@ export class TelegramBotCommands {
       
       if (!user) {
         const activeOrdersText = await TelegramBotCommands.activeOrdersOrHint(chatId);
-        return `👋 Добро пожаловать! Вы были автоматически добавлены в систему.\n\n` +
-               `📋 Доступные команды:\n` +
+        return `Добро пожаловать! Вы были автоматически добавлены в систему.\n\n` +
+               `Доступные команды:\n` +
                `/help - показать все команды\n` +
                `/miniapp - открыть PrintCore App\n\n` +
                `${activeOrdersText}`;
       }
 
       const r = effectiveBotRole(user.role);
-      const roleEmoji = r === 'admin' ? '👑' : r === 'manager' ? '👨‍💼' : '👤';
+      const roleEmoji = r === 'admin' ? '' : r === 'manager' ? '' : '';
       const activeOrdersText = await TelegramBotCommands.activeOrdersOrHint(chatId);
       
-      return `👋 Привет, ${user.first_name || 'пользователь'}!\n\n` +
+      return `Привет, ${user.first_name || 'пользователь'}!\n\n` +
              `${roleEmoji} Ваша роль: ${r}\n` +
-             `📋 Доступные команды:\n` +
+             `Доступные команды:\n` +
              `/help - показать все команды\n` +
              `/miniapp - открыть PrintCore App\n\n` +
              `${activeOrdersText}`;
     } catch (error) {
-      console.error('❌ Error in handleStart:', error);
-      return '❌ Произошла ошибка. Попробуйте позже.';
+      console.error('Error in handleStart:', error);
+      return 'Произошла ошибка. Попробуйте позже.';
     }
   }
 
@@ -110,7 +110,7 @@ export class TelegramBotCommands {
       const user = await TelegramUserService.getUserByChatId(chatId);
       
       if (!user) {
-        return '❌ Пользователь не найден. Обратитесь к администратору.';
+        return 'Пользователь не найден. Обратитесь к администратору.';
       }
 
       const effRole = effectiveBotRole(user.role);
@@ -119,7 +119,7 @@ export class TelegramBotCommands {
       );
       const activeOrdersText = await TelegramBotCommands.activeOrdersOrHint(chatId);
 
-      let helpText = `📋 Доступные команды для роли "${effRole}":\n\n`;
+      let helpText = `Доступные команды для роли "${effRole}":\n\n`;
       
       availableCommands.forEach(cmd => {
         helpText += `${cmd.command} - ${cmd.description}\n`;
@@ -129,8 +129,8 @@ export class TelegramBotCommands {
       
       return helpText;
     } catch (error) {
-      console.error('❌ Error in handleHelp:', error);
-      return '❌ Произошла ошибка. Попробуйте позже.';
+      console.error('Error in handleHelp:', error);
+      return 'Произошла ошибка. Попробуйте позже.';
     }
   }
 
@@ -164,12 +164,12 @@ export class TelegramBotCommands {
       // Проверяем права доступа
       const user = await TelegramUserService.getUserByChatId(chatId);
       if (!user) {
-        return '❌ Пользователь не найден. Обратитесь к администратору.';
+        return 'Пользователь не найден. Обратитесь к администратору.';
       }
 
       const effRole = effectiveBotRole(user.role);
       if (!cmd.roles.includes(effRole)) {
-        return `❌ У вас нет прав для выполнения команды ${command}.\n\n` +
+        return `У вас нет прав для выполнения команды ${command}.\n\n` +
                `Ваша роль: ${effRole}\n` +
                `Требуемые роли: ${cmd.roles.join(', ')}`;
       }
@@ -177,8 +177,8 @@ export class TelegramBotCommands {
       // Выполняем команду
       return await cmd.handler(chatId, userId, args);
     } catch (error) {
-      console.error('❌ Error in handleMessage:', error);
-      return '❌ Произошла ошибка при обработке команды. Попробуйте позже.';
+      console.error('Error in handleMessage:', error);
+      return 'Произошла ошибка при обработке команды. Попробуйте позже.';
     }
   }
 
@@ -186,12 +186,12 @@ export class TelegramBotCommands {
     try {
       const user = await TelegramUserService.getUserByChatId(chatId);
       if (!user) {
-        return '❌ Пользователь не найден.';
+        return 'Пользователь не найден.';
       }
       return TelegramBotCommands.activeOrdersOrHint(chatId);
     } catch (error) {
-      console.error('❌ Error in handleTextFallback:', error);
-      return '❌ Произошла ошибка. Попробуйте позже.';
+      console.error('Error in handleTextFallback:', error);
+      return 'Произошла ошибка. Попробуйте позже.';
     }
   }
 
@@ -202,12 +202,12 @@ export class TelegramBotCommands {
     try {
       const user = await TelegramUserService.getUserByChatId(chatId);
       if (!user) {
-        return '❌ Пользователь не найден.';
+        return 'Пользователь не найден.';
       }
       const url = getMiniappWebAppUrl();
       if (!url) {
         return (
-          '⚠️ *PrintCore App не настроен.*\n\n' +
+          '*PrintCore App не настроен.*\n\n' +
           'На сервере задайте `MINIAPP_WEBAPP_URL` — полный HTTPS-URL до страницы, ' +
           'например: `https://ваш-api.railway.app/miniapp`'
         );
@@ -216,13 +216,13 @@ export class TelegramBotCommands {
         `*PrintCore App*\n\nНажмите кнопку ниже, чтобы открыть приложение.`;
       await TelegramService.sendMessageWithKeyboard(chatId, text, {
         inline_keyboard: [
-          [{ text: '📱 Открыть PrintCore App', web_app: { url } }],
+          [{ text: 'Открыть PrintCore App', web_app: { url } }],
         ],
       });
       return null;
     } catch (error) {
-      console.error('❌ Error in handleMiniappWebView:', error);
-      return '❌ Произошла ошибка. Попробуйте позже.';
+      console.error('Error in handleMiniappWebView:', error);
+      return 'Произошла ошибка. Попробуйте позже.';
     }
   }
 

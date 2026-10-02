@@ -359,7 +359,7 @@ export const CanvasRulers: React.FC<RulersProps> = ({
               key={g.id}
               className={`guide-line guide-v${isDragged ? ' is-dragging' : ''}`}
               style={{ left: px }}
-              onMouseDown={(e) => handleExistingGuideMouseDown(g, e)}
+              onMouseDown={(e) =>handleExistingGuideMouseDown(g, e)}
               onDoubleClick={() => handleGuideDoubleClick(g.id)}
               title={`${g.posMM.toFixed(1)} мм · перетащить / двойной клик — удалить`}
             >
@@ -370,7 +370,7 @@ export const CanvasRulers: React.FC<RulersProps> = ({
               key={g.id}
               className={`guide-line guide-h${isDragged ? ' is-dragging' : ''}`}
               style={{ top: px }}
-              onMouseDown={(e) => handleExistingGuideMouseDown(g, e)}
+              onMouseDown={(e) =>handleExistingGuideMouseDown(g, e)}
               onDoubleClick={() => handleGuideDoubleClick(g.id)}
               title={`${g.posMM.toFixed(1)} мм · перетащить / двойной клик — удалить`}
             >

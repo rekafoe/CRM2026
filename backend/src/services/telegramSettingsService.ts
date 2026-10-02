@@ -13,29 +13,29 @@ export class TelegramSettingsService {
    * Получение настройки по ключу
    */
   static async getSetting(key: string): Promise<string | null> {
-    console.log(`🔧 Getting setting: ${key}`);
+    console.log(`Getting setting: ${key}`);
     
     try {
-      console.log(`🔧 Calling getDb()...`);
+      console.log(`Calling getDb()...`);
       const db = await getDb();
-      console.log(`🔧 getDb() successful, executing query...`);
+      console.log(`getDb() successful, executing query...`);
       
       return new Promise((resolve, reject) => {
-        console.log(`🔧 Executing SQL query for ${key}...`);
+        console.log(`Executing SQL query for ${key}...`);
         db.get('SELECT setting_value FROM telegram_settings WHERE setting_key = ?', [key], (err: any, row: any) => {
-          console.log(`🔧 SQL query completed for ${key}. Error:`, err, 'Row:', row);
+          console.log(`SQL query completed for ${key}. Error:`, err, 'Row:', row);
           if (err) {
-            console.error(`❌ Error getting setting ${key}:`, err);
+            console.error(`Error getting setting ${key}:`, err);
             reject(err);
           } else {
             const value = row ? row.setting_value : null;
-            console.log(`✅ Setting ${key}: ${value}`);
+            console.log(`Setting ${key}: ${value}`);
             resolve(value);
           }
         });
       });
     } catch (error) {
-      console.error(`❌ Database error getting setting ${key}:`, error);
+      console.error(`Database error getting setting ${key}:`, error);
       return null;
     }
   }
@@ -65,17 +65,17 @@ export class TelegramSettingsService {
    * Получение всех настроек
    */
   static async getAllSettings(): Promise<TelegramSettings> {
-    console.log('🔧 Getting all Telegram settings...');
+    console.log('Getting all Telegram settings...');
     
     try {
       const db = await getDb();
-      console.log('🔧 Database connection successful');
+      console.log('Database connection successful');
       
       return new Promise((resolve, reject) => {
         db.all('SELECT setting_key, setting_value FROM telegram_settings', (err: any, rows: any[]) => {
-          console.log('🔧 SQL query completed. Error:', err, 'Rows:', rows);
+          console.log('SQL query completed. Error:', err, 'Rows:', rows);
           if (err) {
-            console.error('❌ Error getting all settings:', err);
+            console.error('Error getting all settings:', err);
             reject(err);
           } else {
           const settings: TelegramSettings = {
@@ -106,13 +106,13 @@ export class TelegramSettingsService {
             }
           });
 
-            console.log('✅ Settings loaded successfully:', settings);
+            console.log('Settings loaded successfully:', settings);
             resolve(settings);
           }
         });
       });
     } catch (error) {
-      console.error('❌ Database error getting all settings:', error);
+      console.error('Database error getting all settings:', error);
       throw error;
     }
   }

@@ -783,7 +783,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   return (
     <div className="order-pool-page">
       <div className="order-pool-sidebar">
-        <button type="button" onClick={() => navigate('/')} className="back-button">
+        <button type="button" onClick={() =>navigate('/')} className="back-button">
           ← Назад
         </button>
         <h2>

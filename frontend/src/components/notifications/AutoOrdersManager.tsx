@@ -46,11 +46,11 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { text: 'Ожидает', class: 'status-pending', icon: '⏳' },
-      approved: { text: 'Подтвержден', class: 'status-approved', icon: '✅' },
-      sent: { text: 'Отправлен', class: 'status-sent', icon: '📤' },
-      delivered: { text: 'Доставлен', class: 'status-delivered', icon: '📦' },
-      cancelled: { text: 'Отменен', class: 'status-cancelled', icon: '❌' }
+      pending: { text: 'Ожидает', class: 'status-pending', icon: '' },
+      approved: { text: 'Подтвержден', class: 'status-approved', icon: '' },
+      sent: { text: 'Отправлен', class: 'status-sent', icon: '' },
+      delivered: { text: 'Доставлен', class: 'status-delivered', icon: '' },
+      cancelled: { text: 'Отменен', class: 'status-cancelled', icon: '' }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
@@ -65,7 +65,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
   const renderOrders = () => (
     <div className="auto-orders">
       <div className="orders-header">
-        <h3>📋 Автоматические заказы</h3>
+        <h3>Автоматические заказы</h3>
         <div className="orders-filters">
           <select
             value={statusFilter}
@@ -88,7 +88,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
         <div className="orders-list">
           {orders.length === 0 ? (
             <div className="no-orders">
-              <div className="no-orders-icon">📋</div>
+              <div className="no-orders-icon"></div>
               <p>Нет заказов для отображения</p>
             </div>
           ) : (
@@ -142,29 +142,29 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
                   {order.status === 'pending' && (
                     <button
                       className="lg-btn lg-btn--success"
-                      onClick={() => handleApproveOrder(order.id)}
+                      onClick={() =>handleApproveOrder(order.id)}
                       disabled={approveAutoOrder.isPending}
                     >
-                      {approveAutoOrder.isPending ? '⏳' : '✅'} Подтвердить
+                      {approveAutoOrder.isPending ? 'Подтверждение…' : 'Подтвердить'}
                     </button>
                   )}
                   
                   {order.status === 'approved' && (
                     <button
                       className="lg-btn lg-btn--primary"
-                      onClick={() => handleSendOrder(order.id)}
+                      onClick={() =>handleSendOrder(order.id)}
                       disabled={sendAutoOrder.isPending}
                     >
-                      {sendAutoOrder.isPending ? '⏳' : '📤'} Отправить
+                      {sendAutoOrder.isPending ? 'Отправка…' : 'Отправить'}
                     </button>
                   )}
                   
                   {order.status === 'sent' && (
                     <button
                       className="lg-btn"
-                      onClick={() => {/* Отметить как доставленный */}}
+                      onClick={() =>{/* Отметить как доставленный */}}
                     >
-                      📦 Доставлен
+                       Доставлен
                     </button>
                   )}
                 </div>
@@ -178,22 +178,22 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
 
   const renderCreate = () => (
     <div className="create-order">
-      <h3>➕ Создать автоматический заказ</h3>
+      <h3>Создать автоматический заказ</h3>
       <div className="create-form">
         <div className="form-note">
-          <p>📝 Автоматические заказы создаются системой на основе правил мониторинга запасов.</p>
+          <p>Автоматические заказы создаются системой на основе правил мониторинга запасов.</p>
           <p>Для создания заказа вручную используйте раздел "Поставщики" → "Создать заказ".</p>
         </div>
         
         <div className="create-actions">
           <button
             className="lg-btn lg-btn--primary"
-            onClick={() => {
+            onClick={() =>{
               // Здесь можно добавить логику для ручного создания заказа
               showToast('Функция создания заказа в разработке', 'info');
             }}
           >
-            🔧 Создать заказ вручную
+             Создать заказ вручную
           </button>
         </div>
       </div>
@@ -203,22 +203,22 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
   return (
     <div className="auto-orders-manager">
       <div className="auto-orders-header">
-        <h2>🤖 Управление автозаказами</h2>
+        <h2>Управление автозаказами</h2>
         <button onClick={onClose} className="close-btn">✕</button>
       </div>
 
       <div className="auto-orders-tabs">
         <button
           className={activeTab === 'orders' ? 'active' : ''}
-          onClick={() => setActiveTab('orders')}
+          onClick={() =>setActiveTab('orders')}
         >
-          📋 Заказы
+           Заказы
         </button>
         <button
           className={activeTab === 'create' ? 'active' : ''}
-          onClick={() => setActiveTab('create')}
+          onClick={() =>setActiveTab('create')}
         >
-          ➕ Создать
+           Создать
         </button>
       </div>
 

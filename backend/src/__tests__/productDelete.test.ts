@@ -24,7 +24,7 @@ describe('DELETE /products/:id', () => {
        VALUES (?, ?, ?, ?, 1)`,
       `Del test cat ${suiteKey}`,
       '',
-      '🧪',
+      '',
       0,
     );
     const catId = cat.lastID!;
@@ -35,7 +35,7 @@ describe('DELETE /products/:id', () => {
       catId,
       `To delete ${suiteKey}`,
       '',
-      '📦',
+      '',
     );
     const pid = ins.lastID!;
 

@@ -45,8 +45,8 @@ export interface ProductSpecs {
   specialServices?: string[];
   materialType?: 'office' | 'coated' | 'designer' | 'selfAdhesive';
   name?: string;
-  size_id?: number | string; // 🆕 Для упрощённых продуктов (number для новых, string для обратной совместимости)
-  material_id?: number; // 🆕 ID материала (для упрощённых и обычных продуктов)
+  size_id?: number | string; //  Для упрощённых продуктов (number для новых, string для обратной совместимости)
+  material_id?: number; //  ID материала (для упрощённых и обычных продуктов)
   /** Условия использования для material-driven printing. */
   usage_context?: 'indoor' | 'outdoor';
   /** Бумага обложки (multiPageStructure.cover.mode = separate) */
@@ -59,7 +59,7 @@ export interface ProductSpecs {
   typeId?: number;
   /** Название типа продукта для отображения и для POST заказа с сайта */
   typeName?: string;
-  selectedOperations?: Array<{ // 🆕 Выбранные операции с подтипами и количеством
+  selectedOperations?: Array<{ //  Выбранные операции с подтипами и количеством
     operationId: number;
     subtype?: string;
     /** Вариант услуги (ламинация и др.) — уходит в finishing.variant_id на бэкенде */
@@ -83,7 +83,7 @@ export interface CalculationResult {
     total: number;
     materialId?: number;
     unitPrice?: number;
-    paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType
+    paper_type_name?: string; //  display_name типа бумаги для установки materialType
   }>;
   services: Array<{
     service: string;

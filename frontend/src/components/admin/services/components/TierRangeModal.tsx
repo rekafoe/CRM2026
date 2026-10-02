@@ -50,7 +50,7 @@ export const TierRangeModal: React.FC<TierRangeModalProps> = ({
                 zIndex: 2003,
               }
         }
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) =>e.stopPropagation()}
       >
         <div className="simplified-tier-modal__content">
           <h3 className="simplified-tier-modal__title">
@@ -69,7 +69,7 @@ export const TierRangeModal: React.FC<TierRangeModalProps> = ({
               className="px-2 py-1 border rounded w-full"
             />
           </FormField>
-          <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
+          <div className="simplified-tier-modal__actions" onClick={(e) =>e.stopPropagation()}>
             <Button variant="secondary" size="sm" onClick={onClose}>
               Отменить
             </Button>

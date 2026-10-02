@@ -415,10 +415,10 @@ export const CustomerLegalDocumentsSection: React.FC<{
                     </td>
                     <td className="customers-legal-docs__notes">{r.notes || '—'}</td>
                     <td className="customers-legal-docs__actions">
-                      <button type="button" className="customers-legal-docs__link" onClick={() => startEdit(r)}>
+                      <button type="button" className="customers-legal-docs__link" onClick={() =>startEdit(r)}>
                         Изменить
                       </button>
-                      <button type="button" className="customers-legal-docs__link" onClick={() => void handleDelete(r.id)}>
+                      <button type="button" className="customers-legal-docs__link" onClick={() =>void handleDelete(r.id)}>
                         Удалить
                       </button>
                     </td>

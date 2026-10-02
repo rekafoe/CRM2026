@@ -39,11 +39,11 @@ function makeRequest(path, token = null) {
 }
 
 async function testAPI() {
-  console.log('🧪 Тестирование API продуктов...\n');
+  console.log('Тестирование API продуктов...\n');
   
   try {
     // Проверяем categories
-    console.log('📁 GET /products/categories');
+    console.log('GET /products/categories');
     const categoriesResp = await makeRequest('/products/categories');
     console.log(`   Статус: ${categoriesResp.status}`);
     if (Array.isArray(categoriesResp.data)) {
@@ -57,13 +57,13 @@ async function testAPI() {
     console.log('');
     
     // Проверяем products
-    console.log('📦 GET /products');
+    console.log('GET /products');
     const productsResp = await makeRequest('/products');
     console.log(`   Статус: ${productsResp.status}`);
     
     if (productsResp.status === 401) {
-      console.log('   ⚠️  Требуется авторизация - это нормально');
-      console.log('   💡 Но в админке должны быть видны продукты!\n');
+      console.log('    Требуется авторизация - это нормально');
+      console.log('   Но в админке должны быть видны продукты!\n');
       
       // Попробуем с фейковым токеном
       console.log('   Пробуем обойти авторизацию...');
@@ -83,18 +83,18 @@ async function testAPI() {
     
     // Итог
     console.log('=' .repeat(60));
-    console.log('📊 ИТОГ:');
+    console.log('ИТОГ:');
     console.log('=' .repeat(60));
-    console.log('\n✅ Продукты созданы в БД');
-    console.log('✅ API работает (требует авторизации)');
-    console.log('\n🎯 Следующие шаги:');
+    console.log('\n Продукты созданы в БД');
+    console.log('API работает (требует авторизации)');
+    console.log('\n Следующие шаги:');
     console.log('  1. Откройте админку: http://localhost:5173/adminpanel/products');
     console.log('  2. Очистите кэш браузера (Ctrl+Shift+R)');
     console.log('  3. Проверьте что продукты отображаются');
     console.log('  4. Если не видны - перезапустите frontend (npm run dev)\n');
     
   } catch (error) {
-    console.error('❌ Ошибка:', error.message);
+    console.error('Ошибка:', error.message);
   } finally {
     db.close();
   }

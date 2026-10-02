@@ -186,7 +186,7 @@ const ProductTypesManager: React.FC = () => {
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Типы продуктов</h2>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() =>setShowAddModal(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Добавить тип
@@ -209,7 +209,7 @@ const ProductTypesManager: React.FC = () => {
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
-                    onClick={() => setSelectedType(type.key)}
+                    onClick={() =>setSelectedType(type.key)}
                   >
                     <div className="flex justify-between items-center">
                       <div>
@@ -225,7 +225,7 @@ const ProductTypesManager: React.FC = () => {
                           {type.status}
                         </span>
                         <button
-                          onClick={(e) => {
+                          onClick={(e) =>{
                             e.stopPropagation();
                             handleDeleteProductType(type.key);
                           }}
@@ -307,7 +307,7 @@ const ProductTypesManager: React.FC = () => {
                             className="px-2 py-1 border rounded text-sm w-24"
                           />
                           <button
-                            onClick={() => removeOperation(index)}
+                            onClick={() =>removeOperation(index)}
                             className="px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
                           >
                             Удалить
@@ -379,7 +379,7 @@ const ProductTypesManager: React.FC = () => {
             
             <div className="flex justify-end space-x-2 mt-6">
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() =>setShowAddModal(false)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
               >
                 Отмена

@@ -15,28 +15,28 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     quantity: specs.quantity,
     paperType: specs.paperType,
     paperDensity: specs.paperDensity,
-    format: specs.format, // ✅ Формат включен в ключ
+    format: specs.format, //  Формат включен в ключ
     sides: specs.sides,
     lamination: specs.lamination,
     priceType: specs.priceType,
     pages: specs.pages ?? null,
-    material_id: specs.material_id, // ✅ ID материала тоже важен
+    material_id: specs.material_id, //  ID материала тоже важен
     cover_material_id: specs.cover_material_id,
-    materialType: specs.materialType, // ✅ Тип материала (при смене типа пересчитываем)
-    // 🆕 Для упрощённых продуктов размер влияет на расчет
+    materialType: specs.materialType, //  Тип материала (при смене типа пересчитываем)
+    //  Для упрощённых продуктов размер влияет на расчет
     size_id: specs.size_id,
-    // 🆕 Подтип продукта (typeId) влияет на цену (другой typeConfig → другие размеры/операции)
+    //  Подтип продукта (typeId) влияет на цену (другой typeConfig → другие размеры/операции)
     typeId: specs.typeId,
-    // 🆕 Выбранные операции влияют на расчет (finishing)
+    //  Выбранные операции влияют на расчет (finishing)
     // Нормализуем массив для стабильного сравнения (сортируем по operationId)
     selectedOperations: specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
       ? JSON.stringify([...specs.selectedOperations].sort((a: any, b: any) => (a.operationId || 0) - (b.operationId || 0)))
       : undefined,
-    // ✅ Кастомный формат и произвольный trim УФ-планшета влияют на расчёт
+    //  Кастомный формат и произвольный trim УФ-планшета влияют на расчёт
     customFormat:
       isCustomFormat || specs.uv_use_custom_dimensions !== false ? customFormat : undefined,
     isCustomFormat: Boolean(isCustomFormat) || specs.uv_use_custom_dimensions !== false,
-    // 🆕 Резка, фальцовка и др. влияют на цену
+    //  Резка, фальцовка и др. влияют на цену
     cutting: specs.cutting,
     folding: specs.folding,
     roundCorners: specs.roundCorners,

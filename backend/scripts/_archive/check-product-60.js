@@ -14,7 +14,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 console.log('='.repeat(80));
-console.log('🔍 ПРОВЕРКА ПРОДУКТА ID 60');
+console.log('ПРОВЕРКА ПРОДУКТА ID 60');
 console.log('='.repeat(80));
 console.log('');
 
@@ -28,7 +28,7 @@ db.get(`SELECT p.*, pc.name as category_name
     return;
   }
   
-  console.log('📦 ПРОДУКТ:');
+  console.log('ПРОДУКТ:');
   console.log(JSON.stringify(product, null, 2));
   console.log('');
 
@@ -41,7 +41,7 @@ db.get(`SELECT p.*, pc.name as category_name
       return;
     }
     
-    console.log('📋 ШАБЛОН:');
+    console.log('ШАБЛОН:');
     if (template?.config_data) {
       const configData = typeof template.config_data === 'string' 
         ? JSON.parse(template.config_data)
@@ -50,17 +50,17 @@ db.get(`SELECT p.*, pc.name as category_name
       console.log(JSON.stringify(configData, null, 2));
       
       if (configData?.trim_size) {
-        console.log(`\n✅ trim_size: ${configData.trim_size.width}×${configData.trim_size.height}`);
+        console.log(`\n trim_size: ${configData.trim_size.width}×${configData.trim_size.height}`);
       } else {
-        console.log('\n❌ trim_size НЕ найден!');
+        console.log('\n trim_size НЕ найден!');
       }
     } else {
-      console.log('❌ Шаблон не найден!');
+      console.log('Шаблон не найден!');
     }
     console.log('');
 
     // 3. Расчет раскладки для 50×90
-    console.log('📊 РАСЧЕТ РАСКЛАДКИ ДЛЯ 50×90:');
+    console.log('РАСЧЕТ РАСКЛАДКИ ДЛЯ 50×90:');
     console.log('-'.repeat(80));
     
     const productSize = { width: 50, height: 90 };
@@ -94,20 +94,20 @@ db.get(`SELECT p.*, pc.name as category_name
     console.log(`  Рядов: ${rows2} (${availableHeight} / (${productSize.width} + ${MARGINS.gap}) = ${Math.floor(availableHeight / (productSize.width + MARGINS.gap))})`);
     console.log(`  Шт на лист: ${items2}`);
     console.log('');
-    console.log(`✅ ОПТИМАЛЬНО: ${Math.max(items1, items2)} шт на лист`);
+    console.log(`ОПТИМАЛЬНО: ${Math.max(items1, items2)} шт на лист`);
     console.log('');
     
     // 4. Расчет для 100 шт
     const quantity = 100;
     const itemsPerSheet = Math.max(items1, items2);
     const sheetsNeeded = Math.ceil(quantity / itemsPerSheet);
-    console.log(`🧮 ДЛЯ ${quantity} ШТ:`);
+    console.log(`ДЛЯ ${quantity} ШТ:`);
     console.log(`  Шт на лист: ${itemsPerSheet}`);
     console.log(`  Листов нужно: ${sheetsNeeded} (${quantity} / ${itemsPerSheet} = ${(quantity / itemsPerSheet).toFixed(2)})`);
     console.log('');
     
     // 5. Проверка, что может быть не так
-    console.log('⚠️  ВОЗМОЖНАЯ ПРОБЛЕМА:');
+    console.log(' ВОЗМОЖНАЯ ПРОБЛЕМА:');
     console.log('Если система считает 50 листов с раскладкой 2 шт на лист,');
     console.log('значит используется размер 90×50 (дефолт) вместо 50×90 из шаблона!');
     console.log('');

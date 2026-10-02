@@ -246,28 +246,28 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
           <button
             type="button"
             className={`tab-btn ${viewMode === 'stock' ? 'active' : ''}`}
-            onClick={() => setViewMode('stock')}
+            onClick={() =>setViewMode('stock')}
           >
             Остатки и операции
           </button>
           <button
             type="button"
             className={`tab-btn ${viewMode === 'history' ? 'active' : ''}`}
-            onClick={() => setViewMode('history')}
+            onClick={() =>setViewMode('history')}
           >
             История движений
           </button>
           <button
             type="button"
             className={`tab-btn ${viewMode === 'deficit' ? 'active' : ''}`}
-            onClick={() => setViewMode('deficit')}
+            onClick={() =>setViewMode('deficit')}
           >
             Дефицит{alerts.length ? ` (${alerts.length})` : ''}
           </button>
           <button
             type="button"
             className={`tab-btn ${viewMode === 'auto-order' ? 'active' : ''}`}
-            onClick={() => setViewMode('auto-order')}
+            onClick={() =>setViewMode('auto-order')}
           >
             Автозаказ
           </button>
@@ -325,7 +325,7 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
                   <button
                     type="button"
                     className="action-btn action-btn--text"
-                    onClick={async () => {
+                    onClick={async () =>{
                       try {
                         await checkMaterialsForAutoOrder();
                         showToast('Проверка выполнена', 'success');
@@ -369,13 +369,13 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
                           </td>
                           <td className="col-actions">
                             <div className="inv-actions inv-actions--labeled">
-                              <button type="button" className="action-btn action-btn--text" onClick={() => openEditRule(r)}>
+                              <button type="button" className="action-btn action-btn--text" onClick={() =>openEditRule(r)}>
                                 Изменить
                               </button>
                               <button
                                 type="button"
                                 className="action-btn action-btn--text danger"
-                                onClick={async () => {
+                                onClick={async () =>{
                                   if (!window.confirm('Удалить правило?')) return;
                                   try {
                                     await deleteAutoOrderRule(r.id);
@@ -402,7 +402,7 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
                   <div className="modal">
                     <div className="modal-header">
                       <h3>{editingRule ? 'Редактировать правило' : 'Новое правило'}</h3>
-                      <button type="button" className="action-btn small" onClick={() => setShowRuleModal(false)}>×</button>
+                      <button type="button" className="action-btn small" onClick={() =>setShowRuleModal(false)}>×</button>
                     </div>
             <div className="modal-body">
                       <div className="form-row">
@@ -462,7 +462,7 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
             </div>
                     <div className="modal-footer">
                       <button type="button" className="action-btn action-btn--text primary" onClick={saveRule}>Сохранить</button>
-                      <button type="button" className="action-btn action-btn--text" onClick={() => setShowRuleModal(false)}>Отмена</button>
+                      <button type="button" className="action-btn action-btn--text" onClick={() =>setShowRuleModal(false)}>Отмена</button>
                     </div>
           </div>
         </div>

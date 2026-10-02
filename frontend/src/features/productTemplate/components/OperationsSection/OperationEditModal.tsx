@@ -61,7 +61,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
     }
   }, [operation]);
 
-  // 🧩 Опции ламинации из склада: одна валидная связка (тип + толщина)
+  //  Опции ламинации из склада: одна валидная связка (тип + толщина)
   const laminationOptions = useMemo(() => {
     const isLaminationCategory = (name?: string) => {
       if (!name) return false;
@@ -160,7 +160,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
                 onChange={() => setConditionMode('always')}
               />
               <div className="flex flex-col">
-                <span className="font-medium">✅ Всегда</span>
+                <span className="font-medium">Всегда</span>
                 <span className="text-sm text-secondary">Операция применяется для всех заказов</span>
               </div>
             </label>
@@ -172,7 +172,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
                 onChange={() => setConditionMode('parameter')}
               />
               <div className="flex flex-col">
-                <span className="font-medium">🔀 Условно (по параметру)</span>
+                <span className="font-medium">Условно (по параметру)</span>
                 <span className="text-sm text-secondary">Операция применяется только при определенном значении параметра</span>
               </div>
             </label>
@@ -183,7 +183,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
         {conditionMode === 'parameter' && (
           <div className="flex flex-col gap-4 p-4 border rounded bg-info-light">
             <Alert type="info">
-              <strong>💡 Условная операция</strong>
+              <strong>Условная операция</strong>
               <p className="text-sm mt-1">
                 Операция будет добавлена в расчет только когда клиент выберет указанное значение параметра.
               </p>
@@ -241,7 +241,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
             {linkedParameter && parameterValue && (
               <div className="p-3 bg-success-light rounded">
                 <div className="text-sm font-medium text-success">
-                  ✅ Условие настроено
+                   Условие настроено
                 </div>
                 <div className="text-sm text-secondary mt-1">
                   Операция "{operation.operation_name || operation.service_name}" будет применена, 
@@ -265,8 +265,8 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
             </label>
             <span className="text-sm text-secondary">
               {isRequired 
-                ? '✅ Операция всегда включается в расчет (если выполняются условия)'
-                : '⭕ Операция может быть опциональной для клиента'}
+                ? 'Операция всегда включается в расчет (если выполняются условия)'
+                : 'Операция может быть опциональной для клиента'}
             </span>
           </div>
         </FormField>
@@ -302,7 +302,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
             onClick={handleSave} 
             disabled={saving || (conditionMode === 'parameter' && (!linkedParameter || !parameterValue))}
           >
-            {saving ? 'Сохранение...' : '💾 Сохранить'}
+            {saving ? 'Сохранение...' : 'Сохранить'}
           </Button>
         </div>
       </div>

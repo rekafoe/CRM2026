@@ -7,7 +7,7 @@ import { Database } from 'sqlite'
  * и добавляет связь между заказами и клиентами
  */
 export async function up(db: Database): Promise<void> {
-  console.log('📋 Создаем таблицу customers...')
+  console.log('Создаем таблицу customers...')
 
   // Создаем таблицу customers
   await db.run(`
@@ -38,10 +38,10 @@ export async function up(db: Database): Promise<void> {
   await db.run(`CREATE INDEX IF NOT EXISTS idx_customers_type ON customers(type)`)
   await db.run(`CREATE INDEX IF NOT EXISTS idx_customers_company_name ON customers(company_name)`)
 
-  console.log('✅ Таблица customers создана')
+  console.log('Таблица customers создана')
 
   // Добавляем customer_id в таблицу orders
-  console.log('📋 Добавляем customer_id в таблицу orders...')
+  console.log('Добавляем customer_id в таблицу orders...')
 
   // Проверяем, существует ли уже колонка
   const tableInfo = await db.all(`PRAGMA table_info(orders)`)
@@ -55,21 +55,21 @@ export async function up(db: Database): Promise<void> {
     // Создаем индекс для быстрого поиска заказов по клиенту
     await db.run(`CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id)`)
     
-    console.log('✅ Колонка customer_id добавлена в orders')
+    console.log('Колонка customer_id добавлена в orders')
   } else {
-    console.log('ℹ️ Колонка customer_id уже существует')
+    console.log('Колонка customer_id уже существует')
   }
 }
 
 export async function down(db: Database): Promise<void> {
-  console.log('🔄 Откатываем миграцию customers...')
+  console.log('Откатываем миграцию customers...')
 
   // Удаляем индекс
   await db.run(`DROP INDEX IF EXISTS idx_orders_customer_id`)
 
   // Удаляем колонку customer_id из orders (SQLite не поддерживает DROP COLUMN напрямую)
   // Вместо этого создадим новую таблицу без этой колонки
-  console.log('⚠️ SQLite не поддерживает DROP COLUMN. Колонка customer_id останется, но будет игнорироваться.')
+  console.log('SQLite не поддерживает DROP COLUMN. Колонка customer_id останется, но будет игнорироваться.')
 
   // Удаляем индексы customers
   await db.run(`DROP INDEX IF EXISTS idx_customers_phone`)
@@ -80,5 +80,5 @@ export async function down(db: Database): Promise<void> {
   // Удаляем таблицу customers
   await db.run(`DROP TABLE IF EXISTS customers`)
 
-  console.log('✅ Откат миграции выполнен')
+  console.log('Откат миграции выполнен')
 }
