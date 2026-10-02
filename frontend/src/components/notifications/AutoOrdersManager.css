@@ -1,19 +1,16 @@
 .auto-orders-manager {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90%;
-  max-width: 1000px;
-  max-height: 90vh;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  overflow: hidden;
+  position: static;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  color: #0f172a;
 }
 
 .auto-orders-header {
@@ -49,36 +46,19 @@
 
 .auto-orders-tabs {
   display: flex;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.auto-orders-tabs button {
-  flex: 1;
-  padding: 15px 20px;
-  background: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: transparent;
   border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-bottom: 3px solid transparent;
-}
-
-.auto-orders-tabs button:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.auto-orders-tabs button.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
-  background: var(--bg-primary);
 }
 
 .auto-orders-content {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 16px 18px;
+  overflow: visible;
 }
 
 /* Заказы */
@@ -103,10 +83,10 @@
 
 .status-filter {
   padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #0f172a;
   font-size: 14px;
 }
 
@@ -117,16 +97,11 @@
 }
 
 .order-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 20px;
-  transition: all 0.2s ease;
-}
-
-.order-card:hover {
-  border-color: var(--primary-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 }
 
 .order-header {
@@ -406,25 +381,6 @@
 
 /* Адаптивность */
 @media (max-width: 768px) {
-  .auto-orders-manager {
-    width: 95%;
-    max-height: 95vh;
-  }
-  
-  .auto-orders-tabs {
-    flex-direction: column;
-  }
-  
-  .auto-orders-tabs button {
-    border-bottom: none;
-    border-right: 3px solid transparent;
-  }
-  
-  .auto-orders-tabs button.active {
-    border-right-color: var(--primary-color);
-    border-bottom-color: transparent;
-  }
-  
   .orders-header {
     flex-direction: column;
     gap: 15px;

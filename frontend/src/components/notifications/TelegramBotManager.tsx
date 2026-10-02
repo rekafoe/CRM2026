@@ -282,37 +282,25 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
 
   return (
     <div className="telegram-bot-manager">
-      <div className="telegram-tabs">
-        <button
-          className={activeTab === 'config' ? 'active' : ''}
-          onClick={() =>setActiveTab('config')}
-        >
-           Настройки
-        </button>
-        <button
-          className={activeTab === 'test' ? 'active' : ''}
-          onClick={() =>setActiveTab('test')}
-        >
-           Тест
-        </button>
-        <button
-          className={activeTab === 'users' ? 'active' : ''}
-          onClick={() =>setActiveTab('users')}
-        >
-           Пользователи
-        </button>
-        <button
-          className={activeTab === 'telegram-users' ? 'active' : ''}
-          onClick={() =>setActiveTab('telegram-users')}
-        >
-           Telegram пользователи
-        </button>
-        <button
-          className={activeTab === 'auto-settings' ? 'active' : ''}
-          onClick={() =>setActiveTab('auto-settings')}
-        >
-           Автонастройки
-        </button>
+      <div className="telegram-tabs" role="tablist">
+        {([
+          ['config', 'Настройки'],
+          ['test', 'Тест'],
+          ['users', 'Пользователи'],
+          ['telegram-users', 'Telegram пользователи'],
+          ['auto-settings', 'Автонастройки'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === id}
+            className={`lg-btn${activeTab === id ? ' lg-btn--primary' : ''}`}
+            onClick={() => setActiveTab(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="telegram-content">

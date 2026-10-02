@@ -202,21 +202,24 @@ export const LowStockAlerts: React.FC = () => {
       {/* Фильтры */}
       <div className="alerts-filters">
         <div className="filter-buttons">
-          <button 
-            className={`filter-btn ${filter === 'active' ? 'active' : ''}`}
-            onClick={() =>setFilter('active')}
+          <button
+            type="button"
+            className={`lg-btn${filter === 'active' ? ' lg-btn--primary' : ''}`}
+            onClick={() => setFilter('active')}
           >
             Активные ({alertsArray.filter(a => !a.isResolved).length})
           </button>
-          <button 
-            className={`filter-btn ${filter === 'resolved' ? 'active' : ''}`}
-            onClick={() =>setFilter('resolved')}
+          <button
+            type="button"
+            className={`lg-btn${filter === 'resolved' ? ' lg-btn--primary' : ''}`}
+            onClick={() => setFilter('resolved')}
           >
             Решенные ({alertsArray.filter(a => a.isResolved).length})
           </button>
-          <button 
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() =>setFilter('all')}
+          <button
+            type="button"
+            className={`lg-btn${filter === 'all' ? ' lg-btn--primary' : ''}`}
+            onClick={() => setFilter('all')}
           >
             Все ({alerts.length})
           </button>

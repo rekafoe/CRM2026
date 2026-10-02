@@ -52,23 +52,23 @@
 
 .alerts-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-  margin-bottom: 20px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
 .stat-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #dee2e6;
+  padding: 12px 14px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .stat-label {
@@ -84,23 +84,23 @@
 }
 
 .stat-value.active {
-  background: #fff3cd;
-  color: #856404;
+  background: rgba(234, 179, 8, 0.18);
+  color: #a16207;
 }
 
 .stat-value.resolved {
-  background: #d4edda;
-  color: #155724;
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
 }
 
 .stat-value.critical {
-  background: #f8d7da;
-  color: #721c24;
+  background: rgba(239, 68, 68, 0.16);
+  color: #b91c1c;
 }
 
 .stat-value.out-of-stock {
-  background: #f5c6cb;
-  color: #721c24;
+  background: rgba(148, 163, 184, 0.22);
+  color: #334155;
 }
 
 .alerts-filters {
@@ -142,31 +142,24 @@
 }
 
 .alert-item {
-  padding: 20px;
-  border-radius: 8px;
-  border: 2px solid;
-  background: white;
-  transition: all 0.2s ease;
-}
-
-.alert-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  border-left-width: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .alert-item.alert-warning {
-  border-color: #ffc107;
-  background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
+  border-left-color: #eab308;
 }
 
 .alert-item.alert-critical {
-  border-color: #dc3545;
-  background: linear-gradient(135deg, #f8d7da 0%, #ffffff 100%);
+  border-left-color: #ef4444;
 }
 
 .alert-item.alert-out-of-stock {
-  border-color: #6c757d;
-  background: linear-gradient(135deg, #f5c6cb 0%, #ffffff 100%);
+  border-left-color: #94a3b8;
 }
 
 .alert-header {

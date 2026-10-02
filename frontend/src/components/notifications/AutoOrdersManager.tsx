@@ -14,7 +14,7 @@ interface AutoOrdersManagerProps {
   onClose: () => void;
 }
 
-export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose }) => {
+export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = () => {
   const [activeTab, setActiveTab] = useState<'orders' | 'create'>('orders');
   const [statusFilter, setStatusFilter] = useState<string>('');
   
@@ -202,24 +202,22 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
 
   return (
     <div className="auto-orders-manager">
-      <div className="auto-orders-header">
-        <h2>Управление автозаказами</h2>
-        <button onClick={onClose} className="close-btn">✕</button>
-      </div>
-
-      <div className="auto-orders-tabs">
-        <button
-          className={activeTab === 'orders' ? 'active' : ''}
-          onClick={() =>setActiveTab('orders')}
-        >
-           Заказы
-        </button>
-        <button
-          className={activeTab === 'create' ? 'active' : ''}
-          onClick={() =>setActiveTab('create')}
-        >
-           Создать
-        </button>
+      <div className="auto-orders-tabs" role="tablist">
+        {([
+          ['orders', 'Заказы'],
+          ['create', 'Создать'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === id}
+            className={`lg-btn${activeTab === id ? ' lg-btn--primary' : ''}`}
+            onClick={() => setActiveTab(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="auto-orders-content">
