@@ -22,10 +22,9 @@ export function isPoolOrderStatusId(statusId: number): boolean {
   return POOL_NAMES.has(row.name);
 }
 
-/** Выдан: строка «Завершён» или прежний номер 7. */
+/** Выдан: только строка «Завершён» (id 7 после unify может быть «Отменён»). */
 export function isCompletedOrderStatusId(statusId: number): boolean {
   const id = Number(statusId);
-  if (id === 7) return true;
   const row = _cache?.find((status) => status.id === id);
   if (!row) return false;
   return row.code === 'completed' || row.name === 'Завершён';

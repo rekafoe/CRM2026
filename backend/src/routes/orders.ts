@@ -1313,7 +1313,8 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const order = await db.get<any>('SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
   const completedId = await findOrderStatusId(db, 'completed', 7)
-  if (Number(order.status) === completedId || Number(order.status) === 7) {
+  // Только id «Завершён»: после unify id 7 может быть «Отменён», не выдачей.
+  if (Number(order.status) === completedId) {
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
     res.json(orderForApi(updated))
     return
