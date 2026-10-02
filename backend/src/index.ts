@@ -24,6 +24,7 @@ import { startEditorDraftsCleanup } from './services/editorDraftOwnerService'
 import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
 import { startMailOutboxWorker } from './services/mailOutboxWorker'
+import { startWebsiteReadyReminderWorker } from './services/websiteReadyReminderWorker'
 import { startEditorProductionWorker } from './services/editorProductionWorker'
 import { startSmsDebounceWorker } from './services/smsDebounceWorker'
 import { startCampaignWorker } from './modules/campaigns/services/campaignWorker'
@@ -297,6 +298,7 @@ async function startServer() {
     }
     app.listen(port, () => {
       startMailOutboxWorker()
+      startWebsiteReadyReminderWorker()
       startSmsDebounceWorker()
       startCampaignWorker()
       startEditorProductionWorker()

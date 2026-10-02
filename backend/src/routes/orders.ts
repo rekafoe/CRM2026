@@ -16,6 +16,7 @@ import { runPreflight, parseTargetFormatFromParams } from '../services/preflight
 import { OrderService } from '../modules/orders/services/orderService'
 import { sendOrderSmsManual } from '../services/orderStatusSmsService'
 import { enqueueMail } from '../services/mailOutboxService'
+import { tryEnqueueWebsiteOrderCompletedEmail } from '../services/websiteOrderEmailService'
 import {
   createBePaidCheckout,
   BePaidCheckoutError,
@@ -1312,7 +1313,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const issuerId = authUser?.id ?? null
   const db = await getDb()
   const order = await db.get<any>(
-    'SELECT id, status, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
+    'SELECT id, status, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
     id,
   )
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
@@ -1354,6 +1355,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
     )
   }
 
+  let debtClosed = false
   try {
     let hasIssuedBy = false
     try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
@@ -1373,8 +1375,12 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
         remainder
       )
     }
+    debtClosed = true
   } catch (e) {
     console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
+  }
+  if (debtClosed && order.source === 'website') {
+    void tryEnqueueWebsiteOrderCompletedEmail(id)
   }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)

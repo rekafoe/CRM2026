@@ -4,6 +4,7 @@ import { PhotoOrderService } from './photoOrderService';
 import { UserOrderPageService } from './userOrderPageService';
 import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
+import { tryEnqueueWebsiteOrderCompletedEmail } from './websiteOrderEmailService';
 import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
 import { issueCashRemainder } from '../utils/orderAmounts';
 import { OrderService } from '../modules/orders/services/orderService';
@@ -458,6 +459,7 @@ export class OrderManagementService {
       const db = await getDb();
       await db.run('BEGIN');
       try {
+        let websiteDebtClosed = false;
         if (orderType === 'telegram') {
           await db.run(
             `
@@ -516,6 +518,7 @@ export class OrderManagementService {
                 orderId, closedDate, remainder
               );
             }
+            if (String(order.source || '') === 'website') websiteDebtClosed = true;
           } catch (e) {
             console.warn('[OrderManagementService.issueOrder] debt_closed_events insert failed:', (e as Error)?.message);
           }
@@ -543,6 +546,9 @@ export class OrderManagementService {
         }
 
         await db.run('COMMIT');
+        if (websiteDebtClosed) {
+          void tryEnqueueWebsiteOrderCompletedEmail(orderId);
+        }
         if (orderType === 'website') {
           void trySyncWebsiteOrderStatusFromCrm(db, orderId);
         }
