@@ -42,7 +42,6 @@ import {
   OrderPoolFilters,
   OrderPoolList,
   OrderPoolDetailHeader,
-  OrderPoolPaymentSummary,
   getEffectiveResponsibleUserId,
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
@@ -857,6 +856,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             <OrderPoolDetailHeader
               order={selectedOrder}
               currentUserId={currentUserId}
+              prepay={selectedPrepay}
+              debt={selectedDebt}
+              onCopyPaymentUrl={() => {
+                void navigator.clipboard.writeText(selectedOrder.paymentUrl || '').then(
+                  () => toast.success('Ссылка скопирована'),
+                  () => toast.error('Не удалось скопировать'),
+                );
+              }}
               allUsers={allUsers}
               assignableOnShift={assignableOnShift}
               assignableAll={assignableAll}
@@ -898,18 +905,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               }
               showPermanentDelete={isAdmin && selectedOrder.is_cancelled === 1}
               issuing={issuingOrderId === selectedOrder.id}
-            />
-
-            <OrderPoolPaymentSummary
-              order={selectedOrder}
-              prepay={selectedPrepay}
-              debt={selectedDebt}
-              onCopyPaymentUrl={() => {
-                void navigator.clipboard.writeText(selectedOrder.paymentUrl || '').then(
-                  () => toast.success('Ссылка скопирована'),
-                  () => toast.error('Не удалось скопировать'),
-                );
-              }}
             />
 
             {orderStatuses.length > 0 && (

@@ -15,10 +15,14 @@ import {
 import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
 import { isPoolOrderStatusId } from '../../hooks/useOrderStatuses';
 import { OrderDeliveryBlock } from '../orders/OrderDeliveryBlock';
+import { OrderPoolPaymentSummary } from './OrderPoolPaymentSummary';
 
 interface OrderPoolDetailHeaderProps {
   order: Order;
   currentUserId: number;
+  prepay: number;
+  debt: number;
+  onCopyPaymentUrl: () => void;
   allUsers: Array<{ id: number; name: string }>;
   assignableOnShift?: AssignableUser[];
   assignableAll?: AssignableUser[];
@@ -46,6 +50,9 @@ interface OrderPoolDetailHeaderProps {
 export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   order,
   currentUserId,
+  prepay,
+  debt,
+  onCopyPaymentUrl,
   allUsers,
   assignableOnShift = [],
   assignableAll = [],
@@ -86,160 +93,171 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
 
   return (
     <div className="order-pool-detail-header">
-      <div className="order-pool-detail-header__top">
-        <div className="order-pool-detail-header__titles">
-          <div className="order-pool-detail-header__number-row">
-            <h2 className="order-pool-detail-header__number">{order.number}</h2>
-            {showCancelled && <StatusBadge status="Отменён" color="error" size="sm" />}
-            {order.source && (
-              <StatusBadge status={getSourceLabel(order.source)} color="info" size="sm" />
-            )}
-          </div>
-          <div className="order-pool-detail-header__client-row">
-            <span className="order-pool-detail-header__client">
-              {order.customerName || 'Клиент не указан'}
-            </span>
-            {order.customerPhone ? (
-              <button
-                type="button"
-                className="order-pool-detail-header__phone-btn"
-                title="Скопировать телефон"
-                onClick={() => onCopyPhone?.(order.customerPhone!)}
-              >
-                {order.customerPhone}
-              </button>
-            ) : (
-              <span className="order-pool-detail-header__phone">—</span>
-            )}
-          </div>
-          <div className="order-pool-detail-header__dates">
-            <p className="order-pool-detail-header__date-row">
-              Оформлен: <strong>{createdLabel}</strong>
-            </p>
-            <p className="order-pool-detail-header__date-row order-pool-detail-header__readiness">
-              Готовность: <strong>{readiness.readyAtLabel}</strong>
-              {readiness.label ? (
-                <span className={['order-pool-detail-header__ready-hint', readiness.isHourSla ? 'is-hour-sla' : ''].filter(Boolean).join(' ')}>
-                  {' '}· {readiness.label}
+      <div className="order-pool-detail-header__layout">
+        <div className="order-pool-detail-header__main">
+          <div className="order-pool-detail-header__top">
+            <div className="order-pool-detail-header__titles">
+              <div className="order-pool-detail-header__number-row">
+                <h2 className="order-pool-detail-header__number">{order.number}</h2>
+                {showCancelled && <StatusBadge status="Отменён" color="error" size="sm" />}
+                {order.source && (
+                  <StatusBadge status={getSourceLabel(order.source)} color="info" size="sm" />
+                )}
+              </div>
+              <div className="order-pool-detail-header__client-row">
+                <span className="order-pool-detail-header__client">
+                  {order.customerName || 'Клиент не указан'}
                 </span>
-              ) : null}
-            </p>
+                {order.customerPhone ? (
+                  <button
+                    type="button"
+                    className="order-pool-detail-header__phone-btn"
+                    title="Скопировать телефон"
+                    onClick={() => onCopyPhone?.(order.customerPhone!)}
+                  >
+                    {order.customerPhone}
+                  </button>
+                ) : (
+                  <span className="order-pool-detail-header__phone">—</span>
+                )}
+              </div>
+              <div className="order-pool-detail-header__dates">
+                <p className="order-pool-detail-header__date-row">
+                  Оформлен: <strong>{createdLabel}</strong>
+                </p>
+                <p className="order-pool-detail-header__date-row order-pool-detail-header__readiness">
+                  Готовность: <strong>{readiness.readyAtLabel}</strong>
+                  {readiness.label ? (
+                    <span className={['order-pool-detail-header__ready-hint', readiness.isHourSla ? 'is-hour-sla' : ''].filter(Boolean).join(' ')}>
+                      {' '}· {readiness.label}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {needsAssign && (
-          <button
-            type="button"
-            className="lg-btn lg-btn--success order-pool-detail-header__take-primary"
-            onClick={onAssignToMe}
-          >
-            Взять в работу
-          </button>
-        )}
-      </div>
-
-      {(showFulfillmentBanner || showDeliveryDetails || showFulfillmentPoint) ? (
-        <div className="order-pool-fulfillment-row">
-          <OrderPoolFulfillmentBanner
-            chip={fulfillmentChip}
-            size="detail"
-            showHint={!showDeliveryDetails}
-          />
-          {showDeliveryDetails && order.delivery ? (
-            <OrderDeliveryBlock delivery={order.delivery} />
-          ) : null}
-          {showFulfillmentPoint ? (
-            <div className="order-pool-fulfillment__point">
-              Точка выдачи: <strong>{order.fulfillment_department_name}</strong>
-              {order.fulfillment_department_code
-                ? ` (${order.fulfillment_department_code})`
-                : ''}
+          {(showFulfillmentBanner || showDeliveryDetails || showFulfillmentPoint) ? (
+            <div className="order-pool-fulfillment-row">
+              <OrderPoolFulfillmentBanner
+                chip={fulfillmentChip}
+                size="detail"
+                showHint={!showDeliveryDetails}
+              />
+              {showDeliveryDetails && order.delivery ? (
+                <OrderDeliveryBlock delivery={order.delivery} />
+              ) : null}
+              {showFulfillmentPoint ? (
+                <div className="order-pool-fulfillment__point">
+                  Точка выдачи: <strong>{order.fulfillment_department_name}</strong>
+                  {order.fulfillment_department_code
+                    ? ` (${order.fulfillment_department_code})`
+                    : ''}
+                </div>
+              ) : null}
             </div>
           ) : null}
-        </div>
-      ) : null}
 
-      <div className="order-detail-responsible order-detail-responsible--with-transfer">
-        <label htmlFor="order-pool-responsible">
-          Ответственный
-          <AssignableUserSelect
-            id="order-pool-responsible"
-            value={responsibleId}
-            onChange={(uid) => {
-              if (uid == null) {
-                if (responsibleId != null) onResponsibleChange(null);
-                return;
+          <div className="order-detail-responsible order-detail-responsible--with-transfer">
+            <label htmlFor="order-pool-responsible">
+              Ответственный
+              <AssignableUserSelect
+                id="order-pool-responsible"
+                value={responsibleId}
+                onChange={(uid) => {
+                  if (uid == null) {
+                    if (responsibleId != null) onResponsibleChange(null);
+                    return;
+                  }
+                  if (uid === responsibleId) return;
+                  onResponsibleChange(uid);
+                }}
+                onShift={roleOnShift}
+                all={roleAll}
+                emptyLabel="— Не назначен"
+                disabled={!canReassign}
+                title={
+                  !canReassign
+                    ? 'Переназначить можно только при статусе «Ожидает» или «Оформлен»'
+                    : undefined
+                }
+              />
+            </label>
+            <button
+              type="button"
+              className={`lg-btn${fulfillmentChip?.variant === 'pickup' ? ' lg-btn--primary' : ''}`}
+              onClick={() => setTransferOpen(true)}
+              title={
+                fulfillmentChip?.variant === 'pickup'
+                  ? `Передать заказ на точку «${fulfillmentChip.pointName}»`
+                  : 'Передать коллеге или в другой павильон'
               }
-              if (uid === responsibleId) return;
-              onResponsibleChange(uid);
-            }}
-            onShift={roleOnShift}
-            all={roleAll}
-            emptyLabel="— Не назначен"
-            disabled={!canReassign}
-            title={
-              !canReassign
-                ? 'Переназначить можно только при статусе «Ожидает» или «Оформлен»'
-                : undefined
-            }
-          />
-        </label>
-        <button
-          type="button"
-          className={`lg-btn${fulfillmentChip?.variant === 'pickup' ? ' lg-btn--primary' : ''}`}
-          onClick={() => setTransferOpen(true)}
-          title={
-            fulfillmentChip?.variant === 'pickup'
-              ? `Передать заказ на точку «${fulfillmentChip.pointName}»`
-              : 'Передать коллеге или в другой павильон'
-          }
-        >
-          {fulfillmentChip?.variant === 'pickup'
-            ? `Передать на ${fulfillmentChip.pointName}`
-            : 'Передать'}
-        </button>
-      </div>
+            >
+              {fulfillmentChip?.variant === 'pickup'
+                ? `Передать на ${fulfillmentChip.pointName}`
+                : 'Передать'}
+            </button>
+          </div>
+        </div>
 
-      <div className="order-detail-actions" role="toolbar" aria-label="Действия по заказу">
-        <button type="button" className="lg-btn" onClick={onShowFiles}>
-          Файлы
-        </button>
-        <button type="button" className="lg-btn lg-btn--success" onClick={onShowPrepayment}>
-          Предоплата
-        </button>
-        <button
-          type="button"
-          className="lg-btn lg-btn--primary"
-          onClick={onSendPaymentLink}
-          title="Создать ссылку BePaid и отправить клиенту"
-        >
-          Ссылка на оплату
-        </button>
-        {showIssueOrder && (
-          <button
-            type="button"
-            className="lg-btn lg-btn--success"
-            onClick={onIssueOrder}
-            disabled={issuing}
-          >
-            {issuing ? 'Выдача…' : 'Выдать'}
-          </button>
-        )}
-        {showRemovePrepayment && (
-          <button type="button" className="lg-btn lg-btn--danger" onClick={onRemovePrepayment}>
-            Снять предоплату
-          </button>
-        )}
-        {showCancelOrder && (
-          <button type="button" className="lg-btn lg-btn--warning" onClick={onCancelOrder}>
-            Отменить
-          </button>
-        )}
-        {showPermanentDelete && (
-          <button type="button" className="lg-btn lg-btn--danger" onClick={onPermanentDelete}>
-            Удалить из базы
-          </button>
-        )}
+        <aside className="order-pool-detail-header__side">
+          <OrderPoolPaymentSummary
+            order={order}
+            prepay={prepay}
+            debt={debt}
+            onCopyPaymentUrl={onCopyPaymentUrl}
+          />
+          {needsAssign && (
+            <button
+              type="button"
+              className="lg-btn lg-btn--success order-pool-detail-header__take-primary"
+              onClick={onAssignToMe}
+            >
+              Взять в работу
+            </button>
+          )}
+          <div className="order-detail-actions" role="toolbar" aria-label="Действия по заказу">
+            <button type="button" className="lg-btn" onClick={onShowFiles}>
+              Файлы
+            </button>
+            <button type="button" className="lg-btn lg-btn--success" onClick={onShowPrepayment}>
+              Предоплата
+            </button>
+            <button
+              type="button"
+              className="lg-btn lg-btn--primary"
+              onClick={onSendPaymentLink}
+              title="Создать ссылку BePaid и отправить клиенту"
+            >
+              Ссылка на оплату
+            </button>
+            {showIssueOrder && (
+              <button
+                type="button"
+                className="lg-btn lg-btn--success"
+                onClick={onIssueOrder}
+                disabled={issuing}
+              >
+                {issuing ? 'Выдача…' : 'Выдать'}
+              </button>
+            )}
+            {showRemovePrepayment && (
+              <button type="button" className="lg-btn lg-btn--danger" onClick={onRemovePrepayment}>
+                Снять предоплату
+              </button>
+            )}
+            {showCancelOrder && (
+              <button type="button" className="lg-btn lg-btn--warning" onClick={onCancelOrder}>
+                Отменить
+              </button>
+            )}
+            {showPermanentDelete && (
+              <button type="button" className="lg-btn lg-btn--danger" onClick={onPermanentDelete}>
+                Удалить из базы
+              </button>
+            )}
+          </div>
+        </aside>
       </div>
 
       <OrderTransferModal
