@@ -18,6 +18,8 @@ export type PostalShipmentRow = {
   recipient_address: string
   places: number
   weight_kg: number | null
+  cod_amount: number | null
+  declared_value: number | null
   tracking_number: string | null
   status: 'draft' | 'blank_issued' | 'handed_over'
   notes: string | null
@@ -35,6 +37,8 @@ type CreateInput = {
   recipient_address?: unknown
   places?: unknown
   weight_kg?: unknown
+  cod_amount?: unknown
+  declared_value?: unknown
   notes?: unknown
 }
 
@@ -56,6 +60,27 @@ function blankNumber(carrier: PostalCarrier, id: number): string {
   return `${carrier === 'belpost' ? 'BP' : 'EP'}-${id}`
 }
 
+const SHIPMENT_COLUMNS = `id, order_id, carrier, payer, organization_id, recipient_name, recipient_phone,
+              recipient_address, places, weight_kg, cod_amount, declared_value, tracking_number, status, notes, created_at, updated_at`
+
+function parseMoney(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const amount = Number(String(value).replace(/\s/g, '').replace(',', '.'))
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  return Math.round(amount * 100) / 100
+}
+
+function belpostMoney(carrier: PostalCarrier, codRaw: unknown, declaredRaw: unknown): { codAmount: number | null; declaredValue: number | null } {
+  if (carrier !== 'belpost') return { codAmount: null, declaredValue: null }
+  const codAmount = parseMoney(codRaw)
+  let declaredValue = parseMoney(declaredRaw)
+  if (codAmount != null && declaredValue == null) declaredValue = codAmount
+  if (codAmount != null && declaredValue != null && codAmount > declaredValue) {
+    throw Object.assign(new Error('Наложенный платёж больше объявленной ценности'), { status: 400 })
+  }
+  return { codAmount, declaredValue }
+}
+
 function mapRow(row: Omit<PostalShipmentRow, 'blank_number' | 'carrier_title'>): PostalShipmentRow {
   return {
     ...row,
@@ -70,8 +95,7 @@ export class PostalShipmentService {
   static async list(orderId: number): Promise<PostalShipmentRow[]> {
     const db = await getDb()
     const rows = await db.all<Array<Omit<PostalShipmentRow, 'blank_number' | 'carrier_title'>>>(
-      `SELECT id, order_id, carrier, payer, organization_id, recipient_name, recipient_phone,
-              recipient_address, places, weight_kg, tracking_number, status, notes, created_at, updated_at
+      `SELECT ${SHIPMENT_COLUMNS}
          FROM postal_shipments
         WHERE order_id = ?
         ORDER BY id DESC`,
@@ -89,13 +113,14 @@ export class PostalShipmentService {
     const places = Math.max(1, Math.floor(Number(input.places) || 1))
     const weightRaw = input.weight_kg == null || input.weight_kg === '' ? null : Number(String(input.weight_kg).replace(',', '.'))
     const weightKg = weightRaw != null && Number.isFinite(weightRaw) && weightRaw > 0 ? Math.round(weightRaw * 1000) / 1000 : null
+    const { codAmount, declaredValue } = belpostMoney(carrier, input.cod_amount, input.declared_value)
     const organizationId = Number(input.organization_id)
     const db = await getDb()
     const inserted = await db.run(
       `INSERT INTO postal_shipments (
          order_id, carrier, payer, organization_id, recipient_name, recipient_phone, recipient_address,
-         places, weight_kg, notes, status, created_at, updated_at
-       ) VALUES (?, ?, 'sender_legal', ?, ?, ?, ?, ?, ?, ?, 'draft', datetime('now'), datetime('now'))`,
+         places, weight_kg, cod_amount, declared_value, notes, status, created_at, updated_at
+       ) VALUES (?, ?, 'sender_legal', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', datetime('now'), datetime('now'))`,
       [
         orderId,
         carrier,
@@ -105,6 +130,8 @@ export class PostalShipmentService {
         recipientAddress,
         places,
         weightKg,
+        codAmount,
+        declaredValue,
         asText(input.notes) || null,
       ],
     )
@@ -139,8 +166,7 @@ export class PostalShipmentService {
   static async get(orderId: number, shipmentId: number): Promise<PostalShipmentRow | null> {
     const db = await getDb()
     const row = await db.get<Omit<PostalShipmentRow, 'blank_number' | 'carrier_title'>>(
-      `SELECT id, order_id, carrier, payer, organization_id, recipient_name, recipient_phone,
-              recipient_address, places, weight_kg, tracking_number, status, notes, created_at, updated_at
+      `SELECT ${SHIPMENT_COLUMNS}
          FROM postal_shipments
         WHERE id = ? AND order_id = ?`,
       [shipmentId, orderId],
@@ -222,6 +248,8 @@ export class PostalShipmentService {
       weightKg: shipment.weight_kg,
       notes: shipment.notes || '',
       trackingNumber: shipment.tracking_number || '',
+      codAmount: shipment.carrier === 'belpost' ? shipment.cod_amount : null,
+      declaredValue: shipment.carrier === 'belpost' ? shipment.declared_value : null,
       senderName: organization?.name || 'Организация',
       senderUnp: organization?.unp || '',
       senderAddress: organization?.legal_address || '',

@@ -1074,6 +1074,8 @@ export type PostalShipment = {
   recipient_address: string;
   places: number;
   weight_kg: number | null;
+  cod_amount: number | null;
+  declared_value: number | null;
   tracking_number: string | null;
   status: 'draft' | 'blank_issued' | 'handed_over';
   notes: string | null;
@@ -1094,6 +1096,8 @@ export const createPostalShipment = (
     recipient_address: string;
     places?: number;
     weight_kg?: number | null;
+    cod_amount?: number | null;
+    declared_value?: number | null;
     notes?: string;
   },
 ) => api.post<PostalShipment>(`/orders/${orderId}/postal-shipments`, body);

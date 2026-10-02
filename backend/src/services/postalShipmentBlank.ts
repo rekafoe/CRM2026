@@ -9,6 +9,10 @@ export type PostalBlankData = {
   recipientAddress: string
   places: number
   weightKg: number | null
+  /** Сумма, которую Белпочта берёт у получателя за товар. Почтовый сбор сюда не входит. */
+  codAmount: number | null
+  /** Объявленная ценность. При наложенном платеже не ниже его суммы. */
+  declaredValue: number | null
   notes: string
   trackingNumber: string
   senderName: string
@@ -40,6 +44,10 @@ function weightLabel(weightKg: number | null): string {
   return weightKg != null && Number.isFinite(weightKg)
     ? `${weightKg.toLocaleString('ru-RU')} кг`
     : '—'
+}
+
+function formatByn(amount: number): string {
+  return `${amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BYN`
 }
 
 function itemList(lines: string[]): string {
@@ -81,6 +89,12 @@ ${body}
 function buildBelpostBlank(data: PostalBlankData): string {
   const weight = weightLabel(data.weightKg)
   const tracking = data.trackingNumber || 'присваивает Белпочта при приёме'
+  const declared = data.declaredValue != null && data.declaredValue > 0
+    ? formatByn(data.declaredValue)
+    : '____________________ BYN'
+  const cod = data.codAmount != null && data.codAmount > 0
+    ? `<strong>${escapePostalHtml(formatByn(data.codAmount))}.</strong> Сумму принимает Белпочта у получателя и перечисляет отправителю.`
+    : '<strong>Наложенный платёж с получателя не взимается.</strong>'
   return page(
     `Белпочта ф. 116 ${data.blankNumber}`,
     `.bp-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
@@ -121,10 +135,10 @@ function buildBelpostBlank(data: PostalBlankData): string {
     <table style="margin-top:8px;">
       <tr><th>Вид отправления</th><td>Посылка</td><th>Мест</th><td>${escapePostalHtml(data.places)}</td></tr>
       <tr><th>Вес</th><td>${escapePostalHtml(weight)}</td><th>ШПИ</th><td>${escapePostalHtml(tracking)}</td></tr>
-      <tr><th>Объявленная ценность</th><td colspan="3">____________________ BYN</td></tr>
+      <tr><th>Объявленная ценность</th><td colspan="3">${escapePostalHtml(declared)}</td></tr>
       <tr>
         <th>Наложенный платёж</th>
-        <td colspan="3"><strong>Наложенный платёж с получателя не взимается.</strong></td>
+        <td colspan="3">${cod}</td>
       </tr>
       <tr>
         <th>Почтовый сбор</th>

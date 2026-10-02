@@ -43,6 +43,17 @@ function recipientAddress(order: Order): string {
   return order.delivery?.address || order.customer?.address || '';
 }
 
+function formatByn(amount: number): string {
+  return `${amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BYN`;
+}
+
+function parseMoneyInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const amount = Number(trimmed.replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
 async function openPdf(data: BlobPart) {
   const blob = new Blob([data], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
@@ -61,6 +72,8 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
   const [address, setAddress] = useState(() => recipientAddress(order));
   const [places, setPlaces] = useState('1');
   const [weight, setWeight] = useState('');
+  const [cod, setCod] = useState('');
+  const [declared, setDeclared] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [trackingDrafts, setTrackingDrafts] = useState<Record<number, string>>({});
@@ -77,6 +90,8 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     setName(recipientName(order));
     setPhone(order.customerPhone || order.customer?.phone || '');
     setAddress(recipientAddress(order));
+    setCod('');
+    setDeclared('');
     load().catch(() => setShipments([]));
     // Поля заказа читаем только при смене заказа: иначе повторный рендер карточки стирает ввод.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,6 +122,8 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     try {
       setBusy(true);
       const weightValue = weight.trim() ? Number(weight.replace(',', '.')) : null;
+      const codAmount = carrier === 'belpost' ? parseMoneyInput(cod) : null;
+      const declaredValue = carrier === 'belpost' ? parseMoneyInput(declared) : null;
       const created = await createPostalShipment(order.id, {
         carrier,
         organization_id: organizationId === '' ? null : organizationId,
@@ -115,12 +132,17 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
         recipient_address: address.trim(),
         places: Math.max(1, Number(places) || 1),
         weight_kg: weightValue != null && Number.isFinite(weightValue) ? weightValue : null,
+        cod_amount: codAmount,
+        declared_value: declaredValue,
         notes: notes.trim(),
       });
       const pdf = await downloadPostalBlankPdf(order.id, created.data.id);
       await openPdf(pdf.data);
       await load();
-      onNotify('success', `Бланк ${created.data.blank_number} открыт. Доставку оплачивает ${payerLabel}`);
+      const codNote = created.data.cod_amount
+        ? ` Наложенный платёж ${formatByn(created.data.cod_amount)}.`
+        : '';
+      onNotify('success', `Бланк ${created.data.blank_number} открыт. Доставку оплачивает ${payerLabel}.${codNote}`);
     } catch (error: any) {
       onNotify('error', error?.response?.data?.message || error?.message || 'Не удалось создать доставку');
     } finally {
@@ -167,10 +189,10 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
       <div className="postal-shipment__head">
         <h3>Белпочта / Европочта</h3>
         <p>
-          Доставку оплачивает наше юрлицо ({payerLabel}). Получатель наложенный платёж не платит.
+          Почтовый сбор оплачивает наше юрлицо ({payerLabel}).
           {' '}
           {carrier === 'belpost'
-            ? 'Для Белпочты печатается сопроводительный адрес к посылке, ф. 116.'
+            ? 'На ф. 116 можно указать наложенный платёж: Белпочта возьмёт эту сумму у получателя и перечислит нам.'
             : 'Для Европочты печатается накладная на отправление.'}
         </p>
       </div>
@@ -216,6 +238,28 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
           Вес, кг
           <input value={weight} onChange={(event) => setWeight(event.target.value)} inputMode="decimal" />
         </label>
+        {carrier === 'belpost' ? (
+          <>
+            <label>
+              Наложенный платёж, BYN
+              <input
+                value={cod}
+                onChange={(event) => setCod(event.target.value)}
+                inputMode="decimal"
+                placeholder={order.debt && order.debt > 0 ? formatByn(order.debt) : ''}
+              />
+            </label>
+            <label>
+              Объявленная ценность, BYN
+              <input
+                value={declared}
+                onChange={(event) => setDeclared(event.target.value)}
+                inputMode="decimal"
+                placeholder="от суммы наложенного платежа"
+              />
+            </label>
+          </>
+        ) : null}
         <label className="postal-shipment__wide">
           Примечание
           <input value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -235,6 +279,9 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
               <div>
                 <strong>{shipment.carrier_title}</strong> · {shipment.blank_number} · {STATUS_LABEL[shipment.status]}
                 <div>{shipment.recipient_name}, {shipment.recipient_address}</div>
+                {shipment.carrier === 'belpost' && shipment.cod_amount ? (
+                  <div>Наложенный платёж {formatByn(shipment.cod_amount)}</div>
+                ) : null}
               </div>
               <div className="postal-shipment__row-actions">
                 <input

@@ -9,6 +9,8 @@ const base: PostalBlankData = {
   recipientAddress: 'Минск, ул. Ленина, 1',
   places: 1,
   weightKg: 0.4,
+  codAmount: null,
+  declaredValue: null,
   notes: '',
   trackingNumber: '',
   senderName: 'ООО Принт',
@@ -38,6 +40,20 @@ describe('buildPostalBlankHtml', () => {
     expect(html).not.toContain('наложенным платежом')
   })
 
+  it('на ф. 116 пишет сумму наложенного платежа, почтовый сбор оставляет на отправителе', () => {
+    const html = buildPostalBlankHtml({
+      ...base,
+      codAmount: 85.5,
+      declaredValue: 90,
+    })
+
+    expect(html).toContain('85,50 BYN')
+    expect(html).toContain('90,00 BYN')
+    expect(html).toContain('Сумму принимает Белпочта у получателя и перечисляет отправителю')
+    expect(html).toContain('Оплата доставки: отправитель, юридическое лицо')
+    expect(html).not.toContain('Наложенный платёж с получателя не взимается')
+  })
+
   it('для Европочты печатает отдельную накладную, а не ф. 116', () => {
     const html = buildPostalBlankHtml({
       ...base,
@@ -49,8 +65,12 @@ describe('buildPostalBlankHtml', () => {
       recipientAddress: 'Пункт выдачи 42',
       places: 2,
       weightKg: null,
+      codAmount: 85.5,
+      declaredValue: 90,
       senderUnp: '',
     })
+
+    expect(html).not.toContain('85,50 BYN')
 
     expect(html).toContain('ЕВРОПОЧТА')
     expect(html).toContain('Накладная на отправление')
