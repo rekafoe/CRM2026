@@ -12,8 +12,9 @@ import {
   type Expense,
   type ExpenseCategory,
 } from '../../api';
-import { Alert, Button } from '../../components/common';
-import { MoneyAmount } from '../../components/ui';
+import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
+import { Alert } from '../../components/common';
+import { AppIcon, MoneyAmount } from '../../components/ui';
 import { getErrorMessage } from '../../utils/errorUtils';
 import './ExpensesPage.css';
 
@@ -202,25 +203,19 @@ export const ExpensesPage: React.FC = () => {
   };
 
   return (
+    <AdminPageLayout
+      title="Расходы"
+      description="Операционные расходы по департаментам и компании."
+      icon={<AppIcon name="receipt" size="lg" />}
+      onBack={goBack}
+      className="expenses-layout"
+    >
     <div className="expenses-page">
-      <div className="expenses-header">
-        <div className="expenses-header-left">
-          <button type="button" onClick={goBack} className="expenses-back-btn">
-            ← Назад
-          </button>
-          <div>
-            <h1 className="expenses-title">Расходы</h1>
-            <p className="expenses-subtitle">Учёт операционных расходов по департаментам и компании</p>
-          </div>
-        </div>
-      </div>
-
       {errorMessage && (
-        <div className="mb-4">
-          <Alert type="error">{errorMessage}</Alert>
-        </div>
+        <Alert type="error">{errorMessage}</Alert>
       )}
 
+      <div className="expenses-top">
       <div className="expenses-filters">
         <div className="expenses-filter-field">
           <label htmlFor="expenses-date-from">Период с</label>
@@ -277,12 +272,12 @@ export const ExpensesPage: React.FC = () => {
           </select>
         </div>
       </div>
-
       <div className="expenses-summary-card">
         <span className="expenses-summary-label">Итого за период</span>
         <span className="expenses-summary-value">
           <MoneyAmount value={periodTotal} />
         </span>
+      </div>
       </div>
 
       <form className="expenses-form-card" onSubmit={handleSubmit}>
@@ -337,7 +332,7 @@ export const ExpensesPage: React.FC = () => {
             </select>
           </div>
           <div className="expenses-form-field">
-            <label htmlFor="expense-amount">Сумма, BYN</label>
+            <label htmlFor="expense-amount">Сумма</label>
             <input
               id="expense-amount"
               type="number"
@@ -391,14 +386,14 @@ export const ExpensesPage: React.FC = () => {
           </p>
         )}
         <div className="expenses-form-actions">
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Сохранение...' : editingId ? 'Сохранить' : 'Добавить расход'}
-          </Button>
           {editingId && (
-            <Button type="button" variant="secondary" onClick={resetForm}>
+            <button type="button" className="lg-btn" onClick={resetForm}>
               Отмена
-            </Button>
+            </button>
           )}
+          <button type="submit" className="lg-btn lg-btn--primary" disabled={saving}>
+            {saving ? 'Сохранение...' : editingId ? 'Сохранить' : 'Добавить'}
+          </button>
         </div>
       </form>
 
@@ -422,34 +417,36 @@ export const ExpensesPage: React.FC = () => {
             <tbody>
               {expenses.map((expense) => (
                 <tr key={expense.id}>
-                  <td>{expense.expense_date?.slice(0, 10)}</td>
-                  <td>{departmentLabel(expense.department_id)}</td>
-                  <td>{expense.category_name ?? '—'}</td>
-                  <td>
-                    {expense.title || '—'}
-                    {expense.notes === 'payroll-auto' ? ' · из ЗП' : ''}
-                    {expense.notes?.startsWith('tax-auto:') ? ' · 6% за квартал' : ''}
-                    {expense.recurring_source_id == null && Number(expense.recurring_monthly) === 1
-                      ? ' · каждый месяц'
-                      : ''}
-                    {expense.recurring_source_id != null ? ' · авто · месяц' : ''}
+                  <td data-label="Дата">{expense.expense_date?.slice(0, 10)}</td>
+                  <td data-label="Департамент">{departmentLabel(expense.department_id)}</td>
+                  <td data-label="Категория">{expense.category_name ?? '—'}</td>
+                  <td data-label="Название">
+                    <span className="expenses-title-cell">
+                      <span>{expense.title || '—'}</span>
+                      {expense.notes === 'payroll-auto' && <span className="expenses-chip">из зарплаты</span>}
+                      {expense.notes?.startsWith('tax-auto:') && <span className="expenses-chip">6% за квартал</span>}
+                      {expense.recurring_source_id == null && Number(expense.recurring_monthly) === 1 && (
+                        <span className="expenses-chip">каждый месяц</span>
+                      )}
+                      {expense.recurring_source_id != null && <span className="expenses-chip">месяц по шаблону</span>}
+                    </span>
                   </td>
-                  <td className="expenses-amount">
+                  <td className="expenses-amount" data-label="Сумма">
                     <MoneyAmount value={expense.amount} />
                   </td>
-                  <td>
+                  <td data-label="">
                     {expense.notes === 'payroll-auto' ? (
-                      <span className="expenses-empty">считается из процентов</span>
+                      <span className="expenses-muted">Считается из процентов</span>
                     ) : expense.notes?.startsWith('tax-auto:') ? (
-                      <span className="expenses-empty">6% выручки за весь календарный квартал</span>
+                      <span className="expenses-muted">За весь календарный квартал</span>
                     ) : (
                       <div className="expenses-table-actions">
-                        <Button type="button" variant="secondary" size="sm" onClick={() => handleEdit(expense)}>
+                        <button type="button" className="lg-btn" onClick={() => handleEdit(expense)}>
                           Изменить
-                        </Button>
-                        <Button type="button" variant="error" size="sm" onClick={() => void handleDelete(expense)}>
+                        </button>
+                        <button type="button" className="lg-btn lg-btn--danger" onClick={() => void handleDelete(expense)}>
                           Удалить
-                        </Button>
+                        </button>
                       </div>
                     )}
                   </td>
@@ -460,6 +457,7 @@ export const ExpensesPage: React.FC = () => {
         )}
       </div>
     </div>
+    </AdminPageLayout>
   );
 };
 
