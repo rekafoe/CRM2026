@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import React from 'react';
 import { Order } from '../../../types';
-import { createOrder, cancelOnlineOrder, addOrderItem, deleteOrderItem, updateOrderItem, updateOrderStatus } from '../../../api';
-import { isCustomCalculatorItem } from '../../calculator/utils/customCalculatorItem';
+import { createOrder, cancelOnlineOrder, addOrderItem, updateOrderItem, updateOrderStatus } from '../../../api';
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
 import { useReasonPresets } from '../../common/useReasonPresets';
@@ -147,42 +146,31 @@ export const useOrderHandlers = ({
           : typeof item.params?.storedTotalCost === 'number'
             ? item.params.storedTotalCost
             : undefined;
-      const keepCustomRow = isCustomCalculatorItem(item);
       try {
-        let savedItem: any;
-        if (keepCustomRow) {
-          // Произвольную позицию обновляем на месте: удаление перед вставкой теряло строку, если повторное сохранение падало.
-          const updated = await updateOrderItem(orderId, itemId, {
-            type: 'custom',
-            price: item.price,
-            quantity: item.quantity,
-            sides: item.sides,
-            sheets: item.sheets,
-            waste: item.waste,
-            clicks: item.clicks,
-            totalCost,
-            params: item.params,
-          });
-          savedItem = updated.data;
-        } else {
-          await deleteOrderItem(orderId, itemId);
-          const addedItem = await addOrderItem(orderId, { ...item, totalCost });
-          savedItem = addedItem.data;
-        }
+        // Снимок калькулятора пишется в ту же строку. Удаление перед вставкой теряло позицию, если вторая запись падала.
+        const updated = await updateOrderItem(orderId, itemId, {
+          type: item.type,
+          price: item.price,
+          quantity: item.quantity,
+          sides: item.sides,
+          sheets: item.sheets,
+          waste: item.waste,
+          clicks: item.clicks,
+          totalCost,
+          params: item.params,
+          components: item.components,
+          replaceParams: true,
+        } as any);
+        const savedItem = updated.data;
 
         setOrders((prevOrders: Order[]) => {
           const orderIndex = prevOrders.findIndex(o => o.id === orderId);
           if (orderIndex === -1) return prevOrders;
 
           const updatedOrder = { ...prevOrders[orderIndex] };
-          if (keepCustomRow) {
-            updatedOrder.items = (updatedOrder.items || []).map((existing) =>
-              existing.id === itemId ? { ...existing, ...savedItem, id: itemId } : existing
-            );
-          } else {
-            updatedOrder.items = (updatedOrder.items || []).filter(i => i.id !== itemId);
-            updatedOrder.items.push(savedItem);
-          }
+          updatedOrder.items = (updatedOrder.items || []).map((existing) =>
+            existing.id === itemId ? { ...existing, ...savedItem, id: itemId } : existing
+          );
 
           const newOrders = [...prevOrders];
           newOrders[orderIndex] = updatedOrder;
@@ -193,7 +181,7 @@ export const useOrderHandlers = ({
         closeCalculator();
 
         toast.success('Позиция обновлена', 'Параметры товара обновлены');
-        logger.info('Order item replaced', { orderId, itemId, keepCustomRow });
+        logger.info('Order item replaced', { orderId, itemId });
       } catch (error) {
         logger.error('Failed to update order item', error);
         loadOrders(undefined, true);

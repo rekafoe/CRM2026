@@ -17,10 +17,75 @@ import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
+import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
   return unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
+}
+
+async function reserveComponentsForOrder(
+  db: Awaited<ReturnType<typeof getDb>>,
+  orderId: number,
+  components: Array<{ materialId: number; qtyPerItem: number }>,
+  quantity: number,
+): Promise<Array<{ materialId: number; qtyPerItem: number; reservationId?: number }>> {
+  if (components.length === 0) return []
+  const ids = components
+    .map((component) => Number(component.materialId))
+    .filter((id) => Number.isFinite(id) && id > 0)
+  const rows = ids.length
+    ? await db.all<Array<{ id: number; quantity: number; name: string; unit?: string | null }>>(
+        `SELECT id, quantity, name, unit FROM materials WHERE id IN (${ids.map(() => '?').join(',')})`,
+        ids,
+      )
+    : []
+  const byId = new Map(rows.map((row) => [Number(row.id), row]))
+  const now = new Date().toISOString()
+  const reserved: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> = []
+  for (const component of components) {
+    const materialId = Number(component.materialId)
+    const qtyPerItem = Number(component.qtyPerItem) || 0
+    const material = byId.get(materialId)
+    if (!material) {
+      const error = new Error(`Материал с ID ${materialId} не найден`)
+      ;(error as any).status = 400
+      throw error
+    }
+    const neededQty = computeRequiredQuantityForReservation(qtyPerItem, quantity, material.unit)
+    if (neededQty <= 0) {
+      reserved.push({ materialId, qtyPerItem })
+      continue
+    }
+    const existing = await db.get<{ reserved: number }>(
+      `SELECT COALESCE(SUM(quantity_reserved), 0) as reserved
+         FROM material_reservations
+        WHERE material_id = ? AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > ?)`,
+      [materialId, now],
+    )
+    const available = Number(material.quantity) - Number(existing?.reserved || 0)
+    if (available < neededQty) {
+      const error = new Error(`Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${neededQty}`)
+      ;(error as any).status = 400
+      ;(error as any).code = 'INSUFFICIENT_MATERIAL'
+      throw error
+    }
+    const expiresAt = new Date()
+    expiresAt.setHours(expiresAt.getHours() + 24)
+    const inserted = await db.run(
+      `INSERT INTO material_reservations
+        (material_id, order_id, quantity_reserved, status, notes, expires_at)
+       VALUES (?, ?, ?, 'active', ?, ?)`,
+      materialId,
+      orderId,
+      neededQty,
+      'reserve for order item replace',
+      expiresAt.toISOString(),
+    )
+    reserved.push({ materialId, qtyPerItem, reservationId: inserted.lastID || undefined })
+  }
+  return reserved
 }
 
 function computeRequiredQuantityForReservation(
@@ -732,10 +797,15 @@ export class OrderItemController {
         body.price = Math.round((totalCostFromClient / newQuantity) * 100) / 100
       }
       const deltaQty = newQuantity - (existing.quantity ?? 1)
+      const replaceParams = rawBody.replaceParams === true
+      const incomingComponents = Array.isArray(rawBody.components)
+        ? (rawBody.components as Array<{ materialId: number; qtyPerItem: number }>)
+        : null
+      const fullComponentReplace = replaceParams && incomingComponents != null
 
       await db.run('BEGIN')
       try {
-        if (deltaQty !== 0) {
+        if (deltaQty !== 0 && !fullComponentReplace) {
           const paramsObj = JSON.parse(existing.params || '{}') as { description?: string; components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> }
           const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
 
@@ -871,34 +941,64 @@ export class OrderItemController {
           }
         })()
         let paramsJson: string | undefined
-        const paramsPatch: Record<string, unknown> =
+        let paramsPatch: Record<string, unknown> =
           body.params != null && typeof body.params === 'object'
             ? { ...body.params }
             : body.printerId !== undefined
               ? { printerId: body.printerId ?? null }
               : {}
+        if (replaceParams && body.params != null && typeof body.params === 'object') {
+          let reservedComponents: unknown = incomingComponents ?? undefined
+          if (fullComponentReplace && incomingComponents) {
+            const oldComponents = Array.isArray(existingParams.components) ? existingParams.components : []
+            const reservationIds = oldComponents
+              .map((component) => Number((component as { reservationId?: number }).reservationId))
+              .filter((id) => Number.isFinite(id) && id > 0)
+            if (reservationIds.length > 0) {
+              await db.run(
+                `UPDATE material_reservations SET status = 'cancelled' WHERE id IN (${reservationIds.map(() => '?').join(',')})`,
+                ...reservationIds,
+              )
+            }
+            reservedComponents = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
+          }
+          paramsPatch = buildReplacedItemParams({
+            existing: existingParams,
+            incoming: body.params,
+            components: reservedComponents,
+          })
+        }
         if (totalCostFromClient != null) {
           paramsPatch.storedTotalCost = totalCostFromClient
           paramsPatch.priceLockedByCalculator = true
         }
-        const incomingCustom =
-          isArbitraryCalculatorItem(paramsPatch, String(rawBody.type ?? existing.type)) ||
-          isArbitraryCalculatorItem(existingParams, existing.type)
+        const incomingCustom = replaceParams
+          ? isArbitraryCalculatorItem(paramsPatch, String(rawBody.type ?? ''))
+          : isArbitraryCalculatorItem(paramsPatch, String(rawBody.type ?? existing.type)) ||
+            isArbitraryCalculatorItem(existingParams, existing.type)
         if (incomingCustom && Object.keys(paramsPatch).length > 0) {
           paramsPatch.customProduct = true
           paramsPatch.productType = 'custom'
           paramsPatch.operator_percent = CUSTOM_CALCULATOR_OPERATOR_PERCENT
-          if (isArbitraryCalculatorItem(body.params, String(rawBody.type ?? ''))) {
-            paramsPatch.productId = null
-          }
+          paramsPatch.productId = null
         }
-        const forceCustomType = incomingCustom && existing.type !== 'custom'
+        const requestedType = typeof rawBody.type === 'string' ? rawBody.type.trim() : ''
+        const nextType = incomingCustom
+          ? 'custom'
+          : replaceParams && requestedType
+            ? requestedType
+            : null
+        const typeClause = nextType && nextType !== existing.type ? 'type = ?,' : ''
         if (Object.keys(paramsPatch).length > 0) {
-          paramsJson = JSON.stringify({ ...existingParams, ...paramsPatch })
+          const snapshotReplacesParams =
+            replaceParams && body.params != null && typeof body.params === 'object'
+          paramsJson = snapshotReplacesParams
+            ? JSON.stringify(paramsPatch)
+            : JSON.stringify({ ...existingParams, ...paramsPatch })
         }
 
         const updateSql = `UPDATE items SET 
-              ${forceCustomType ? 'type = ?,' : ''}
+              ${typeClause}
               ${body.price != null ? 'price = ?,' : ''}
               ${body.quantity != null ? 'quantity = ?,' : ''}
               ${printerIdClause}
@@ -913,7 +1013,7 @@ export class OrderItemController {
           logger.info('🖨️ [updateItem] UPDATE SQL', { printerIdCol, printerIdClause: printerIdClause || '(none)', printerIdVal })
         }
         const bindings = [
-          ...(forceCustomType ? ['custom'] : []),
+          ...(typeClause ? [nextType] : []),
           ...(body.price != null ? [Number(body.price)] : []),
           ...(body.quantity != null ? [newQuantity] : []),
           ...printerIdVal,
