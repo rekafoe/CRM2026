@@ -1077,10 +1077,32 @@ export type PostalShipment = {
   cod_amount: number | null;
   declared_value: number | null;
   tracking_number: string | null;
+  external_id: string | null;
+  document_id: string | null;
+  blank_status: 'none' | 'processing' | 'ready';
+  carrier_message: string | null;
+  has_blank: boolean;
   status: 'draft' | 'blank_issued' | 'handed_over';
   notes: string | null;
   blank_number: string;
   carrier_title: string;
+};
+
+export type PostalCarrierSettingsView = {
+  belpostReady: boolean;
+  europostReady: boolean;
+  belpostBaseUrl: string;
+  belpostTokenHint: string;
+  europostApiUrl: string;
+  europostApiPort: string;
+  europostServiceHint: string;
+  europostLogin: string;
+  europostPasswordHint: string;
+  europostLoginTypeId: string;
+  europostGoodsId: string;
+  europostWarehouseId: string;
+  europostWeightTypeId: string;
+  europostDeliveryTypeId: string;
 };
 
 export const getPostalShipments = (orderId: number) =>
@@ -1110,6 +1132,26 @@ export const updatePostalShipment = (
 
 export const downloadPostalBlankPdf = (orderId: number, shipmentId: number) =>
   api.get(`/orders/${orderId}/postal-shipments/${shipmentId}/blank-pdf`, { responseType: 'blob' });
+
+export const getPostalCarrierStatus = () =>
+  api.get<{
+    belpostReady: boolean;
+    europostReady: boolean;
+    belpostMessage: string;
+    europostMessage: string;
+  }>('/postal-carriers/status');
+
+export const getPostalCarrierSettings = () =>
+  api.get<PostalCarrierSettingsView>('/postal-carriers/settings');
+
+export const savePostalCarrierSettings = (body: Record<string, string>) =>
+  api.put<PostalCarrierSettingsView>('/postal-carriers/settings', body);
+
+export const checkPostalCarrierAccess = () =>
+  api.post<{
+    belpost: { ok: boolean; message: string };
+    europost: { ok: boolean; message: string };
+  }>('/postal-carriers/check', {}, { timeout: 45000 });
 
 // Генерация PDF бланка заказа
 export const generateOrderBlankPdf = (orderId: number, companyPhones?: string[]) => {

@@ -42,6 +42,7 @@ import expensesRoutes from './expenses'
 import publicEditorRoutes from './publicEditor'
 import webhooksRoutes from './webhooks'
 import { knowledgeBaseRoutes } from '../modules/knowledge-base'
+import postalCarriersRoutes from './postalCarriers'
 
 const router = Router()
 
@@ -50,6 +51,7 @@ router.use('/webhooks', webhooksRoutes)
 router.use('/auth', authRoutes)
 router.use('/users', usersRoutes)
 router.use('/orders', ordersRoutes)
+router.use('/postal-carriers', postalCarriersRoutes)
 router.use('/order-statuses', orderStatusesRoutes)
 router.use('/materials', materialsRoutes)
 router.use('/pricing', pricingRoutes)

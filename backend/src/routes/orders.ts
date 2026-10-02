@@ -796,8 +796,8 @@ router.get('/:id/postal-shipments/:shipmentId/blank-pdf', asyncHandler(async (re
     return
   }
   try {
-    const { pdf, filename } = await PostalShipmentService.renderBlankPdf(orderId, shipmentId)
-    res.setHeader('Content-Type', 'application/pdf')
+    const { pdf, filename, contentType } = await PostalShipmentService.renderBlankPdf(orderId, shipmentId)
+    res.setHeader('Content-Type', contentType || 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.setHeader('Content-Length', pdf.length)
     res.send(pdf)

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { UserManagement, DepartmentManagement } from '../../features/userManagement';
 import { useAdminBack } from '../../hooks/useAdminBack';
+import { PostalCarrierSettings } from './PostalCarrierSettings';
 
 interface SettingsPageProps {
   onBack?: () => void;
@@ -35,6 +36,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
     >
       <div className="settings-content">
         <div className="settings-grid">
+          <div className="setting-card">
+            <h3>Белпочта и Европочта</h3>
+            <p>JWT и доступ Европочты. Бланк и трек CRM забирает у перевозчика.</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => document.getElementById('postal-carriers')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              Открыть
+            </button>
+          </div>
+
           <div className="setting-card">
             <h3>Произвольный калькулятор</h3>
             <p>Процент оператора для произвольных позиций. Пересчёт зарплаты берёт сохранённое значение.</p>
@@ -80,6 +92,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
             </button>
           </div>
         </div>
+        <PostalCarrierSettings />
       </div>
     </AdminPageLayout>
   );

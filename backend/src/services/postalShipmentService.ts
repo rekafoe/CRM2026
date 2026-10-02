@@ -1,11 +1,7 @@
 import { getDb } from '../config/database'
-import { PDFReportService } from './pdfReportService'
-import {
-  buildPostalBlankHtml,
-  postalCarrierTitle,
-  type PostalBlankData,
-  type PostalCarrier,
-} from './postalShipmentBlank'
+import { dispatchPostalShipment, pullPostalBlank } from './postalDispatch'
+import { getPostalCarrierSettings } from './postalCarrierSettings'
+import { postalCarrierTitle, type PostalCarrier } from './postalShipmentBlank'
 
 export type PostalShipmentRow = {
   id: number
@@ -21,6 +17,11 @@ export type PostalShipmentRow = {
   cod_amount: number | null
   declared_value: number | null
   tracking_number: string | null
+  external_id: string | null
+  document_id: string | null
+  blank_status: 'none' | 'processing' | 'ready'
+  carrier_message: string | null
+  has_blank: boolean
   status: 'draft' | 'blank_issued' | 'handed_over'
   notes: string | null
   created_at: string
@@ -61,7 +62,10 @@ function blankNumber(carrier: PostalCarrier, id: number): string {
 }
 
 const SHIPMENT_COLUMNS = `id, order_id, carrier, payer, organization_id, recipient_name, recipient_phone,
-              recipient_address, places, weight_kg, cod_amount, declared_value, tracking_number, status, notes, created_at, updated_at`
+              recipient_address, places, weight_kg, cod_amount, declared_value, tracking_number,
+              external_id, document_id, blank_status, carrier_message,
+              CASE WHEN blank_file IS NOT NULL AND length(blank_file) > 0 THEN 1 ELSE 0 END AS has_blank,
+              status, notes, created_at, updated_at`
 
 function parseMoney(value: unknown): number | null {
   if (value == null || value === '') return null
@@ -81,11 +85,13 @@ function belpostMoney(carrier: PostalCarrier, codRaw: unknown, declaredRaw: unkn
   return { codAmount, declaredValue }
 }
 
-function mapRow(row: Omit<PostalShipmentRow, 'blank_number' | 'carrier_title'>): PostalShipmentRow {
+function mapRow(row: Omit<PostalShipmentRow, 'blank_number' | 'carrier_title' | 'has_blank'> & { has_blank?: number | boolean }): PostalShipmentRow {
   return {
     ...row,
     carrier: row.carrier,
     payer: 'sender_legal',
+    blank_status: row.blank_status || 'none',
+    has_blank: row.has_blank === true || row.has_blank === 1,
     blank_number: blankNumber(row.carrier, row.id),
     carrier_title: postalCarrierTitle(row.carrier),
   }
@@ -114,13 +120,35 @@ export class PostalShipmentService {
     const weightRaw = input.weight_kg == null || input.weight_kg === '' ? null : Number(String(input.weight_kg).replace(',', '.'))
     const weightKg = weightRaw != null && Number.isFinite(weightRaw) && weightRaw > 0 ? Math.round(weightRaw * 1000) / 1000 : null
     const { codAmount, declaredValue } = belpostMoney(carrier, input.cod_amount, input.declared_value)
+    if (weightKg == null) throw Object.assign(new Error('Укажите вес, кг'), { status: 400 })
     const organizationId = Number(input.organization_id)
     const db = await getDb()
+    const order = await db.get<{ id: number; number: string | null }>(
+      `SELECT id, number FROM orders WHERE id = ?`,
+      [orderId],
+    )
+    if (!order) throw Object.assign(new Error('Заказ не найден'), { status: 404 })
+    const settings = await getPostalCarrierSettings(db)
+    const externalRef = `crm-${orderId}-${Date.now()}`
+    const dispatched = await dispatchPostalShipment({
+      carrier,
+      orderNumber: order.number || `№${order.id}`,
+      externalRef,
+      recipientName,
+      recipientPhone: asText(input.recipient_phone),
+      recipientAddress,
+      weightKg,
+      codAmount,
+      declaredValue,
+      notes: asText(input.notes),
+    }, settings)
     const inserted = await db.run(
       `INSERT INTO postal_shipments (
          order_id, carrier, payer, organization_id, recipient_name, recipient_phone, recipient_address,
-         places, weight_kg, cod_amount, declared_value, notes, status, created_at, updated_at
-       ) VALUES (?, ?, 'sender_legal', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', datetime('now'), datetime('now'))`,
+         places, weight_kg, cod_amount, declared_value, tracking_number, external_id, document_id,
+         blank_status, blank_filename, blank_content_type, blank_file, carrier_message, notes, status,
+         created_at, updated_at
+       ) VALUES (?, ?, 'sender_legal', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'blank_issued', datetime('now'), datetime('now'))`,
       [
         orderId,
         carrier,
@@ -132,12 +160,20 @@ export class PostalShipmentService {
         weightKg,
         codAmount,
         declaredValue,
+        dispatched.trackingNumber,
+        dispatched.externalId,
+        dispatched.documentId,
+        dispatched.file ? 'ready' : dispatched.blankStatus,
+        dispatched.file ? `${carrier}-blank-${dispatched.trackingNumber || dispatched.externalId || externalRef}.${dispatched.file.extension}` : null,
+        dispatched.file?.contentType ?? null,
+        dispatched.file?.bytes ?? null,
+        dispatched.message,
         asText(input.notes) || null,
       ],
     )
     const id = Number(inserted.lastID)
     const row = await this.get(orderId, id)
-    if (!row) throw new Error('Не удалось сохранить доставку')
+    if (!row) throw new Error('Не удалось сохранить ответ перевозчика')
     return row
   }
 
@@ -148,15 +184,16 @@ export class PostalShipmentService {
   ): Promise<PostalShipmentRow> {
     const existing = await this.get(orderId, shipmentId)
     if (!existing) throw Object.assign(new Error('Доставка не найдена'), { status: 404 })
-    const tracking = input.tracking_number === undefined ? existing.tracking_number : asText(input.tracking_number) || null
+    if (input.tracking_number !== undefined) {
+      throw Object.assign(new Error('Трек-номер приходит только от Белпочты или Европочты'), { status: 400 })
+    }
     const notes = input.notes === undefined ? existing.notes : asText(input.notes) || null
-    const status = tracking ? 'handed_over' : existing.status
     const db = await getDb()
     await db.run(
       `UPDATE postal_shipments
-          SET tracking_number = ?, notes = ?, status = ?, updated_at = datetime('now')
+          SET notes = ?, updated_at = datetime('now')
         WHERE id = ? AND order_id = ?`,
-      [tracking, notes, status, shipmentId, orderId],
+      [notes, shipmentId, orderId],
     )
     const row = await this.get(orderId, shipmentId)
     if (!row) throw new Error('Доставка не найдена')
@@ -174,98 +211,66 @@ export class PostalShipmentService {
     return row ? mapRow(row) : null
   }
 
-  static async markBlankIssued(orderId: number, shipmentId: number): Promise<void> {
+  static async renderBlankPdf(orderId: number, shipmentId: number): Promise<{ pdf: Buffer; filename: string; contentType: string }> {
+    const shipment = await this.get(orderId, shipmentId)
+    if (!shipment) throw Object.assign(new Error('Доставка не найдена'), { status: 404 })
+    const stored = await this.readStoredBlank(orderId, shipmentId)
+    if (stored) return stored
+    if (shipment.blank_status !== 'processing' && !shipment.document_id && !shipment.external_id) {
+      throw Object.assign(new Error(shipment.carrier_message || 'Перевозчик ещё не прислал бланк'), { status: 409 })
+    }
     const db = await getDb()
+    const settings = await getPostalCarrierSettings(db)
+    const pulled = await pullPostalBlank(shipment.carrier, {
+      documentId: shipment.document_id,
+      externalId: shipment.external_id,
+      trackingNumber: shipment.tracking_number,
+    }, settings)
+    if (pulled.file) {
+      const filename = `${shipment.carrier}-blank-${shipment.tracking_number || shipment.external_id || shipment.blank_number}.${pulled.file.extension}`
+      await db.run(
+        `UPDATE postal_shipments
+            SET blank_status = 'ready',
+                blank_filename = ?,
+                blank_content_type = ?,
+                blank_file = ?,
+                carrier_message = ?,
+                tracking_number = COALESCE(?, tracking_number),
+                updated_at = datetime('now')
+          WHERE id = ? AND order_id = ?`,
+        [filename, pulled.file.contentType, pulled.file.bytes, pulled.message, pulled.trackingNumber, shipmentId, orderId],
+      )
+      return { pdf: pulled.file.bytes, filename, contentType: pulled.file.contentType }
+    }
     await db.run(
       `UPDATE postal_shipments
-          SET status = CASE WHEN status = 'handed_over' THEN status ELSE 'blank_issued' END,
-              updated_at = datetime('now')
+          SET blank_status = 'processing', carrier_message = ?, updated_at = datetime('now')
+        WHERE id = ? AND order_id = ?`,
+      [pulled.message, shipmentId, orderId],
+    )
+    throw Object.assign(new Error(pulled.message || 'Бланк ещё формируется у перевозчика'), { status: 409 })
+  }
+
+  private static async readStoredBlank(orderId: number, shipmentId: number): Promise<{ pdf: Buffer; filename: string; contentType: string } | null> {
+    const db = await getDb()
+    const row = await db.get<{
+      blank_file: Buffer | null
+      blank_filename: string | null
+      blank_content_type: string | null
+      carrier: PostalCarrier
+      tracking_number: string | null
+    }>(
+      `SELECT blank_file, blank_filename, blank_content_type, carrier, tracking_number
+         FROM postal_shipments
         WHERE id = ? AND order_id = ?`,
       [shipmentId, orderId],
     )
-  }
-
-  static async buildBlankData(orderId: number, shipmentId: number): Promise<PostalBlankData> {
-    const shipment = await this.get(orderId, shipmentId)
-    if (!shipment) throw Object.assign(new Error('Доставка не найдена'), { status: 404 })
-    const db = await getDb()
-    const order = await db.get<{
-      id: number
-      number: string | null
-      customerName: string | null
-    }>(
-      `SELECT id, number, customerName FROM orders WHERE id = ?`,
-      [orderId],
-    )
-    if (!order) throw Object.assign(new Error('Заказ не найден'), { status: 404 })
-
-    let organization: {
-      name?: string | null
-      unp?: string | null
-      legal_address?: string | null
-      phone?: string | null
-      bank_details?: string | null
-    } | null = null
-    if (shipment.organization_id) {
-      organization = await db.get(
-        `SELECT name, unp, legal_address, phone, bank_details FROM organizations WHERE id = ?`,
-        [shipment.organization_id],
-      )
-    }
-    if (!organization) {
-      organization = await db.get(
-        `SELECT name, unp, legal_address, phone, bank_details
-           FROM organizations
-          ORDER BY is_default DESC, sort_order ASC, id ASC
-          LIMIT 1`,
-      )
-    }
-
-    const items = await db.all<Array<{ type: string; params: string; quantity: number }>>(
-      `SELECT type, params, quantity FROM items WHERE orderId = ? ORDER BY id`,
-      [orderId],
-    )
-    const itemLines = (items || []).slice(0, 12).map((item) => {
-      let name = item.type
-      try {
-        const params = JSON.parse(item.params || '{}')
-        name = String(params.productName || params.customName || params.name || params.description || item.type)
-      } catch {
-        name = item.type
-      }
-      const qty = Math.max(1, Number(item.quantity) || 1)
-      return `${name} × ${qty}`
-    })
-
+    const bytes = row?.blank_file
+    if (!bytes || bytes.length === 0) return null
     return {
-      blankNumber: shipment.blank_number,
-      carrier: shipment.carrier,
-      orderNumber: order.number || `№${order.id}`,
-      recipientName: shipment.recipient_name,
-      recipientPhone: shipment.recipient_phone || '',
-      recipientAddress: shipment.recipient_address,
-      places: shipment.places,
-      weightKg: shipment.weight_kg,
-      notes: shipment.notes || '',
-      trackingNumber: shipment.tracking_number || '',
-      codAmount: shipment.carrier === 'belpost' ? shipment.cod_amount : null,
-      declaredValue: shipment.carrier === 'belpost' ? shipment.declared_value : null,
-      senderName: organization?.name || 'Организация',
-      senderUnp: organization?.unp || '',
-      senderAddress: organization?.legal_address || '',
-      senderPhone: organization?.phone || '',
-      senderBank: organization?.bank_details || '',
-      itemLines,
+      pdf: Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes),
+      filename: row?.blank_filename || `${row?.carrier || 'postal'}-blank-${row?.tracking_number || shipmentId}`,
+      contentType: row?.blank_content_type || 'application/pdf',
     }
-  }
-
-  static async renderBlankPdf(orderId: number, shipmentId: number): Promise<{ pdf: Buffer; filename: string }> {
-    const data = await this.buildBlankData(orderId, shipmentId)
-    const pdf = await PDFReportService.renderHtmlPdf(buildPostalBlankHtml(data))
-    await this.markBlankIssued(orderId, shipmentId)
-    const filename = data.carrier === 'europost'
-      ? `europost-nakladnaya-${data.blankNumber}.pdf`
-      : `belpost-f116-${data.blankNumber}.pdf`
-    return { pdf, filename }
   }
 }

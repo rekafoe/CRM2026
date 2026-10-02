@@ -4,8 +4,8 @@ import {
   createPostalShipment,
   downloadPostalBlankPdf,
   getOrganizations,
+  getPostalCarrierStatus,
   getPostalShipments,
-  updatePostalShipment,
   type Organization,
   type PostalCarrier,
   type PostalShipment,
@@ -55,9 +55,31 @@ function parseMoneyInput(value: string): number | null {
   return Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
-async function openPdf(data: BlobPart) {
-  const blob = new Blob([data], { type: 'application/pdf' });
+async function explain(error: any, fallback: string): Promise<string> {
+  const data = error?.response?.data;
+  if (data && typeof data.text === 'function') {
+    try {
+      const parsed = JSON.parse(await data.text());
+      if (parsed?.message) return String(parsed.message);
+    } catch {
+      return fallback;
+    }
+  }
+  return data?.message || error?.message || fallback;
+}
+
+function openCarrierFile(data: BlobPart, contentType: string, filename: string) {
+  const type = contentType || 'application/octet-stream';
+  const blob = new Blob([data], { type });
   const url = window.URL.createObjectURL(blob);
+  if (type.includes('zip') || filename.toLowerCase().endsWith('.zip')) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'blank.zip';
+    link.click();
+    setTimeout(() => window.URL.revokeObjectURL(url), 30000);
+    return;
+  }
   const opened = window.open(url, '_blank', 'noopener,noreferrer');
   if (!opened) throw new Error('Браузер заблокировал открытие бланка');
   setTimeout(() => window.URL.revokeObjectURL(url), 30000);
@@ -78,14 +100,13 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
-  const [trackingDrafts, setTrackingDrafts] = useState<Record<number, string>>({});
+  const [carrierReady, setCarrierReady] = useState({ belpost: false, europost: false, belpostMessage: '', europostMessage: '' });
   const rootRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const response = await getPostalShipments(order.id);
     const rows = Array.isArray(response.data) ? response.data : [];
     setShipments(rows);
-    setTrackingDrafts(Object.fromEntries(rows.map((row) => [row.id, row.tracking_number || ''])));
   }, [order.id]);
 
   useEffect(() => {
@@ -116,6 +137,19 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
   }, [open]);
 
   useEffect(() => {
+    getPostalCarrierStatus()
+      .then((response) => {
+        setCarrierReady({
+          belpost: Boolean(response.data?.belpostReady),
+          europost: Boolean(response.data?.europostReady),
+          belpostMessage: response.data?.belpostMessage || '',
+          europostMessage: response.data?.europostMessage || '',
+        });
+      })
+      .catch(() => setCarrierReady({ belpost: false, europost: false, belpostMessage: '', europostMessage: '' }));
+  }, []);
+
+  useEffect(() => {
     getOrganizations()
       .then((response) => {
         const rows = Array.isArray(response.data) ? response.data : [];
@@ -132,14 +166,21 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     return org.unp ? `${org.name}, УНП ${org.unp}` : org.name;
   }, [organizations, organizationId]);
 
+  const ready = carrier === 'belpost' ? carrierReady.belpost : carrierReady.europost;
+  const readyMessage = carrier === 'belpost' ? carrierReady.belpostMessage : carrierReady.europostMessage;
+
   const createAndPrint = async () => {
     if (!name.trim() || !address.trim()) {
       onNotify('error', 'Укажите получателя и адрес');
       return;
     }
+    if (!weight.trim() || !(Number(weight.replace(',', '.')) > 0)) {
+      onNotify('error', 'Укажите вес, кг');
+      return;
+    }
     try {
       setBusy(true);
-      const weightValue = weight.trim() ? Number(weight.replace(',', '.')) : null;
+      const weightValue = Number(weight.replace(',', '.'));
       const codAmount = carrier === 'belpost' ? parseMoneyInput(cod) : null;
       const declaredValue = carrier === 'belpost' ? parseMoneyInput(declared) : null;
       const created = await createPostalShipment(order.id, {
@@ -149,20 +190,22 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
         recipient_phone: phone.trim(),
         recipient_address: address.trim(),
         places: Math.max(1, Number(places) || 1),
-        weight_kg: weightValue != null && Number.isFinite(weightValue) ? weightValue : null,
+        weight_kg: weightValue,
         cod_amount: codAmount,
         declared_value: declaredValue,
         notes: notes.trim(),
       });
-      const pdf = await downloadPostalBlankPdf(order.id, created.data.id);
-      await openPdf(pdf.data);
       await load();
-      const codNote = created.data.cod_amount
-        ? ` Наложенный платёж ${formatByn(created.data.cod_amount)}.`
-        : '';
-      onNotify('success', `Бланк ${created.data.blank_number} открыт. Доставку оплачивает ${payerLabel}.${codNote}`);
+      if (created.data.has_blank) {
+        const pdf = await downloadPostalBlankPdf(order.id, created.data.id);
+        const contentType = String(pdf.headers['content-type'] || 'application/pdf');
+        const disposition = String(pdf.headers['content-disposition'] || '');
+        const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] || 'blank.pdf';
+        openCarrierFile(pdf.data, contentType, filename);
+      }
+      onNotify('success', created.data.carrier_message || `Отправление принято. Платит ${payerLabel}.`);
     } catch (error: any) {
-      onNotify('error', error?.response?.data?.message || error?.message || 'Не удалось создать доставку');
+      onNotify('error', await explain(error, 'Перевозчик не принял отправление'));
     } finally {
       setBusy(false);
     }
@@ -172,31 +215,13 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     try {
       setBusy(true);
       const pdf = await downloadPostalBlankPdf(order.id, shipment.id);
-      await openPdf(pdf.data);
+      const contentType = String(pdf.headers['content-type'] || 'application/pdf');
+      const disposition = String(pdf.headers['content-disposition'] || '');
+      const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] || 'blank.pdf';
+      openCarrierFile(pdf.data, contentType, filename);
       await load();
     } catch (error: any) {
-      onNotify('error', error?.response?.data?.message || 'Не удалось открыть бланк');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const saveTracking = async (shipment: PostalShipment) => {
-    try {
-      setBusy(true);
-      const tracking = (trackingDrafts[shipment.id] || '').trim();
-      await updatePostalShipment(order.id, shipment.id, {
-        tracking_number: tracking,
-      });
-      await load();
-      onNotify(
-        'success',
-        tracking
-          ? 'Трек сохранён, отправление отмечено как переданное'
-          : 'Трек очищен',
-      );
-    } catch (error: any) {
-      onNotify('error', error?.response?.data?.message || 'Не удалось сохранить трек');
+      onNotify('error', await explain(error, 'Перевозчик ещё не отдал бланк'));
     } finally {
       setBusy(false);
     }
@@ -207,7 +232,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
       <button
         type="button"
         className={`order-detail-action-btn order-detail-action-btn--neutral${open ? ' postal-shipment__toggle--open' : ''}`}
-        title="Белпочта и Европочта: бланк, оплата нашим юрлицом"
+        title="Трек и бланк приходят от Белпочты или Европочты"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((value) => !value);
@@ -221,12 +246,13 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
       <div className="postal-shipment__head">
         <h3>Белпочта / Европочта</h3>
         <p>
-          Почтовый сбор оплачивает наше юрлицо ({payerLabel}).
-          {' '}
+          Трек и бланк приходят ответом {carrier === 'belpost' ? 'Белпочты' : 'Европочты'}. Свой бланк CRM не печатает.
+          Почтовый сбор платит {payerLabel}.
           {carrier === 'belpost'
-            ? 'На ф. 116 можно указать наложенный платёж: Белпочта возьмёт эту сумму у получателя и перечислит нам.'
-            : 'Для Европочты печатается накладная на отправление.'}
+            ? ' Наложенный платёж, если указать, Белпочта возьмёт у получателя за товар.'
+            : ' Для Европочты наложенный платёж не отправляем.'}
         </p>
+        {!ready ? <p className="postal-shipment__warn">{readyMessage || 'Доступ перевозчика не сохранён. Его добавляет администратор в общих настройках.'}</p> : null}
       </div>
       <div className="postal-shipment__form">
         <label>
@@ -296,12 +322,8 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
           Примечание
           <input value={notes} onChange={(event) => setNotes(event.target.value)} />
         </label>
-        <button type="button" onClick={createAndPrint} disabled={busy}>
-          {busy
-            ? 'Готовим бланк…'
-            : carrier === 'belpost'
-              ? 'Создать доставку и ф. 116'
-              : 'Создать доставку и накладную'}
+        <button type="button" onClick={createAndPrint} disabled={busy || !ready}>
+          {busy ? 'Ждём ответ перевозчика…' : carrier === 'belpost' ? 'Отправить в Белпочту' : 'Отправить в Европочту'}
         </button>
       </div>
       {shipments.length > 0 ? (
@@ -311,19 +333,19 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
               <div>
                 <strong>{shipment.carrier_title}</strong> · {shipment.blank_number} · {STATUS_LABEL[shipment.status]}
                 <div>{shipment.recipient_name}, {shipment.recipient_address}</div>
+                <div>{shipment.tracking_number ? `Трек ${shipment.tracking_number}` : 'Трек ещё не пришёл'}</div>
                 {shipment.carrier === 'belpost' && shipment.cod_amount ? (
                   <div>Наложенный платёж {formatByn(shipment.cod_amount)}</div>
                 ) : null}
+                {shipment.carrier_message ? <div className="postal-shipment__note">{shipment.carrier_message}</div> : null}
               </div>
               <div className="postal-shipment__row-actions">
-                <input
-                  value={trackingDrafts[shipment.id] ?? ''}
-                  placeholder="Трек-номер"
-                  onChange={(event) => setTrackingDrafts((prev) => ({ ...prev, [shipment.id]: event.target.value }))}
-                />
-                <button type="button" onClick={() => saveTracking(shipment)} disabled={busy}>Трек</button>
-                <button type="button" onClick={() => reprint(shipment)} disabled={busy}>
-                  {shipment.carrier === 'belpost' ? 'ф. 116' : 'Накладная'}
+                <button
+                  type="button"
+                  onClick={() => reprint(shipment)}
+                  disabled={busy || (!shipment.has_blank && shipment.blank_status !== 'processing')}
+                >
+                  {shipment.has_blank ? 'Бланк перевозчика' : 'Забрать бланк'}
                 </button>
               </div>
             </li>
