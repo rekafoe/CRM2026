@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { User, Department, getAllUsers, getDepartments, createUser, updateUser, deleteUser, resetUserToken, getCurrentUser, setAuthToken } from '../../api';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { Alert } from '../../components/common';
+import { AppIcon, MoneyAmount } from '../../components/ui';
 import { useAdminBack } from '../../hooks/useAdminBack';
 import './UserManagement.css';
 
@@ -136,15 +138,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'var(--error)';
-      case 'manager': return 'var(--accent-primary)';
-      case 'user': return 'var(--accent-light)';
-      default: return 'var(--text-secondary)';
-    }
-  };
-
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'admin': return 'Администратор';
@@ -154,41 +147,26 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
     }
   };
 
-  return (
+  const createButton = (
+    <button
+      type="button"
+      onClick={() => setShowCreateModal(true)}
+      className="lg-btn lg-btn--primary"
+    >
+      Создать
+    </button>
+  );
+
+  const page = (
     <div className={`user-management${embedded ? ' user-management--embedded' : ''}`}>
-      {/* Заголовок */}
-      <div className="user-management-header">
-        <div className="user-management-header-left">
-          {!embedded && (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="user-management-back-btn lg-btn"
-            >
-              ← Назад
-            </button>
-          )}
-          <div>
-            <h1 className="user-management-title">
-              {embedded ? 'Пользователи' : 'Управление пользователями'}
-            </h1>
-            <p className="user-management-description">
-              Создание, редактирование и управление пользователями системы
-            </p>
-          </div>
+      {embedded && (
+        <div className="user-management-toolbar">
+          {createButton}
         </div>
-        <div className="user-management-header-actions">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="lg-btn lg-btn--primary"
-          >
-            Создать пользователя
-          </button>
-        </div>
-      </div>
+      )}
 
       {errorMessage && (
-        <Alert type="error" className="mb-4" onClose={() => setErrorMessage(null)}>
+        <Alert type="error" onClose={() => setErrorMessage(null)}>
           {errorMessage}
         </Alert>
       )}
@@ -228,8 +206,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value === '' ? '' : Number(e.target.value))}
-            className="user-form-select"
-            style={{ marginLeft: 'auto', minWidth: '160px' }}
+            className="user-form-select users-list-filter"
+            aria-label="Департамент"
           >
             <option value="">Все департаменты</option>
             {departments.map(d => (
@@ -277,12 +255,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                     <span>{new Date(user.created_at).toLocaleDateString('ru-RU')}</span>
                     {Number(user.hourly_rate) > 0 ? (
                       <span title="Почасовая ставка">
-                        {Number(user.hourly_rate).toFixed(2)} BYN/ч
+                        <MoneyAmount value={user.hourly_rate} />/ч
                       </span>
                     ) : null}
-                    {!user.department_name && user.department_id == null && (
-                      <span title="Без департамента">—</span>
-                    )}
                   </div>
                 </div>
                 <div className="user-actions">
@@ -290,13 +265,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                     onClick={() => setEditingUser(user)}
                     className="lg-btn"
                   >
-                    Редактировать
+                    Изменить
                   </button>
                   <button
                     onClick={() => setShowTokenModal(user)}
                     className="lg-btn"
                   >
-                    API токен
+                    Токен
                   </button>
                   <button
                     onClick={() => handleDeleteUser(user.id)}
@@ -383,6 +358,21 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
       )}
     </div>
   );
+
+  if (embedded) return page;
+
+  return (
+    <AdminPageLayout
+      title="Пользователи"
+      description="Сотрудники, роли и API-токены."
+      icon={<AppIcon name="user" size="lg" />}
+      onBack={handleBack}
+      className="users-layout"
+      headerExtra={createButton}
+    >
+      {page}
+    </AdminPageLayout>
+  );
 };
 
 // Компонент формы пользователя
@@ -449,7 +439,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         <form onSubmit={handleSubmit} className="user-form">
           <div className="user-form-group">
             <label className="user-form-label">
-              Имя:
+              Имя
             </label>
             <input
               type="text"
@@ -461,7 +451,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
           <div className="user-form-group">
             <label className="user-form-label">
-              Email:
+              Email
             </label>
             <input
               type="email"
@@ -474,7 +464,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           {!initialData && (
             <div className="user-form-group">
               <label className="user-form-label">
-                Пароль:
+                Пароль
               </label>
               <input
                 type="password"
@@ -487,7 +477,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           )}
           <div className="user-form-group">
             <label className="user-form-label">
-              Роль:
+              Роль
             </label>
             <select
               value={formData.role}
@@ -501,7 +491,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
           <div className="user-form-group">
             <label className="user-form-label">
-              Департамент:
+              Департамент
             </label>
             <select
               value={formData.department_id === '' ? '' : formData.department_id}
@@ -516,7 +506,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
           <div className="user-form-group">
             <label className="user-form-label">
-              Почасовая ставка (BYN/ч):
+              Почасовая ставка
             </label>
             <input
               type="number"
