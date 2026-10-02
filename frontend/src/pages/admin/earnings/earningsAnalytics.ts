@@ -1,6 +1,12 @@
 import type { AdminUserRow } from './earningsTypes';
 import { getMonthProgress } from '../../../utils/monthProgress';
 
+function calendarYearKeys(month: string): string[] {
+  const year = Number(month.slice(0, 4));
+  if (!Number.isFinite(year) || year < 2000) return [];
+  return Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`);
+}
+
 export type EarningsRoleStat = {
   role: string;
   users: number;
@@ -94,11 +100,12 @@ export function buildEarningsAnalytics(rows: AdminUserRow[], month: string): Ear
     }))
     .sort((a, b) => b.net - a.net);
 
-  const historyMonths = Array.from(new Set(rows.flatMap((row) => row.history.map((item) => item.month)))).sort();
-  const historyTotals = historyMonths.map((historyMonth) => ({
+  const yearKeys = calendarYearKeys(month);
+  const historyTotals = yearKeys.map((historyMonth) => ({
     month: historyMonth,
     total: rows.reduce((sum, row) => {
-      const item = row.history.find((entry) => entry.month === historyMonth);
+      const series = row.yearHistory?.length ? row.yearHistory : row.history;
+      const item = series.find((entry) => entry.month === historyMonth);
       return sum + toNumber(item?.net ?? item?.total);
     }, 0),
   }));

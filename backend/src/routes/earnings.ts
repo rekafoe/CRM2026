@@ -24,6 +24,12 @@ const getPreviousMonthKey = (monthKey: string) => {
   return date.toISOString().slice(0, 7)
 }
 
+const calendarYearKeys = (monthKey: string) => {
+  const year = Number(String(monthKey).slice(0, 4))
+  if (!Number.isFinite(year) || year < 2000) return []
+  return Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`)
+}
+
 const buildMonthKeys = (count: number, baseMonth: string) => {
   const [yearStr, monthStr] = baseMonth.split('-')
   const year = Number(yearStr)
@@ -382,20 +388,22 @@ router.get('/admin', asyncHandler(async (req, res) => {
   const bonusesPrevMap = new Map((bonusesPrevRows || []).map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
 
   const historyKeys = buildMonthKeys(historyMonths, month)
+  const yearKeys = calendarYearKeys(month)
+  const seriesKeys = Array.from(new Set([...yearKeys, ...historyKeys]))
   const historyRows = await db.all<any>(
     `
     SELECT user_id, substr(earned_date, 1, 7) as month_key, SUM(amount) as total
     FROM order_item_earnings
-    WHERE substr(earned_date, 1, 7) IN (${historyKeys.map(() => '?').join(',')})
+    WHERE substr(earned_date, 1, 7) IN (${seriesKeys.map(() => '?').join(',')})
     GROUP BY user_id, month_key
     `,
-    historyKeys
+    seriesKeys
   )
   const historyMap = new Map<string, number>()
   historyRows.forEach((row: any) => {
     historyMap.set(`${row.user_id}_${row.month_key}`, Number(row.total) || 0)
   })
-  const historyPlaceholders = historyKeys.map(() => '?').join(',')
+  const historyPlaceholders = seriesKeys.map(() => '?').join(',')
   const toMonthMap = (rows: any[]) => {
     const map = new Map<string, number>()
     rows.forEach((row) => {
@@ -410,7 +418,7 @@ router.get('/admin', asyncHandler(async (req, res) => {
     WHERE substr(work_date, 1, 7) IN (${historyPlaceholders})
     GROUP BY user_id, month_key
     `,
-    historyKeys,
+    seriesKeys,
   ).catch(() => []))
   const historyBonusMap = toMonthMap(await db.all<any>(
     `
@@ -419,7 +427,7 @@ router.get('/admin', asyncHandler(async (req, res) => {
     WHERE substr(bonus_date, 1, 7) IN (${historyPlaceholders})
     GROUP BY user_id, month_key
     `,
-    historyKeys,
+    seriesKeys,
   ).catch(() => []))
   const historyPenaltyMap = toMonthMap(await db.all<any>(
     `
@@ -428,8 +436,21 @@ router.get('/admin', asyncHandler(async (req, res) => {
     WHERE substr(penalty_date, 1, 7) IN (${historyPlaceholders})
     GROUP BY user_id, month_key
     `,
-    historyKeys,
+    seriesKeys,
   ).catch(() => []))
+
+  const monthPayout = (userId: number, key: string, hourlyRate: number) => {
+    const percent = historyMap.get(`${userId}_${key}`) || 0
+    const hours = historyHoursMap.get(`${userId}_${key}`) || 0
+    const hourlyPart = Math.round(hours * hourlyRate * 100) / 100
+    const bonuses = historyBonusMap.get(`${userId}_${key}`) || 0
+    const penalties = historyPenaltyMap.get(`${userId}_${key}`) || 0
+    return {
+      month: key,
+      total: percent,
+      net: Math.max(0, percent + bonuses + hourlyPart - penalties),
+    }
+  }
 
   const result = users.map((u: any) => {
     const shift = shiftsMap.get(u.id) || { hours: 0, shifts: 0 }
@@ -450,18 +471,8 @@ router.get('/admin', asyncHandler(async (req, res) => {
       0,
       Number(previousPercent) + Number(previousBonuses) + previousHourlyPay - Number(previousPenalties),
     )
-    const history = historyKeys.map((key) => {
-      const percent = historyMap.get(`${u.id}_${key}`) || 0
-      const hours = historyHoursMap.get(`${u.id}_${key}`) || 0
-      const hourlyPart = Math.round(hours * hourlyRate * 100) / 100
-      const bonuses = historyBonusMap.get(`${u.id}_${key}`) || 0
-      const penalties = historyPenaltyMap.get(`${u.id}_${key}`) || 0
-      return {
-        month: key,
-        total: percent,
-        net: Math.max(0, percent + bonuses + hourlyPart - penalties),
-      }
-    })
+    const history = historyKeys.map((key) => monthPayout(u.id, key, hourlyRate))
+    const yearHistory = yearKeys.map((key) => monthPayout(u.id, key, hourlyRate))
     return {
       userId: u.id,
       name: u.name,
@@ -478,6 +489,7 @@ router.get('/admin', asyncHandler(async (req, res) => {
       hours: shift.hours,
       shifts: shift.shifts,
       history,
+      yearHistory,
     }
   })
 

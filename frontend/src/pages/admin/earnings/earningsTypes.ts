@@ -15,4 +15,6 @@ export type AdminUserRow = {
   hours: number;
   shifts: number;
   history: Array<{ month: string; total: number; net?: number }>;
+  /** К выплате по месяцам календарного года выбранного месяца. */
+  yearHistory?: Array<{ month: string; total: number; net?: number }>;
 };

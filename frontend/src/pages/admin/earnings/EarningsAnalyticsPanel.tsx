@@ -69,12 +69,12 @@ export const EarningsAnalyticsPanel: React.FC<EarningsAnalyticsPanelProps> = ({ 
         <section className="earn-admin__card earn-analytics-card">
           <div className="earn-admin__card-header">
             <h3>Динамика фонда ЗП</h3>
-            <span className="earn-admin__card-badge">{analytics.historyTotals.length} мес.</span>
+            <span className="earn-admin__card-badge">{month.slice(0, 4)}</span>
           </div>
           <div className="earn-analytics-card__body">
             {analytics.historyTotals.length > 0 ? (
               <>
-                <p className="earn-chart-caption">К выплате: проценты, часы, премии и штрафы. Высота столбца считается от нуля.</p>
+                <p className="earn-chart-caption">Календарный год. К выплате: проценты, часы, премии и штрафы. Высота столбца считается от нуля.</p>
                 <EarningsBarChart items={analytics.historyTotals} highlightMonth={month} />
                 <div className="earn-history-strip">
                   {analytics.historyTotals.map((entry) => (
