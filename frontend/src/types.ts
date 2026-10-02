@@ -49,6 +49,15 @@ export interface ItemParams {
   productName?: string;
   operator_percent?: number;
   operatorPercent?: number;
+  /** Позиция сохранена, но резерв склада не создан: доступно меньше, чем нужно. */
+  materialShortage?: {
+    items: Array<{
+      materialId: number;
+      name: string;
+      available: number;
+      required: number;
+    }>;
+  };
   layout?: {
     sheetsNeeded?: number;
     itemsPerSheet?: number;

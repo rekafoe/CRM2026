@@ -3,6 +3,7 @@ import { Order } from '../../types';
 import { parseNumberFlexible } from '../../utils/numberInput';
 import { getOrderAmounts } from '../../utils/orderTotal';
 import { MoneyAmount } from '../ui';
+import { readMaterialShortage } from '../order/materialShortage';
 import { useOrderStatusClasses } from './hooks/useOrderStatusClasses';
 import type { OrdersListTab } from './hooks/useOptimizedAppData';
 import './styles/OrderList.css';
@@ -66,6 +67,9 @@ const OrderItem = memo<{
 
   const isAssignedAsExecutor =
     order.assigned_as_executor === true || order.assigned_as_executor === 1;
+  const hasMaterialShortage = (order.items || []).some(
+    (item) => readMaterialShortage(item.params).length > 0,
+  );
 
   // Возвращает имя клиента или null если не указан
   const customerLabel = useMemo(() => {
@@ -115,6 +119,9 @@ const OrderItem = memo<{
         <div className="order-item__executor-badge">
           Исполнитель по позиции
         </div>
+      )}
+      {hasMaterialShortage && (
+        <div className="order-item__material-shortage">Мало материала</div>
       )}
       {showDebt && debt != null && debt > 0 && (
         <div className="order-item__debt">

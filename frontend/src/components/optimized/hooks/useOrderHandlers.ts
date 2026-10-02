@@ -5,6 +5,7 @@ import { createOrder, cancelOnlineOrder, addOrderItem, updateOrderItem, updateOr
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
 import { useReasonPresets } from '../../common/useReasonPresets';
+import { formatMaterialShortage, readMaterialShortage } from '../../order/materialShortage';
 
 interface UseOrderHandlersProps {
   orders: Order[];
@@ -112,7 +113,12 @@ export const useOrderHandlers = ({
         loadOrders(undefined, true);
         closeCalculator();
 
-        toast.success('Товар добавлен в заказ!', 'Товар успешно добавлен в заказ');
+        const shortageText = formatMaterialShortage(readMaterialShortage(addedItem.data?.params));
+        if (shortageText) {
+          toast.warning('Позиция добавлена в заказ', shortageText);
+        } else {
+          toast.success('Товар добавлен в заказ!', 'Товар успешно добавлен в заказ');
+        }
         logger.info('Item added to order');
       } catch (error: any) {
         logger.error('Failed to add item to order', error);
@@ -180,7 +186,12 @@ export const useOrderHandlers = ({
         loadOrders(undefined, true);
         closeCalculator();
 
-        toast.success('Позиция обновлена', 'Параметры товара обновлены');
+        const shortageText = formatMaterialShortage(readMaterialShortage(savedItem?.params));
+        if (shortageText) {
+          toast.warning('Позиция обновлена', shortageText);
+        } else {
+          toast.success('Позиция обновлена', 'Параметры товара обновлены');
+        }
         logger.info('Order item replaced', { orderId, itemId });
       } catch (error) {
         logger.error('Failed to update order item', error);

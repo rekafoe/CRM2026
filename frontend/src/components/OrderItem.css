@@ -13,6 +13,22 @@
   min-width: 0;
 }
 
+.order-item-row--shortage {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.order-item-material-shortage {
+  flex: 1 0 100%;
+  margin-bottom: 6px;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 /* Исполнитель / принтер / действия — компактная панель без таблицы разбивки */
 .order-item-meta-panel {
   margin-top: 6px;

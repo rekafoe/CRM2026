@@ -22,13 +22,23 @@ function isMeterUnit(unitRaw: unknown): boolean {
   return unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
 }
 
+type MaterialShortageItem = {
+  materialId: number
+  name: string
+  available: number
+  required: number
+}
+
 async function reserveComponentsForOrder(
   db: Awaited<ReturnType<typeof getDb>>,
   orderId: number,
   components: Array<{ materialId: number; qtyPerItem: number }>,
   quantity: number,
-): Promise<Array<{ materialId: number; qtyPerItem: number; reservationId?: number }>> {
-  if (components.length === 0) return []
+): Promise<{
+  components: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }>
+  shortages: MaterialShortageItem[]
+}> {
+  if (components.length === 0) return { components: [], shortages: [] }
   const ids = components
     .map((component) => Number(component.materialId))
     .filter((id) => Number.isFinite(id) && id > 0)
@@ -41,6 +51,7 @@ async function reserveComponentsForOrder(
   const byId = new Map(rows.map((row) => [Number(row.id), row]))
   const now = new Date().toISOString()
   const reserved: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> = []
+  const shortages: MaterialShortageItem[] = []
   for (const component of components) {
     const materialId = Number(component.materialId)
     const qtyPerItem = Number(component.qtyPerItem) || 0
@@ -64,10 +75,14 @@ async function reserveComponentsForOrder(
     )
     const available = Number(material.quantity) - Number(existing?.reserved || 0)
     if (available < neededQty) {
-      const error = new Error(`Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${neededQty}`)
-      ;(error as any).status = 400
-      ;(error as any).code = 'INSUFFICIENT_MATERIAL'
-      throw error
+      shortages.push({
+        materialId,
+        name: material.name,
+        available: Math.round(available * 100) / 100,
+        required: neededQty,
+      })
+      reserved.push({ materialId, qtyPerItem })
+      continue
     }
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 24)
@@ -83,7 +98,7 @@ async function reserveComponentsForOrder(
     )
     reserved.push({ materialId, qtyPerItem, reservationId: inserted.lastID || undefined })
   }
-  return reserved
+  return { components: reserved, shortages }
 }
 
 function computeRequiredQuantityForReservation(
@@ -209,6 +224,7 @@ export class OrderItemController {
         // Если материалов не требуется (нет пресетов/компонентов) — пропускаем резервирование
         // Резервируем материалы внутри текущей транзакции
         let reservations: any[] = []
+        const materialShortages: MaterialShortageItem[] = []
         if (reservationsPayload.length > 0) {
           // Резервируем материалы напрямую в БД, без отдельной транзакции
           for (const payload of reservationsPayload) {
@@ -235,10 +251,13 @@ export class OrderItemController {
             const available = material.quantity - reserved
             
             if (available < payload.quantity) {
-              const error = new Error(`Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${payload.quantity}`)
-              ;(error as any).status = 400 // 🆕 Устанавливаем статус 400 (Bad Request) вместо 500
-              ;(error as any).code = 'INSUFFICIENT_MATERIAL' // 🆕 Код ошибки для фронтенда
-              throw error
+              materialShortages.push({
+                materialId: payload.material_id,
+                name: material.name,
+                available: Math.round(available * 100) / 100,
+                required: payload.quantity,
+              })
+              continue
             }
             
             // Создаем резерв
@@ -314,6 +333,7 @@ export class OrderItemController {
             ...(effectiveTotal != null
               ? { storedTotalCost: effectiveTotal, priceLockedByCalculator: true }
               : {}),
+            ...(materialShortages.length > 0 ? { materialShortage: { items: materialShortages } } : {}),
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
@@ -358,6 +378,7 @@ export class OrderItemController {
             ...(effectiveTotal != null
               ? { storedTotalCost: effectiveTotal, priceLockedByCalculator: true }
               : {}),
+            ...(materialShortages.length > 0 ? { materialShortage: { items: materialShortages } } : {}),
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
@@ -950,6 +971,7 @@ export class OrderItemController {
               : {}
         if (replaceParams && body.params != null && typeof body.params === 'object') {
           let reservedComponents: unknown = incomingComponents ?? undefined
+          let replacementShortages: MaterialShortageItem[] | null = null
           if (fullComponentReplace && incomingComponents) {
             const oldComponents = Array.isArray(existingParams.components) ? existingParams.components : []
             const reservationIds = oldComponents
@@ -961,13 +983,22 @@ export class OrderItemController {
                 ...reservationIds,
               )
             }
-            reservedComponents = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
+            const reserved = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
+            reservedComponents = reserved.components
+            replacementShortages = reserved.shortages
           }
           paramsPatch = buildReplacedItemParams({
             existing: existingParams,
             incoming: body.params,
             components: reservedComponents,
           })
+          if (replacementShortages) {
+            if (replacementShortages.length > 0) {
+              paramsPatch.materialShortage = { items: replacementShortages }
+            } else {
+              delete paramsPatch.materialShortage
+            }
+          }
         }
         if (totalCostFromClient != null) {
           paramsPatch.storedTotalCost = totalCostFromClient

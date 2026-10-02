@@ -18,6 +18,7 @@ import { OrderItemEditForm } from './order/OrderItemEditForm';
 import { OrderItemActions } from './order/OrderItemActions';
 import { getEditorItemSummary, type DesignTemplateRoyaltyInfo } from './order/editorItemSummary';
 import { getItemLineTotal } from '../utils/orderTotal';
+import { formatMaterialShortage, readMaterialShortage } from './order/materialShortage';
 import { calcAuthorPayoutPerUnit } from '../pages/admin/designTemplates/designTemplateCatalogUtils';
 import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 import { AssignableUserSelect } from './orders/AssignableUserSelect';
@@ -493,8 +494,15 @@ export const OrderItem: React.FC<OrderItemProps> = ({
     </>
   ) : null;
 
+  const materialShortageText = formatMaterialShortage(readMaterialShortage(item.params));
+
   return (
-    <div className="item order-item-row">
+    <div className={`item order-item-row${materialShortageText ? ' order-item-row--shortage' : ''}`}>
+      {materialShortageText ? (
+        <div className="order-item-material-shortage" role="status">
+          {materialShortageText}
+        </div>
+      ) : null}
       <div className="order-item-body">
         {(() => {
           const display = stripDisplayedInfoFromDescription(
