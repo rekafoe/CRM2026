@@ -16,6 +16,7 @@ import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
+import { planReplaceComponentReservations } from '../services/replaceOrderItemReservations'
 import { planPrepaymentAfterItemTotalChange } from '../../../utils/itemTotalPrepaymentUpdate'
 
 function isMeterUnit(unitRaw: unknown): boolean {
@@ -35,11 +36,30 @@ async function reserveComponentsForOrder(
   orderId: number,
   components: Array<{ materialId: number; qtyPerItem: number }>,
   quantity: number,
+  options?: { creditReservationIds?: number[]; softShortage?: boolean },
 ): Promise<{
   components: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }>
   shortages: MaterialShortageItem[]
 }> {
   if (components.length === 0) return { components: [], shortages: [] }
+  const softShortage = options?.softShortage !== false
+  const creditIds = (options?.creditReservationIds || []).filter((id) => Number.isFinite(id) && id > 0)
+  const creditByMaterial = new Map<number, number>()
+  if (creditIds.length > 0) {
+    const creditRows = await db.all<Array<{ material_id: number; quantity_reserved: number }>>(
+      `SELECT material_id, quantity_reserved FROM material_reservations
+        WHERE id IN (${creditIds.map(() => '?').join(',')})
+          AND status IN ('active', 'reserved')`,
+      creditIds,
+    )
+    for (const row of creditRows || []) {
+      const materialId = Number(row.material_id)
+      creditByMaterial.set(
+        materialId,
+        (creditByMaterial.get(materialId) || 0) + Number(row.quantity_reserved || 0),
+      )
+    }
+  }
   const ids = components
     .map((component) => Number(component.materialId))
     .filter((id) => Number.isFinite(id) && id > 0)
@@ -74,7 +94,8 @@ async function reserveComponentsForOrder(
           AND (expires_at IS NULL OR expires_at > ?)`,
       [materialId, now],
     )
-    const available = Number(material.quantity) - Number(existing?.reserved || 0)
+    const credit = creditByMaterial.get(materialId) || 0
+    const available = Number(material.quantity) - Number(existing?.reserved || 0) + credit
     if (available < neededQty) {
       shortages.push({
         materialId,
@@ -82,6 +103,14 @@ async function reserveComponentsForOrder(
         available: Math.round(available * 100) / 100,
         required: neededQty,
       })
+      if (!softShortage) {
+        const error = new Error(
+          `Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${neededQty}`,
+        )
+        ;(error as any).status = 400
+        ;(error as any).code = 'INSUFFICIENT_MATERIAL'
+        throw error
+      }
       reserved.push({ materialId, qtyPerItem })
       continue
     }
@@ -941,13 +970,42 @@ export class OrderItemController {
             const reservationIds = oldComponents
               .map((component) => Number((component as { reservationId?: number }).reservationId))
               .filter((id) => Number.isFinite(id) && id > 0)
+            let activeIds: number[] = []
             if (reservationIds.length > 0) {
+              const oldRows = await db.all<Array<{ id: number; status: string }>>(
+                `SELECT id, status FROM material_reservations
+                  WHERE id IN (${reservationIds.map(() => '?').join(',')})`,
+                reservationIds,
+              )
+              const plan = planReplaceComponentReservations(oldRows || [])
+              if (plan.action === 'reject_fulfilled') {
+                const error = new Error(
+                  'Состав материалов нельзя менять после «Принят в работу»: склад уже списан',
+                )
+                ;(error as any).status = 409
+                ;(error as any).code = 'MATERIALS_ALREADY_FULFILLED'
+                throw error
+              }
+              activeIds = plan.activeIds
+            }
+            // Сначала новые холды с учётом своих active, потом отмена старых.
+            // Soft-shortage здесь нельзя: иначе COMMIT без резервов (потеря hold).
+            const reserved = await reserveComponentsForOrder(
+              db,
+              orderId,
+              incomingComponents,
+              newQuantity,
+              { creditReservationIds: activeIds, softShortage: false },
+            )
+            if (activeIds.length > 0) {
               await db.run(
-                `UPDATE material_reservations SET status = 'cancelled' WHERE id IN (${reservationIds.map(() => '?').join(',')})`,
-                ...reservationIds,
+                `UPDATE material_reservations
+                    SET status = 'cancelled'
+                  WHERE id IN (${activeIds.map(() => '?').join(',')})
+                    AND status IN ('active', 'reserved')`,
+                ...activeIds,
               )
             }
-            const reserved = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
             reservedComponents = reserved.components
             replacementShortages = reserved.shortages
           }
