@@ -20,8 +20,8 @@ import { productMatchesSearchQuery } from '../utils/productSearch';
 
 export const CUSTOM_PRODUCT_ID = -1000;
 export const POSTPRINT_PRODUCT_ID = -1001;
-/** Доля оператора с произвольного калькулятора. Рекальк процентов берёт это же живое значение. */
-export const CUSTOM_OPERATOR_PERCENT = 20;
+/** Запасное значение, пока с сервера не пришёл процент из настроек. */
+export const CUSTOM_OPERATOR_PERCENT = 17.5;
 
 const customProduct: Product = {
   id: CUSTOM_PRODUCT_ID,

@@ -667,3 +667,44 @@
   padding: 0 8px 12px !important;
   background: #f8fafc;
 }
+
+.earn-admin__custom-percent {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.earn-admin__custom-percent h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.earn-admin__custom-percent p {
+  margin: 0;
+  max-width: 640px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.earn-admin__custom-percent-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.earn-admin__custom-percent-form .earn-filter-input {
+  width: 120px;
+}
+
+@media (max-width: 720px) {
+  .earn-admin__custom-percent {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

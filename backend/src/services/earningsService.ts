@@ -5,6 +5,7 @@ import { hasColumn } from '../utils/tableSchemaCache';
 import { notWaitingStatusSql } from '../utils/orderFulfillmentScope';
 import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
 import { resolveEarningsOperatorPercent } from './earningsOperatorPercent';
+import { getCustomCalculatorOperatorPercent } from './customCalculatorPercentSettings';
 import { getDesignTemplatesByIds } from './designTemplateService';
 
 export interface EarningsSchedulerConfig {
@@ -313,6 +314,8 @@ export class EarningsService {
       await new Promise<void>((resolve) => setImmediate(resolve));
     };
 
+    const customCalculatorPercent = await getCustomCalculatorOperatorPercent(db);
+
     try {
       for (const row of rows) {
         const effectiveUserId = effectiveEarningsUserId(row);
@@ -325,13 +328,14 @@ export class EarningsService {
           params = {};
         }
 
-        // Произвольный калькулятор — живые 20%, не снимок и не чужой productId.
+        // Произвольный калькулятор — живой процент из настроек, не снимок и не чужой productId.
         // Остальные позиции: актуальные проценты из БД, params — только fallback.
         const percent = resolveEarningsOperatorPercent({
           params,
           itemType: row.itemType,
           productPercentMap,
           operationPercentMap,
+          customCalculatorPercent,
         });
 
         const qty = Number(row.quantity) || 0;

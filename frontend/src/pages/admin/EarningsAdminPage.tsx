@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, FormField, Modal } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
-import { getAdminEarnings, getAdminEarningsOrders, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
+import { getAdminEarnings, getAdminEarningsOrders, getCustomCalculatorPercent, updateCustomCalculatorPercent, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
 import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
 import type { AdminUserRow } from './earnings/earningsTypes';
 import './EarningsAdminPage.css';
@@ -54,6 +54,9 @@ export const EarningsAdminPage: React.FC = () => {
   const [newBonusAmount, setNewBonusAmount] = useState('');
   const [newBonusReason, setNewBonusReason] = useState('');
   const [newBonusDate, setNewBonusDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [customPercent, setCustomPercent] = useState('17.5');
+  const [customPercentSaving, setCustomPercentSaving] = useState(false);
+  const [customPercentMessage, setCustomPercentMessage] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -73,6 +76,34 @@ export const EarningsAdminPage: React.FC = () => {
   useEffect(() => {
     getDepartments().then(r => setDepartments(r.data ?? [])).catch(() => setDepartments([]));
   }, []);
+
+  useEffect(() => {
+    getCustomCalculatorPercent()
+      .then((response) => {
+        const value = Number(response.data?.operatorPercent);
+        if (Number.isFinite(value)) setCustomPercent(String(value));
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveCustomPercent = useCallback(async () => {
+    const value = Number(String(customPercent).replace(',', '.'));
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      setError('Процент произвольного калькулятора должен быть от 0 до 100');
+      return;
+    }
+    try {
+      setCustomPercentSaving(true);
+      setCustomPercentMessage(null);
+      const response = await updateCustomCalculatorPercent(value);
+      setCustomPercent(String(response.data.operatorPercent));
+      setCustomPercentMessage('Сохранено. Пересчёт процентов возьмёт это значение для всех произвольных позиций.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Не удалось сохранить процент произвольного калькулятора');
+    } finally {
+      setCustomPercentSaving(false);
+    }
+  }, [customPercent]);
 
   useEffect(() => {
     loadData();
@@ -312,6 +343,30 @@ export const EarningsAdminPage: React.FC = () => {
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
+      {customPercentMessage && <Alert type="success">{customPercentMessage}</Alert>}
+
+      <div className="earn-admin__custom-percent">
+        <div>
+          <h3>Произвольный калькулятор</h3>
+          <p>Доля оператора с произвольных позиций. Новые строки и пересчёт процентов берут это число, а не старый снимок в заказе.</p>
+        </div>
+        <div className="earn-admin__custom-percent-form">
+          <FormField label="Процент">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              className="earn-filter-input"
+              value={customPercent}
+              onChange={(e) => setCustomPercent(e.target.value)}
+            />
+          </FormField>
+          <Button variant="primary" size="sm" onClick={saveCustomPercent} disabled={customPercentSaving}>
+            {customPercentSaving ? 'Сохранение…' : 'Сохранить'}
+          </Button>
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="earn-admin__stats">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
+import { getCustomCalculatorPercent } from '../../../api';
 import { CUSTOM_OPERATOR_PERCENT, CUSTOM_PRODUCT_ID } from '../components/DynamicProductSelector';
 import { isCustomCalculatorItem, readItemParams } from '../utils/customCalculatorItem';
 
@@ -16,7 +17,7 @@ interface UseCustomProductParams {
   toast: { success: (msg: string) => void; error: (msg: string, details?: string) => void };
 }
 
-const buildCustomProduct = (): Product => ({
+const buildCustomProduct = (operatorPercent: number): Product => ({
   id: CUSTOM_PRODUCT_ID,
   category_id: 0,
   name: 'Произвольный продукт',
@@ -24,7 +25,7 @@ const buildCustomProduct = (): Product => ({
   icon: 'edit',
   calculator_type: 'simplified',
   product_type: 'universal',
-  operator_percent: CUSTOM_OPERATOR_PERCENT,
+  operator_percent: operatorPercent,
   is_active: true,
   created_at: '',
   updated_at: '',
@@ -44,6 +45,7 @@ export function useCustomProduct({
   logger,
   toast,
 }: UseCustomProductParams) {
+  const [operatorPercent, setOperatorPercent] = useState(CUSTOM_OPERATOR_PERCENT);
   const [customProductForm, setCustomProductForm] = useState({
     name: '',
     characteristics: '',
@@ -58,6 +60,22 @@ export function useCustomProduct({
   const customProductionDays = Math.max(0, Number(customProductForm.productionDays) || 0);
   const isCustomValid =
     Boolean(customProductForm.name.trim()) && customQuantity > 0 && customPrice > 0;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    getCustomCalculatorPercent()
+      .then((response) => {
+        const next = Number(response.data?.operatorPercent);
+        if (!cancelled && Number.isFinite(next)) setOperatorPercent(next);
+      })
+      .catch(() => {
+        /* остаётся запасные 17,5; при сохранении бэкенд всё равно подставит настройку */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -83,7 +101,7 @@ export function useCustomProduct({
           : '';
     const rawName = params.customName || params.productName || params.description || '';
 
-    setSelectedProduct(buildCustomProduct() as Product & { resolvedProductType?: string });
+    setSelectedProduct(buildCustomProduct(operatorPercent) as Product & { resolvedProductType?: string });
     setCustomProductForm({
       name: String(rawName),
       characteristics: String(params.characteristics || ''),
@@ -128,7 +146,7 @@ export function useCustomProduct({
       customName: name,
       characteristics,
       productionDays: customProductionDays > 0 ? customProductionDays : null,
-      operator_percent: CUSTOM_OPERATOR_PERCENT,
+      operator_percent: operatorPercent,
       productType: 'custom',
       productName: name,
       storedTotalCost: storedTotal,
@@ -175,6 +193,7 @@ export function useCustomProduct({
     customProductForm.characteristics,
     customProductForm.name,
     customProductionDays,
+    operatorPercent,
     editContext,
     isCustomValid,
     isEditMode,

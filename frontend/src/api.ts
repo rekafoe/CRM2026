@@ -811,6 +811,10 @@ export const createDailyReport = (data: { report_date: string; user_id?: number;
   api.post<DailyReport>('/daily-reports', data);
 
 // Earnings API
+export const getCustomCalculatorPercent = () =>
+  api.get<{ operatorPercent: number }>('/earnings/custom-calculator-percent');
+export const updateCustomCalculatorPercent = (operatorPercent: number) =>
+  api.put<{ operatorPercent: number }>('/earnings/custom-calculator-percent', { operatorPercent });
 export const getMyEarnings = (params?: { month?: string }) =>
   api.get('/earnings/me', { params });
 export const getAdminEarnings = (params?: { month?: string; history_months?: number; department_id?: number }) =>

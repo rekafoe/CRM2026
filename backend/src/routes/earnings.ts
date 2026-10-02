@@ -2,6 +2,11 @@ import { Router } from 'express'
 import { asyncHandler, AuthenticatedRequest } from '../middleware'
 import { getDb } from '../config/database'
 import { EarningsService } from '../services/earningsService'
+import {
+  getCustomCalculatorOperatorPercent,
+  setCustomCalculatorOperatorPercent,
+} from '../services/customCalculatorPercentSettings'
+import { normalizeCustomCalculatorPercent } from '../services/earningsOperatorPercent'
 
 const router = Router()
 
@@ -31,6 +36,36 @@ const buildMonthKeys = (count: number, baseMonth: string) => {
   }
   return result
 }
+
+router.get('/custom-calculator-percent', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+  const db = await getDb()
+  const operatorPercent = await getCustomCalculatorOperatorPercent(db)
+  res.json({ operatorPercent })
+}))
+
+router.put('/custom-calculator-percent', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser || authUser.role !== 'admin') {
+    res.status(403).json({ message: 'Forbidden' })
+    return
+  }
+  const operatorPercent = normalizeCustomCalculatorPercent(
+    (req.body as { operatorPercent?: unknown; operator_percent?: unknown })?.operatorPercent
+      ?? (req.body as { operator_percent?: unknown })?.operator_percent,
+  )
+  if (operatorPercent == null) {
+    res.status(400).json({ message: 'Процент должен быть числом от 0 до 100' })
+    return
+  }
+  const db = await getDb()
+  await setCustomCalculatorOperatorPercent(db, operatorPercent)
+  res.json({ operatorPercent })
+}))
 
 router.get('/me', asyncHandler(async (req, res) => {
   const authUser = (req as AuthenticatedRequest).user

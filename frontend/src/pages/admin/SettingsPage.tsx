@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { UserManagement, DepartmentManagement } from '../../features/userManagement';
 import { useAdminBack } from '../../hooks/useAdminBack';
@@ -9,6 +10,7 @@ interface SettingsPageProps {
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
   const goBack = useAdminBack();
+  const navigate = useNavigate();
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showDepartmentManagement, setShowDepartmentManagement] = useState(false);
 
@@ -33,6 +35,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
     >
       <div className="settings-content">
         <div className="settings-grid">
+          <div className="setting-card">
+            <h3>Произвольный калькулятор</h3>
+            <p>Процент оператора для произвольных позиций. Пересчёт зарплаты берёт сохранённое значение.</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/adminpanel/earnings')}
+            >
+              Открыть
+            </button>
+          </div>
+
           <div className="setting-card">
             <h3>⚙️ Системные настройки</h3>
             <p>Основные настройки системы</p>

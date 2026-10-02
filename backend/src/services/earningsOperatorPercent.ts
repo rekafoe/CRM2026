@@ -1,5 +1,16 @@
-/** Доля оператора с произвольного калькулятора. Живое значение: рекальк не смотрит на старый снимок в params. */
-export const CUSTOM_CALCULATOR_OPERATOR_PERCENT = 20
+/** Доля оператора с произвольного калькулятора, если в настройках ещё нет своего числа. */
+export const DEFAULT_CUSTOM_CALCULATOR_OPERATOR_PERCENT = 17.5
+export const CUSTOM_CALCULATOR_PERCENT_KEY = 'custom_calculator_operator_percent'
+
+/** @deprecated Используйте DEFAULT_CUSTOM_CALCULATOR_OPERATOR_PERCENT или значение из crm_settings. */
+export const CUSTOM_CALCULATOR_OPERATOR_PERCENT = DEFAULT_CUSTOM_CALCULATOR_OPERATOR_PERCENT
+
+export function normalizeCustomCalculatorPercent(raw: unknown): number | null {
+  const text = typeof raw === 'string' ? raw.trim().replace(',', '.') : raw
+  const value = Number(text)
+  if (!Number.isFinite(value) || value < 0 || value > 100) return null
+  return Math.round(value * 100) / 100
+}
 
 export function isArbitraryCalculatorItem(
   params: unknown,
@@ -20,7 +31,7 @@ export function isArbitraryCalculatorItem(
 
 /**
  * Процент оператора по позиции.
- * Произвольный калькулятор всегда получает текущие {@link CUSTOM_CALCULATOR_OPERATOR_PERCENT},
+ * Произвольный калькулятор получает живой процент из настроек,
  * даже если в params лежит старый operator_percent или чужой productId.
  */
 export function resolveEarningsOperatorPercent(input: {
@@ -28,10 +39,14 @@ export function resolveEarningsOperatorPercent(input: {
   itemType?: string | null
   productPercentMap: Map<number, number>
   operationPercentMap: Map<number, number>
+  customCalculatorPercent?: number | null
 }): number {
   const params = input.params ?? {}
   if (isArbitraryCalculatorItem(params, input.itemType)) {
-    return CUSTOM_CALCULATOR_OPERATOR_PERCENT
+    return (
+      normalizeCustomCalculatorPercent(input.customCalculatorPercent) ??
+      DEFAULT_CUSTOM_CALCULATOR_OPERATOR_PERCENT
+    )
   }
 
   let percent = 0

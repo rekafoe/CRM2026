@@ -1,5 +1,6 @@
 import {
-  CUSTOM_CALCULATOR_OPERATOR_PERCENT,
+  DEFAULT_CUSTOM_CALCULATOR_OPERATOR_PERCENT,
+  normalizeCustomCalculatorPercent,
   resolveEarningsOperatorPercent,
 } from '../services/earningsOperatorPercent'
 
@@ -7,7 +8,7 @@ describe('resolveEarningsOperatorPercent', () => {
   const productPercentMap = new Map<number, number>([[12, 7]])
   const operationPercentMap = new Map<number, number>([[5, 15]])
 
-  it('произвольный калькулятор берёт живые 20, а не снимок 10 и не процент чужого продукта', () => {
+  it('произвольный калькулятор берёт живой процент из настроек, а не снимок 10 и не процент чужого продукта', () => {
     expect(
       resolveEarningsOperatorPercent({
         params: {
@@ -20,11 +21,12 @@ describe('resolveEarningsOperatorPercent', () => {
         itemType: 'custom',
         productPercentMap,
         operationPercentMap,
+        customCalculatorPercent: 12.5,
       }),
-    ).toBe(CUSTOM_CALCULATOR_OPERATOR_PERCENT)
+    ).toBe(12.5)
   })
 
-  it('старая позиция с type=custom и снимком 10 тоже получает 20', () => {
+  it('без переданного процента произвольный калькулятор получает 17,5', () => {
     expect(
       resolveEarningsOperatorPercent({
         params: { operator_percent: 10 },
@@ -32,7 +34,11 @@ describe('resolveEarningsOperatorPercent', () => {
         productPercentMap,
         operationPercentMap,
       }),
-    ).toBe(20)
+    ).toBe(DEFAULT_CUSTOM_CALCULATOR_OPERATOR_PERCENT)
+  })
+
+  it('принимает процент с запятой', () => {
+    expect(normalizeCustomCalculatorPercent('17,5')).toBe(17.5)
   })
 
   it('productId витрины -1000 считается произвольным калькулятором', () => {
@@ -42,8 +48,9 @@ describe('resolveEarningsOperatorPercent', () => {
         itemType: 'print',
         productPercentMap,
         operationPercentMap,
+        customCalculatorPercent: 17.5,
       }),
-    ).toBe(20)
+    ).toBe(17.5)
   })
 
   it('обычный продукт берёт процент из справочника, не 20', () => {

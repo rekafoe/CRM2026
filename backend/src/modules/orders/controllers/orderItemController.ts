@@ -5,10 +5,8 @@ import { hasColumn, getTableColumns } from '../../../utils/tableSchemaCache'
 import { Item } from '../../../models'
 import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMapper'
 import { EarningsService } from '../../../services/earningsService'
-import {
-  CUSTOM_CALCULATOR_OPERATOR_PERCENT,
-  isArbitraryCalculatorItem,
-} from '../../../services/earningsOperatorPercent'
+import { isArbitraryCalculatorItem } from '../../../services/earningsOperatorPercent'
+import { getCustomCalculatorOperatorPercent } from '../../../services/customCalculatorPercentSettings'
 import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehouseService'
 import { MaterialTransactionService } from '../../warehouse/services/materialTransactionService'
 import { computeClicks } from '../../../utils/printing'
@@ -300,13 +298,16 @@ export class OrderItemController {
           }
           
           const arbitraryCalculator = isArbitraryCalculatorItem(cleanParams, type)
+          const customOperatorPercent = arbitraryCalculator
+            ? await getCustomCalculatorOperatorPercent(db)
+            : 0
           const paramsToSave = {
             ...cleanParams,
             ...(arbitraryCalculator
               ? {
                   customProduct: true,
                   productType: 'custom',
-                  operator_percent: CUSTOM_CALCULATOR_OPERATOR_PERCENT,
+                  operator_percent: customOperatorPercent,
                   productId: null,
                 }
               : {}),
@@ -979,7 +980,7 @@ export class OrderItemController {
         if (incomingCustom && Object.keys(paramsPatch).length > 0) {
           paramsPatch.customProduct = true
           paramsPatch.productType = 'custom'
-          paramsPatch.operator_percent = CUSTOM_CALCULATOR_OPERATOR_PERCENT
+          paramsPatch.operator_percent = await getCustomCalculatorOperatorPercent(db)
           paramsPatch.productId = null
         }
         const requestedType = typeof rawBody.type === 'string' ? rawBody.type.trim() : ''
