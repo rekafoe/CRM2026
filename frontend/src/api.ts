@@ -1145,6 +1145,44 @@ export type EuropostOffice = {
 export const getEuropostOffices = () =>
   api.get<{ offices: EuropostOffice[] }>('/postal-carriers/europost/offices', { timeout: 45000 });
 
+export type PostalTrackingFilter = 'all' | PostalCarrier;
+
+export type PostalTrackingEvent = {
+  id: number;
+  eventAt: string | null;
+  code: string;
+  title: string;
+  place: string;
+};
+
+export type PostalTrackingShipment = {
+  id: number;
+  order_id: number;
+  order_number: string;
+  customer_name: string;
+  carrier: PostalCarrier;
+  carrier_title: string;
+  recipient_name: string;
+  recipient_address: string;
+  tracking_number: string | null;
+  tracking_checked_at: string | null;
+  tracking_error: string | null;
+  current_status: string;
+  current_place: string;
+  current_at: string | null;
+  events: PostalTrackingEvent[];
+};
+
+export const getPostalTracking = (carrier: PostalTrackingFilter) =>
+  api.get<{ shipments: PostalTrackingShipment[] }>('/postal-carriers/tracking', { params: { carrier } });
+
+export const refreshPostalTracking = (body: { carrier: PostalTrackingFilter; shipmentId?: number }) =>
+  api.post<{ shipments: PostalTrackingShipment[]; updated: number; message: string }>(
+    '/postal-carriers/tracking/refresh',
+    body,
+    { timeout: 120000 },
+  );
+
 export const getPostalCarrierStatus = () =>
   api.get<{
     belpostReady: boolean;

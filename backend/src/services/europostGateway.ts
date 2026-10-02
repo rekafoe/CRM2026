@@ -8,10 +8,12 @@ import {
   findStringByKey,
   phoneDigits,
   collectEuropostOffices,
+  parseEuropostTracking,
   pickGoodsId,
   pickSenderDeliveryId,
   pickWeightTypeId,
   type EuropostOffice,
+  type TrackingEvent,
   sniffCarrierFile,
   splitRecipientName,
   type CarrierFile,
@@ -223,6 +225,20 @@ export async function submitEuropost(
     file,
     message: `Европочта приняла отправление, доставку оплачивает наше юрлицо. ${tracking ? `Номер ${tracking}.` : 'Номер Европочта пришлёт вместе с накладной.'} ${ids.note} ${detail}`.replace(/\s+/g, ' ').trim(),
   }
+}
+
+export async function fetchEuropostTracking(
+  trackingNumber: string,
+  externalId: string | null,
+  settings: PostalCarrierSettings,
+  request: CarrierRequest = carrierRequest,
+): Promise<TrackingEvent[]> {
+  const token = await jwtToken(settings, request)
+  const payload = await callMethod(settings, 'Postal.Tracking', {
+    Number: trackingNumber.trim(),
+    PostalItemExternalId: externalId || '',
+  }, token, request)
+  return parseEuropostTracking(payload)
 }
 
 export async function listEuropostOffices(

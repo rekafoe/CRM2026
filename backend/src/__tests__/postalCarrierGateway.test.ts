@@ -6,6 +6,9 @@ import {
   collectBelpostAddresses,
   collectEuropostOffices,
   decodePdfString,
+  latestTrackingEvent,
+  parseBelpostTracking,
+  parseEuropostTracking,
   pickBelpostAddress,
   pickSenderDeliveryId,
   readS10,
@@ -138,6 +141,21 @@ describe('postal carrier responses', () => {
     expect(result.file?.bytes.subarray(0, 4).toString()).toBe('%PDF')
     expect(decodePdfString(encoded)?.subarray(0, 4).toString()).toBe('%PDF')
     expect(pickSenderDeliveryId([{ id: '1', label: 'За счёт получателя' }, { id: '8', label: 'Оплата отправителем' }])).toBe('8')
+    const steps = parseBelpostTracking({
+      data: [{
+        number: 'CP123456789BY',
+        steps: [
+          { code: 4, event: 'Принято от отправителя', place: 'Минск', timestamp: 1710000000 },
+          { code: 15, event: 'Покинуло сортировку', place: 'Минск', timestamp: 1710003600 },
+        ],
+      }],
+    })
+    expect(steps).toHaveLength(2)
+    expect(latestTrackingEvent(steps)?.title).toBe('Покинуло сортировку')
+    expect(parseBelpostTracking({ data: [{ number: 'CP000000000BY', steps: [] }] })).toEqual([])
+    expect(parseEuropostTracking({
+      Table: [{ InfoTrack: 'Принято', Timex: '2026-10-02 10:00:00', WarehouseName: 'ПВЗ Минск' }],
+    })[0]).toMatchObject({ title: 'Принято', place: 'ПВЗ Минск' })
     expect(collectEuropostOffices({
       Table: [
         { WarehouseId: 70130010, WarehouseName: 'Отделение №1', Address7Name: 'Минск', Address: 'ул. Ленина, 1' },

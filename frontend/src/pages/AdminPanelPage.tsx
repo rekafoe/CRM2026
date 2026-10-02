@@ -77,6 +77,9 @@ const DesignAssetsPage = lazy(() =>
 const DesignEditorPage = lazy(() =>
   import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
 );
+const PostalTrackingPage = lazy(() =>
+  import('./admin/PostalTrackingPage').then((m) => ({ default: m.PostalTrackingPage }))
+);
 const ExpensesPage = lazy(() =>
   import('../features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage }))
 );
@@ -165,6 +168,9 @@ const AdminPanelHome: React.FC = () => {
           </button>
           <button onClick={() => navigate('/adminpanel/expenses')} className="nav-btn">
             <AppIcon name="receipt" size="xs" /> Расходы
+          </button>
+          <button onClick={() => navigate('/adminpanel/deliveries')} className="nav-btn">
+            <AppIcon name="package" size="xs" /> Доставка
           </button>
           <button onClick={() => navigate('/adminpanel/products')} className="nav-btn">
             <AppIcon name="puzzle" size="xs" /> Продукты калькулятора
@@ -400,6 +406,7 @@ export const AdminPanelPage: React.FC = () => {
           {/* Оригинальные админ страницы */}
           <Route path="/reports" element={<AdminReportsPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
+          <Route path="/deliveries" element={<PostalTrackingPage />} />
           <Route path="/daily-reports" element={<AdminReportsPage />} />
           <Route path="/analytics" element={<ReportsPage />} />
           

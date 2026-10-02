@@ -286,3 +286,88 @@ export function pickGoodsId(rows: DirectoryRow[]): string | null {
   const preferred = rows.find((row) => /посыл|товар|отправ/i.test(row.label))
   return preferred?.id ?? rows[0]?.id ?? null
 }
+
+export type TrackingEvent = {
+  eventKey: string
+  eventAt: string | null
+  code: string
+  title: string
+  place: string
+}
+
+function eventTime(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    const ms = value > 1e12 ? value : value * 1000
+    const date = new Date(ms)
+    return Number.isNaN(date.getTime()) ? null : date.toISOString()
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const asNumber = Number(value)
+    if (Number.isFinite(asNumber) && asNumber > 1e8) return eventTime(asNumber)
+    const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'))
+    if (!Number.isNaN(date.getTime())) return date.toISOString()
+  }
+  return null
+}
+
+function trackingEvent(code: string, title: string, place: string, eventAt: string | null): TrackingEvent | null {
+  const name = title.trim()
+  if (!name) return null
+  return {
+    eventKey: [code, eventAt || '', name, place.trim()].join('|'),
+    eventAt,
+    code,
+    title: name,
+    place: place.trim(),
+  }
+}
+
+export function parseBelpostTracking(payload: unknown): TrackingEvent[] {
+  const record = payload && typeof payload === 'object' ? payload as Record<string, unknown> : null
+  const data = record?.data
+  const first = Array.isArray(data) ? data[0] : data
+  const steps = first && typeof first === 'object' && Array.isArray((first as { steps?: unknown }).steps)
+    ? (first as { steps: unknown[] }).steps
+    : []
+  const events: TrackingEvent[] = []
+  for (const step of steps) {
+    if (!step || typeof step !== 'object') continue
+    const row = step as Record<string, unknown>
+    const event = trackingEvent(
+      row.code == null ? '' : String(row.code),
+      textField(row, ['event', 'name', 'status']),
+      textField(row, ['place']),
+      eventTime(row.timestamp ?? row.date),
+    )
+    if (event) events.push(event)
+  }
+  return events
+}
+
+export function parseEuropostTracking(payload: unknown): TrackingEvent[] {
+  const table = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === 'object' && Array.isArray((payload as { Table?: unknown }).Table)
+      ? (payload as { Table: unknown[] }).Table
+      : []
+  const events: TrackingEvent[] = []
+  for (const item of table) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const event = trackingEvent(
+      textField(row, ['Checkx', 'Code', 'StatusId']),
+      textField(row, ['InfoTrack', 'Event', 'Status', 'Info', 'Name', 'Checkx']),
+      textField(row, ['WarehouseName', 'Place', 'Address', 'Info1']),
+      eventTime(row.Timex ?? row.DateTime ?? row.Date ?? row.CheckxTime),
+    )
+    if (event) events.push(event)
+  }
+  return events
+}
+
+export function latestTrackingEvent(events: TrackingEvent[]): TrackingEvent | null {
+  if (events.length === 0) return null
+  const dated = events.filter((event) => event.eventAt)
+  const pool = dated.length > 0 ? dated : events
+  return [...pool].sort((a, b) => String(a.eventAt || '').localeCompare(String(b.eventAt || '')))[pool.length - 1]
+}

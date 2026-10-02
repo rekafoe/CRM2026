@@ -4,6 +4,8 @@ import {
   PostalCarrierError,
   asJson,
   collectBelpostAddresses,
+  parseBelpostTracking,
+  type TrackingEvent,
   findStringByKey,
   phoneDigits,
   pickBelpostAddress,
@@ -200,6 +202,23 @@ export async function submitBelpost(
     file,
     message: `Белпочта приняла отправление, почтовый сбор по договору нашего юрлица. ${trackNote}${codNote} ${detail}`.replace(/\s+/g, ' ').trim(),
   }
+}
+
+export async function fetchBelpostTracking(
+  trackingNumber: string,
+  settings: PostalCarrierSettings,
+  request: CarrierRequest = carrierRequest,
+): Promise<TrackingEvent[]> {
+  const response = await request({
+    url: `${baseUrl(settings)}/api/v1/tracking`,
+    method: 'POST',
+    headers: settings.belpostJwt.trim() ? authHeaders(settings) : {},
+    body: { number: trackingNumber.trim() },
+  })
+  if (response.status === 429) {
+    throw new PostalCarrierError('Белпочта ограничила частоту запросов отслеживания. Повторите чуть позже.', 429)
+  }
+  return parseBelpostTracking(readJson(response, 'Белпочта'))
 }
 
 export async function probeBelpostAccess(

@@ -1,0 +1,93 @@
+.postal-tracking__toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.postal-tracking__tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.postal-tracking__tab,
+.postal-tracking__actions button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.postal-tracking__tab--active {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.postal-tracking__hint,
+.postal-tracking__track {
+  color: #475569;
+  font-size: 13px;
+}
+
+.postal-tracking__error {
+  color: #9a3412;
+}
+
+.postal-tracking__ok {
+  color: #166534;
+}
+
+.postal-tracking__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.postal-tracking__card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.postal-tracking__card header {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.postal-tracking__card p {
+  margin: 0 0 6px;
+}
+
+.postal-tracking__status {
+  font-weight: 600;
+}
+
+.postal-tracking__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.postal-tracking__history {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.postal-tracking__history li {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.postal-tracking__history span {
+  color: #475569;
+  font-size: 13px;
+}

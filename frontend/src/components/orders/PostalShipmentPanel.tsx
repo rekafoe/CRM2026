@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Order } from '../../types';
 import {
   createPostalShipment,
@@ -308,6 +309,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
             : ' Пункт выдачи выбирается из справочника Европочты. Наложенный платёж не отправляем.'}
         </p>
         {!ready ? <p className="postal-shipment__warn">{readyMessage || 'Доступ перевозчика не сохранён. Его добавляет администратор в общих настройках.'}</p> : null}
+        <p><Link to="/adminpanel/deliveries">Статусы и история доставок</Link></p>
       </div>
       <div className="postal-shipment__form">
         <label>

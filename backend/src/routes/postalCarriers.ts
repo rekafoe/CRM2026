@@ -13,6 +13,7 @@ import {
 } from '../services/postalCarrierSettings'
 import { probeBelpostAccess } from '../services/belpostGateway'
 import { listEuropostOffices, probeEuropostAccess } from '../services/europostGateway'
+import { listPostalTracking, refreshPostalTracking, type TrackingCarrierFilter } from '../services/postalTrackingService'
 
 const router = Router()
 
@@ -51,6 +52,32 @@ function publicSettings(settings: PostalCarrierSettings) {
     europostDeliveryTypeId: settings.europostDeliveryTypeId,
   }
 }
+
+function trackingCarrier(value: unknown): TrackingCarrierFilter {
+  const carrier = String(value || 'all')
+  if (carrier === 'belpost' || carrier === 'europost' || carrier === 'all') return carrier
+  return 'all'
+}
+
+router.get('/tracking', asyncHandler(async (req, res) => {
+  if (!requireUser(req as AuthenticatedRequest, res)) return
+  const shipments = await listPostalTracking(trackingCarrier(req.query.carrier))
+  res.json({ shipments })
+}))
+
+router.post('/tracking/refresh', asyncHandler(async (req, res) => {
+  if (!requireUser(req as AuthenticatedRequest, res)) return
+  const shipmentId = Number((req.body as { shipmentId?: unknown })?.shipmentId)
+  try {
+    const result = await refreshPostalTracking({
+      carrier: trackingCarrier((req.body as { carrier?: unknown })?.carrier),
+      shipmentId: Number.isFinite(shipmentId) && shipmentId > 0 ? shipmentId : undefined,
+    })
+    res.json(result)
+  } catch (error: any) {
+    res.status(error?.status || 500).json({ message: error?.message || 'Не удалось обновить статусы' })
+  }
+}))
 
 router.get('/europost/offices', asyncHandler(async (req, res) => {
   if (!requireUser(req as AuthenticatedRequest, res)) return
