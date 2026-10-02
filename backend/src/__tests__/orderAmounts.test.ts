@@ -2,6 +2,7 @@ import {
   attachAmountsToOrder,
   computeItemLineTotal,
   computeOrderAmounts,
+  issueCashRemainder,
   parseMoneyInput,
 } from '../utils/orderAmounts';
 
@@ -70,5 +71,20 @@ describe('orderAmounts', () => {
     expect(order.items[0].lineTotal).toBe(30);
     expect(order.subtotal).toBe(30);
     expect(order.totalAmount).toBe(30);
+  });
+
+  it('issue remainder ignores unpaid BePaid and keeps paid prepayment', () => {
+    expect(
+      issueCashRemainder(100, { prepaymentAmount: 40, prepaymentStatus: 'paid', paymentMethod: 'offline' }),
+    ).toBe(60);
+    expect(
+      issueCashRemainder(100, { prepaymentAmount: 40, prepaymentStatus: 'pending', paymentMethod: 'online' }),
+    ).toBe(100);
+    expect(
+      issueCashRemainder(180, { prepaymentAmount: 0, prepaymentStatus: null, paymentMethod: null }),
+    ).toBe(180);
+    expect(
+      issueCashRemainder(100, { prepaymentAmount: 100, prepaymentStatus: 'paid', paymentMethod: 'offline' }),
+    ).toBe(0);
   });
 });

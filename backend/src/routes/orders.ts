@@ -9,6 +9,7 @@ import { PDFReportService } from '../services/pdfReportService'
 import { PostalShipmentService } from '../services/postalShipmentService'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { findOrderStatusId } from '../utils/orderStatusCatalog'
+import { issueCashRemainder } from '../utils/orderAmounts'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
@@ -1310,8 +1311,15 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const authUser = (req as any).user as { id: number } | undefined
   const issuerId = authUser?.id ?? null
   const db = await getDb()
-  const order = await db.get<any>('SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
+  const order = await db.get<any>(
+    'SELECT id, status, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
+    id,
+  )
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
+  if (Number(order.is_cancelled) === 1) {
+    res.status(400).json({ message: 'Отменённый заказ нельзя выдать' })
+    return
+  }
   const completedId = await findOrderStatusId(db, 'completed', 7)
   if (Number(order.status) === completedId || Number(order.status) === 7) {
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
@@ -1320,7 +1328,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   }
   const amounts = await OrderService.getOrderAmountsById(id)
   const total = amounts.totalAmount
-  const remainder = amounts.debt
+  const remainder = issueCashRemainder(total, order)
 
   // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
   const bodyDate = (req.body as any)?.issued_on

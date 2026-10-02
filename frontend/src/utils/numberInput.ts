@@ -66,6 +66,24 @@ export function isPaidPrepaymentStatus(status: string | null | undefined): boole
   return s === 'paid' || s === 'successful';
 }
 
+/** Деньги, которые уже в кассе. Ожидающая ссылка BePaid и неуспешная оплата не считаются. */
+export function collectedPrepaymentAmount(
+  amount: number | string | null | undefined,
+  status: string | null | undefined,
+  method?: string | null,
+): number {
+  const prepay = parseNumberFlexible(amount);
+  if (prepay <= 0) return 0;
+  if (isPaidPrepaymentStatus(status)) return prepay;
+  const methodName = String(method ?? '').trim().toLowerCase();
+  if (methodName === 'online' || methodName === 'telegram') return 0;
+  const statusName = String(status ?? '').trim().toLowerCase();
+  if (statusName === 'pending' || statusName === 'failed' || statusName === 'cancelled' || statusName === 'canceled') {
+    return 0;
+  }
+  return prepay;
+}
+
 function countsAsPaidForCashCounter(
   order: {
     prepaymentStatus?: string | null;

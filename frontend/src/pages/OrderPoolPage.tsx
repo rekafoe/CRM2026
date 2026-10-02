@@ -23,7 +23,7 @@ import {
   type AssignableUser,
 } from '../api';
 import { completedOrderStatusId, isCompletedOrderStatusId, isPoolOrderStatusId, useOrderStatuses } from '../hooks/useOrderStatuses';
-import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
+import { collectedPrepaymentAmount, parseNumberFlexible } from '../utils/numberInput';
 import { isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
 import { mergeSelectedOrderFromList } from '../utils/orderNotes';
@@ -117,8 +117,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const getOrderDebt = useCallback(
     (order: Order) => {
       const total = getOrderTotal(order);
-      const prepay = getOrderPrepayment(order);
-      const paidPortion = isPaidPrepaymentStatus(order.prepaymentStatus) ? prepay : 0;
+      const paidPortion = collectedPrepaymentAmount(
+        order.prepaymentAmount,
+        order.prepaymentStatus,
+        order.paymentMethod,
+      );
       return Math.max(0, total - paidPortion);
     },
     [getOrderTotal, getOrderPrepayment],
@@ -884,6 +887,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onCopyPhone={handleCopyPhone}
               showRemovePrepayment={selectedPrepay > 0}
               showIssueOrder={
+                selectedOrder.is_cancelled !== 1 &&
                 (selectedDebt > 0 ||
                   (selectedPrepay >= selectedTotal && selectedTotal > 0)) &&
                 !isCompletedOrderStatusId(Number(selectedOrder.status))

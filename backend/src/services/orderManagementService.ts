@@ -5,6 +5,7 @@ import { UserOrderPageService } from './userOrderPageService';
 import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
 import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
+import { issueCashRemainder } from '../utils/orderAmounts';
 import { OrderService } from '../modules/orders/services/orderService';
 import { findOrderStatusId } from '../utils/orderStatusCatalog';
 
@@ -469,7 +470,7 @@ export class OrderManagementService {
         } else {
           const order = await db.get<any>(
             `
-            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent
+            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled
             FROM orders WHERE id = ?
           `,
             [orderId],
@@ -478,11 +479,14 @@ export class OrderManagementService {
             await db.run('ROLLBACK');
             return null;
           }
+          if (Number(order.is_cancelled) === 1) {
+            await db.run('ROLLBACK');
+            return null;
+          }
 
           const amounts = await OrderService.getOrderAmountsById(orderId);
           const totalAmount = amounts.totalAmount;
-          const remainder = amounts.debt;
-          const prepaymentAmount = Number(order.prepaymentAmount || 0);
+          const remainder = issueCashRemainder(totalAmount, order);
 
           let hasPrepaymentUpdatedAt = false;
           try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
