@@ -4,14 +4,15 @@ import { invalidateTableSchemaCache } from '../utils/tableSchemaCache'
 import { up as bindCompletedTemplate } from '../migrations/20261002190000_website_order_completed_email'
 import {
   isCompletedOrderStatus,
-  isReadyNotifyStatus,
-  isWebsiteReadyReminderDue,
-  shouldDeferWebsiteReadyEmail,
+  isPickedUpNotifyStatus,
+  shouldSkipImmediateWebsiteReadyEmail,
+  websiteReadyReminderSendAtMs,
   WEBSITE_READY_REMINDER_LEAD_MS,
 } from '../services/websiteOrderEmailTiming'
 import { tryEnqueueOrderStatusEmail } from '../services/orderStatusEmailService'
 import {
   processWebsiteReadyReminders,
+  syncWebsitePickedUpReadyEmail,
   tryEnqueueWebsiteOrderCompletedEmail,
 } from '../services/websiteOrderEmailService'
 
@@ -185,25 +186,25 @@ describe('website order email timing', () => {
     else process.env.SMTP_FROM = prevFrom
   })
 
-  it('считает полученный в ПВЗ готовым статусом, а завершённый отдельным', () => {
-    expect(isReadyNotifyStatus('picked_up', 'Получен в ПВЗ')).toBe(true)
-    expect(isReadyNotifyStatus('at_pickup', 'Передан в ПВЗ')).toBe(true)
-    expect(isReadyNotifyStatus('done', 'Выполнен')).toBe(true)
-    expect(isReadyNotifyStatus('in_work', 'Принят в работу')).toBe(false)
-    expect(isReadyNotifyStatus('completed', 'Завершён')).toBe(false)
+  it('ставит готовность в очередь только из «получен в ПВЗ»', () => {
+    expect(isPickedUpNotifyStatus('picked_up', 'Получен в ПВЗ')).toBe(true)
+    expect(isPickedUpNotifyStatus('at_pickup', 'Передан в ПВЗ')).toBe(false)
+    expect(isPickedUpNotifyStatus('done', 'Выполнен')).toBe(false)
+    expect(isPickedUpNotifyStatus('in_work', 'Принят в работу')).toBe(false)
     expect(isCompletedOrderStatus('completed', 'Завершён')).toBe(true)
-    expect(shouldDeferWebsiteReadyEmail('website', 'picked_up', 'Получен в ПВЗ')).toBe(true)
-    expect(shouldDeferWebsiteReadyEmail('crm', 'picked_up', 'Получен в ПВЗ')).toBe(false)
+    expect(shouldSkipImmediateWebsiteReadyEmail('website', 'picked_up', 'Получен в ПВЗ')).toBe(true)
+    expect(shouldSkipImmediateWebsiteReadyEmail('website', 'done', 'Выполнен')).toBe(true)
+    expect(shouldSkipImmediateWebsiteReadyEmail('crm', 'done', 'Выполнен')).toBe(false)
   })
 
-  it('письмо о готовности пора, когда до даты осталось не больше суток', () => {
+  it('откладывает отправку до суток перед датой готовности', () => {
     const readyAt = Date.parse('2026-10-05T12:00:00.000Z')
-    expect(isWebsiteReadyReminderDue(readyAt, readyAt - WEBSITE_READY_REMINDER_LEAD_MS - 1000)).toBe(false)
-    expect(isWebsiteReadyReminderDue(readyAt, readyAt - WEBSITE_READY_REMINDER_LEAD_MS)).toBe(true)
-    expect(isWebsiteReadyReminderDue(readyAt, readyAt)).toBe(true)
+    const now = readyAt - WEBSITE_READY_REMINDER_LEAD_MS - 1000
+    expect(websiteReadyReminderSendAtMs(readyAt, now)).toBe(readyAt - WEBSITE_READY_REMINDER_LEAD_MS)
+    expect(websiteReadyReminderSendAtMs(readyAt, readyAt)).toBe(readyAt)
   })
 
-  it('не шлёт готовность сразу, даже если заказ уже получен в ПВЗ, пока до даты больше суток', async () => {
+  it('ставит готовность в очередь при получении в ПВЗ и не отдаёт её в отправку, пока до даты больше суток', async () => {
     const now = Date.now()
     await insertOrder({
       id: 1,
@@ -212,12 +213,16 @@ describe('website order email timing', () => {
       readyDate: new Date(now + 5 * 24 * HOUR).toISOString(),
     })
     await tryEnqueueOrderStatusEmail({ orderId: 1, oldStatusId: 8, newStatusId: 11, source: 'website' })
-    expect(await processWebsiteReadyReminders(20, now)).toBe(0)
-    const jobs = await testDb.all<{ idempotency_key: string }[]>(`SELECT idempotency_key FROM mail_jobs`)
-    expect(jobs).toEqual([])
+    expect(await processWebsiteReadyReminders(20, now)).toBe(1)
+    const job = await testDb.get<{ status: string; next_attempt_at: string; idempotency_key: string }>(
+      `SELECT status, next_attempt_at, idempotency_key FROM mail_jobs`,
+    )
+    expect(job?.idempotency_key).toBe('website-ready-reminder:1')
+    expect(job?.status).toBe('pending')
+    expect(String(job?.next_attempt_at) > new Date(now).toISOString()).toBe(true)
   })
 
-  it('шлёт отложенное письмо о готовности, когда заказ получен в ПВЗ и до даты сутки или меньше', async () => {
+  it('когда до даты сутки или меньше, очередь уже можно забирать в отправку', async () => {
     const now = Date.now()
     await insertOrder({
       id: 2,
@@ -225,25 +230,98 @@ describe('website order email timing', () => {
       priceType: 'online',
       readyDate: new Date(now + 12 * HOUR).toISOString(),
     })
-    await tryEnqueueOrderStatusEmail({ orderId: 2, oldStatusId: 8, newStatusId: 11, source: 'website' })
-    expect(await processWebsiteReadyReminders(20, now)).toBe(1)
+    expect(await syncWebsitePickedUpReadyEmail({
+      orderId: 2,
+      oldStatusId: 8,
+      newStatusId: 11,
+      nowMs: now,
+    })).toBe('queued')
     expect(await processWebsiteReadyReminders(20, now)).toBe(0)
-    const job = await testDb.get<{ subject: string; idempotency_key: string }>(
-      `SELECT subject, idempotency_key FROM mail_jobs`,
+    const job = await testDb.get<{ subject: string; idempotency_key: string; next_attempt_at: string }>(
+      `SELECT subject, idempotency_key, next_attempt_at FROM mail_jobs`,
     )
     expect(job?.idempotency_key).toBe('website-ready-reminder:2')
     expect(job?.subject).toContain('готов к выдаче')
+    expect(String(job?.next_attempt_at) <= new Date(now).toISOString()).toBe(true)
   })
 
-  it('для срочного сайта шлёт готовность сразу после финального статуса: сутки до даты уже позади', async () => {
+  it('для срочного сайта, уже полученного в ПВЗ, очередь сразу доступна к отправке', async () => {
     const now = Date.now()
     await insertOrder({
       id: 3,
-      status: 9,
+      status: 11,
       createdAt: new Date(now).toISOString(),
       priceType: 'standard',
     })
     expect(await processWebsiteReadyReminders(20, now)).toBe(1)
+    const job = await testDb.get<{ next_attempt_at: string }>(`SELECT next_attempt_at FROM mail_jobs`)
+    expect(String(job?.next_attempt_at) <= new Date(now).toISOString()).toBe(true)
+  })
+
+  it('снимает неотправленное письмо, если статус убрали с «получен в ПВЗ»', async () => {
+    const now = Date.now()
+    await insertOrder({
+      id: 12,
+      status: 11,
+      priceType: 'online',
+      readyDate: new Date(now + 4 * 24 * HOUR).toISOString(),
+    })
+    expect(await syncWebsitePickedUpReadyEmail({
+      orderId: 12,
+      oldStatusId: 10,
+      newStatusId: 11,
+      nowMs: now,
+    })).toBe('queued')
+    await testDb.run(`UPDATE orders SET status = 9 WHERE id = 12`)
+    expect(await syncWebsitePickedUpReadyEmail({
+      orderId: 12,
+      oldStatusId: 11,
+      newStatusId: 9,
+      nowMs: now,
+    })).toBe('removed')
+    expect(await testDb.get(`SELECT id FROM mail_jobs`)).toBeUndefined()
+  })
+
+  it('уже отправленное письмо при смене статуса остаётся', async () => {
+    await insertOrder({
+      id: 13,
+      status: 9,
+      priceType: 'online',
+      readyDate: new Date().toISOString(),
+    })
+    await testDb.run(
+      `INSERT INTO mail_jobs (job_type, to_email, subject, status, idempotency_key)
+       VALUES ('transactional', 'client@example.com', 'готов', 'sent', 'website-ready-reminder:13')`,
+    )
+    expect(await syncWebsitePickedUpReadyEmail({
+      orderId: 13,
+      oldStatusId: 11,
+      newStatusId: 9,
+    })).toBe('skipped')
+    const job = await testDb.get<{ status: string }>(`SELECT status FROM mail_jobs`)
+    expect(job?.status).toBe('sent')
+  })
+
+  it('«выполнен» и «передан в ПВЗ» письмо о готовности не ставят', async () => {
+    const now = Date.now()
+    await insertOrder({
+      id: 14,
+      status: 9,
+      priceType: 'online',
+      readyDate: new Date(now + HOUR).toISOString(),
+    })
+    await insertOrder({
+      id: 15,
+      status: 10,
+      priceType: 'online',
+      readyDate: new Date(now + HOUR).toISOString(),
+    })
+    await tryEnqueueOrderStatusEmail({ orderId: 14, oldStatusId: 8, newStatusId: 9, source: 'website' })
+    await tryEnqueueOrderStatusEmail({ orderId: 15, oldStatusId: 8, newStatusId: 10, source: 'website' })
+    await syncWebsitePickedUpReadyEmail({ orderId: 14, oldStatusId: 8, newStatusId: 9, nowMs: now })
+    await syncWebsitePickedUpReadyEmail({ orderId: 15, oldStatusId: 8, newStatusId: 10, nowMs: now })
+    expect(await processWebsiteReadyReminders(20, now)).toBe(0)
+    expect(await testDb.get(`SELECT id FROM mail_jobs`)).toBeUndefined()
   })
 
   it('«принят в работу» уходит сразу, без отложенной готовности', async () => {

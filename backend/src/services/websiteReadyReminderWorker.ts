@@ -5,8 +5,8 @@ import { processWebsiteReadyReminders } from './websiteOrderEmailService'
 let timer: ReturnType<typeof setInterval> | null = null
 
 /**
- * Для заказов с сайта проверяет, не пора ли отправить письмо о готовности
- * (за сутки до планируемой даты, если статус уже «готов» / ПВЗ).
+ * Для заказов с сайта в статусе «Получен в ПВЗ» ставит письмо о готовности
+ * в очередь на момент за сутки до планируемой даты.
  */
 export function startWebsiteReadyReminderWorker(): void {
   if (timer) return

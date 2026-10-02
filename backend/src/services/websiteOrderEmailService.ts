@@ -6,8 +6,8 @@ import { parseItemParams, resolveOrderReadyAtMs, type ReadySlaItem } from '../ut
 import { enqueueOrderEmailBySlug } from './orderStatusEmailService'
 import {
   isCompletedOrderStatus,
-  isReadyNotifyStatus,
-  isWebsiteReadyReminderDue,
+  isPickedUpNotifyStatus,
+  websiteReadyReminderSendAtMs,
 } from './websiteOrderEmailTiming'
 
 const READY_TEMPLATE_SLUG = 'order_ready_for_pickup'
@@ -21,9 +21,13 @@ type ReadyCandidate = {
   status_code: string | null
 }
 
+export function websiteReadyReminderKey(orderId: number): string {
+  return `website-ready-reminder:${orderId}`
+}
+
 /**
- * Заказ с сайта уже готов (выполнен, в ПВЗ или получен в ПВЗ) —
- * письмо о готовности ставится в очередь не раньше чем за сутки до даты.
+ * Заказ с сайта в статусе «Получен в ПВЗ»: письмо о готовности встаёт в очередь
+ * на момент за сутки до планируемой даты. Если это время уже прошло — на сейчас.
  */
 export async function processWebsiteReadyReminders(limit = 40, nowMs = Date.now()): Promise<number> {
   if (!getSmtpConfig().configured) return 0
@@ -31,28 +35,9 @@ export async function processWebsiteReadyReminders(limit = 40, nowMs = Date.now(
   try {
     const db = await getDb()
     const rows = await selectReadyCandidates(db, capped)
-    if (rows.length === 0) return 0
-    const itemsByOrder = await loadReadyItems(db, rows.map((row) => row.id))
     let enqueued = 0
     for (const row of rows) {
-      const readyMs = resolveOrderReadyAtMs({
-        created_at: row.created_at,
-        source: 'website',
-        items: itemsByOrder.get(row.id) ?? [],
-      })
-      if (!isWebsiteReadyReminderDue(readyMs, nowMs)) continue
-      if (!(await stillReadyForReminder(db, row.id))) continue
-      const result = await enqueueOrderEmailBySlug({
-        orderId: row.id,
-        templateSlug: READY_TEMPLATE_SLUG,
-        statusName: row.status_name || 'Выполнен',
-        idempotencyKey: `website-ready-reminder:${row.id}`,
-        payload: {
-          type: 'website_ready_reminder',
-          orderId: row.id,
-          readyAt: readyMs != null ? new Date(readyMs).toISOString() : null,
-        },
-      })
+      const result = await queuePickedUpReadyEmail(db, row.id, row.status_name, nowMs)
       if (result === 'enqueued') enqueued += 1
     }
     return enqueued
@@ -60,6 +45,52 @@ export async function processWebsiteReadyReminders(limit = 40, nowMs = Date.now(
     logger.warn('Website ready reminder scan failed', { error: e })
     return 0
   }
+}
+
+/**
+ * Постановка и снятие письма о готовности при смене статуса.
+ * В очередь — только «Получен в ПВЗ». Любой другой статус снимает неотправленное письмо.
+ */
+export async function syncWebsitePickedUpReadyEmail(params: {
+  orderId: number
+  oldStatusId: number
+  newStatusId: number
+  nowMs?: number
+}): Promise<'queued' | 'removed' | 'skipped'> {
+  if (!Number.isFinite(params.orderId) || params.oldStatusId === params.newStatusId) return 'skipped'
+  if (!getSmtpConfig().configured) return 'skipped'
+  try {
+    const db = await getDb()
+    const order = await loadWebsiteOrderGate(db, params.orderId)
+    if (!order || order.source !== 'website') return 'skipped'
+    const next = await loadStatus(db, params.newStatusId)
+    const pickedUp = isPickedUpNotifyStatus(next.code, next.name) && Number(order.is_cancelled) !== 1
+    if (pickedUp) {
+      const result = await queuePickedUpReadyEmail(db, params.orderId, next.name, params.nowMs ?? Date.now())
+      return result === 'enqueued' || result === 'duplicate' ? 'queued' : 'skipped'
+    }
+    const removed = await removePendingWebsiteReadyReminder(params.orderId)
+    return removed ? 'removed' : 'skipped'
+  } catch (e) {
+    logger.warn('Website picked-up email sync failed', { error: e, orderId: params.orderId })
+    return 'skipped'
+  }
+}
+
+/** Снять с очереди письмо, которое ещё не ушло. Уже отправленное не трогаем. */
+export async function removePendingWebsiteReadyReminder(orderId: number): Promise<boolean> {
+  const db = await getDb()
+  const result = await db.run(
+    `DELETE FROM mail_jobs
+     WHERE idempotency_key = ?
+       AND status IN ('pending', 'failed')`,
+    websiteReadyReminderKey(orderId),
+  )
+  const removed = Number(result?.changes ?? 0) > 0
+  if (removed) {
+    logger.info('Website ready reminder removed from queue', { orderId })
+  }
+  return removed
 }
 
 /** Письмо «завершён» только для сайта и только когда долг уже закрыт выдачей. */
@@ -93,10 +124,7 @@ async function selectReadyCandidates(
   const cancelledSql = (await hasColumn('orders', 'is_cancelled').catch(() => false))
     ? 'AND COALESCE(o.is_cancelled, 0) = 0'
     : ''
-  const readySql = `(
-    s.code IN ('done', 'at_pickup', 'picked_up')
-    OR s.name IN ('Выполнен', 'Готов', 'Передан в ПВЗ', 'Получен в ПВЗ')
-  )`
+  const readySql = `(s.code = 'picked_up' OR s.name = 'Получен в ПВЗ')`
   const sql = `
     SELECT o.id,
            ${createdExpr} as created_at,
@@ -117,7 +145,7 @@ async function selectReadyCandidates(
   try {
     const rows = await db.all<ReadyCandidate[]>(sql, limit)
     return (Array.isArray(rows) ? rows : []).filter((row) =>
-      isReadyNotifyStatus(row.status_code, row.status_name),
+      isPickedUpNotifyStatus(row.status_code, row.status_name),
     )
   } catch {
     const fallback = `
@@ -129,7 +157,7 @@ async function selectReadyCandidates(
       INNER JOIN order_statuses s ON s.id = o.status
       WHERE o.source = 'website'
         ${cancelledSql}
-        AND s.name IN ('Выполнен', 'Готов', 'Передан в ПВЗ', 'Получен в ПВЗ')
+        AND s.name = 'Получен в ПВЗ'
         AND ${createdExpr} >= datetime('now', '-${SCAN_DAYS} days')
         AND NOT EXISTS (
           SELECT 1 FROM mail_jobs mj
@@ -193,7 +221,7 @@ async function stillReadyForReminder(
     )
     if (!row || row.source !== 'website') return false
     if (Number(row.is_cancelled) === 1) return false
-    return isReadyNotifyStatus(row.code, row.name)
+    return isPickedUpNotifyStatus(row.code, row.name)
   } catch {
     const row = await db.get<{ source: string | null; name: string | null }>(
       `SELECT o.source, s.name
@@ -202,8 +230,46 @@ async function stillReadyForReminder(
        WHERE o.id = ?`,
       orderId,
     )
-    return !!row && row.source === 'website' && isReadyNotifyStatus(null, row.name)
+    return !!row && row.source === 'website' && isPickedUpNotifyStatus(null, row.name)
   }
+}
+
+async function queuePickedUpReadyEmail(
+  db: Awaited<ReturnType<typeof getDb>>,
+  orderId: number,
+  statusName: string | null,
+  nowMs: number,
+): Promise<'enqueued' | 'duplicate' | 'skipped' | 'removed'> {
+  if (!(await stillReadyForReminder(db, orderId))) return 'skipped'
+  const created = await db.get<{ created_at: string | null }>(
+    `SELECT ${await createdAtExpr(db)} as created_at FROM orders o WHERE o.id = ?`,
+    orderId,
+  ).catch(() => undefined)
+  const itemsByOrder = await loadReadyItems(db, [orderId])
+  const readyMs = resolveOrderReadyAtMs({
+    created_at: created?.created_at,
+    source: 'website',
+    items: itemsByOrder.get(orderId) ?? [],
+  })
+  const sendAtMs = websiteReadyReminderSendAtMs(readyMs, nowMs)
+  if (sendAtMs == null) return 'skipped'
+  const result = await enqueueOrderEmailBySlug({
+    orderId,
+    templateSlug: READY_TEMPLATE_SLUG,
+    statusName: statusName || 'Получен в ПВЗ',
+    idempotencyKey: websiteReadyReminderKey(orderId),
+    nextAttemptAt: new Date(sendAtMs).toISOString(),
+    payload: {
+      type: 'website_ready_reminder',
+      orderId,
+      readyAt: readyMs != null ? new Date(readyMs).toISOString() : null,
+    },
+  })
+  if (!(await stillReadyForReminder(db, orderId))) {
+    await removePendingWebsiteReadyReminder(orderId)
+    return 'removed'
+  }
+  return result
 }
 
 async function loadWebsiteOrderGate(

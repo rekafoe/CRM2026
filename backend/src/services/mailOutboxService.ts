@@ -18,6 +18,8 @@ export interface EnqueueMailInput {
   maxAttempts?: number;
   /** Для отчёта/фильтра: заказ CRM (уведомления о статусе) */
   contextOrderId?: number | null;
+  /** ISO-время, раньше которого воркер письмо не забирает. Пусто — сразу. */
+  nextAttemptAt?: string | null;
 }
 
 /**
@@ -75,7 +77,7 @@ export async function enqueueMail(input: EnqueueMailInput): Promise<{ id: number
       input.idempotencyKey ?? null,
       maxAttempts,
       payloadJson,
-      null,
+      input.nextAttemptAt ?? null,
       ctx,
       openToken
     );

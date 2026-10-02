@@ -2,16 +2,15 @@
  * Сроки писем по заказам с сайта.
  *
  * «Принят в работу» уходит сразу при смене статуса.
- * О готовности — не в момент статуса, а за сутки до планируемой даты,
- * и только если заказ уже в готовом статусе: выполнен, передан в ПВЗ
- * или получен в ПВЗ. Если это окно уже позади, письмо уходит на ближайшем проходе.
+ * О готовности встаёт в очередь только на «Получен в ПВЗ» и ждёт за сутки
+ * до планируемой даты. Если статус сменили раньше отправки, письмо из очереди снимается.
  * «Завершён» не шлётся сменой статуса: только после закрытия долга.
  */
 
 export const WEBSITE_READY_REMINDER_LEAD_MS = 24 * 60 * 60 * 1000
 
-const READY_CODES = new Set(['done', 'at_pickup', 'picked_up'])
-const READY_NAMES = new Set(['выполнен', 'готов', 'передан в пвз', 'получен в пвз'])
+const WEBSITE_SILENT_READY_CODES = new Set(['done', 'at_pickup', 'picked_up'])
+const WEBSITE_SILENT_READY_NAMES = new Set(['выполнен', 'готов', 'передан в пвз', 'получен в пвз'])
 
 export function normalizeStatusName(name: string | null | undefined): string {
   return String(name || '')
@@ -20,11 +19,24 @@ export function normalizeStatusName(name: string | null | undefined): string {
     .replace(/ё/g, 'е')
 }
 
-/** Заказ уже готов к выдаче, в том числе когда он получен в ПВЗ. */
-export function isReadyNotifyStatus(code?: string | null, name?: string | null): boolean {
-  const statusCode = String(code || '').trim()
-  if (READY_CODES.has(statusCode)) return true
-  return READY_NAMES.has(normalizeStatusName(name))
+/** Письмо о готовности ставится в очередь только из этого статуса. */
+export function isPickedUpNotifyStatus(code?: string | null, name?: string | null): boolean {
+  if (String(code || '').trim() === 'picked_up') return true
+  return normalizeStatusName(name) === 'получен в пвз'
+}
+
+/**
+ * Для сайта «выполнен», «передан в ПВЗ» и «получен в ПВЗ» не шлют мгновенное письмо по правилу.
+ * Отложенная готовность живёт отдельно и только для «получен в ПВЗ».
+ */
+export function shouldSkipImmediateWebsiteReadyEmail(
+  source?: string | null,
+  code?: string | null,
+  name?: string | null,
+): boolean {
+  if (source !== 'website') return false
+  if (WEBSITE_SILENT_READY_CODES.has(String(code || '').trim())) return true
+  return WEBSITE_SILENT_READY_NAMES.has(normalizeStatusName(name))
 }
 
 export function isCompletedOrderStatus(code?: string | null, name?: string | null): boolean {
@@ -33,16 +45,8 @@ export function isCompletedOrderStatus(code?: string | null, name?: string | nul
   return statusName === 'завершен' || statusName.startsWith('завершен ')
 }
 
-export function shouldDeferWebsiteReadyEmail(
-  source?: string | null,
-  code?: string | null,
-  name?: string | null,
-): boolean {
-  return source === 'website' && isReadyNotifyStatus(code, name)
-}
-
-/** true, когда сейчас уже не раньше чем за сутки до планируемой готовности. */
-export function isWebsiteReadyReminderDue(readyAtMs: number | null, nowMs: number): boolean {
-  if (readyAtMs == null || !Number.isFinite(readyAtMs) || !Number.isFinite(nowMs)) return false
-  return nowMs >= readyAtMs - WEBSITE_READY_REMINDER_LEAD_MS
+/** Момент постановки в отправку: не раньше чем за сутки до готовности, иначе сразу. */
+export function websiteReadyReminderSendAtMs(readyAtMs: number | null, nowMs: number): number | null {
+  if (readyAtMs == null || !Number.isFinite(readyAtMs) || !Number.isFinite(nowMs)) return null
+  return Math.max(nowMs, readyAtMs - WEBSITE_READY_REMINDER_LEAD_MS)
 }

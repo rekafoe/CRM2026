@@ -16,6 +16,7 @@ import {
   photoOrderRowToPoolOrder,
 } from '../../../models/mappers/telegramPhotoOrderMapper'
 import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailService'
+import { syncWebsitePickedUpReadyEmail } from '../../../services/websiteOrderEmailService'
 import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
 import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/miniappOrderStatusTelegramService'
 import { trySyncWebsiteOrderStatusFromCrm } from '../../../services/websiteOrderStatusSyncService'
@@ -1655,6 +1656,11 @@ export class OrderService {
           newStatusId,
           source: prevRow?.source ?? 'crm',
         });
+        void syncWebsitePickedUpReadyEmail({
+          orderId: id,
+          oldStatusId,
+          newStatusId,
+        });
         void tryScheduleOrderStatusSms({ orderId: id, newStatusId });
         void tryNotifyTelegramOrderStatusForMiniappOrder({
           orderId: id,
@@ -1937,6 +1943,11 @@ export class OrderService {
         await EarningsService.recalculateForDate(date)
       }
       void trySyncWebsiteOrderStatusFromCrm(db, id)
+      void syncWebsitePickedUpReadyEmail({
+        orderId: id,
+        oldStatusId: Number(ord?.status ?? 0),
+        newStatusId: cancelledStatusId,
+      })
       return { softCancelled: true, status: cancelledStatusId }
     } catch (e) {
       await db.run('ROLLBACK')
@@ -2272,6 +2283,11 @@ export class OrderService {
           oldStatusId: old,
           newStatusId: n,
           source: row.source ?? 'crm',
+        });
+        void syncWebsitePickedUpReadyEmail({
+          orderId: row.id,
+          oldStatusId: old,
+          newStatusId: n,
         });
         void tryScheduleOrderStatusSms({ orderId: row.id, newStatusId: n });
         void tryNotifyTelegramOrderStatusForMiniappOrder({

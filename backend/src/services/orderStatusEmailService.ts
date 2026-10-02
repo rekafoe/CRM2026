@@ -7,7 +7,7 @@ import { logger } from '../utils/logger'
 import { buildOrderStatusEmailVars } from './orderStatusEmailVars'
 import {
   isCompletedOrderStatus,
-  shouldDeferWebsiteReadyEmail,
+  shouldSkipImmediateWebsiteReadyEmail,
 } from './websiteOrderEmailTiming'
 
 export type OrderEmailSource = 'crm' | 'website' | 'telegram' | 'mini_app'
@@ -93,8 +93,8 @@ export async function tryEnqueueOrderStatusEmail(params: {
     if (isCompletedOrderStatus(status.code, statusName)) {
       return
     }
-    // Сайт: о готовности (выполнен, передан или получен в ПВЗ) — отдельная отложка за сутки.
-    if (shouldDeferWebsiteReadyEmail(source, status.code, statusName)) {
+    // Сайт: готовность не уходит мгновенно. В очередь её ставит только «Получен в ПВЗ».
+    if (shouldSkipImmediateWebsiteReadyEmail(source, status.code, statusName)) {
       return
     }
     const vars = await buildOrderStatusEmailVars({
@@ -141,6 +141,7 @@ export async function enqueueOrderEmailBySlug(params: {
   statusName: string
   idempotencyKey: string
   payload: Record<string, unknown>
+  nextAttemptAt?: string | null
 }): Promise<'enqueued' | 'duplicate' | 'skipped'> {
   if (!getSmtpConfig().configured) return 'skipped'
   try {
@@ -199,6 +200,7 @@ export async function enqueueOrderEmailBySlug(params: {
       idempotencyKey: params.idempotencyKey,
       contextOrderId: order.id,
       payload: params.payload,
+      nextAttemptAt: params.nextAttemptAt ?? null,
     })
     logger.info('Order email enqueued', {
       orderId: params.orderId,
