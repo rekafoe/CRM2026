@@ -14,5 +14,5 @@ export type AdminUserRow = {
   totalNet?: number;
   hours: number;
   shifts: number;
-  history: Array<{ month: string; total: number }>;
+  history: Array<{ month: string; total: number; net?: number }>;
 };

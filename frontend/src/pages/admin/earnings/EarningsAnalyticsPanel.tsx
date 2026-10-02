@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { AppIcon, MoneyAmount } from '../../../components/ui';
+import { EarningsBarChart } from './EarningsBarChart';
 import { buildEarningsAnalytics } from './earningsAnalytics';
 import type { AdminUserRow } from './earningsTypes';
 import './EarningsAnalyticsPanel.css';
@@ -21,25 +22,8 @@ const formatPercent = (value: number | null) => {
 
 const formatCompactNumber = (value: number) => value.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
 
-const buildChartPoints = (items: Array<{ month: string; total: number }>) => {
-  if (items.length === 0) return '';
-  const values = items.map((item) => toNumber(item.total));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-
-  return values
-    .map((value, index) => {
-      const x = items.length === 1 ? 50 : (index / (items.length - 1)) * 100;
-      const y = 100 - ((value - min) / range) * 100;
-      return `${x},${y}`;
-    })
-    .join(' ');
-};
-
 export const EarningsAnalyticsPanel: React.FC<EarningsAnalyticsPanelProps> = ({ rows, month }) => {
   const analytics = useMemo(() => buildEarningsAnalytics(rows, month), [rows, month]);
-  const chartPoints = useMemo(() => buildChartPoints(analytics.historyTotals), [analytics.historyTotals]);
 
   return (
     <div className="earn-analytics-panel">
@@ -90,20 +74,8 @@ export const EarningsAnalyticsPanel: React.FC<EarningsAnalyticsPanelProps> = ({ 
           <div className="earn-analytics-card__body">
             {analytics.historyTotals.length > 0 ? (
               <>
-                <div className="earn-chart earn-chart--large">
-                  <svg className="earn-chart__svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <polyline className="earn-chart__line" points={chartPoints} />
-                    {analytics.historyTotals.map((entry, index) => {
-                      const point = chartPoints.split(' ')[index];
-                      if (!point) return null;
-                      const [x, y] = point.split(',');
-                      return <circle key={entry.month} className="earn-chart__dot" cx={x} cy={y} r="2.5" />;
-                    })}
-                  </svg>
-                  <div className="earn-chart__labels">
-                    {analytics.historyTotals.map((entry) => <span key={entry.month}>{entry.month}</span>)}
-                  </div>
-                </div>
+                <p className="earn-chart-caption">К выплате: проценты, часы, премии и штрафы. Высота столбца считается от нуля.</p>
+                <EarningsBarChart items={analytics.historyTotals} highlightMonth={month} />
                 <div className="earn-history-strip">
                   {analytics.historyTotals.map((entry) => (
                     <div className="earn-history-strip__item" key={entry.month}>

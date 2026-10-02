@@ -395,6 +395,41 @@ router.get('/admin', asyncHandler(async (req, res) => {
   historyRows.forEach((row: any) => {
     historyMap.set(`${row.user_id}_${row.month_key}`, Number(row.total) || 0)
   })
+  const historyPlaceholders = historyKeys.map(() => '?').join(',')
+  const toMonthMap = (rows: any[]) => {
+    const map = new Map<string, number>()
+    rows.forEach((row) => {
+      map.set(`${row.user_id}_${row.month_key}`, Number(row.total) || 0)
+    })
+    return map
+  }
+  const historyHoursMap = toMonthMap(await db.all<any>(
+    `
+    SELECT user_id, substr(work_date, 1, 7) as month_key, SUM(hours) as total
+    FROM user_shifts
+    WHERE substr(work_date, 1, 7) IN (${historyPlaceholders})
+    GROUP BY user_id, month_key
+    `,
+    historyKeys,
+  ).catch(() => []))
+  const historyBonusMap = toMonthMap(await db.all<any>(
+    `
+    SELECT user_id, substr(bonus_date, 1, 7) as month_key, SUM(amount) as total
+    FROM user_bonuses
+    WHERE substr(bonus_date, 1, 7) IN (${historyPlaceholders})
+    GROUP BY user_id, month_key
+    `,
+    historyKeys,
+  ).catch(() => []))
+  const historyPenaltyMap = toMonthMap(await db.all<any>(
+    `
+    SELECT user_id, substr(penalty_date, 1, 7) as month_key, SUM(amount) as total
+    FROM user_penalties
+    WHERE substr(penalty_date, 1, 7) IN (${historyPlaceholders})
+    GROUP BY user_id, month_key
+    `,
+    historyKeys,
+  ).catch(() => []))
 
   const result = users.map((u: any) => {
     const shift = shiftsMap.get(u.id) || { hours: 0, shifts: 0 }
@@ -415,10 +450,18 @@ router.get('/admin', asyncHandler(async (req, res) => {
       0,
       Number(previousPercent) + Number(previousBonuses) + previousHourlyPay - Number(previousPenalties),
     )
-    const history = historyKeys.map((key) => ({
-      month: key,
-      total: historyMap.get(`${u.id}_${key}`) || 0,
-    }))
+    const history = historyKeys.map((key) => {
+      const percent = historyMap.get(`${u.id}_${key}`) || 0
+      const hours = historyHoursMap.get(`${u.id}_${key}`) || 0
+      const hourlyPart = Math.round(hours * hourlyRate * 100) / 100
+      const bonuses = historyBonusMap.get(`${u.id}_${key}`) || 0
+      const penalties = historyPenaltyMap.get(`${u.id}_${key}`) || 0
+      return {
+        month: key,
+        total: percent,
+        net: Math.max(0, percent + bonuses + hourlyPart - penalties),
+      }
+    })
     return {
       userId: u.id,
       name: u.name,

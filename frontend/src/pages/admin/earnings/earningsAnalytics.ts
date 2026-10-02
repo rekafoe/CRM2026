@@ -113,7 +113,7 @@ export function buildEarningsAnalytics(rows: AdminUserRow[], month: string): Ear
     month: historyMonth,
     total: rows.reduce((sum, row) => {
       const item = row.history.find((entry) => entry.month === historyMonth);
-      return sum + toNumber(item?.total);
+      return sum + toNumber(item?.net ?? item?.total);
     }, 0),
   }));
 

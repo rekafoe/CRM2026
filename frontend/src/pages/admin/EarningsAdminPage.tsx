@@ -4,6 +4,7 @@ import { Alert, Button, FormField, Modal } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
 import { getAdminEarnings, getAdminEarningsOrders, getCustomCalculatorPercent, updateCustomCalculatorPercent, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
 import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
+import { EarningsBarChart } from './earnings/EarningsBarChart';
 import type { AdminUserRow } from './earnings/earningsTypes';
 import './EarningsAdminPage.css';
 
@@ -293,20 +294,6 @@ export const EarningsAdminPage: React.FC = () => {
     if (!analyticsUser) return [];
     return [...analyticsUser.history].sort((a, b) => a.month.localeCompare(b.month));
   }, [analyticsUser]);
-  const analyticsChartPoints = useMemo(() => {
-    if (analyticsHistory.length === 0) return '';
-    const values = analyticsHistory.map((entry) => Number(entry.total || 0));
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-    return values
-      .map((value, index) => {
-        const x = analyticsHistory.length === 1 ? 50 : (index / (analyticsHistory.length - 1)) * 100;
-        const y = 100 - ((value - min) / range) * 100;
-        return `${x},${y}`;
-      })
-      .join(' ');
-  }, [analyticsHistory]);
   const analyticsTrend = useMemo(() => {
     if (analyticsHistory.length < 2) {
       return { direction: 'neutral' as const, delta: 0, percent: null as number | null };
@@ -602,23 +589,13 @@ export const EarningsAdminPage: React.FC = () => {
 
             {analyticsHistory.length > 0 && (
               <>
-                <div className="earn-chart">
-                  <svg className="earn-chart__svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <polyline className="earn-chart__line" points={analyticsChartPoints} />
-                    {analyticsHistory.map((entry, index) => {
-                      const points = analyticsChartPoints.split(' ');
-                      const point = points[index];
-                      if (!point) return null;
-                      const [x, y] = point.split(',');
-                      return <circle key={entry.month} className="earn-chart__dot" cx={x} cy={y} r="2.5" />;
-                    })}
-                  </svg>
-                  <div className="earn-chart__labels">
-                    {analyticsHistory.map((entry) => (
-                      <span key={entry.month}>{entry.month}</span>
-                    ))}
-                  </div>
-                </div>
+                <EarningsBarChart
+                  items={analyticsHistory.map((entry) => ({
+                    month: entry.month,
+                    total: Number(entry.total) || 0,
+                  }))}
+                  highlightMonth={month}
+                />
                 <div className="earn-table-wrapper" style={{ marginTop: 16 }}>
                   <table className="earn-table">
                     <thead>
