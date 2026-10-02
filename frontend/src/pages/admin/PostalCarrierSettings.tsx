@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button } from '../../components/common';
+import { Alert } from '../../components/common';
 import {
   checkPostalCarrierAccess,
   getPostalCarrierSettings,
@@ -204,11 +204,13 @@ export const PostalCarrierSettings: React.FC = () => {
           </div>
         </fieldset>
       </div>
-      <div className="postal-settings__actions">
-        <Button variant="primary" size="sm" onClick={save} disabled={busy}>
-          {busy ? 'Подождите…' : 'Сохранить доступы'}
-        </Button>
-        <Button variant="secondary" size="sm" onClick={check} disabled={busy}>Проверить ответ</Button>
+      <div className="settings-actions">
+        <button type="button" className="settings-action" onClick={check} disabled={busy}>
+          Проверить
+        </button>
+        <button type="button" className="settings-action settings-action--primary" onClick={save} disabled={busy}>
+          {busy ? 'Сохранение…' : 'Сохранить'}
+        </button>
       </div>
     </div>
   );

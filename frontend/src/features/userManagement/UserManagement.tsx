@@ -170,7 +170,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
           )}
           <div>
             <h1 className="user-management-title">
-              {embedded ? 'Пользователи' : '👥 Управление пользователями'}
+              {embedded ? 'Пользователи' : 'Управление пользователями'}
             </h1>
             <p className="user-management-description">
               Создание, редактирование и управление пользователями системы
@@ -182,7 +182,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
             onClick={() => setShowCreateModal(true)}
             className="user-management-create-btn"
           >
-            ➕ Создать пользователя
+            Создать пользователя
           </button>
         </div>
       </div>
@@ -268,16 +268,16 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                     )}
                     {user.has_api_token && (
                       <div className="user-api-badge">
-                        API ✓
+                        API
                       </div>
                     )}
                   </div>
                   <div className="user-details">
-                    <span>📧 {user.email}</span>
-                    <span>📅 {new Date(user.created_at).toLocaleDateString('ru-RU')}</span>
+                    <span>{user.email}</span>
+                    <span>{new Date(user.created_at).toLocaleDateString('ru-RU')}</span>
                     {Number(user.hourly_rate) > 0 ? (
                       <span title="Почасовая ставка">
-                        ⏱ {Number(user.hourly_rate).toFixed(2)} BYN/ч
+                        {Number(user.hourly_rate).toFixed(2)} BYN/ч
                       </span>
                     ) : null}
                     {!user.department_name && user.department_id == null && (
@@ -290,19 +290,19 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                     onClick={() => setEditingUser(user)}
                     className="user-edit-btn"
                   >
-                    ✏️ Редактировать
+                    Редактировать
                   </button>
                   <button
                     onClick={() => setShowTokenModal(user)}
                     className="user-token-btn"
                   >
-                    🔑 API токен
+                    API токен
                   </button>
                   <button
                     onClick={() => handleDeleteUser(user.id)}
                     className="user-delete-btn"
                   >
-                    🗑️ Удалить
+                    Удалить
                   </button>
                 </div>
               </div>
@@ -344,7 +344,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
           <div className="user-modal">
             <div className="user-modal-header">
               <h3 className="user-modal-title">
-                🔑 Управление API токеном
+                Управление API токеном
               </h3>
               <button
                 onClick={() => setShowTokenModal(null)}
@@ -374,7 +374,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                   onClick={() => handleResetToken(showTokenModal)}
                   className="user-btn-primary"
                 >
-                  🔄 Сбросить токен
+                  Сбросить токен
                 </button>
               </div>
             </div>

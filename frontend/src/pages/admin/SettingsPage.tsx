@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
-import { Alert, Button, FormField } from '../../components/common';
+import { Alert, FormField } from '../../components/common';
 import { AppIcon, type IconName } from '../../components/ui';
 import { DepartmentManagement, UserManagement } from '../../features/userManagement';
 import { useAdminBack } from '../../hooks/useAdminBack';
@@ -294,9 +294,9 @@ const PayrollSettings: React.FC<{ onOpenEarnings: () => void }> = ({ onOpenEarni
             onChange={(event) => setValue(event.target.value)}
           />
         </FormField>
-        <Button variant="primary" size="sm" onClick={save} disabled={saving}>
+        <button type="button" className="settings-action settings-action--primary" onClick={save} disabled={saving}>
           {saving ? 'Сохранение…' : 'Сохранить'}
-        </Button>
+        </button>
       </div>
       <button type="button" className="settings-text-link" onClick={onOpenEarnings}>
         Начисления, часы и аналитика сотрудников
@@ -316,7 +316,6 @@ const SettingsLinkGrid: React.FC<{ links: SettingsLink[]; onOpen: (to: string) =
           <strong>{link.title}</strong>
           <span>{link.description}</span>
         </span>
-        <span className="settings-link__action">Открыть</span>
       </button>
     ))}
   </div>

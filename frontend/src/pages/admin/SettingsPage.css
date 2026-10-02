@@ -151,6 +151,10 @@
   max-width: 420px;
 }
 
+.settings-payroll__row .form-group {
+  margin-bottom: 0;
+}
+
 .settings-input {
   width: 140px;
   border: 1px solid #cbd5e1;
@@ -225,15 +229,43 @@
   color: #64748b;
 }
 
-.settings-link__action {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #0f172a;
-  padding: 6px 10px;
-  border: 1px solid #e2e8f0;
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+.settings-action {
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
   border-radius: 8px;
-  background: #fff;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.settings-action:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.settings-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings-action--primary {
+  background: #0f172a;
+  color: #fff;
+}
+
+.settings-action--primary:hover:not(:disabled) {
+  background: #1e293b;
+  color: #fff;
 }
 
 .settings-page .back-btn,
@@ -259,8 +291,6 @@
 
 .settings-page .back-btn,
 .settings-page .btn.btn-secondary,
-.settings-page .user-edit-btn,
-.settings-page .user-token-btn,
 .settings-page .user-btn-secondary {
   background: #fff !important;
   border: 1px solid #cbd5e1 !important;
@@ -270,11 +300,30 @@
 
 .settings-page .back-btn:hover,
 .settings-page .btn.btn-secondary:hover:not(:disabled),
-.settings-page .user-edit-btn:hover,
-.settings-page .user-token-btn:hover,
 .settings-page .user-btn-secondary:hover {
   background: #f8fafc !important;
   border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.settings-page .user-edit-btn,
+.settings-page .user-token-btn,
+.settings-page .user-delete-btn {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 4px 8px !important;
+  font-weight: 500 !important;
+}
+
+.settings-page .user-edit-btn,
+.settings-page .user-token-btn {
+  color: #334155 !important;
+}
+
+.settings-page .user-edit-btn:hover,
+.settings-page .user-token-btn:hover {
+  background: #f1f5f9 !important;
   color: #0f172a !important;
 }
 
@@ -296,15 +345,11 @@
 }
 
 .settings-page .user-delete-btn {
-  background: #fff !important;
-  border: 1px solid #fecaca !important;
   color: #b91c1c !important;
-  padding: 8px 12px !important;
 }
 
 .settings-page .user-delete-btn:hover {
   background: #fef2f2 !important;
-  border-color: #fca5a5 !important;
   color: #991b1b !important;
 }
 
