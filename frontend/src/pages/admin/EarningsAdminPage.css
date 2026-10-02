@@ -300,6 +300,13 @@
   border-radius: 10px;
 }
 
+.earn-chart-caption {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* =================================
    Table
    ================================= */

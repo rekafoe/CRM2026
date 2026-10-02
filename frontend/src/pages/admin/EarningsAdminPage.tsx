@@ -5,6 +5,7 @@ import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
 import { getAdminEarnings, getAdminEarningsOrders, getCustomCalculatorPercent, updateCustomCalculatorPercent, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
 import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
 import { EarningsBarChart } from './earnings/EarningsBarChart';
+import { employeeYearTotals } from './earnings/earningsAnalytics';
 import type { AdminUserRow } from './earnings/earningsTypes';
 import './EarningsAdminPage.css';
 
@@ -22,7 +23,6 @@ export const EarningsAdminPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<AdminUserRow[]>([]);
-  const [historyMonths, setHistoryMonths] = useState(3);
   const [departmentId, setDepartmentId] = useState<number | ''>('');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [activeTab, setActiveTab] = useState<'summary' | 'analytics' | 'employee'>('summary');
@@ -63,7 +63,7 @@ export const EarningsAdminPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const params: { month?: string; history_months?: number; department_id?: number } = { month, history_months: historyMonths };
+      const params: { month?: string; department_id?: number } = { month };
       if (departmentId !== '' && Number.isFinite(departmentId)) params.department_id = departmentId;
       const res = await getAdminEarnings(params);
       setRows(Array.isArray(res.data?.users) ? res.data.users : []);
@@ -72,7 +72,7 @@ export const EarningsAdminPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [month, historyMonths, departmentId]);
+  }, [month, departmentId]);
 
   useEffect(() => {
     getDepartments().then(r => setDepartments(r.data ?? [])).catch(() => setDepartments([]));
@@ -290,21 +290,36 @@ export const EarningsAdminPage: React.FC = () => {
     const selected = rows.find((row) => row.userId === analyticsUserId);
     return selected ?? rows[0];
   }, [rows, analyticsUserId]);
-  const analyticsHistory = useMemo(() => {
-    if (!analyticsUser) return [];
-    return [...analyticsUser.history].sort((a, b) => a.month.localeCompare(b.month));
-  }, [analyticsUser]);
+  const analyticsHistory = useMemo(
+    () => employeeYearTotals(analyticsUser, month),
+    [analyticsUser, month],
+  );
   const analyticsTrend = useMemo(() => {
-    if (analyticsHistory.length < 2) {
-      return { direction: 'neutral' as const, delta: 0, percent: null as number | null };
+    const throughSelected = analyticsHistory.filter((entry) => entry.month <= month);
+    if (throughSelected.length < 2) {
+      return {
+        direction: 'neutral' as const,
+        delta: 0,
+        percent: null as number | null,
+        from: '',
+        to: '',
+        visible: false,
+      };
     }
-    const first = Number(analyticsHistory[0]?.total || 0);
-    const last = Number(analyticsHistory[analyticsHistory.length - 1]?.total || 0);
+    const first = Number(throughSelected[0]?.total || 0);
+    const last = Number(throughSelected[throughSelected.length - 1]?.total || 0);
     const delta = last - first;
     const percent = first > 0 ? (delta / first) * 100 : null;
     const direction = delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral';
-    return { direction, delta, percent };
-  }, [analyticsHistory]);
+    return {
+      direction,
+      delta,
+      percent,
+      from: throughSelected[0].month,
+      to: throughSelected[throughSelected.length - 1].month,
+      visible: true,
+    };
+  }, [analyticsHistory, month]);
 
   return (
     <div className="earn-admin">
@@ -396,9 +411,6 @@ export const EarningsAdminPage: React.FC = () => {
         <div className="earn-admin__filters-row">
           <FormField label="Месяц">
             <input type="month" className="earn-filter-input" value={month} onChange={(e) => setMonth(e.target.value)} />
-          </FormField>
-          <FormField label="История (мес.)">
-            <input type="number" min={1} max={6} className="earn-filter-input" value={historyMonths} onChange={(e) => setHistoryMonths(Number(e.target.value) || 3)} />
           </FormField>
           <FormField label="Департамент">
             <select
@@ -550,6 +562,7 @@ export const EarningsAdminPage: React.FC = () => {
         <div className="earn-admin__card">
           <div className="earn-admin__card-header">
             <h3>Аналитика по сотруднику</h3>
+            <span className="earn-admin__card-badge">{month.slice(0, 4)}</span>
           </div>
           <div className="earn-analytics">
             <div className="earn-analytics__controls">
@@ -565,7 +578,7 @@ export const EarningsAdminPage: React.FC = () => {
                 </select>
               </FormField>
 
-              {analyticsHistory.length >= 2 && (
+              {analyticsTrend.visible && (
                 <div className="earn-trend-card">
                   <div className={`earn-trend-badge earn-trend-badge--${analyticsTrend.direction}`}>
                     {analyticsTrend.direction === 'up' && '↑ Рост'}
@@ -581,7 +594,7 @@ export const EarningsAdminPage: React.FC = () => {
                     )}
                   </div>
                   <div className="earn-trend-period">
-                    {analyticsHistory[0].month} → {analyticsHistory[analyticsHistory.length - 1].month}
+                    {analyticsTrend.from} → {analyticsTrend.to}
                   </div>
                 </div>
               )}
@@ -589,6 +602,7 @@ export const EarningsAdminPage: React.FC = () => {
 
             {analyticsHistory.length > 0 && (
               <>
+                <p className="earn-chart-caption">Календарный год. Начислено — проценты с заказов. Высота столбца считается от нуля.</p>
                 <EarningsBarChart
                   items={analyticsHistory.map((entry) => ({
                     month: entry.month,
@@ -640,13 +654,15 @@ export const EarningsAdminPage: React.FC = () => {
       <Modal isOpen={!!detailUser} onClose={() => setDetailUser(null)} title="Динамика начислений" size="md">
         {detailUser && (
           <div className="earn-table-wrapper">
-            <p className="earn-detail-hint">Нажмите на месяц, чтобы увидеть заказы и статусы</p>
+            <p className="earn-detail-hint">
+              Календарный год {month.slice(0, 4)}. Начислено — проценты с заказов. Нажмите на месяц, чтобы увидеть заказы и статусы.
+            </p>
             <table className="earn-table">
               <thead>
                 <tr><th>Месяц</th><th>Начислено</th></tr>
               </thead>
               <tbody>
-                {detailUser.history.map((h) => (
+                {employeeYearTotals(detailUser, month).map((h) => (
                   <tr key={h.month}>
                     <td>
                       <button

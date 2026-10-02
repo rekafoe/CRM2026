@@ -53,6 +53,20 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
+/** Проценты сотрудника за январь–декабрь года выбранного месяца. Пустые месяцы — ноль. */
+export function employeeYearTotals(
+  user: Pick<AdminUserRow, 'history' | 'yearHistory'> | null | undefined,
+  month: string,
+): Array<{ month: string; total: number }> {
+  const yearKeys = calendarYearKeys(month);
+  if (!user || yearKeys.length === 0) return [];
+  const series = user.yearHistory?.length ? user.yearHistory : user.history;
+  return yearKeys.map((historyMonth) => {
+    const item = series.find((entry) => entry.month === historyMonth);
+    return { month: historyMonth, total: toNumber(item?.total) };
+  });
+}
+
 const percentDelta = (current: number, previous: number) => {
   if (previous <= 0) return current > 0 ? null : 0;
   return ((current - previous) / previous) * 100;
