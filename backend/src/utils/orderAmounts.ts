@@ -114,6 +114,29 @@ export function issueCashRemainder(
   return round2(Math.max(0, round2(totalAmount) - collectedPrepaymentAmount(order)))
 }
 
+/** Сумма позиции после скидки заказа. База та же, что в карточке: storedTotalCost, иначе price × quantity. */
+export function discountedItemAmount(item: ItemLike, discountPercent: number): number {
+  const base = computeItemLineTotal(item);
+  const pct = parseNum(discountPercent);
+  if (pct <= 0) return base;
+  return round2(base * (1 - pct / 100));
+}
+
+/**
+ * Суммы строк бланка/чека. Сумма строк равна итогу заказа после скидки
+ * (как computeOrderAmounts), копейка округления садится на последнюю строку.
+ */
+export function discountedItemAmounts(items: ItemLike[], discountPercent: number): number[] {
+  if (items.length === 0) return [];
+  const total = computeOrderAmounts({ items, discount_percent: discountPercent }).totalAmount;
+  const lines = items.map((item) => discountedItemAmount(item, discountPercent));
+  const diff = round2(total - round2(lines.reduce((sum, line) => sum + line, 0)));
+  if (Math.abs(diff) >= 0.01) {
+    lines[lines.length - 1] = round2(lines[lines.length - 1] + diff);
+  }
+  return lines;
+}
+
 export function computeOrderAmounts(order: OrderLike): OrderAmounts {
   const items = order.items ?? [];
   const subtotal = round2(

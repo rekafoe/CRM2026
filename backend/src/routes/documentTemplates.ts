@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { DocumentTemplateService, TemplateData } from '../services/documentTemplateService';
 import { PDFReportService } from '../services/pdfReportService';
+import { computeOrderAmounts } from '../utils/orderAmounts';
 import { OrderRepository } from '../repositories/orderRepository';
 import { CustomerService } from '../modules/customers/services/customerService';
 import { getDb } from '../config/database';
@@ -355,13 +356,13 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     const orderAmounts = new Map<number, number>();
     for (const o of orders) {
       const list = itemsMap.get(o.id) ?? [];
-      const discountPct = getDiscountPercent(o.id) / 100;
-      let sum = 0;
-      for (const it of list) {
-        const qty = Math.max(1, Number(it.quantity) || 1);
-        sum += Math.round((Number(it.price) || 0) * qty * (1 - discountPct) * 100) / 100;
-      }
-      orderAmounts.set(o.id, sum);
+      orderAmounts.set(
+        o.id,
+        computeOrderAmounts({
+          items: list,
+          discount_percent: getDiscountPercent(o.id),
+        }).totalAmount,
+      );
     }
 
     const customerId = orders[0].customer_id;

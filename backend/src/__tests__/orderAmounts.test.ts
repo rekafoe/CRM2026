@@ -2,6 +2,7 @@ import {
   attachAmountsToOrder,
   computeItemLineTotal,
   computeOrderAmounts,
+  discountedItemAmounts,
   issueCashRemainder,
   parseMoneyInput,
 } from '../utils/orderAmounts';
@@ -47,6 +48,21 @@ describe('orderAmounts', () => {
         params: { storedTotalCost: 100 },
       })
     ).toBe(115);
+  });
+
+  it('discountedItemAmounts keeps the order discount on the stored line total', () => {
+    expect(
+      discountedItemAmounts(
+        [{ price: 2, quantity: 100, params: { storedTotalCost: 200 } }],
+        10,
+      ),
+    ).toEqual([180]);
+    expect(
+      discountedItemAmounts(
+        [{ price: 250, quantity: 1, params: { storedTotalCost: 200 } }],
+        10,
+      ),
+    ).toEqual([180]);
   });
 
   it('computeOrderAmounts applies discount and debt', () => {

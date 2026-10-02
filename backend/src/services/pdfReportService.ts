@@ -3,7 +3,7 @@ import { formatReceiptPaperCaptionFromItemParams } from './commodityReceiptLabel
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
 import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
-import { computeItemLineTotal } from '../utils/orderAmounts';
+import { computeItemLineTotal, computeOrderAmounts, discountedItemAmounts } from '../utils/orderAmounts';
 import * as fs from 'fs';
 import * as path from 'path';
 import { launchPuppeteerBrowser } from '../utils/puppeteerLaunch';
@@ -473,18 +473,14 @@ export class PDFReportService {
         console.error('Error formatting ready date:', e);
       }
 
-      // Вычисляем промежуточную сумму из позиций (до скидки)
-      const subtotal = Array.isArray(items) && items.length > 0
-        ? items.reduce((sum: number, item: any) => {
-            const itemPrice = Number(item.price) || 0;
-            const itemQuantity = Number(item.quantity) || 1;
-            return sum + (itemPrice * itemQuantity);
-          }, 0)
-        : 0;
-
-      // Применяем скидку заказа
-      const discountPercent = Number(order.discount_percent) || 0;
-      const calculatedTotalAmount = Math.round(subtotal * (1 - discountPercent / 100) * 100) / 100;
+      // Та же база, что в карточке заказа: storedTotalCost, затем скидка заказа.
+      const discountPercent = Number(order.discount_percent ?? order.discountPercent) || 0;
+      const blankItems = Array.isArray(items) ? items : [];
+      const calculatedTotalAmount = computeOrderAmounts({
+        items: blankItems,
+        discount_percent: discountPercent,
+      }).totalAmount;
+      const discountedLineTotals = discountedItemAmounts(blankItems, discountPercent);
 
       // Вычисляем предоплату и долг
       const rawPrepayment = order.prepaymentAmount ?? order.prepayment_amount ?? order.prepaymentamount ?? 0;
@@ -496,7 +492,7 @@ export class PDFReportService {
 
       const resolvedExecutedBy = order.executedByName || executedBy || undefined;
       const orderNumber = order.number || buildOrderNumberFromSourceAndId((order as { source?: string | null }).source, order.id);
-      const mappedItems = (Array.isArray(items) ? items : []).map(item => {
+      const mappedItems = blankItems.map((item, itemIndex) => {
           let params: any = {};
           try {
             if (item.params) {
@@ -614,9 +610,8 @@ export class PDFReportService {
             });
           }
           
-          const rawPrice = Number(item.price) || 0;
           const qty = Number(item.quantity) || 1;
-          const rowTotal = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
+          const rowTotal = discountedLineTotals[itemIndex] ?? 0;
           const discountedPrice = qty > 0 ? Math.round((rowTotal / qty) * 100) / 100 : 0;
           const displayName = (item.name || params.productName || params.name || item.type || 'Товар').toString().trim();
           return {
@@ -1685,13 +1680,13 @@ export class PDFReportService {
 
       const receiptNumber = String(order.number || orderId);
       const orderNumber = String(order.number || orderId);
-      const discountPercent = Number(order.discount_percent) || 0;
+      const discountPercent = Number(order.discount_percent ?? order.discountPercent) || 0;
+      const receiptLineTotals = discountedItemAmounts(items || [], discountPercent);
       const rows: Array<{ num: number; name: string; quantity: number; unit: string; price: number; sum: number }> = [];
       let rowNum = 0;
-      for (const it of items || []) {
-        const q = Number(it.quantity) || 1;
-        const rawP = Number(it.price) || 0;
-        const itemSum = Math.round(rawP * q * (1 - discountPercent / 100) * 100) / 100;
+      for (let itemIndex = 0; itemIndex < (items || []).length; itemIndex++) {
+        const it = items[itemIndex];
+        const itemSum = receiptLineTotals[itemIndex] ?? 0;
         const lines = this.getOrderItemProductionRows(it);
         const rowSums = this.distributeItemSumToRows(itemSum, lines);
         lines.forEach((line, idx) => {
@@ -1971,15 +1966,16 @@ export class PDFReportService {
         ORDER BY id
       `, [orderId]);
 
-      const discountPercent = Number(order.discount_percent) || 0;
+      const discountPercent = Number(order.discount_percent ?? order.discountPercent) || 0;
+      const legacyReceiptItems = Array.isArray(items) ? items : [];
+      const legacyLineTotals = discountedItemAmounts(legacyReceiptItems, discountPercent);
 
       // Разворачиваем каждую позицию в отдельные строки; сумма позиции распределяется по строкам (печать, операции с totalCost, резка)
       const receiptItems: Array<{ number: number; name: string; quantity: number; unit?: string; price: number; amount: number }> = [];
       let itemNumber = 0;
-      for (const item of Array.isArray(items) ? items : []) {
-        const qty = Number(item.quantity) || 1;
-        const rawPrice = Number(item.price) || 0;
-        const itemAmount = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
+      for (let itemIndex = 0; itemIndex < legacyReceiptItems.length; itemIndex++) {
+        const item = legacyReceiptItems[itemIndex];
+        const itemAmount = legacyLineTotals[itemIndex] ?? 0;
         const lines = this.getOrderItemProductionRows(item);
         const rowSums = this.distributeItemSumToRows(itemAmount, lines);
         lines.forEach((line, idx) => {

@@ -20,6 +20,7 @@ import {
   getOrderItemProductionRows,
   distributeItemSumToRows,
 } from '../../../pages/admin/clients/customerDocumentHelpers';
+import { getItemLineTotal } from '../../../utils/orderTotal';
 import '../../../pages/admin/CustomersAdminPage.css';
 import './CustomerDetailView.css';
 import { DEFAULT_CUSTOMER_DETAIL_TAB, type CustomerDetailTab } from './customerDetail/customerDetailTab';
@@ -413,9 +414,8 @@ export const CustomerDetailView: React.FC<{
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
-          const rawPrice = Number(item.price) || 0;
-          const price = Math.round(rawPrice * (1 - discountPct / 100) * 100) / 100;
-          const itemAmount = Math.round(price * (Number(item.quantity) || 1) * 100) / 100;
+          const lineBase = getItemLineTotal(item);
+          const itemAmount = Math.round(lineBase * (1 - discountPct / 100) * 100) / 100;
           const vatRate = 'Без НДС';
           const vatAmount = 0;
 
@@ -615,9 +615,8 @@ export const CustomerDetailView: React.FC<{
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
-          const rawPrice = Number(item.price) || 0;
-          const price = Math.round(rawPrice * (1 - discountPct / 100) * 100) / 100;
-          const itemAmount = Math.round(price * (Number(item.quantity) || 1) * 100) / 100;
+          const lineBase = getItemLineTotal(item);
+          const itemAmount = Math.round(lineBase * (1 - discountPct / 100) * 100) / 100;
 
           const lines = getOrderItemProductionRows(item);
           const rowAmounts = distributeItemSumToRows(itemAmount, lines);
