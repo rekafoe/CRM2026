@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Order } from '../../types';
 import {
   createPostalShipment,
@@ -10,6 +10,7 @@ import {
   type PostalCarrier,
   type PostalShipment,
 } from '../../api';
+import { AppIcon } from '../ui/AppIcon';
 import './PostalShipmentPanel.css';
 
 type Props = {
@@ -76,7 +77,9 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
   const [declared, setDeclared] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const [trackingDrafts, setTrackingDrafts] = useState<Record<number, string>>({});
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const response = await getPostalShipments(order.id);
@@ -96,6 +99,21 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     // Поля заказа читаем только при смене заказа: иначе повторный рендер карточки стирает ввод.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id, load]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [order.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('click', onOutside, true);
+    return () => document.removeEventListener('click', onOutside, true);
+  }, [open]);
 
   useEffect(() => {
     getOrganizations()
@@ -185,7 +203,21 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
   };
 
   return (
-    <section className="postal-shipment">
+    <div className="postal-shipment" ref={rootRef}>
+      <button
+        type="button"
+        className={`order-detail-action-btn order-detail-action-btn--neutral${open ? ' postal-shipment__toggle--open' : ''}`}
+        title="Белпочта и Европочта: бланк, оплата нашим юрлицом"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((value) => !value);
+        }}
+      >
+        <AppIcon name="package" size="xs" />
+        {shipments.length > 0 ? `Доставка ${shipments.length} ▼` : 'Доставка ▼'}
+      </button>
+      {open ? (
+      <div className="postal-shipment__popover">
       <div className="postal-shipment__head">
         <h3>Белпочта / Европочта</h3>
         <p>
@@ -298,6 +330,8 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
           ))}
         </ul>
       ) : null}
-    </section>
+      </div>
+      ) : null}
+    </div>
   );
 };

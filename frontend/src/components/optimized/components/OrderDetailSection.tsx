@@ -364,6 +364,14 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 {isGeneratingPdf ? <><AppIcon name="refresh" size="xs" /> Генерация...</> : <><AppIcon name="document" size="xs" /> Бланк</>}
               </button>
+              <PostalShipmentPanel
+                order={selectedOrder}
+                onNotify={(type, message) => addToast({
+                  type,
+                  title: type === 'success' ? 'Доставка' : 'Ошибка',
+                  message,
+                })}
+              />
               {showLegalDocsButton && (
                 <div ref={docsMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                   <button
@@ -715,14 +723,6 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         {selectedOrder.delivery ? (
           <OrderDeliveryBlock delivery={selectedOrder.delivery} />
         ) : null}
-        <PostalShipmentPanel
-          order={selectedOrder}
-          onNotify={(type, message) => addToast({
-            type,
-            title: type === 'success' ? 'Доставка' : 'Ошибка',
-            message,
-          })}
-        />
         {items.length === 0 && (
           <div className="item">Пока нет позиций</div>
         )}

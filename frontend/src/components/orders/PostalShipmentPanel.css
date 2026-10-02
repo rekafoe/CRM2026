@@ -1,9 +1,25 @@
 .postal-shipment {
-  margin: 0 0 12px;
+  position: relative;
+  display: inline-block;
+}
+
+.postal-shipment__toggle--open {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.postal-shipment__popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1000;
+  width: min(760px, 92vw);
+  max-height: min(70vh, 560px);
+  overflow: auto;
   padding: 12px 14px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   background: #f8fafc;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
 }
 
 .postal-shipment__head h3 {
@@ -46,7 +62,7 @@
   background: #fff;
 }
 
-.postal-shipment__form button,
+.postal-shipment__form > button,
 .postal-shipment__row-actions button {
   border: 0;
   border-radius: 6px;
