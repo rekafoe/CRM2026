@@ -22,7 +22,11 @@ export function isPaidPrepaymentStatus(status: string | null | undefined): boole
   return s === 'paid' || s === 'successful'
 }
 
-/** Заказ в пуле «Ожидает» (id=0) — не в выручку кассы. id=1 — «Оформлен», учитывается. */
+/**
+ * Числовой статус 0 (просчёт) не входит в кассу.
+ * Справочник «Ожидает» (code waiting) отсекается в SQL кассы, даже если его id не 0.
+ * Другой id, в том числе 1, сам по себе кассу не выключает: это может быть «Оформлен».
+ */
 export function isOrderExcludedFromCashRegister(status: number | string | null | undefined): boolean {
   return Number(status) === 0
 }

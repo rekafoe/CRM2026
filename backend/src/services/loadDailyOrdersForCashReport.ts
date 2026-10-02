@@ -3,6 +3,7 @@ import { hasColumn } from '../utils/tableSchemaCache'
 import {
   hasFulfillmentDepartmentColumn,
   notEstimateStatusSql,
+  notWaitingStatusSql,
   scopeByFulfillmentDepartment,
 } from '../utils/orderFulfillmentScope'
 import { OrderRepository } from '../repositories/orderRepository'
@@ -196,6 +197,7 @@ export async function loadDailyOrdersForCashReport(
             ${notesSelect}
        FROM orders o
       WHERE ${dayFilter.whereSql}
+        AND ${notWaitingStatusSql('o.status')}
         ${fulfillmentScope.clause}
       ORDER BY o.id DESC`,
     ...dayFilter.params,
@@ -257,8 +259,13 @@ export async function loadDailyOrdersForCashReport(
   if (hasDebtClosed) {
     try {
       const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id')
+      const notWaitingIssue = `(o.id IS NULL OR ${notWaitingStatusSql('o.status')})`
       const row = await db.get<{ s: number }>(
-        'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ?',
+        `SELECT COALESCE(SUM(d.amount), 0) AS s
+           FROM debt_closed_events d
+           LEFT JOIN orders o ON o.id = d.order_id
+          WHERE d.closed_date = ?
+            AND ${notWaitingIssue}`,
         d,
       )
       issuedOrdersTotal = Number(row?.s ?? 0)
@@ -266,8 +273,10 @@ export async function loadDailyOrdersForCashReport(
         const rows = (await db.all(
           `SELECT d.issued_by_user_id as user_id, COALESCE(u.name, u.email, 'Без оператора') as user_name, SUM(d.amount) as amount
            FROM debt_closed_events d
+           LEFT JOIN orders o ON o.id = d.order_id
            LEFT JOIN users u ON u.id = d.issued_by_user_id
            WHERE d.closed_date = ? AND d.issued_by_user_id IS NOT NULL
+             AND ${notWaitingIssue}
            GROUP BY d.issued_by_user_id
            ORDER BY amount DESC`,
           d,
@@ -278,7 +287,11 @@ export async function loadDailyOrdersForCashReport(
           amount: Number(r.amount ?? 0),
         }))
         const nullRow = await db.get<{ s: number }>(
-          'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ? AND issued_by_user_id IS NULL',
+          `SELECT COALESCE(SUM(d.amount), 0) AS s
+             FROM debt_closed_events d
+             LEFT JOIN orders o ON o.id = d.order_id
+            WHERE d.closed_date = ? AND d.issued_by_user_id IS NULL
+              AND ${notWaitingIssue}`,
           d,
         )
         const nullAmount = Number(nullRow?.s ?? 0)

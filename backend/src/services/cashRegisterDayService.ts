@@ -10,7 +10,11 @@ import {
   type DailyOrderForCashReport,
 } from './loadDailyOrdersForCashReport'
 import { logger } from '../utils/logger'
-import { hasFulfillmentDepartmentColumn, scopeByFulfillmentDepartment } from '../utils/orderFulfillmentScope'
+import {
+  hasFulfillmentDepartmentColumn,
+  notWaitingStatusSql,
+  scopeByFulfillmentDepartment,
+} from '../utils/orderFulfillmentScope'
 
 export type CashRegisterContribution = {
   user_id: number
@@ -57,6 +61,7 @@ function aggregateCashFromOrders(
 
   for (const order of orders) {
     const cashIncrement = Number(order.cash_for_report_date ?? 0)
+    if (isOrderExcludedFromCashRegister(order.status)) continue
     if (!shouldIncludeOrderInCashRegister(order, reportDate, cashIncrement)) {
       if (
         !isOrderExcludedFromCashRegister(order.status) &&
@@ -138,7 +143,7 @@ async function loadOrderVolumeWorkDay(reportDate: string, departmentId?: number)
     `SELECT COALESCE(SUM(${totalExpr}), 0) as s
        FROM orders o
       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-        AND o.status != 0
+        AND ${notWaitingStatusSql('o.status')}
         ${fulfillmentScope.clause}`,
     d,
     ...fulfillmentScope.params,
