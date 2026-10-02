@@ -839,35 +839,39 @@ export const DesignTemplatesPage: React.FC = () => {
   return (
     <AdminPageLayout
       className="design-templates-layout"
-      title="Каталог шаблонов дизайна"
-      icon={<AppIcon name="layers" size="sm" />}
+      title="Шаблоны дизайна"
+      description="Семьи макетов, размеры и привязка к продуктам."
+      icon={<AppIcon name="image" size="lg" />}
       onBack={() => navigate('/adminpanel')}
     >
       {error && <Alert type="error">{error}</Alert>}
 
       <div className="design-templates-page product-management">
-        <div className="design-templates-tabs">
+        <div className="design-templates-tabs" role="tablist">
           <button
             type="button"
-            className={`design-templates-tab${pageTab === 'catalog' ? ' design-templates-tab--active' : ''}`}
+            role="tab"
+            className={`lg-btn${pageTab === 'catalog' ? ' lg-btn--primary' : ''}`}
             onClick={() => setPageTab('catalog')}
           >
-            <AppIcon name="layers" size="xs" /> Каталог
+            Каталог
             <span className="design-templates-tab__count">{groupTemplatesIntoFamilies(templates).length}</span>
           </button>
           <button
             type="button"
-            className={`design-templates-tab${pageTab === 'bindings' ? ' design-templates-tab--active' : ''}`}
+            role="tab"
+            className={`lg-btn${pageTab === 'bindings' ? ' lg-btn--primary' : ''}`}
             onClick={() => setPageTab('bindings')}
           >
-            <AppIcon name="link" size="xs" /> Привязки
+            Привязки
           </button>
           <button
             type="button"
-            className={`design-templates-tab${pageTab === 'analytics' ? ' design-templates-tab--active' : ''}`}
+            role="tab"
+            className={`lg-btn${pageTab === 'analytics' ? ' lg-btn--primary' : ''}`}
             onClick={() => setPageTab('analytics')}
           >
-            <AppIcon name="chart" size="xs" /> Аналитика
+            Аналитика
           </button>
         </div>
 

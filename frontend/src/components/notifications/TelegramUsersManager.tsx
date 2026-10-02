@@ -233,14 +233,14 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
       <td>
         <div className="actions">
           <button
-            className="btn btn-sm btn-primary"
+            className="lg-btn lg-btn--primary"
             onClick={() => setEditingUser(user)}
             title="Редактировать"
           >
             ✏️
           </button>
           <button
-            className="btn btn-sm btn-danger"
+            className="lg-btn lg-btn--danger"
             onClick={() => deleteUser(user.id)}
             title="Удалить"
           >
@@ -382,10 +382,10 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
             </div>
           </div>
           <div className="modal-footer">
-            <button onClick={() => setEditingUser(null)} className="btn btn-secondary">
+            <button onClick={() => setEditingUser(null)} className="lg-btn">
               Отмена
             </button>
-            <button onClick={() => updateUser(editingUser)} className="btn btn-primary">
+            <button onClick={() => updateUser(editingUser)} className="lg-btn lg-btn--primary">
               Сохранить
             </button>
           </div>
@@ -517,10 +517,10 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
             </div>
           </div>
           <div className="modal-footer">
-            <button onClick={() => setShowAddModal(false)} className="btn btn-secondary">
+            <button onClick={() => setShowAddModal(false)} className="lg-btn">
               Отмена
             </button>
-            <button onClick={createUser} className="btn btn-primary">
+            <button onClick={createUser} className="lg-btn lg-btn--primary">
               Создать
             </button>
           </div>
@@ -534,10 +534,10 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
       <div className="telegram-users-header">
         <h2>👥 Управление пользователями Telegram</h2>
         <div className="header-actions">
-          <button onClick={loadUsers} className="btn btn-secondary" disabled={loading}>
+          <button onClick={loadUsers} className="lg-btn" disabled={loading}>
             {loading ? '⏳' : '🔄'} Обновить
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
+          <button onClick={() => setShowAddModal(true)} className="lg-btn lg-btn--primary">
             ➕ Добавить пользователя
           </button>
         </div>

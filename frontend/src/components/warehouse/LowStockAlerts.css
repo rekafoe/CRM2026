@@ -1,23 +1,25 @@
+@import '../../styles/admin-glass-buttons.css';
+
 .low-stock-alerts {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
 .alerts-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #e9ecef;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .alerts-header h2 {
   margin: 0;
-  color: #2c3e50;
-  font-size: 24px;
-  font-weight: 600;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .alerts-actions {
@@ -30,56 +32,6 @@
 .alerts-last-checked {
   color: #6c757d;
   font-size: 13px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #545b62;
-}
-
-.btn-success {
-  background: #28a745;
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background: #1e7e34;
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 12px;
 }
 
 .error-message {
@@ -160,27 +112,27 @@
   gap: 10px;
 }
 
-.filter-btn {
-  padding: 8px 16px;
-  border: 2px solid #dee2e6;
-  background: white;
-  color: #495057;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+.filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.filter-btn:hover {
-  border-color: #007bff;
-  color: #007bff;
+.filter-btn {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(209, 213, 219, 0.7);
+  background: rgba(229, 231, 235, 0.55);
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .filter-btn.active {
-  background: #007bff;
-  color: white;
-  border-color: #007bff;
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #1e3a8a;
 }
 
 .alerts-list {

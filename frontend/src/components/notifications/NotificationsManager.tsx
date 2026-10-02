@@ -12,7 +12,7 @@ import './NotificationsManager.css';
 type NotifyTab = 'alerts' | 'telegram' | 'orders' | 'settings' | 'client' | 'campaigns';
 
 interface NotificationsManagerProps {
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 function tabFromSearchParam(t: string | null): NotifyTab {
@@ -59,7 +59,7 @@ function paramForTab(tab: NotifyTab): string | undefined {
   return undefined;
 }
 
-export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onClose }) => {
+export const NotificationsManager: React.FC<NotificationsManagerProps> = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<NotifyTab>(() => tabFromSearchParam(searchParams.get('tab')));
   const { showToast } = useUIStore();
@@ -98,56 +98,26 @@ export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onCl
 
   return (
     <div className="notifications-manager">
-      <div className="notifications-header">
-        <h2>Управление уведомлениями</h2>
-        <button type="button" onClick={onClose} className="close-btn" aria-label="Закрыть">
-          ✕
-        </button>
-      </div>
-
-      <div className="notifications-tabs">
-        <button
-          type="button"
-          className={activeTab === 'alerts' ? 'active' : ''}
-          onClick={() => goTab('alerts')}
-        >
-          Остатки
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'client' ? 'active' : ''}
-          onClick={() => goTab('client')}
-        >
-          Почта / SMS
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'campaigns' ? 'active' : ''}
-          onClick={() => goTab('campaigns')}
-        >
-          Кампании
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'telegram' ? 'active' : ''}
-          onClick={() => goTab('telegram')}
-        >
-          Telegram
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'orders' ? 'active' : ''}
-          onClick={() => goTab('orders')}
-        >
-          Автозаказы
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'settings' ? 'active' : ''}
-          onClick={() => goTab('settings')}
-        >
-          Настройки
-        </button>
+      <div className="notifications-tabs" role="tablist" aria-label="Разделы уведомлений">
+        {([
+          ['alerts', 'Остатки'],
+          ['client', 'Почта заказов'],
+          ['campaigns', 'Рассылка'],
+          ['telegram', 'Telegram'],
+          ['orders', 'Автозаказы'],
+          ['settings', 'Настройки'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === id}
+            className={`lg-btn${activeTab === id ? ' lg-btn--primary' : ''}`}
+            onClick={() => goTab(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="notifications-content">
@@ -361,10 +331,11 @@ const NotificationsSettings: React.FC = () => {
 
       <div className="settings-actions">
         <button
-          className="btn btn-primary"
+          type="button"
+          className="lg-btn lg-btn--primary"
           onClick={handleSaveSettings}
         >
-          💾 Сохранить настройки
+          Сохранить
         </button>
       </div>
     </div>

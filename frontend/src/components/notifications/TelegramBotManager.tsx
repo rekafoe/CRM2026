@@ -133,7 +133,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
 
       <div className="config-actions">
         <button
-          className="btn btn-primary"
+          className="lg-btn lg-btn--primary"
           onClick={handleSaveConfig}
           disabled={configureTelegram.isPending}
         >
@@ -166,7 +166,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
         
         <div className="test-actions">
           <button
-            className="btn btn-primary"
+            className="lg-btn lg-btn--primary"
             onClick={handleTestMessage}
             disabled={testTelegram.isPending || !config.enabled}
           >
@@ -233,7 +233,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
 
             <div className="send-buttons">
               <button
-                className="btn btn-secondary"
+                className="lg-btn"
                 onClick={handleSendToRole}
                 disabled={sendToRole.isPending || !userMessage.trim()}
               >
@@ -241,7 +241,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
               </button>
               
               <button
-                className="btn btn-primary"
+                className="lg-btn lg-btn--primary"
                 onClick={handleSendToAll}
                 disabled={sendToAllUsers.isPending || !userMessage.trim()}
               >

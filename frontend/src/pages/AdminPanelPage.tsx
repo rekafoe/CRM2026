@@ -1,10 +1,10 @@
 import React, { lazy, Suspense, useMemo } from 'react';
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { AdminPageLayout } from '../components/admin/AdminPageLayout';
 import { useAdminBack } from '../hooks/useAdminBack';
 import { NotificationsManager } from '../components/notifications/NotificationsManager';
 import { DailyActivityOverview } from '../components/admin/DailyActivityOverview';
 import SystemFeaturesPanel from '../components/admin/SystemFeaturesPanel';
-import { AdminPageLayout } from '../components/admin/AdminPageLayout';
 import { AppIcon, type IconName } from '../components/ui/AppIcon';
 import '../styles/admin-panel.css';
 import '../components/notifications/NotificationsManager.css';
@@ -87,17 +87,26 @@ const DESIGN_TEMPLATES_CATALOG = '/adminpanel/design-templates';
 // Компонент страницы уведомлений (исправлен - убраны инлайн стили)
 const NotificationsPage: React.FC = () => {
   const goBack = useAdminBack();
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab');
+  const title = tab === 'client' ? 'Почта заказов' : tab === 'campaigns' ? 'Рассылка' : 'Уведомления';
+  const description = tab === 'client'
+    ? 'SMTP и письма при смене статуса заказа.'
+    : tab === 'campaigns'
+      ? 'Кампании, сегменты и журнал отправки.'
+      : 'Остатки, Telegram и служебные оповещения.';
+  const iconName = tab === 'client' ? 'document' : tab === 'campaigns' ? 'bell-ring' : 'bell';
 
   return (
-    <div className="notifications-page">
-      <div className="page-header">
-        <button type="button" onClick={goBack} className="back-btn">← Назад</button>
-        <h1><AppIcon name="bell" size="sm" /> Управление уведомлениями</h1>
-      </div>
-      <div className="page-content">
-        <NotificationsManager onClose={goBack} />
-      </div>
-    </div>
+    <AdminPageLayout
+      title={title}
+      description={description}
+      icon={<AppIcon name={iconName} size="lg" />}
+      onBack={goBack}
+      className="notifications-layout"
+    >
+      <NotificationsManager />
+    </AdminPageLayout>
   );
 };
 

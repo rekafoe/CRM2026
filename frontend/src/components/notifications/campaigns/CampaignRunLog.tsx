@@ -55,7 +55,7 @@ export const CampaignRunLog: React.FC = () => {
       <div className="campaign-card">
         <div className="campaign-card__header">
           <h4>Запуски кампаний</h4>
-          <button type="button" className="btn btn-secondary" onClick={() => void loadRuns()}>
+          <button type="button" className="lg-btn" onClick={() => void loadRuns()}>
             Обновить
           </button>
         </div>
@@ -80,7 +80,7 @@ export const CampaignRunLog: React.FC = () => {
       <div className="campaign-card">
         <div className="campaign-card__header">
           <h4>Получатели запуска</h4>
-          <button type="button" className="btn btn-secondary" onClick={() => void handleCancel()} disabled={!selectedRun}>
+          <button type="button" className="lg-btn" onClick={() => void handleCancel()} disabled={!selectedRun}>
             Отменить запуск
           </button>
         </div>

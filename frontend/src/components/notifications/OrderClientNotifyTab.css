@@ -1,6 +1,11 @@
 /* Вкладка «Почта и SMS» внутри NotificationsManager — те же --tokens */
 
 .client-notify-tab {
+  --bg-primary: #fff;
+  --bg-secondary: #f8fafc;
+  --border-color: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
   max-width: 900px;
 }
 

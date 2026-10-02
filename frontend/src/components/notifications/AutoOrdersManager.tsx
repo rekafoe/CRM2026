@@ -141,7 +141,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
                 <div className="order-actions">
                   {order.status === 'pending' && (
                     <button
-                      className="btn btn-success"
+                      className="lg-btn lg-btn--success"
                       onClick={() => handleApproveOrder(order.id)}
                       disabled={approveAutoOrder.isPending}
                     >
@@ -151,7 +151,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
                   
                   {order.status === 'approved' && (
                     <button
-                      className="btn btn-primary"
+                      className="lg-btn lg-btn--primary"
                       onClick={() => handleSendOrder(order.id)}
                       disabled={sendAutoOrder.isPending}
                     >
@@ -161,7 +161,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
                   
                   {order.status === 'sent' && (
                     <button
-                      className="btn btn-secondary"
+                      className="lg-btn"
                       onClick={() => {/* Отметить как доставленный */}}
                     >
                       📦 Доставлен
@@ -187,7 +187,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
         
         <div className="create-actions">
           <button
-            className="btn btn-primary"
+            className="lg-btn lg-btn--primary"
             onClick={() => {
               // Здесь можно добавить логику для ручного создания заказа
               showToast('Функция создания заказа в разработке', 'info');

@@ -1,14 +1,24 @@
+@import '../../styles/admin-glass-buttons.css';
+
+.notifications-layout .admin-page-content {
+  padding: 16px;
+  background: #f8f9fa;
+}
+
 .notifications-manager {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: var(--bg-primary);
-  z-index: 1000;
-  overflow: hidden;
+  --bg-primary: #fff;
+  --bg-secondary: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --border-color: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --primary-color: #1d4ed8;
+  --primary-hover: #1e40af;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  background: transparent;
 }
 
 .notifications-header {
@@ -45,40 +55,12 @@
 .notifications-tabs {
   display: flex;
   flex-wrap: wrap;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  gap: 0;
-}
-
-.notifications-tabs button {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 12px 14px;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-bottom: 3px solid transparent;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.notifications-tabs button:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.notifications-tabs button.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
-  background: var(--bg-primary);
+  gap: 8px;
 }
 
 .notifications-content {
-  flex: 1;
-  overflow-y: auto;
-  background: var(--bg-primary);
+  min-width: 0;
+  background: transparent;
 }
 
 /* Настройки */
@@ -158,56 +140,15 @@
 
 .settings-actions {
   display: flex;
-  justify-content: center;
-  padding-top: 20px;
-  border-top: 1px solid var(--border-color);
+  justify-content: flex-end;
+  padding-top: 16px;
 }
 
-/* Кнопки */
-.btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-primary {
-  background: var(--primary-color);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: var(--primary-hover);
-}
-
-/* Адаптивность */
 @media (max-width: 768px) {
-  .notifications-manager {
-    width: 98%;
-    max-height: 98vh;
+  .notifications-layout .admin-page-content {
+    padding: 12px;
   }
-  
-  .notifications-tabs {
-    flex-direction: column;
-  }
-  
-  .notifications-tabs button {
-    border-bottom: none;
-    border-right: 3px solid transparent;
-    text-align: left;
-  }
-  
-  .notifications-tabs button.active {
-    border-right-color: var(--primary-color);
-    border-bottom-color: transparent;
-  }
-  
+
   .notifications-settings {
     padding: 15px;
   }

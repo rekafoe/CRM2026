@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
-import { Alert, Button, Modal } from '../../components/common';
+import { Alert, Modal } from '../../components/common';
+import { AppIcon } from '../../components/ui';
 import {
   getDocumentTemplates,
   uploadDocumentTemplate,
@@ -231,12 +232,6 @@ const DocumentTemplatesPage: React.FC = () => {
     invoice: 'Счёт',
   };
 
-  const typeIcons = {
-    contract: '📄',
-    act: '📊',
-    invoice: '💰',
-  };
-
   const groupedTemplates = templates.reduce((acc, template) => {
     if (!acc[template.type]) {
       acc[template.type] = [];
@@ -246,7 +241,13 @@ const DocumentTemplatesPage: React.FC = () => {
   }, {} as Record<string, DocumentTemplate[]>);
 
   return (
-    <AdminPageLayout title="Шаблоны документов" icon="📋" onBack={() => navigate('/adminpanel')}>
+    <AdminPageLayout
+      title="Шаблоны документов"
+      description="Договоры, акты и счета для клиента."
+      icon={<AppIcon name="clipboard" size="lg" />}
+      onBack={() => navigate('/adminpanel')}
+      className="document-templates-layout"
+    >
       {error && <Alert type="error">{error}</Alert>}
 
       <div className="document-templates-page">
@@ -310,13 +311,14 @@ const DocumentTemplatesPage: React.FC = () => {
                 disabled={uploading || !uploadForm.name.trim()}
                 className="file-input"
               />
-              <Button
-                variant="primary"
+              <button
+                type="button"
+                className="lg-btn lg-btn--primary"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading || !uploadForm.name.trim()}
               >
                 {uploading ? 'Загрузка...' : 'Выбрать файл'}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
@@ -336,9 +338,7 @@ const DocumentTemplatesPage: React.FC = () => {
 
                 return (
                   <div key={type} className="templates-group">
-                    <h4>
-                      {typeIcons[type]} {typeLabels[type]}
-                    </h4>
+                    <h4>{typeLabels[type]}</h4>
                     <div className="templates-table-wrapper">
                       <table className="templates-table">
                         <thead>
@@ -365,40 +365,38 @@ const DocumentTemplatesPage: React.FC = () => {
                               </td>
                               <td>
                                 <div className="templates-actions">
-                                  <div title="Скачать шаблон">
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => handleDownload(template)}
-                                    >
-                                      Скачать
-                                    </Button>
-                                  </div>
-                                  <div title="Настройка полей опциональна - система автоматически сопоставляет стандартные поля">
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => handleConfigureMapping(template)}
-                                    >
-                                      Настроить поля (опционально)
-                                    </Button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    className="lg-btn"
+                                    title="Скачать шаблон"
+                                    onClick={() => handleDownload(template)}
+                                  >
+                                    Скачать
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lg-btn"
+                                    title="Система сама сопоставляет стандартные поля"
+                                    onClick={() => handleConfigureMapping(template)}
+                                  >
+                                    Поля
+                                  </button>
                                   {!template.is_default && (
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
+                                    <button
+                                      type="button"
+                                      className="lg-btn"
                                       onClick={() => handleSetDefault(template.id)}
                                     >
                                       По умолчанию
-                                    </Button>
+                                    </button>
                                   )}
-                                  <Button
-                                    variant="error"
-                                    size="sm"
+                                  <button
+                                    type="button"
+                                    className="lg-btn lg-btn--danger"
                                     onClick={() => handleDelete(template.id)}
                                   >
                                     Удалить
-                                  </Button>
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -494,8 +492,9 @@ const DocumentTemplatesPage: React.FC = () => {
             </div>
             
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <Button
-                variant="secondary"
+              <button
+                type="button"
+                className="lg-btn"
                 onClick={() => {
                   setMappingModalOpen(false);
                   setSelectedTemplate(null);
@@ -504,14 +503,15 @@ const DocumentTemplatesPage: React.FC = () => {
                 }}
               >
                 Отмена
-              </Button>
-              <Button
-                variant="primary"
+              </button>
+              <button
+                type="button"
+                className="lg-btn lg-btn--primary"
                 onClick={handleSaveMapping}
                 disabled={savingMapping}
               >
                 {savingMapping ? 'Сохранение...' : 'Сохранить'}
-              </Button>
+              </button>
             </div>
           </div>
         ) : null}

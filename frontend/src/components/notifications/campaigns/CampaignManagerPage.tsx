@@ -20,35 +20,24 @@ export const CampaignManagerPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="campaign-manager__tabs">
-        <button
-          type="button"
-          className={tab === 'campaigns' ? 'active' : ''}
-          onClick={() => setTab('campaigns')}
-        >
-          Кампании
-        </button>
-        <button
-          type="button"
-          className={tab === 'templates' ? 'active' : ''}
-          onClick={() => setTab('templates')}
-        >
-          Шаблоны
-        </button>
-        <button
-          type="button"
-          className={tab === 'segments' ? 'active' : ''}
-          onClick={() => setTab('segments')}
-        >
-          Сегменты
-        </button>
-        <button
-          type="button"
-          className={tab === 'runs' ? 'active' : ''}
-          onClick={() => setTab('runs')}
-        >
-          Журнал
-        </button>
+      <div className="campaign-manager__tabs" role="tablist">
+        {([
+          ['campaigns', 'Кампании'],
+          ['templates', 'Шаблоны'],
+          ['segments', 'Сегменты'],
+          ['runs', 'Журнал'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={`lg-btn${tab === id ? ' lg-btn--primary' : ''}`}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="campaign-manager__content">

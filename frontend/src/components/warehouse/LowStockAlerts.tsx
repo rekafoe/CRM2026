@@ -148,19 +148,20 @@ export const LowStockAlerts: React.FC = () => {
   return (
     <div className="low-stock-alerts">
       <div className="alerts-header">
-        <h2>📦 Уведомления о низких остатках</h2>
+        <h2>Низкие остатки</h2>
         <div className="alerts-actions">
           {lastCheckedAt && (
             <span className="alerts-last-checked">
               Последняя проверка: {lastCheckedAt.toLocaleString('ru-RU')}
             </span>
           )}
-          <button 
-            className="btn btn-primary"
+          <button
+            type="button"
+            className="lg-btn lg-btn--primary"
             onClick={handleCheckStockLevels}
             disabled={checkStockLevels.isPending}
           >
-            {checkStockLevels.isPending ? '⏳ Проверка...' : '🔍 Проверить остатки'}
+            {checkStockLevels.isPending ? 'Проверка...' : 'Проверить остатки'}
           </button>
         </div>
       </div>
@@ -271,12 +272,13 @@ export const LowStockAlerts: React.FC = () => {
 
               {!alert.isResolved && (
                 <div className="alert-actions">
-                  <button 
-                    className="btn btn-success btn-sm"
+                  <button
+                    type="button"
+                    className="lg-btn lg-btn--success"
                     onClick={() => handleResolveAlert(alert.id)}
                     disabled={resolveStockAlert.isPending}
                   >
-                    {resolveStockAlert.isPending ? '⏳' : '✅'} Отметить как решенное
+                    {resolveStockAlert.isPending ? 'Сохранение...' : 'Отметить решённым'}
                   </button>
                 </div>
               )}

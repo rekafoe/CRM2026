@@ -374,7 +374,7 @@ export const OrderClientNotifyTab: React.FC = () => {
           <div className="client-notify-diagnostics">
             <button
               type="button"
-              className="btn btn-secondary"
+              className="lg-btn"
               onClick={() => void handleDiagnostics()}
               disabled={diagnosticsLoading}
             >
@@ -406,7 +406,7 @@ export const OrderClientNotifyTab: React.FC = () => {
             />
             <button
               type="button"
-              className="btn btn-primary"
+              className="lg-btn lg-btn--primary"
               onClick={() => void handleTest()}
               disabled={testSending}
             >
@@ -557,7 +557,7 @@ export const OrderClientNotifyTab: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <button type="button" className="btn btn-secondary" onClick={() => void handleCreateRule()}>
+              <button type="button" className="lg-btn" onClick={() => void handleCreateRule()}>
                 Добавить
               </button>
             </div>
@@ -627,7 +627,7 @@ export const OrderClientNotifyTab: React.FC = () => {
           </label>
           <button
             type="button"
-            className="btn btn-primary"
+            className="lg-btn lg-btn--primary"
             disabled={savingTemplate || selectedTemplateId == null}
             onClick={() => void handleSaveTemplate()}
           >

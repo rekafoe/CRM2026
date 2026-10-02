@@ -72,10 +72,10 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
       <div className="settings-header">
         <h2>⚙️ Настройки автоматического добавления</h2>
         <div className="header-actions">
-          <button onClick={loadSettings} className="btn btn-secondary" disabled={loading}>
+          <button onClick={loadSettings} className="lg-btn" disabled={loading}>
             {loading ? '⏳' : '🔄'} Обновить
           </button>
-          <button onClick={saveSettings} className="btn btn-primary" disabled={saving}>
+          <button onClick={saveSettings} className="lg-btn lg-btn--primary" disabled={saving}>
             {saving ? '⏳' : '💾'} Сохранить
           </button>
         </div>

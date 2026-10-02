@@ -1,14 +1,22 @@
+@import '../../styles/admin-glass-buttons.css';
+
+.document-templates-layout .admin-page-content {
+  padding: 16px;
+  background: #f8f9fa;
+}
+
 .document-templates-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .templates-upload-section {
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-  padding: 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 16px 18px 18px;
 }
 
 .templates-upload-section h3 {
@@ -42,14 +50,16 @@
   font-weight: 500;
 }
 
-.form-row input[type="text"],
-.form-row select {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 6px;
+.document-templates-page .form-row input[type="text"],
+.document-templates-page .form-row select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   font-size: 14px;
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #111827);
+  background: #fff;
+  color: #0f172a;
 }
 
 .checkbox-label {
@@ -69,10 +79,11 @@
 }
 
 .templates-list-section {
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-  padding: 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 16px 18px 18px;
 }
 
 .templates-list-section h3 {
@@ -103,8 +114,8 @@
 }
 
 .templates-table-wrapper {
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
   overflow: hidden;
 }
 
@@ -116,16 +127,18 @@
 
 .templates-table th,
 .templates-table td {
-  padding: 12px;
+  padding: 12px 14px;
   text-align: left;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
-  font-size: 13px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 14px;
+  color: #0f172a;
 }
 
 .templates-table th {
-  background: var(--bg-secondary, #f8f9fa);
-  font-weight: 600;
-  color: var(--text-secondary, #6b7280);
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
 }
 
 .templates-table tbody tr:last-child td {
@@ -137,25 +150,64 @@
 }
 
 .badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .badge-success {
-  background: #d1fae5;
-  color: #065f46;
+  background: rgba(34, 197, 94, 0.16);
+  color: #166534;
 }
 
 .badge-secondary {
-  background: var(--bg-secondary, #f8f9fa);
-  color: var(--text-secondary, #6b7280);
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .templates-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+}
+
+.templates-actions .lg-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.document-templates-page .templates-upload-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.document-templates-page .templates-upload-form .form-row:nth-child(n + 3) {
+  grid-column: 1 / -1;
+}
+
+.document-templates-page .checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.document-templates-page .templates-upload-form .lg-btn {
+  align-self: flex-start;
+}
+
+@media (max-width: 720px) {
+  .document-templates-page .templates-upload-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .document-templates-layout .admin-page-content {
+    padding: 12px;
+  }
 }

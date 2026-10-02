@@ -131,9 +131,9 @@
   border-radius: 10px;
 }
 
-.design-templates-tab--active .design-templates-tab__count {
+.lg-btn--primary .design-templates-tab__count {
   color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .design-templates-shown-count {
@@ -148,46 +148,10 @@
   gap: 8px;
 }
 
-/* Вкладки — как customers-tabs */
 .design-templates-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px;
-  max-width: min(100%, 520px);
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  box-sizing: border-box;
-}
-
-.design-templates-tab {
-  flex: 1 1 160px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #64748b;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-}
-
-.design-templates-tab:hover:not(.design-templates-tab--active) {
-  background: rgba(255, 255, 255, 0.7);
-  color: #1e293b;
-}
-
-.design-templates-tab--active {
-  background: #fff;
-  color: #2563eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  gap: 8px;
 }
 
 /* Панель фильтров */
