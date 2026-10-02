@@ -235,6 +235,9 @@ export class PostalShipmentService {
     const data = await this.buildBlankData(orderId, shipmentId)
     const pdf = await PDFReportService.renderHtmlPdf(buildPostalBlankHtml(data))
     await this.markBlankIssued(orderId, shipmentId)
-    return { pdf, filename: `postal-blank-${data.blankNumber}.pdf` }
+    const filename = data.carrier === 'europost'
+      ? `europost-nakladnaya-${data.blankNumber}.pdf`
+      : `belpost-f116-${data.blankNumber}.pdf`
+    return { pdf, filename }
   }
 }

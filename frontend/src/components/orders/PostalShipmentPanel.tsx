@@ -166,7 +166,13 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     <section className="postal-shipment">
       <div className="postal-shipment__head">
         <h3>Белпочта / Европочта</h3>
-        <p>Доставку оплачивает наше юрлицо ({payerLabel}). Получатель наложенный платёж не платит.</p>
+        <p>
+          Доставку оплачивает наше юрлицо ({payerLabel}). Получатель наложенный платёж не платит.
+          {' '}
+          {carrier === 'belpost'
+            ? 'Для Белпочты печатается сопроводительный адрес к посылке, ф. 116.'
+            : 'Для Европочты печатается накладная на отправление.'}
+        </p>
       </div>
       <div className="postal-shipment__form">
         <label>
@@ -199,7 +205,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
           <input value={phone} onChange={(event) => setPhone(event.target.value)} />
         </label>
         <label className="postal-shipment__wide">
-          Адрес или пункт выдачи
+          {carrier === 'belpost' ? 'Адрес получателя' : 'Пункт выдачи или адрес'}
           <input value={address} onChange={(event) => setAddress(event.target.value)} />
         </label>
         <label>
@@ -215,7 +221,11 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
           <input value={notes} onChange={(event) => setNotes(event.target.value)} />
         </label>
         <button type="button" onClick={createAndPrint} disabled={busy}>
-          {busy ? 'Готовим бланк…' : 'Создать доставку и бланк'}
+          {busy
+            ? 'Готовим бланк…'
+            : carrier === 'belpost'
+              ? 'Создать доставку и ф. 116'
+              : 'Создать доставку и накладную'}
         </button>
       </div>
       {shipments.length > 0 ? (
@@ -233,7 +243,9 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
                   onChange={(event) => setTrackingDrafts((prev) => ({ ...prev, [shipment.id]: event.target.value }))}
                 />
                 <button type="button" onClick={() => saveTracking(shipment)} disabled={busy}>Трек</button>
-                <button type="button" onClick={() => reprint(shipment)} disabled={busy}>Бланк</button>
+                <button type="button" onClick={() => reprint(shipment)} disabled={busy}>
+                  {shipment.carrier === 'belpost' ? 'ф. 116' : 'Накладная'}
+                </button>
               </div>
             </li>
           ))}
