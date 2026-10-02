@@ -7,6 +7,16 @@
   margin: 0 auto;
 }
 
+.user-management--embedded {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+}
+
+.user-management--embedded .user-management-header {
+  border-bottom: 1px solid #e2e8f0;
+}
+
 /* Заголовок */
 .user-management-header {
   display: flex;
@@ -373,4 +383,31 @@
   border: 1px solid var(--border-color);
   border-radius: 4px;
   cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .user-management-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .user-management-header-left {
+    align-items: flex-start;
+  }
+
+  .user-management-header-actions {
+    justify-content: flex-start;
+  }
+
+  .user-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .user-header,
+  .user-details {
+    flex-wrap: wrap;
+  }
 }

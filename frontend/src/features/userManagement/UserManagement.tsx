@@ -9,9 +9,10 @@ import './UserManagement.css';
 
 interface UserManagementProps {
   onBack?: () => void;
+  embedded?: boolean;
 }
 
-export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
+export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded = false }) => {
   const goBack = useAdminBack();
   const handleBack = onBack ?? goBack;
   const [users, setUsers] = useState<User[]>([]);
@@ -154,20 +155,22 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="user-management">
+    <div className={`user-management${embedded ? ' user-management--embedded' : ''}`}>
       {/* Заголовок */}
       <div className="user-management-header">
         <div className="user-management-header-left">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="user-management-back-btn"
-          >
-            ← Назад
-          </button>
+          {!embedded && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="user-management-back-btn"
+            >
+              ← Назад
+            </button>
+          )}
           <div>
             <h1 className="user-management-title">
-              👥 Управление пользователями
+              {embedded ? 'Пользователи' : '👥 Управление пользователями'}
             </h1>
             <p className="user-management-description">
               Создание, редактирование и управление пользователями системы

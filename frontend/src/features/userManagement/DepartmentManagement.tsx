@@ -6,6 +6,7 @@ import './UserManagement.css';
 
 interface DepartmentManagementProps {
   onBack?: () => void;
+  embedded?: boolean;
 }
 
 type DepartmentFormData = {
@@ -18,7 +19,7 @@ type DepartmentFormData = {
   is_active?: boolean;
 };
 
-export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBack }) => {
+export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBack, embedded = false }) => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,10 +73,10 @@ export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBa
   };
 
   return (
-    <div className="user-management">
+    <div className={`user-management${embedded ? ' user-management--embedded' : ''}`}>
       <div className="user-management-header">
         <div className="user-management-header-left">
-          {onBack && (
+          {!embedded && onBack && (
             <button onClick={onBack} className="user-management-back-btn">← Назад</button>
           )}
           <div>

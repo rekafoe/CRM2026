@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Alert, Button } from '../../components/common';
 import {
   checkPostalCarrierAccess,
   getPostalCarrierSettings,
@@ -128,68 +129,87 @@ export const PostalCarrierSettings: React.FC = () => {
   };
 
   return (
-    <section className="postal-settings" id="postal-carriers">
-      <h3>Белпочта и Европочта</h3>
-      <p>
+    <div className="postal-settings" id="postal-carriers">
+      <p className="settings-lead">
         Сюда вставляется доступ, который выдаёт перевозчик. CRM отправляет отправление и хранит их трек и бланк.
         Почтовый сбор идёт по договору нашего юрлица.
       </p>
-      {error ? <p className="postal-settings__error">{error}</p> : null}
-      {message ? <p className="postal-settings__ok">{message}</p> : null}
-      <div className="postal-settings__grid">
-        <label>
-          JWT Белпочты
-          <input value={form.belpostJwt} onChange={set('belpostJwt')} placeholder={hints.token || 'токен из договора'} autoComplete="off" />
-        </label>
-        <label>
-          Адрес API Белпочты
-          <input value={form.belpostBaseUrl} onChange={set('belpostBaseUrl')} />
-        </label>
-        <label>
-          Адрес API Европочты
-          <input value={form.europostApiUrl} onChange={set('europostApiUrl')} placeholder="https://..." />
-        </label>
-        <label>
-          Порт Европочты
-          <input value={form.europostApiPort} onChange={set('europostApiPort')} placeholder="если не входит в адрес" />
-        </label>
-        <label>
-          Номер услуги Европочты
-          <input value={form.europostServiceNumber} onChange={set('europostServiceNumber')} placeholder={hints.service || '32 символа из договора'} autoComplete="off" />
-        </label>
-        <label>
-          Логин Европочты
-          <input value={form.europostLogin} onChange={set('europostLogin')} autoComplete="off" />
-        </label>
-        <label>
-          Пароль Европочты
-          <input type="password" value={form.europostPassword} onChange={set('europostPassword')} placeholder={hints.password || ''} autoComplete="new-password" />
-        </label>
-        <label>
-          Тип логина
-          <input value={form.europostLoginTypeId} onChange={set('europostLoginTypeId')} placeholder="число от Европочты" />
-        </label>
-        <label>
-          Склад отправки
-          <input value={form.europostWarehouseId} onChange={set('europostWarehouseId')} placeholder="пусто, если склад один" />
-        </label>
-        <label>
-          Товар Европочты
-          <input value={form.europostGoodsId} onChange={set('europostGoodsId')} placeholder="пусто — взять из справочника" />
-        </label>
-        <label>
-          Тип веса
-          <input value={form.europostWeightTypeId} onChange={set('europostWeightTypeId')} placeholder="пусто — по весу отправления" />
-        </label>
-        <label>
-          Тип доставки
-          <input value={form.europostDeliveryTypeId} onChange={set('europostDeliveryTypeId')} placeholder="пусто — оплата отправителем" />
-        </label>
+      {error ? <Alert type="error">{error}</Alert> : null}
+      {message ? <Alert type="success">{message}</Alert> : null}
+      <div className="postal-settings__groups">
+        <fieldset className="postal-settings__group">
+          <legend>Белпочта</legend>
+          <p className="postal-settings__note">JWT из договора. Пустое поле токена при сохранении не затирает уже записанный доступ.</p>
+          <div className="postal-settings__grid">
+            <label>
+              JWT
+              <input value={form.belpostJwt} onChange={set('belpostJwt')} placeholder={hints.token || 'токен из договора'} autoComplete="off" />
+            </label>
+            <label>
+              Адрес API
+              <input value={form.belpostBaseUrl} onChange={set('belpostBaseUrl')} />
+            </label>
+          </div>
+        </fieldset>
+        <fieldset className="postal-settings__group">
+          <legend>Европочта — доступ</legend>
+          <p className="postal-settings__note">CRM сама запрашивает JWT по логину договора. Номер услуги и пароль тоже не стираются, если поля оставить пустыми.</p>
+          <div className="postal-settings__grid">
+            <label>
+              Адрес API
+              <input value={form.europostApiUrl} onChange={set('europostApiUrl')} placeholder="https://..." />
+            </label>
+            <label>
+              Порт
+              <input value={form.europostApiPort} onChange={set('europostApiPort')} placeholder="если не входит в адрес" />
+            </label>
+            <label>
+              Номер услуги
+              <input value={form.europostServiceNumber} onChange={set('europostServiceNumber')} placeholder={hints.service || '32 символа из договора'} autoComplete="off" />
+            </label>
+            <label>
+              Логин
+              <input value={form.europostLogin} onChange={set('europostLogin')} autoComplete="off" />
+            </label>
+            <label>
+              Пароль
+              <input type="password" value={form.europostPassword} onChange={set('europostPassword')} placeholder={hints.password || ''} autoComplete="new-password" />
+            </label>
+            <label>
+              Тип логина
+              <input value={form.europostLoginTypeId} onChange={set('europostLoginTypeId')} placeholder="число от Европочты" />
+            </label>
+          </div>
+        </fieldset>
+        <fieldset className="postal-settings__group">
+          <legend>Европочта — справочники</legend>
+          <p className="postal-settings__note">Пустые поля CRM подбирает сама: склад, если он один, товар, вес и доставку за счёт отправителя.</p>
+          <div className="postal-settings__grid">
+            <label>
+              Склад отправки
+              <input value={form.europostWarehouseId} onChange={set('europostWarehouseId')} placeholder="пусто, если склад один" />
+            </label>
+            <label>
+              Товар
+              <input value={form.europostGoodsId} onChange={set('europostGoodsId')} placeholder="пусто — взять из справочника" />
+            </label>
+            <label>
+              Тип веса
+              <input value={form.europostWeightTypeId} onChange={set('europostWeightTypeId')} placeholder="пусто — по весу отправления" />
+            </label>
+            <label>
+              Тип доставки
+              <input value={form.europostDeliveryTypeId} onChange={set('europostDeliveryTypeId')} placeholder="пусто — оплата отправителем" />
+            </label>
+          </div>
+        </fieldset>
       </div>
       <div className="postal-settings__actions">
-        <button type="button" className="btn btn-primary" onClick={save} disabled={busy}>Сохранить доступы</button>
-        <button type="button" className="btn" onClick={check} disabled={busy}>Проверить ответ</button>
+        <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+          {busy ? 'Подождите…' : 'Сохранить доступы'}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={check} disabled={busy}>Проверить ответ</Button>
       </div>
-    </section>
+    </div>
   );
 };
