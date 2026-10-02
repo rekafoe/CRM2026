@@ -299,6 +299,14 @@ export class PDFReportService {
     }
   }
 
+  /** Публичная обёртка для бланков, которым нужен тот же HTML→PDF, что и у отчётов. */
+  static async renderHtmlPdf(html: string): Promise<Buffer> {
+    return this.convertHTMLToPDF(html, {
+      headerTemplate: '<div></div>',
+      footerTemplate: '<div></div>',
+    })
+  }
+
   /**
    * Конвертация HTML в PDF
    */

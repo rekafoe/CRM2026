@@ -1062,6 +1062,51 @@ export const sendOrderPaymentLink = (
     }
   >(`/orders/${orderId}/send-payment-link`, payload, { timeout: 45000 });
 
+export type PostalCarrier = 'belpost' | 'europost';
+export type PostalShipment = {
+  id: number;
+  order_id: number;
+  carrier: PostalCarrier;
+  payer: 'sender_legal';
+  organization_id: number | null;
+  recipient_name: string;
+  recipient_phone: string | null;
+  recipient_address: string;
+  places: number;
+  weight_kg: number | null;
+  tracking_number: string | null;
+  status: 'draft' | 'blank_issued' | 'handed_over';
+  notes: string | null;
+  blank_number: string;
+  carrier_title: string;
+};
+
+export const getPostalShipments = (orderId: number) =>
+  api.get<PostalShipment[]>(`/orders/${orderId}/postal-shipments`);
+
+export const createPostalShipment = (
+  orderId: number,
+  body: {
+    carrier: PostalCarrier;
+    organization_id?: number | null;
+    recipient_name: string;
+    recipient_phone?: string;
+    recipient_address: string;
+    places?: number;
+    weight_kg?: number | null;
+    notes?: string;
+  },
+) => api.post<PostalShipment>(`/orders/${orderId}/postal-shipments`, body);
+
+export const updatePostalShipment = (
+  orderId: number,
+  shipmentId: number,
+  body: { tracking_number?: string; notes?: string },
+) => api.patch<PostalShipment>(`/orders/${orderId}/postal-shipments/${shipmentId}`, body);
+
+export const downloadPostalBlankPdf = (orderId: number, shipmentId: number) =>
+  api.get(`/orders/${orderId}/postal-shipments/${shipmentId}/blank-pdf`, { responseType: 'blob' });
+
 // Генерация PDF бланка заказа
 export const generateOrderBlankPdf = (orderId: number, companyPhones?: string[]) => {
   const params = companyPhones && companyPhones.length > 0 

@@ -6,6 +6,7 @@ import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middlew
 import { upload, uploadMemory, uploadOrderFilesMemory, saveBufferToOrderFiles, orderFilesDir, uploadsDir, resolveSafeExistingPath, resolveSafeFilePath } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
+import { PostalShipmentService } from '../services/postalShipmentService'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { findOrderStatusId } from '../utils/orderStatusCatalog'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
@@ -745,6 +746,63 @@ router.get('/commodity-receipt-blank-pdf', asyncHandler(async (req, res) => {
       error: error?.message || 'Неизвестная ошибка',
       details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
     });
+  }
+}))
+
+router.get('/:id/postal-shipments', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  if (!orderId) {
+    res.status(400).json({ message: 'Неверный ID заказа' })
+    return
+  }
+  const shipments = await PostalShipmentService.list(orderId)
+  res.json(shipments)
+}))
+
+router.post('/:id/postal-shipments', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  if (!orderId) {
+    res.status(400).json({ message: 'Неверный ID заказа' })
+    return
+  }
+  try {
+    const shipment = await PostalShipmentService.create(orderId, req.body || {})
+    res.status(201).json(shipment)
+  } catch (error: any) {
+    res.status(error?.status || 500).json({ message: error?.message || 'Не удалось создать доставку' })
+  }
+}))
+
+router.patch('/:id/postal-shipments/:shipmentId', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const shipmentId = Number(req.params.shipmentId)
+  if (!orderId || !shipmentId) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  try {
+    const shipment = await PostalShipmentService.update(orderId, shipmentId, req.body || {})
+    res.json(shipment)
+  } catch (error: any) {
+    res.status(error?.status || 500).json({ message: error?.message || 'Не удалось обновить доставку' })
+  }
+}))
+
+router.get('/:id/postal-shipments/:shipmentId/blank-pdf', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const shipmentId = Number(req.params.shipmentId)
+  if (!orderId || !shipmentId) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  try {
+    const { pdf, filename } = await PostalShipmentService.renderBlankPdf(orderId, shipmentId)
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Content-Length', pdf.length)
+    res.send(pdf)
+  } catch (error: any) {
+    res.status(error?.status || 500).json({ message: error?.message || 'Не удалось сформировать бланк' })
   }
 }))
 
