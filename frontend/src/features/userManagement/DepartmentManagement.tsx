@@ -77,7 +77,7 @@ export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBa
       <div className="user-management-header">
         <div className="user-management-header-left">
           {!embedded && onBack && (
-            <button onClick={onBack} className="user-management-back-btn">← Назад</button>
+            <button onClick={onBack} className="user-management-back-btn lg-btn">← Назад</button>
           )}
           <div>
             <h1 className="user-management-title">Точки / департаменты</h1>
@@ -87,7 +87,7 @@ export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBa
           </div>
         </div>
         <div className="user-management-header-actions">
-          <button onClick={() => { setShowCreate(true); setEditingDept(null); }} className="user-management-create-btn">
+          <button onClick={() => { setShowCreate(true); setEditingDept(null); }} className="lg-btn lg-btn--primary">
             Создать точку
           </button>
         </div>
@@ -121,8 +121,8 @@ export const DepartmentManagement: React.FC<DepartmentManagementProps> = ({ onBa
                   {d.sort_order != null && <div className="user-details">Порядок: {d.sort_order}</div>}
                 </div>
                 <div className="user-actions">
-                  <button onClick={() => { setEditingDept(d); setShowCreate(false); }} className="user-edit-btn">Редактировать</button>
-                  <button onClick={() => handleDelete(d.id)} className="user-delete-btn">Удалить</button>
+                  <button onClick={() => { setEditingDept(d); setShowCreate(false); }} className="lg-btn">Редактировать</button>
+                  <button onClick={() => handleDelete(d.id)} className="lg-btn lg-btn--danger">Удалить</button>
                 </div>
               </div>
             ))}
@@ -210,8 +210,8 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({ department, o
             </label>
           </div>
           <div className="user-form-actions">
-            <button type="button" onClick={onClose} className="user-btn-secondary">Отмена</button>
-            <button type="submit" className="user-btn-primary">{department ? 'Сохранить' : 'Создать'}</button>
+            <button type="button" onClick={onClose} className="lg-btn">Отмена</button>
+            <button type="submit" className="lg-btn lg-btn--primary">{department ? 'Сохранить' : 'Создать'}</button>
           </div>
         </form>
       </div>

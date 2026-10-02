@@ -1,4 +1,5 @@
 /* UserManagement.css - Стили для управления пользователями */
+@import '../../styles/admin-glass-buttons.css';
 
 /* Основной контейнер */
 .user-management {
@@ -34,12 +35,7 @@
 }
 
 .user-management-back-btn {
-  padding: 8px 16px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .user-management-title {
@@ -57,17 +53,6 @@
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.user-management-create-btn {
-  padding: 8px 16px;
-  background-color: var(--accent-primary);
-  color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: bold;
 }
 
 /* Статистика пользователей */
@@ -226,35 +211,9 @@
   flex-wrap: wrap;
 }
 
-.user-edit-btn {
+.user-actions .lg-btn {
   padding: 6px 12px;
-  background-color: var(--accent-light);
-  color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
   font-size: 12px;
-  font-weight: bold;
-}
-
-.user-token-btn {
-  padding: 6px 12px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.user-delete-btn {
-  padding: 6px 12px;
-  background-color: var(--error);
-  color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: 'pointer';
-  font-size: 12px;
-  font-weight: bold;
 }
 
 /* Модальные окна */
@@ -365,24 +324,6 @@
   gap: 12px;
   justify-content: flex-end;
   margin-top: 20px;
-}
-
-.user-btn-secondary {
-  padding: 8px 16px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-primary);
-}
-
-.user-btn-primary {
-  padding: 8px 16px;
-  background-color: var(--accent-primary);
-  color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
 }
 
 @media (max-width: 720px) {

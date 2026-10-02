@@ -163,7 +163,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
             <button
               type="button"
               onClick={handleBack}
-              className="user-management-back-btn"
+              className="user-management-back-btn lg-btn"
             >
               ← Назад
             </button>
@@ -180,7 +180,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
         <div className="user-management-header-actions">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="user-management-create-btn"
+            className="lg-btn lg-btn--primary"
           >
             Создать пользователя
           </button>
@@ -288,19 +288,19 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                 <div className="user-actions">
                   <button
                     onClick={() => setEditingUser(user)}
-                    className="user-edit-btn"
+                    className="lg-btn"
                   >
                     Редактировать
                   </button>
                   <button
                     onClick={() => setShowTokenModal(user)}
-                    className="user-token-btn"
+                    className="lg-btn"
                   >
                     API токен
                   </button>
                   <button
                     onClick={() => handleDeleteUser(user.id)}
-                    className="user-delete-btn"
+                    className="lg-btn lg-btn--danger"
                   >
                     Удалить
                   </button>
@@ -366,13 +366,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
               <div className="user-form-actions">
                 <button
                   onClick={() => setShowTokenModal(null)}
-                  className="user-btn-secondary"
+                  className="lg-btn"
                 >
                   Отмена
                 </button>
                 <button
                   onClick={() => handleResetToken(showTokenModal)}
-                  className="user-btn-primary"
+                  className="lg-btn lg-btn--primary"
                 >
                   Сбросить токен
                 </button>
@@ -535,13 +535,13 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="user-btn-secondary"
+              className="lg-btn"
             >
               Отмена
             </button>
             <button
               type="submit"
-              className="user-btn-primary"
+              className="lg-btn lg-btn--primary"
             >
               {initialData ? 'Сохранить' : 'Создать'}
             </button>

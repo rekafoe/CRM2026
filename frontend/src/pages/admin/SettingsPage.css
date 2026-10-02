@@ -1,3 +1,5 @@
+@import '../../styles/admin-glass-buttons.css';
+
 .settings-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -24,25 +26,27 @@
   gap: 12px;
   width: 100%;
   padding: 10px 12px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: #0f172a;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  border-radius: 14px;
+  background: rgba(229, 231, 235, 0.55);
+  color: #1f2937;
   text-align: left;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .settings-nav__btn:hover {
-  background: #f8fafc;
+  background: rgba(229, 231, 235, 0.95);
 }
 
 .settings-nav__btn--active {
-  background: #0f172a;
-  color: #fff;
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #1e3a8a;
 }
 
 .settings-nav__btn--active:hover {
-  background: #0f172a;
+  background: rgba(59, 130, 246, 0.26);
 }
 
 .settings-nav__icon {
@@ -58,8 +62,8 @@
 }
 
 .settings-nav__btn--active .settings-nav__icon {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.7);
+  color: #1d4ed8;
 }
 
 .settings-nav__text {
@@ -82,7 +86,7 @@
 }
 
 .settings-nav__btn--active .settings-nav__hint {
-  color: #cbd5e1;
+  color: #3b5b8c;
 }
 
 .settings-panel {
@@ -116,23 +120,6 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 16px;
-}
-
-.settings-subtab {
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #334155;
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.settings-subtab--active {
-  background: #0f172a;
-  border-color: #0f172a;
-  color: #fff;
 }
 
 .settings-lead {
@@ -233,135 +220,8 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   margin-top: 16px;
-}
-
-.settings-action {
-  height: 34px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #334155;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.settings-action:hover:not(:disabled) {
-  background: #f1f5f9;
-}
-
-.settings-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.settings-action--primary {
-  background: #0f172a;
-  color: #fff;
-}
-
-.settings-action--primary:hover:not(:disabled) {
-  background: #1e293b;
-  color: #fff;
-}
-
-.settings-page .back-btn,
-.settings-page .btn,
-.settings-page .btn.btn-primary,
-.settings-page .btn.btn-secondary,
-.settings-page .user-management-create-btn,
-.settings-page .user-edit-btn,
-.settings-page .user-token-btn,
-.settings-page .user-delete-btn,
-.settings-page .user-btn-primary,
-.settings-page .user-btn-secondary {
-  border-radius: 8px !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  letter-spacing: 0 !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  line-height: 1.2 !important;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
-}
-
-.settings-page .back-btn,
-.settings-page .btn.btn-secondary,
-.settings-page .user-btn-secondary {
-  background: #fff !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #0f172a !important;
-  padding: 8px 12px !important;
-}
-
-.settings-page .back-btn:hover,
-.settings-page .btn.btn-secondary:hover:not(:disabled),
-.settings-page .user-btn-secondary:hover {
-  background: #f8fafc !important;
-  border-color: #94a3b8 !important;
-  color: #0f172a !important;
-}
-
-.settings-page .user-edit-btn,
-.settings-page .user-token-btn,
-.settings-page .user-delete-btn {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  padding: 4px 8px !important;
-  font-weight: 500 !important;
-}
-
-.settings-page .user-edit-btn,
-.settings-page .user-token-btn {
-  color: #334155 !important;
-}
-
-.settings-page .user-edit-btn:hover,
-.settings-page .user-token-btn:hover {
-  background: #f1f5f9 !important;
-  color: #0f172a !important;
-}
-
-.settings-page .btn.btn-primary,
-.settings-page .user-management-create-btn,
-.settings-page .user-btn-primary {
-  background: #0f172a !important;
-  border: 1px solid #0f172a !important;
-  color: #fff !important;
-  padding: 8px 14px !important;
-}
-
-.settings-page .btn.btn-primary:hover:not(:disabled),
-.settings-page .user-management-create-btn:hover,
-.settings-page .user-btn-primary:hover {
-  background: #1e293b !important;
-  border-color: #1e293b !important;
-  color: #fff !important;
-}
-
-.settings-page .user-delete-btn {
-  color: #b91c1c !important;
-}
-
-.settings-page .user-delete-btn:hover {
-  background: #fef2f2 !important;
-  color: #991b1b !important;
-}
-
-.settings-page .settings-subtab {
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-.settings-page .settings-subtab--active {
-  background: #0f172a;
-  border-color: #0f172a;
-  color: #fff;
 }
 
 @media (max-width: 860px) {

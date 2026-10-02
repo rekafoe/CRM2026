@@ -205,10 +205,10 @@ export const PostalCarrierSettings: React.FC = () => {
         </fieldset>
       </div>
       <div className="settings-actions">
-        <button type="button" className="settings-action" onClick={check} disabled={busy}>
+        <button type="button" className="lg-btn" onClick={check} disabled={busy}>
           Проверить
         </button>
-        <button type="button" className="settings-action settings-action--primary" onClick={save} disabled={busy}>
+        <button type="button" className="lg-btn lg-btn--primary" onClick={save} disabled={busy}>
           {busy ? 'Сохранение…' : 'Сохранить'}
         </button>
       </div>

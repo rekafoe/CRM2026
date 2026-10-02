@@ -197,7 +197,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
                   type="button"
                   role="tab"
                   aria-selected={teamTab === 'users'}
-                  className={`settings-subtab${teamTab === 'users' ? ' settings-subtab--active' : ''}`}
+                  className={`lg-btn${teamTab === 'users' ? ' lg-btn--primary' : ''}`}
                   onClick={() => openTeam('users')}
                 >
                   Пользователи
@@ -206,7 +206,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
                   type="button"
                   role="tab"
                   aria-selected={teamTab === 'departments'}
-                  className={`settings-subtab${teamTab === 'departments' ? ' settings-subtab--active' : ''}`}
+                  className={`lg-btn${teamTab === 'departments' ? ' lg-btn--primary' : ''}`}
                   onClick={() => openTeam('departments')}
                 >
                   Точки и департаменты
@@ -294,7 +294,7 @@ const PayrollSettings: React.FC<{ onOpenEarnings: () => void }> = ({ onOpenEarni
             onChange={(event) => setValue(event.target.value)}
           />
         </FormField>
-        <button type="button" className="settings-action settings-action--primary" onClick={save} disabled={saving}>
+        <button type="button" className="lg-btn lg-btn--primary" onClick={save} disabled={saving}>
           {saving ? 'Сохранение…' : 'Сохранить'}
         </button>
       </div>
