@@ -1,4 +1,5 @@
 import type { AdminUserRow } from './earningsTypes';
+import { getMonthProgress } from '../../../utils/monthProgress';
 
 export type EarningsRoleStat = {
   role: string;
@@ -49,21 +50,6 @@ const toNumber = (value: unknown) => {
 const percentDelta = (current: number, previous: number) => {
   if (previous <= 0) return current > 0 ? null : 0;
   return ((current - previous) / previous) * 100;
-};
-
-const getMonthProgress = (month: string) => {
-  const [year, monthIndex] = month.split('-').map(Number);
-  if (!year || !monthIndex) return 1;
-
-  const now = new Date();
-  const selectedStart = new Date(year, monthIndex - 1, 1);
-  const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const daysInMonth = new Date(year, monthIndex, 0).getDate();
-
-  if (selectedStart < currentStart) return 1;
-  if (selectedStart > currentStart) return 0;
-
-  return Math.max(1 / daysInMonth, Math.min(1, now.getDate() / daysInMonth));
 };
 
 export function buildEarningsAnalytics(rows: AdminUserRow[], month: string): EarningsAnalytics {

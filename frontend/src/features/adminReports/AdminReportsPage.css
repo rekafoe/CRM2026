@@ -930,3 +930,80 @@
     font-size: 24px;
   }
 }
+
+.reports-revenue-forecast {
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.reports-revenue-forecast__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.reports-revenue-forecast__head h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.reports-revenue-forecast__head span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reports-revenue-forecast__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.reports-revenue-forecast__label {
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reports-revenue-forecast__value {
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.reports-revenue-forecast__note,
+.reports-revenue-forecast__caption {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.reports-revenue-forecast__note {
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.reports-revenue-forecast__caption {
+  margin: 0 0 16px;
+}
+
+@media (max-width: 768px) {
+  .reports-revenue-forecast__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-revenue-forecast__value {
+    font-size: 22px;
+  }
+}

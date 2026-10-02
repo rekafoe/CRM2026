@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAdminBack } from '../../hooks/useAdminBack';
 import { useAnalytics } from './hooks/useAnalytics';
 import { ProductAnalytics } from './components/ProductAnalytics';
@@ -9,6 +9,8 @@ import { MaterialsAnalytics } from './components/MaterialsAnalytics';
 import { TimeAnalytics } from './components/TimeAnalytics';
 import { LocationRevenueAnalytics } from './components/LocationRevenueAnalytics';
 import { PnLAnalytics } from './components/PnLAnalytics';
+import { buildRevenueMonthForecast } from './revenueMonthForecast';
+import { EarningsBarChart } from '../../pages/admin/earnings/EarningsBarChart';
 import { AnalyticsTab } from './types';
 import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getYearlyRevenue, getDepartments, getExpenseSummary, updateReasonPresetsSettings, type Department } from '../../api';
 import { Button } from '../../components/common';
@@ -552,6 +554,10 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   const ordersPlan = Math.max(0, Number(planTargets.ordersPlan) || 0);
   const ordersPlanPercent = ordersPlan > 0 ? (ordersFact / ordersPlan) * 100 : null;
 
+  const revenueForecast = useMemo(
+    () => buildRevenueMonthForecast(yearlyRevenue?.by_month ?? []),
+    [yearlyRevenue],
+  );
   const revenueFact = totalStats.totalRevenue;
   const revenuePlan = Math.max(0, Number(planTargets.revenuePlan) || 0);
   const revenuePlanPercent = revenuePlan > 0 ? (revenueFact / revenuePlan) * 100 : null;
@@ -945,6 +951,41 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             </div>
           </div>
         </div>
+
+        <section className="reports-revenue-forecast">
+          <div className="reports-revenue-forecast__head">
+            <h3>Прогноз выручки</h3>
+            <span>текущий месяц</span>
+          </div>
+          {yearlyRevenueLoading && !yearlyRevenue ? (
+            <div className="reports-user-info">Считаем выручку месяца…</div>
+          ) : (
+            <>
+              <div className="reports-revenue-forecast__metrics">
+                <div>
+                  <div className="reports-revenue-forecast__label">Уже в выручке</div>
+                  <div className="reports-revenue-forecast__value">
+                    <MoneyAmount value={revenueForecast.revenueSoFar} decimals={0} />
+                  </div>
+                </div>
+                <div>
+                  <div className="reports-revenue-forecast__label">Прогноз месяца</div>
+                  <div className="reports-revenue-forecast__value">
+                    <MoneyAmount value={revenueForecast.forecast} decimals={0} />
+                  </div>
+                  <div className="reports-revenue-forecast__note">
+                    Готовность {revenueForecast.monthProgressPercent.toFixed(0)}%
+                  </div>
+                </div>
+              </div>
+              <p className="reports-revenue-forecast__caption">
+                Считается так же, как прогноз фонда зарплаты: выручка текущего месяца делится на долю прошедших дней.
+                Столбцы — факт за 12 месяцев, высота от нуля.
+              </p>
+              <EarningsBarChart items={revenueForecast.chart} highlightMonth={revenueForecast.currentMonth} />
+            </>
+          )}
+        </section>
 
         <div className="reports-alerts">
           {alerts.map((alert, idx) => (
