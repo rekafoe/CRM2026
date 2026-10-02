@@ -20,6 +20,8 @@ import { productMatchesSearchQuery } from '../utils/productSearch';
 
 export const CUSTOM_PRODUCT_ID = -1000;
 export const POSTPRINT_PRODUCT_ID = -1001;
+/** Доля оператора с произвольного калькулятора. Рекальк процентов берёт это же живое значение. */
+export const CUSTOM_OPERATOR_PERCENT = 20;
 
 const customProduct: Product = {
   id: CUSTOM_PRODUCT_ID,
@@ -29,7 +31,7 @@ const customProduct: Product = {
   icon: 'edit',
   calculator_type: 'simplified',
   product_type: 'universal',
-  operator_percent: 10,
+  operator_percent: CUSTOM_OPERATOR_PERCENT,
   is_active: true,
   created_at: '',
   updated_at: '',

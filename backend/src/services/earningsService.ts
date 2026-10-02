@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
 import { notWaitingStatusSql } from '../utils/orderFulfillmentScope';
 import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
+import { resolveEarningsOperatorPercent } from './earningsOperatorPercent';
 import { getDesignTemplatesByIds } from './designTemplateService';
 
 export interface EarningsSchedulerConfig {
@@ -324,48 +325,14 @@ export class EarningsService {
           params = {};
         }
 
-        // Всегда подтягиваем актуальные проценты из БД; params — только fallback
-        let percent = 0;
-        // 1. Операции (params.services)
-        if (params?.services && Array.isArray(params.services) && params.services.length > 0) {
-          const firstOpId = Number(params.services[0]?.operationId);
-          if (Number.isFinite(firstOpId)) {
-            percent = operationPercentMap.get(firstOpId) ?? 0;
-          }
-        }
-        // 2. Послепечатные услуги (postprintOperations)
-        if (percent === 0 && params?.postprintOperations && Array.isArray(params.postprintOperations) && params.postprintOperations.length > 0) {
-          for (const op of params.postprintOperations) {
-            const sid = Number(op?.serviceId ?? op?.id);
-            if (!Number.isFinite(sid)) continue;
-            const p = operationPercentMap.get(sid) ?? 0;
-            percent = p;
-            if (p > 0) break;
-          }
-        }
-        // 3. Прямой operationId
-        if (percent === 0) {
-          const opId = Number(params?.operationId);
-          if (Number.isFinite(opId)) {
-            percent = operationPercentMap.get(opId) ?? 0;
-          }
-        }
-        // 4. Продукт (params.productId или type позиции = id продукта с витрины / MAP)
-        if (percent === 0) {
-          let productId = Number(params?.productId);
-          if (!Number.isFinite(productId) && row.itemType != null) {
-            const fromType = Number(String(row.itemType).trim());
-            if (Number.isFinite(fromType) && fromType > 0) productId = fromType;
-          }
-          if (Number.isFinite(productId)) {
-            percent = productPercentMap.get(productId) ?? 0;
-          }
-        }
-        // 5. Fallback: сохранённый в params (устаревший, но лучше чем 0)
-        if (percent === 0) {
-          const rawPercent = Number(params?.operator_percent ?? params?.operatorPercent ?? NaN);
-          if (Number.isFinite(rawPercent)) percent = rawPercent;
-        }
+        // Произвольный калькулятор — живые 20%, не снимок и не чужой productId.
+        // Остальные позиции: актуальные проценты из БД, params — только fallback.
+        const percent = resolveEarningsOperatorPercent({
+          params,
+          itemType: row.itemType,
+          productPercentMap,
+          operationPercentMap,
+        });
 
         const qty = Number(row.quantity) || 0;
         const lineTotal = (Number(row.price) || 0) * qty;

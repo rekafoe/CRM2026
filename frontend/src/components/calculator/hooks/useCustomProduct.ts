@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
-import { CUSTOM_PRODUCT_ID } from '../components/DynamicProductSelector';
+import { CUSTOM_OPERATOR_PERCENT, CUSTOM_PRODUCT_ID } from '../components/DynamicProductSelector';
+import { isCustomCalculatorItem, readItemParams } from '../utils/customCalculatorItem';
 
 interface UseCustomProductParams {
   isOpen: boolean;
@@ -23,7 +24,7 @@ const buildCustomProduct = (): Product => ({
   icon: 'edit',
   calculator_type: 'simplified',
   product_type: 'universal',
-  operator_percent: 10,
+  operator_percent: CUSTOM_OPERATOR_PERCENT,
   is_active: true,
   created_at: '',
   updated_at: '',
@@ -64,20 +65,31 @@ export function useCustomProduct({
       return;
     }
     if (!isEditMode || !editContext?.item) return;
-    const params = (editContext.item as any).params || {};
-    if (!params?.customProduct) return;
+    const params = readItemParams((editContext.item as any).params);
+    if (!isCustomCalculatorItem(editContext.item)) return;
 
     const hydrateKey = `${editContext.orderId}:${editContext.item.id}`;
     if (hydratedEditKeyRef.current === hydrateKey) return;
     hydratedEditKeyRef.current = hydrateKey;
 
+    const qty = Math.max(1, Number(editContext.item.quantity) || 1);
+    const unitPrice = Number(editContext.item.price);
+    const storedTotal = Number(params.storedTotalCost);
+    const pricePerItem =
+      Number.isFinite(unitPrice) && unitPrice > 0
+        ? unitPrice
+        : Number.isFinite(storedTotal) && storedTotal > 0
+          ? Math.round((storedTotal / qty) * 100) / 100
+          : '';
+    const rawName = params.customName || params.productName || params.description || '';
+
     setSelectedProduct(buildCustomProduct() as Product & { resolvedProductType?: string });
     setCustomProductForm({
-      name: String(params.customName || params.description || editContext.item.type || ''),
+      name: String(rawName),
       characteristics: String(params.characteristics || ''),
       quantity: String(editContext.item.quantity ?? 1),
       productionDays: String(params.productionDays ?? '1'),
-      pricePerItem: String(editContext.item.price ?? ''),
+      pricePerItem: String(pricePerItem),
     });
     setSpecs((prev: any) => ({ ...prev, productType: 'universal' }));
   }, [editContext?.item?.id, editContext?.orderId, isEditMode, isOpen, setSelectedProduct, setSpecs]);
@@ -114,13 +126,17 @@ export function useCustomProduct({
     const paramsPayload = {
       customProduct: true,
       customName: name,
-      characteristics: characteristics || undefined,
-      productionDays: customProductionDays > 0 ? customProductionDays : undefined,
-      operator_percent: 10,
+      characteristics,
+      productionDays: customProductionDays > 0 ? customProductionDays : null,
+      operator_percent: CUSTOM_OPERATOR_PERCENT,
       productType: 'custom',
       productName: name,
       storedTotalCost: storedTotal,
       priceLockedByCalculator: true,
+      productId: null,
+      services: null,
+      postprintOperations: null,
+      operationId: null,
     };
 
     const apiItem = {

@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import React from 'react';
 import { Order } from '../../../types';
-import { createOrder, cancelOnlineOrder, addOrderItem, deleteOrderItem, updateOrderStatus } from '../../../api';
+import { createOrder, cancelOnlineOrder, addOrderItem, deleteOrderItem, updateOrderItem, updateOrderStatus } from '../../../api';
+import { isCustomCalculatorItem } from '../../calculator/utils/customCalculatorItem';
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
 import { useReasonPresets } from '../../common/useReasonPresets';
@@ -140,45 +141,63 @@ export const useOrderHandlers = ({
 
   const handleReplaceOrderItem = useCallback(
     async ({ orderId, itemId, item }: { orderId: number; itemId: number; item: any }) => {
+      const totalCost =
+        typeof item.totalCost === 'number' && Number.isFinite(item.totalCost)
+          ? item.totalCost
+          : typeof item.params?.storedTotalCost === 'number'
+            ? item.params.storedTotalCost
+            : undefined;
+      const keepCustomRow = isCustomCalculatorItem(item);
       try {
-        await deleteOrderItem(orderId, itemId);
-        const payload = {
-          ...item,
-          totalCost:
-            typeof item.totalCost === 'number' && Number.isFinite(item.totalCost)
-              ? item.totalCost
-              : typeof item.params?.storedTotalCost === 'number'
-                ? item.params.storedTotalCost
-                : undefined,
-        };
-        const addedItem = await addOrderItem(orderId, payload);
-        
-        // Оптимистично обновляем локальное состояние заказа
+        let savedItem: any;
+        if (keepCustomRow) {
+          // Произвольную позицию обновляем на месте: удаление перед вставкой теряло строку, если повторное сохранение падало.
+          const updated = await updateOrderItem(orderId, itemId, {
+            type: 'custom',
+            price: item.price,
+            quantity: item.quantity,
+            sides: item.sides,
+            sheets: item.sheets,
+            waste: item.waste,
+            clicks: item.clicks,
+            totalCost,
+            params: item.params,
+          });
+          savedItem = updated.data;
+        } else {
+          await deleteOrderItem(orderId, itemId);
+          const addedItem = await addOrderItem(orderId, { ...item, totalCost });
+          savedItem = addedItem.data;
+        }
+
         setOrders((prevOrders: Order[]) => {
           const orderIndex = prevOrders.findIndex(o => o.id === orderId);
           if (orderIndex === -1) return prevOrders;
-          
+
           const updatedOrder = { ...prevOrders[orderIndex] };
-          // Удаляем старый item и добавляем новый
-          updatedOrder.items = (updatedOrder.items || []).filter(i => i.id !== itemId);
-          updatedOrder.items.push(addedItem.data);
-          
+          if (keepCustomRow) {
+            updatedOrder.items = (updatedOrder.items || []).map((existing) =>
+              existing.id === itemId ? { ...existing, ...savedItem, id: itemId } : existing
+            );
+          } else {
+            updatedOrder.items = (updatedOrder.items || []).filter(i => i.id !== itemId);
+            updatedOrder.items.push(savedItem);
+          }
+
           const newOrders = [...prevOrders];
           newOrders[orderIndex] = updatedOrder;
           return newOrders;
         });
-        
-        // Принудительно перезагружаем заказы
+
         loadOrders(undefined, true);
         closeCalculator();
 
         toast.success('Позиция обновлена', 'Параметры товара обновлены');
-        logger.info('Order item replaced', { orderId, itemId });
+        logger.info('Order item replaced', { orderId, itemId, keepCustomRow });
       } catch (error) {
         logger.error('Failed to update order item', error);
-        toast.error('Ошибка обновления позиции', (error as Error).message);
-        // В случае ошибки перезагружаем заказы
         loadOrders(undefined, true);
+        throw error;
       }
     },
     [setOrders, loadOrders, closeCalculator, toast, logger]

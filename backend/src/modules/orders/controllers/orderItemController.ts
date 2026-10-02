@@ -5,6 +5,10 @@ import { hasColumn, getTableColumns } from '../../../utils/tableSchemaCache'
 import { Item } from '../../../models'
 import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMapper'
 import { EarningsService } from '../../../services/earningsService'
+import {
+  CUSTOM_CALCULATOR_OPERATOR_PERCENT,
+  isArbitraryCalculatorItem,
+} from '../../../services/earningsOperatorPercent'
 import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehouseService'
 import { MaterialTransactionService } from '../../warehouse/services/materialTransactionService'
 import { computeClicks } from '../../../utils/printing'
@@ -230,8 +234,17 @@ export class OrderItemController {
             }
           }
           
+          const arbitraryCalculator = isArbitraryCalculatorItem(cleanParams, type)
           const paramsToSave = {
             ...cleanParams,
+            ...(arbitraryCalculator
+              ? {
+                  customProduct: true,
+                  productType: 'custom',
+                  operator_percent: CUSTOM_CALCULATOR_OPERATOR_PERCENT,
+                  productId: null,
+                }
+              : {}),
             ...(effectiveTotal != null
               ? { storedTotalCost: effectiveTotal, priceLockedByCalculator: true }
               : {}),
@@ -309,13 +322,14 @@ export class OrderItemController {
           defaultExecutor = (hasOrderResponsible ? orderRow?.responsible_user_id : null) ?? orderRow?.userId ?? null
         }
 
+        const storedType = isArbitraryCalculatorItem(params, type) ? 'custom' : type
         const insertItem = await db.run(
           hasExecutorUserId
             ? 'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             : 'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           hasExecutorUserId
-            ? [orderId, type, paramsJson, priceToStore, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks, defaultExecutor]
-            : [orderId, type, paramsJson, priceToStore, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks]
+            ? [orderId, storedType, paramsJson, priceToStore, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks, defaultExecutor]
+            : [orderId, storedType, paramsJson, priceToStore, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks]
         )
         const itemId = insertItem.lastID!
 
@@ -867,11 +881,24 @@ export class OrderItemController {
           paramsPatch.storedTotalCost = totalCostFromClient
           paramsPatch.priceLockedByCalculator = true
         }
+        const incomingCustom =
+          isArbitraryCalculatorItem(paramsPatch, String(rawBody.type ?? existing.type)) ||
+          isArbitraryCalculatorItem(existingParams, existing.type)
+        if (incomingCustom && Object.keys(paramsPatch).length > 0) {
+          paramsPatch.customProduct = true
+          paramsPatch.productType = 'custom'
+          paramsPatch.operator_percent = CUSTOM_CALCULATOR_OPERATOR_PERCENT
+          if (isArbitraryCalculatorItem(body.params, String(rawBody.type ?? ''))) {
+            paramsPatch.productId = null
+          }
+        }
+        const forceCustomType = incomingCustom && existing.type !== 'custom'
         if (Object.keys(paramsPatch).length > 0) {
           paramsJson = JSON.stringify({ ...existingParams, ...paramsPatch })
         }
 
         const updateSql = `UPDATE items SET 
+              ${forceCustomType ? 'type = ?,' : ''}
               ${body.price != null ? 'price = ?,' : ''}
               ${body.quantity != null ? 'quantity = ?,' : ''}
               ${printerIdClause}
@@ -886,6 +913,7 @@ export class OrderItemController {
           logger.info('🖨️ [updateItem] UPDATE SQL', { printerIdCol, printerIdClause: printerIdClause || '(none)', printerIdVal })
         }
         const bindings = [
+          ...(forceCustomType ? ['custom'] : []),
           ...(body.price != null ? [Number(body.price)] : []),
           ...(body.quantity != null ? [newQuantity] : []),
           ...printerIdVal,
