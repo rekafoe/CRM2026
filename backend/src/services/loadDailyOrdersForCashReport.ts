@@ -1,6 +1,10 @@
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
-import { hasFulfillmentDepartmentColumn, scopeByFulfillmentDepartment } from '../utils/orderFulfillmentScope'
+import {
+  hasFulfillmentDepartmentColumn,
+  notEstimateStatusSql,
+  scopeByFulfillmentDepartment,
+} from '../utils/orderFulfillmentScope'
 import { OrderRepository } from '../repositories/orderRepository'
 import { computeCashForReportDate, sqlDailyOrderDayFilter } from '../utils/reportOrderCash'
 
@@ -54,6 +58,7 @@ async function resolveItemsPrinterColumn(): Promise<string> {
 
 /**
  * Ожидаемые клики по принтерам за день отчёта (без выгрузки всех позиций).
+ * Заказы в статусе 0 (ожидает / просчёт) не входят.
  * Как в UI: не считаем клики у заказов, выданных сегодня, но оформленных в другой день.
  */
 export async function loadPrinterExpectedClicksForDay(
@@ -111,6 +116,7 @@ export async function loadPrinterExpectedClicksForDay(
          JOIN orders o ON o.id = i.orderId
         WHERE ${dayFilter.whereSql}
           ${fulfillmentScope.clause}
+          AND ${notEstimateStatusSql('o.status')}
           AND i.${printerCol} IS NOT NULL
           AND CAST(i.${printerCol} AS INTEGER) != 0
           ${skipIssuedOtherDaySql}
