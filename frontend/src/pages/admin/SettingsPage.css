@@ -228,9 +228,95 @@
 .settings-link__action {
   flex-shrink: 0;
   font-size: 12px;
-  font-weight: 700;
-  color: #334155;
-  padding-top: 2px;
+  font-weight: 600;
+  color: #0f172a;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.settings-page .back-btn,
+.settings-page .btn,
+.settings-page .btn.btn-primary,
+.settings-page .btn.btn-secondary,
+.settings-page .user-management-create-btn,
+.settings-page .user-edit-btn,
+.settings-page .user-token-btn,
+.settings-page .user-delete-btn,
+.settings-page .user-btn-primary,
+.settings-page .user-btn-secondary {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+
+.settings-page .back-btn,
+.settings-page .btn.btn-secondary,
+.settings-page .user-edit-btn,
+.settings-page .user-token-btn,
+.settings-page .user-btn-secondary {
+  background: #fff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  padding: 8px 12px !important;
+}
+
+.settings-page .back-btn:hover,
+.settings-page .btn.btn-secondary:hover:not(:disabled),
+.settings-page .user-edit-btn:hover,
+.settings-page .user-token-btn:hover,
+.settings-page .user-btn-secondary:hover {
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.settings-page .btn.btn-primary,
+.settings-page .user-management-create-btn,
+.settings-page .user-btn-primary {
+  background: #0f172a !important;
+  border: 1px solid #0f172a !important;
+  color: #fff !important;
+  padding: 8px 14px !important;
+}
+
+.settings-page .btn.btn-primary:hover:not(:disabled),
+.settings-page .user-management-create-btn:hover,
+.settings-page .user-btn-primary:hover {
+  background: #1e293b !important;
+  border-color: #1e293b !important;
+  color: #fff !important;
+}
+
+.settings-page .user-delete-btn {
+  background: #fff !important;
+  border: 1px solid #fecaca !important;
+  color: #b91c1c !important;
+  padding: 8px 12px !important;
+}
+
+.settings-page .user-delete-btn:hover {
+  background: #fef2f2 !important;
+  border-color: #fca5a5 !important;
+  color: #991b1b !important;
+}
+
+.settings-page .settings-subtab {
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.settings-page .settings-subtab--active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
 }
 
 @media (max-width: 860px) {
