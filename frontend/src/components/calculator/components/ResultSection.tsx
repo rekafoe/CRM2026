@@ -21,10 +21,49 @@ interface ResultSectionProps {
     };
     warnings?: string[];
     tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price?: number }>;
+    materials?: Array<{
+      material?: string;
+      total?: number;
+      unitPrice?: number;
+      price?: number;
+      isConsumableOnly?: boolean;
+    }>;
+    services?: Array<{
+      service?: string;
+      operationName?: string;
+      total?: number;
+      totalCost?: number;
+    }>;
   } | null;
   isValid: boolean;
   onAddToOrder: () => void;
   mode?: 'create' | 'edit';
+  /** Ошибка последнего расчёта: старая сумма уже сброшена, добавлять её нельзя */
+  calcError?: string | null;
+  /** Первая ошибка заполнения, если расчёта ещё нет */
+  blockingMessage?: string | null;
+  /** Идёт запрос цены: кнопку добавления держим выключенной, чтобы не записать прошлую сумму */
+  pricePending?: boolean;
+}
+
+function positiveCostLines(result: NonNullable<ResultSectionProps['result']>) {
+  const lines: Array<{ key: string; name: string; total: number }> = [];
+  (result.materials ?? []).forEach((material, index) => {
+    const total = Number(material.total);
+    const name = String(material.material ?? '').trim();
+    const unitPrice = Number(material.unitPrice ?? material.price ?? 0);
+    if (!Number.isFinite(total) || total <= 0) return;
+    if (!name || name === 'Материал') return;
+    if (material.isConsumableOnly && unitPrice <= 0) return;
+    lines.push({ key: `material-${index}-${name}`, name, total });
+  });
+  (result.services ?? []).forEach((service, index) => {
+    const total = Number(service.total ?? service.totalCost);
+    const name = String(service.service || service.operationName || '').trim();
+    if (!Number.isFinite(total) || total <= 0 || !name) return;
+    lines.push({ key: `service-${index}-${name}`, name, total });
+  });
+  return lines;
 }
 
 export const ResultSection: React.FC<ResultSectionProps> = ({
@@ -32,6 +71,9 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   isValid,
   onAddToOrder,
   mode = 'create',
+  calcError = null,
+  blockingMessage = null,
+  pricePending = false,
 }) => {
   const formatNumber = (value?: number, suffix?: string, roundTo2 = false) => {
     if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -68,14 +110,16 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
     );
   };
 
+  const emptyMessage = calcError || blockingMessage || 'Заполните параметры для расчёта';
+
   // Всегда показываем секцию, даже если result null (показываем заглушку)
   if (!result) {
     return (
       <div className="form-section result-section compact">
         <h3><AppIcon name="money" size="xs" /> Стоимость: —</h3>
         <div className="result-details">
-          <div className="result-item">
-            <span>Заполните параметры для расчёта</span>
+          <div className={`result-item result-status-message${calcError ? ' result-status-message--error' : ''}`} role={calcError ? 'alert' : undefined}>
+            <span>{emptyMessage}</span>
           </div>
         </div>
         <div className="result-actions">
@@ -103,6 +147,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   const parameterSummary = result.parameterSummary || [];
   const addButtonLabel = mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <>Добавить в заказ</>;
   const showFormatWarning = fitsOnSheet === false || warnings.length > 0;
+  const costLines = positiveCostLines(result);
 
   return (
     <div className="form-section result-section compact">
@@ -119,6 +164,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
       {/* Округляем до 2 знаков — так же, как при добавлении в заказ (storedTotalCost), чтобы сумма в заказе совпадала с калькулятором */}
       <h3>
         <AppIcon name="money" size="xs" /> Стоимость: {withByn(result.totalCost, true)}
+        {pricePending ? <span className="result-price-pending"> Пересчёт…</span> : null}
       </h3>
       <div className="result-details">
         <div className="result-item">
@@ -140,6 +186,16 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
           <span>{result.productionTime}</span>
         </div>
       </div>
+      {costLines.length > 0 && (
+        <div className="result-cost-lines">
+          {costLines.map((line) => (
+            <div className="result-cost-line" key={line.key}>
+              <span className="result-cost-line__name">{line.name}</span>
+              <span>{withByn(line.total, true)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {parameterSummary.length > 0 && (
         <div className="result-parameter-summary">
           {parameterSummary
@@ -226,11 +282,16 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
           </table>
         </details>
       )}
+      {!isValid && blockingMessage && (
+        <div className="result-status-message" role="status">
+          <span>{blockingMessage}</span>
+        </div>
+      )}
       <div className="result-actions">
         <button 
           className="btn btn-primary"
           onClick={onAddToOrder}
-          disabled={!isValid}
+          disabled={!isValid || Boolean(calcError) || pricePending}
         >
           {addButtonLabel}
         </button>

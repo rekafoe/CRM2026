@@ -491,6 +491,45 @@
 .calculator-subtotal-bar .result-tier-prices summary {
   padding: 2px 0;
 }
+.calculator-subtotal-bar .result-cost-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 2px 0 6px;
+}
+.calculator-subtotal-bar .result-cost-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #334155;
+}
+.calculator-subtotal-bar .result-cost-line__name {
+  color: #64748b;
+}
+.calculator-subtotal-bar .result-status-message {
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+.calculator-subtotal-bar .result-status-message--error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.calculator-subtotal-bar .result-price-pending {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
 .calculator-subtotal-bar .result-actions .btn-primary {
   padding: 10px 20px;
   font-weight: 600;
@@ -2323,6 +2362,13 @@
 .custom-product-hint {
   font-size: 12px;
   color: #6b7280;
+}
+
+.custom-product-line-total {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
 }
 
 .postprint-services-form {

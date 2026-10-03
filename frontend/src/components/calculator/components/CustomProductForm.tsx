@@ -27,7 +27,17 @@ export const CustomProductForm: React.FC<CustomProductFormProps> = ({
   customProductForm,
   setCustomProductForm,
   onOpenProductSelector,
-}) => (
+}) => {
+  const quantity = Number(customProductForm.quantity);
+  const pricePerItem = Number(customProductForm.pricePerItem);
+  const lineTotal =
+    Number.isFinite(quantity) && Number.isFinite(pricePerItem) && quantity > 0 && pricePerItem > 0
+      ? Math.round(quantity * pricePerItem * 100) / 100
+      : null;
+  const formatMoney = (value: number) =>
+    value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return (
   <div className="calculator-section-group calculator-section-unified">
     <div className="section-group-header">
       <h3><AppIcon name="edit" size="xs" /> Произвольный продукт</h3>
@@ -93,7 +103,18 @@ export const CustomProductForm: React.FC<CustomProductFormProps> = ({
             />
           </label>
         </div>
+        <p className="custom-product-line-total">
+          Итого:{' '}
+          {lineTotal != null ? (
+            <>
+              {formatMoney(quantity)} × {formatMoney(pricePerItem)} = {formatMoney(lineTotal)} <BynSymbol />
+            </>
+          ) : (
+            '—'
+          )}
+        </p>
       </div>
     </div>
   </div>
-);
+  );
+};

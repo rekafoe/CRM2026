@@ -59,6 +59,7 @@ interface UseCalculatorPricingActionsReturn {
   userInteracted: boolean;
   setUserInteracted: React.Dispatch<React.SetStateAction<boolean>>;
   error: string | null;
+  isCalculating: boolean;
   calculateCost: (showToast?: boolean) => Promise<void>;
 }
 
@@ -134,6 +135,7 @@ export function useCalculatorPricingActions({
   const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
   const calcRequestSeqRef = useRef(0);
 
   const calculatePriceViaBackend = useCallback(
@@ -179,6 +181,8 @@ export function useCalculatorPricingActions({
 
       let requestSeq: number | null = null;
       try {
+        requestSeq = ++calcRequestSeqRef.current;
+        setIsCalculating(true);
         if (!selectedProduct?.id) {
           throw new Error('Необходимо выбрать продукт из базы данных для расчета цены');
         }
@@ -540,7 +544,6 @@ export function useCalculatorPricingActions({
           logger.info('Продукт без печати — расчёт без параметров печати', { productId: selectedProduct.id });
         }
 
-        requestSeq = ++calcRequestSeqRef.current;
         const pricingResult = await calculatePriceViaBackend(
           selectedProduct.id,
           configuration,
@@ -1166,6 +1169,7 @@ export function useCalculatorPricingActions({
           tier_prices: Array.isArray(backendResult.tier_prices) ? backendResult.tier_prices : undefined,
         };
 
+        setIsCalculating(false);
         setResult(calculationResult);
         logger.info('Расчет выполнен успешно', { totalCost: backendResult.finalPrice });
 
@@ -1226,7 +1230,9 @@ export function useCalculatorPricingActions({
           response: err?.response,
         });
         
+        setIsCalculating(false);
         setError(errorMessage);
+        setResult(null);
         if (showToast) {
           toast.error(`Ошибка расчета: ${errorMessage}`);
         }
@@ -1264,6 +1270,7 @@ export function useCalculatorPricingActions({
     userInteracted,
     setUserInteracted,
     error,
+    isCalculating,
     calculateCost,
   };
 }

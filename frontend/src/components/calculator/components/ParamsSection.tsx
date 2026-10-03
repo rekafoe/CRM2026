@@ -111,6 +111,8 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
 
   const selectedSizeId = specs.size_id ?? (simplifiedSizes?.length ? simplifiedSizes[0].id : undefined);
   const selectedSize = simplifiedSizes?.find((s: any) => String(s.id) === String(selectedSizeId));
+  const quantityAtLeastMin = (current: number | undefined, minQty: number) =>
+    typeof current === 'number' && Number.isFinite(current) && current >= minQty ? current : minQty;
   const multipageLike =
     isMultiPageProduct ||
     isMultipageLikeProduct({ simplifiedPages: effectivePagesProp });
@@ -134,7 +136,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         updateSpecs({ 
           size_id: first.id,
           format: `${first.width_mm}×${first.height_mm}`,
-          quantity: minQty,
+          quantity: quantityAtLeastMin(specs.quantity, minQty),
         }, true);
       }
     }
@@ -162,7 +164,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                   const minQty = resolveMinQtyForSize(size);
                   const nextUpdates: Partial<any> = {
                     size_id: id,
-                    quantity: minQty,
+                    quantity: quantityAtLeastMin(specs.quantity, minQty),
                   };
 
                   if (isCustomFormat) {

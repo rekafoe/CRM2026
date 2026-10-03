@@ -594,6 +594,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     userInteracted,
     setUserInteracted,
     calculateCost,
+    error: pricingError,
+    isCalculating: pricePending,
   } = useCalculatorPricingActions({
     specs,
     isValid,
@@ -1317,6 +1319,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             isValid={isCustomValid}
             onAddToOrder={() => handleAddCustomProduct()}
             mode={isEditMode ? 'edit' : 'create'}
+            blockingMessage={customErrors[0] ?? null}
           />
         ) : isPostprintProduct ? (
           <ResultSection
@@ -1324,6 +1327,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             isValid={isPostprintValid}
             onAddToOrder={() => handleAddPostprintProduct()}
             mode={isEditMode ? 'edit' : 'create'}
+            blockingMessage={postprintErrors[0] ?? null}
           />
         ) : (
           <ResultSection
@@ -1331,6 +1335,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             isValid={isValid}
             onAddToOrder={() => handleAddToOrder()}
             mode={isEditMode ? 'edit' : 'create'}
+            calcError={pricingError}
+            blockingMessage={Object.values(validationErrors)[0] ?? null}
+            pricePending={pricePending}
           />
         )}
       </div>
