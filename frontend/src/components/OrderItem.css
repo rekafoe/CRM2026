@@ -599,6 +599,29 @@
   cursor: not-allowed;
 }
 
+.order-item-waste-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+}
+
+.order-item-waste-input:focus {
+  outline: none;
+  border-color: #6c8eb8;
+  box-shadow: 0 0 0 3px rgba(108, 142, 184, 0.2);
+}
+
+.order-item-waste-input:disabled {
+  opacity: 0.65;
+}
+
 /* Кнопки в панели меты — заметные, без «кричащих» заливок */
 .order-item-breakdown-meta .order-item-actions,
 .order-item-meta-panel .order-item-actions {

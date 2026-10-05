@@ -97,7 +97,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       {typeof waste !== 'undefined' && waste !== null && waste > 0 && (
         <>
           <span className="separator">|</span>
-          <span className="detail-item">брак: {waste} шт.</span>
+          <span className="detail-item">брак: {waste} листов</span>
         </>
       )}
 

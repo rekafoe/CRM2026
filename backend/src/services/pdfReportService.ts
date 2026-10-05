@@ -522,7 +522,7 @@ export class PDFReportService {
 
           const waste = Number((item as any).waste) || 0;
           if (waste > 0) {
-            paramParts.push(`брак: ${waste} шт.`);
+            paramParts.push(`брак: ${waste} листов`);
           }
 
           const sheetCount =

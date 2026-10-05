@@ -230,7 +230,7 @@ export const OrderItemPositionBreakdown: React.FC<Props> = ({
                           {' '}
                           ·{' '}
                         </span>
-                        <span>брак: {footer.waste} шт.</span>
+                        <span>брак: {footer.waste} листов</span>
                       </>
                     ) : null}
                   </span>

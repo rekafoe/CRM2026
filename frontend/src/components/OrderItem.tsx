@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Item } from '../types';
 import { updateOrderItem, deleteOrderItem, getPrinters, getDesignTemplate } from '../api';
 import { numberInputFromString, numberInputToNumber, type NumberInputValue } from '../utils/numberInput';
@@ -180,6 +180,8 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   const [printerId, setPrinterId] = useState<number | ''>(item.printerId ?? '');
   const [printers, setPrinters] = useState<Array<{ id: number; name: string; technology_code?: string | null; color_mode?: 'bw' | 'color' | 'both' }>>([]);
   const [savingPrinter, setSavingPrinter] = useState(false);
+  const [savingWaste, setSavingWaste] = useState(false);
+  const wasteFocusedRef = useRef(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditorPreview, setShowEditorPreview] = useState(false);
 
@@ -191,7 +193,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
     setPrice(item.price);
     setSides(item.sides ?? 1);
     setSheets(item.sheets ?? item.params.sheetsNeeded ?? 0);
-    setWaste(item.waste ?? 0);
+    if (!wasteFocusedRef.current) setWaste(item.waste ?? 0);
     setCustomDescription(
       item.params.description &&
       item.params.description !== 'Описание товара' &&
@@ -300,6 +302,23 @@ export const OrderItem: React.FC<OrderItemProps> = ({
       addToast({ type: 'error', title: 'Ошибка', message: err?.message || 'Ошибка при сохранении принтера' });
     } finally {
       setSavingPrinter(false);
+    }
+  };
+
+  const commitWaste = async () => {
+    const next = Math.max(0, Math.round(numberInputToNumber(waste, 0)));
+    const current = Math.max(0, Math.round(Number(item.waste) || 0));
+    setWaste(next);
+    if (next === current) return;
+    try {
+      setSavingWaste(true);
+      await updateOrderItem(orderId, item.id, { waste: next });
+      onUpdate();
+    } catch (err: any) {
+      setWaste(item.waste ?? 0);
+      addToast({ type: 'error', title: 'Ошибка', message: err?.message || 'Не удалось сохранить брак' });
+    } finally {
+      setSavingWaste(false);
     }
   };
   
@@ -486,6 +505,35 @@ export const OrderItem: React.FC<OrderItemProps> = ({
               ))}
             </select>
             {savingPrinter ? (
+              <span className="order-item-meta-field-hint">Сохраняем…</span>
+            ) : null}
+          </div>
+        </div>
+      )}
+      {!readOnly && (
+        <div className="order-item-meta-field-row order-item-meta-field-row--assign-line">
+          <span className="order-item-meta-assign-label">Брак, листы</span>
+          <div className="order-item-meta-assign-select-wrap">
+            <input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              className="order-item-waste-input"
+              value={waste === '' ? '' : waste}
+              aria-label="Брак, листы"
+              disabled={savingWaste}
+              onFocus={() => { wasteFocusedRef.current = true; }}
+              onChange={(e) => setWaste(numberInputFromString(e.target.value))}
+              onBlur={() => {
+                wasteFocusedRef.current = false;
+                void commitWaste();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+            />
+            {savingWaste ? (
               <span className="order-item-meta-field-hint">Сохраняем…</span>
             ) : null}
           </div>
