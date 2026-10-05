@@ -114,125 +114,224 @@
    line-height: 1.5;
  }
  
- .customer-modal-overlay {
-   position: fixed;
-   top: 0;
-   left: 0;
-   right: 0;
-   bottom: 0;
-   background-color: rgba(0, 0, 0, 0.5);
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   z-index: 1000;
- }
- 
- .customer-modal {
-   background-color: white;
-   border-radius: 8px;
-   padding: 24px;
-   max-width: 500px;
-   width: 90%;
-   max-height: 90vh;
-   overflow: auto;
- }
- 
- .customer-modal__title {
-   margin-top: 0;
-   margin-bottom: 20px;
-   font-size: 18px;
-   font-weight: 600;
-   color: #111827;
- }
- 
- .customer-modal__field {
-   margin-bottom: 18px;
- }
- 
- .customer-modal__label {
-   display: block;
-   margin-bottom: 6px;
-   font-size: 14px;
-   font-weight: 600;
-   color: #1f2937;
- }
- 
- .customer-modal__label-sm {
-   display: block;
-   margin-bottom: 6px;
-   font-size: 13px;
-   font-weight: 500;
-   color: #374151;
- }
- 
- /* Модальные поля — как кнопки (консистентно, без увеличения) */
- .customer-modal input.customer-modal__input,
- .customer-modal select.customer-modal__input {
-   width: 100%;
- }
+.customer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
 
- .customer-modal select.customer-modal__input {
-   appearance: none;
-   background-color: #fff;
-   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-   background-repeat: no-repeat;
-   background-position: right 12px center;
-   padding-right: 36px;
- }
+.customer-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+  width: min(640px, 100%);
+  max-height: min(90vh, 860px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
- .customer-modal textarea.customer-modal__textarea {
-   width: 100%;
-   min-height: 72px;
-   resize: vertical;
- }
- 
- .customer-modal__actions {
-   display: flex;
-   gap: 12px;
-   justify-content: flex-end;
-   margin-top: 24px;
-   padding-top: 20px;
-   border-top: 1px solid #e5e7eb;
- }
- 
-/* Кнопки модалки — liquid glass */
+.customer-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.customer-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.3;
+}
+
+.customer-modal__close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.customer-modal__close:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.customer-modal__close:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.customer-modal__form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.customer-modal__body {
+  padding: 18px 20px 8px;
+  overflow-y: auto;
+}
+
+.customer-modal__section {
+  margin-top: 4px;
+  margin-bottom: 16px;
+  padding-top: 4px;
+}
+
+.customer-modal__section-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.customer-modal__grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.customer-modal__grid--2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.customer-modal__grid--3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.customer-modal__grid .customer-modal__field {
+  margin-bottom: 0;
+}
+
+.customer-modal__field {
+  margin-bottom: 12px;
+}
+
+.customer-modal__field--narrow {
+  max-width: 220px;
+}
+
+.customer-modal__label,
+.customer-modal__label-sm {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.customer-modal input.customer-modal__input,
+.customer-modal select.customer-modal__input,
+.customer-modal textarea.customer-modal__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.customer-modal select.customer-modal__input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.customer-modal textarea.customer-modal__textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.customer-modal input.customer-modal__input:focus,
+.customer-modal select.customer-modal__input:focus,
+.customer-modal textarea.customer-modal__textarea:focus {
+  outline: none;
+  border-color: #4a6a94;
+  box-shadow: 0 0 0 3px rgba(74, 106, 148, 0.18);
+}
+
+.customer-modal__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 14px 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
 .customer-modal__button {
   padding: 8px 16px;
   border-radius: 999px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
- 
+
 .customer-modal__button--secondary {
-  background-color: rgba(229, 231, 235, 0.88);
+  background: #fff;
   color: #1f2937;
-  border: 1px solid rgba(209, 213, 219, 0.6);
+  border: 1px solid #d1d5db;
 }
- 
- .customer-modal__button--secondary:hover {
-   background-color: rgba(229, 231, 235, 0.8);
-   border-color: rgba(255, 255, 255, 0.5);
-   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 12px rgba(0, 0, 0, 0.08);
- }
- 
+
+.customer-modal__button--secondary:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
 .customer-modal__button--primary {
-  background: rgba(108, 142, 184, 0.75);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: #4a6a94;
+  color: #fff;
+  border: 1px solid #3d5a7c;
 }
- 
- .customer-modal__button--primary:hover:not(:disabled) {
-   background: rgba(108, 142, 184, 0.88);
-   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.12);
- }
- 
- .customer-modal__button--primary:disabled {
-   background-color: #9ca3af;
-   cursor: not-allowed;
-   box-shadow: none;
- }
+
+.customer-modal__button--primary:hover:not(:disabled) {
+  background: #3d5a7c;
+}
+
+.customer-modal__button:disabled {
+  background: #9ca3af;
+  border-color: #9ca3af;
+  color: #fff;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .customer-modal__grid--2,
+  .customer-modal__grid--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-modal__field--narrow {
+    max-width: none;
+  }
+}

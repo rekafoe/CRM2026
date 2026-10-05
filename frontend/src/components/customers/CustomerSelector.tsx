@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Customer, Order } from '../../types';
 import { getCustomers, updateOrderCustomer, createCustomer, updateOrderPaymentChannel } from '../../api';
 import { useToast } from '../Toast';
@@ -294,7 +295,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
     }
   };
 
-  return (
+  return createPortal(
     // Клик по фону не закрывает модалку: иначе пропадает уже введённая форма.
     <div className="customer-modal-overlay" role="presentation">
       <div
@@ -303,166 +304,210 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
         aria-modal="true"
         aria-labelledby="create-customer-title"
       >
-        <h3 id="create-customer-title" className="customer-modal__title">Создать клиента</h3>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="customer-modal__field">
-            <label className="customer-modal__label">Тип клиента</label>
-            <select
-              value={type}
-              onChange={(e) => {
-                const newType = e.target.value as 'individual' | 'legal';
-                setType(newType);
-                // Сбрасываем поля, специфичные для другого типа
-                if (newType === 'individual') {
-                  setFormData(prev => ({
-                    ...prev,
-                    company_name: '',
-                    legal_name: '',
-                    tax_id: '',
-                    authorized_person: '',
-                    bank_details: '',
-                  }));
-                } else {
-                  setFormData(prev => ({
-                    ...prev,
-                    first_name: '',
-                    last_name: '',
-                    middle_name: '',
-                  }));
-                }
-              }}
-              className="customer-modal__input"
-            >
-              <option value="individual">Физическое лицо</option>
-              <option value="legal">Юридическое лицо</option>
-            </select>
-          </div>
+        <div className="customer-modal__header">
+          <h3 id="create-customer-title" className="customer-modal__title">Создать клиента</h3>
+          <button
+            type="button"
+            className="customer-modal__close"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
 
-          {type === 'individual' ? (
-            <>
+        <form onSubmit={handleSubmit} className="customer-modal__form">
+          <div className="customer-modal__body">
+            <div className="customer-modal__field">
+              <label className="customer-modal__label" htmlFor="create-customer-type">Тип клиента</label>
+              <select
+                id="create-customer-type"
+                value={type}
+                onChange={(e) => {
+                  const newType = e.target.value as 'individual' | 'legal';
+                  setType(newType);
+                  if (newType === 'individual') {
+                    setFormData(prev => ({
+                      ...prev,
+                      company_name: '',
+                      legal_name: '',
+                      tax_id: '',
+                      authorized_person: '',
+                      bank_details: '',
+                    }));
+                  } else {
+                    setFormData(prev => ({
+                      ...prev,
+                      first_name: '',
+                      last_name: '',
+                      middle_name: '',
+                    }));
+                  }
+                }}
+                className="customer-modal__input"
+              >
+                <option value="individual">Физическое лицо</option>
+                <option value="legal">Юридическое лицо</option>
+              </select>
+            </div>
+
+            {type === 'individual' ? (
+              <section className="customer-modal__section">
+                <h4 className="customer-modal__section-title">ФИО</h4>
+                <div className="customer-modal__grid customer-modal__grid--3">
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-last-name">Фамилия</label>
+                    <input
+                      id="create-customer-last-name"
+                      type="text"
+                      value={formData.last_name}
+                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-first-name">Имя</label>
+                    <input
+                      id="create-customer-first-name"
+                      type="text"
+                      value={formData.first_name}
+                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-middle-name">Отчество</label>
+                    <input
+                      id="create-customer-middle-name"
+                      type="text"
+                      value={formData.middle_name}
+                      onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
+                      className="customer-modal__input"
+                    />
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <>
+                <section className="customer-modal__section">
+                  <h4 className="customer-modal__section-title">Компания</h4>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-company">Название компании *</label>
+                    <input
+                      id="create-customer-company"
+                      type="text"
+                      value={formData.company_name}
+                      onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                      required
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-legal-name">Юридическое название</label>
+                    <input
+                      id="create-customer-legal-name"
+                      type="text"
+                      value={formData.legal_name}
+                      onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field customer-modal__field--narrow">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-tax-id">УНП</label>
+                    <input
+                      id="create-customer-tax-id"
+                      type="text"
+                      value={formData.tax_id}
+                      onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                      className="customer-modal__input"
+                    />
+                  </div>
+                </section>
+                <section className="customer-modal__section">
+                  <h4 className="customer-modal__section-title">Реквизиты</h4>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-authorized">Уполномоченное лицо</label>
+                    <input
+                      id="create-customer-authorized"
+                      type="text"
+                      value={formData.authorized_person}
+                      onChange={(e) => setFormData({ ...formData, authorized_person: e.target.value })}
+                      placeholder="ФИО уполномоченного лица"
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-bank">Расчётный счёт</label>
+                    <textarea
+                      id="create-customer-bank"
+                      value={formData.bank_details}
+                      onChange={(e) => setFormData({ ...formData, bank_details: e.target.value })}
+                      placeholder="р/с, банк, БИК и т.д."
+                      rows={3}
+                      className="customer-modal__textarea"
+                    />
+                  </div>
+                </section>
+              </>
+            )}
+
+            <section className="customer-modal__section">
+              <h4 className="customer-modal__section-title">Контакты</h4>
+              <div className="customer-modal__grid customer-modal__grid--2">
+                <div className="customer-modal__field">
+                  <label className="customer-modal__label-sm" htmlFor="create-customer-phone">Телефон</label>
+                  <input
+                    id="create-customer-phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="customer-modal__input"
+                  />
+                </div>
+                <div className="customer-modal__field">
+                  <label className="customer-modal__label-sm" htmlFor="create-customer-email">Email</label>
+                  <input
+                    id="create-customer-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="customer-modal__input"
+                  />
+                </div>
+              </div>
               <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">Фамилия</label>
+                <label className="customer-modal__label-sm" htmlFor="create-customer-address">Адрес</label>
                 <input
+                  id="create-customer-address"
                   type="text"
-                  value={formData.last_name}
-                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="customer-modal__input"
                 />
               </div>
+            </section>
+
+            <section className="customer-modal__section">
+              <h4 className="customer-modal__section-title">Примечание</h4>
               <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">Имя</label>
-                <input
-                  type="text"
-                  value={formData.first_name}
-                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="customer-modal__input"
-                />
-              </div>
-              <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">Отчество</label>
-                <input
-                  type="text"
-                  value={formData.middle_name}
-                  onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
-                  className="customer-modal__input"
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">Название компании *</label>
-                <input
-                  type="text"
-                  value={formData.company_name}
-                  onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                  required
-                  className="customer-modal__input"
-                />
-              </div>
-              <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">Юридическое название</label>
-                <input
-                  type="text"
-                  value={formData.legal_name}
-                  onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
-                  className="customer-modal__input"
-                />
-              </div>
-              <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">УНП</label>
-                <input
-                  type="text"
-                  value={formData.tax_id}
-                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-                  className="customer-modal__input"
-                />
-              </div>
-              <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">Уполномоченное лицо</label>
-                <input
-                  type="text"
-                  value={formData.authorized_person}
-                  onChange={(e) => setFormData({ ...formData, authorized_person: e.target.value })}
-                  placeholder="ФИО уполномоченного лица"
-                  className="customer-modal__input"
-                />
-              </div>
-              <div className="customer-modal__field">
-                <label className="customer-modal__label-sm">Расчётный счёт</label>
+                <label className="customer-modal__label-sm" htmlFor="create-customer-notes">Комментарий</label>
                 <textarea
-                  value={formData.bank_details}
-                  onChange={(e) => setFormData({ ...formData, bank_details: e.target.value })}
-                  placeholder="р/с, банк, БИК и т.д."
+                  id="create-customer-notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
                   className="customer-modal__textarea"
                 />
               </div>
-            </>
-          )}
-
-          <div className="customer-modal__field">
-            <label className="customer-modal__label-sm">Телефон</label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="customer-modal__input"
-            />
-          </div>
-          <div className="customer-modal__field">
-            <label className="customer-modal__label-sm">Email</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="customer-modal__input"
-            />
-          </div>
-          <div className="customer-modal__field">
-            <label className="customer-modal__label-sm">Адрес</label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="customer-modal__input"
-            />
-          </div>
-          <div className="customer-modal__field">
-            <label className="customer-modal__label-sm">Примечания</label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-              className="customer-modal__textarea"
-            />
+            </section>
           </div>
 
           <div className="customer-modal__actions">
             <button
               type="button"
               onClick={onClose}
+              disabled={saving}
               className="customer-modal__button customer-modal__button--secondary"
             >
               Отмена
@@ -477,6 +522,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
