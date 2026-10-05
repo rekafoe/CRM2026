@@ -34,6 +34,9 @@ export const EarningsPage: React.FC = () => {
   const [hours, setHours] = useState(0);
   const [hourlyPay, setHourlyPay] = useState(0);
   const [totalNet, setTotalNet] = useState(0);
+  const [wasteShare, setWasteShare] = useState(0);
+  const [wastePool, setWastePool] = useState(0);
+  const [wasteOperators, setWasteOperators] = useState(0);
   const [penalties, setPenalties] = useState<Array<{ id: number; amount: number; reason: string; penaltyDate: string }>>([]);
   const [bonuses, setBonuses] = useState<Array<{ id: number; amount: number; reason: string; bonusDate: string }>>([]);
   const [showPenaltiesModal, setShowPenaltiesModal] = useState(false);
@@ -56,7 +59,11 @@ export const EarningsPage: React.FC = () => {
       const tp = Number(payload.totalPenalties) || 0;
       const tb = Number(payload.totalBonuses) || 0;
       const hp = Number(payload.hourlyPay) || 0;
-      setTotalNet(Number(payload.totalNet) ?? Math.max(0, t + tb + hp - tp));
+      const waste = Number(payload.wasteShare) || 0;
+      setWasteShare(waste);
+      setWastePool(Number(payload.wastePool) || 0);
+      setWasteOperators(Number(payload.wasteOperators) || 0);
+      setTotalNet(Number(payload.totalNet) ?? Math.max(0, t + tb + hp - tp - waste));
       setPenalties(Array.isArray(payload.penalties) ? payload.penalties : []);
       setBonuses(Array.isArray(payload.bonuses) ? payload.bonuses : []);
     } catch (e: any) {
@@ -218,6 +225,20 @@ export const EarningsPage: React.FC = () => {
             <div className="earnings-summary-title">Штрафы</div>
             <div className="earnings-summary-value">−<MoneyAmount value={totalPenalties} /></div>
           </button>
+          <div
+            className="earnings-summary-card earnings-summary-card--penalty"
+            title={
+              wasteOperators > 0
+                ? `Сумма брака месяца делится поровну на ${wasteOperators}`
+                : 'Доля появляется, если за месяц есть начисление исполнителя'
+            }
+          >
+            <div className="earnings-summary-title">Брак</div>
+            <div className="earnings-summary-value">−<MoneyAmount value={wasteShare} /></div>
+            {wastePool > 0 && wasteOperators > 0 ? (
+              <div className="earnings-muted">из <MoneyAmount value={wastePool} /> на {wasteOperators}</div>
+            ) : null}
+          </div>
           <div className="earnings-summary-card earnings-summary-card--net">
             <div className="earnings-summary-title">К выплате</div>
             <div className="earnings-summary-value"><MoneyAmount value={totalNet} /></div>

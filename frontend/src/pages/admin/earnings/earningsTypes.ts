@@ -9,6 +9,8 @@ export type AdminUserRow = {
   totalPreviousNet?: number;
   totalPenalties?: number;
   totalBonuses?: number;
+  /** Доля брака месяца. Вычитается из «к выплате», в проценты позиции не входит. */
+  totalWaste?: number;
   hourlyRate?: number;
   hourlyPay?: number;
   totalNet?: number;

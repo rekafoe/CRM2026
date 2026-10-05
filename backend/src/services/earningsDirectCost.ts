@@ -215,6 +215,56 @@ export function printDirectCost(usage: PrintUsage, rates: PrintCostRates[]): num
   return Math.round(usage.totalM2 * (color + white + varnish) * 10000) / 10000
 }
 
+/** Сколько годных листов калькулятор заложил в позицию. Брак в это число не входит. */
+export function goodSheetCount(params: unknown, itemSheets: number): number {
+  const record = readRecord(params)
+  const specs = readRecord(record.specifications)
+  const layout = readRecord(record.layout ?? specs.layout)
+  return positive(record.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded ?? itemSheets)
+}
+
+/**
+ * Деньги брака позиции: оттиски испорченных листов и закупка материала на эти листы.
+ * В процент контактёра, ответственного и исполнителя не входит.
+ */
+export function wasteItemMoney(input: {
+  wasteSheets: number
+  sides: number
+  params: unknown
+  itemQuantity: number
+  itemSheets: number
+  purchasePriceById: Map<number, number | null>
+  printRates: PrintCostRates[]
+}): number {
+  const waste = positive(input.wasteSheets)
+  if (waste <= 0) return 0
+  const usage = printUsageFromParams(input.params, input.itemQuantity, input.itemSheets, input.sides)
+  const technology = usage.kind === 'none' ? '' : usage.technology
+  const print = technology
+    ? printDirectCost(
+      {
+        kind: 'sheets',
+        technology,
+        impressions: sheetImpressions(waste, input.sides),
+        sheetWidthMm: usage.kind === 'sheets' ? usage.sheetWidthMm : undefined,
+        sheetHeightMm: usage.kind === 'sheets' ? usage.sheetHeightMm : undefined,
+      },
+      input.printRates,
+    )
+    : 0
+  const good = goodSheetCount(input.params, input.itemSheets)
+  const material = good > 0
+    ? materialDirectCost(
+      materialUsesFromParams(input.params, input.itemQuantity).map((use) => ({
+        materialId: use.materialId,
+        quantity: (use.quantity / good) * waste,
+      })),
+      input.purchasePriceById,
+    )
+    : 0
+  return Math.round((print + material) * 10000) / 10000
+}
+
 function pickSheetRow(
   rows: PrintCostRates[],
   width?: number,

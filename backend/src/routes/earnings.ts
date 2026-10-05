@@ -8,6 +8,7 @@ import {
 } from '../services/customCalculatorPercentSettings'
 import { normalizeCustomCalculatorPercent } from '../services/earningsOperatorPercent'
 import { getRoleOrderPercents, setRoleOrderPercents } from '../services/earningsRoleRateSettings'
+import { getWasteSharesForMonths } from '../services/earningsWasteService'
 
 const router = Router()
 
@@ -203,7 +204,10 @@ router.get('/me', asyncHandler(async (req, res) => {
   ).catch(() => ({ hours: 0 }))
   const hours = Number(shiftRow?.hours) || 0
   const hourlyPay = Math.round(hours * hourlyRate * 100) / 100
-  const totalNet = Math.max(0, total + totalBonuses + hourlyPay - totalPenalties)
+  const wastePools = await getWasteSharesForMonths(db, [month]).catch(() => new Map())
+  const wastePool = wastePools.get(month)
+  const wasteShare = wastePool?.shares.get(authUser.id) || 0
+  const totalNet = Math.max(0, total + totalBonuses + hourlyPay - totalPenalties - wasteShare)
 
   res.json({
     month,
@@ -213,6 +217,9 @@ router.get('/me', asyncHandler(async (req, res) => {
     hourlyRate,
     hours,
     hourlyPay,
+    wasteShare,
+    wastePool: wastePool?.total || 0,
+    wasteOperators: wastePool?.operatorCount || 0,
     totalNet,
     penalties,
     bonuses,
@@ -473,16 +480,21 @@ router.get('/admin', asyncHandler(async (req, res) => {
     seriesKeys,
   ).catch(() => []))
 
+  const wasteMonths = Array.from(new Set([...seriesKeys, month, prevMonth]))
+  const wasteByMonth = await getWasteSharesForMonths(db, wasteMonths).catch(() => new Map())
+  const wasteShareOf = (userId: number, key: string) => wasteByMonth.get(key)?.shares.get(userId) || 0
+
   const monthPayout = (userId: number, key: string, hourlyRate: number) => {
     const percent = historyMap.get(`${userId}_${key}`) || 0
     const hours = historyHoursMap.get(`${userId}_${key}`) || 0
     const hourlyPart = Math.round(hours * hourlyRate * 100) / 100
     const bonuses = historyBonusMap.get(`${userId}_${key}`) || 0
     const penalties = historyPenaltyMap.get(`${userId}_${key}`) || 0
+    const waste = wasteShareOf(userId, key)
     return {
       month: key,
       total: percent,
-      net: Math.max(0, percent + bonuses + hourlyPart - penalties),
+      net: Math.max(0, percent + bonuses + hourlyPart - penalties - waste),
     }
   }
 
@@ -493,17 +505,19 @@ router.get('/admin', asyncHandler(async (req, res) => {
     const totalBonuses = bonusesMap.get(u.id) || 0
     const hourlyRate = Number(u.hourly_rate) || 0
     const hourlyPay = Math.round(shift.hours * hourlyRate * 100) / 100
+    const totalWaste = wasteShareOf(u.id, month)
     const totalNet = Math.max(
       0,
-      Number(earnings) + Number(totalBonuses) + hourlyPay - Number(totalPenalties),
+      Number(earnings) + Number(totalBonuses) + hourlyPay - Number(totalPenalties) - totalWaste,
     )
     const previousPercent = totalsPrevMap.get(u.id) || 0
     const previousHourlyPay = Math.round((shiftsPrevMap.get(u.id) || 0) * hourlyRate * 100) / 100
     const previousBonuses = bonusesPrevMap.get(u.id) || 0
     const previousPenalties = penaltiesPrevMap.get(u.id) || 0
+    const previousWaste = wasteShareOf(u.id, prevMonth)
     const totalPreviousNet = Math.max(
       0,
-      Number(previousPercent) + Number(previousBonuses) + previousHourlyPay - Number(previousPenalties),
+      Number(previousPercent) + Number(previousBonuses) + previousHourlyPay - Number(previousPenalties) - previousWaste,
     )
     const history = historyKeys.map((key) => monthPayout(u.id, key, hourlyRate))
     const yearHistory = yearKeys.map((key) => monthPayout(u.id, key, hourlyRate))
@@ -517,6 +531,7 @@ router.get('/admin', asyncHandler(async (req, res) => {
       totalPreviousNet,
       totalPenalties,
       totalBonuses,
+      totalWaste,
       hourlyRate,
       hourlyPay,
       totalNet,

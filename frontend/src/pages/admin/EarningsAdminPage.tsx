@@ -535,8 +535,9 @@ export const EarningsAdminPage: React.FC = () => {
                   <th>Часы × ставка</th>
                   <th>Премии</th>
                   <th>Штрафы</th>
+                  <th title="Доля брака месяца, поровну между исполнителями">Брак</th>
                   <th>К выплате</th>
-                  <th title="К выплате за прошлый месяц: проценты, часы, премии и штрафы">Пред. месяц</th>
+                  <th title="К выплате за прошлый месяц: проценты, часы, премии, штрафы и доля брака">Пред. месяц</th>
                   <th>Часы</th>
                   <th>Смены</th>
                   <th>Действия</th>
@@ -545,7 +546,7 @@ export const EarningsAdminPage: React.FC = () => {
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                    <td colSpan={11} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
                       Нет данных за выбранный месяц
                     </td>
                   </tr>
@@ -580,6 +581,12 @@ export const EarningsAdminPage: React.FC = () => {
                     </td>
                     <td className="earn-cell-money earn-cell-money--penalty">
                       −<MoneyAmount value={row.totalPenalties ?? 0} />
+                    </td>
+                    <td
+                      className="earn-cell-money earn-cell-money--penalty"
+                      title="Общая сумма брака месяца делится поровну между теми, у кого есть начисление исполнителя"
+                    >
+                      −<MoneyAmount value={row.totalWaste ?? 0} />
                     </td>
                     <td className="earn-cell-money earn-cell-money--net">
                       <MoneyAmount value={row.totalNet ?? row.totalCurrentMonth} />
@@ -949,7 +956,7 @@ export const EarningsAdminPage: React.FC = () => {
             <div className="earn-penalty-summary">
               Итого штрафов за {month}: <strong><MoneyAmount value={penaltyTotal} /></strong>
               {' · '}
-              К выплате: <strong><MoneyAmount value={Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.hourlyPay ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal)} /></strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.hourlyPay ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal - (penaltyUser.totalWaste ?? 0))} /></strong>
             </div>
             {penaltyLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
@@ -1008,7 +1015,7 @@ export const EarningsAdminPage: React.FC = () => {
             <div className="earn-bonus-summary">
               Итого премий за {month}: <strong><MoneyAmount value={bonusTotal} signed /></strong>
               {' · '}
-              К выплате: <strong><MoneyAmount value={Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + (bonusUser.hourlyPay ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0))} /></strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + (bonusUser.hourlyPay ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0) - (bonusUser.totalWaste ?? 0))} /></strong>
             </div>
             {bonusLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
