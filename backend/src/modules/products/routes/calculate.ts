@@ -3,6 +3,7 @@ import { getDb } from '../../../db';
 import { ProductConfiguration } from '../../../types/products';
 import { rateLimiter } from '../../../middleware/rateLimiter';
 import { logger } from '../../../utils/logger';
+import { UnifiedPricingService } from '../../pricing/services/unifiedPricingService';
 
 const router = Router();
 
@@ -97,7 +98,6 @@ router.post('/:productId/calculate', calculateRateLimit, async (req, res) => {
 
     logger.debug('Calculating price for product', { productId, configuration });
 
-    const { UnifiedPricingService } = await import('../../pricing/services/unifiedPricingService');
     const result = await UnifiedPricingService.calculatePrice(
       parseInt(productId, 10),
       configuration,

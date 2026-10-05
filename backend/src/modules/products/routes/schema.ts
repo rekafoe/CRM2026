@@ -276,9 +276,9 @@ router.get('/:productId/schema', async (req, res) => {
             ? JSON.parse(templateConfig.config_data)
             : templateConfig.config_data;
           templateConfigData = normalizeConfigDataForPersistence(templateConfigData);
-          // Синхронизируем операции из typeConfigs (подтипы) в product_operations_link,
-          // чтобы операции «биговка с фальцовкой» и др. отображались в калькуляторе
-          if (templateConfigData?.simplified) {
+          // Запись связей операций нужна CRM-калькулятору (полная схема).
+          // Compact для сайта — чтение: синхронизация на каждом просчёте тормозит первый ответ.
+          if (!isCompact && templateConfigData?.simplified) {
             try {
               await syncSimplifiedOperations(db, Number(productId), templateConfigData);
             } catch (syncErr) {
@@ -477,7 +477,7 @@ router.get('/:productId/schema', async (req, res) => {
     // Compact schema ниже собирается отдельно и по-прежнему не содержит ширину рулона.
     const simplified = normalizedSimplified;
     let schemaMaterials = productMaterials;
-    if (simplified && typeof simplified === 'object') {
+    if (!isCompact && simplified && typeof simplified === 'object') {
       const materialIds = collectMaterialIdsFromSimplified(simplified);
       if (materialIds.length > 0) {
         const placeholders = materialIds.map(() => '?').join(',');
