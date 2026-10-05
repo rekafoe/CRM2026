@@ -3,6 +3,10 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { logger } from '../utils/logger'
+import {
+  getBePaidShopCredentials,
+  isBePaidWebhookAuthorized,
+} from '../services/bepaidCheckoutService'
 
 const router = Router()
 
@@ -31,10 +35,29 @@ function mapBePaidStatus(raw: string): 'paid' | 'failed' | 'pending' | null {
   return null
 }
 
-// POST /api/webhooks/bepaid — статус оплаты BePaid (checkout notification)
+/**
+ * POST /api/webhooks/bepaid — статус оплаты BePaid (checkout notification).
+ * BePaid sends HTTP Basic Auth (Shop ID + Secret Key). Without verification
+ * anyone could mark an order paid by number/id.
+ * @see https://docs.bepaid.by/en/using_api/webhooks/
+ */
 router.post(
   '/bepaid',
   asyncHandler(async (req, res) => {
+    if (!getBePaidShopCredentials()) {
+      logger.error('BePaid webhook: BEPAID_SHOP_ID/BEPAID_SECRET_KEY not configured')
+      res.status(503).json({ message: 'BePaid webhook is not configured' })
+      return
+    }
+    if (!isBePaidWebhookAuthorized(req.headers.authorization)) {
+      logger.warn('BePaid webhook: rejected unauthorized request', {
+        hasAuthorization: Boolean(req.headers.authorization),
+      })
+      res.setHeader('WWW-Authenticate', 'Basic realm="bePaid"')
+      res.status(401).json({ message: 'Unauthorized' })
+      return
+    }
+
     const body = (req.body || {}) as BePaidWebhookBody
     const tx = body.transaction
     const gatewayPayment = body.checkout?.gateway_response?.payment
@@ -60,23 +83,24 @@ router.post(
       return
     }
 
+    type OrderPayRow = {
+      id: number
+      prepaymentAmount?: number | string | null
+      prepaymentStatus?: string | null
+      paymentUrl?: string | null
+      paymentId?: string | null
+    }
+    const selectPay =
+      'SELECT id, prepaymentAmount, prepaymentStatus, paymentUrl, paymentId FROM orders WHERE '
+
     const db = await getDb()
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
-          paymentId,
-        )
+      ? await db.get<OrderPayRow>(`${selectPay}paymentId = ?`, paymentId)
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
-        trackingId,
-      )
+      order = await db.get<OrderPayRow>(`${selectPay}number = ?`, trackingId)
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
-          Number(trackingId),
-        )
+        order = await db.get<OrderPayRow>(`${selectPay}id = ?`, Number(trackingId))
       }
     }
     if (!order) {
@@ -93,16 +117,32 @@ router.post(
     }
 
     const existingPrepay = Number(order.prepaymentAmount ?? 0)
+    const statusLower = String(order.prepaymentStatus ?? '').toLowerCase()
+    const alreadyPaid = statusLower === 'paid' || statusLower === 'successful'
+    // Idempotent retry: same payment uid already applied as paid.
+    if (
+      prepaymentStatus === 'paid' &&
+      alreadyPaid &&
+      paymentId &&
+      String(order.paymentId || '') === paymentId
+    ) {
+      res.status(204).end()
+      return
+    }
+
+    // Follow-up BePaid link (send-payment-link keeps paid amount + open paymentUrl):
+    // accumulate; otherwise SET (first payment / website confirm already wrote amount).
+    const hasOpenCheckout = Boolean(String(order.paymentUrl || '').trim())
     const amount =
       prepaymentStatus === 'paid'
         ? amountByn > 0
-          ? amountByn
+          ? alreadyPaid && hasOpenCheckout
+            ? Math.round((existingPrepay + amountByn) * 100) / 100
+            : amountByn
           : existingPrepay > 0
             ? existingPrepay
             : 0
-        : prepaymentStatus === 'failed'
-          ? 0
-          : existingPrepay
+        : existingPrepay
 
     if (prepaymentStatus === 'paid' && amount <= 0) {
       logger.warn('BePaid webhook: paid without amount', { orderId: order.id, paymentId })
@@ -119,6 +159,7 @@ router.post(
            paymentUrl = NULL, paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(sql, amount, paymentId || null, order.id)
     } else if (prepaymentStatus === 'failed') {
+      // Do not wipe an already-recorded prepaymentAmount on failed attempts.
       const sql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
            paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`

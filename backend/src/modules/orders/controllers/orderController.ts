@@ -407,21 +407,29 @@ export class OrderController {
 
     const db = await getDb()
     let row = orderIdFromPath
-      ? await db.get<{ id: number; source?: string | null; number?: string | null }>(
-          'SELECT id, source, number FROM orders WHERE id = ?',
-          orderIdFromPath
-        )
+      ? await db.get<{
+          id: number
+          source?: string | null
+          number?: string | null
+          prepaymentAmount?: number | string | null
+        }>('SELECT id, source, number, prepaymentAmount FROM orders WHERE id = ?', orderIdFromPath)
       : undefined
 
     if (!row && orderNumber) {
-      row = await db.get<{ id: number; source?: string | null; number?: string | null }>(
-        'SELECT id, source, number FROM orders WHERE number = ?',
-        orderNumber
-      )
+      row = await db.get<{
+        id: number
+        source?: string | null
+        number?: string | null
+        prepaymentAmount?: number | string | null
+      }>('SELECT id, source, number, prepaymentAmount FROM orders WHERE number = ?', orderNumber)
     }
 
     if (!row) {
       res.status(404).json({ error: 'Заказ не найден' })
+      return
+    }
+    if (row.source !== 'website') {
+      res.status(403).json({ error: 'Подтверждение оплаты доступно только для заказов с сайта' })
       return
     }
 
@@ -455,13 +463,19 @@ export class OrderController {
     }
 
     if (paymentStatus === 'failed') {
+      // Keep any already-recorded prepaymentAmount (mirror BePaid webhook failed path).
       const updateSql = hasPrepaymentUpdatedAt
-        ? `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
+        ? `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
            paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-        : `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
+        : `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
            paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(updateSql, paymentId, orderId)
-      res.json({ ok: true, skipped: false, paymentStatus: 'failed' })
+      res.json({
+        ok: true,
+        skipped: false,
+        paymentStatus: 'failed',
+        prepaymentAmount: Number(row.prepaymentAmount ?? 0),
+      })
       return
     }
 

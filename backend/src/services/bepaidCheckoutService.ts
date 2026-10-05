@@ -1,3 +1,4 @@
+import { constantTimeKeyEquals } from '../middleware/authMailApiKey'
 import { logger } from '../utils/logger'
 
 export type BePaidCheckoutInput = {
@@ -44,6 +45,44 @@ function getCredentials(): { shopId: string; secretKey: string } {
     )
   }
   return { shopId, secretKey }
+}
+
+/** Shop credentials for webhook Basic Auth; null if BePaid is not configured. */
+export function getBePaidShopCredentials(): { shopId: string; secretKey: string } | null {
+  try {
+    return getCredentials()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * bePaid sends checkout/payment notifications with HTTP Basic Auth
+ * (Shop ID + Secret Key). Reject anything else — the webhook is otherwise public.
+ * @see https://docs.bepaid.by/en/using_api/webhooks/
+ */
+export function isBePaidWebhookAuthorized(
+  authorizationHeader: string | undefined | null,
+): boolean {
+  const credentials = getBePaidShopCredentials()
+  if (!credentials) return false
+  const raw = String(authorizationHeader || '').trim()
+  const match = /^Basic\s+(\S+)$/i.exec(raw)
+  if (!match) return false
+  let decoded = ''
+  try {
+    decoded = Buffer.from(match[1], 'base64').toString('utf8')
+  } catch {
+    return false
+  }
+  const sep = decoded.indexOf(':')
+  if (sep <= 0) return false
+  const shopId = decoded.slice(0, sep)
+  const secretKey = decoded.slice(sep + 1)
+  return (
+    constantTimeKeyEquals(shopId, credentials.shopId) &&
+    constantTimeKeyEquals(secretKey, credentials.secretKey)
+  )
 }
 
 function isTestMode(explicit?: boolean): boolean {
