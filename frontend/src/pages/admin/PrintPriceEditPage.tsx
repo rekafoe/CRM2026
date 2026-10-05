@@ -302,6 +302,12 @@ export const PrintPriceEditPage: React.FC = () => {
     price_color_per_m2: null as number | null,
     price_white_per_m2: null as number | null,
     price_varnish_per_m2: null as number | null,
+    cost_per_impression: null as number | null,
+    cost_bw_per_meter: null as number | null,
+    cost_color_per_meter: null as number | null,
+    cost_color_per_m2: null as number | null,
+    cost_white_per_m2: null as number | null,
+    cost_varnish_per_m2: null as number | null,
     min_charge: 0,
     max_width_mm: 600,
     max_height_mm: 900,
@@ -353,6 +359,12 @@ export const PrintPriceEditPage: React.FC = () => {
           price_color_per_m2: (item as any).price_color_per_m2 ?? null,
           price_white_per_m2: (item as any).price_white_per_m2 ?? null,
           price_varnish_per_m2: (item as any).price_varnish_per_m2 ?? null,
+          cost_per_impression: (item as any).cost_per_impression ?? null,
+          cost_bw_per_meter: (item as any).cost_bw_per_meter ?? null,
+          cost_color_per_meter: (item as any).cost_color_per_meter ?? null,
+          cost_color_per_m2: (item as any).cost_color_per_m2 ?? null,
+          cost_white_per_m2: (item as any).cost_white_per_m2 ?? null,
+          cost_varnish_per_m2: (item as any).cost_varnish_per_m2 ?? null,
           min_charge: (item as any).min_charge ?? 0,
           max_width_mm: (item as any).max_width_mm ?? 600,
           max_height_mm: (item as any).max_height_mm ?? 900,
@@ -385,6 +397,7 @@ export const PrintPriceEditPage: React.FC = () => {
     setForm((prev) => ({
       ...prev,
       price_bw_per_meter: null,
+      cost_bw_per_meter: null,
       tiers: prev.tiers.filter((tier) => !String(tier.price_mode).startsWith('bw_')),
     }));
   }, [technologySupportsBw]);
@@ -396,6 +409,8 @@ export const PrintPriceEditPage: React.FC = () => {
       ...prev,
       price_white_per_m2: null,
       price_varnish_per_m2: null,
+      cost_white_per_m2: null,
+      cost_varnish_per_m2: null,
       roll_m2_tiers:
         prev.roll_m2_tiers.length > 0 ? normalizeRollM2Tiers(prev.roll_m2_tiers) : buildDefaultRollM2Tiers(),
     }));
@@ -826,6 +841,7 @@ export const PrintPriceEditPage: React.FC = () => {
             )}
 
             {form.counter_unit === 'sheets' && (
+              <>
               <FormField label="Размер печатного листа (мм)" className="mt-3">
                 <div className="flex gap-2 items-center">
                   <input
@@ -844,6 +860,17 @@ export const PrintPriceEditPage: React.FC = () => {
                   <span className="text-muted">SRA3 = 320×450</span>
                 </div>
               </FormField>
+              <FormField label="Себестоимость оттиска" className="mt-3">
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  className="form-control"
+                  value={form.cost_per_impression ?? ''}
+                  onChange={(e) => updateForm({ cost_per_impression: e.target.value ? parseFloat(e.target.value) : null })}
+                />
+              </FormField>
+              </>
             )}
 
           </div>
@@ -868,13 +895,22 @@ export const PrintPriceEditPage: React.FC = () => {
                     <FormField label="Цвет, руб/м² (база)">
                       <input type="number" step="0.01" className="form-control" value={form.price_color_per_m2 ?? ''} onChange={(e) => updateForm({ price_color_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
                     </FormField>
+                    <FormField label="Себестоимость цвета, за м²">
+                      <input type="number" step="0.01" min={0} className="form-control" value={form.cost_color_per_m2 ?? ''} onChange={(e) => updateForm({ cost_color_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                    </FormField>
                     {form.m2_pricing_kind === 'uv_flatbed' && (
                       <>
                         <FormField label="Белый, руб/м² (база)">
                           <input type="number" step="0.01" className="form-control" value={form.price_white_per_m2 ?? ''} onChange={(e) => updateForm({ price_white_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
                         </FormField>
+                        <FormField label="Себестоимость белого, за м²">
+                          <input type="number" step="0.01" min={0} className="form-control" value={form.cost_white_per_m2 ?? ''} onChange={(e) => updateForm({ cost_white_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                        </FormField>
                         <FormField label="Лак, руб/м² (база)">
                           <input type="number" step="0.01" className="form-control" value={form.price_varnish_per_m2 ?? ''} onChange={(e) => updateForm({ price_varnish_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                        </FormField>
+                        <FormField label="Себестоимость лака, за м²">
+                          <input type="number" step="0.01" min={0} className="form-control" value={form.cost_varnish_per_m2 ?? ''} onChange={(e) => updateForm({ cost_varnish_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
                         </FormField>
                       </>
                     )}
@@ -940,6 +976,28 @@ export const PrintPriceEditPage: React.FC = () => {
                       className="form-control"
                       value={form.price_color_per_meter ?? ''}
                       onChange={(e) => updateForm({ price_color_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
+                    />
+                  </FormField>
+                  {technologySupportsBw && (
+                    <FormField label="Себестоимость ЧБ, за метр">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        className="form-control"
+                        value={form.cost_bw_per_meter ?? ''}
+                        onChange={(e) => updateForm({ cost_bw_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
+                      />
+                    </FormField>
+                  )}
+                  <FormField label="Себестоимость цвета, за метр">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      className="form-control"
+                      value={form.cost_color_per_meter ?? ''}
+                      onChange={(e) => updateForm({ cost_color_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
                     />
                   </FormField>
                 </div>

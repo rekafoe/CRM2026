@@ -5,7 +5,7 @@ import { Alert, FormField } from '../../components/common';
 import { AppIcon, type IconName } from '../../components/ui';
 import { DepartmentManagement, UserManagement } from '../../features/userManagement';
 import { useAdminBack } from '../../hooks/useAdminBack';
-import { getCustomCalculatorPercent, updateCustomCalculatorPercent } from '../../api';
+import { getCustomCalculatorPercent, updateCustomCalculatorPercent, getRoleOrderPercents, updateRoleOrderPercents } from '../../api';
 import { PostalCarrierSettings } from './PostalCarrierSettings';
 import './SettingsPage.css';
 
@@ -239,7 +239,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
 
 const PayrollSettings: React.FC<{ onOpenEarnings: () => void }> = ({ onOpenEarnings }) => {
   const [value, setValue] = useState('17.5');
+  const [contactPercent, setContactPercent] = useState('1');
+  const [responsiblePercent, setResponsiblePercent] = useState('5');
   const [saving, setSaving] = useState(false);
+  const [roleSaving, setRoleSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -252,6 +255,14 @@ const PayrollSettings: React.FC<{ onOpenEarnings: () => void }> = ({ onOpenEarni
       .catch(() => {
         setError('Процент видит авторизованный пользователь. Сохраняет его администратор.');
       });
+    getRoleOrderPercents()
+      .then((response) => {
+        const contact = Number(response.data?.contactPercent);
+        const responsible = Number(response.data?.responsiblePercent);
+        if (Number.isFinite(contact)) setContactPercent(String(contact));
+        if (Number.isFinite(responsible)) setResponsiblePercent(String(responsible));
+      })
+      .catch(() => {});
   }, []);
 
   const save = async () => {
@@ -296,6 +307,62 @@ const PayrollSettings: React.FC<{ onOpenEarnings: () => void }> = ({ onOpenEarni
         </FormField>
         <button type="button" className="lg-btn lg-btn--primary" onClick={save} disabled={saving}>
           {saving ? 'Сохранение…' : 'Сохранить'}
+        </button>
+      </div>
+      <p className="settings-lead">
+        С базы позиции после прямых расходов. Исполнитель получает процент позиции минус эти две доли.
+      </p>
+      <div className="settings-payroll__row">
+        <FormField label="Контактёр, %">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.1}
+            className="settings-input"
+            value={contactPercent}
+            onChange={(event) => setContactPercent(event.target.value)}
+          />
+        </FormField>
+        <FormField label="Ответственный, %">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.1}
+            className="settings-input"
+            value={responsiblePercent}
+            onChange={(event) => setResponsiblePercent(event.target.value)}
+          />
+        </FormField>
+        <button
+          type="button"
+          className="lg-btn lg-btn--primary"
+          onClick={async () => {
+            const contact = Number(String(contactPercent).replace(',', '.'));
+            const responsible = Number(String(responsiblePercent).replace(',', '.'));
+            if (![contact, responsible].every((item) => Number.isFinite(item) && item >= 0 && item <= 100)) {
+              setError('Доли должны быть от 0 до 100');
+              setMessage(null);
+              return;
+            }
+            try {
+              setRoleSaving(true);
+              setError(null);
+              setMessage(null);
+              const response = await updateRoleOrderPercents({ contactPercent: contact, responsiblePercent: responsible });
+              setContactPercent(String(response.data.contactPercent));
+              setResponsiblePercent(String(response.data.responsiblePercent));
+              setMessage('Сохранено. Следующий пересчёт дня возьмёт эти доли.');
+            } catch (reason: any) {
+              setError(reason?.response?.data?.message || 'Не удалось сохранить доли');
+            } finally {
+              setRoleSaving(false);
+            }
+          }}
+          disabled={roleSaving}
+        >
+          {roleSaving ? 'Сохранение…' : 'Сохранить доли'}
         </button>
       </div>
       <button type="button" className="settings-text-link" onClick={onOpenEarnings}>

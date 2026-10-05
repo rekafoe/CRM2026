@@ -3,10 +3,19 @@ import { syncPayrollExpenses } from './payrollExpenseSync'
 import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
 import { notWaitingStatusSql } from '../utils/orderFulfillmentScope';
-import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
+import { type EarningsOrderItemRow } from './earningsEffectiveUserId';
 import { resolveEarningsOperatorPercent } from './earningsOperatorPercent';
 import { getCustomCalculatorOperatorPercent } from './customCalculatorPercentSettings';
 import { getDesignTemplatesByIds } from './designTemplateService';
+import {
+  materialDirectCost,
+  materialUsesFromParams,
+  printDirectCost,
+  printUsageFromParams,
+  type PrintCostRates,
+} from './earningsDirectCost';
+import { earningsBase, roleEarnings } from './earningsRoleSplit';
+import { getRoleOrderPercents } from './earningsRoleRateSettings';
 
 export interface EarningsSchedulerConfig {
   enabled: boolean;
@@ -21,6 +30,9 @@ type EarningsRow = EarningsOrderItemRow & {
   params: string;
   /** `items.type` — часто id продукта (сайт / Mini App), пока `params.productId` пуст */
   itemType: string | null;
+  contactUserId?: number | null;
+  itemSheets?: number | null;
+  itemSides?: number | null;
 };
 
 export class EarningsService {
@@ -151,6 +163,7 @@ export class EarningsService {
   private static async doRecalculateForDate(db: Awaited<ReturnType<typeof getDb>>, date: string) {
     let hasExecutorUserId = false;
     let hasResponsibleUserId = false;
+    let hasContactUserId = false;
     let hasIsInternal = false;
     let hasPaymentChannel = false;
     let hasIsCancelled = false;
@@ -158,6 +171,7 @@ export class EarningsService {
     try {
       hasExecutorUserId = await hasColumn('items', 'executor_user_id');
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id');
+      hasContactUserId = await hasColumn('orders', 'contact_user_id');
       hasIsInternal = await hasColumn('orders', 'is_internal');
       hasPaymentChannel = await hasColumn('orders', 'payment_channel');
       hasIsCancelled = await hasColumn('orders', 'is_cancelled');
@@ -166,6 +180,7 @@ export class EarningsService {
 
     const executorSel = hasExecutorUserId ? 'i.executor_user_id as executorUserId' : 'NULL as executorUserId';
     const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id as responsibleUserId' : 'NULL as responsibleUserId';
+    const contactSel = hasContactUserId ? 'o.contact_user_id as contactUserId' : 'NULL as contactUserId';
     const sourceSel = hasOrderSource ? "COALESCE(o.source, '') as orderSource" : "'' as orderSource";
     const excludeInternal = hasIsInternal
       ? 'AND COALESCE(o.is_internal, 0) = 0'
@@ -183,9 +198,12 @@ export class EarningsService {
         o.userId as userId,
         ${executorSel},
         ${responsibleSel},
+        ${contactSel},
         ${sourceSel},
         i.price as price,
         i.quantity as quantity,
+        i.sheets as itemSheets,
+        i.sides as itemSides,
         i.params as params,
         i.type as itemType
       FROM items i
@@ -315,12 +333,12 @@ export class EarningsService {
     };
 
     const customCalculatorPercent = await getCustomCalculatorOperatorPercent(db);
+    const rolePercents = await getRoleOrderPercents(db);
+    const purchasePrices = await loadPurchasePrices(db, rows);
+    const printCosts = await loadPrintCostRates(db);
 
     try {
       for (const row of rows) {
-        const effectiveUserId = effectiveEarningsUserId(row);
-        if (effectiveUserId == null || !Number.isFinite(effectiveUserId)) continue;
-
         let params: any = {};
         try {
           params = JSON.parse(row.params || '{}');
@@ -340,7 +358,7 @@ export class EarningsService {
 
         const qty = Number(row.quantity) || 0;
         const lineTotal = (Number(row.price) || 0) * qty;
-        // База оператора = X (без платы за дизайн Y). Y — один раз на позицию с макетом.
+        // Плата за макет Y не входит в базу ролей. Автор получает свой процент только с Y.
         let designUsageTotal = 0;
         const designTemplateIdForFee = Number(params?.designTemplateId);
         if (Number.isFinite(designTemplateIdForFee) && designTemplateIdForFee > 0) {
@@ -353,45 +371,62 @@ export class EarningsService {
             if (usageFee > 0 && qty > 0) designUsageTotal = usageFee;
           }
         }
-        const itemTotal = Math.max(0, lineTotal - designUsageTotal);
-        const amount = (itemTotal * percent) / 100;
+        const materialCost = materialDirectCost(materialUsesFromParams(params, qty), purchasePrices);
+        const printCost = printDirectCost(
+          printUsageFromParams(params, qty, Number(row.itemSheets) || 0, Number(row.itemSides) || 1),
+          printCosts,
+        );
+        const itemTotal = earningsBase(lineTotal, designUsageTotal, materialCost + printCost);
+        const responsibleUserId = row.responsibleUserId ?? row.userId;
+        const shares = roleEarnings({
+          base: itemTotal,
+          positionPercent: percent,
+          contactPercent: rolePercents.contact,
+          responsiblePercent: rolePercents.responsible,
+          contactUserId: row.contactUserId,
+          responsibleUserId,
+          executorUserId: row.executorUserId,
+        });
 
-        if (hasEarningType) {
-          await db.run(
-            `
-            INSERT OR REPLACE INTO order_item_earnings
-            (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, earning_type, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'operator', datetime('now'))
-            `,
-            [
-              row.orderId,
-              row.itemId,
-              effectiveUserId,
-              itemTotal,
-              percent,
-              amount,
-              date,
-            ],
-          );
-        } else {
-          await db.run(
-            `
-            INSERT OR REPLACE INTO order_item_earnings
-            (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-            `,
-            [
-              row.orderId,
-              row.itemId,
-              effectiveUserId,
-              itemTotal,
-              percent,
-              amount,
-              date,
-            ],
-          );
+        for (const share of shares) {
+          if (hasEarningType) {
+            await db.run(
+              `
+              INSERT OR REPLACE INTO order_item_earnings
+              (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, earning_type, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+              `,
+              [
+                row.orderId,
+                row.itemId,
+                share.userId,
+                itemTotal,
+                share.percent,
+                share.amount,
+                date,
+                share.role,
+              ],
+            );
+          } else if (share.role === 'operator') {
+            await db.run(
+              `
+              INSERT OR REPLACE INTO order_item_earnings
+              (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+              `,
+              [
+                row.orderId,
+                row.itemId,
+                share.userId,
+                itemTotal,
+                share.percent,
+                share.amount,
+                date,
+              ],
+            );
+          }
+          pendingInBatch++;
         }
-        pendingInBatch++;
 
         const designTemplateId = Number(params?.designTemplateId);
         if (
@@ -434,4 +469,76 @@ export class EarningsService {
       throw error;
     }
   }
+}
+
+async function loadPurchasePrices(
+  db: Awaited<ReturnType<typeof getDb>>,
+  rows: EarningsRow[],
+): Promise<Map<number, number | null>> {
+  const ids = new Set<number>()
+  for (const row of rows) {
+    let params: unknown = {}
+    try {
+      params = JSON.parse(row.params || '{}')
+    } catch {
+      params = {}
+    }
+    for (const use of materialUsesFromParams(params, Number(row.quantity) || 0)) {
+      ids.add(use.materialId)
+    }
+  }
+  const prices = new Map<number, number | null>()
+  if (ids.size === 0) return prices
+  let hasPurchase = false
+  try {
+    hasPurchase = await hasColumn('materials', 'purchase_price')
+  } catch {
+    hasPurchase = false
+  }
+  if (!hasPurchase) return prices
+  const list = [...ids]
+  const placeholders = list.map(() => '?').join(',')
+  const found = await db.all<Array<{ id: number; purchase_price: number | null }>>(
+    `SELECT id, purchase_price FROM materials WHERE id IN (${placeholders})`,
+    list,
+  )
+  for (const row of found) {
+    const value = Number(row.purchase_price)
+    prices.set(Number(row.id), Number.isFinite(value) ? value : null)
+  }
+  return prices
+}
+
+async function loadPrintCostRates(db: Awaited<ReturnType<typeof getDb>>): Promise<PrintCostRates[]> {
+  try {
+    const hasCost = await hasColumn('print_prices', 'cost_per_impression')
+    if (!hasCost) return []
+    const found = await db.all<Array<Record<string, unknown>>>(
+      `SELECT technology_code, counter_unit, m2_pricing_kind, sheet_width_mm, sheet_height_mm,
+              cost_per_impression, cost_bw_per_meter, cost_color_per_meter,
+              cost_color_per_m2, cost_white_per_m2, cost_varnish_per_m2
+       FROM print_prices
+       WHERE COALESCE(is_active, 1) = 1`,
+    )
+    return found.map((row) => ({
+      technologyCode: String(row.technology_code ?? ''),
+      counterUnit: String(row.counter_unit ?? ''),
+      m2PricingKind: row.m2_pricing_kind != null ? String(row.m2_pricing_kind) : null,
+      sheetWidthMm: Number(row.sheet_width_mm) || null,
+      sheetHeightMm: Number(row.sheet_height_mm) || null,
+      costPerImpression: numberOrNull(row.cost_per_impression),
+      costBwPerMeter: numberOrNull(row.cost_bw_per_meter),
+      costColorPerMeter: numberOrNull(row.cost_color_per_meter),
+      costColorPerM2: numberOrNull(row.cost_color_per_m2),
+      costWhitePerM2: numberOrNull(row.cost_white_per_m2),
+      costVarnishPerM2: numberOrNull(row.cost_varnish_per_m2),
+    }))
+  } catch {
+    return []
+  }
+}
+
+function numberOrNull(value: unknown): number | null {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
 }

@@ -5,6 +5,7 @@ import { AdminPageLayout } from '../components/admin/AdminPageLayout';
 import { Alert, Button, FormField, Modal } from '../components/common';
 import { AppIcon, MoneyAmount } from '../components/ui';
 import { getMyEarnings } from '../api';
+import { earningRoleLabel } from './admin/earnings/earningRoleLabel';
 import './EarningsPage.css';
 
 type EarningsItem = {
@@ -17,6 +18,7 @@ type EarningsItem = {
   percent: number;
   amount: number;
   earnedDate: string;
+  earningType?: string;
 };
 
 export const EarningsPage: React.FC = () => {
@@ -122,6 +124,7 @@ export const EarningsPage: React.FC = () => {
         Дата: item.earnedDate.slice(0, 10),
         Заказ: item.orderNumber || `#${item.orderId}`,
         Позиция: item.itemName,
+        Роль: earningRoleLabel(item.earningType),
         'Сумма позиции': Number(item.itemTotal),
         '%': Number(item.percent),
         Начислено: Number(item.amount),
@@ -254,16 +257,18 @@ export const EarningsPage: React.FC = () => {
               </div>
               <table className="earnings-table">
                 <colgroup>
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '38%' }} />
-                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '28%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '16%' }} />
                   <col style={{ width: '10%' }} />
-                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '18%' }} />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Заказ</th>
                     <th>Позиция</th>
+                    <th>Роль</th>
                     <th>Сумма позиции</th>
                     <th>%</th>
                     <th>Начислено</th>
@@ -271,9 +276,10 @@ export const EarningsPage: React.FC = () => {
                 </thead>
                 <tbody>
                   {dayItems.map((item) => (
-                    <tr key={`${item.itemId}-${item.earnedDate}`}>
+                    <tr key={`${item.itemId}-${item.earnedDate}-${item.earningType || 'operator'}`}>
                       <td>{item.orderNumber || `#${item.orderId}`}</td>
                       <td>{item.itemName}</td>
+                      <td>{earningRoleLabel(item.earningType)}</td>
                       <td><MoneyAmount value={item.itemTotal} /></td>
                       <td>{Number(item.percent).toFixed(2)}%</td>
                       <td className="earnings-amount"><MoneyAmount value={item.amount} /></td>

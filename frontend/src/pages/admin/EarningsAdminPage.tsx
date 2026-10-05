@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, FormField, Modal } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
-import { getAdminEarnings, getAdminEarningsOrders, getCustomCalculatorPercent, updateCustomCalculatorPercent, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
+import { getAdminEarnings, getAdminEarningsOrders, getCustomCalculatorPercent, updateCustomCalculatorPercent, getRoleOrderPercents, updateRoleOrderPercents, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
+import { earningRoleLabel } from './earnings/earningRoleLabel';
 import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
 import { EarningsBarChart } from './earnings/EarningsBarChart';
 import { employeeYearTotals } from './earnings/earningsAnalytics';
@@ -58,6 +59,9 @@ export const EarningsAdminPage: React.FC = () => {
   const [customPercent, setCustomPercent] = useState('17.5');
   const [customPercentSaving, setCustomPercentSaving] = useState(false);
   const [customPercentMessage, setCustomPercentMessage] = useState<string | null>(null);
+  const [contactPercent, setContactPercent] = useState('1');
+  const [responsiblePercent, setResponsiblePercent] = useState('5');
+  const [rolePercentSaving, setRolePercentSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -85,6 +89,14 @@ export const EarningsAdminPage: React.FC = () => {
         if (Number.isFinite(value)) setCustomPercent(String(value));
       })
       .catch(() => {});
+    getRoleOrderPercents()
+      .then((response) => {
+        const contact = Number(response.data?.contactPercent);
+        const responsible = Number(response.data?.responsiblePercent);
+        if (Number.isFinite(contact)) setContactPercent(String(contact));
+        if (Number.isFinite(responsible)) setResponsiblePercent(String(responsible));
+      })
+      .catch(() => {});
   }, []);
 
   const saveCustomPercent = useCallback(async () => {
@@ -105,6 +117,27 @@ export const EarningsAdminPage: React.FC = () => {
       setCustomPercentSaving(false);
     }
   }, [customPercent]);
+
+  const saveRolePercents = useCallback(async () => {
+    const contact = Number(String(contactPercent).replace(',', '.'));
+    const responsible = Number(String(responsiblePercent).replace(',', '.'));
+    if (![contact, responsible].every((value) => Number.isFinite(value) && value >= 0 && value <= 100)) {
+      setError('Доли контактёра и ответственного должны быть от 0 до 100');
+      return;
+    }
+    try {
+      setRolePercentSaving(true);
+      setCustomPercentMessage(null);
+      const response = await updateRoleOrderPercents({ contactPercent: contact, responsiblePercent: responsible });
+      setContactPercent(String(response.data.contactPercent));
+      setResponsiblePercent(String(response.data.responsiblePercent));
+      setCustomPercentMessage('Сохранено. Следующий пересчёт дня возьмёт эти доли с базы позиции.');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Не удалось сохранить доли контактёра и ответственного');
+    } finally {
+      setRolePercentSaving(false);
+    }
+  }, [contactPercent, responsiblePercent]);
 
   useEffect(() => {
     loadData();
@@ -366,6 +399,40 @@ export const EarningsAdminPage: React.FC = () => {
           </FormField>
           <Button variant="primary" size="sm" onClick={saveCustomPercent} disabled={customPercentSaving}>
             {customPercentSaving ? 'Сохранение…' : 'Сохранить'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="earn-admin__custom-percent">
+        <div>
+          <h3>Доли с позиции</h3>
+          <p>После прямых расходов контактёр и ответственный всегда получают свои пункты. Исполнителю остаётся процент позиции минус эти две доли.</p>
+        </div>
+        <div className="earn-admin__custom-percent-form">
+          <FormField label="Контактёр, %">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              className="earn-filter-input"
+              value={contactPercent}
+              onChange={(e) => setContactPercent(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Ответственный, %">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              className="earn-filter-input"
+              value={responsiblePercent}
+              onChange={(e) => setResponsiblePercent(e.target.value)}
+            />
+          </FormField>
+          <Button variant="primary" size="sm" onClick={saveRolePercents} disabled={rolePercentSaving}>
+            {rolePercentSaving ? 'Сохранение…' : 'Сохранить'}
           </Button>
         </div>
       </div>
@@ -763,6 +830,7 @@ export const EarningsAdminPage: React.FC = () => {
                                 <thead>
                                   <tr>
                                     <th>Позиция</th>
+                                    <th>Роль</th>
                                     <th>База</th>
                                     <th>%</th>
                                     <th>Сумма</th>
@@ -771,8 +839,9 @@ export const EarningsAdminPage: React.FC = () => {
                                 </thead>
                                 <tbody>
                                   {order.lines.map((line) => (
-                                    <tr key={`${order.orderId}-${line.itemId}-${line.earnedDate}`}>
+                                    <tr key={`${order.orderId}-${line.itemId}-${line.earnedDate}-${line.earningType || 'operator'}`}>
                                       <td>{line.itemName}</td>
+                                      <td>{earningRoleLabel(line.earningType)}</td>
                                       <td><MoneyAmount value={line.itemTotal} /></td>
                                       <td>{Number(line.percent || 0).toFixed(1)}</td>
                                       <td className="earn-cell-money">

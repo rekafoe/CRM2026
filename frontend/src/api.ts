@@ -815,6 +815,10 @@ export const getCustomCalculatorPercent = () =>
   api.get<{ operatorPercent: number }>('/earnings/custom-calculator-percent');
 export const updateCustomCalculatorPercent = (operatorPercent: number) =>
   api.put<{ operatorPercent: number }>('/earnings/custom-calculator-percent', { operatorPercent });
+export const getRoleOrderPercents = () =>
+  api.get<{ contactPercent: number; responsiblePercent: number }>('/earnings/role-order-percents');
+export const updateRoleOrderPercents = (payload: { contactPercent: number; responsiblePercent: number }) =>
+  api.put<{ contactPercent: number; responsiblePercent: number }>('/earnings/role-order-percents', payload);
 export const getMyEarnings = (params?: { month?: string }) =>
   api.get('/earnings/me', { params });
 export const getAdminEarnings = (params?: { month?: string; history_months?: number; department_id?: number }) =>
@@ -827,6 +831,7 @@ export type AdminEarningsOrderLine = {
   percent: number;
   amount: number;
   earnedDate: string;
+  earningType?: string;
 };
 export type AdminEarningsOrderRow = {
   orderId: number;

@@ -87,6 +87,10 @@ function parseNonNegativeNumber(raw: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
+function optionalNonNegative(raw: unknown): number | null {
+  return parseNonNegativeNumber(raw)
+}
+
 function normalizeServiceConsumptionMode(raw: unknown): 'fixed' | 'roll_feed' | undefined {
   if (raw === undefined) return undefined
   if (raw === null || raw === '') return undefined
@@ -483,6 +487,12 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
         pp.price_color_per_m2,
         pp.price_white_per_m2,
         pp.price_varnish_per_m2,
+        pp.cost_per_impression,
+        pp.cost_bw_per_meter,
+        pp.cost_color_per_meter,
+        pp.cost_color_per_m2,
+        pp.cost_white_per_m2,
+        pp.cost_varnish_per_m2,
         pp.min_charge,
         pp.max_width_mm,
         pp.max_height_mm,
@@ -1320,6 +1330,12 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
     price_color_per_m2,
     price_white_per_m2,
     price_varnish_per_m2,
+    cost_per_impression,
+    cost_bw_per_meter,
+    cost_color_per_meter,
+    cost_color_per_m2,
+    cost_white_per_m2,
+    cost_varnish_per_m2,
     min_charge,
     max_width_mm,
     max_height_mm,
@@ -1386,6 +1402,18 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
     const minChargeForSave = resolvedCounterUnit === 'm2' ? (min_charge ?? 0) : 0
     const maxWidthForSave = resolvedCounterUnit === 'm2' ? (max_width_mm ?? 600) : null
     const maxHeightForSave = resolvedCounterUnit === 'm2' ? (max_height_mm ?? 900) : null
+    const costPerImpressionForSave = resolvedCounterUnit === 'sheets' ? optionalNonNegative(cost_per_impression) : null
+    const costBwPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_bw_per_meter) : null
+    const costColorPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_color_per_meter) : null
+    const costColorPerM2ForSave = resolvedCounterUnit === 'm2' ? optionalNonNegative(cost_color_per_m2) : null
+    const costWhitePerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed'
+        ? optionalNonNegative(cost_white_per_m2)
+        : null
+    const costVarnishPerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed'
+        ? optionalNonNegative(cost_varnish_per_m2)
+        : null
 
     const result = await db.run(`
       INSERT INTO print_prices (
@@ -1403,13 +1431,19 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
         price_color_per_m2,
         price_white_per_m2,
         price_varnish_per_m2,
+        cost_per_impression,
+        cost_bw_per_meter,
+        cost_color_per_meter,
+        cost_color_per_m2,
+        cost_white_per_m2,
+        cost_varnish_per_m2,
         min_charge,
         max_width_mm,
         max_height_mm,
         is_active,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
     `, [
       technology_code,
       resolvedCounterUnit || 'sheets',
@@ -1425,6 +1459,12 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
       colorPerM2ForSave,
       whitePerM2ForSave,
       varnishPerM2ForSave,
+      costPerImpressionForSave,
+      costBwPerMeterForSave,
+      costColorPerMeterForSave,
+      costColorPerM2ForSave,
+      costWhitePerM2ForSave,
+      costVarnishPerM2ForSave,
       minChargeForSave,
       maxWidthForSave,
       maxHeightForSave,
@@ -1459,6 +1499,12 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
       price_color_per_m2: colorPerM2ForSave,
       price_white_per_m2: whitePerM2ForSave,
       price_varnish_per_m2: varnishPerM2ForSave,
+      cost_per_impression: costPerImpressionForSave,
+      cost_bw_per_meter: costBwPerMeterForSave,
+      cost_color_per_meter: costColorPerMeterForSave,
+      cost_color_per_m2: costColorPerM2ForSave,
+      cost_white_per_m2: costWhitePerM2ForSave,
+      cost_varnish_per_m2: costVarnishPerM2ForSave,
       is_active: 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -2127,6 +2173,12 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
     price_color_per_m2,
     price_white_per_m2,
     price_varnish_per_m2,
+    cost_per_impression,
+    cost_bw_per_meter,
+    cost_color_per_meter,
+    cost_color_per_m2,
+    cost_white_per_m2,
+    cost_varnish_per_m2,
     min_charge,
     max_width_mm,
     max_height_mm,
@@ -2193,6 +2245,18 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
     const minChargeForSave = resolvedCounterUnit === 'm2' ? (min_charge ?? 0) : 0
     const maxWidthForSave = resolvedCounterUnit === 'm2' ? (max_width_mm ?? 600) : null
     const maxHeightForSave = resolvedCounterUnit === 'm2' ? (max_height_mm ?? 900) : null
+    const costPerImpressionForSave = resolvedCounterUnit === 'sheets' ? optionalNonNegative(cost_per_impression) : null
+    const costBwPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_bw_per_meter) : null
+    const costColorPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_color_per_meter) : null
+    const costColorPerM2ForSave = resolvedCounterUnit === 'm2' ? optionalNonNegative(cost_color_per_m2) : null
+    const costWhitePerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed'
+        ? optionalNonNegative(cost_white_per_m2)
+        : null
+    const costVarnishPerM2ForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed'
+        ? optionalNonNegative(cost_varnish_per_m2)
+        : null
     await db.run(`
       UPDATE print_prices SET
         technology_code = ?,
@@ -2209,6 +2273,12 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
         price_color_per_m2 = ?,
         price_white_per_m2 = ?,
         price_varnish_per_m2 = ?,
+        cost_per_impression = ?,
+        cost_bw_per_meter = ?,
+        cost_color_per_meter = ?,
+        cost_color_per_m2 = ?,
+        cost_white_per_m2 = ?,
+        cost_varnish_per_m2 = ?,
         min_charge = ?,
         max_width_mm = ?,
         max_height_mm = ?,
@@ -2230,6 +2300,12 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       colorPerM2ForSave,
       whitePerM2ForSave,
       varnishPerM2ForSave,
+      costPerImpressionForSave,
+      costBwPerMeterForSave,
+      costColorPerMeterForSave,
+      costColorPerM2ForSave,
+      costWhitePerM2ForSave,
+      costVarnishPerM2ForSave,
       minChargeForSave,
       maxWidthForSave,
       maxHeightForSave,
@@ -2269,6 +2345,12 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       price_color_per_m2: colorPerM2ForSave,
       price_white_per_m2: whitePerM2ForSave,
       price_varnish_per_m2: varnishPerM2ForSave,
+      cost_per_impression: costPerImpressionForSave,
+      cost_bw_per_meter: costBwPerMeterForSave,
+      cost_color_per_meter: costColorPerMeterForSave,
+      cost_color_per_m2: costColorPerM2ForSave,
+      cost_white_per_m2: costWhitePerM2ForSave,
+      cost_varnish_per_m2: costVarnishPerM2ForSave,
       is_active: is_active !== undefined ? is_active : 1,
       updated_at: new Date().toISOString()
     })

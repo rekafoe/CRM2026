@@ -36,6 +36,12 @@ export interface PrintPrice {
   price_color_per_m2?: number | null
   price_white_per_m2?: number | null
   price_varnish_per_m2?: number | null
+  cost_per_impression?: number | null
+  cost_bw_per_meter?: number | null
+  cost_color_per_meter?: number | null
+  cost_color_per_m2?: number | null
+  cost_white_per_m2?: number | null
+  cost_varnish_per_m2?: number | null
   min_charge?: number | null
   max_width_mm?: number | null
   max_height_mm?: number | null

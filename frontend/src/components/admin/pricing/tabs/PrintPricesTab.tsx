@@ -155,22 +155,28 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
                         <PriceLine label="ЧБ двустор." value={<MoneyAmount value={item.price_bw_duplex} />} />
                         <PriceLine label="Цвет одностор." value={<MoneyAmount value={item.price_color_single} />} />
                         <PriceLine label="Цвет двустор." value={<MoneyAmount value={item.price_color_duplex} />} />
+                        <PriceLine label="Себестоимость оттиска" value={<MoneyAmount value={item.cost_per_impression} />} />
                       </>
                     )}
                     {item.counter_unit === 'meters' && (
                       <>
                         <PriceLine label="ЧБ / метр" value={<MoneyAmount value={item.price_bw_per_meter} />} />
                         <PriceLine label="Цвет / метр" value={<MoneyAmount value={item.price_color_per_meter} />} />
+                        <PriceLine label="Себест. ЧБ / метр" value={<MoneyAmount value={item.cost_bw_per_meter} />} />
+                        <PriceLine label="Себест. цвет / метр" value={<MoneyAmount value={item.cost_color_per_meter} />} />
                       </>
                     )}
                     {item.counter_unit === 'm2' && (
                       <>
                         <PriceLine label="m² профиль" value={formatM2PricingKind(item.m2_pricing_kind ?? null)} />
                         <PriceLine label="Цвет / м²" value={<MoneyAmount value={item.price_color_per_m2} />} />
+                        <PriceLine label="Себест. цвет / м²" value={<MoneyAmount value={item.cost_color_per_m2} />} />
                         {item.m2_pricing_kind !== 'roll_wide' && (
                           <>
                             <PriceLine label="Белый / м²" value={<MoneyAmount value={item.price_white_per_m2} />} />
                             <PriceLine label="Лак / м²" value={<MoneyAmount value={item.price_varnish_per_m2} />} />
+                            <PriceLine label="Себест. белый / м²" value={<MoneyAmount value={item.cost_white_per_m2} />} />
+                            <PriceLine label="Себест. лак / м²" value={<MoneyAmount value={item.cost_varnish_per_m2} />} />
                           </>
                         )}
                         <PriceLine label="Мин. заказ" value={<MoneyAmount value={item.min_charge} />} />

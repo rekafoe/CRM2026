@@ -7,6 +7,7 @@ import {
   setCustomCalculatorOperatorPercent,
 } from '../services/customCalculatorPercentSettings'
 import { normalizeCustomCalculatorPercent } from '../services/earningsOperatorPercent'
+import { getRoleOrderPercents, setRoleOrderPercents } from '../services/earningsRoleRateSettings'
 
 const router = Router()
 
@@ -54,6 +55,35 @@ router.get('/custom-calculator-percent', asyncHandler(async (req, res) => {
   res.json({ operatorPercent })
 }))
 
+router.get('/role-order-percents', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+  const db = await getDb()
+  const percents = await getRoleOrderPercents(db)
+  res.json({ contactPercent: percents.contact, responsiblePercent: percents.responsible })
+}))
+
+router.put('/role-order-percents', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser || authUser.role !== 'admin') {
+    res.status(403).json({ message: 'Forbidden' })
+    return
+  }
+  const body = req.body as { contactPercent?: unknown; responsiblePercent?: unknown }
+  const contactPercent = normalizeCustomCalculatorPercent(body?.contactPercent)
+  const responsiblePercent = normalizeCustomCalculatorPercent(body?.responsiblePercent)
+  if (contactPercent == null || responsiblePercent == null) {
+    res.status(400).json({ message: 'Проценты должны быть числами от 0 до 100' })
+    return
+  }
+  const db = await getDb()
+  const saved = await setRoleOrderPercents(db, { contact: contactPercent, responsible: responsiblePercent })
+  res.json({ contactPercent: saved.contact, responsiblePercent: saved.responsible })
+}))
+
 router.put('/custom-calculator-percent', asyncHandler(async (req, res) => {
   const authUser = (req as AuthenticatedRequest).user
   if (!authUser || authUser.role !== 'admin') {
@@ -90,6 +120,7 @@ router.get('/me', asyncHandler(async (req, res) => {
       e.percent,
       e.amount,
       e.earned_date,
+      e.earning_type,
       i.type,
       i.params,
       o.number as order_number
@@ -120,6 +151,7 @@ router.get('/me', asyncHandler(async (req, res) => {
       percent: row.percent,
       amount: row.amount,
       earnedDate: row.earned_date,
+      earningType: row.earning_type || 'operator',
     }
   })
 
@@ -214,6 +246,7 @@ router.get('/daily', asyncHandler(async (req, res) => {
       e.percent,
       e.amount,
       e.earned_date,
+      e.earning_type,
       i.type,
       i.params,
       o.number as order_number
@@ -243,6 +276,7 @@ router.get('/daily', asyncHandler(async (req, res) => {
       percent: row.percent,
       amount: row.amount,
       earnedDate: row.earned_date,
+      earningType: row.earning_type || 'operator',
     }
   })
 
@@ -553,6 +587,7 @@ router.get('/admin/orders', asyncHandler(async (req, res) => {
       e.percent,
       e.amount,
       e.earned_date,
+      e.earning_type,
       i.type,
       i.params
     FROM order_item_earnings e
@@ -581,6 +616,7 @@ router.get('/admin/orders', asyncHandler(async (req, res) => {
       percent: Number(row.percent) || 0,
       amount: Number(row.amount) || 0,
       earnedDate: row.earned_date,
+      earningType: row.earning_type || 'operator',
     })
     linesByOrder.set(orderId, list)
   }
