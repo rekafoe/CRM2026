@@ -1,4 +1,5 @@
 import { getDb } from '../db';
+import { notWaitingStatusSql } from '../utils/orderFulfillmentScope';
 import { UserOrderPage, UserOrderPageOrder, CreateUserOrderPageRequest, AssignOrderRequest } from '../models/userOrderPage';
 
 export class UserOrderPageService {
@@ -199,7 +200,10 @@ export class UserOrderPageService {
           COALESCE(SUM(CASE WHEN status = 'completed' THEN 
             CASE 
               WHEN order_type = 'telegram' THEN (SELECT total_price FROM photo_orders WHERE id = order_id)
-              WHEN order_type = 'website' THEN (SELECT total FROM orders WHERE id = order_id)
+              WHEN order_type = 'website' THEN (
+                SELECT CASE WHEN ${notWaitingStatusSql('status')} THEN total ELSE 0 END
+                FROM orders WHERE id = order_id
+              )
               ELSE 0
             END
           END), 0) as totalRevenue

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler } from '../../../middleware'
 import { getDb } from '../../../config/database'
+import { notWaitingStatusSql } from '../../../utils/orderFulfillmentScope'
 
 const router = Router()
 
@@ -10,7 +11,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
   if (!d) { res.status(400).json({ message: 'date required' }); return }
   const db = await getDb()
   const ordersCount = await db.get<any>(
-    `SELECT COUNT(1) as c FROM orders WHERE substr(createdAt,1,10) = ?`, d
+    `SELECT COUNT(1) as c FROM orders WHERE substr(createdAt,1,10) = ? AND ${notWaitingStatusSql('status')}`, d
   )
   const sums = await db.get<any>(
     `SELECT 
@@ -21,7 +22,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
         COALESCE(SUM(i.waste), 0) as total_waste
      FROM items i
      JOIN orders o ON o.id = i.orderId
-    WHERE substr(o.createdAt,1,10) = ?`, d
+    WHERE substr(o.createdAt,1,10) = ? AND ${notWaitingStatusSql('o.status')}`, d
   )
   const prepay = await db.get<any>(
     `SELECT 
@@ -33,7 +34,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
         COALESCE(SUM(CASE WHEN paymentMethod = 'offline' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END),0) as offline_paid_amount,
         COALESCE(SUM(CASE WHEN paymentMethod = 'online' THEN 1 ELSE 0 END),0) as online_count,
         COALESCE(SUM(CASE WHEN paymentMethod = 'offline' THEN 1 ELSE 0 END),0) as offline_count
-       FROM orders WHERE substr(createdAt,1,10) = ?`, d
+       FROM orders WHERE substr(createdAt,1,10) = ? AND ${notWaitingStatusSql('status')}`, d
   )
   const materials = await db.all<any>(
     `SELECT m.id as materialId, m.name as material_name,
@@ -52,7 +53,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
         COALESCE(SUM(o.prepaymentAmount), 0) as total_prepayment_amount,
         COALESCE(SUM(o.total) - SUM(o.prepaymentAmount), 0) as total_debt
      FROM orders o 
-     WHERE substr(o.createdAt,1,10) = ?`, d
+     WHERE substr(o.createdAt,1,10) = ? AND ${notWaitingStatusSql('o.status')}`, d
   )
 
   res.json({

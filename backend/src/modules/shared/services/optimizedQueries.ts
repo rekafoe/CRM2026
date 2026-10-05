@@ -1,4 +1,5 @@
 import { getDb } from '../../../config/database'
+import { notWaitingStatusSql } from '../../../utils/orderFulfillmentScope'
 
 export class OptimizedQueries {
   // Оптимизированный запрос для загрузки заказов с пагинацией
@@ -114,6 +115,7 @@ export class OptimizedQueries {
         AVG(CAST(createdAt AS REAL)) as avg_processing_time
       FROM orders
       WHERE DATE(createdAt) BETWEEN ? AND ?
+        AND ${notWaitingStatusSql('status')}
     `, dateFrom, dateTo)
   }
   

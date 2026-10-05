@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto'
 import { getDb } from '../../../config/database'
 import { sqlOrderTotalAfterDiscount } from '../../../utils/orderAmountsSql'
+import { notWaitingStatusSql } from '../../../utils/orderFulfillmentScope'
 
 const CUSTOMER_SOURCE_VALUES = new Set(['crm', 'website', 'telegram', 'mini_app'])
 
@@ -132,6 +133,7 @@ export class CustomerService {
             ) AS rn
           FROM orders o
           WHERE o.customer_id IN (${ph})
+            AND ${notWaitingStatusSql('o.status')}
         )
         WHERE rn = 1
         `,

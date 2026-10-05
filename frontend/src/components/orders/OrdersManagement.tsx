@@ -5,7 +5,7 @@ import { useLogger } from '../../utils/logger';
 import { useToastNotifications } from '../Toast';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { ErrorDisplay } from '../ErrorStates';
-import { useOrderStatuses } from '../../hooks/useOrderStatuses';
+import { isWaitingOrder, useOrderStatuses } from '../../hooks/useOrderStatuses';
 import { MoneyAmount } from '../ui';
 import './OrdersManagement.css';
 
@@ -325,15 +325,16 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   const hasSelectedOrders = selectedOrdersCount > 0;
   const totalAmount = useMemo(
     () =>
-      orders.reduce(
-        (sum, order) =>
+      orders.reduce((sum, order) => {
+        if (isWaitingOrder(order, orderStatuses)) return sum;
+        return (
           sum +
           (typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
             ? order.totalAmount
-            : 0),
-        0,
-      ),
-    [orders],
+            : 0)
+        );
+      }, 0),
+    [orders, orderStatuses],
   );
 
   if (loading && orders.length === 0) {

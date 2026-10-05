@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getFullDailyReport, updateOrderStatus, cancelOnlineOrder, duplicateOrder } from '../api';
-import { useOrderStatuses } from '../hooks/useOrderStatuses';
+import { isWaitingOrder, useOrderStatuses } from '../hooks/useOrderStatuses';
 import { Order, DailyReport } from '../types';
 import { ProgressBar } from '../components/order/ProgressBar';
 import { OrderItem } from '../components/OrderItem';
@@ -103,7 +103,10 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
 
   const getTotalRevenue = () => {
     if (!report?.orders) return 0;
-    return report.orders.reduce((sum, order) => sum + getOrderAmounts(order).total, 0);
+    return report.orders.reduce((sum, order) => {
+      if (isWaitingOrder(order, statuses)) return sum;
+      return sum + getOrderAmounts(order).total;
+    }, 0);
   };
 
   const getOrdersByStatus = (statusId: number) => {
@@ -190,7 +193,8 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
         {statuses.map(status => {
           const statusOrders = getOrdersByStatus(status.id);
           const statusRevenue = statusOrders.reduce((sum, order) => {
-      const orderTotal = getOrderAmounts(order).total;
+            if (isWaitingOrder(order, statuses) || status.name === 'Ожидает') return sum;
+            const orderTotal = getOrderAmounts(order).total;
             return sum + orderTotal;
           }, 0);
 

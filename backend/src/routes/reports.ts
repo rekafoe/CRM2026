@@ -22,7 +22,6 @@ import {
   hasFulfillmentDepartmentColumn,
   parseFulfillmentDepartmentId,
   isWaitingStatusSql,
-  notEstimateStatusSql,
   notWaitingStatusSql,
   revenueOrdersCondition,
   scopeByFulfillmentDepartment,
@@ -199,22 +198,22 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
   if (!d) { res.status(400).json({ message: 'date required' }); return }
   const db = await getDb()
   const ordersCount = await db.get<any>(
-    `SELECT COUNT(1) as c FROM orders WHERE substr(COALESCE(createdAt, created_at),1,10) = ?`, d
+    `SELECT COUNT(1) as c FROM orders WHERE substr(COALESCE(createdAt, created_at),1,10) = ? AND ${notWaitingStatusSql('status')}`, d
   )
   const orderTotalExpr = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)')
   const dayCreated = `substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?`
-  const notEstimate = notEstimateStatusSql('o.status')
+  const notWaiting = notWaitingStatusSql('o.status')
   const sums = await db.get<any>(
     `SELECT
-        (SELECT COALESCE(SUM(${orderTotalExpr}), 0) FROM orders o WHERE ${dayCreated} AND ${notWaitingStatusSql('o.status')}) as total_revenue,
+        (SELECT COALESCE(SUM(${orderTotalExpr}), 0) FROM orders o WHERE ${dayCreated} AND ${notWaiting}) as total_revenue,
         (SELECT COALESCE(SUM(i.quantity), 0) FROM items i
-           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as items_qty,
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated} AND ${notWaiting}) as items_qty,
         (SELECT COALESCE(SUM(i.clicks), 0) FROM items i
-           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as total_clicks,
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated} AND ${notWaiting}) as total_clicks,
         (SELECT COALESCE(SUM(i.sheets), 0) FROM items i
-           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as total_sheets,
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated} AND ${notWaiting}) as total_sheets,
         (SELECT COALESCE(SUM(i.waste), 0) FROM items i
-           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated}) as total_waste`,
+           JOIN orders o ON o.id = i.orderId WHERE ${dayCreated} AND ${notWaiting}) as total_waste`,
     d,
     d,
     d,
@@ -261,14 +260,18 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
        COALESCE(SUM(${ordTotalSql}) - SUM(COALESCE(o.prepaymentAmount, 0)), 0) AS total_debt
      FROM orders o
      WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-       AND ${notEstimate}`,
+       AND ${notWaiting}`,
     d,
   )
 
   let debtClosedToday = 0
   try {
     const row = await db.get<{ s: number }>(
-      'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ?',
+      `SELECT COALESCE(SUM(dce.amount), 0) AS s
+         FROM debt_closed_events dce
+         LEFT JOIN orders o ON o.id = dce.order_id
+        WHERE dce.closed_date = ?
+          AND (o.id IS NULL OR ${notWaitingStatusSql('o.status')})`,
       d
     )
     debtClosedToday = Number(row?.s ?? 0)
@@ -732,14 +735,15 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
   `, orderScopeParams)
 
   const totalActiveCond = hasFunnelIsCancelled
-    ? 'status != 0 AND COALESCE(is_cancelled, 0) = 0'
-    : 'status != 0'
+    ? `${notWaitingStatusSql('status')} AND COALESCE(is_cancelled, 0) = 0`
+    : notWaitingStatusSql('status')
+  const notWaitingPlain = notWaitingStatusSql('status')
 
   const statusConversion = await db.all<any>(`
     SELECT DATE(COALESCE(createdAt, created_at)) as date,
-      COUNT(CASE WHEN status >= 2 THEN 1 END) as confirmed_orders,
-      COUNT(CASE WHEN status >= 3 THEN 1 END) as in_progress_orders,
-      COUNT(CASE WHEN status >= 4 THEN 1 END) as ready_orders,
+      COUNT(CASE WHEN status >= 2 AND ${notWaitingPlain} THEN 1 END) as confirmed_orders,
+      COUNT(CASE WHEN status >= 3 AND ${notWaitingPlain} THEN 1 END) as in_progress_orders,
+      COUNT(CASE WHEN status >= 4 AND ${notWaitingPlain} THEN 1 END) as ready_orders,
       COUNT(CASE WHEN ${completedStatusSql('status')} THEN 1 END) as completed_orders,
       COUNT(CASE WHEN ${totalActiveCond} THEN 1 END) as total_active
     FROM orders WHERE ${orderScopeNoAlias}
@@ -757,7 +761,7 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 
   const cancellationReasons = await db.all<any>(`
     SELECT COUNT(*) as cancelled_count,
-      SUM(CASE WHEN status = 0 THEN 0 ELSE COALESCE(prepaymentAmount, 0) END) as cancelled_amount
+      SUM(CASE WHEN ${isWaitingStatusSql('status')} THEN 0 ELSE COALESCE(prepaymentAmount, 0) END) as cancelled_amount
     FROM orders WHERE ${cancelledCond} AND ${orderScopeNoAlias}
   `, orderScopeNoAliasParams)
 
@@ -1042,7 +1046,9 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   const offset = Math.max(0, Number.isFinite(offsetRaw) ? offsetRaw : 0)
   const hasIsCancelledList = await hasColumn('orders', 'is_cancelled')
   const cancelledListCond = hasIsCancelledList ? 'COALESCE(o.is_cancelled, 0) = 1' : 'o.status = 0'
-  const notCancelledListCond = hasIsCancelledList ? 'COALESCE(o.is_cancelled, 0) = 0' : 'o.status != 0'
+  const notCancelledListCond = hasIsCancelledList
+    ? `(${notWaitingStatusSql('o.status')} AND COALESCE(o.is_cancelled, 0) = 0)`
+    : notWaitingStatusSql('o.status')
 
   const where: string[] = [dateFilter('o')]
   const params: any[] = [...dateParams]
@@ -1052,11 +1058,13 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
     params.push(...fulfillment.params)
   }
 
-  if (statusFilter && statusFilter !== 'all') {
-    if (statusFilter === 'revenue') {
+  if (!statusFilter || statusFilter === 'all') {
+    where.push(notWaitingStatusSql('o.status'))
+  } else if (statusFilter === 'revenue') {
       where.push(notCancelledListCond)
       where.push(revenueOrdersCondition('o'))
     } else if (statusFilter === 'paid') {
+      where.push(notWaitingStatusSql('o.status'))
       where.push(`o.prepaymentStatus IN ('paid','successful')`)
     } else if (statusFilter === 'pending_payment') {
       where.push(notCancelledListCond)
@@ -1074,7 +1082,7 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
         params.push(numericStatus)
       }
     }
-  }
+
 
   const ageHoursExpr = `(JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24`
   if (reasonFilter) {
@@ -1087,11 +1095,11 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
     } else if (reasonFilter === 'cancellation_after_paid') {
       where.push(`${cancelledListCond} AND o.prepaymentStatus IN ('paid','successful')`)
     } else if (reasonFilter === 'delay_waiting_payment') {
-      where.push(`o.status IN (1,2,3,4,5,6) AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND ${ageHoursExpr} > 24`)
+      where.push(`${notWaitingStatusSql('o.status')} AND o.status IN (1,2,3,4,5,6) AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND ${ageHoursExpr} > 24`)
     } else if (reasonFilter === 'delay_long_production') {
-      where.push(`o.status IN (3,4) AND ${ageHoursExpr} > 48`)
+      where.push(`${notWaitingStatusSql('o.status')} AND o.status IN (3,4) AND ${ageHoursExpr} > 48`)
     } else if (reasonFilter === 'delay_initial_stuck') {
-      where.push(`o.status IN (1,2) AND ${ageHoursExpr} > 24`)
+      where.push(`${notWaitingStatusSql('o.status')} AND o.status IN (1,2) AND ${ageHoursExpr} > 24`)
     } else {
       const hasCancellationEvents = !!(await db.get(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='order_cancellation_events'"
@@ -1372,8 +1380,9 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const oUpdated = 'COALESCE(o.updatedAt, o.updated_at)'
 
   const managerEfficiency = await db.all<any>(
-    `SELECT u.id as user_id, u.name as user_name, COUNT(o.id) as total_orders,
-      COUNT(o.id) as completed_orders,
+    `SELECT u.id as user_id, u.name as user_name,
+      COUNT(CASE WHEN ${notWaitingStatusSql('o.status')} THEN 1 END) as total_orders,
+      COUNT(CASE WHEN ${notWaitingStatusSql('o.status')} THEN 1 END) as completed_orders,
       COUNT(CASE WHEN ${cancelledCondition} THEN 1 END) as cancelled_orders,
       SUM(CASE WHEN ${notWaitingStatusSql('o.status')} THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as total_revenue,
       AVG(CASE WHEN ${notWaitingStatusSql('o.status')} THEN COALESCE(o.prepaymentAmount, 0) END) as avg_order_value,
@@ -1389,18 +1398,20 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const topManagerIds = managerEfficiency.slice(0, 3).map(m => m.user_id)
   const managerDailyStats = topManagerIds.length
     ? await db.all<any>(`
-    SELECT o.userId as user_id, ${oDate} as date, COUNT(o.id) as daily_orders,
+    SELECT o.userId as user_id, ${oDate} as date,
+      COUNT(CASE WHEN ${notWaitingStatusSql('o.status')} THEN 1 END) as daily_orders,
       SUM(CASE WHEN ${notWaitingStatusSql('o.status')} THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as daily_revenue,
-      COUNT(o.id) as daily_completed
-    FROM orders o WHERE ${oCreatedRange}${orderFulfillmentJoin ? ` AND ${orderFulfillmentJoin}` : ''} AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
+      COUNT(CASE WHEN ${notWaitingStatusSql('o.status')} THEN 1 END) as daily_completed
+    FROM orders o WHERE ${oCreatedRange} AND ${notWaitingStatusSql('o.status')}${orderFulfillmentJoin ? ` AND ${orderFulfillmentJoin}` : ''} AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
     GROUP BY o.userId, ${oDate} ORDER BY date DESC
   `, [...managerDateParams, ...orderFulfillmentParams, ...topManagerIds])
     : []
 
   const managerConversion = await db.all<any>(
     `SELECT u.id as user_id, u.name as user_name,
-      COUNT(o.id) as confirmed_orders,
-      COUNT(o.id) as completed_orders, COUNT(o.id) as total_orders,
+      COUNT(CASE WHEN ${notWaitingStatusSql('o.status')} THEN 1 END) as confirmed_orders,
+      COUNT(CASE WHEN ${notWaitingStatusSql('o.status')} THEN 1 END) as completed_orders,
+      COUNT(CASE WHEN ${notWaitingStatusSql('o.status')} THEN 1 END) as total_orders,
       100.0 as conversion_rate
     FROM users u LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}${orderFulfillmentJoin ? ` AND ${orderFulfillmentJoin}` : ''}
     WHERE u.role IN ('admin', 'manager', 'user')

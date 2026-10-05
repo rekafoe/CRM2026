@@ -23,6 +23,7 @@ import {
 import { getItemLineTotal } from '../../../utils/orderTotal';
 import '../../../pages/admin/CustomersAdminPage.css';
 import './CustomerDetailView.css';
+import { isWaitingOrder, useOrderStatuses } from '../../../hooks/useOrderStatuses';
 import { DEFAULT_CUSTOMER_DETAIL_TAB, type CustomerDetailTab } from './customerDetail/customerDetailTab';
 import { CustomerDetailOverviewPanel } from './customerDetail/CustomerDetailOverviewPanel';
 import { CustomerDetailProfilePanel } from './customerDetail/CustomerDetailProfilePanel';
@@ -40,6 +41,7 @@ export const CustomerDetailView: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const { statuses: orderStatuses } = useOrderStatuses();
   const [activeTab, setActiveTab] = useState<CustomerDetailTab>(DEFAULT_CUSTOMER_DETAIL_TAB);
   const [ordersFrom, setOrdersFrom] = useState('');
   const [ordersTo, setOrdersTo] = useState('');
@@ -171,7 +173,7 @@ export const CustomerDetailView: React.FC<{
     setActiveTab(DEFAULT_CUSTOMER_DETAIL_TAB);
   }, [customerId]);
 
-  const filteredOrders = useMemo(() => {
+  const dateFilteredOrders = useMemo(() => {
     if (!ordersFrom && !ordersTo) {
       return orders;
     }
@@ -191,6 +193,11 @@ export const CustomerDetailView: React.FC<{
     });
   }, [orders, ordersFrom, ordersTo]);
 
+  const countedOrders = useMemo(
+    () => dateFilteredOrders.filter((order) => !isWaitingOrder(order, orderStatuses)),
+    [dateFilteredOrders, orderStatuses],
+  );
+
   const customerMetrics = useMemo(() => {
     if (!customer) {
       return {
@@ -199,22 +206,22 @@ export const CustomerDetailView: React.FC<{
         averageIntervalDays: null as number | null,
       };
     }
-    if (filteredOrders.length === 0) {
+    if (countedOrders.length === 0) {
       return {
         ordersCount: 0,
         averageCheck: 0,
         averageIntervalDays: null,
       };
     }
-    const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
-    const averageCheck = total / filteredOrders.length;
-    const sorted = [...filteredOrders].sort((a, b) => {
+    const total = countedOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+    const averageCheck = total / countedOrders.length;
+    const sorted = [...countedOrders].sort((a, b) => {
       const aDate = new Date(a.created_at || (a as any).created_at || 0).getTime();
       const bDate = new Date(b.created_at || (b as any).created_at || 0).getTime();
       return aDate - bDate;
     });
     if (sorted.length < 2) {
-      return { ordersCount: filteredOrders.length, averageCheck, averageIntervalDays: null };
+      return { ordersCount: countedOrders.length, averageCheck, averageIntervalDays: null };
     }
     const intervals = sorted.slice(1).map((order, index) => {
       const prev = sorted[index];
@@ -223,8 +230,8 @@ export const CustomerDetailView: React.FC<{
       return Math.max(diffMs / (1000 * 60 * 60 * 24), 0);
     });
     const averageIntervalDays = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
-    return { ordersCount: filteredOrders.length, averageCheck, averageIntervalDays };
-  }, [filteredOrders, customer]);
+    return { ordersCount: countedOrders.length, averageCheck, averageIntervalDays };
+  }, [countedOrders, customer]);
 
   const recordLegalExport = useCallback(
     async (kind: 'act' | 'invoice' | 'contract') => {
@@ -237,7 +244,7 @@ export const CustomerDetailView: React.FC<{
             ? `Счёт (Excel) — ${orderRef} — ${dayStr}`
             : `Договор (Word) — ${orderRef} — ${dayStr}`;
       try {
-        if (filteredOrders.length === 0) {
+        if (countedOrders.length === 0) {
           await createCustomerLegalDocument(customer.id, {
             title: mkTitle('без заказа в периоде'),
             document_kind: kind,
@@ -247,7 +254,7 @@ export const CustomerDetailView: React.FC<{
             order_id: null,
           });
         } else {
-          for (const order of filteredOrders) {
+          for (const order of countedOrders) {
             const orderRef = order.number || `№${order.id}`;
             await createCustomerLegalDocument(customer.id, {
               title: mkTitle(orderRef),
@@ -265,7 +272,7 @@ export const CustomerDetailView: React.FC<{
         console.warn('[Клиенты] Не удалось записать документ в журнал', e);
       }
     },
-    [customer, refreshCustomer, filteredOrders],
+    [customer, refreshCustomer, countedOrders],
   );
 
   const handleSaveLegalDetails = useCallback(async () => {
@@ -333,7 +340,7 @@ export const CustomerDetailView: React.FC<{
     
     try {
       setGeneratingDocument('act');
-      const orderIds = filteredOrders.map((o) => o.id);
+      const orderIds = countedOrders.map((o) => o.id);
       if (orderIds.length > 0) {
         try {
           const response = await generateDocumentByTypeFromOrders('act', orderIds);
@@ -383,11 +390,11 @@ export const CustomerDetailView: React.FC<{
       }> = [];
       
       let itemNumber = 1;
-      console.log(`[Frontend] Начинаем сбор позиций из ${filteredOrders.length} заказов`);
+      console.log(`[Frontend] Начинаем сбор позиций из ${countedOrders.length} заказов`);
       
       // Проверяем, есть ли items в заказах
       let totalItemsFound = 0;
-      for (const order of filteredOrders) {
+      for (const order of countedOrders) {
         const orderItems = (order as any).items || [];
         totalItemsFound += orderItems.length;
         if (orderItems.length === 0) {
@@ -399,7 +406,7 @@ export const CustomerDetailView: React.FC<{
         }
       }
       
-      console.log(`[Frontend] Всего найдено позиций: ${totalItemsFound} из ${filteredOrders.length} заказов`);
+      console.log(`[Frontend] Всего найдено позиций: ${totalItemsFound} из ${countedOrders.length} заказов`);
       
       // Функция для формирования краткого названия (если нет листов/резок)
       const buildSimplifiedItemName = (item: any): string => {
@@ -410,7 +417,7 @@ export const CustomerDetailView: React.FC<{
         return item.name || item.params?.productName || item.params?.name || item.params?.description || item.type || 'Услуга';
       };
       
-      for (const order of filteredOrders) {
+      for (const order of countedOrders) {
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
@@ -462,14 +469,14 @@ export const CustomerDetailView: React.FC<{
           taxId: customer.tax_id || '—',
           bankDetails: customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—'),
           authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
-          orders: filteredOrders.map((order, index) => ({
+          orders: countedOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
           orderItems: allOrderItems,
-          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalAmount: countedOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
           totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0),
         };
         
@@ -529,9 +536,9 @@ export const CustomerDetailView: React.FC<{
       // Стандартная генерация без шаблона
       const rows = [
         ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
-        ...buildOrdersTableRows(filteredOrders),
+        ...buildOrdersTableRows(countedOrders),
       ];
-      const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+      const total = countedOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
       rows.push(['', '', 'Итого', total.toFixed(2), '']);
 
       const worksheet = XLSX.utils.aoa_to_sheet(rows);
@@ -545,14 +552,14 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, countedOrders, legalForm, recordLegalExport, customer]);
 
   const handleExportInvoice = useCallback(async () => {
     if (!customer) return;
     
     try {
       setGeneratingDocument('invoice');
-      const orderIds = filteredOrders.map((o) => o.id);
+      const orderIds = countedOrders.map((o) => o.id);
       if (orderIds.length > 0) {
         try {
           const response = await generateDocumentByTypeFromOrders('invoice', orderIds);
@@ -611,7 +618,7 @@ export const CustomerDetailView: React.FC<{
       };
       
       let itemNumber = 1;
-      for (const order of filteredOrders) {
+      for (const order of countedOrders) {
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
@@ -650,14 +657,14 @@ export const CustomerDetailView: React.FC<{
           taxId: customer.tax_id || '—',
           bankDetails: customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—'),
           authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
-          orders: filteredOrders.map((order, index) => ({
+          orders: countedOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
           orderItems: allOrderItems,
-          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalAmount: countedOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
           totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0),
         };
         
@@ -703,9 +710,9 @@ export const CustomerDetailView: React.FC<{
       // Стандартная генерация без шаблона
       const rows = [
         ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
-        ...buildOrdersTableRows(filteredOrders),
+        ...buildOrdersTableRows(countedOrders),
       ];
-      const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+      const total = countedOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
       rows.push(['', '', 'Итого', total.toFixed(2), '']);
 
       const worksheet = XLSX.utils.aoa_to_sheet(rows);
@@ -719,7 +726,7 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, countedOrders, legalForm, recordLegalExport, customer]);
 
   const handleExportContract = useCallback(async () => {
     if (!customer) return;
@@ -742,13 +749,13 @@ export const CustomerDetailView: React.FC<{
           authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
           contractNumber,
           contractDate: new Date().toLocaleDateString('ru-RU'),
-          orders: filteredOrders.map((order, index) => ({
+          orders: countedOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
-          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalAmount: countedOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
         };
         
         const response = await generateDocumentByType('contract', templateData);
@@ -805,7 +812,7 @@ export const CustomerDetailView: React.FC<{
             })
           ),
         }),
-        ...buildOrdersTableRows(filteredOrders).map(
+        ...buildOrdersTableRows(countedOrders).map(
           (cells) =>
             new TableRow({
               children: cells.map((value) => new TableCell({ children: [new Paragraph(value)] })),
@@ -874,7 +881,7 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, countedOrders, legalForm, recordLegalExport, customer]);
 
   if (pageLoading) {
     return (
@@ -973,7 +980,7 @@ export const CustomerDetailView: React.FC<{
           {activeTab === 'orders' && (
             <CustomerDetailOrdersPanel
               ordersLoading={ordersLoading}
-              filteredOrders={filteredOrders}
+              filteredOrders={dateFilteredOrders}
               legalBlock={
                 customer.type === 'legal'
                   ? {

@@ -62,6 +62,24 @@ export async function findOrderStatusId(
   return fallback
 }
 
+/** Просчёт: status 0 и строка «Ожидает» / code waiting. «Оформлен» сюда не входит. */
+export async function isWaitingStatusId(db: Pick<Database, 'get'>, statusId: number): Promise<boolean> {
+  const id = Number(statusId)
+  if (!Number.isFinite(id)) return false
+  if (id === 0) return true
+  try {
+    const row = await db.get<{ code?: string | null; name?: string | null }>(
+      `SELECT code, name FROM order_statuses WHERE id = ?`,
+      id,
+    )
+    if (!row) return false
+    if (row.code === 'waiting') return true
+    return row.name === 'Ожидает'
+  } catch {
+    return false
+  }
+}
+
 export async function isPoolStatusId(db: Pick<Database, 'get'>, statusId: number): Promise<boolean> {
   const id = Number(statusId)
   if (id === 0) return true

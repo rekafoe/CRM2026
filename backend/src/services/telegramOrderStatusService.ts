@@ -1,5 +1,6 @@
 import { getDb } from '../config/database';
 import { hasColumn } from '../utils/tableSchemaCache';
+import { notWaitingStatusSql } from '../utils/orderFulfillmentScope';
 import { TelegramUserService } from './telegramUserService';
 import { MINIAPP_CHECKOUT_STATE_DRAFT } from '../utils/miniappCheckoutState';
 
@@ -97,7 +98,7 @@ export async function listTelegramActiveOrders(
        o.source
      FROM orders o
      WHERE (${ownershipClauses.join(' OR ')})
-       AND o.status != 0
+       AND ${notWaitingStatusSql('o.status')}
        ${hasIsCancelled ? 'AND COALESCE(o.is_cancelled, 0) = 0' : ''}
        ${completedClause}
        ${checkoutStateClause}

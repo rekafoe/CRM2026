@@ -2,7 +2,6 @@ import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import {
   hasFulfillmentDepartmentColumn,
-  notEstimateStatusSql,
   notWaitingStatusSql,
   scopeByFulfillmentDepartment,
 } from '../utils/orderFulfillmentScope'
@@ -117,7 +116,7 @@ export async function loadPrinterExpectedClicksForDay(
          JOIN orders o ON o.id = i.orderId
         WHERE ${dayFilter.whereSql}
           ${fulfillmentScope.clause}
-          AND ${notEstimateStatusSql('o.status')}
+          AND ${notWaitingStatusSql('o.status')}
           AND i.${printerCol} IS NOT NULL
           AND CAST(i.${printerCol} AS INTEGER) != 0
           ${skipIssuedOtherDaySql}

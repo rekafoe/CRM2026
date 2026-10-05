@@ -10,6 +10,7 @@ import { getCustomCalculatorOperatorPercent } from '../../../services/customCalc
 import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehouseService'
 import { MaterialTransactionService } from '../../warehouse/services/materialTransactionService'
 import { computeClicks } from '../../../utils/printing'
+import { isWaitingStatusId } from '../../../utils/orderStatusCatalog'
 import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
@@ -476,9 +477,9 @@ export class OrderItemController {
         
         logger.info('[addItem] Позиция вставлена', { itemId })
 
-        // Если заказ не в первом статусе (0 или 1) — прибавляем клики позиции в счётчик принтера на дату добавления
-        const notFirstStatus = orderStatus !== 0 && orderStatus !== 1
-        if (notFirstStatus && printerId != null && Number.isFinite(printerId) && clicks > 0) {
+        // Просчёт «Ожидает» в счётчик принтера не пишем. «Оформлен» уже работа, клики учитываем.
+        const waitingOrder = await isWaitingStatusId(db, orderStatus)
+        if (!waitingOrder && printerId != null && Number.isFinite(printerId) && clicks > 0) {
           const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
           const today = todayRow?.d?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)
           const current = await db.get<{ value: number }>(

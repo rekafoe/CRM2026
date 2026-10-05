@@ -1,3 +1,5 @@
+import { isWaitingOrder } from '../hooks/useOrderStatuses';
+
 export type NumberInputValue = number | '';
 
 export function numberInputFromString(raw: string): NumberInputValue {
@@ -55,9 +57,14 @@ export function calendarDateLocal(value: string | null | undefined): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Заказ в пуле «Ожидает» (status=0) — не в выручку счётчиков. status=1 — «Оформлен», учитывается. */
-export function isOrderExcludedFromCashCounter(order: { status?: number | string | null }): boolean {
-  return Number(order.status) === 0;
+/** Просчёт «Ожидает» не входит в выручку счётчиков. «Оформлен» учитывается. */
+export function isOrderExcludedFromCashCounter(order: {
+  status?: number | string | null
+  status_name?: string | null
+  statusName?: string | null
+  status_code?: string | null
+}): boolean {
+  return isWaitingOrder(order);
 }
 
 /** Онлайн-предоплата с сайта: confirm-prepayment пишет `successful`, офлайн — `paid`. */

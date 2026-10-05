@@ -44,8 +44,13 @@ describe('CustomerService list and last order', () => {
     createdIds.push(older.id, newer.id, extra.id)
 
     const db = await getDb()
-    const status = await db.get('SELECT id FROM order_statuses ORDER BY id LIMIT 1') as { id: number } | undefined
-    const statusId = status?.id ?? 1
+    const placed = await db.get<{ id: number }>(
+      `SELECT id FROM order_statuses WHERE code = 'placed' OR name = 'Оформлен' ORDER BY id LIMIT 1`,
+    )
+    const waiting = await db.get<{ id: number }>(
+      `SELECT id FROM order_statuses WHERE code = 'waiting' OR name = 'Ожидает' ORDER BY id LIMIT 1`,
+    )
+    const statusId = placed?.id ?? 2
 
     const oldOrder = await db.run(
       `INSERT INTO orders (number, status, customer_id, created_at, createdAt, discount_percent)
@@ -69,6 +74,19 @@ describe('CustomerService list and last order', () => {
       `INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, 'print', ?, 1, 1)`,
       [newOrderId, JSON.stringify({ storedTotalCost: 200 })]
     )
+    if (waiting?.id != null) {
+      const estimate = await db.run(
+        `INSERT INTO orders (number, status, customer_id, created_at, createdAt, discount_percent)
+         VALUES (?, ?, ?, ?, ?, 0)`,
+        [`${stamp}-WAIT`, waiting.id, newer.id, '2026-08-01 10:00:00', '2026-08-01 10:00:00'],
+      )
+      const estimateId = Number((estimate as { lastID: number }).lastID)
+      orderIds.push(estimateId)
+      await db.run(
+        `INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, 'print', '{}', 999, 1)`,
+        [estimateId],
+      )
+    }
 
     const listed = await CustomerService.getAllCustomers({
       search: stamp,

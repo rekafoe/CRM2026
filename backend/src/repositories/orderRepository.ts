@@ -1090,12 +1090,12 @@ export const OrderRepository = {
     const whereClause = whereConditions.join(' AND ')
     const stats = await db.get(`
       SELECT
-        COUNT(*) as totalOrders,
-        COUNT(CASE WHEN base.status = 1 THEN 1 END) as newOrders,
-        COUNT(CASE WHEN base.status = 2 THEN 1 END) as inProgressOrders,
-        COUNT(CASE WHEN base.status = 3 THEN 1 END) as readyOrders,
+        COUNT(CASE WHEN ${notWaitingStatusSql('base.status')} THEN 1 END) as totalOrders,
+        COUNT(CASE WHEN ${notWaitingStatusSql('base.status')} AND base.status = 1 THEN 1 END) as newOrders,
+        COUNT(CASE WHEN ${notWaitingStatusSql('base.status')} AND base.status = 2 THEN 1 END) as inProgressOrders,
+        COUNT(CASE WHEN ${notWaitingStatusSql('base.status')} AND base.status = 3 THEN 1 END) as readyOrders,
         COUNT(CASE WHEN ${completedStatusSql('base.status')} THEN 1 END) as shippedOrders,
-        COUNT(CASE WHEN base.status = 5 THEN 1 END) as completedOrders,
+        COUNT(CASE WHEN ${notWaitingStatusSql('base.status')} AND base.status = 5 THEN 1 END) as completedOrders,
         COALESCE(SUM(CASE WHEN ${notWaitingStatusSql('base.status')} THEN base.totalAmount ELSE 0 END), 0) as totalRevenue,
         COALESCE(AVG(CASE WHEN ${notWaitingStatusSql('base.status')} THEN base.totalAmount END), 0) as averageOrderValue,
         COUNT(CASE WHEN ${notWaitingStatusSql('base.status')} AND base.prepaymentAmount > 0 THEN 1 END) as ordersWithPrepayment,

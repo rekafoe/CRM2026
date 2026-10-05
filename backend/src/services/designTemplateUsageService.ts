@@ -1,5 +1,6 @@
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { notWaitingStatusSql } from '../utils/orderFulfillmentScope'
 
 const DESIGN_TEMPLATE_ID_EXPR = `
   CAST(NULLIF(TRIM(COALESCE(CAST(json_extract(i.params, '$.designTemplateId') AS TEXT), '')), '') AS INTEGER)
@@ -120,8 +121,8 @@ export async function getDesignTemplateUsageAnalytics(
 
   const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
   const notCancelledCond = hasIsCancelled
-    ? '(o.status != 0 AND COALESCE(o.is_cancelled, 0) = 0)'
-    : 'o.status != 0'
+    ? `(${notWaitingStatusSql('o.status')} AND COALESCE(o.is_cancelled, 0) = 0)`
+    : notWaitingStatusSql('o.status')
 
   const usageRows = await db.all<Array<{
     design_template_id: number

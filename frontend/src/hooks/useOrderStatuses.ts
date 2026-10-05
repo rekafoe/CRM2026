@@ -22,6 +22,31 @@ export function isPoolOrderStatusId(statusId: number): boolean {
   return POOL_NAMES.has(row.name);
 }
 
+type StatusRef = { id: number; name: string; code?: string | null }
+
+/** Просчёт: status 0, code waiting или имя «Ожидает». «Оформлен» учитывается. */
+export function isWaitingOrder(
+  order: {
+    status?: number | string | null
+    status_name?: string | null
+    statusName?: string | null
+    status_code?: string | null
+  },
+  statuses?: StatusRef[] | null,
+): boolean {
+  const name = String(order.status_name ?? order.statusName ?? '').trim()
+  if (name === 'Ожидает') return true
+  const code = String(order.status_code ?? '').trim()
+  if (code === 'waiting') return true
+  const id = Number(order.status)
+  if (id === 0) return true
+  const list = statuses ?? _cache ?? []
+  const row = list.find((status) => status.id === id)
+  if (!row) return false
+  if (row.code === 'waiting') return true
+  return row.name === 'Ожидает'
+}
+
 /** Выдан: строка «Завершён» или прежний номер 7. */
 export function isCompletedOrderStatusId(statusId: number): boolean {
   const id = Number(statusId);

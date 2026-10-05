@@ -1,6 +1,6 @@
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
-import { revenueOrdersCondition } from '../utils/orderFulfillmentScope'
+import { notWaitingStatusSql, revenueOrdersCondition } from '../utils/orderFulfillmentScope'
 import { turnoverTaxAmount } from '../utils/turnoverTax'
 
 /** Маркер авторасхода. Ручные налоги с другими notes не трогаем. */
@@ -86,8 +86,8 @@ async function quarterRevenue(
 ): Promise<number> {
   const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
   const notCancelled = hasIsCancelled
-    ? 'AND o.status != 0 AND COALESCE(o.is_cancelled, 0) = 0'
-    : 'AND o.status != 0'
+    ? `AND ${notWaitingStatusSql('o.status')} AND COALESCE(o.is_cancelled, 0) = 0`
+    : `AND ${notWaitingStatusSql('o.status')}`
   const row = await db.get<{ revenue: number }>(
     `SELECT COALESCE(SUM(
         (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(i_totals.raw_total, 0)

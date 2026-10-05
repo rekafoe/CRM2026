@@ -12,7 +12,7 @@ import {
   unassignOrderByNumber,
 } from "../../api";
 import { useNavigate } from 'react-router-dom';
-import { isPoolOrderStatusId } from "../../hooks/useOrderStatuses";
+import { isPoolOrderStatusId, isWaitingOrder } from "../../hooks/useOrderStatuses";
 import AddItemModal from "../AddItemModal";
 import { PrepaymentModal } from "../PrepaymentModal";
 import { FeatureFlaggedCalculator } from "../calculator/FeatureFlaggedCalculator";
@@ -337,8 +337,11 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   }, [lowStock]);
 
   const totalRevenue = useMemo(() => {
-    return orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
-  }, [orders]);
+    return orders.reduce((sum, order) => {
+      if (isWaitingOrder(order, statuses)) return sum;
+      return sum + (order.totalAmount || 0);
+    }, 0);
+  }, [orders, statuses]);
 
   // Эффекты
   useEffect(() => {

@@ -45,15 +45,29 @@ describe('loadPrinterExpectedClicksForDay', () => {
       )
     }
 
+    const waitingRow = await db.get<{ id: number }>(
+      `SELECT id FROM order_statuses WHERE code = 'waiting' OR name = 'Ожидает' ORDER BY id LIMIT 1`,
+    )
+    if (waitingRow?.id == null) throw new Error('статус «Ожидает» не найден')
+    if (Number(waitingRow.id) === Number(placedStatus)) {
+      throw new Error('статус «Ожидает» совпал с «Оформлен»')
+    }
+
     try {
       await insertOrder(`EXP-WAIT-${stamp}`, 0, 40)
+      await insertOrder(`EXP-NAMED-${stamp}`, waitingRow.id, 25)
       await insertOrder(`EXP-OK-${stamp}`, placedStatus, 15)
 
       const clicks = await loadPrinterExpectedClicksForDay(day)
       expect(clicks[printer.id]).toBe(15)
     } finally {
       await db.run('DELETE FROM items WHERE printerId = ?', printer.id)
-      await db.run(`DELETE FROM orders WHERE number IN (?, ?)`, `EXP-WAIT-${stamp}`, `EXP-OK-${stamp}`)
+      await db.run(
+        `DELETE FROM orders WHERE number IN (?, ?, ?)`,
+        `EXP-WAIT-${stamp}`,
+        `EXP-NAMED-${stamp}`,
+        `EXP-OK-${stamp}`,
+      )
       await db.run('DELETE FROM printers WHERE id = ?', printer.id)
     }
   })

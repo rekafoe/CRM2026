@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { isOrderExcludedFromCashCounter } from '../../utils/numberInput';
+import { useOrderStatuses } from '../../hooks/useOrderStatuses';
 import { BynSymbol, MoneyAmount } from '../ui';
 
 interface PrinterCounter {
@@ -34,6 +35,7 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  useOrderStatuses();
 
   useEffect(() => {
     loadCounters();

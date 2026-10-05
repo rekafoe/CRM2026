@@ -1,4 +1,5 @@
 import { getOrders, getOrderStatuses, getCurrentUser, getUsers, getLowStock } from '../api';
+import { isWaitingOrder } from '../hooks/useOrderStatuses';
 import { clearCache } from '../hooks/useOptimizedData';
 
 export class OptimizedApiClient {
@@ -50,7 +51,7 @@ export class OptimizedApiClient {
     const orders = await this.getOrders();
     const filteredOrders = orders.data.filter((order: any) => {
       const orderDate = new Date(order.created_at).toISOString().slice(0, 10);
-      return orderDate >= dateFrom && orderDate <= dateTo;
+      return orderDate >= dateFrom && orderDate <= dateTo && !isWaitingOrder(order);
     });
 
     return {

@@ -483,7 +483,11 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   const alerts = (() => {
     const items: Array<{ level: 'ok' | 'warn' | 'critical'; title: string; description: string; tab?: AnalyticsTab }> = [];
 
-    const totalOrdersFromFunnel = orderStatusData?.statusFunnel?.reduce((sum, row) => sum + Number(row.count || 0), 0) || 0;
+    const totalOrdersFromFunnel = orderStatusData?.statusFunnel?.reduce((sum, row) => {
+      const name = String(row.status_name || '').trim();
+      if (name === 'Ожидает' || Number(row.status) === 0) return sum;
+      return sum + Number(row.count || 0);
+    }, 0) || 0;
     const cancelledOrders = Number(orderStatusData?.cancellationReasons?.cancelled_count || 0);
     const cancellationRate = totalOrdersFromFunnel > 0 ? (cancelledOrders / totalOrdersFromFunnel) * 100 : 0;
     if (cancellationRate >= alertThresholds.cancellationCritical) {
