@@ -1,6 +1,11 @@
-import { Router, Request, Response } from 'express'
+import { Router, Request, Response, NextFunction } from 'express'
 import { getDb } from '../config/database'
-import { orderFilesDir, resolveSafeExistingPath, uploadOrderFilesMemory } from '../config/upload'
+import {
+  EDITOR_DRAFT_MAX_FILE_BYTES,
+  orderFilesDir,
+  resolveSafeExistingPath,
+  uploadEditorDraftFileMemory,
+} from '../config/upload'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 import { isClientRenderedPageFileName } from '../utils/clientRenderedPageFile'
@@ -18,6 +23,10 @@ import {
   updateEditorDraftPayload,
 } from '../services/publicEditorDraftService'
 import {
+  EditorDraftFileTooLargeError,
+  formatEditorDraftMegabytes,
+} from '../services/editorDraftUploadLimit'
+import {
   cloneCustomerProjectToDraft,
   listCustomerProjects,
   toCustomerProjectListDto,
@@ -25,6 +34,28 @@ import {
 import { ensureWebsiteCustomer } from '../services/editorDraftOwnerService'
 
 const router = Router()
+
+function uploadEditorDraftFile(req: Request, res: Response, next: NextFunction): void {
+  uploadEditorDraftFileMemory.single('file')(req, res, (err: unknown) => {
+    const code = String((err as { code?: string } | null)?.code || '')
+    if (code === 'LIMIT_FILE_SIZE') {
+      const limit = formatEditorDraftMegabytes(EDITOR_DRAFT_MAX_FILE_BYTES)
+      res.status(413).json({
+        message: `Файл больше ${limit}. В редактор можно загрузить один файл до ${limit}. Сожмите фото или выберите снимок поменьше.`,
+      })
+      return
+    }
+    next(err)
+  })
+}
+
+function sendEditorDraftFileError(res: Response, err: unknown): void {
+  if (err instanceof EditorDraftFileTooLargeError) {
+    res.status(413).json({ message: err.message })
+    return
+  }
+  res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось загрузить файл' })
+}
 
 async function getPublicBranding(): Promise<{ logoUrl: string | null; organizationName: string | null }> {
   try {
@@ -220,13 +251,13 @@ router.patch('/admin-preview/drafts/:token', authenticate, asyncHandler(async (r
 router.post(
   '/admin-preview/drafts/:token/files',
   authenticate,
-  uploadOrderFilesMemory.single('file'),
+  uploadEditorDraftFile,
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const file = await addEditorDraftFile(req.params.token, (req as any).file)
       res.status(201).json(withDraftFileUrl(req, req.params.token, file))
     } catch (err: unknown) {
-      res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось загрузить файл draft' })
+      sendEditorDraftFileError(res, err)
     }
   }),
 )
@@ -485,13 +516,13 @@ router.patch('/drafts/:token', asyncHandler(async (req: Request, res: Response) 
 
 router.post(
   '/drafts/:token/files',
-  uploadOrderFilesMemory.single('file'),
+  uploadEditorDraftFile,
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const file = await addEditorDraftFile(req.params.token, (req as any).file)
       res.status(201).json(withDraftFileUrl(req, req.params.token, file))
     } catch (err: unknown) {
-      res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось загрузить файл draft' })
+      sendEditorDraftFileError(res, err)
     }
   }),
 )

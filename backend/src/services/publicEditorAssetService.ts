@@ -1,7 +1,11 @@
 import sharp from 'sharp'
 import path from 'path'
 import { getDb } from '../config/database'
-import { saveBufferToOrderFiles } from '../config/upload'
+import { EDITOR_DRAFT_MAX_FILE_BYTES, saveBufferToOrderFiles } from '../config/upload'
+import {
+  EditorDraftFileTooLargeError,
+  editorDraftFileTooLargeMessage,
+} from './editorDraftUploadLimit'
 import { hasColumn, invalidateTableSchemaCache } from '../utils/tableSchemaCache'
 
 type DraftUploadFile = {
@@ -100,9 +104,17 @@ async function buildImageMetadata(buffer: Buffer | undefined, originalName?: str
 function assertDraftImageFile(file: DraftUploadFile): void {
   const mime = String(file.mimetype || '').toLowerCase()
   const ext = path.extname(String(file.originalname || '')).toLowerCase()
-  if (!file.buffer?.length) throw new Error('Файл пустой или не загружен')
-  if (!allowedDraftImageMimes.has(mime) || !allowedDraftImageExtensions.has(ext)) {
-    throw new Error('Draft редактора принимает только изображения JPG, PNG, WEBP, TIFF или HEIC')
+  const size = file.buffer?.length ?? 0
+  if (!size) throw new Error('Файл пустой. Выберите другое фото.')
+  if (size > EDITOR_DRAFT_MAX_FILE_BYTES) {
+    throw new EditorDraftFileTooLargeError(
+      editorDraftFileTooLargeMessage(String(file.originalname || ''), size),
+    )
+  }
+  const mimeMissing = mime === '' || mime === 'application/octet-stream'
+  const mimeOk = allowedDraftImageMimes.has(mime) || (mimeMissing && allowedDraftImageExtensions.has(ext))
+  if (!mimeOk || !allowedDraftImageExtensions.has(ext)) {
+    throw new Error('В редактор можно загрузить только фото: JPG, PNG, WEBP, TIFF или HEIC. PDF сюда не ставится.')
   }
 }
 
@@ -135,7 +147,7 @@ export async function createEditorDraftAsset(
     [draftId],
   )
   if ((currentCount?.count ?? 0) >= MAX_DRAFT_FILES_PER_DRAFT) {
-    throw new Error(`В draft можно загрузить не больше ${MAX_DRAFT_FILES_PER_DRAFT} файлов`)
+    throw new Error(`В этот альбом можно загрузить не больше ${MAX_DRAFT_FILES_PER_DRAFT} фото.`)
   }
   const saved = saveBufferToOrderFiles(file.buffer, file.originalname)
   if (!saved) throw new Error('Файл пустой или не загружен')

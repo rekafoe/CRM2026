@@ -129,6 +129,20 @@ export const uploadOrderFilesMemory = multer({
   },
 })
 
+/** Фото в редакторе альбома: художественные снимки тяжелее обычных макетов. */
+export const EDITOR_DRAFT_MAX_FILE_BYTES = Number(
+  process.env.EDITOR_DRAFT_MAX_FILE_BYTES || 100 * 1024 * 1024,
+)
+
+export const uploadEditorDraftFileMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: EDITOR_DRAFT_MAX_FILE_BYTES,
+    fields: MAX_UPLOAD_FIELDS,
+    files: 1,
+  },
+})
+
 export function isSafeStoredFilename(filename: string): boolean {
   if (!filename) return false
   if (!SAFE_STORED_FILENAME_RE.test(filename)) return false
