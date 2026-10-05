@@ -61,26 +61,55 @@ router.post(
     }
 
     const db = await getDb()
+    type WebhookOrderRow = {
+      id: number
+      prepaymentAmount?: number | string | null
+      paymentId?: string | null
+    }
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
+      ? await db.get<WebhookOrderRow>(
+          'SELECT id, prepaymentAmount, paymentId FROM orders WHERE paymentId = ?',
           paymentId,
         )
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
+      order = await db.get<WebhookOrderRow>(
+        'SELECT id, prepaymentAmount, paymentId FROM orders WHERE number = ?',
         trackingId,
       )
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
+        order = await db.get<WebhookOrderRow>(
+          'SELECT id, prepaymentAmount, paymentId FROM orders WHERE id = ?',
           Number(trackingId),
         )
       }
     }
     if (!order) {
       logger.warn('BePaid webhook: order not found', { paymentId, trackingId, statusRaw })
+      res.status(204).end()
+      return
+    }
+
+    // Issue seals prepaid (paymentId ISSUE-… + debt_closed). Late BePaid success still
+    // matches by tracking_id/number and must not overwrite sealed amount/method/day.
+    const storedPaymentId = String(order.paymentId ?? '').trim()
+    let debtClosed = false
+    try {
+      const row = await db.get<{ id: number }>(
+        'SELECT id FROM debt_closed_events WHERE order_id = ? LIMIT 1',
+        order.id,
+      )
+      debtClosed = Boolean(row?.id)
+    } catch {
+      debtClosed = false
+    }
+    if (debtClosed || storedPaymentId.startsWith('ISSUE-')) {
+      logger.info('BePaid webhook ignored: order already issued', {
+        orderId: order.id,
+        paymentId: paymentId || undefined,
+        trackingId: trackingId || undefined,
+        statusRaw,
+      })
       res.status(204).end()
       return
     }
