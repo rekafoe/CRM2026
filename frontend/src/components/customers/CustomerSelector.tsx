@@ -295,12 +295,15 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
   };
 
   return (
-    <div className="customer-modal-overlay" onClick={onClose}>
+    // Клик по фону не закрывает модалку: иначе пропадает уже введённая форма.
+    <div className="customer-modal-overlay" role="presentation">
       <div
         className="customer-modal"
-        onClick={(e) =>e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-customer-title"
       >
-        <h3 className="customer-modal__title">Создать клиента</h3>
+        <h3 id="create-customer-title" className="customer-modal__title">Создать клиента</h3>
         
         <form onSubmit={handleSubmit}>
           <div className="customer-modal__field">
