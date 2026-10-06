@@ -25,11 +25,7 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
     cutsPerSheet: itemsPerSheet > 0 ? itemsPerSheet + 1 : 0,
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layout(2));
-    (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layout(2));
-
+  const mockDb = (minQty: number) => {
     mockedGetDb.mockResolvedValue({
       get: jest.fn(async (query: string) => {
         if (query.includes('FROM products WHERE id = ?')) {
@@ -52,7 +48,7 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
                     label: '10×20 см',
                     width_mm: 100,
                     height_mm: 200,
-                    min_qty: 1,
+                    min_qty: minQty,
                     items_per_sheet_override: 8,
                     print_prices: [
                       {
@@ -75,6 +71,13 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
       all: jest.fn(async () => []),
       run: jest.fn(),
     } as any);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layout(2));
+    (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layout(2));
+    mockDb(1);
   });
 
   const calc = (trim?: { width: number; height: number }, quantity = 2) =>
@@ -118,6 +121,18 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
     await expect(calc({ width: 400, height: 400 })).rejects.toMatchObject({
       status: 400,
       message: expect.stringContaining('400×400 мм не помещается'),
+    });
+  });
+
+  it('свой обрез не требует мин. тираж каталожной строки', async () => {
+    mockDb(100);
+    const custom = await calc({ width: 200, height: 200 }, 2);
+    expect(custom.layout?.sheetsNeeded).toBe(1);
+    expect(custom.finalPrice).toBeCloseTo(8, 2);
+
+    await expect(calc(undefined, 2)).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining('не меньше 100'),
     });
   });
 

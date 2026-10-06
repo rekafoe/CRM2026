@@ -974,12 +974,15 @@ export class SimplifiedPricingService {
       selectedSize.min_qty > 1 &&
       itemsPerSheetOverride == null &&
       (tierMinQty == null || tierMinQty <= 1);
-    const catalogMinIsItsOwnImposition =
-      customTrimActive &&
-      selectedSize.min_qty != null &&
-      itemsPerSheetOverrideRaw != null &&
-      Number(selectedSize.min_qty) === Number(itemsPerSheetOverrideRaw);
-    const minQtyLimit = catalogMinIsItsOwnImposition
+    // Свой размер не наследует мин. тираж якорной строки: якорь нужен только для тарифа.
+    const pricingSizeId = (normalizedConfig as any).pricing_size_id;
+    const customTrimRequested =
+      allowCustomTrim &&
+      trimInput != null &&
+      !isUvFlatbedMode &&
+      pricingSizeId != null &&
+      String(pricingSizeId) !== '';
+    const minQtyLimit = customTrimActive || customTrimRequested
       ? 1
       : usePagesMultiplier
       ? minQtyFromLayoutOverride || minQtyCoupledToItemsPerSheet || minQtyLikelyFromLayoutOnly
@@ -989,6 +992,10 @@ export class SimplifiedPricingService {
           isOfficePrint || isRollPrint || isRollWideM2Mode || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
         );
     const maxQtyLimit = selectedSize.max_qty;
+    const qtySizeLabel =
+      (customTrimActive || customTrimRequested) && trimInput
+        ? `${trimInput.width}×${trimInput.height} мм`
+        : selectedSize.label;
     if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
       const layoutHint =
         useLayout &&
@@ -1003,8 +1010,8 @@ export class SimplifiedPricingService {
           : '';
       const err: any = new Error(
         maxQtyLimit !== undefined
-          ? `Тираж для размера "${selectedSize.label}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`
-          : `Тираж для размера "${selectedSize.label}" должен быть не меньше ${minQtyLimit}${layoutHint}`
+          ? `Тираж для размера "${qtySizeLabel}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`
+          : `Тираж для размера "${qtySizeLabel}" должен быть не меньше ${minQtyLimit}${layoutHint}`
       );
       err.status = 400;
       throw err;

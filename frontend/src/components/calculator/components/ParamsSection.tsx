@@ -118,7 +118,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
     isMultipageLikeProduct({ simplifiedPages: effectivePagesProp });
   const resolveMinQtyForSize = (size: any) =>
     resolveMultipageMinQty(size, { multipageLike, itemsPerSheet });
-  const minQtyForSize = selectedSize ? resolveMinQtyForSize(selectedSize) : 1;
+  const minQtyForSize = isCustomFormat ? 1 : selectedSize ? resolveMinQtyForSize(selectedSize) : 1;
 
   const [pagesCustomMode, setPagesCustomMode] = useState(false);
 
@@ -150,58 +150,90 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
       >
         {/*  Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
         {isSimplifiedProduct && !hideSimplifiedSizeSelect && (() => {
-          const customSizeValue = '__custom_trim__';
-          const sizeOptionLabel = isCustomFormat
-            ? 'Произвольный размер'
-            : selectedSize
-              ? `${selectedSize.label} (${selectedSize.width_mm}×${selectedSize.height_mm} мм)`
-              : '';
+          const sizeLabel = (size: { label?: string; width_mm: number; height_mm: number }) => {
+            const name = String(size.label || '').trim();
+            return name || `${size.width_mm}×${size.height_mm} мм`;
+          };
+          const shortSizeList =
+            simplifiedSizes.length > 0 &&
+            simplifiedSizes.length <= 5 &&
+            simplifiedSizes.every((size) => sizeLabel(size).length <= 28);
+          const chooseCatalogSize = (id: string) => {
+            setIsCustomFormat(false);
+            const size = simplifiedSizes.find((s: any) => String(s.id) === String(id)) as any;
+            const minQty = resolveMinQtyForSize(size);
+            updateSpecs({
+              size_id: id,
+              quantity: quantityAtLeastMin(specs.quantity, minQty),
+              format: size ? `${size.width_mm}×${size.height_mm}` : specs.format,
+              customFormat: undefined,
+            }, true);
+          };
+          const chooseCustomSize = () => {
+            const fallbackWidth = customFormat.width || (selectedSize ? String(selectedSize.width_mm) : '');
+            const fallbackHeight = customFormat.height || (selectedSize ? String(selectedSize.height_mm) : '');
+            setIsCustomFormat(true);
+            setCustomFormat({ width: fallbackWidth, height: fallbackHeight });
+            if (fallbackWidth && fallbackHeight) {
+              updateSpecs({
+                format: `${fallbackWidth}×${fallbackHeight}`,
+                customFormat: { width: fallbackWidth, height: fallbackHeight },
+              }, true);
+            }
+          };
           return (
-            <div className="param-group param-group--narrow param-group--size-block">
+            <div className={`param-group param-group--size-block${allowCustomTrimForSimplified ? ' param-group--size-choices' : ' param-group--narrow'}`}>
               <label>
                 Размер изделия <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
               </label>
-              <select
-                value={isCustomFormat ? customSizeValue : selectedSizeId}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  if (allowCustomTrimForSimplified && id === customSizeValue) {
-                    const fallbackWidth = customFormat.width || (selectedSize ? String(selectedSize.width_mm) : '');
-                    const fallbackHeight = customFormat.height || (selectedSize ? String(selectedSize.height_mm) : '');
-                    setIsCustomFormat(true);
-                    setCustomFormat({ width: fallbackWidth, height: fallbackHeight });
-                    if (fallbackWidth && fallbackHeight) {
-                      updateSpecs({
-                        format: `${fallbackWidth}×${fallbackHeight}`,
-                        customFormat: { width: fallbackWidth, height: fallbackHeight },
-                      }, true);
-                    }
-                    return;
-                  }
-
-                  setIsCustomFormat(false);
-                  const size = simplifiedSizes.find((s: any) => String(s.id) === String(id)) as any;
-                  const minQty = resolveMinQtyForSize(size);
-                  updateSpecs({
-                    size_id: id,
-                    quantity: quantityAtLeastMin(specs.quantity, minQty),
-                    format: size ? `${size.width_mm}×${size.height_mm}` : specs.format,
-                    customFormat: undefined,
-                  }, true);
-                }}
-                className="form-control"
-                required
-                title={sizeOptionLabel || undefined}
-              >
-                {simplifiedSizes.map(size => (
-                  <option key={size.id} value={size.id}>
-                    {size.label} ({size.width_mm}×{size.height_mm} мм)
-                  </option>
-                ))}
-                {allowCustomTrimForSimplified && (
-                  <option value={customSizeValue}>Произвольный размер</option>
-                )}
-              </select>
+              {allowCustomTrimForSimplified && shortSizeList ? (
+                <div className="size-choice-list" role="radiogroup" aria-label="Размер изделия">
+                  {simplifiedSizes.map((size) => {
+                    const active = !isCustomFormat && String(selectedSizeId) === String(size.id);
+                    return (
+                      <button
+                        key={size.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        className={active ? 'size-choice-btn is-active' : 'size-choice-btn'}
+                        title={`${size.width_mm}×${size.height_mm} мм`}
+                        onClick={() => chooseCatalogSize(String(size.id))}
+                      >
+                        {sizeLabel(size)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <select
+                  value={isCustomFormat ? '' : selectedSizeId}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    chooseCatalogSize(e.target.value);
+                  }}
+                  className="form-control"
+                  required={!isCustomFormat}
+                  title={selectedSize ? `${sizeLabel(selectedSize)} (${selectedSize.width_mm}×${selectedSize.height_mm} мм)` : undefined}
+                >
+                  {isCustomFormat && <option value="">Формат из списка</option>}
+                  {simplifiedSizes.map(size => (
+                    <option key={size.id} value={size.id}>
+                      {sizeLabel(size)} ({size.width_mm}×{size.height_mm} мм)
+                    </option>
+                  ))}
+                </select>
+              )}
+              {allowCustomTrimForSimplified && (
+                <button
+                  type="button"
+                  className={isCustomFormat ? 'size-choice-btn size-choice-btn--custom is-active' : 'size-choice-btn size-choice-btn--custom'}
+                  aria-pressed={isCustomFormat}
+                  onClick={chooseCustomSize}
+                >
+                  Произвольный размер
+                </button>
+              )}
               {allowCustomTrimForSimplified && isCustomFormat && (
                 <div className="custom-format-inputs custom-format-inputs--size">
                   <input
@@ -221,6 +253,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                     }}
                     className="form-control"
                     min="1"
+                    aria-label="Ширина, мм"
                   />
                   <span>×</span>
                   <input
@@ -240,8 +273,12 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                     }}
                     className="form-control"
                     min="1"
+                    aria-label="Высота, мм"
                   />
                 </div>
+              )}
+              {validationErrors.format && (
+                <div className="text-sm text-red-600">{validationErrors.format}</div>
               )}
             </div>
           );

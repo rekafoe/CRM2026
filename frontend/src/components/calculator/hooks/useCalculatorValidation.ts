@@ -242,12 +242,14 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     if (!Array.isArray(sizes)) return undefined;
     const selectedSize = sizes.find((s: any) => s.id === sizeId);
     if (!selectedSize) return undefined;
-    const min = resolveMultipageMinQty(selectedSize, { multipageLike: isMultiPageProduct === true });
+    const min = isCustomFormat
+      ? 1
+      : resolveMultipageMinQty(selectedSize, { multipageLike: isMultiPageProduct === true });
     return {
       min,
       max: selectedSize.max_qty ?? undefined,
     };
-  }, [backendProductSchema, effectiveSizes, isMultiPageProduct]);
+  }, [backendProductSchema, effectiveSizes, isMultiPageProduct, isCustomFormat]);
 
   const getOperationLimits = useCallback((selectedOps?: Array<{ operationId?: number | string }>) => {
     if (!Array.isArray(selectedOps) || selectedOps.length === 0) return undefined;
