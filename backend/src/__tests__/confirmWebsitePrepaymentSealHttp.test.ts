@@ -1,22 +1,17 @@
 import 'dotenv/config'
+
+const API_KEY = 'confirm-seal-test-key'
+process.env.WEBSITE_ORDER_API_KEY = API_KEY
+
 import express from 'express'
 import request from 'supertest'
 import { initDB, getDb } from '../config/database'
 import ordersRoutes from '../routes/orders'
 
-const API_KEY = 'confirm-seal-test-key'
-
 describe('confirm-prepayment sealed prepaid', () => {
-  const originalKey = process.env.WEBSITE_ORDER_API_KEY
-
   beforeAll(async () => {
     process.env.WEBSITE_ORDER_API_KEY = API_KEY
     await initDB()
-  })
-
-  afterAll(() => {
-    if (originalKey === undefined) delete process.env.WEBSITE_ORDER_API_KEY
-    else process.env.WEBSITE_ORDER_API_KEY = originalKey
   })
 
   function app() {
