@@ -671,7 +671,6 @@ export class OrderService {
       }>;
     }
   ) {
-    const isWebsiteLike = payload.source === 'website' || payload.source === 'mini_app';
     for (const item of payload.items) {
       let paramsObj: Record<string, any> = {};
       try {
@@ -684,6 +683,15 @@ export class OrderService {
           materialId: Number(component.materialId),
           qtyPerItem: Number(component.qtyPerItem),
         }));
+      }
+      // Website/mini_app/telegram: клиентские флаги не должны блокировать server reprice.
+      if (payload.source !== 'crm') {
+        delete paramsObj.priceLockedByCalculator;
+        delete paramsObj.customProduct;
+        delete paramsObj.postprintProduct;
+        if (String(paramsObj.productType ?? '').trim().toLowerCase() === 'custom') {
+          delete paramsObj.productType;
+        }
       }
       const qty = Math.max(1, Number(item.quantity) || 1);
       const effectiveTotal =
