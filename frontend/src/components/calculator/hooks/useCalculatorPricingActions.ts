@@ -807,6 +807,11 @@ export function useCalculatorPricingActions({
           layoutBleedMmRaw != null && Number.isFinite(Number(layoutBleedMmRaw))
             ? Math.max(0, Number(layoutBleedMmRaw))
             : undefined;
+        const knifePathRaw = layoutData.knifePathM ?? layoutData.knife_path_m;
+        const knifePathM =
+          knifePathRaw != null && Number.isFinite(Number(knifePathRaw)) && Number(knifePathRaw) > 0
+            ? Math.round(Number(knifePathRaw) * 1000) / 1000
+            : undefined;
         const layoutSummary =
           itemsPerSheet ||
           sheetsNeeded ||
@@ -816,7 +821,8 @@ export function useCalculatorPricingActions({
           wastePercentage ||
           fitsOnSheet === false ||
           (Number(cutsPerSheet) > 0) ||
-          (layoutBleedMm != null && layoutBleedMm > 0)
+          (layoutBleedMm != null && layoutBleedMm > 0) ||
+          knifePathM != null
             ? {
                 itemsPerSheet,
                 sheetsNeeded,
@@ -828,6 +834,7 @@ export function useCalculatorPricingActions({
                 fitsOnSheet: fitsOnSheet === undefined ? undefined : !!fitsOnSheet,
                 ...(Number(cutsPerSheet) > 0 ? { cutsPerSheet: Number(cutsPerSheet) } : {}),
                 ...(layoutBleedMm != null && layoutBleedMm > 0 ? { bleedMm: layoutBleedMm } : {}),
+                ...(knifePathM != null ? { knifePathM } : {}),
               }
             : undefined;
 

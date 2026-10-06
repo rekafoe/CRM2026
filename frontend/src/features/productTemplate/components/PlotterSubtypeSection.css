@@ -87,3 +87,62 @@
 .plotter-subtype__grid-2 .simplified-template__type-website-field {
   min-width: 0;
 }
+
+.plotter-mode-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.plotter-mode-card {
+  margin: 0;
+  padding: 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.plotter-mode-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.plotter-mode-card span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary, #6b7280);
+}
+
+.plotter-mode-card.is-active {
+  background: #e0f2fe;
+  border-color: #667eea;
+}
+
+.plotter-material-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+}
+
+.plotter-material-list li + li {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.plotter-material-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}

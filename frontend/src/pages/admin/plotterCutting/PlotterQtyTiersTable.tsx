@@ -7,25 +7,20 @@ export type PlotterQtyTierRow = { min_quantity: number; price_per_unit: number }
 type Props = {
   tiers: PlotterQtyTierRow[] | undefined;
   onChange: (next: PlotterQtyTierRow[]) => void;
-  /** Подпись нижней границы (aria), напр. «Мин. пробег ножа (м)». */
   thresholdTitle: string;
-  /** Подпись поля цены под диапазоном. */
   priceTitle: string;
-  /** Единица в строке диапазона: «м», «м²», «шт». */
   rangeUnit: string;
   description: string;
   emptyHint?: string;
   thresholdFractionDigits?: number;
   priceFractionDigits?: number;
   addRangeLabel?: string;
-  /** Краткая подпись таблицы (caption). */
   rangeColumnHeading?: string;
+  /** Нельзя удалить последнюю строку (базовая ставка резки). */
+  keepOneRow?: boolean;
 };
 
-const UPPER_BOUND_TITLE =
-  'При значении, совпадающем со следующим порогом, действует строка ниже.';
-
-/** Табличное отображение: один ряд столбцов — в каждом «от … до …» и под ней цена. */
+/** Строки «от / до / цена». Верхняя граница — порог следующей строки. */
 export const PlotterQtyTiersTable: React.FC<Props> = ({
   tiers,
   onChange,
@@ -33,11 +28,12 @@ export const PlotterQtyTiersTable: React.FC<Props> = ({
   priceTitle,
   rangeUnit,
   description,
-  emptyHint = 'Нет диапазонов — используйте добавление строки.',
+  emptyHint = 'Пока нет строк.',
   thresholdFractionDigits = 3,
   priceFractionDigits = 4,
-  addRangeLabel = 'Добавить диапазон',
-  rangeColumnHeading = 'Диапазоны и ставки по объёму',
+  addRangeLabel = 'Добавить порог',
+  rangeColumnHeading,
+  keepOneRow = false,
 }) => {
   const rows = tiers?.length ? tiers : [];
   const sortedRows = useMemo(
@@ -58,6 +54,7 @@ export const PlotterQtyTiersTable: React.FC<Props> = ({
   };
 
   const removeRow = (idxInSorted: number) => {
+    if (keepOneRow && sortedRows.length <= 1) return;
     const row = sortedRows[idxInSorted];
     const origIdx = rows.indexOf(row);
     if (origIdx < 0) return;
@@ -66,107 +63,91 @@ export const PlotterQtyTiersTable: React.FC<Props> = ({
 
   const addRow = () => {
     const lastMin = sortedRows.length ? sortedRows[sortedRows.length - 1].min_quantity : 0;
-    onChange([...rows, { min_quantity: roundThreshold(lastMin + 1), price_per_unit: 0 }]);
+    const step = thresholdFractionDigits === 0 ? 1 : 1;
+    onChange([
+      ...rows,
+      {
+        min_quantity: roundThreshold(lastMin + step),
+        price_per_unit: sortedRows.length ? sortedRows[sortedRows.length - 1].price_per_unit : 0,
+      },
+    ]);
   };
-
-  const colCount = sortedRows.length > 0 ? sortedRows.length : 1;
 
   return (
     <div className="plotter-tier-table">
+      {rangeColumnHeading ? <p className="plotter-rate-rows__title">{rangeColumnHeading}</p> : null}
       <p className="plotter-tier-table__desc">{description}</p>
-      <div className="plotter-tier-table__surface plotter-tier-table__surface--scroll">
-        <table className="plotter-tier-table__table plotter-tier-table__table--columns">
-          <caption className="plotter-tier-table__caption">{rangeColumnHeading}</caption>
+      <div className="plotter-rate-rows__surface">
+        <table className="plotter-rate-rows">
+          <thead>
+            <tr>
+              <th>От, {rangeUnit}</th>
+              <th>До</th>
+              <th>{priceTitle}</th>
+              <th />
+            </tr>
+          </thead>
           <tbody>
             {sortedRows.length === 0 ? (
               <tr>
-                <td colSpan={1} className="plotter-tier-table__empty">
+                <td colSpan={4} className="plotter-rate-rows__empty">
                   {emptyHint}
                 </td>
               </tr>
             ) : (
-              <tr>
-                {sortedRows.map((r, idx) => {
-                  const upper = sortedRows[idx + 1]?.min_quantity;
-                  const upperFmt =
-                    upper !== undefined ? formatTierQuantity(upper, thresholdFractionDigits) : null;
-                  return (
-                    <td key={`${r.min_quantity}-${idx}`} className="plotter-tier-table__tier-cell">
-                      <div className="plotter-tier-table__stack plotter-tier-table__stack--col">
-                        <div className="plotter-tier-table__col-head">
-                          <button
-                            type="button"
-                            className="plotter-tier-table__remove"
-                            aria-label="Удалить диапазон"
-                            title="Удалить"
-                            onClick={() =>removeRow(idx)}
-                          >
-                            ×
-                          </button>
-                        </div>
-                        <div className="plotter-tier-table__band-line" aria-label="Диапазон порогов">
-                          <span className="plotter-tier-table__band-txt">От</span>
-                          <DecimalNumberInput
-                            className="plotter-tier-table__field plotter-tier-table__field--band-lo"
-                            value={r.min_quantity}
-                            emptyFallback={0}
-                            minClamp={0}
-                            fractionDigits={thresholdFractionDigits}
-                            placeholder="0"
-                            aria-label={`${thresholdTitle} (нижняя граница)`}
-                            onChange={(v) =>
-                              patchRow(idx, {
-                                min_quantity: roundThreshold(v ?? 0),
-                              })
-                            }
-                          />
-                          {upperFmt !== null ? (
-                            <>
-                              <span className="plotter-tier-table__band-txt">до</span>
-                              <span
-                                className="plotter-tier-table__band-upper"
-                                title={UPPER_BOUND_TITLE}
-                              >
-                                {upperFmt}
-                                {rangeUnit ? `\u00a0${rangeUnit}` : ''}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="plotter-tier-table__band-rest">
-                              {rangeUnit ? `\u00a0${rangeUnit}` : ''} и выше
-                            </span>
-                          )}
-                        </div>
-                        <div className="plotter-tier-table__price-line plotter-tier-table__price-line--col">
-                          <span className="plotter-tier-table__price-caption">{priceTitle}</span>
-                          <DecimalNumberInput
-                            className="plotter-tier-table__field plotter-tier-table__field--price-col"
-                            value={r.price_per_unit}
-                            emptyFallback={0}
-                            minClamp={0}
-                            fractionDigits={priceFractionDigits}
-                            aria-label={priceTitle}
-                            onChange={(v) => patchRow(idx, { price_per_unit: v ?? 0 })}
-                          />
-                        </div>
-                      </div>
+              sortedRows.map((row, idx) => {
+                const upper = sortedRows[idx + 1]?.min_quantity;
+                const upperText =
+                  upper !== undefined
+                    ? `${formatTierQuantity(upper, thresholdFractionDigits)} ${rangeUnit}`
+                    : 'и выше';
+                return (
+                  <tr key={`${row.min_quantity}-${idx}`}>
+                    <td>
+                      <DecimalNumberInput
+                        className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
+                        value={row.min_quantity}
+                        emptyFallback={0}
+                        minClamp={0}
+                        fractionDigits={thresholdFractionDigits}
+                        aria-label={`${thresholdTitle}, строка ${idx + 1}`}
+                        onChange={(v) => patchRow(idx, { min_quantity: roundThreshold(v ?? 0) })}
+                      />
                     </td>
-                  );
-                })}
-              </tr>
+                    <td className="plotter-rate-rows__until">{upperText}</td>
+                    <td>
+                      <DecimalNumberInput
+                        className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--price"
+                        value={row.price_per_unit}
+                        emptyFallback={0}
+                        minClamp={0}
+                        fractionDigits={priceFractionDigits}
+                        aria-label={`${priceTitle}, строка ${idx + 1}`}
+                        onChange={(v) => patchRow(idx, { price_per_unit: v ?? 0 })}
+                      />
+                    </td>
+                    <td>
+                      {!(keepOneRow && sortedRows.length <= 1) ? (
+                        <button
+                          type="button"
+                          className="plotter-rate-rows__remove"
+                          aria-label="Удалить порог"
+                          onClick={() => removeRow(idx)}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={colCount} className="plotter-tier-table__toolbar">
-                <Button type="button" variant="secondary" size="sm" onClick={addRow}>
-                  {addRangeLabel}
-                </Button>
-              </td>
-            </tr>
-          </tfoot>
         </table>
       </div>
+      <Button type="button" variant="secondary" size="sm" onClick={addRow}>
+        {addRangeLabel}
+      </Button>
     </div>
   );
 };

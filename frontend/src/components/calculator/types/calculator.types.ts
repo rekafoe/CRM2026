@@ -137,6 +137,8 @@ export interface CalculationResult {
     cutsPerSheet?: number;
     /** Дозаливка с каждой стороны (мм), факт из ответа расчёта */
     bleedMm?: number;
+    /** Пробег ножа плоттера, м */
+    knifePathM?: number;
   };
   /** Предупреждения от бэкенда (например: формат не помещается на печатный лист) */
   warnings?: string[];

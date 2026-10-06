@@ -8,6 +8,12 @@ type Props = {
   onChangeRollTariff: (next: PlotterCuttingModeTariffApi) => void;
 };
 
+function exampleLine(tiers: Array<{ min_quantity: number; price_per_unit: number }> | undefined): string | null {
+  if (!tiers?.length) return null;
+  const rate = tierRateAtOrderQty(tiers, 50);
+  return `50 шт → ${rate} за изделие`;
+}
+
 export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChangeRollTariff }) => {
   const patchWeeding = (weeding_tiers: NonNullable<PlotterCuttingModeTariffApi['weeding_tiers']>) =>
     onChangeRollTariff({
@@ -23,41 +29,47 @@ export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChan
       mounting_price_per_item: mounting_tiers.length ? tierRateAtOrderQty(mounting_tiers, 1) : null,
     });
 
+  const weedingExample = exampleLine(rollTariff.weeding_tiers);
+  const mountingExample = exampleLine(rollTariff.mounting_tiers);
+
   return (
     <section className="plotter-roll-finishing">
       <div className="plotter-roll-finishing__header">
-        <h4 className="plotter-tariff-mode__subtitle">Выборка / накатка — диапазоны за изделие</h4>
-        <span className="plotter-roll-finishing__badge">Рулонная резка</span>
+        <h4 className="plotter-tariff-mode__subtitle">Выборка и накатка</h4>
       </div>
-      <p className="plotter-roll-finishing__hint">
-        Порог по <strong>тиражу заказа (шт)</strong>. При включении чекбокса в калькуляторе к позиции добавляется
-        строка из подходящего диапазона.
+      <p className="plotter-block__hint">
+        Только для рулона. Порог — тираж в штуках. Пустая таблица значит, что этой галочки в калькуляторе нет.
       </p>
-
       <div className="plotter-roll-finishing__tier-blocks">
         <div className="plotter-roll-finishing__tier-block">
           <PlotterQtyTiersTable
             tiers={rollTariff.weeding_tiers}
             onChange={patchWeeding}
-            thresholdTitle="Тираж от, шт"
+            thresholdTitle="Тираж от"
             priceTitle="Цена за изделие"
             rangeUnit="шт"
             thresholdFractionDigits={0}
-            description="Выборка винила."
-            emptyHint="Нет диапазонов — в расчёт не попадёт (или добавьте порог от 1 шт.)."
+            rangeColumnHeading="Выборка"
+            description="Снять лишний винил вокруг контура."
+            emptyHint="Пока пусто — в калькуляторе выборки не будет."
+            addRangeLabel="Добавить порог выборки"
           />
+          {weedingExample ? <p className="plotter-example">{weedingExample}</p> : null}
         </div>
         <div className="plotter-roll-finishing__tier-block">
           <PlotterQtyTiersTable
             tiers={rollTariff.mounting_tiers}
             onChange={patchMounting}
-            thresholdTitle="Тираж от, шт"
+            thresholdTitle="Тираж от"
             priceTitle="Цена за изделие"
             rangeUnit="шт"
             thresholdFractionDigits={0}
-            description="Накатка монтажной плёнки."
-            emptyHint="Нет диапазонов — в расчёт не попадёт (или добавьте порог от 1 шт.)."
+            rangeColumnHeading="Накатка"
+            description="Прикатать монтажную плёнку."
+            emptyHint="Пока пусто — в калькуляторе накатки не будет."
+            addRangeLabel="Добавить порог накатки"
           />
+          {mountingExample ? <p className="plotter-example">{mountingExample}</p> : null}
         </div>
       </div>
     </section>

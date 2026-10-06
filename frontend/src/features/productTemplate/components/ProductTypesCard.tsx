@@ -829,9 +829,15 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                 <SubtypePanelHeader
                   step={4}
                   title="Плоттерная резка"
-                  lede="Режим лист/рулон и привязка услуг из справочника. Тарифы задаются в карточках услуг и объёмных ценах."
+                  lede="Рулон или лист. Ставки метра, выборка и накатка — в разделе «Плоттерная резка»."
                 />
-                <PlotterSubtypeSection value={value} typeId={editingType.id} onChange={onChange} />
+                <PlotterSubtypeSection
+                  value={value}
+                  typeId={editingType.id}
+                  onChange={onChange}
+                  materials={allMaterials}
+                  materialDriven={value.material_driven_printing === true}
+                />
               </section>
             </div>
             <div className="simplified-template__type-modal-actions">

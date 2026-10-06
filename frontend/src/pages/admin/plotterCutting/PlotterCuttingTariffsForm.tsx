@@ -32,13 +32,9 @@ export const PlotterCuttingTariffsForm: React.FC = () => {
       )}
       <section className="plotter-tariffs-form__panel" aria-label="Тарифы плоттера и режимы резки">
         <header className="plotter-tariffs-form__header">
-          <p className="plotter-tariffs-form__kicker">
-            Тарифы рулона и листа, диапазоны по объёму и дополнительные строки для выборки и накатки.
-          </p>
           <p className="plotter-tariffs-form__lead">
-            Два фиксированных режима — рулон и лист. Листовой плоттер в типовом сценарии режет носитель{' '}
-            <strong>SRA3 (320×450 мм)</strong>; расчёт использует размеры листа материала или эти значения как
-            запасной вариант. Режим задаётся в шаблоне подтипа.
+            Рулон и лист считаются отдельно. Режим выбирается в подтипе продукта. У листа, если у материала не задан
+            свой формат, в расчёт берётся SRA3, 320×450 мм.
           </p>
         </header>
         <div className="plotter-tariffs-form__tabs" role="tablist" aria-label="Режимы плоттерной резки">
@@ -78,7 +74,7 @@ export const PlotterCuttingTariffsForm: React.FC = () => {
             </>
           ) : (
             <PlotterTariffModeBlock
-              title="Листовой плоттер (SRA3 320×450 мм)"
+              title="Листовой плоттер"
               value={bundle.sheet}
               materials={materials}
               onChange={(sheet) => setBundle({ ...bundle, sheet })}

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../../components/common'
 import type { SimplifiedConfig, SimplifiedTypeConfig, ProductTypeId } from '../hooks/useProductTemplate'
@@ -18,24 +18,31 @@ const updateTypeConfig = (
   }
 }
 
+export type PlotterMaterialOption = { id: number; name?: string }
+
 export interface PlotterSubtypeSectionProps {
   value: SimplifiedConfig
   typeId: ProductTypeId
   onChange: (next: SimplifiedConfig) => void
+  materials?: PlotterMaterialOption[]
+  materialDriven?: boolean
 }
 
-/** Редактор блока plotter в подтипе: режим резки и ограничения; ставки выборки/накатки — в «Плоттерная резка». */
+/** Режим резки подтипа и материалы. Ставки живут в админке «Плоттерная резка». */
 export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
   value,
   typeId,
   onChange,
+  materials = [],
+  materialDriven = false,
 }) => {
   const navigate = useNavigate()
+  const [materialQuery, setMaterialQuery] = useState('')
   const cfg = value.typeConfigs?.[String(typeId)]
   const plotter = cfg?.plotter ?? {}
-  const rollIdsText = Array.isArray(plotter.roll_allowed_material_ids)
-    ? plotter.roll_allowed_material_ids.join('\n')
-    : ''
+  const mode = plotter.mode ?? 'roll'
+  const selectedIds = Array.isArray(plotter.roll_allowed_material_ids) ? plotter.roll_allowed_material_ids : []
+  const showAuto = materialDriven || mode === 'auto'
 
   const patchPlotter = (patch: Partial<NonNullable<SimplifiedTypeConfig['plotter']>>) => {
     const nextPlotter = { ...plotter, ...patch }
@@ -54,11 +61,17 @@ export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
     )
   }
 
-  const parseIds = (text: string): number[] =>
-    text
-      .split(/[\n,]+/)
-      .map((s) => Number(String(s).trim()))
-      .filter((n) => Number.isFinite(n) && n > 0)
+  const toggleMaterial = (id: number, checked: boolean) => {
+    const next = checked ? [...selectedIds, id] : selectedIds.filter((item) => item !== id)
+    patchPlotter({ roll_allowed_material_ids: next.length ? Array.from(new Set(next)) : undefined })
+  }
+
+  const visibleMaterials = useMemo(() => {
+    const q = materialQuery.trim().toLowerCase()
+    const list = [...materials].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'))
+    if (!q) return list
+    return list.filter((m) => String(m.name || '').toLowerCase().includes(q) || String(m.id).includes(q))
+  }, [materials, materialQuery])
 
   return (
     <div className="subtype-edit-panel__body plotter-subtype">
@@ -69,11 +82,11 @@ export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
           size="sm"
           onClick={() => navigate('/adminpanel/plotter-cutting')}
         >
-          Тарифы и услуги плоттера
+          Ставки резки
         </Button>
         <p className="plotter-subtype__toolbar-hint">
-          Базовые тарифы и доптарифы (выборка/накатка) настраиваются в админке в разделе «Плоттерная резка». Здесь —
-          только режим подтипа и ограничения по материалам.
+          Цена метра, выборка и накатка задаются в разделе «Плоттерная резка». Здесь — рулон или лист и какие материалы
+          можно выбрать.
         </p>
       </div>
       <div className="plotter-subtype__toggle">
@@ -90,85 +103,98 @@ export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
       {plotter.enabled === true && (
         <div className="plotter-subtype__content">
           <div className="plotter-subtype__section">
-            <div className="simplified-template__type-website-title">Режим резки</div>
-            <p className="plotter-subtype__hint">
-              Авто выбирает листовой или рулонный плоттер по фактическому виду материала.
-              Цена и доптарифы берутся из глобальных тарифов в админке.
-            </p>
-            <div className="simplified-template__type-website-field">
-              <label htmlFor={`plotter-mode-${String(typeId)}`}>Режим плоттера</label>
-              <select
-                id={`plotter-mode-${String(typeId)}`}
-                className="form-input"
-                value={plotter.mode ?? 'roll'}
-                onChange={(e) =>
-                  patchPlotter({ mode: e.target.value as 'auto' | 'sheet' | 'roll' })
-                }
+            <div className="simplified-template__type-website-title">Как режем</div>
+            <div className="plotter-mode-cards" role="radiogroup" aria-label="Режим плоттера">
+              <button
+                type="button"
+                className={mode === 'roll' ? 'plotter-mode-card is-active' : 'plotter-mode-card'}
+                aria-pressed={mode === 'roll'}
+                onClick={() => patchPlotter({ mode: 'roll' })}
               >
-                <option value="auto">Автоматически по материалу</option>
-                <option value="roll">Рулонный плоттер</option>
-                <option value="sheet">Листовой плоттер</option>
-              </select>
+                <strong>Рулон</strong>
+                <span>Плёнка с рулона. Можно добавить выборку и накатку.</span>
+              </button>
+              <button
+                type="button"
+                className={mode === 'sheet' ? 'plotter-mode-card is-active' : 'plotter-mode-card'}
+                aria-pressed={mode === 'sheet'}
+                onClick={() => patchPlotter({ mode: 'sheet' })}
+              >
+                <strong>Лист</strong>
+                <span>Режем лист материала. Если формат не задан — SRA3, 320×450 мм.</span>
+              </button>
+              {showAuto && (
+                <button
+                  type="button"
+                  className={mode === 'auto' ? 'plotter-mode-card is-active' : 'plotter-mode-card'}
+                  aria-pressed={mode === 'auto'}
+                  onClick={() => patchPlotter({ mode: 'auto' })}
+                >
+                  <strong>Авто</strong>
+                  <span>Рулон или лист по виду выбранного материала.</span>
+                </button>
+              )}
             </div>
-            {plotter.mode === 'sheet' && (
-              <p className="plotter-subtype__hint plotter-subtype__hint--sheet">
-                Листовой плоттер: типовой носитель <strong>SRA3</strong> (320×450 мм). В калькуляторе берутся размеры листа у
-                материала; если не заданы — для оценки пробега ножа подставляется SRA3 (с предупреждением в расчёте).
-              </p>
-            )}
           </div>
 
           <div className="plotter-subtype__section">
             <div className="simplified-template__type-website-title">Материалы рулона</div>
             <p className="plotter-subtype__hint">
-              Если список не пустой, для рулонного режима можно выбрать только эти материалы. Пусто — любой
-              материал, разрешённый для размера.
+              Отмеченные можно выбрать в рулонном режиме. Если ничего не отмечено, подходят все материалы размера.
             </p>
-            <div className="simplified-template__type-website-field">
-              <label htmlFor={`plotter-roll-ids-${String(typeId)}`}>
-                Разрешённые ID материалов (по одному в строке или через запятую)
-              </label>
-              <textarea
-                id={`plotter-roll-ids-${String(typeId)}`}
+            {materials.length > 8 && (
+              <input
                 className="form-input"
-                rows={3}
-                value={rollIdsText}
-                onChange={(e) =>
-                  patchPlotter({
-                    roll_allowed_material_ids:
-                      e.target.value.trim() === '' ? undefined : parseIds(e.target.value),
-                  })
-                }
-                placeholder="Например: 12"
-                autoComplete="off"
+                value={materialQuery}
+                onChange={(e) => setMaterialQuery(e.target.value)}
+                placeholder="Найти материал"
+                aria-label="Найти материал"
               />
-            </div>
+            )}
+            {materials.length === 0 ? (
+              <p className="plotter-subtype__hint">Список материалов ещё не загружен.</p>
+            ) : (
+              <ul className="plotter-material-list">
+                {visibleMaterials.map((material) => {
+                  const checked = selectedIds.includes(material.id)
+                  return (
+                    <li key={material.id}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => toggleMaterial(material.id, e.target.checked)}
+                        />
+                        <span>{material.name || `Материал ${material.id}`}</span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
 
           <div className="plotter-subtype__section">
-            <div className="simplified-template__type-website-title">Дополнительно в калькуляторе</div>
+            <div className="simplified-template__type-website-title">Монтажная плёнка</div>
             <p className="plotter-subtype__hint">
-              Для монтажки можно задать материал списания в п.м. При флаге <code>plotter_mounting</code> этот материал
-              будет учтён в расходе.
+              Когда в калькуляторе включена накатка, этот материал списывается в метрах подачи.
             </p>
-            <div className="plotter-subtype__grid-2">
-              <div className="simplified-template__type-website-field">
-                <label htmlFor={`plotter-mount-mat-${String(typeId)}`}>Монтажная плёнка (материал, п.м.)</label>
-                <input
-                  id={`plotter-mount-mat-${String(typeId)}`}
-                  type="number"
-                  className="form-input"
-                  min={1}
-                  value={plotter.mounting_film_material_id ?? ''}
-                  onChange={(e) =>
-                    patchPlotter({
-                      mounting_film_material_id: e.target.value === '' ? undefined : Number(e.target.value),
-                    })
-                  }
-                  autoComplete="off"
-                />
-              </div>
-            </div>
+            <select
+              className="form-input"
+              value={plotter.mounting_film_material_id ?? ''}
+              onChange={(e) =>
+                patchPlotter({
+                  mounting_film_material_id: e.target.value === '' ? undefined : Number(e.target.value),
+                })
+              }
+            >
+              <option value="">Не списывать отдельно</option>
+              {materials.map((material) => (
+                <option key={material.id} value={material.id}>
+                  {material.name || `Материал ${material.id}`}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}

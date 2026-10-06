@@ -173,7 +173,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             const fallbackWidth = customFormat.width || (selectedSize ? String(selectedSize.width_mm) : '');
             const fallbackHeight = customFormat.height || (selectedSize ? String(selectedSize.height_mm) : '');
             setIsCustomFormat(true);
-            setCustomFormat({ width: fallbackWidth, height: fallbackHeight });
+            setCustomFormat(() => ({ width: fallbackWidth, height: fallbackHeight }));
             if (fallbackWidth && fallbackHeight) {
               updateSpecs({
                 format: `${fallbackWidth}×${fallbackHeight}`,

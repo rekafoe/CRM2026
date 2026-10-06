@@ -454,13 +454,13 @@ router.get('/:productId/schema', async (req, res) => {
       const plotterRollFinFields: Array<{ name: string; label: string; type: string; required: boolean }> = [
         {
           name: 'plotter_weeding',
-          label: 'Выборка винила (за 1 изделие; ставка в админке «Плоттерная резка»)',
+          label: 'Выборка',
           type: 'boolean',
           required: false,
         },
         {
           name: 'plotter_mounting',
-          label: 'Накатка монтажной плёнки (за 1 изделие; ставка в админке «Плоттерная резка»)',
+          label: 'Накатка',
           type: 'boolean',
           required: false,
         },

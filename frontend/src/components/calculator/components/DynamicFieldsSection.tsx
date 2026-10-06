@@ -48,6 +48,10 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
   );
   if (fields.length === 0) return null;
 
+  const plotterNames = new Set(['plotter_weeding', 'plotter_mounting']);
+  const plotterFields = fields.filter((f: any) => plotterNames.has(f.name));
+  const otherFields = fields.filter((f: any) => !plotterNames.has(f.name));
+
   const renderField = (field: any) => {
     const value = (specs as any)[field.name];
 
@@ -136,12 +140,25 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
   };
 
   return (
-    <div className="form-section compact">
-      <h3><AppIcon name="puzzle" size="xs" /> Доп. параметры</h3>
-      <div className="advanced-grid compact">
-        {fields.map(renderField)}
-      </div>
-    </div>
+    <>
+      {plotterFields.length > 0 && (
+        <div className="form-section compact">
+          <h3><AppIcon name="scissors" size="xs" /> Плоттер</h3>
+          <p className="param-hint">Резка уже входит в цену. Отметьте, если нужна выборка или накатка.</p>
+          <div className="advanced-grid compact">
+            {plotterFields.map(renderField)}
+          </div>
+        </div>
+      )}
+      {otherFields.length > 0 && (
+        <div className="form-section compact">
+          <h3><AppIcon name="puzzle" size="xs" /> Доп. параметры</h3>
+          <div className="advanced-grid compact">
+            {otherFields.map(renderField)}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

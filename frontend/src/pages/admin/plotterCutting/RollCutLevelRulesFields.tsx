@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, FormField, DecimalNumberInput } from '../../../components/common';
+import { Button, DecimalNumberInput } from '../../../components/common';
 
 export type CutLevelRuleRow = { max_cell_long_side_mm: number; multiplier: number };
 
@@ -8,72 +8,105 @@ type Props = {
   onChange: (next: CutLevelRuleRow[]) => void;
 };
 
+const DEFAULT_LEVELS: CutLevelRuleRow[] = [
+  { max_cell_long_side_mm: 50, multiplier: 1.5 },
+  { max_cell_long_side_mm: 150, multiplier: 1.25 },
+  { max_cell_long_side_mm: 9999, multiplier: 1 },
+];
+
+function levelTitle(index: number, total: number): string {
+  if (total <= 1) return 'Все размеры';
+  if (index === 0) return 'Мелкие';
+  if (index === total - 1) return 'Крупные';
+  if (total === 3 && index === 1) return 'Средние';
+  return 'Следующий размер';
+}
+
 export const RollCutLevelRulesFields: React.FC<Props> = ({ rules, onChange }) => {
-  const rows = rules?.length ? rules : [];
+  const rows = [...(rules ?? [])].sort((a, b) => a.max_cell_long_side_mm - b.max_cell_long_side_mm);
 
   const patchRow = (idx: number, patch: Partial<CutLevelRuleRow>) => {
-    const next = rows.map((r, i) => (i === idx ? { ...r, ...patch } : r));
-    onChange(next);
+    onChange(rows.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   };
 
   const removeRow = (idx: number) => {
     onChange(rows.filter((_, i) => i !== idx));
   };
 
-  const addRow = () => {
-    onChange([...rows, { max_cell_long_side_mm: 150, multiplier: 1.25 }]);
+  const addBeforeLast = () => {
+    if (rows.length === 0) {
+      onChange(DEFAULT_LEVELS);
+      return;
+    }
+    const last = rows[rows.length - 1];
+    const prev = rows[rows.length - 2];
+    const suggested = prev ? Math.round((prev.max_cell_long_side_mm + last.max_cell_long_side_mm) / 2) : 150;
+    const inserted = { max_cell_long_side_mm: Math.max(1, suggested), multiplier: 1.25 };
+    onChange([...rows.slice(0, -1), inserted, last]);
   };
 
+  if (rows.length === 0) {
+    return (
+      <div className="plotter-levels">
+        <p className="plotter-block__hint">
+          Сейчас ставка одна на все размеры. Можно умножить её для мелких наклеек: нож на них ездит дольше относительно
+          метра плёнки.
+        </p>
+        <Button type="button" variant="secondary" size="sm" onClick={() => onChange(DEFAULT_LEVELS)}>
+          Разделить на мелкие, средние и крупные
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="plotter-roll-cut-levels">
-      <p className="plotter-roll-cut-levels__hint">
-        Уровни резки для рулона: ставка за п.м. умножается, если длинная сторона ячейки (trim max + 2×вылет){' '}
-        не превышает порога. Правила сортируются по порогу; подходит первое, где размер ≤ порога. Последняя
-        строка с большим порогом (например 9999) и множителем 1 задаёт «крупный формат».
+    <div className="plotter-levels">
+      <p className="plotter-block__hint">
+        Длинная сторона наклейки с вылетами. Подходит первая строка, чей порог не меньше этой стороны. Крупные стоят
+        последними.
       </p>
-      {rows.length === 0 ? (
-        <p className="plotter-roll-cut-levels__empty">Нет правил — коэффициент 1.</p>
-      ) : (
-        <ul className="plotter-roll-cut-levels__list" aria-label="Пороги уровня резки">
-          {rows.map((r, idx) => (
-            <li key={idx} className="plotter-roll-cut-levels__row">
-              <FormField label="Макс. длинная сторона ячейки, мм">
+      <ul className="plotter-levels__list">
+        {rows.map((row, idx) => {
+          return (
+            <li key={idx} className="plotter-levels__row">
+              <div className="plotter-levels__name">{levelTitle(idx, rows.length)}</div>
+              <label className="plotter-levels__field">
+                <span>До, мм</span>
                 <DecimalNumberInput
                   className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--dim"
-                  value={r.max_cell_long_side_mm}
+                  value={row.max_cell_long_side_mm}
                   emptyFallback={150}
                   minClamp={1}
-                  fractionDigits={3}
+                  fractionDigits={0}
                   onChange={(v) => {
                     const n = v ?? 150;
                     if (n > 0) patchRow(idx, { max_cell_long_side_mm: n });
                   }}
                 />
-              </FormField>
-              <FormField label="× к ставке">
+              </label>
+              <label className="plotter-levels__field">
+                <span>Множитель</span>
                 <DecimalNumberInput
                   className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--mult"
-                  value={r.multiplier}
+                  value={row.multiplier}
                   emptyFallback={1}
                   minClamp={0.01}
-                  fractionDigits={4}
+                  fractionDigits={2}
                   onChange={(v) => {
                     const n = v ?? 1;
                     if (n > 0) patchRow(idx, { multiplier: n });
                   }}
                 />
-              </FormField>
-              <div className="plotter-roll-cut-levels__actions">
-                <Button type="button" variant="secondary" onClick={() => removeRow(idx)}>
-                  Удалить
-                </Button>
-              </div>
+              </label>
+              <button type="button" className="plotter-rate-rows__remove" aria-label="Удалить уровень" onClick={() => removeRow(idx)}>
+                ×
+              </button>
             </li>
-          ))}
-        </ul>
-      )}
-      <Button type="button" variant="secondary" onClick={addRow}>
-        Добавить правило
+          );
+        })}
+      </ul>
+      <Button type="button" variant="secondary" size="sm" onClick={addBeforeLast}>
+        Добавить размер
       </Button>
     </div>
   );

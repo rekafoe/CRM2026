@@ -18,6 +18,7 @@ interface ResultSectionProps {
       fitsOnSheet?: boolean;
       bleedMm?: number;
       cutsPerSheet?: number;
+      knifePathM?: number;
     };
     warnings?: string[];
     tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price?: number }>;
@@ -33,6 +34,10 @@ interface ResultSectionProps {
       operationName?: string;
       total?: number;
       totalCost?: number;
+      quantity?: number;
+      unitPrice?: number;
+      price?: number;
+      priceUnit?: string;
     }>;
   } | null;
   isValid: boolean;
@@ -61,7 +66,14 @@ function positiveCostLines(result: NonNullable<ResultSectionProps['result']>) {
     const total = Number(service.total ?? service.totalCost);
     const name = String(service.service || service.operationName || '').trim();
     if (!Number.isFinite(total) || total <= 0 || !name) return;
-    lines.push({ key: `service-${index}-${name}`, name, total });
+    const qty = Number(service.quantity);
+    const rate = Number(service.unitPrice ?? service.price);
+    const perMeter = String(service.priceUnit || '').toLowerCase() === 'per_meter';
+    const labeled =
+      perMeter && Number.isFinite(qty) && qty > 0 && Number.isFinite(rate) && rate > 0
+        ? `${name} · ${qty.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')} м × ${rate.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}`
+        : name;
+    lines.push({ key: `service-${index}-${name}`, name: labeled, total });
   });
   return lines;
 }
@@ -226,7 +238,8 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
         itemsPerSheet ||
         sheetSize ||
         (bleedMm != null && bleedMm > 0) ||
-        (cutsPerSheetUi != null && cutsPerSheetUi > 0)) && (
+        (cutsPerSheetUi != null && cutsPerSheetUi > 0) ||
+        (result.layout?.knifePathM != null && result.layout.knifePathM > 0)) && (
         <div className="result-sheet-info">
           {sheetsNeeded != null && <span><AppIcon name="document" size="xs" /> Листов: {sheetsNeeded}</span>}
           {metersNeeded != null && <span>• Подача рулона: {formatNumber(metersNeeded, 'п.м.', true)}</span>}
@@ -236,6 +249,9 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
           {bleedMm != null && bleedMm > 0 && <span>• Дозаливка: {bleedMm} мм</span>}
           {cutsPerSheetUi != null && cutsPerSheetUi > 0 && (
             <span>• Резов на лист: {cutsPerSheetUi}</span>
+          )}
+          {result.layout?.knifePathM != null && result.layout.knifePathM > 0 && (
+            <span>• Длина реза: {formatNumber(result.layout.knifePathM, 'м', true)}</span>
           )}
         </div>
       )}
