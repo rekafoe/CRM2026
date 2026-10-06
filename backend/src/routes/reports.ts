@@ -266,12 +266,10 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
 
   let debtClosedToday = 0
   try {
+    // Факт выдачи — историческое событие: не фильтруем по текущему статусу
+    // (заказ могли вернуть в «Ожидает» после Issue).
     const row = await db.get<{ s: number }>(
-      `SELECT COALESCE(SUM(dce.amount), 0) AS s
-         FROM debt_closed_events dce
-         LEFT JOIN orders o ON o.id = dce.order_id
-        WHERE dce.closed_date = ?
-          AND (o.id IS NULL OR ${notWaitingStatusSql('o.status')})`,
+      'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ?',
       d
     )
     debtClosedToday = Number(row?.s ?? 0)
@@ -410,6 +408,15 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
     )
     monthParams.push(month)
   }
+  // «Ожидает» не даёт предоплату в кассу, но выдача (debt_closed в месяце)
+  // остаётся в календаре даже если заказ позже вернули в «Ожидает».
+  const notWaitingOrIssuedInMonth = hasDebtClosedCash
+    ? `(${notWaitingStatusSql('o.status')} OR EXISTS (
+         SELECT 1 FROM debt_closed_events dce
+          WHERE dce.order_id = o.id AND substr(dce.closed_date, 1, 7) = ?
+       ))`
+    : notWaitingStatusSql('o.status')
+  const notWaitingOrIssuedParams = hasDebtClosedCash ? [month] : []
   const orders = await db.all<any>(
     `SELECT o.id, o.userId as user_id, o.prepaymentAmount, o.prepaymentStatus,
             COALESCE(o.created_at, o.createdAt) as created_at,
@@ -417,9 +424,10 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
        FROM orders o
       WHERE (${monthParts.join(' OR ')})
         AND COALESCE(o.prepaymentAmount, 0) > 0
-        AND ${notWaitingStatusSql('o.status')}
+        AND ${notWaitingOrIssuedInMonth}
         ${fulfillmentScope.clause}`,
     ...monthParams,
+    ...notWaitingOrIssuedParams,
     ...fulfillmentScope.params,
   )
   const issueByOrderDay = new Map<string, number>()
