@@ -652,9 +652,23 @@ export class SimplifiedPricingService {
     const customGapMm: number | undefined = (selectedSize as any).cut_gap_mm != null
       ? Number((selectedSize as any).cut_gap_mm)
       : undefined;
-    const itemsPerSheetOverride: number | undefined = (selectedSize as any).items_per_sheet_override != null
+    const itemsPerSheetOverrideRaw: number | undefined = (selectedSize as any).items_per_sheet_override != null
       ? Number((selectedSize as any).items_per_sheet_override)
       : undefined;
+    const anchorWidthMm = Number(selectedSize.width_mm);
+    const anchorHeightMm = Number(selectedSize.height_mm);
+    // Свой обрез не должен наследовать «шт/лист» якорной строки: иначе 200×200 мм
+    // считается как каталожный 100×200 и вместимость на лист не проверяется.
+    const customTrimActive =
+      allowCustomTrim &&
+      trimInput != null &&
+      Number.isFinite(anchorWidthMm) &&
+      Number.isFinite(anchorHeightMm) &&
+      (Math.abs(trimInput.width - anchorWidthMm) > 1 || Math.abs(trimInput.height - anchorHeightMm) > 1);
+    const itemsPerSheetOverride: number | undefined =
+      !customTrimActive && itemsPerSheetOverrideRaw != null && itemsPerSheetOverrideRaw > 0
+        ? itemsPerSheetOverrideRaw
+        : undefined;
 
     const effectiveAllowedMaterialIds = typeConfig
       ? getEffectiveAllowedMaterialIds(typeConfig, selectedSize)
@@ -875,6 +889,37 @@ export class SimplifiedPricingService {
       effectivePlotterConfig?.enabled === true &&
       effectivePlotterConfig?.mode === 'roll';
     const isRollMeterage = isRollPrint || plotterRollMode;
+
+    if (customTrimActive && !isUvFlatbedMode && !isRollWideM2Mode && !isRollMeterage) {
+      let fitCheck = layoutCheck;
+      if (!useLayout) {
+        const mw = materialSheetMm?.width ?? 0;
+        const mh = materialSheetMm?.height ?? 0;
+        fitCheck =
+          mw > 0 && mh > 0
+            ? LayoutCalculationService.calculateLayout(
+                layoutTrim,
+                { width: mw, height: mh },
+                customMarginMm,
+                customGapMm,
+                resolvedBleedMm,
+              )
+            : LayoutCalculationService.findOptimalSheetSize(
+                layoutTrim,
+                customMarginMm,
+                customGapMm,
+                resolvedBleedMm,
+              );
+      }
+      if (!fitCheck.fitsOnSheet) {
+        const sheet = fitCheck.recommendedSheetSize;
+        const err: any = new Error(
+          `Размер ${layoutTrim.width}×${layoutTrim.height} мм не помещается на печатный лист ${sheet.width}×${sheet.height} мм. Проверьте обрез, дозаливку и формат листа материала.`,
+        );
+        err.status = 400;
+        throw err;
+      }
+    }
 
     // Офисный принтер, рулон или ручная норма вместимости (items_per_sheet_override): не привязываем
     // мин. тираж к «шт/лист» — иначе override 128 заставляет minQty=128 и отсекает 100 шт.
@@ -2746,9 +2791,11 @@ export class SimplifiedPricingService {
       quantity,
       selectedSize: {
         id: selectedSize.id,
-        label: selectedSize.label,
-        width_mm: selectedSize.width_mm,
-        height_mm: selectedSize.height_mm,
+        label: customTrimActive
+          ? `${layoutTrim.width}×${layoutTrim.height} мм`
+          : selectedSize.label,
+        width_mm: customTrimActive ? layoutTrim.width : selectedSize.width_mm,
+        height_mm: customTrimActive ? layoutTrim.height : selectedSize.height_mm,
       },
       actualTrimMm: { width: layoutTrim.width, height: layoutTrim.height },
       layoutBleedMm: resolvedBleedMm,
