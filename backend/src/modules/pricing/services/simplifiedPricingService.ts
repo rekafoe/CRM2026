@@ -921,6 +921,37 @@ export class SimplifiedPricingService {
       }
     }
 
+    // Цена листа в тарифе = ставка × шт/лист якорного размера.
+    // Для произвольного обреза число листов берётся из введённых мм, ставка листа — из тарифа.
+    let printTariffItemsPerSheet = itemsPerSheet;
+    if (customTrimActive && !isUvFlatbedMode && !isRollWideM2Mode && !isRollMeterage) {
+      if (itemsPerSheetOverrideRaw != null && itemsPerSheetOverrideRaw > 0) {
+        printTariffItemsPerSheet = itemsPerSheetOverrideRaw;
+      } else if (anchorWidthMm > 0 && anchorHeightMm > 0) {
+        const anchorTrim = { width: anchorWidthMm, height: anchorHeightMm };
+        const mw = materialSheetMm?.width ?? 0;
+        const mh = materialSheetMm?.height ?? 0;
+        const anchorLayout =
+          mw > 0 && mh > 0
+            ? LayoutCalculationService.calculateLayout(
+                anchorTrim,
+                { width: mw, height: mh },
+                customMarginMm,
+                customGapMm,
+                resolvedBleedMm,
+              )
+            : LayoutCalculationService.findOptimalSheetSize(
+                anchorTrim,
+                customMarginMm,
+                customGapMm,
+                resolvedBleedMm,
+              );
+        if (anchorLayout.fitsOnSheet && anchorLayout.itemsPerSheet > 0) {
+          printTariffItemsPerSheet = anchorLayout.itemsPerSheet;
+        }
+      }
+    }
+
     // Офисный принтер, рулон или ручная норма вместимости (items_per_sheet_override): не привязываем
     // мин. тираж к «шт/лист» — иначе override 128 заставляет minQty=128 и отсекает 100 шт.
     const isOfficePrint = (normalizedConfig.print_technology ?? '').toLowerCase().includes('office');
@@ -943,7 +974,14 @@ export class SimplifiedPricingService {
       selectedSize.min_qty > 1 &&
       itemsPerSheetOverride == null &&
       (tierMinQty == null || tierMinQty <= 1);
-    const minQtyLimit = usePagesMultiplier
+    const catalogMinIsItsOwnImposition =
+      customTrimActive &&
+      selectedSize.min_qty != null &&
+      itemsPerSheetOverrideRaw != null &&
+      Number(selectedSize.min_qty) === Number(itemsPerSheetOverrideRaw);
+    const minQtyLimit = catalogMinIsItsOwnImposition
+      ? 1
+      : usePagesMultiplier
       ? minQtyFromLayoutOverride || minQtyCoupledToItemsPerSheet || minQtyLikelyFromLayoutOnly
         ? 1
         : (selectedSize.min_qty ?? 1)
@@ -1194,7 +1232,10 @@ export class SimplifiedPricingService {
       if (printPriceConfig?.tiers?.length) {
         // Листовые ступени — min_sheets × itemsPerSheet. Ищем по полным листам, иначе
         // 107 шт. при 54 шт/лист остаются на тарифе 1 листа, а 108 шт. проваливают цену.
-        const sheetTierQuantity = sheetLayoutPrintTierQuantity(quantity, itemsPerSheet);
+        const billingItemsPerSheet = customTrimActive ? printTariffItemsPerSheet : itemsPerSheet;
+        const sheetTierQuantity = customTrimActive
+          ? Math.max(1, sheetsNeeded) * Math.max(1, billingItemsPerSheet)
+          : sheetLayoutPrintTierQuantity(quantity, itemsPerSheet);
         const tierQuantity =
           tierSheetsOverride != null
             ? tierSheetsOverride
@@ -1206,11 +1247,11 @@ export class SimplifiedPricingService {
         const tier = this.findTierForQuantity(printPriceConfig.tiers, tierQuantity);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
-          const pricePerSheet = priceForTier * itemsPerSheet;
+          const pricePerSheet = priceForTier * billingItemsPerSheet;
           const discreteSheetTotal = sheetsNeeded * pricePerSheet;
           const smoothedTotal =
             !usePagesMultiplier && !isRollPrint && !isMaterialMeterBased
-              ? smoothedSheetPrintTotal(sheetsNeeded, printPriceConfig.tiers, itemsPerSheet)
+              ? smoothedSheetPrintTotal(sheetsNeeded, printPriceConfig.tiers, billingItemsPerSheet)
               : null;
           const basePrintPrice = usePagesMultiplier
             ? priceForTier * multipagePrintUnits
@@ -2575,6 +2616,7 @@ export class SimplifiedPricingService {
       selectedSize,
       layoutCheck,
       itemsPerSheet,
+      printTariffItemsPerSheet: customTrimActive ? printTariffItemsPerSheet : undefined,
       usePagesMultiplier,
       effectivePages,
       sheetsPerItem,
@@ -2890,6 +2932,8 @@ export class SimplifiedPricingService {
     selectedSize: SimplifiedSizeConfig;
     layoutCheck: any;
     itemsPerSheet: number;
+    /** Шт/лист, на которых собран тариф. Для произвольного обреза не совпадает с раскладкой. */
+    printTariffItemsPerSheet?: number;
     usePagesMultiplier: boolean;
     effectivePages: number;
     sheetsPerItem: number;
@@ -2978,10 +3022,13 @@ export class SimplifiedPricingService {
         const physicalSheets = ctx.usePagesMultiplier
           ? Math.max(1, q * ctx.sheetsPerItem)
           : Math.ceil(q / ctx.itemsPerSheet);
+        const tariffItemsPerSheet = Math.max(1, ctx.printTariffItemsPerSheet || ctx.itemsPerSheet);
         const printTierQty =
           ctx.usePagesMultiplier || ctx.isRollPrint || ctx.isRollMeterage
             ? q
-            : sheetLayoutPrintTierQuantity(q, ctx.itemsPerSheet);
+            : ctx.printTariffItemsPerSheet
+              ? physicalSheets * tariffItemsPerSheet
+              : sheetLayoutPrintTierQuantity(q, ctx.itemsPerSheet);
         const tier = this.findTierForQuantity(ctx.printPriceConfig.tiers, printTierQty);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
@@ -3002,11 +3049,11 @@ export class SimplifiedPricingService {
             ? this.findTierForQuantity(ctx.printPriceConfig.tiers, tierPrintUnits)
             : tier;
           const unitPrice = tierForPrint ? this.getPriceForQuantityTier(tierForPrint) : priceForTier;
-          const pricePerSheet = unitPrice * ctx.itemsPerSheet;
+          const pricePerSheet = unitPrice * tariffItemsPerSheet;
           const discreteSheetTotal = physicalSheets * pricePerSheet;
           const smoothedTotal =
             !ctx.usePagesMultiplier && !ctx.isRollPrint && !ctx.isRollMeterage
-              ? smoothedSheetPrintTotal(physicalSheets, ctx.printPriceConfig.tiers, ctx.itemsPerSheet)
+              ? smoothedSheetPrintTotal(physicalSheets, ctx.printPriceConfig.tiers, tariffItemsPerSheet)
               : null;
           const basePrintPrice = ctx.usePagesMultiplier
             ? unitPrice * printUnits

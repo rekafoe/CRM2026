@@ -77,7 +77,7 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
     } as any);
   });
 
-  const calc = (trim?: { width: number; height: number }) =>
+  const calc = (trim?: { width: number; height: number }, quantity = 2) =>
     SimplifiedPricingService.calculatePrice(
       1,
       {
@@ -88,11 +88,11 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
         print_sides_mode: 'single',
         ...(trim ? { trim_size: trim } : {}),
       } as any,
-      2,
+      quantity,
     );
 
-  it('200×200 мм считает свою раскладку, а не 8 шт/лист размера 10×20 см', async () => {
-    const result = await calc({ width: 200, height: 200 });
+  it('200×200 мм считает свою раскладку, а цену листа берёт с якорного размера', async () => {
+    const result = await calc({ width: 200, height: 200 }, 8);
 
     expect(LayoutCalculationService.findOptimalSheetSize).toHaveBeenCalledWith(
       { width: 200, height: 200 },
@@ -101,14 +101,15 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
       0,
     );
     expect(result.layout?.itemsPerSheet).toBe(2);
+    expect(result.layout?.sheetsNeeded).toBe(4);
     expect(result.actualTrimMm).toEqual({ width: 200, height: 200 });
     expect(result.selectedSize).toMatchObject({
       width_mm: 200,
       height_mm: 200,
       label: '200×200 мм',
     });
-    // 1 лист × 2 шт × 1
-    expect(result.finalPrice).toBeCloseTo(2, 2);
+    // 4 листа × цена листа каталога (8 шт × 1), а не 8 × ставка за штуку
+    expect(result.finalPrice).toBeCloseTo(32, 2);
   });
 
   it('размер, который не влезает на лист, не получает цену каталожного формата', async () => {
@@ -124,6 +125,9 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
     const result = await calc();
     expect(LayoutCalculationService.findOptimalSheetSize).not.toHaveBeenCalled();
     expect(result.layout?.itemsPerSheet).toBe(8);
+    expect(result.layout?.sheetsNeeded).toBe(1);
     expect(result.selectedSize).toMatchObject({ width_mm: 100, height_mm: 200, label: '10×20 см' });
+    // 1 лист × 8 шт × 1 — каталожная норма не меняется
+    expect(result.finalPrice).toBeCloseTo(8, 2);
   });
 });
