@@ -20,4 +20,19 @@ describe('OrderPricingService.extractPricingLineFromItem', () => {
       })
     ).toBeNull();
   });
+
+  it('still extracts a pricing line when group-key fields are incomplete', () => {
+    const line = OrderPricingService.extractPricingLineFromItem({
+      id: 3,
+      quantity: 100,
+      params: {
+        productId: 22,
+        // no material_id / print_technology / print_color_mode / print_sides_mode
+        priceType: 'standard',
+      },
+    });
+    expect(line).not.toBeNull();
+    expect(line?.productId).toBe(22);
+    expect(line?.quantity).toBe(100);
+  });
 });
