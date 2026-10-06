@@ -449,6 +449,8 @@ export function compactSimplifiedForSite(simplified: any) {
                 : {}),
               pages: cfg?.pages || simplifiedOrdered.pages || null,
               initial: compactInitial(cfg?.initial),
+              ...(cfg?.allow_custom_trim === true ? { allow_custom_trim: true } : {}),
+              ...(cfg?.roll_m2?.mode === 'roll_wide_m2' ? { roll_m2: { mode: 'roll_wide_m2' } } : {}),
             },
           ])
         )
@@ -458,6 +460,12 @@ export function compactSimplifiedForSite(simplified: any) {
 
   return {
     material_driven_printing: simplifiedOrdered.material_driven_printing === true,
+    ...(simplifiedOrdered.allow_custom_trim === true ? { allow_custom_trim: true } : {}),
+    ...(simplifiedOrdered.custom_trim_pricing_size_id != null &&
+    String(simplifiedOrdered.custom_trim_pricing_size_id).trim() !== ''
+      ? { custom_trim_pricing_size_id: simplifiedOrdered.custom_trim_pricing_size_id }
+      : {}),
+    ...(simplifiedOrdered.roll_m2?.mode === 'roll_wide_m2' ? { roll_m2: { mode: 'roll_wide_m2' } } : {}),
     use_layout: simplifiedOrdered.use_layout,
     cutting: simplifiedOrdered.cutting,
     pages: simplifiedOrdered.pages || null,

@@ -84,4 +84,18 @@ describe('compact material-driven schema', () => {
       },
     ])
   })
+
+  it('отдаёт флаг своего обреза и режим рулона без ширины рулона', () => {
+    const compact = compactSimplifiedForSite({
+      allow_custom_trim: true,
+      custom_trim_pricing_size_id: 'a4',
+      roll_m2: { mode: 'roll_wide_m2', roll_width_mm: 1600 },
+      sizes: [],
+    })
+
+    expect(compact.allow_custom_trim).toBe(true)
+    expect(compact.custom_trim_pricing_size_id).toBe('a4')
+    expect(compact.roll_m2).toEqual({ mode: 'roll_wide_m2' })
+    expect(JSON.stringify(compact)).not.toContain('1600')
+  })
 })
