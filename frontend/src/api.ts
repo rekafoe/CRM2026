@@ -201,6 +201,50 @@ export const cancelOnlineOrder = (id: number, cancelReason: string) =>
 export const getOrderActivity = (id: number) =>
   api.get<OrderActivityResponse>(`/orders/${id}/activity`);
 
+export type OrderCostExpense = {
+  kind: 'material' | 'print' | 'design';
+  title: string;
+  quantity: number | null;
+  amount: number;
+};
+
+export type OrderCostLine = {
+  itemId: number;
+  title: string;
+  quantity: number;
+  revenue: number;
+  expense: number;
+  base: number;
+  contactPercent: number;
+  responsiblePercent: number;
+  executorPercent: number;
+  contactAmount: number;
+  responsibleAmount: number;
+  executorAmount: number;
+  contactAssigned: boolean;
+  responsibleAssigned: boolean;
+  executorAssigned: boolean;
+};
+
+export type OrderCostSheet = {
+  orderId: number;
+  rates: { contact: number; responsible: number };
+  expenses: OrderCostExpense[];
+  expensesTotal: number;
+  lines: OrderCostLine[];
+  totals: {
+    revenue: number;
+    expense: number;
+    base: number;
+    contact: number;
+    responsible: number;
+    executor: number;
+  };
+};
+
+export const getOrderCostSheet = (id: number) =>
+  api.get<OrderCostSheet>(`/orders/${id}/cost-sheet`);
+
 /** Выдать заказ: 100% остатка → предоплата, debt_closed, статус 7. issued_on — дата выдачи (YYYY-MM-DD), чтобы заказ попал в «Выданные заказы» за выбранный день. */
 export const issueOrder = (id: number, issuedOn?: string) =>
   api.post<Order>(`/orders/${id}/issue`, issuedOn ? { issued_on: issuedOn.slice(0, 10) } : {});

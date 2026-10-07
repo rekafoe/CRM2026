@@ -15,6 +15,7 @@ import { OrderMailLogPanel } from '../../orders/OrderMailLogPanel';
 import { OrderSmsPanel } from '../../orders/OrderSmsPanel';
 import { OrderDeliveryBlock } from '../../orders/OrderDeliveryBlock';
 import { PostalShipmentPanel } from '../../orders/PostalShipmentPanel';
+import { OrderCostSheetPanel } from '../../orders/OrderCostSheetPanel';
 import { AssignableUserSelect } from '../../orders/AssignableUserSelect';
 import { OrderTransferModal } from '../../orders/OrderTransferModal';
 import { useAssignableUsers } from '../../../hooks/useAssignableUsers';
@@ -372,6 +373,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   message,
                 })}
               />
+              <OrderCostSheetPanel orderId={selectedOrder.id} />
               {showLegalDocsButton && (
                 <div ref={docsMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                   <button

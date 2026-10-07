@@ -7,6 +7,7 @@ import { upload, uploadMemory, uploadOrderFilesMemory, saveBufferToOrderFiles, o
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { PostalShipmentService } from '../services/postalShipmentService'
+import { buildOrderCostSheet } from '../services/orderCostSheet'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { findOrderStatusId } from '../utils/orderStatusCatalog'
 import { issueCashRemainder } from '../utils/orderAmounts'
@@ -749,6 +750,20 @@ router.get('/commodity-receipt-blank-pdf', asyncHandler(async (req, res) => {
       details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
     });
   }
+}))
+
+router.get('/:id/cost-sheet', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  if (!orderId) {
+    res.status(400).json({ message: 'Неверный ID заказа' })
+    return
+  }
+  const sheet = await buildOrderCostSheet(orderId)
+  if (!sheet) {
+    res.status(404).json({ message: 'Заказ не найден' })
+    return
+  }
+  res.json(sheet)
 }))
 
 router.get('/:id/postal-shipments', asyncHandler(async (req, res) => {
