@@ -86,11 +86,14 @@ export class OrderPricingService {
   /**
    * Пересчитать цены всех groupable simplified-позиций заказа.
    * Позиции без productId / без ключа группы не меняются.
+   * Ошибки расчёта (мин. тираж, раскладка и т.п.) возвращаются в failedLines —
+   * иначе клиентский totalCost/price остаётся в заказе (underpay).
    */
   static async recalculateOrderPrices(orderId: number): Promise<{
     updatedCount: number;
     cartTotal: number;
     groups: OrderPricingGroupView[];
+    failedLines: Array<{ itemId: number; error: string }>;
   }> {
     const db = await getDb();
     const items = (await db.all(
@@ -115,21 +118,24 @@ export class OrderPricingService {
     }
 
     if (lines.length === 0) {
-      return { updatedCount: 0, cartTotal: 0, groups: [] };
+      return { updatedCount: 0, cartTotal: 0, groups: [], failedLines: [] };
     }
 
     const quoted = await quoteLines(lines);
     let updatedCount = 0;
+    const failedLines: Array<{ itemId: number; error: string }> = [];
 
     for (const q of quoted.lines) {
-      if (q.skipped || q.error || q.finalPrice <= 0) {
-        if (q.error) {
-          logger.warn('[OrderPricingService] позиция не пересчитана', {
-            orderId,
-            itemId: q.lineId,
-            error: q.error,
-          });
-        }
+      if (q.error) {
+        failedLines.push({ itemId: Number(q.lineId), error: String(q.error) });
+        logger.warn('[OrderPricingService] позиция не пересчитана', {
+          orderId,
+          itemId: q.lineId,
+          error: q.error,
+        });
+        continue;
+      }
+      if (q.skipped || q.finalPrice <= 0) {
         continue;
       }
 
@@ -167,6 +173,7 @@ export class OrderPricingService {
     logger.info('[OrderPricingService] пересчёт завершён', {
       orderId,
       updatedCount,
+      failedCount: failedLines.length,
       cartTotal: quoted.cartTotal,
       groupsCount: groups.length,
     });
@@ -175,6 +182,7 @@ export class OrderPricingService {
       updatedCount,
       cartTotal: quoted.cartTotal,
       groups,
+      failedLines,
     };
   }
 }
