@@ -79,13 +79,19 @@ function parseCutLevelRules(
   try {
     const v = JSON.parse(raw);
     if (!Array.isArray(v)) return undefined;
-    const out: Array<{ max_cell_long_side_mm: number; multiplier: number }> = [];
+    const out: Array<{ max_cell_long_side_mm: number; multiplier: number; name?: string }> = [];
     for (const item of v) {
       if (!item || typeof item !== 'object') continue;
       const maxSide = Number((item as { max_cell_long_side_mm?: unknown }).max_cell_long_side_mm);
       const mult = Number((item as { multiplier?: unknown }).multiplier);
       if (!Number.isFinite(maxSide) || maxSide <= 0 || !Number.isFinite(mult) || mult <= 0) continue;
-      out.push({ max_cell_long_side_mm: maxSide, multiplier: mult });
+      const nameRaw = (item as { name?: unknown }).name;
+      const name = typeof nameRaw === 'string' ? nameRaw.trim() : '';
+      out.push({
+        max_cell_long_side_mm: maxSide,
+        multiplier: mult,
+        ...(name ? { name } : {}),
+      });
     }
     return out.length ? out : undefined;
   } catch {
@@ -249,10 +255,14 @@ export class PlotterCuttingTariffRepository {
       const cutLevelJson =
         dto.mode === 'roll' && dto.cut_level_rules && dto.cut_level_rules.length > 0
           ? JSON.stringify(
-              dto.cut_level_rules.map((r) => ({
-                max_cell_long_side_mm: r.max_cell_long_side_mm,
-                multiplier: r.multiplier,
-              }))
+              dto.cut_level_rules.map((r) => {
+                const name = typeof r.name === 'string' ? r.name.trim() : '';
+                return {
+                  max_cell_long_side_mm: r.max_cell_long_side_mm,
+                  multiplier: r.multiplier,
+                  ...(name ? { name } : {}),
+                };
+              })
             )
           : null;
       const volBasis =

@@ -90,7 +90,7 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
 
       {showRollCutLevels ? (
         <div className="plotter-tariff-mode__cut-levels">
-          <h4 className="plotter-tariff-mode__subtitle">Мелкие и крупные наклейки</h4>
+          <h4 className="plotter-tariff-mode__subtitle">Уровни резки</h4>
           <RollCutLevelRulesFields
             rules={value.cut_level_rules}
             onChange={(cut_level_rules) => onChange({ ...value, cut_level_rules })}

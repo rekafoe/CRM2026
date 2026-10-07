@@ -158,11 +158,16 @@
   gap: 12px;
 }
 
-.plotter-levels__name {
-  min-width: 7rem;
+.plotter-levels__ordinal {
+  min-width: 7.5rem;
   font-size: 13px;
   font-weight: 700;
   padding-bottom: 6px;
+}
+
+.plotter-levels__name-field {
+  flex: 1 1 220px;
+  min-width: 180px;
 }
 
 .plotter-levels__catch {

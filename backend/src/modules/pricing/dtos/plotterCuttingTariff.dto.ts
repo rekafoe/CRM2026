@@ -28,7 +28,7 @@ export interface PlotterCuttingModeTariffDTO {
    * Только рулон: уровни резки — чем меньше ячейка, тем выше multiplier к цене за п.м.
    * Сравнение по длинной стороне ячейки (мм): max(trim_w, trim_h) + 2×bleed.
    */
-  cut_level_rules?: Array<{ max_cell_long_side_mm: number; multiplier: number }>;
+  cut_level_rules?: Array<{ max_cell_long_side_mm: number; multiplier: number; name?: string }>;
 }
 
 export interface PlotterCuttingTariffsBundleDTO {

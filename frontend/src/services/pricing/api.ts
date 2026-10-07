@@ -101,7 +101,7 @@ export interface PlotterCuttingModeTariffApi {
   weeding_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   mounting_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   volume_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
-  cut_level_rules?: Array<{ max_cell_long_side_mm: number; multiplier: number }>;
+  cut_level_rules?: Array<{ max_cell_long_side_mm: number; multiplier: number; name?: string }>;
 }
 
 export interface PlotterCuttingTariffsBundleApi {
