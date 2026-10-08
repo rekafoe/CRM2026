@@ -23,7 +23,6 @@ import {
 import { PriceTypeService } from './priceTypeService';
 import { BindingPricingService, BindingQuoteResult } from './bindingPricingService';
 import {
-  computeKnifePathMetersRoll,
   computeKnifePathMetersSheet,
   computeOptimizedRollFeedMeters,
   resolvePlotterMargins,
@@ -1602,29 +1601,14 @@ export class SimplifiedPricingService {
         }
       }
       const margins = resolvePlotterMargins(plotterCfg.mode, customMarginMm, customGapMm);
-      if (plotterCfg.mode === 'roll') {
-        const wRoll = materialSheetMm?.width ?? 0;
-        if (wRoll <= 0) {
-          pricingWarnings.push(
-            'Плоттер (рулон): у материала не задана ширина рулона (sheet_width) — пробег ножа не оценен.'
-          );
-        } else {
-          knifePathMetersTotal = computeKnifePathMetersRoll({
-            rollWidthMm: wRoll,
-            trimMm: layoutTrim,
-            bleedMm: resolvedBleedMm,
-            quantity,
-            margins,
-          }).knifePathM;
-        }
-      } else {
+      if (plotterCfg.mode === 'sheet') {
         let sw = materialSheetMm?.width ?? 0;
         let sh = materialSheetMm?.height ?? 0;
         if (sw <= 0 || sh <= 0) {
           sw = SHEET_PLOTTER_SRA3_MM.width;
           sh = SHEET_PLOTTER_SRA3_MM.height;
           pricingWarnings.push(
-            'Плоттер (лист): у материала не задан формат листа — для оценки пробега ножа принят SRA3 (320×450 мм), как на листовом плоттере.'
+            'Плоттер (лист): у материала не задан формат листа — для раскладки принят SRA3 (320×450 мм).'
           );
         }
         const sheetLayout = computeKnifePathMetersSheet({
@@ -1638,7 +1622,7 @@ export class SimplifiedPricingService {
         sheetPlotterSheetsNeeded = sheetLayout.sheetsNeeded ?? quantity;
         if (sheetLayout.fitsOnSheet === false) {
           pricingWarnings.push(
-            'Плоттер (лист): изделие не помещается на лист. В длину реза заложен периметр каждой штуки, листов к оплате столько же, сколько штук.'
+            'Плоттер (лист): изделие не помещается на лист. Листов к оплате столько же, сколько штук.'
           );
         }
       }
@@ -2009,7 +1993,7 @@ export class SimplifiedPricingService {
               meterUnits = filmFeed.feedMeters;
               if (filmFeed.warning) pricingWarnings.push(filmFeed.warning);
             } else {
-              meterUnits = knifePathMetersTotal;
+              meterUnits = pieceCutAreaTrimM2 * quantity;
             }
           }
           const perSheetUnits = isPerSheetOp
@@ -2029,7 +2013,7 @@ export class SimplifiedPricingService {
               const unitLabel = isPerSheetOp
                 ? (isMaterialMeterBased ? 'пог. м' : 'листов')
                 : isPerMeterOp
-                  ? (sheetBilledByCount ? 'листов' : 'п.м.')
+                  ? (sheetBilledByCount ? 'листов' : meterBasis === 'feed' ? 'п.м.' : 'м²')
                   : 'шт';
               const err: any = new Error(
                 `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit} ${unitLabel}`
@@ -2058,7 +2042,7 @@ export class SimplifiedPricingService {
                   ? 'пог. м'
                   : 'листов печати'
                 : isPerMeterOp
-                  ? (sheetBilledByCount ? 'листов' : 'п.м.')
+                  ? (sheetBilledByCount ? 'листов' : meterBasis === 'feed' ? 'п.м.' : 'м²')
                   : 'единиц';
               const billed = minLimit;
               pricingWarnings.push(
@@ -2616,24 +2600,7 @@ export class SimplifiedPricingService {
         margins,
       });
     };
-    const knifePathByQty = (q: number): number => {
-      const pc = effectivePlotterConfig;
-      if (!pc?.enabled || !pc.mode) return 0;
-      const margins = resolvePlotterMargins(pc.mode, customMarginMm, customGapMm);
-      const qq = Math.max(1, Math.floor(Number(q) || 0));
-      if (pc.mode === 'roll') {
-        const wRoll = materialSheetMm?.width ?? 0;
-        if (wRoll <= 0) return 0;
-        return computeKnifePathMetersRoll({
-          rollWidthMm: wRoll,
-          trimMm: layoutTrim,
-          bleedMm: resolvedBleedMm,
-          quantity: qq,
-          margins,
-        }).knifePathM;
-      }
-      return sheetLayoutByQty(qq).knifePathM;
-    };
+    const knifePathByQty = (q: number): number => pieceCutAreaTrimM2 * Math.max(0, Number(q) || 0);
     const sheetCountByQty = (q: number): number => sheetLayoutByQty(q).sheetsNeeded ?? Math.max(1, Math.floor(q));
     const tierPricesResult = this.buildTierPricesForConfig({
       printPriceConfig: printPriceConfigForTiers,
@@ -2772,7 +2739,6 @@ export class SimplifiedPricingService {
       sheetsNeeded: isMaterialMeterBased ? 0 : sheetsNeeded,
       ...(isMaterialMeterBased && { metersNeeded: materialMetersNeeded }),
       ...(isRollWideM2Mode && totalM2Needed > 0 ? { totalM2Needed } : {}),
-      ...(knifePathMetersTotal > 0 ? { knifePathM: knifePathMetersTotal } : {}),
       wastePercentage: layoutCheck.wastePercentage,
       recommendedSheetSize: layoutCheck.recommendedSheetSize,
       cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,

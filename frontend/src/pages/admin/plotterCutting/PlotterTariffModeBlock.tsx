@@ -5,7 +5,6 @@ import { PlotterQtyTiersTable } from './PlotterQtyTiersTable';
 import type { PlotterCuttingModeTariffApi } from '../../../services/pricing';
 import type { PlotterTariffMaterialOption } from './usePlotterCuttingTariffsForm';
 import {
-  applyAreaDiscount,
   applyMeasure,
   commitCuttingRows,
   measureLabel,
@@ -32,7 +31,7 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
   showCutLevels,
 }) => {
   const measure: PlotterMeasure = value.meter_basis === 'feed' ? 'feed' : 'knife_path';
-  const areaDiscount = value.volume_tier_basis === 'cut_area_m2';
+  const areaPriced = measure !== 'feed';
   const rows = visibleCuttingRows(value);
   const sheetByCount = carrier === 'sheet' && measure === 'feed';
   const billed = sheetByCount ? 'листам' : measureLabel(measure);
@@ -49,10 +48,10 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
           {carrier === 'sheet'
             ? sheetByCount
               ? 'Цена умножается на число листов. Если у материала нет своего формата, берётся SRA3, 320×450 мм.'
-              : 'Цена умножается на метры длины реза: путь ножа по наклейкам на листе. Если у материала нет формата, берётся SRA3, 320×450 мм.'
-            : 'Цена умножается на метры ' +
-              billed +
-              '. Длина реза — путь ножа вокруг каждой наклейки. Подача плёнки — сколько метров рулона отмоталось.'}
+              : 'Цена умножается на площадь изделий и на множитель уровня. Если у материала нет формата, для раскладки листов берётся SRA3, 320×450 мм.'
+            : areaPriced
+              ? 'Цена умножается на площадь изделий (ширина × длина × количество) и на множитель уровня. Плёнка в калькуляторе считается отдельно, по метрам рулона.'
+              : 'Цена умножается на метры подачи плёнки.'}
         </p>
         <div className="plotter-measure" role="radiogroup" aria-label="Что умножать на ставку">
           <button
@@ -61,7 +60,7 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
             aria-pressed={measure === 'knife_path'}
             onClick={() => onChange(applyMeasure(value, 'knife_path'))}
           >
-            По длине реза
+            По площади
           </button>
           <button
             type="button"
@@ -76,14 +75,13 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
           tiers={rows}
           keepOneRow
           onChange={(next) => onChange(commitCuttingRows(value, next))}
-          thresholdTitle={areaDiscount ? 'Площадь от' : sheetByCount ? 'Листы от' : 'Метры от'}
-          priceTitle={sheetByCount ? 'Цена за лист' : 'Цена за метр'}
-          rangeUnit={areaDiscount ? 'м²' : sheetByCount ? 'лист' : 'м'}
-          thresholdFractionDigits={sheetByCount && !areaDiscount ? 0 : 3}
+          thresholdTitle={areaPriced ? 'Площадь от' : sheetByCount ? 'Листы от' : 'Метры от'}
+          priceTitle={areaPriced ? 'Цена за м²' : sheetByCount ? 'Цена за лист' : 'Цена за метр'}
+          rangeUnit={areaPriced ? 'м²' : sheetByCount ? 'лист' : 'м'}
+          thresholdFractionDigits={sheetByCount && !areaPriced ? 0 : 3}
           description={
-            areaDiscount
-              ? 'Порог строки — суммарная площадь изделий в заказе. Цена строки всё равно за ' +
-                (sheetByCount ? 'лист.' : 'метр ' + billed + '.')
+            areaPriced
+              ? 'Первая строка — обычная ставка за м². Следующие пороги снижают её, когда суммарная площадь изделий больше.'
               : sheetByCount
                 ? 'Первая строка — обычная ставка. Следующие пороги снижают её, когда листов становится больше.'
                 : 'Первая строка — обычная ставка. Следующие пороги снижают её, когда метров ' +
@@ -92,14 +90,6 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
           }
           addRangeLabel="Добавить порог"
         />
-        <label className="plotter-block__check">
-          <input
-            type="checkbox"
-            checked={areaDiscount}
-            onChange={(e) => onChange(applyAreaDiscount(value, e.target.checked))}
-          />
-          <span>Пороги скидки считать по площади изделий, а не по метрам</span>
-        </label>
       </div>
 
       {showCutLevels ? (
@@ -127,8 +117,8 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
             label={
               sheetByCount
                 ? 'Минимум к оплате, листов'
-                : carrier === 'sheet'
-                  ? 'Минимум к оплате, м реза'
+                : areaPriced
+                  ? 'Минимум к оплате, м²'
                   : `Минимум к оплате, м ${billed}`
             }
           >
@@ -143,7 +133,15 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
               }}
             />
           </FormField>
-          <FormField label={sheetByCount ? 'Максимум, листов. Пусто — без потолка' : 'Максимум, м. Пусто — без потолка'}>
+          <FormField
+            label={
+              sheetByCount
+                ? 'Максимум, листов. Пусто — без потолка'
+                : areaPriced
+                  ? 'Максимум, м². Пусто — без потолка'
+                  : 'Максимум, м. Пусто — без потолка'
+            }
+          >
             <DecimalNumberInput
               className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
               nullable

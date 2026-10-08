@@ -44,9 +44,8 @@ export function resolvePlotterTierVolumeQty(params: {
   feedM: number;
   cutAreaM2: number;
 }): number {
-  const { basis, tariffMeterBasis, knifePathM, feedM, cutAreaM2 } = params;
-  if (basis === 'cut_area_m2') return cutAreaM2;
+  const { basis, tariffMeterBasis, feedM, cutAreaM2 } = params;
+  if (basis === 'cut_area_m2' || basis === 'knife_m') return cutAreaM2;
   if (basis === 'feed_m') return feedM;
-  if (basis === 'knife_m') return knifePathM;
-  return tariffMeterBasis === 'feed' ? feedM : knifePathM;
+  return tariffMeterBasis === 'feed' ? feedM : cutAreaM2;
 }

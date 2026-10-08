@@ -1,14 +1,13 @@
 /**
  * Калькулятор «Плоттерная резка» в заказе: резка плёнки для аппликации.
- * HTTP-расчёт всегда рулонный. Без материала в сумме только резка.
- * Ветку листа функция оставляет для проверки раскладки.
+ * Резка — площадь изделий, м², умноженная на ставку и на уровень.
+ * Плёнка — погонные метры подачи рулона. Без материала в сумме только резка.
  */
 
 import type { PlotterCuttingModeTariffDTO } from '../dtos/plotterCuttingTariff.dto';
 import { matchPlotterCutLevel } from './plotterCutLevel';
 import {
   SHEET_PLOTTER_SRA3_MM,
-  computeKnifePathMetersRoll,
   computeKnifePathMetersSheet,
   computeOptimizedRollFeedMeters,
   resolvePlotterMargins,
@@ -90,24 +89,17 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
   const multiplier = forced ?? autoLevel.multiplier;
   const levelName = forced != null ? (input.levelName?.trim() || null) : autoLevel.name;
 
-  let knifePathM = 0;
   let feedM = 0;
   let sheetsNeeded = 0;
+  const cutAreaM2 = (widthMm * heightMm * quantity) / 1_000_000;
 
   if (mode === 'roll') {
     const rollWidthMm = Math.max(0, Number(input.rollWidthMm) || 0);
     if (rollWidthMm <= 0) {
-      knifePathM = (quantity * 2 * (widthMm + heightMm)) / 1000;
-      feedM = knifePathM;
-      warnings.push('Ширина рулона неизвестна. Резка посчитана по периметру каждой штуки, без раскладки на рулоне.');
+      if (input.includeMaterial !== false) {
+        warnings.push('Ширина рулона неизвестна. Метраж плёнки не посчитан.');
+      }
     } else {
-      knifePathM = computeKnifePathMetersRoll({
-        rollWidthMm,
-        trimMm: { width: widthMm, height: heightMm },
-        bleedMm: 0,
-        quantity,
-        margins,
-      }).knifePathM;
       feedM =
         computeOptimizedRollFeedMeters({
           rollWidthMm,
@@ -132,10 +124,9 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
       quantity,
       margins,
     });
-    knifePathM = layout.knifePathM;
     sheetsNeeded = layout.sheetsNeeded ?? quantity;
     if (layout.fitsOnSheet === false) {
-      warnings.push('Изделие не помещается на лист. В длину реза заложен периметр, листов столько же, сколько штук.');
+      warnings.push('Изделие не помещается на лист. Листов к оплате столько же, сколько штук.');
     }
   }
 
@@ -146,17 +137,17 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
   const volumeQty = resolvePlotterTierVolumeQty({
     basis: tariff.volume_tier_basis ?? null,
     tariffMeterBasis: tariff.meter_basis,
-    knifePathM,
+    knifePathM: 0,
     feedM: feedForTier,
-    cutAreaM2: (widthMm * heightMm * quantity) / 1_000_000,
+    cutAreaM2,
   });
   const tier = findPlotterVolumeTier(tiers, volumeQty);
   const rate = (tier?.unit_price ?? tariff.price_per_meter ?? 0) * multiplier;
-  const rawUnits = sheetByCount ? sheetsNeeded : tariff.meter_basis === 'feed' ? feedM : knifePathM;
+  const rawUnits = sheetByCount ? sheetsNeeded : tariff.meter_basis === 'feed' ? feedM : cutAreaM2;
   const minUnits = Math.max(0, Number(tariff.min_quantity) || 0);
   const billedUnits = Math.max(rawUnits, minUnits);
   const cutTotal = roundMoney(rate * billedUnits);
-  const cutUnit = sheetByCount ? 'лист' : 'м';
+  const cutUnit = sheetByCount ? 'лист' : tariff.meter_basis === 'feed' ? 'м' : 'м²';
   const lines: PlotterBareQuoteLine[] = [
     {
       key: 'cut',
@@ -215,7 +206,7 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
     total,
     unitPrice: quantity > 0 ? roundMoney(total / quantity) : 0,
     warnings,
-    knifePathM,
+    knifePathM: 0,
     feedM,
     sheetsNeeded,
     multiplier,

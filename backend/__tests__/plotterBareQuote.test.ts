@@ -69,7 +69,7 @@ describe('quoteBarePlotter', () => {
     expect(quote.warnings.some((line) => line.includes('не помещается'))).toBe(true)
   })
 
-  test('without material the quote is cut only, by piece perimeter', () => {
+  test('without material the quote is cut only, by area', () => {
     const quote = quoteBarePlotter({
       widthMm: 1000,
       heightMm: 1000,
@@ -87,8 +87,9 @@ describe('quoteBarePlotter', () => {
       includeMaterial: false,
     });
     expect(quote.lines.map((line) => line.key)).toEqual(['cut']);
-    expect(quote.knifePathM).toBeCloseTo(4);
-    expect(quote.lines[0].total).toBeCloseTo(20);
+    expect(quote.lines[0].unit).toBe('м²');
+    expect(quote.lines[0].quantity).toBeCloseTo(1);
+    expect(quote.lines[0].total).toBeCloseTo(5);
   });
 
   test('chosen level multiplier overrides the size match', () => {

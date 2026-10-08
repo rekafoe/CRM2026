@@ -36,7 +36,7 @@ export const RollCutLevelRulesFields: React.FC<Props> = ({ rules, onChange }) =>
     return (
       <div className="plotter-levels">
         <p className="plotter-block__hint">
-          Сейчас ставка одна на все размеры. Добавьте уровни, если мелкий контур должен стоить дороже.
+          Сейчас ставка одна на все размеры. Добавьте уровни, если мелкий контур должен стоить дороже за м².
         </p>
         <Button type="button" variant="secondary" size="sm" onClick={addLevel}>
           Добавить уровень

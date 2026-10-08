@@ -8,7 +8,7 @@ export interface PlotterCuttingModeTariffDTO {
   label: string;
   price_per_meter: number;
   meter_basis: PlotterCuttingMeterBasis;
-  /** По какой величине выбирать строку volume_tiers; не задано — совпадает с meter_basis (п.м. ножа или подачи). */
+  /** По какой величине выбирать строку volume_tiers. knife_m оставлен в базе и считается как площадь, м². */
   volume_tier_basis?: PlotterVolumeTierBasis | null;
   min_quantity: number;
   max_quantity?: number | null;
@@ -28,7 +28,7 @@ export interface PlotterCuttingModeTariffDTO {
   /** Диапазоны цен по тиражу; пусто — одна ставка price_per_meter */
   volume_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   /**
-   * Только рулон: уровни резки — чем меньше ячейка, тем выше multiplier к цене за п.м.
+   * Уровни резки — чем меньше ячейка, тем выше multiplier к цене за м².
    * Сравнение по длинной стороне ячейки (мм): max(trim_w, trim_h) + 2×bleed.
    */
   cut_level_rules?: Array<{ max_cell_long_side_mm: number; multiplier: number; name?: string }>;

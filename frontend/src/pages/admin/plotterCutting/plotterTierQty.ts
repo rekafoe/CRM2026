@@ -16,10 +16,9 @@ export function plotterVolumeTierThresholdTitle(
   volumeTierBasis: PlotterCuttingModeTariffApi['volume_tier_basis'],
   meterBasis: PlotterCuttingModeTariffApi['meter_basis'],
 ): string {
-  if (volumeTierBasis === 'knife_m') return 'Мин. пробег ножа (м)';
+  if (volumeTierBasis === 'knife_m' || volumeTierBasis === 'cut_area_m2') return 'Мин. площадь изделий (м²)';
   if (volumeTierBasis === 'feed_m') return 'Мин. подача (м)';
-  if (volumeTierBasis === 'cut_area_m2') return 'Мин. суммарная площадь trim (м²)';
-  return meterBasis === 'feed' ? 'Мин. подача (м)' : 'Мин. пробег ножа (м)';
+  return meterBasis === 'feed' ? 'Мин. подача (м)' : 'Мин. площадь изделий (м²)';
 }
 
 export function plotterVolumeTierTableHint(

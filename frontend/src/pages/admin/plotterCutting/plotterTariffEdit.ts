@@ -38,25 +38,13 @@ export function applyMeasure(
   tariff: PlotterCuttingModeTariffApi,
   measure: PlotterMeasure,
 ): PlotterCuttingModeTariffApi {
-  const area = tariff.volume_tier_basis === 'cut_area_m2';
   return {
     ...tariff,
     meter_basis: measure,
-    volume_tier_basis: area ? 'cut_area_m2' : measure === 'feed' ? 'feed_m' : 'knife_m',
-  };
-}
-
-export function applyAreaDiscount(
-  tariff: PlotterCuttingModeTariffApi,
-  enabled: boolean,
-): PlotterCuttingModeTariffApi {
-  if (enabled) return { ...tariff, volume_tier_basis: 'cut_area_m2' };
-  return {
-    ...tariff,
-    volume_tier_basis: tariff.meter_basis === 'feed' ? 'feed_m' : 'knife_m',
+    volume_tier_basis: measure === 'feed' ? 'feed_m' : 'cut_area_m2',
   };
 }
 
 export function measureLabel(measure: PlotterMeasure): string {
-  return measure === 'feed' ? 'подаче плёнки' : 'длине реза';
+  return measure === 'feed' ? 'подаче плёнки' : 'площади изделий';
 }

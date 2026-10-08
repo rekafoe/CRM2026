@@ -89,7 +89,7 @@ const consumptionModeOptions: Array<{ value: ServiceConsumptionMode; label: stri
 
 const meterBasisOptions: Array<{ value: ServiceMeterBasis; label: string }> = [
   { value: 'feed', label: 'feed (подача по раскладке)' },
-  { value: 'knife_path', label: 'knife_path (по пробегу ножа)' },
+  { value: 'knife_path', label: 'площадь изделий, м²' },
 ];
 
 const inputClass = 'form-input w-full';
