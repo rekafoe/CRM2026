@@ -630,8 +630,28 @@ export class SimplifiedPricingService {
       throw err;
     }
 
+    const catalogWidthMm = Number(selectedSize.width_mm);
+    const catalogHeightMm = Number(selectedSize.height_mm);
+    // Без allow_custom_trim клиентский trim_size не может расходиться с каталожным размером:
+    // иначе size_id + items_per_sheet_override дают цену мелкого формата при большом actualTrimMm.
+    if (!allowCustomTrim && trimInput) {
+      const matchesCatalog =
+        Number.isFinite(catalogWidthMm) &&
+        Number.isFinite(catalogHeightMm) &&
+        ((Math.abs(trimInput.width - catalogWidthMm) <= 1 && Math.abs(trimInput.height - catalogHeightMm) <= 1) ||
+          (Math.abs(trimInput.width - catalogHeightMm) <= 1 && Math.abs(trimInput.height - catalogWidthMm) <= 1));
+      if (!matchesCatalog) {
+        const err: any = new Error(
+          `trim_size ${trimInput.width}×${trimInput.height} мм не совпадает с размером ${catalogWidthMm}×${catalogHeightMm} мм. ` +
+            'Для произвольного обреза включите allow_custom_trim в шаблоне продукта.',
+        );
+        err.status = 400;
+        throw err;
+      }
+    }
+
     const layoutTrim =
-      trimInput && Number.isFinite(trimInput.width) && Number.isFinite(trimInput.height)
+      allowCustomTrim && trimInput && Number.isFinite(trimInput.width) && Number.isFinite(trimInput.height)
         ? trimInput
         : { width: selectedSize.width_mm, height: selectedSize.height_mm };
 
