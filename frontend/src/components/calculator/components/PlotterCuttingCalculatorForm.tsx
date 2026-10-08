@@ -48,6 +48,12 @@ export function levelChoice(draft: PlotterCalcDraft, quote: PlotterBareQuoteResp
   return { multiplier: option?.multiplier ?? null, name: option?.name ?? null };
 }
 
+function stepQuantity(current: string, delta: number): string {
+  const base = Math.floor(Number(current));
+  const start = Number.isFinite(base) && base > 0 ? base : 0;
+  return String(Math.max(1, start + delta));
+}
+
 export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
   selectedProductName,
   onOpenProductSelector,
@@ -97,14 +103,39 @@ export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
               onChange={(e) => onChange({ heightMm: e.target.value })}
             />
           </label>
-          <label>
-            Количество
-            <input
-              className="form-input quantitySelector"
-              inputMode="numeric"
-              value={draft.quantity}
-              onChange={(e) => onChange({ quantity: e.target.value })}
-            />
+          <label className="param-group param-group--quantity">
+            Количество, шт
+            <div className="quantity-controls">
+              <button
+                type="button"
+                className="quantity-btn quantity-btn-minus"
+                aria-label="Уменьшить количество"
+                disabled={Math.floor(Number(draft.quantity)) <= 1}
+                onClick={() => onChange({ quantity: stepQuantity(draft.quantity, -1) })}
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={1}
+                inputMode="numeric"
+                className="quantity-input"
+                value={draft.quantity}
+                onChange={(e) => onChange({ quantity: e.target.value })}
+                onBlur={() => {
+                  const next = Math.floor(Number(draft.quantity));
+                  onChange({ quantity: next > 0 ? String(next) : '1' });
+                }}
+              />
+              <button
+                type="button"
+                className="quantity-btn quantity-btn-plus"
+                aria-label="Увеличить количество"
+                onClick={() => onChange({ quantity: stepQuantity(draft.quantity, 1) })}
+              >
+                +
+              </button>
+            </div>
           </label>
           <label>
             Уровень сложности

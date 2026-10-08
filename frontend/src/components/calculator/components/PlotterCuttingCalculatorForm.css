@@ -23,6 +23,10 @@
   grid-column: 1 / -1;
 }
 
+.plotter-bare-calc__grid .quantity-controls {
+  width: 100%;
+}
+
 .plotter-bare-calc__ops {
   display: flex;
   flex-wrap: wrap;
