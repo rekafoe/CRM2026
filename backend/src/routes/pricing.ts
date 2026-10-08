@@ -8,6 +8,11 @@ import { PriceTypeService } from '../modules/pricing/services/priceTypeService'
 import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
 import { PlotterCuttingTariffRepository } from '../modules/pricing/repositories/plotterCuttingTariffRepository'
 import { quoteBarePlotter } from '../modules/pricing/services/plotterBareQuote'
+import {
+  getPlotterCalculatorMaterialIds,
+  listRollMaterials,
+  setPlotterCalculatorMaterialIds,
+} from '../services/plotterCalculatorMaterials'
 import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 import {
   UvFlatbedPricingService,
@@ -986,73 +991,91 @@ router.put('/plotter-cutting-tariffs', asyncHandler(async (req, res) => {
   res.json(next)
 }))
 
+router.get('/plotter-cutting/calculator-materials', asyncHandler(async (_req, res) => {
+  const db = await getDb()
+  const rolls = await listRollMaterials(db)
+  const selectedIds = await getPlotterCalculatorMaterialIds(db)
+  const selected = new Set(selectedIds)
+  res.json({
+    material_ids: selectedIds.filter((id) => rolls.some((row) => row.id === id)),
+    rolls,
+    materials: rolls.filter((row) => selected.has(row.id)),
+  })
+}))
+
+router.put('/plotter-cutting/calculator-materials', asyncHandler(async (req, res) => {
+  const raw = Array.isArray(req.body?.material_ids) ? req.body.material_ids : []
+  const db = await getDb()
+  const materialIds = await setPlotterCalculatorMaterialIds(db, raw)
+  const rolls = await listRollMaterials(db)
+  const selected = new Set(materialIds)
+  res.json({
+    material_ids: materialIds,
+    rolls,
+    materials: rolls.filter((row) => selected.has(row.id)),
+  })
+}))
+
 router.post('/plotter-cutting/quote', asyncHandler(async (req, res) => {
   const body = req.body ?? {}
   const widthMm = Number(body.width_mm)
   const heightMm = Number(body.height_mm)
   const quantity = Math.floor(Number(body.quantity))
-  const materialId = Number(body.material_id)
   if (!(widthMm > 0) || !(heightMm > 0) || !(quantity > 0)) {
     res.status(400).json({ message: 'Укажите ширину, длину и тираж.' })
     return
   }
-  if (!Number.isInteger(materialId) || materialId <= 0) {
-    res.status(400).json({ message: 'Выберите материал.' })
-    return
-  }
   const db = await getDb()
-  const material = await db.get<{
+  const bundle = await PlotterCuttingTariffRepository.getBundle()
+  const tariff = bundle.roll
+  const materialId = Number(body.material_id)
+  const withMaterial = Number.isInteger(materialId) && materialId > 0
+  let material: {
     id: number
     name: string
-    material_kind: string | null
     sheet_width: number | null
-    sheet_height: number | null
     sheet_price_single: number | null
-    finish: string | null
-  }>(
-    `SELECT id, name, material_kind, sheet_width, sheet_height, sheet_price_single, finish
-     FROM materials WHERE id = ?`,
-    materialId,
-  )
-  if (!material) {
-    res.status(404).json({ message: 'Материал не найден.' })
-    return
+  } | null = null
+  if (withMaterial) {
+    const allowed = new Set(await getPlotterCalculatorMaterialIds(db))
+    if (!allowed.has(materialId)) {
+      res.status(400).json({ message: 'Этот материал не отмечен для калькулятора плоттерной резки.' })
+      return
+    }
+    material = await db.get(
+      `SELECT id, name, sheet_width, sheet_price_single
+       FROM materials WHERE id = ? AND material_kind = 'roll'`,
+      materialId,
+    )
+    if (!material) {
+      res.status(400).json({ message: 'Для этого калькулятора нужен рулон из списка материалов.' })
+      return
+    }
   }
-  const kind = String(material.material_kind || '')
-  if (kind !== 'roll' && kind !== 'sheet') {
-    res.status(400).json({ message: 'Для плоттера нужен материал вида «рулон» или «лист».' })
-    return
-  }
-  const bundle = await PlotterCuttingTariffRepository.getBundle()
-  const tariff = kind === 'roll' ? bundle.roll : bundle.sheet
   const forced = body.level_multiplier
   const quote = quoteBarePlotter({
     widthMm,
     heightMm,
     quantity,
-    mode: kind,
-    rollWidthMm: Number(material.sheet_width) || 0,
-    sheetWidthMm: Number(material.sheet_width) || 0,
-    sheetHeightMm: Number(material.sheet_height) || 0,
-    materialPrice: Number(material.sheet_price_single) || 0,
-    materialName: material.name,
+    mode: 'roll',
+    rollWidthMm: Number(material?.sheet_width) || 0,
+    sheetWidthMm: 0,
+    sheetHeightMm: 0,
+    materialPrice: Number(material?.sheet_price_single) || 0,
+    materialName: material?.name || '',
+    includeMaterial: withMaterial,
     tariff,
-    weeding: body.weeding === true,
-    mounting: body.mounting === true,
-    proof: body.proof === true,
+    weeding: withMaterial && body.weeding === true,
+    mounting: withMaterial && body.mounting === true,
+    proof: withMaterial && body.proof === true,
     levelMultiplier: forced == null || forced === '' ? null : Number(forced),
     levelName: typeof body.level_name === 'string' ? body.level_name : null,
   })
   res.json({
     ...quote,
-    material: {
-      id: material.id,
-      name: material.name,
-      kind,
-      finish: material.finish ?? null,
-      sheet_width: material.sheet_width,
-      sheet_height: material.sheet_height,
-    },
+    material: material
+      ? { id: material.id, name: material.name, kind: 'roll' as const, sheet_width: material.sheet_width }
+      : null,
     cut_level_rules: tariff.cut_level_rules ?? [],
     operations: {
       weeding: (tariff.weeding_tiers?.length ?? 0) > 0,

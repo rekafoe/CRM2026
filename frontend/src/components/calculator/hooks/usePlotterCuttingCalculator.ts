@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getMaterials } from '../../../api';
-import { quotePlotterCutting, type PlotterBareQuoteResponse } from '../../../services/pricing';
-import type { Material } from '../../../types';
+import {
+  getPlotterCalculatorMaterials,
+  quotePlotterCutting,
+  type PlotterBareQuoteResponse,
+  type PlotterCalculatorMaterial,
+} from '../../../services/pricing';
 import type { Product } from '../../../services/products';
 import { PLOTTER_PRODUCT_ID } from '../components/DynamicProductSelector';
 import {
@@ -14,7 +17,6 @@ const emptyDraft = (): PlotterCalcDraft => ({
   heightMm: '1000',
   quantity: '1',
   materialId: null,
-  finish: '',
   levelKey: 'auto',
   weeding: false,
   mounting: false,
@@ -39,7 +41,7 @@ const plotterProduct = (): Product => ({
   id: PLOTTER_PRODUCT_ID,
   category_id: 0,
   name: 'Плоттерная резка',
-  description: 'Нож, материал, выборка, накатка и проверка',
+  description: 'Резка плёнки для аппликации',
   icon: 'scissors',
   calculator_type: 'simplified',
   product_type: 'universal',
@@ -64,7 +66,7 @@ export function usePlotterCuttingCalculator({
   logger,
   toast,
 }: Params) {
-  const [materials, setMaterials] = useState<Material[]>([]);
+  const [materials, setMaterials] = useState<PlotterCalculatorMaterial[]>([]);
   const [draft, setDraft] = useState<PlotterCalcDraft>(emptyDraft);
   const [quote, setQuote] = useState<PlotterBareQuoteResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -81,12 +83,9 @@ export function usePlotterCuttingCalculator({
   useEffect(() => {
     if (!isOpen || !isPlotterProduct) return;
     let cancelled = false;
-    getMaterials()
-      .then((response) => {
-        const list = (response.data ?? []).filter(
-          (material) => material.material_kind === 'roll' || material.material_kind === 'sheet',
-        );
-        if (!cancelled) setMaterials(list);
+    getPlotterCalculatorMaterials()
+      .then((payload) => {
+        if (!cancelled) setMaterials(payload.materials ?? []);
       })
       .catch((err: any) => {
         if (!cancelled) setError(err?.message || 'Не удалось загрузить материалы');
@@ -110,7 +109,6 @@ export function usePlotterCuttingCalculator({
       heightMm: String(params.height_mm ?? ''),
       quantity: String(editContext.item.quantity ?? params.quantity ?? 1),
       materialId: params.material_id != null ? Number(params.material_id) : null,
-      finish: String(params.finish ?? ''),
       levelKey: params.level_key || 'auto',
       weeding: params.plotter_weeding === true,
       mounting: params.plotter_mounting === true,
@@ -124,7 +122,7 @@ export function usePlotterCuttingCalculator({
     const width = Number(draft.widthMm);
     const height = Number(draft.heightMm);
     const quantity = Math.floor(Number(draft.quantity));
-    if (!(width > 0) || !(height > 0) || !(quantity > 0) || !draft.materialId) {
+    if (!(width > 0) || !(height > 0) || !(quantity > 0)) {
       setQuote(null);
       setLoading(false);
       return;
@@ -137,7 +135,7 @@ export function usePlotterCuttingCalculator({
         width_mm: width,
         height_mm: height,
         quantity,
-        material_id: draft.materialId!,
+        material_id: draft.materialId,
         weeding: draft.weeding,
         mounting: draft.mounting,
         proof: draft.proof,
@@ -172,7 +170,7 @@ export function usePlotterCuttingCalculator({
     draft.levelKey,
   ]);
 
-  const isPlotterValid = Boolean(quote && quote.total >= 0 && draft.materialId);
+  const isPlotterValid = Boolean(quote && quote.total >= 0);
   const plotterResult = useMemo(() => {
     if (!quote) return null;
     return {
@@ -189,7 +187,7 @@ export function usePlotterCuttingCalculator({
   }, [draft.quantity, quote]);
 
   const handleAddPlotterProduct = useCallback(async () => {
-    if (!quote || !draft.materialId) return;
+    if (!quote) return;
     const width = Number(draft.widthMm);
     const height = Number(draft.heightMm);
     const quantity = Math.max(1, Math.floor(Number(draft.quantity) || 1));
@@ -206,7 +204,6 @@ export function usePlotterCuttingCalculator({
       height_mm: height,
       quantity,
       material_id: draft.materialId,
-      finish: draft.finish,
       level_key: draft.levelKey,
       plotter_weeding: draft.weeding,
       plotter_mounting: draft.mounting,
@@ -214,8 +211,8 @@ export function usePlotterCuttingCalculator({
       plotter_mode: quote.mode,
       plotterLines: quote.lines,
       materials:
-        materialQty > 0
-          ? [{ materialId: draft.materialId, quantity: materialQty, name: quote.material.name }]
+        draft.materialId && materialQty > 0
+          ? [{ materialId: draft.materialId, quantity: materialQty, name: quote.material?.name }]
           : [],
     };
     const apiItem = {
@@ -226,7 +223,7 @@ export function usePlotterCuttingCalculator({
       totalCost: quote.total,
       quantity,
       sides: 1,
-      sheets: quote.mode === 'sheet' ? quote.sheetsNeeded : 0,
+          sheets: 0,
       waste: 0,
       clicks: 0,
     };

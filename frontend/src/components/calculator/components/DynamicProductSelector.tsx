@@ -44,7 +44,7 @@ const plotterProduct: Product = {
   id: PLOTTER_PRODUCT_ID,
   category_id: 0,
   name: 'Плоттерная резка',
-  description: 'Нож, материал, выборка, накатка и проверка',
+  description: 'Резка плёнки для аппликации',
   icon: 'scissors',
   calculator_type: 'simplified',
   product_type: 'universal',

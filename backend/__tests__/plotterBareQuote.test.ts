@@ -69,6 +69,28 @@ describe('quoteBarePlotter', () => {
     expect(quote.warnings.some((line) => line.includes('не помещается'))).toBe(true)
   })
 
+  test('without material the quote is cut only, by piece perimeter', () => {
+    const quote = quoteBarePlotter({
+      widthMm: 1000,
+      heightMm: 1000,
+      quantity: 1,
+      mode: 'roll',
+      rollWidthMm: 0,
+      sheetWidthMm: 0,
+      sheetHeightMm: 0,
+      materialPrice: 20,
+      materialName: '',
+      tariff: tariff({ cut_level_rules: [], price_per_meter: 5, min_quantity: 0.001 }),
+      weeding: false,
+      mounting: false,
+      proof: false,
+      includeMaterial: false,
+    });
+    expect(quote.lines.map((line) => line.key)).toEqual(['cut']);
+    expect(quote.knifePathM).toBeCloseTo(4);
+    expect(quote.lines[0].total).toBeCloseTo(20);
+  });
+
   test('chosen level multiplier overrides the size match', () => {
     const quote = quoteBarePlotter({
       widthMm: 1000,

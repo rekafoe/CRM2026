@@ -18,12 +18,14 @@ import { ProductSetupStatus } from './ProductSetupStatus';
 import { Modal } from '../common/Modal';
 import { useProductManagementState } from './hooks/useProductManagementState';
 import { CategoryManagementModal } from './CategoryManagementModal';
+import { PlotterCalculatorMaterialsModal } from './PlotterCalculatorMaterialsModal';
 import { getAxiosErrorMessage } from '../../utils/errorUtils';
 import './ProductManagement.css';
 
 const ProductManagement: React.FC = () => {
   const navigate = useNavigate();
   const [showCategoryModal, setShowCategoryModal] = React.useState(false);
+  const [showPlotterMaterialsModal, setShowPlotterMaterialsModal] = React.useState(false);
   const [duplicateSource, setDuplicateSource] = useState<Product | null>(null);
   const [togglingSiteProductId, setTogglingSiteProductId] = React.useState<number | null>(null);
   const [uploadingImageProductId, setUploadingImageProductId] = useState<number | null>(null);
@@ -286,6 +288,9 @@ const ProductManagement: React.FC = () => {
           </div>
         </div>
         <div className="product-management__header-actions">
+          <button type="button" className="lg-btn" onClick={() => setShowPlotterMaterialsModal(true)}>
+            <AppIcon name="scissors" size="xs" /> Материалы плоттера
+          </button>
           <button type="button" className="lg-btn" onClick={() =>setShowCategoryModal(true)}>
             <AppIcon name="folder" size="xs" /> Категории
           </button>
@@ -561,6 +566,10 @@ const ProductManagement: React.FC = () => {
         onClose={() => setShowCategoryModal(false)}
         categories={categories}
         onCategoriesChanged={() => fetchCategories(true)}
+      />
+      <PlotterCalculatorMaterialsModal
+        isOpen={showPlotterMaterialsModal}
+        onClose={() => setShowPlotterMaterialsModal(false)}
       />
     </div>
   );

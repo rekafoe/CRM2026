@@ -1,6 +1,7 @@
 /**
- * Голый калькулятор плоттерной резки: нож, материал, выборка, накатка, проверка.
- * Печати нет. Режим берётся из вида материала.
+ * Калькулятор «Плоттерная резка» в заказе: резка плёнки для аппликации.
+ * HTTP-расчёт всегда рулонный. Без материала в сумме только резка.
+ * Ветку листа функция оставляет для проверки раскладки.
  */
 
 import type { PlotterCuttingModeTariffDTO } from '../dtos/plotterCuttingTariff.dto';
@@ -47,6 +48,8 @@ export type PlotterBareQuoteInput = {
   sheetHeightMm: number;
   materialPrice: number;
   materialName: string;
+  /** false — в сумме только резка и рулонные операции, строка материала не добавляется. */
+  includeMaterial?: boolean;
   tariff: PlotterCuttingModeTariffDTO;
   weeding: boolean;
   mounting: boolean;
@@ -94,7 +97,9 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
   if (mode === 'roll') {
     const rollWidthMm = Math.max(0, Number(input.rollWidthMm) || 0);
     if (rollWidthMm <= 0) {
-      warnings.push('У материала не задана ширина рулона — пробег ножа и метраж не посчитаны.');
+      knifePathM = (quantity * 2 * (widthMm + heightMm)) / 1000;
+      feedM = knifePathM;
+      warnings.push('Ширина рулона неизвестна. Резка посчитана по периметру каждой штуки, без раскладки на рулоне.');
     } else {
       knifePathM = computeKnifePathMetersRoll({
         rollWidthMm,
@@ -163,17 +168,19 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
     },
   ];
 
-  const materialQty = mode === 'roll' ? feedM : sheetsNeeded;
-  const materialUnit = mode === 'roll' ? 'м' : 'лист';
-  const materialPrice = Math.max(0, Number(input.materialPrice) || 0);
-  lines.push({
-    key: 'material',
-    title: input.materialName?.trim() || 'Материал',
-    quantity: Math.round(materialQty * 1000) / 1000,
-    unit: materialUnit,
-    unitPrice: roundMoney(materialPrice),
-    total: roundMoney(materialPrice * materialQty),
-  });
+  if (input.includeMaterial !== false) {
+    const materialQty = mode === 'roll' ? feedM : sheetsNeeded;
+    const materialUnit = mode === 'roll' ? 'м' : 'лист';
+    const materialPrice = Math.max(0, Number(input.materialPrice) || 0);
+    lines.push({
+      key: 'material',
+      title: input.materialName?.trim() || 'Материал',
+      quantity: Math.round(materialQty * 1000) / 1000,
+      unit: materialUnit,
+      unitPrice: roundMoney(materialPrice),
+      total: roundMoney(materialPrice * materialQty),
+    });
+  }
 
   const extra = (
     key: PlotterBareQuoteLine['key'],

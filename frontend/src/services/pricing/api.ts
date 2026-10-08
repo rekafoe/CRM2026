@@ -141,18 +141,43 @@ export type PlotterBareQuoteResponse = {
   material: {
     id: number;
     name: string;
-    kind: 'roll' | 'sheet';
-    finish: string | null;
-  };
+    kind: 'roll';
+    sheet_width: number | null;
+  } | null;
   cut_level_rules: Array<{ max_cell_long_side_mm: number; multiplier: number; name?: string }>;
   operations: { weeding: boolean; mounting: boolean; proof: boolean };
 };
+
+export type PlotterCalculatorMaterial = {
+  id: number;
+  name: string;
+  sheet_width: number | null;
+  sheet_price_single: number | null;
+};
+
+export type PlotterCalculatorMaterialsResponse = {
+  material_ids: number[];
+  rolls: PlotterCalculatorMaterial[];
+  materials: PlotterCalculatorMaterial[];
+};
+
+export async function getPlotterCalculatorMaterials(): Promise<PlotterCalculatorMaterialsResponse> {
+  const response = await api.get('/pricing/plotter-cutting/calculator-materials');
+  const data = (response.data as any)?.data ?? response.data;
+  return data as PlotterCalculatorMaterialsResponse;
+}
+
+export async function putPlotterCalculatorMaterials(materialIds: number[]): Promise<PlotterCalculatorMaterialsResponse> {
+  const response = await api.put('/pricing/plotter-cutting/calculator-materials', { material_ids: materialIds });
+  const data = (response.data as any)?.data ?? response.data;
+  return data as PlotterCalculatorMaterialsResponse;
+}
 
 export async function quotePlotterCutting(body: {
   width_mm: number;
   height_mm: number;
   quantity: number;
-  material_id: number;
+  material_id?: number | null;
   weeding: boolean;
   mounting: boolean;
   proof: boolean;
