@@ -146,3 +146,100 @@ describe('SimplifiedPricingService: свой обрез не подменяет 
     expect(result.finalPrice).toBeCloseTo(8, 2);
   });
 });
+
+describe('allow_custom_trim=false: mismatched trim_size must not undercharge', () => {
+  const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>;
+
+  const layout = (itemsPerSheet: number, fitsOnSheet = true) => ({
+    fitsOnSheet,
+    itemsPerSheet,
+    wastePercentage: 0,
+    recommendedSheetSize: { width: 320, height: 450 },
+    layout: { rows: 1, cols: Math.max(itemsPerSheet, 0), actualItemsPerSheet: itemsPerSheet },
+    cutsPerSheet: itemsPerSheet > 0 ? itemsPerSheet + 1 : 0,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layout(2));
+    (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layout(2));
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return { id: 1, name: 'Листовки', calculator_type: 'simplified', product_type: 'flyers' };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return {
+            config_data: JSON.stringify({
+              simplified: {
+                allow_custom_trim: false,
+                include_material_cost: false,
+                sizes: [
+                  {
+                    id: '10x20',
+                    label: '10×20 см',
+                    width_mm: 100,
+                    height_mm: 200,
+                    min_qty: 1,
+                    items_per_sheet_override: 8,
+                    print_prices: [
+                      {
+                        technology_code: 'laser_prof',
+                        color_mode: 'color',
+                        sides_mode: 'single',
+                        tiers: [{ min_qty: 1, unit_price: 1 }],
+                      },
+                    ],
+                    material_prices: [],
+                    finishing: [],
+                  },
+                ],
+              },
+            }),
+          };
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+  });
+
+  it('size_id + oversized trim_size is rejected (no catalog override undercharge)', async () => {
+    await expect(
+      SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: '10x20',
+          print_technology: 'laser_prof',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+          trim_size: { width: 200, height: 200 },
+        } as any,
+        8,
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining('allow_custom_trim'),
+    });
+    expect(LayoutCalculationService.findOptimalSheetSize).not.toHaveBeenCalled();
+  });
+
+  it('matching trim_size (incl. rotation) still uses catalog override', async () => {
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: '10x20',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        trim_size: { width: 200, height: 100 },
+      } as any,
+      8,
+    );
+    expect(result.layout?.itemsPerSheet).toBe(8);
+    expect(result.layout?.sheetsNeeded).toBe(1);
+    expect(result.finalPrice).toBeCloseTo(8, 2);
+    expect(result.actualTrimMm).toEqual({ width: 100, height: 200 });
+  });
+});
