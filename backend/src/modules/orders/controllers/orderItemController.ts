@@ -172,7 +172,9 @@ export class OrderItemController {
       }
       const orderStatus = Number(orderRow.status)
       const skipPresetLookup =
-        paramsObjForTotal?.customProduct === true || paramsObjForTotal?.postprintProduct === true
+        paramsObjForTotal?.customProduct === true ||
+        paramsObjForTotal?.postprintProduct === true ||
+        paramsObjForTotal?.plotterBareProduct === true
       let needed = [] as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null; unit?: string | null }>
       if (Array.isArray(components) && components.length > 0) {
         const ids = components.map(c => Number(c.materialId)).filter(Boolean)
@@ -639,7 +641,9 @@ export class OrderItemController {
           .map(c => c.reservationId)
           .filter((id): id is number => typeof id === 'number' && id > 0)
         const skipPresetLookup =
-          (paramsObj as any).customProduct === true || (paramsObj as any).postprintProduct === true
+          (paramsObj as any).customProduct === true ||
+          (paramsObj as any).postprintProduct === true ||
+          (paramsObj as any).plotterBareProduct === true
         if (reservationIds.length > 0) {
           await UnifiedWarehouseService.cancelReservations(reservationIds)
         } else if (!skipPresetLookup && (paramsObj as any).description) {
@@ -873,7 +877,8 @@ export class OrderItemController {
             }
           } else if (
             (paramsObj as any).customProduct !== true &&
-            (paramsObj as any).postprintProduct !== true
+            (paramsObj as any).postprintProduct !== true &&
+            (paramsObj as any).plotterBareProduct !== true
           ) {
             // Старые записи без компонентов/резервов — fallback к прежней логике движений склада
             const composition = (await db.all<{

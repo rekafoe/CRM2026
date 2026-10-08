@@ -1,0 +1,67 @@
+.plotter-bare-calc__lead {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.plotter-bare-calc__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.plotter-bare-calc__grid label,
+.plotter-bare-calc__ops label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.plotter-bare-calc__material {
+  grid-column: 1 / -1;
+}
+
+.plotter-bare-calc__ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 12px;
+}
+
+.plotter-bare-calc__ops label {
+  flex-direction: row;
+  align-items: center;
+}
+
+.plotter-bare-calc__status,
+.plotter-bare-calc__warnings,
+.plotter-bare-calc__lines {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.plotter-bare-calc__warnings {
+  color: #9a3412;
+  padding-left: 18px;
+}
+
+.plotter-bare-calc__lines {
+  list-style: none;
+  padding: 0;
+}
+
+.plotter-bare-calc__lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+@media (max-width: 720px) {
+  .plotter-bare-calc__grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -13,7 +13,7 @@ import { useCalculatorMaterials } from './hooks/useCalculatorMaterials';
 import { ResultSection } from './components/ResultSection';
 import { useCalculatorUI } from './hooks/useCalculatorUI';
 import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
-import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
+import { DynamicProductSelector, CUSTOM_PRODUCT_ID, PLOTTER_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType, getProductionTimeLabelFromDays } from './utils/time';
 import {
@@ -32,6 +32,8 @@ import { CalculatorSections } from './components/CalculatorSections';
 import { isBindingVariantPricingLeaf } from './components/BindingVariantSelector';
 import { CustomProductForm } from './components/CustomProductForm';
 import { PostprintServicesForm } from './components/PostprintServicesForm';
+import { PlotterCuttingCalculatorForm } from './components/PlotterCuttingCalculatorForm';
+import { usePlotterCuttingCalculator } from './hooks/usePlotterCuttingCalculator';
 import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
@@ -125,6 +127,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const [selectedProduct, setSelectedProduct] = useState<(Product & { resolvedProductType?: string }) | null>(null);
   const isCustomProduct = selectedProduct?.id === CUSTOM_PRODUCT_ID;
   const isPostprintProduct = selectedProduct?.id === POSTPRINT_PRODUCT_ID;
+  const isPlotterProduct = selectedProduct?.id === PLOTTER_PRODUCT_ID;
+  const isStandaloneProduct = isCustomProduct || isPostprintProduct || isPlotterProduct;
   const {
     customProductForm,
     setCustomProductForm,
@@ -170,6 +174,30 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     logger,
     toast,
   });
+  const {
+    plotterMaterials,
+    plotterDraft,
+    patchPlotterDraft,
+    plotterQuote,
+    plotterLoading,
+    plotterError,
+    plotterResult,
+    isPlotterValid,
+    handleAddPlotterProduct,
+    resetPlotterDraft,
+  } = usePlotterCuttingCalculator({
+    isOpen,
+    isPlotterProduct,
+    isEditMode,
+    editContext,
+    onAddToOrder,
+    onSubmitExisting,
+    onClose,
+    setSelectedProduct,
+    setSpecs,
+    logger,
+    toast,
+  });
   const postprintByCategory = useMemo(() => {
     const groups = new Map<string, typeof postprintServices>();
     for (const s of postprintServices) {
@@ -184,7 +212,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   const { backendProductSchema, currentConfig, availableFormats, getDefaultFormat } = useCalculatorSchema({
     productType: specs.productType,
-    productId: isCustomProduct || isPostprintProduct ? null : (selectedProduct?.id || null), //  Передаем ID выбранного продукта
+    productId: isStandaloneProduct ? null : (selectedProduct?.id || null),
     log: logger,
     setSpecs
   });
@@ -242,7 +270,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const bindingVariantLocked = bindingTemplate?.variant_id != null;
   useEffect(() => {
     const sid = bindingTemplate?.service_id;
-    if (sid == null || isCustomProduct || isPostprintProduct) {
+    if (sid == null || isStandaloneProduct) {
       setBindingVariants([]);
       return;
     }
@@ -257,7 +285,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     return () => {
       cancelled = true;
     };
-  }, [bindingTemplate?.service_id, selectedProduct?.id, isCustomProduct, isPostprintProduct]);
+  }, [bindingTemplate?.service_id, selectedProduct?.id, isStandaloneProduct]);
 
   type SizeWithPrices = { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> };
 
@@ -424,7 +452,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const prefillAppliedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isOpen || !embedded || !initialTestConfig || !selectedProduct?.id) return;
-    if (isCustomProduct || isPostprintProduct) return;
+    if (isStandaloneProduct) return;
 
     const prefillKey = JSON.stringify({
       productId: selectedProduct.id,
@@ -460,8 +488,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     embedded,
     initialTestConfig,
     selectedProduct?.id,
-    isCustomProduct,
-    isPostprintProduct,
+    isStandaloneProduct,
     applyProductTypeConfig,
   ]);
 
@@ -634,7 +661,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     specs,
     selectedProduct,
     isValid,
-    enabled: (userInteracted || !!editContext?.item) && selectedProduct?.id != null && !isCustomProduct && !isPostprintProduct
+    enabled: (userInteracted || !!editContext?.item) && selectedProduct?.id != null && !isStandaloneProduct
       && (!requiresPrint || hasPrintParams),
     onCalculate: calculateCost,
     debounceMs: 500,
@@ -767,7 +794,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Автопересчёт при готовности параметров без userInteracted (материал, УФ-слои, trim).
   useEffect(() => {
-    if (!selectedProduct?.id || isCustomProduct || isPostprintProduct || !isValid) return;
+    if (!selectedProduct?.id || isStandaloneProduct || !isValid) return;
     if (editContext?.item) return;
 
     const uvPrint = (specs as { uv_print?: Record<string, unknown> }).uv_print;
@@ -823,8 +850,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     isUvFlatbed,
     isValid,
     calculateCost,
-    isCustomProduct,
-    isPostprintProduct,
+    isStandaloneProduct,
     userInteracted,
     editContext?.item,
   ]);
@@ -851,7 +877,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   //  При открытии в режиме редактирования — запускаем расчёт после загрузки продукта и параметров
   useEffect(() => {
-    if (!isOpen || !editContext?.item || !selectedProduct?.id || !isValid || isCustomProduct || isPostprintProduct) {
+    if (!isOpen || !editContext?.item || !selectedProduct?.id || !isValid || isStandaloneProduct) {
       return;
     }
     if (editModeCalculatedRef.current) return;
@@ -860,7 +886,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       instantCalculate();
     }, 150);
     return () => clearTimeout(t);
-  }, [isOpen, editContext?.item, selectedProduct?.id, isValid, isCustomProduct, isPostprintProduct, instantCalculate]);
+  }, [isOpen, editContext?.item, selectedProduct?.id, isValid, isStandaloneProduct, instantCalculate]);
 
   //  useEffect для загрузки данных при открытии (однократно на открытие)
   const didOpenInitRef = useRef(false);
@@ -955,6 +981,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setPrintColorMode,
     resetCustomProductForm,
     resetPostprintSelections,
+    resetPlotterDraft,
   });
 
   const resetProductSelection = useCallback(() => {
@@ -969,6 +996,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setUserInteracted(false);
     resetCustomProductForm();
     resetPostprintSelections();
+    resetPlotterDraft();
     setPrintTechnology('');
     setPrintColorMode(null);
   }, [
@@ -977,6 +1005,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     isEditMode,
     resetCustomProductForm,
     resetPostprintSelections,
+    resetPlotterDraft,
     setResult,
     setSelectedProduct,
     setSpecs,
@@ -1219,7 +1248,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         <div className="calculator-content">
           <div className="calculator-main">
             {/* Ошибки валидации */}
-            {!isCustomProduct && !isPostprintProduct && Object.keys(validationErrors).length > 0 && (
+            {!isStandaloneProduct && Object.keys(validationErrors).length > 0 && (
               <div className="validation-errors">
                 {Object.entries(validationErrors).map(([key, message]) => (
                   <div key={key} className="validation-error">
@@ -1243,6 +1272,17 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 customProductForm={customProductForm}
                 setCustomProductForm={setCustomProductForm}
                 onOpenProductSelector={handleOpenProductSelector}
+              />
+            ) : isPlotterProduct ? (
+              <PlotterCuttingCalculatorForm
+                selectedProductName={selectedProduct?.name || ''}
+                onOpenProductSelector={handleOpenProductSelector}
+                materials={plotterMaterials}
+                loading={plotterLoading}
+                error={plotterError}
+                draft={plotterDraft}
+                onChange={patchPlotterDraft}
+                quote={plotterQuote}
               />
             ) : isPostprintProduct ? (
               <PostprintServicesForm
@@ -1320,6 +1360,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             onAddToOrder={() => handleAddCustomProduct()}
             mode={isEditMode ? 'edit' : 'create'}
             blockingMessage={customErrors[0] ?? null}
+          />
+        ) : isPlotterProduct ? (
+          <ResultSection
+            result={plotterResult as any}
+            isValid={isPlotterValid}
+            onAddToOrder={() => handleAddPlotterProduct()}
+            mode={isEditMode ? 'edit' : 'create'}
+            blockingMessage={plotterError}
+            pricePending={plotterLoading}
           />
         ) : isPostprintProduct ? (
           <ResultSection

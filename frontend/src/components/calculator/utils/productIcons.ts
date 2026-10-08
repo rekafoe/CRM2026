@@ -3,6 +3,7 @@ import type { IconName } from '../../ui/AppIcon';
 /** Маппинг типа продукта на имя иконки AppIcon */
 export const getProductIconName = (productType: string): IconName => {
   const map: Record<string, IconName> = {
+    plotter: 'scissors',
     flyers: 'document',
     business_cards: 'card',
     booklets: 'document',

@@ -37,7 +37,12 @@ export class OrderPricingService {
       return null;
     }
 
-    if (params.customProduct === true || params.postprintProduct === true || params.productType === 'custom') {
+    if (
+      params.customProduct === true ||
+      params.postprintProduct === true ||
+      params.plotterBareProduct === true ||
+      params.productType === 'custom'
+    ) {
       return null;
     }
 

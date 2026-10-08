@@ -22,6 +22,9 @@ export interface PlotterCuttingModeTariffDTO {
   /** Только рулон: порог тиража (шт от) × цена за изделие. Пусто — как одна ставка из weeding_price_per_item или 0. */
   weeding_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   mounting_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  /** Только рулон: проверка макета, порог тиража × цена за изделие. */
+  proof_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  proof_price_per_item?: number | null;
   /** Диапазоны цен по тиражу; пусто — одна ставка price_per_meter */
   volume_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   /**

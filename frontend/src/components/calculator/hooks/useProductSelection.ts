@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Product } from '../../../services/products';
-import { CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from '../components/DynamicProductSelector';
+import { CUSTOM_PRODUCT_ID, PLOTTER_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from '../components/DynamicProductSelector';
 import { ProductSpecs } from '../types/calculator.types';
 import type { UIState } from './useCalculatorUI';
 
@@ -17,6 +17,7 @@ interface UseProductSelectionParams {
   setPrintColorMode: (value: 'bw' | 'color' | null) => void;
   resetCustomProductForm: () => void;
   resetPostprintSelections: () => void;
+  resetPlotterDraft: () => void;
 }
 
 export function useProductSelection({
@@ -32,6 +33,7 @@ export function useProductSelection({
   setPrintColorMode,
   resetCustomProductForm,
   resetPostprintSelections,
+  resetPlotterDraft,
 }: UseProductSelectionParams) {
   const handleProductSelect = useCallback(
     (product: Product) => {
@@ -51,6 +53,15 @@ export function useProductSelection({
         close('showProductSelection');
         setUserInteracted(false);
         logger.info('Выбран продукт послепечатных услуг');
+        return;
+      }
+      if (product.id === PLOTTER_PRODUCT_ID) {
+        setSelectedProduct(product as Product & { resolvedProductType?: string });
+        setSpecs((prev) => ({ ...prev, productType: 'universal' }));
+        resetPlotterDraft();
+        close('showProductSelection');
+        setUserInteracted(false);
+        logger.info('Выбрана плоттерная резка');
         return;
       }
 
@@ -88,6 +99,7 @@ export function useProductSelection({
       getDefaultFormat,
       logger,
       resetCustomProductForm,
+      resetPlotterDraft,
       resetPostprintSelections,
       resolveProductType,
       setPrintColorMode,

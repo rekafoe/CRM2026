@@ -24,6 +24,8 @@ type RawRow = {
   cut_level_rules_json?: string | null;
   weeding_tiers_json?: string | null;
   mounting_tiers_json?: string | null;
+  proof_tiers_json?: string | null;
+  proof_price_per_item?: number | null;
 };
 
 /** Мин. п.м. в тарифе: допускаются доли (0,3 м); хранение REAL, округление до 3 знаков. */
@@ -103,6 +105,7 @@ function mapRow(row: RawRow): PlotterCuttingModeTariffDTO {
   const mode = row.mode === 'sheet' ? 'sheet' : 'roll';
   const parsedWeeding = parseTiersJson(row.weeding_tiers_json ?? null);
   const parsedMounting = parseTiersJson(row.mounting_tiers_json ?? null);
+  const parsedProof = parseTiersJson(row.proof_tiers_json ?? null);
   const legacyWeedingScalar =
     row.weeding_price_per_item != null && Number.isFinite(Number(row.weeding_price_per_item))
       ? Number(row.weeding_price_per_item)
@@ -114,18 +117,27 @@ function mapRow(row: RawRow): PlotterCuttingModeTariffDTO {
 
   let weeding_tiers = undefined as PlotterCuttingModeTariffDTO['weeding_tiers'];
   let mounting_tiers = undefined as PlotterCuttingModeTariffDTO['mounting_tiers'];
+  let proof_tiers = undefined as PlotterCuttingModeTariffDTO['proof_tiers'];
+  const legacyProofScalar =
+    row.proof_price_per_item != null && Number.isFinite(Number(row.proof_price_per_item))
+      ? Number(row.proof_price_per_item)
+      : undefined;
 
   if (mode === 'roll') {
     if (parsedWeeding?.length) weeding_tiers = parsedWeeding;
     else if (legacyWeedingScalar !== undefined) weeding_tiers = [{ min_quantity: 1, price_per_unit: legacyWeedingScalar }];
     if (parsedMounting?.length) mounting_tiers = parsedMounting;
     else if (legacyMountScalar !== undefined) mounting_tiers = [{ min_quantity: 1, price_per_unit: legacyMountScalar }];
+    if (parsedProof?.length) proof_tiers = parsedProof;
+    else if (legacyProofScalar !== undefined) proof_tiers = [{ min_quantity: 1, price_per_unit: legacyProofScalar }];
   }
 
   const weeding_price_per_item =
     mode === 'roll' && weeding_tiers?.length ? tierRateAtQty(weeding_tiers, 1) : null;
   const mounting_price_per_item =
     mode === 'roll' && mounting_tiers?.length ? tierRateAtQty(mounting_tiers, 1) : null;
+  const proof_price_per_item =
+    mode === 'roll' && proof_tiers?.length ? tierRateAtQty(proof_tiers, 1) : null;
 
   return {
     mode,
@@ -143,8 +155,10 @@ function mapRow(row: RawRow): PlotterCuttingModeTariffDTO {
     qty_per_item: row.qty_per_item != null ? Number(row.qty_per_item) : null,
     weeding_tiers,
     mounting_tiers,
+    proof_tiers,
     weeding_price_per_item,
     mounting_price_per_item,
+    proof_price_per_item,
     volume_tiers: parseTiersJson(row.volume_tiers_json),
     cut_level_rules: parseCutLevelRules(row.cut_level_rules_json),
   };
@@ -197,6 +211,18 @@ export class PlotterCuttingTariffRepository {
     }
     try {
       await db.exec(`ALTER TABLE plotter_cutting_mode_tariffs ADD COLUMN mounting_tiers_json TEXT`);
+    } catch (e: unknown) {
+      const msg = String((e as { message?: string })?.message ?? e ?? '');
+      if (!msg.includes('duplicate column')) throw e;
+    }
+    try {
+      await db.exec(`ALTER TABLE plotter_cutting_mode_tariffs ADD COLUMN proof_tiers_json TEXT`);
+    } catch (e: unknown) {
+      const msg = String((e as { message?: string })?.message ?? e ?? '');
+      if (!msg.includes('duplicate column')) throw e;
+    }
+    try {
+      await db.exec(`ALTER TABLE plotter_cutting_mode_tariffs ADD COLUMN proof_price_per_item REAL`);
     } catch (e: unknown) {
       const msg = String((e as { message?: string })?.message ?? e ?? '');
       if (!msg.includes('duplicate column')) throw e;
@@ -289,6 +315,15 @@ export class PlotterCuttingTariffRepository {
               })),
             )
           : null;
+      const proofTiersJson =
+        dto.mode === 'roll' && dto.proof_tiers && dto.proof_tiers.length > 0
+          ? JSON.stringify(
+              dto.proof_tiers.map((t) => ({
+                min_quantity: t.min_quantity,
+                price_per_unit: t.price_per_unit,
+              })),
+            )
+          : null;
       const weedingScalar =
         dto.mode === 'roll' && dto.weeding_tiers && dto.weeding_tiers.length > 0
           ? tierRateAtQty(dto.weeding_tiers, 1)
@@ -305,12 +340,21 @@ export class PlotterCuttingTariffRepository {
               Number.isFinite(Number(dto.mounting_price_per_item))
             ? Number(dto.mounting_price_per_item)
             : null;
+      const proofScalar =
+        dto.mode === 'roll' && dto.proof_tiers && dto.proof_tiers.length > 0
+          ? tierRateAtQty(dto.proof_tiers, 1)
+          : dto.mode === 'roll' &&
+              dto.proof_price_per_item != null &&
+              Number.isFinite(Number(dto.proof_price_per_item))
+            ? Number(dto.proof_price_per_item)
+            : null;
       await db.run(
         `INSERT INTO plotter_cutting_mode_tariffs (
           mode, label, price_per_meter, meter_basis, volume_tier_basis, min_quantity, max_quantity,
           operator_percent, material_id, qty_per_item, volume_tiers_json, cut_level_rules_json,
-          updated_at, weeding_price_per_item, mounting_price_per_item, weeding_tiers_json, mounting_tiers_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?)
+          updated_at, weeding_price_per_item, mounting_price_per_item, weeding_tiers_json, mounting_tiers_json,
+          proof_price_per_item, proof_tiers_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?)
         ON CONFLICT(mode) DO UPDATE SET
           label = excluded.label,
           price_per_meter = excluded.price_per_meter,
@@ -327,6 +371,8 @@ export class PlotterCuttingTariffRepository {
           mounting_price_per_item = excluded.mounting_price_per_item,
           weeding_tiers_json = excluded.weeding_tiers_json,
           mounting_tiers_json = excluded.mounting_tiers_json,
+          proof_price_per_item = excluded.proof_price_per_item,
+          proof_tiers_json = excluded.proof_tiers_json,
           updated_at = datetime('now')`,
         dto.mode,
         dto.label?.trim() || (dto.mode === 'roll' ? 'Плоттерная резка (рулон)' : 'Плоттерная резка (лист)'),
@@ -345,7 +391,9 @@ export class PlotterCuttingTariffRepository {
         weedingScalar,
         mountingScalar,
         weedingTiersJson,
-        mountingTiersJson
+        mountingTiersJson,
+        proofScalar,
+        proofTiersJson
       );
     };
     await db.exec('BEGIN');

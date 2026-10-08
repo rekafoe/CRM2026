@@ -29,13 +29,20 @@ export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChan
       mounting_price_per_item: mounting_tiers.length ? tierRateAtOrderQty(mounting_tiers, 1) : null,
     });
 
+  const patchProof = (proof_tiers: NonNullable<PlotterCuttingModeTariffApi['proof_tiers']>) =>
+    onChangeRollTariff({
+      ...rollTariff,
+      proof_tiers,
+      proof_price_per_item: proof_tiers.length ? tierRateAtOrderQty(proof_tiers, 1) : null,
+    });
+
   const weedingExample = exampleLine(rollTariff.weeding_tiers);
   const mountingExample = exampleLine(rollTariff.mounting_tiers);
 
   return (
     <section className="plotter-roll-finishing">
       <div className="plotter-roll-finishing__header">
-        <h4 className="plotter-tariff-mode__subtitle">Выборка и накатка</h4>
+        <h4 className="plotter-tariff-mode__subtitle">Выборка, накатка и проверка</h4>
       </div>
       <p className="plotter-block__hint">
         Только для рулона. Порог — тираж в штуках. Пустая таблица значит, что этой галочки в калькуляторе нет.
@@ -70,6 +77,20 @@ export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChan
             addRangeLabel="Добавить порог накатки"
           />
           {mountingExample ? <p className="plotter-example">{mountingExample}</p> : null}
+        </div>
+        <div className="plotter-roll-finishing__tier-block">
+          <PlotterQtyTiersTable
+            tiers={rollTariff.proof_tiers}
+            onChange={patchProof}
+            thresholdTitle="Тираж от"
+            priceTitle="Цена за изделие"
+            rangeUnit="шт"
+            thresholdFractionDigits={0}
+            rangeColumnHeading="Проверка"
+            description="Проверить макет перед резкой."
+            emptyHint="Пока пусто — в калькуляторе проверки не будет."
+            addRangeLabel="Добавить порог проверки"
+          />
         </div>
       </div>
     </section>

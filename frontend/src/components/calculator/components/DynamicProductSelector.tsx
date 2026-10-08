@@ -20,6 +20,7 @@ import { productMatchesSearchQuery } from '../utils/productSearch';
 
 export const CUSTOM_PRODUCT_ID = -1000;
 export const POSTPRINT_PRODUCT_ID = -1001;
+export const PLOTTER_PRODUCT_ID = -1002;
 /** Запасное значение, пока с сервера не пришёл процент из настроек. */
 export const CUSTOM_OPERATOR_PERCENT = 17.5;
 
@@ -37,6 +38,22 @@ const customProduct: Product = {
   updated_at: '',
   category_name: 'Произвольное',
   category_icon: 'folder',
+};
+
+const plotterProduct: Product = {
+  id: PLOTTER_PRODUCT_ID,
+  category_id: 0,
+  name: 'Плоттерная резка',
+  description: 'Нож, материал, выборка, накатка и проверка',
+  icon: 'scissors',
+  calculator_type: 'simplified',
+  product_type: 'universal',
+  operator_percent: 0,
+  is_active: true,
+  created_at: '',
+  updated_at: '',
+  category_name: 'Услуги',
+  category_icon: 'puzzle',
 };
 
 const postprintProduct: Product = {
@@ -320,6 +337,26 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
               {/* Служебные карточки — только когда нет поискового запроса */}
               {!searchQuery.trim() && (
                 <>
+                  <div
+                    className={`product-card custom-product-card ${isProductSelected(plotterProduct) ? 'selected' : ''}`}
+                    onClick={() =>handleProductSelect(plotterProduct)}
+                  >
+                    <div className="product-icon">{renderProductIcon(plotterProduct)}</div>
+                    <div className="product-info">
+                      <h4 className="product-name">{plotterProduct.name}</h4>
+                      <p className="product-description">{plotterProduct.description}</p>
+                      <div className="product-category">
+                        <span className="category-badge">
+                          <AppIcon name={getProductCategoryIconName(plotterProduct)} size="xs" /> {plotterProduct.category_name}
+                        </span>
+                      </div>
+                    </div>
+                    {isProductSelected(plotterProduct) && (
+                      <div className="selected-indicator">
+                        <AppIcon name="check" size="sm" />
+                      </div>
+                    )}
+                  </div>
                   <div
                     className={`product-card custom-product-card ${isProductSelected(postprintProduct) ? 'selected' : ''}`}
                     onClick={() =>handleProductSelect(postprintProduct)}

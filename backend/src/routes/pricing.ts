@@ -7,6 +7,7 @@ import { ServiceManagementService } from '../modules/pricing/services/serviceMan
 import { PriceTypeService } from '../modules/pricing/services/priceTypeService'
 import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
 import { PlotterCuttingTariffRepository } from '../modules/pricing/repositories/plotterCuttingTariffRepository'
+import { quoteBarePlotter } from '../modules/pricing/services/plotterBareQuote'
 import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 import {
   UvFlatbedPricingService,
@@ -983,6 +984,82 @@ router.put('/plotter-cutting-tariffs', asyncHandler(async (req, res) => {
   }
   const next = await PlotterCuttingTariffRepository.replaceBundle(merged)
   res.json(next)
+}))
+
+router.post('/plotter-cutting/quote', asyncHandler(async (req, res) => {
+  const body = req.body ?? {}
+  const widthMm = Number(body.width_mm)
+  const heightMm = Number(body.height_mm)
+  const quantity = Math.floor(Number(body.quantity))
+  const materialId = Number(body.material_id)
+  if (!(widthMm > 0) || !(heightMm > 0) || !(quantity > 0)) {
+    res.status(400).json({ message: 'Укажите ширину, длину и тираж.' })
+    return
+  }
+  if (!Number.isInteger(materialId) || materialId <= 0) {
+    res.status(400).json({ message: 'Выберите материал.' })
+    return
+  }
+  const db = await getDb()
+  const material = await db.get<{
+    id: number
+    name: string
+    material_kind: string | null
+    sheet_width: number | null
+    sheet_height: number | null
+    sheet_price_single: number | null
+    finish: string | null
+  }>(
+    `SELECT id, name, material_kind, sheet_width, sheet_height, sheet_price_single, finish
+     FROM materials WHERE id = ?`,
+    materialId,
+  )
+  if (!material) {
+    res.status(404).json({ message: 'Материал не найден.' })
+    return
+  }
+  const kind = String(material.material_kind || '')
+  if (kind !== 'roll' && kind !== 'sheet') {
+    res.status(400).json({ message: 'Для плоттера нужен материал вида «рулон» или «лист».' })
+    return
+  }
+  const bundle = await PlotterCuttingTariffRepository.getBundle()
+  const tariff = kind === 'roll' ? bundle.roll : bundle.sheet
+  const forced = body.level_multiplier
+  const quote = quoteBarePlotter({
+    widthMm,
+    heightMm,
+    quantity,
+    mode: kind,
+    rollWidthMm: Number(material.sheet_width) || 0,
+    sheetWidthMm: Number(material.sheet_width) || 0,
+    sheetHeightMm: Number(material.sheet_height) || 0,
+    materialPrice: Number(material.sheet_price_single) || 0,
+    materialName: material.name,
+    tariff,
+    weeding: body.weeding === true,
+    mounting: body.mounting === true,
+    proof: body.proof === true,
+    levelMultiplier: forced == null || forced === '' ? null : Number(forced),
+    levelName: typeof body.level_name === 'string' ? body.level_name : null,
+  })
+  res.json({
+    ...quote,
+    material: {
+      id: material.id,
+      name: material.name,
+      kind,
+      finish: material.finish ?? null,
+      sheet_width: material.sheet_width,
+      sheet_height: material.sheet_height,
+    },
+    cut_level_rules: tariff.cut_level_rules ?? [],
+    operations: {
+      weeding: (tariff.weeding_tiers?.length ?? 0) > 0,
+      mounting: (tariff.mounting_tiers?.length ?? 0) > 0,
+      proof: (tariff.proof_tiers?.length ?? 0) > 0,
+    },
+  })
 }))
 
 router.get('/bindings', asyncHandler(async (_req, res) => {

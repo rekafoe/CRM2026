@@ -100,6 +100,8 @@ export interface PlotterCuttingModeTariffApi {
   mounting_price_per_item?: number | null;
   weeding_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   mounting_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  proof_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  proof_price_per_item?: number | null;
   volume_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   cut_level_rules?: Array<{ max_cell_long_side_mm: number; multiplier: number; name?: string }>;
 }
@@ -113,6 +115,53 @@ export async function getPlotterCuttingTariffs(): Promise<PlotterCuttingTariffsB
   const response = await api.get('/pricing/plotter-cutting-tariffs');
   const data = (response.data as any)?.data ?? response.data;
   return data as PlotterCuttingTariffsBundleApi;
+}
+
+export type PlotterBareQuoteLine = {
+  key: 'cut' | 'material' | 'weeding' | 'mounting' | 'proof';
+  title: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  total: number;
+};
+
+export type PlotterBareQuoteResponse = {
+  mode: 'roll' | 'sheet';
+  lines: PlotterBareQuoteLine[];
+  total: number;
+  unitPrice: number;
+  warnings: string[];
+  knifePathM: number;
+  feedM: number;
+  sheetsNeeded: number;
+  multiplier: number;
+  levelName: string | null;
+  cellLongSideMm: number;
+  material: {
+    id: number;
+    name: string;
+    kind: 'roll' | 'sheet';
+    finish: string | null;
+  };
+  cut_level_rules: Array<{ max_cell_long_side_mm: number; multiplier: number; name?: string }>;
+  operations: { weeding: boolean; mounting: boolean; proof: boolean };
+};
+
+export async function quotePlotterCutting(body: {
+  width_mm: number;
+  height_mm: number;
+  quantity: number;
+  material_id: number;
+  weeding: boolean;
+  mounting: boolean;
+  proof: boolean;
+  level_multiplier?: number | null;
+  level_name?: string | null;
+}): Promise<PlotterBareQuoteResponse> {
+  const response = await api.post('/pricing/plotter-cutting/quote', body);
+  const data = (response.data as any)?.data ?? response.data;
+  return data as PlotterBareQuoteResponse;
 }
 
 export async function putPlotterCuttingTariffs(
