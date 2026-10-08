@@ -32,7 +32,35 @@ describe('plotterLayout', () => {
       quantity: 100,
       margins: resolvePlotterMargins('sheet'),
     });
+    expect(r.fitsOnSheet).toBe(true);
     expect(r.knifePathM).toBeGreaterThan(0);
     expect(r.sheetsNeeded).toBeGreaterThanOrEqual(1);
+  });
+
+  test('sheet turns a wide sticker so it fits', () => {
+    const r = computeKnifePathMetersSheet({
+      sheetMm: { width: 320, height: 450 },
+      trimMm: { width: 300, height: 80 },
+      bleedMm: 0,
+      quantity: 3,
+      margins: resolvePlotterMargins('sheet'),
+    });
+    expect(r.fitsOnSheet).toBe(true);
+    expect(r.itemsPerBand).toBeGreaterThanOrEqual(1);
+    expect(r.sheetsNeeded).toBe(1);
+    expect(r.knifePathM).toBeGreaterThan(0);
+  });
+
+  test('sheet piece larger than the sheet bills perimeter and one sheet per item', () => {
+    const r = computeKnifePathMetersSheet({
+      sheetMm: { width: 320, height: 450 },
+      trimMm: { width: 400, height: 400 },
+      bleedMm: 0,
+      quantity: 3,
+      margins: resolvePlotterMargins('sheet'),
+    });
+    expect(r.fitsOnSheet).toBe(false);
+    expect(r.sheetsNeeded).toBe(3);
+    expect(r.knifePathM).toBeCloseTo((3 * 2 * (400 + 400)) / 1000);
   });
 });

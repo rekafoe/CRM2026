@@ -57,6 +57,8 @@ export type KnifePathResult = {
   /** Шт на один «полный» ряд поперёк рулона или на лист (для листа — на лист). */
   itemsPerBand: number;
   sheetsNeeded?: number;
+  /** Лист: ячейка влезла хотя бы в одной ориентации. Нет поля — раскладка рулона. */
+  fitsOnSheet?: boolean;
 };
 
 /**
@@ -236,44 +238,90 @@ export function computeOptimizedRollFeedMeters(input: RollFeedMetersInput): Roll
   };
 }
 
+type SheetGrid = {
+  cols: number;
+  rows: number;
+  itemsPerSheet: number;
+  sheetsNeeded: number;
+  knifePathM: number;
+};
+
 /**
- * Лист: сколько помещается на листе; пробег = на лист × число листов.
+ * Сетка на листе. Зазор после последней колонки и ряда не требуется — как у рулона.
+ * null, если ячейка не влезает.
+ */
+function layoutSheetGrid(params: {
+  usableW: number;
+  usableH: number;
+  cellW: number;
+  cellH: number;
+  gap: number;
+  quantity: number;
+}): SheetGrid | null {
+  const { usableW, usableH, cellW, cellH, gap, quantity } = params;
+  if (cellW <= 0 || cellH <= 0 || usableW <= 0 || usableH <= 0) return null;
+  const pitchW = cellW + gap;
+  const pitchH = cellH + gap;
+  if (pitchW <= 0 || pitchH <= 0) return null;
+  const cols = Math.floor((usableW + gap) / pitchW);
+  const rows = Math.floor((usableH + gap) / pitchH);
+  if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols <= 0 || rows <= 0) return null;
+  const itemsPerSheet = cols * rows;
+  const sheetsNeeded = Math.ceil(quantity / itemsPerSheet);
+  const perimeter = 2 * (cellW + cellH);
+  const bandWidth = cols * cellW + Math.max(0, cols - 1) * gap;
+  const streetH = Math.max(0, rows - 1) * bandWidth;
+  const streetV = Math.max(0, cols - 1) * rows * (cellH + gap);
+  const knifePerSheetMm = itemsPerSheet * perimeter + streetH + streetV;
+  return {
+    cols,
+    rows,
+    itemsPerSheet,
+    sheetsNeeded,
+    knifePathM: (knifePerSheetMm * sheetsNeeded) / 1000,
+  };
+}
+
+/**
+ * Лист: обе ориентации, берётся та, где больше штук на лист.
+ * Пробег ножа = нож полного листа × число листов.
+ * Если не влезает ни так, ни повёрнутой — периметр каждой штуки и один лист на штуку.
  */
 export function computeKnifePathMetersSheet(input: KnifePathSheetInput): KnifePathResult {
   const { cellW, cellH } = cellSize(input.trimMm, input.bleedMm);
   const gap = input.margins.gapMm;
   const edge = input.margins.edgeMm;
-  const sw = Math.max(0, input.sheetMm.width - 2 * edge);
-  const sh = Math.max(0, input.sheetMm.height - 2 * edge);
-  const pitchW = cellW + gap;
-  const pitchH = cellH + gap;
-  const cols = Math.max(0, Math.floor(sw / pitchW));
-  const rows = Math.max(0, Math.floor(sh / pitchH));
-  const itemsPerSheet = cols * rows;
+  const usableW = Math.max(0, input.sheetMm.width - 2 * edge);
+  const usableH = Math.max(0, input.sheetMm.height - 2 * edge);
   const q = Math.max(1, Math.floor(Number(input.quantity) || 0));
 
-  if (cols === 0 || rows === 0 || itemsPerSheet === 0) {
+  const normal = layoutSheetGrid({ usableW, usableH, cellW, cellH, gap, quantity: q });
+  const rotated =
+    Math.abs(cellW - cellH) > 0.001
+      ? layoutSheetGrid({ usableW, usableH, cellW: cellH, cellH: cellW, gap, quantity: q })
+      : null;
+  const candidates = [normal, rotated].filter((v): v is SheetGrid => v != null);
+  candidates.sort((a, b) => {
+    if (a.itemsPerSheet !== b.itemsPerSheet) return b.itemsPerSheet - a.itemsPerSheet;
+    return a.knifePathM - b.knifePathM;
+  });
+  const best = candidates[0];
+  if (!best) {
     return {
-      knifePathM: 0,
-      cols: Math.max(1, cols),
-      rowsFeed: Math.max(1, rows),
-      itemsPerBand: Math.max(1, itemsPerSheet || 1),
+      knifePathM: (q * 2 * (cellW + cellH)) / 1000,
+      cols: 1,
+      rowsFeed: 1,
+      itemsPerBand: 1,
       sheetsNeeded: q,
+      fitsOnSheet: false,
     };
   }
-
-  const sheetsNeeded = Math.ceil(q / itemsPerSheet);
-  const Pcell = 2 * (cellW + cellH);
-  const usableWidth = cols * cellW + Math.max(0, cols - 1) * gap;
-  const streetH = Math.max(0, rows - 1) * usableWidth;
-  const streetV = Math.max(0, cols - 1) * rows * (cellH + gap);
-  const knifePerSheetMm = itemsPerSheet * Pcell + streetH + streetV;
-
   return {
-    knifePathM: (knifePerSheetMm * sheetsNeeded) / 1000,
-    cols,
-    rowsFeed: rows,
-    itemsPerBand: itemsPerSheet,
-    sheetsNeeded,
+    knifePathM: best.knifePathM,
+    cols: best.cols,
+    rowsFeed: best.rows,
+    itemsPerBand: best.itemsPerSheet,
+    sheetsNeeded: best.sheetsNeeded,
+    fitsOnSheet: true,
   };
 }

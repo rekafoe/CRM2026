@@ -62,9 +62,10 @@ export const PlotterCuttingTariffsForm: React.FC = () => {
             <>
               <PlotterTariffModeBlock
                 title="Рулонный плоттер"
+                carrier="roll"
                 value={bundle.roll}
                 materials={materials}
-                showRollCutLevels
+                showCutLevels
                 onChange={(roll) => setBundle({ ...bundle, roll })}
               />
               <PlotterRollFinishingRanges
@@ -75,8 +76,10 @@ export const PlotterCuttingTariffsForm: React.FC = () => {
           ) : (
             <PlotterTariffModeBlock
               title="Листовой плоттер"
+              carrier="sheet"
               value={bundle.sheet}
               materials={materials}
+              showCutLevels
               onChange={(sheet) => setBundle({ ...bundle, sheet })}
             />
           )}

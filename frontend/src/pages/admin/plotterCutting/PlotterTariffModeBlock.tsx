@@ -18,7 +18,9 @@ export type PlotterTariffModeBlockProps = {
   value: PlotterCuttingModeTariffApi;
   onChange: (next: PlotterCuttingModeTariffApi) => void;
   materials: PlotterTariffMaterialOption[];
-  showRollCutLevels?: boolean;
+  /** Лист считает «подачу» числом листов, рулон — метрами плёнки. */
+  carrier?: 'roll' | 'sheet';
+  showCutLevels?: boolean;
 };
 
 export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
@@ -26,12 +28,14 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
   value,
   onChange,
   materials,
-  showRollCutLevels,
+  carrier = 'roll',
+  showCutLevels,
 }) => {
   const measure: PlotterMeasure = value.meter_basis === 'feed' ? 'feed' : 'knife_path';
   const areaDiscount = value.volume_tier_basis === 'cut_area_m2';
   const rows = visibleCuttingRows(value);
-  const billed = measureLabel(measure);
+  const sheetByCount = carrier === 'sheet' && measure === 'feed';
+  const billed = sheetByCount ? 'листам' : measureLabel(measure);
 
   return (
     <section className="plotter-tariff-mode" aria-labelledby={`plotter-h-${value.mode}`}>
@@ -42,8 +46,13 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
       <div className="plotter-block">
         <h4 className="plotter-tariff-mode__subtitle">Резка</h4>
         <p className="plotter-block__hint">
-          Цена умножается на метры {billed}. Длина реза — путь ножа вокруг каждой наклейки. Подача плёнки — сколько
-          метров рулона отмоталось.
+          {carrier === 'sheet'
+            ? sheetByCount
+              ? 'Цена умножается на число листов. Если у материала нет своего формата, берётся SRA3, 320×450 мм.'
+              : 'Цена умножается на метры длины реза: путь ножа по наклейкам на листе. Если у материала нет формата, берётся SRA3, 320×450 мм.'
+            : 'Цена умножается на метры ' +
+              billed +
+              '. Длина реза — путь ножа вокруг каждой наклейки. Подача плёнки — сколько метров рулона отмоталось.'}
         </p>
         <div className="plotter-measure" role="radiogroup" aria-label="Что умножать на ставку">
           <button
@@ -60,21 +69,26 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
             aria-pressed={measure === 'feed'}
             onClick={() => onChange(applyMeasure(value, 'feed'))}
           >
-            По подаче плёнки
+            {carrier === 'sheet' ? 'По числу листов' : 'По подаче плёнки'}
           </button>
         </div>
         <PlotterQtyTiersTable
           tiers={rows}
           keepOneRow
           onChange={(next) => onChange(commitCuttingRows(value, next))}
-          thresholdTitle={areaDiscount ? 'Площадь от' : 'Метры от'}
-          priceTitle="Цена за метр"
-          rangeUnit={areaDiscount ? 'м²' : 'м'}
-          thresholdFractionDigits={areaDiscount ? 3 : 3}
+          thresholdTitle={areaDiscount ? 'Площадь от' : sheetByCount ? 'Листы от' : 'Метры от'}
+          priceTitle={sheetByCount ? 'Цена за лист' : 'Цена за метр'}
+          rangeUnit={areaDiscount ? 'м²' : sheetByCount ? 'лист' : 'м'}
+          thresholdFractionDigits={sheetByCount && !areaDiscount ? 0 : 3}
           description={
             areaDiscount
-              ? 'Порог строки — суммарная площадь изделий в заказе. Цена строки всё равно за метр ' + billed + '.'
-              : 'Первая строка — обычная ставка. Следующие пороги снижают её, когда метров ' + billed + ' становится больше.'
+              ? 'Порог строки — суммарная площадь изделий в заказе. Цена строки всё равно за ' +
+                (sheetByCount ? 'лист.' : 'метр ' + billed + '.')
+              : sheetByCount
+                ? 'Первая строка — обычная ставка. Следующие пороги снижают её, когда листов становится больше.'
+                : 'Первая строка — обычная ставка. Следующие пороги снижают её, когда метров ' +
+                  billed +
+                  ' становится больше.'
           }
           addRangeLabel="Добавить порог"
         />
@@ -88,7 +102,7 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
         </label>
       </div>
 
-      {showRollCutLevels ? (
+      {showCutLevels ? (
         <div className="plotter-tariff-mode__cut-levels">
           <h4 className="plotter-tariff-mode__subtitle">Уровни резки</h4>
           <RollCutLevelRulesFields
@@ -109,7 +123,15 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
               autoComplete="off"
             />
           </FormField>
-          <FormField label={`Минимум к оплате, м ${billed}`}>
+          <FormField
+            label={
+              sheetByCount
+                ? 'Минимум к оплате, листов'
+                : carrier === 'sheet'
+                  ? 'Минимум к оплате, м реза'
+                  : `Минимум к оплате, м ${billed}`
+            }
+          >
             <DecimalNumberInput
               className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
               value={value.min_quantity}
@@ -121,7 +143,7 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
               }}
             />
           </FormField>
-          <FormField label="Максимум, м. Пусто — без потолка">
+          <FormField label={sheetByCount ? 'Максимум, листов. Пусто — без потолка' : 'Максимум, м. Пусто — без потолка'}>
             <DecimalNumberInput
               className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
               nullable

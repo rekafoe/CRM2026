@@ -253,7 +253,7 @@ export class PlotterCuttingTariffRepository {
             )
           : null;
       const cutLevelJson =
-        dto.mode === 'roll' && dto.cut_level_rules && dto.cut_level_rules.length > 0
+        dto.cut_level_rules && dto.cut_level_rules.length > 0
           ? JSON.stringify(
               dto.cut_level_rules.map((r) => {
                 const name = typeof r.name === 'string' ? r.name.trim() : '';

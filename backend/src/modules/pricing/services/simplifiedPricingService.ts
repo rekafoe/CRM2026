@@ -1585,8 +1585,9 @@ export class SimplifiedPricingService {
     }
 
     let knifePathMetersTotal = 0;
+    let sheetPlotterSheetsNeeded = 0;
     let plotterTariffsBundle: PlotterCuttingTariffsBundleDTO | null = null;
-    let rollPlotterCutLevelMultiplier = 1;
+    let plotterCutLevelMultiplier = 1;
     const plotterCfg = effectivePlotterConfig;
     if (plotterCfg?.enabled === true && plotterCfg.mode) {
       const rollAllow = plotterCfg.roll_allowed_material_ids;
@@ -1626,24 +1627,35 @@ export class SimplifiedPricingService {
             'Плоттер (лист): у материала не задан формат листа — для оценки пробега ножа принят SRA3 (320×450 мм), как на листовом плоттере.'
           );
         }
-        knifePathMetersTotal = computeKnifePathMetersSheet({
+        const sheetLayout = computeKnifePathMetersSheet({
           sheetMm: { width: sw, height: sh },
           trimMm: layoutTrim,
           bleedMm: resolvedBleedMm,
           quantity,
           margins,
-        }).knifePathM;
+        });
+        knifePathMetersTotal = sheetLayout.knifePathM;
+        sheetPlotterSheetsNeeded = sheetLayout.sheetsNeeded ?? quantity;
+        if (sheetLayout.fitsOnSheet === false) {
+          pricingWarnings.push(
+            'Плоттер (лист): изделие не помещается на лист. В длину реза заложен периметр каждой штуки, листов к оплате столько же, сколько штук.'
+          );
+        }
       }
 
       plotterTariffsBundle = await PlotterCuttingTariffRepository.getBundle();
-      if (plotterCfg.mode === 'roll') {
-        const rules = plotterTariffsBundle.roll.cut_level_rules;
+      {
+        const rules =
+          plotterCfg.mode === 'roll'
+            ? plotterTariffsBundle.roll.cut_level_rules
+            : plotterTariffsBundle.sheet.cut_level_rules;
         if (rules?.length) {
           const cellLong = Math.max(layoutTrim.width, layoutTrim.height) + 2 * resolvedBleedMm;
-          rollPlotterCutLevelMultiplier = resolveRollCutLevelMultiplier(cellLong, rules);
-          if (rollPlotterCutLevelMultiplier !== 1) {
+          plotterCutLevelMultiplier = resolveRollCutLevelMultiplier(cellLong, rules);
+          if (plotterCutLevelMultiplier !== 1) {
+            const modeLabel = plotterCfg.mode === 'roll' ? 'рулон' : 'лист';
             pricingWarnings.push(
-              `Плоттер (рулон): уровень резки ×${rollPlotterCutLevelMultiplier.toFixed(2)} (длинная сторона ячейки ≈ ${Math.round(cellLong)} мм).`
+              `Плоттер (${modeLabel}): уровень резки ×${plotterCutLevelMultiplier.toFixed(2)} (длинная сторона ячейки ≈ ${Math.round(cellLong)} мм).`
             );
           }
         }
@@ -1967,9 +1979,13 @@ export class SimplifiedPricingService {
               ? variantMeterBasisMap.get(variantId) ?? serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path'
               : serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path';
           // per_meter + feed: подача по ширине плёнки варианта/услуги (не материала печати)
+          const sidEarly = Number(finConfig.service_id);
+          const sheetBilledByCount = sidEarly === PLOTTER_FIN_SHEET && meterBasis === 'feed';
           let meterUnits = 0;
           if (isPerMeterOp) {
-            if (meterBasis === 'feed') {
+            if (sheetBilledByCount) {
+              meterUnits = sheetPlotterSheetsNeeded;
+            } else if (meterBasis === 'feed') {
               const filmFeed = resolveWarehouseFeedMeters({
                 rollWidthMm: finishingRollWidthMmMap.get(mapKey) ?? null,
                 layout: {
@@ -2013,7 +2029,7 @@ export class SimplifiedPricingService {
               const unitLabel = isPerSheetOp
                 ? (isMaterialMeterBased ? 'пог. м' : 'листов')
                 : isPerMeterOp
-                  ? 'п.м.'
+                  ? (sheetBilledByCount ? 'листов' : 'п.м.')
                   : 'шт';
               const err: any = new Error(
                 `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit} ${unitLabel}`
@@ -2042,7 +2058,7 @@ export class SimplifiedPricingService {
                   ? 'пог. м'
                   : 'листов печати'
                 : isPerMeterOp
-                  ? 'п.м.'
+                  ? (sheetBilledByCount ? 'листов' : 'п.м.')
                   : 'единиц';
               const billed = minLimit;
               pricingWarnings.push(
@@ -2090,7 +2106,7 @@ export class SimplifiedPricingService {
                       ? plotterTierVolumeCtx.roll.meterBasis
                       : plotterTierVolumeCtx.sheet.meterBasis,
                   knifePathM: knifePathMetersTotal,
-                  feedM: metersNeeded,
+                  feedM: sidNum === PLOTTER_FIN_SHEET ? sheetPlotterSheetsNeeded : metersNeeded,
                   cutAreaM2: plotterTierVolumeCtx.pieceCutAreaTrimM2 * quantity,
                 })
               : tierQty;
@@ -2109,7 +2125,7 @@ export class SimplifiedPricingService {
 
           const priceForTier = this.getPriceForQuantityTier(tier);
           const plotterRollMul =
-            Number(finConfig.service_id) === PLOTTER_FIN_ROLL ? rollPlotterCutLevelMultiplier : 1;
+            sidNum === PLOTTER_FIN_ROLL || sidNum === PLOTTER_FIN_SHEET ? plotterCutLevelMultiplier : 1;
           const effectivePriceForTier = priceForTier * plotterRollMul;
           const serviceMinQty = limits?.min ?? 0;
           // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на позицию (units_per_item); иначе — тираж × units_per_item (per_item и др.)
@@ -2583,8 +2599,25 @@ export class SimplifiedPricingService {
     const cuttingPricePerCut = configCutting && (layoutCheck.cutsPerSheet ?? 0) > 0
       ? (finishingDetails.find((d: any) => (serviceTypesMap.get(d.service_id) || '').toLowerCase() === 'cut')?.tier?.price ?? 0)
       : 0;
+    const sheetLayoutByQty = (q: number) => {
+      const margins = resolvePlotterMargins('sheet', customMarginMm, customGapMm);
+      const qq = Math.max(1, Math.floor(Number(q) || 0));
+      let sw = materialSheetMm?.width ?? 0;
+      let sh = materialSheetMm?.height ?? 0;
+      if (sw <= 0 || sh <= 0) {
+        sw = SHEET_PLOTTER_SRA3_MM.width;
+        sh = SHEET_PLOTTER_SRA3_MM.height;
+      }
+      return computeKnifePathMetersSheet({
+        sheetMm: { width: sw, height: sh },
+        trimMm: layoutTrim,
+        bleedMm: resolvedBleedMm,
+        quantity: qq,
+        margins,
+      });
+    };
     const knifePathByQty = (q: number): number => {
-      const pc = typeConfig?.plotter;
+      const pc = effectivePlotterConfig;
       if (!pc?.enabled || !pc.mode) return 0;
       const margins = resolvePlotterMargins(pc.mode, customMarginMm, customGapMm);
       const qq = Math.max(1, Math.floor(Number(q) || 0));
@@ -2599,20 +2632,9 @@ export class SimplifiedPricingService {
           margins,
         }).knifePathM;
       }
-      let sw = materialSheetMm?.width ?? 0;
-      let sh = materialSheetMm?.height ?? 0;
-      if (sw <= 0 || sh <= 0) {
-        sw = SHEET_PLOTTER_SRA3_MM.width;
-        sh = SHEET_PLOTTER_SRA3_MM.height;
-      }
-      return computeKnifePathMetersSheet({
-        sheetMm: { width: sw, height: sh },
-        trimMm: layoutTrim,
-        bleedMm: resolvedBleedMm,
-        quantity: qq,
-        margins,
-      }).knifePathM;
+      return sheetLayoutByQty(qq).knifePathM;
     };
+    const sheetCountByQty = (q: number): number => sheetLayoutByQty(q).sheetsNeeded ?? Math.max(1, Math.floor(q));
     const tierPricesResult = this.buildTierPricesForConfig({
       printPriceConfig: printPriceConfigForTiers,
       materialPricePerSheet,
@@ -2640,7 +2662,8 @@ export class SimplifiedPricingService {
       isRollMeterage: isMaterialMeterBased,
       metersPerItem: materialMetersPerItem,
       knifePathByQty,
-      rollPlotterCutLevelMultiplier,
+      sheetCountByQty,
+      plotterCutLevelMultiplier,
       plotterTierVolumeCtx,
       coverPages: separateCoverForTier ? pageSplit.coverPages : 0,
       coverSidesMode: separateCoverForTier ? coverSidesForTier : undefined,
@@ -2959,8 +2982,10 @@ export class SimplifiedPricingService {
     isRollMeterage?: boolean;
     metersPerItem?: number;
     knifePathByQty?: (q: number) => number;
-    /** Рулонный плоттер: множитель уровня резки к ставке за п.м. */
-    rollPlotterCutLevelMultiplier?: number;
+    /** Лист: число листов на тираж q. Для тарифа «по числу листов». */
+    sheetCountByQty?: (q: number) => number;
+    /** Множитель уровня резки к ставке. Один на расчёт: режим подтипа уже выбран. */
+    plotterCutLevelMultiplier?: number;
     /** Оси объёма для тиражных ступеней плоттера (synthetic PLOTTER_FIN_*) */
     plotterTierVolumeCtx?: {
       roll: { volumeTierBasis: PlotterVolumeTierBasis | null; meterBasis: 'knife_path' | 'feed' };
@@ -3114,8 +3139,12 @@ export class SimplifiedPricingService {
         };
         const bleedForFin = rca?.bleedMm ?? 0;
         const marginsForFin = rca?.margins ?? { edgeMm: 0, gapMm: 0 };
-        const meterUnits =
-          isPerMeterOp && meterBasis === 'feed'
+        const sidForMeters = Number(finConfig.service_id);
+        const sheetBilledByCount =
+          isPerMeterOp && sidForMeters === PLOTTER_FIN_SHEET && meterBasis === 'feed';
+        const meterUnits = sheetBilledByCount
+          ? (ctx.sheetCountByQty?.(q) ?? 0)
+          : isPerMeterOp && meterBasis === 'feed'
             ? resolveWarehouseFeedMeters({
                 rollWidthMm: rca?.rollWidthByFinKey.get(finKey) ?? null,
                 layout: {
@@ -3173,7 +3202,11 @@ export class SimplifiedPricingService {
                   sidFin === PLOTTER_FIN_ROLL ? ptv.roll.meterBasis : ptv.sheet.meterBasis,
                 knifePathM: ctx.knifePathByQty?.(q) ?? 0,
                 feedM:
-                  ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0 ? ctx.metersPerItem! * q : 0,
+                  sidFin === PLOTTER_FIN_SHEET
+                    ? (ctx.sheetCountByQty?.(q) ?? 0)
+                    : ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0
+                      ? ctx.metersPerItem! * q
+                      : 0,
                 cutAreaM2: ptv.pieceCutAreaTrimM2 * q,
               })
             : tierQty;
@@ -3183,7 +3216,9 @@ export class SimplifiedPricingService {
         if (!tier) continue;
         const priceForTier = this.getPriceForQuantityTier(tier);
         const rollMul =
-          finConfig.service_id === PLOTTER_FIN_ROLL ? (ctx.rollPlotterCutLevelMultiplier ?? 1) : 1;
+          sidFin === PLOTTER_FIN_ROLL || sidFin === PLOTTER_FIN_SHEET
+            ? (ctx.plotterCutLevelMultiplier ?? 1)
+            : 1;
         const effectiveTierPrice = priceForTier * rollMul;
         const priceUnit = priceUnitFromDb;
         const serviceMinQty = ctx.serviceLimitsMap?.get(finConfig.service_id)?.min ?? 0;

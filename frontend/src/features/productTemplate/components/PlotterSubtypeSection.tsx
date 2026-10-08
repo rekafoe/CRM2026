@@ -137,6 +137,15 @@ export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
             </div>
           </div>
 
+          {mode === 'sheet' ? (
+            <p className="plotter-subtype__hint">
+              Лист берёт формат выбранного материала. Если формат не задан, в расчёт идёт SRA3, 320×450 мм. Выборка и
+              накатка для листа не считаются.
+            </p>
+          ) : null}
+
+          {mode !== 'sheet' && (
+          <>
           <div className="plotter-subtype__section">
             <div className="simplified-template__type-website-title">Материалы рулона</div>
             <p className="plotter-subtype__hint">
@@ -196,6 +205,8 @@ export const PlotterSubtypeSection: React.FC<PlotterSubtypeSectionProps> = ({
               ))}
             </select>
           </div>
+          </>
+          )}
         </div>
       )}
     </div>
