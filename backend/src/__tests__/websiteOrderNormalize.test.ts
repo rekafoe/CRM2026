@@ -25,4 +25,27 @@ describe('websiteOrderNormalize', () => {
     expect(item.params.layoutHumanLabel).toBeUndefined()
     expect(item.params.designEditorMode).toBeUndefined()
   })
+
+  it('strips plotterBareProduct so website totalCost cannot skip server reprice', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: 'Листовки',
+        price: 0.01,
+        quantity: 100,
+        totalCost: 0.01,
+        params: {
+          description: 'A6',
+          productId: 22,
+          storedTotalCost: 0.01,
+          plotterBareProduct: true,
+          priceLockedByCalculator: true,
+        },
+      },
+    ])
+
+    expect(item.totalCost).toBe(0.01)
+    expect(item.params.plotterBareProduct).toBeUndefined()
+    expect(item.params.productId).toBe(22)
+    expect(item.params.storedTotalCost).toBe(0.01)
+  })
 })
