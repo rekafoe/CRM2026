@@ -671,7 +671,6 @@ export class OrderService {
       }>;
     }
   ) {
-    const isWebsiteLike = payload.source === 'website' || payload.source === 'mini_app';
     for (const item of payload.items) {
       let paramsObj: Record<string, any> = {};
       try {
@@ -684,6 +683,11 @@ export class OrderService {
           materialId: Number(component.materialId),
           qtyPerItem: Number(component.qtyPerItem),
         }));
+      }
+      // Сайт/miniapp/telegram: plotterBareProduct — только CRM-калькулятор; иначе
+      // OrderPricingService.extractPricingLineFromItem пропускает строку и оставляет client totalCost.
+      if (payload.source !== 'crm') {
+        delete paramsObj.plotterBareProduct;
       }
       const qty = Math.max(1, Number(item.quantity) || 1);
       const effectiveTotal =

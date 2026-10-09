@@ -20,4 +20,14 @@ describe('OrderPricingService.extractPricingLineFromItem', () => {
       })
     ).toBeNull();
   });
+
+  it('does not requote CRM plotter-bare calculator lines', () => {
+    expect(
+      OrderPricingService.extractPricingLineFromItem({
+        id: 3,
+        quantity: 1,
+        params: { plotterBareProduct: true, productId: 12, storedTotalCost: 0.01 },
+      })
+    ).toBeNull();
+  });
 });
