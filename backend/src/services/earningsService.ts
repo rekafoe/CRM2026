@@ -3,7 +3,7 @@ import { syncPayrollExpenses } from './payrollExpenseSync'
 import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
 import { notWaitingStatusSql } from '../utils/orderFulfillmentScope';
-import { type EarningsOrderItemRow } from './earningsEffectiveUserId';
+import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
 import { resolveEarningsOperatorPercent } from './earningsOperatorPercent';
 import { getCustomCalculatorOperatorPercent } from './customCalculatorPercentSettings';
 import { getDesignTemplatesByIds } from './designTemplateService';
@@ -378,6 +378,9 @@ export class EarningsService {
         );
         const itemTotal = earningsBase(lineTotal, designUsageTotal, materialCost + printCost);
         const responsibleUserId = row.responsibleUserId ?? row.userId;
+        // Доля исполнителя: явный executor_user_id, иначе цепочка responsible → owner
+        // (website/mini_app insertItemsForOrder не пишет executor; после claim он часто NULL).
+        const executorUserId = effectiveEarningsUserId(row);
         const shares = roleEarnings({
           base: itemTotal,
           positionPercent: percent,
@@ -385,7 +388,7 @@ export class EarningsService {
           responsiblePercent: rolePercents.responsible,
           contactUserId: row.contactUserId,
           responsibleUserId,
-          executorUserId: row.executorUserId,
+          executorUserId,
         });
 
         for (const share of shares) {
