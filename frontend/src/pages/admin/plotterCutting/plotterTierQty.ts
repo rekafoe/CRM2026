@@ -1,6 +1,6 @@
 import type { PlotterCuttingModeTariffApi } from '../../../services/pricing';
 
-/** Порог тиража (шт от) → ставка при расчёте per_item для плоттера выборки/накатки. */
+/** Порог площади (м²) или тиража → ставка строки, у которой порог не выше объёма. */
 export function tierRateAtOrderQty(
   rows: Array<{ min_quantity: number; price_per_unit: number }>,
   qty: number,

@@ -37,6 +37,19 @@ export function findPlotterVolumeTier(tiers: PlotterTierSlice[], qty: number): P
   return pick;
 }
 
+/** Минимальный кусок рулона в резке: ширина 1,2 м и закладка 0,25 м. */
+export const PLOTTER_MIN_ROLL_WIDTH_M = 1.2;
+export const PLOTTER_MIN_LAY_M = 0.25;
+export const PLOTTER_MIN_CUT_AREA_M2 = PLOTTER_MIN_ROLL_WIDTH_M * PLOTTER_MIN_LAY_M;
+
+/** Площадь резки рулона: не меньше 0,3 м² и не меньше минимума тарифа. */
+export function billPlotterRollCutAreaM2(productAreaM2: number, adminMinM2?: number | null): number {
+  const area = Math.max(0, Number(productAreaM2) || 0);
+  const admin = Number(adminMinM2);
+  const adminFloor = Number.isFinite(admin) && admin > 0 ? admin : 0;
+  return Math.max(area, PLOTTER_MIN_CUT_AREA_M2, adminFloor);
+}
+
 export function resolvePlotterTierVolumeQty(params: {
   basis: PlotterVolumeTierBasis | null | undefined;
   tariffMeterBasis: 'knife_path' | 'feed';

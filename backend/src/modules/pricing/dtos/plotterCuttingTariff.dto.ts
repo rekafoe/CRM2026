@@ -15,12 +15,13 @@ export interface PlotterCuttingModeTariffDTO {
   operator_percent?: number | null;
   material_id?: number | null;
   qty_per_item?: number | null;
-  /** Только рулон: ставка выборки за изделие (деривируется из мыeding_tiers при сохранении; для совместимости API). */
+  /** Только рулон: ставка выборки за м² при пороге 1 м². Имя поля старое, для совместимости API. */
   weeding_price_per_item?: number | null;
-  /** Только рулон: ставка накатки за изделие (как мыeding_*). */
+  /** Только рулон: ставка накатки за м² при пороге 1 м². Имя поля старое, для совместимости API. */
   mounting_price_per_item?: number | null;
-  /** Только рулон: порог тиража (шт от) × цена за изделие. Пусто — как одна ставка из weeding_price_per_item или 0. */
+  /** Только рулон: порог площади (м²) × цена за м². Уровень резки умножает эту ставку. */
   weeding_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  /** Только рулон: порог площади (м²) × цена за м². Уровень резки не умножает. */
   mounting_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
   /** Только рулон: проверка макета, порог тиража × цена за изделие. */
   proof_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;

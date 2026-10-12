@@ -1,6 +1,7 @@
 /**
  * Калькулятор «Плоттерная резка» в заказе: резка плёнки для аппликации.
- * Резка — площадь изделий, м², умноженная на ставку и на уровень.
+ * Резка — площадь изделий, м², умноженная на ставку и на уровень, но не меньше рулона 1,2 × 0,25 м.
+ * Выборка — та же площадь изделий × ставка за м² × уровень. Накатка — площадь × ставка за м², без уровня.
  * Плёнка — погонные метры подачи рулона. Без материала в сумме только резка.
  */
 
@@ -12,7 +13,12 @@ import {
   computeOptimizedRollFeedMeters,
   resolvePlotterMargins,
 } from './plotterLayout';
-import { buildPlotterTiersFromDto, findPlotterVolumeTier, resolvePlotterTierVolumeQty } from './plotterVolumeTier';
+import {
+  billPlotterRollCutAreaM2,
+  buildPlotterTiersFromDto,
+  findPlotterVolumeTier,
+  resolvePlotterTierVolumeQty,
+} from './plotterVolumeTier';
 
 export type PlotterBareQuoteLine = {
   key: 'cut' | 'material' | 'weeding' | 'mounting' | 'proof';
@@ -132,20 +138,23 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
 
   const tariff = input.tariff;
   const sheetByCount = mode === 'sheet' && tariff.meter_basis === 'feed';
+  const rollAreaCut = mode === 'roll' && tariff.meter_basis !== 'feed';
   const feedForTier = sheetByCount ? sheetsNeeded : feedM;
-  const tiers = buildPlotterTiersFromDto(tariff);
-  const volumeQty = resolvePlotterTierVolumeQty({
-    basis: tariff.volume_tier_basis ?? null,
-    tariffMeterBasis: tariff.meter_basis,
-    knifePathM: 0,
-    feedM: feedForTier,
-    cutAreaM2,
-  });
-  const tier = findPlotterVolumeTier(tiers, volumeQty);
-  const rate = (tier?.unit_price ?? tariff.price_per_meter ?? 0) * multiplier;
   const rawUnits = sheetByCount ? sheetsNeeded : tariff.meter_basis === 'feed' ? feedM : cutAreaM2;
   const minUnits = Math.max(0, Number(tariff.min_quantity) || 0);
-  const billedUnits = Math.max(rawUnits, minUnits);
+  const billedUnits = rollAreaCut ? billPlotterRollCutAreaM2(rawUnits, minUnits) : Math.max(rawUnits, minUnits);
+  const tiers = buildPlotterTiersFromDto(tariff);
+  const volumeQty = rollAreaCut
+    ? billedUnits
+    : resolvePlotterTierVolumeQty({
+        basis: tariff.volume_tier_basis ?? null,
+        tariffMeterBasis: tariff.meter_basis,
+        knifePathM: 0,
+        feedM: feedForTier,
+        cutAreaM2,
+      });
+  const tier = findPlotterVolumeTier(tiers, volumeQty);
+  const rate = (tier?.unit_price ?? tariff.price_per_meter ?? 0) * multiplier;
   const cutTotal = roundMoney(rate * billedUnits);
   const cutUnit = sheetByCount ? 'лист' : tariff.meter_basis === 'feed' ? 'м' : 'м²';
   const lines: PlotterBareQuoteLine[] = [
@@ -173,7 +182,7 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
     });
   }
 
-  const extra = (
+  const extraPieces = (
     key: PlotterBareQuoteLine['key'],
     title: string,
     enabled: boolean,
@@ -195,9 +204,33 @@ export function quoteBarePlotter(input: PlotterBareQuoteInput): PlotterBareQuote
     });
   };
 
-  extra('weeding', 'Выборка', input.weeding, tariff.weeding_tiers);
-  extra('mounting', 'Накатка монтажной плёнки', input.mounting, tariff.mounting_tiers);
-  extra('proof', 'Проверка', input.proof, tariff.proof_tiers);
+  const extraArea = (
+    key: PlotterBareQuoteLine['key'],
+    title: string,
+    enabled: boolean,
+    rows: Array<{ min_quantity: number; price_per_unit: number }> | undefined,
+    applyLevel: boolean,
+  ) => {
+    if (mode !== 'roll' || !enabled) return;
+    if (!rows?.length) {
+      warnings.push(`${title}: тариф не задан, в сумму не входит.`);
+      return;
+    }
+    const unitPrice = tierAtQty(rows, cutAreaM2) * (applyLevel ? multiplier : 1);
+    const areaQty = Math.round(cutAreaM2 * 1000) / 1000;
+    lines.push({
+      key,
+      title,
+      quantity: areaQty,
+      unit: 'м²',
+      unitPrice: roundMoney(unitPrice),
+      total: roundMoney(unitPrice * cutAreaM2),
+    });
+  };
+
+  extraArea('weeding', 'Выборка', input.weeding, tariff.weeding_tiers, true);
+  extraArea('mounting', 'Накатка монтажной плёнки', input.mounting, tariff.mounting_tiers, false);
+  extraPieces('proof', 'Проверка', input.proof, tariff.proof_tiers);
 
   const total = roundMoney(lines.reduce((sum, line) => sum + line.total, 0));
   return {
