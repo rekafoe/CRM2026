@@ -3,9 +3,12 @@ import { PlotterQtyTiersTable } from './PlotterQtyTiersTable';
 import type { PlotterCuttingModeTariffApi } from '../../../services/pricing';
 import { tierRateAtOrderQty } from './plotterTierQty';
 
+export type PlotterFinishingPart = 'weeding' | 'mounting' | 'proof';
+
 type Props = {
   rollTariff: PlotterCuttingModeTariffApi;
   onChangeRollTariff: (next: PlotterCuttingModeTariffApi) => void;
+  part: PlotterFinishingPart;
 };
 
 function areaExample(tiers: Array<{ min_quantity: number; price_per_unit: number }> | undefined): string | null {
@@ -14,7 +17,7 @@ function areaExample(tiers: Array<{ min_quantity: number; price_per_unit: number
   return `0,25 м² → ${rate} за м²`;
 }
 
-export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChangeRollTariff }) => {
+export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChangeRollTariff, part }) => {
   const patchWeeding = (weeding_tiers: NonNullable<PlotterCuttingModeTariffApi['weeding_tiers']>) =>
     onChangeRollTariff({
       ...rollTariff,
@@ -41,14 +44,7 @@ export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChan
 
   return (
     <section className="plotter-roll-finishing">
-      <div className="plotter-roll-finishing__header">
-        <h4 className="plotter-tariff-mode__subtitle">Выборка, накатка и проверка</h4>
-      </div>
-      <p className="plotter-block__hint">
-        Только для рулона. Выборка и накатка считаются по площади изделий. Уровень умножает выборку, накатку не
-        умножает. Проверка считается по числу штук. Пустая таблица значит, что этой галочки в калькуляторе нет.
-      </p>
-      <div className="plotter-roll-finishing__tier-blocks">
+      {part === 'weeding' ? (
         <div className="plotter-roll-finishing__tier-block">
           <PlotterQtyTiersTable
             tiers={rollTariff.weeding_tiers}
@@ -58,12 +54,14 @@ export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChan
             rangeUnit="м²"
             thresholdFractionDigits={3}
             rangeColumnHeading="Выборка"
-            description="Снять лишний винил. Цена за м² умножается на площадь изделий и на уровень резки."
+            description="Снять лишний винил. Цена за м² умножается на площадь изделий и на уровень резки. Пустая таблица убирает галочку из калькулятора."
             emptyHint="Пока пусто — в калькуляторе выборки не будет."
             addRangeLabel="Добавить порог выборки"
           />
           {weedingExample ? <p className="plotter-example">{weedingExample}</p> : null}
         </div>
+      ) : null}
+      {part === 'mounting' ? (
         <div className="plotter-roll-finishing__tier-block">
           <PlotterQtyTiersTable
             tiers={rollTariff.mounting_tiers}
@@ -73,12 +71,14 @@ export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChan
             rangeUnit="м²"
             thresholdFractionDigits={3}
             rangeColumnHeading="Накатка"
-            description="Прикатать монтажную плёнку. Цена за м² умножается на площадь изделий, без уровня резки."
+            description="Прикатать монтажную плёнку. Цена за м² умножается на площадь изделий, без уровня резки. Пустая таблица убирает галочку из калькулятора."
             emptyHint="Пока пусто — в калькуляторе накатки не будет."
             addRangeLabel="Добавить порог накатки"
           />
           {mountingExample ? <p className="plotter-example">{mountingExample}</p> : null}
         </div>
+      ) : null}
+      {part === 'proof' ? (
         <div className="plotter-roll-finishing__tier-block">
           <PlotterQtyTiersTable
             tiers={rollTariff.proof_tiers}
@@ -88,12 +88,12 @@ export const PlotterRollFinishingRanges: React.FC<Props> = ({ rollTariff, onChan
             rangeUnit="шт"
             thresholdFractionDigits={0}
             rangeColumnHeading="Проверка"
-            description="Проверить макет перед резкой."
+            description="Проверить макет перед резкой. Считается по числу штук. Пустая таблица убирает галочку из калькулятора."
             emptyHint="Пока пусто — в калькуляторе проверки не будет."
             addRangeLabel="Добавить порог проверки"
           />
         </div>
-      </div>
+      ) : null}
     </section>
   );
 };

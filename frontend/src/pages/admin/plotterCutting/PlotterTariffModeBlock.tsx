@@ -12,6 +12,8 @@ import {
   type PlotterMeasure,
 } from './plotterTariffEdit';
 
+export type PlotterTariffPart = 'cut' | 'levels' | 'extra';
+
 export type PlotterTariffModeBlockProps = {
   title: string;
   value: PlotterCuttingModeTariffApi;
@@ -20,6 +22,8 @@ export type PlotterTariffModeBlockProps = {
   /** Лист считает «подачу» числом листов, рулон — метрами плёнки. */
   carrier?: 'roll' | 'sheet';
   showCutLevels?: boolean;
+  /** Один раздел за раз: резка, уровни или списание. */
+  part: PlotterTariffPart;
 };
 
 export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
@@ -29,6 +33,7 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
   materials,
   carrier = 'roll',
   showCutLevels,
+  part,
 }) => {
   const measure: PlotterMeasure = value.meter_basis === 'feed' ? 'feed' : 'knife_path';
   const areaPriced = measure !== 'feed';
@@ -36,14 +41,96 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
   const sheetByCount = carrier === 'sheet' && measure === 'feed';
   const billed = sheetByCount ? 'листам' : measureLabel(measure);
 
-  return (
-    <section className="plotter-tariff-mode" aria-labelledby={`plotter-h-${value.mode}`}>
-      <h3 className="plotter-tariff-mode__title" id={`plotter-h-${value.mode}`}>
-        {title}
-      </h3>
+  const extraFields = (
+    <div className="plotter-extra__grid">
+      <FormField label="Название в расчёте">
+        <input
+          className="form-input plotter-tariffs-form__field-text plotter-tariffs-form__inp-text"
+          value={value.label}
+          onChange={(e) => onChange({ ...value, label: e.target.value })}
+          autoComplete="off"
+        />
+      </FormField>
+      <FormField
+        label={
+          sheetByCount
+            ? 'Минимум к оплате, листов'
+            : areaPriced
+              ? 'Минимум к оплате, м²'
+              : `Минимум к оплате, м ${billed}`
+        }
+      >
+        <DecimalNumberInput
+          className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
+          value={value.min_quantity}
+          emptyFallback={1}
+          fractionDigits={3}
+          onChange={(v) => {
+            const n = v ?? 1;
+            onChange({ ...value, min_quantity: n > 0 ? Math.round(n * 1000) / 1000 : 1 });
+          }}
+        />
+      </FormField>
+      <FormField
+        label={
+          sheetByCount
+            ? 'Максимум, листов. Пусто — без потолка'
+            : areaPriced
+              ? 'Максимум, м². Пусто — без потолка'
+              : 'Максимум, м. Пусто — без потолка'
+        }
+      >
+        <DecimalNumberInput
+          className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
+          nullable
+          value={value.max_quantity ?? null}
+          onChange={(v) => onChange({ ...value, max_quantity: v })}
+        />
+      </FormField>
+      <FormField label="Процент оператора">
+        <DecimalNumberInput
+          className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--pct"
+          nullable
+          value={value.operator_percent ?? null}
+          minClamp={0}
+          fractionDigits={2}
+          onChange={(v) => onChange({ ...value, operator_percent: v })}
+        />
+      </FormField>
+      <FormField label="Материал списания">
+        <select
+          className="form-input plotter-tariffs-form__inp-select"
+          value={value.material_id ?? ''}
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange({ ...value, material_id: v === '' ? null : Number(v) });
+          }}
+        >
+          <option value="">Не списывать</option>
+          {materials.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      <FormField label="Расход материала на 1 м">
+        <DecimalNumberInput
+          className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--price"
+          nullable
+          value={value.qty_per_item ?? null}
+          minClamp={0}
+          fractionDigits={4}
+          onChange={(v) => onChange({ ...value, qty_per_item: v })}
+        />
+      </FormField>
+    </div>
+  );
 
+  return (
+    <section className="plotter-tariff-mode" aria-label={title}>
+      {part === 'cut' ? (
       <div className="plotter-block">
-        <h4 className="plotter-tariff-mode__subtitle">Резка</h4>
         <p className="plotter-block__hint">
           {carrier === 'sheet'
             ? sheetByCount
@@ -53,19 +140,21 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
               ? 'Цена умножается на площадь изделий (ширина × длина × количество) и на множитель уровня. Если площадь меньше 0,3 м², в резку закладывается рулон 1,2 × 0,25 м. Плёнка считается отдельно, по метрам рулона.'
               : 'Цена умножается на метры подачи плёнки.'}
         </p>
-        <div className="plotter-measure" role="radiogroup" aria-label="Что умножать на ставку">
+        <div className="plotter-tariffs-form__tabs" role="radiogroup" aria-label="Что умножать на ставку">
           <button
             type="button"
-            className={measure === 'knife_path' ? 'plotter-measure__btn is-active' : 'plotter-measure__btn'}
-            aria-pressed={measure === 'knife_path'}
+            role="radio"
+            className={`orders-list-tab ${measure === 'knife_path' ? 'active' : ''}`}
+            aria-checked={measure === 'knife_path'}
             onClick={() => onChange(applyMeasure(value, 'knife_path'))}
           >
             По площади
           </button>
           <button
             type="button"
-            className={measure === 'feed' ? 'plotter-measure__btn is-active' : 'plotter-measure__btn'}
-            aria-pressed={measure === 'feed'}
+            role="radio"
+            className={`orders-list-tab ${measure === 'feed' ? 'active' : ''}`}
+            aria-checked={measure === 'feed'}
             onClick={() => onChange(applyMeasure(value, 'feed'))}
           >
             {carrier === 'sheet' ? 'По числу листов' : 'По подаче плёнки'}
@@ -91,10 +180,10 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
           addRangeLabel="Добавить порог"
         />
       </div>
+      ) : null}
 
-      {showCutLevels ? (
+      {part === 'levels' && showCutLevels ? (
         <div className="plotter-tariff-mode__cut-levels">
-          <h4 className="plotter-tariff-mode__subtitle">Уровни резки</h4>
           <RollCutLevelRulesFields
             rules={value.cut_level_rules}
             onChange={(cut_level_rules) => onChange({ ...value, cut_level_rules })}
@@ -102,92 +191,7 @@ export const PlotterTariffModeBlock: React.FC<PlotterTariffModeBlockProps> = ({
         </div>
       ) : null}
 
-      <details className="plotter-extra">
-        <summary>Списание и зарплата</summary>
-        <div className="plotter-extra__grid">
-          <FormField label="Название в расчёте">
-            <input
-              className="form-input plotter-tariffs-form__field-text plotter-tariffs-form__inp-text"
-              value={value.label}
-              onChange={(e) => onChange({ ...value, label: e.target.value })}
-              autoComplete="off"
-            />
-          </FormField>
-          <FormField
-            label={
-              sheetByCount
-                ? 'Минимум к оплате, листов'
-                : areaPriced
-                  ? 'Минимум к оплате, м²'
-                  : `Минимум к оплате, м ${billed}`
-            }
-          >
-            <DecimalNumberInput
-              className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
-              value={value.min_quantity}
-              emptyFallback={1}
-              fractionDigits={3}
-              onChange={(v) => {
-                const n = v ?? 1;
-                onChange({ ...value, min_quantity: n > 0 ? Math.round(n * 1000) / 1000 : 1 });
-              }}
-            />
-          </FormField>
-          <FormField
-            label={
-              sheetByCount
-                ? 'Максимум, листов. Пусто — без потолка'
-                : areaPriced
-                  ? 'Максимум, м². Пусто — без потолка'
-                  : 'Максимум, м. Пусто — без потолка'
-            }
-          >
-            <DecimalNumberInput
-              className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--qty"
-              nullable
-              value={value.max_quantity ?? null}
-              onChange={(v) => onChange({ ...value, max_quantity: v })}
-            />
-          </FormField>
-          <FormField label="Процент оператора">
-            <DecimalNumberInput
-              className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--pct"
-              nullable
-              value={value.operator_percent ?? null}
-              minClamp={0}
-              fractionDigits={2}
-              onChange={(v) => onChange({ ...value, operator_percent: v })}
-            />
-          </FormField>
-          <FormField label="Материал списания">
-            <select
-              className="form-input plotter-tariffs-form__inp-select"
-              value={value.material_id ?? ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                onChange({ ...value, material_id: v === '' ? null : Number(v) });
-              }}
-            >
-              <option value="">Не списывать</option>
-              {materials.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Расход материала на 1 м">
-            <DecimalNumberInput
-              className="form-input plotter-tariffs-form__inp-num plotter-tariffs-form__inp-num--price"
-              nullable
-              value={value.qty_per_item ?? null}
-              minClamp={0}
-              fractionDigits={4}
-              onChange={(v) => onChange({ ...value, qty_per_item: v })}
-            />
-          </FormField>
-        </div>
-      </details>
+      {part === 'extra' ? <div className="plotter-extra plotter-extra--open">{extraFields}</div> : null}
     </section>
   );
 };

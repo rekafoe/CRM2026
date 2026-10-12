@@ -249,9 +249,19 @@
 }
 
 .plotter-tariff-mode__cut-levels {
-  margin-top: 12px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.plotter-tariffs-form__subtabs {
+  margin-top: 0;
+}
+
+.plotter-extra--open {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .plotter-tariff-mode__volume-tiers {

@@ -12,6 +12,16 @@ import {
   type PlotterCalcDraft,
 } from '../components/PlotterCuttingCalculatorForm';
 
+function formatQuoteQty(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  return (Math.round(value * 10000) / 10000).toLocaleString('ru-RU', { maximumFractionDigits: 4 });
+}
+
+function formatQuoteRate(value: number): string {
+  if (!Number.isFinite(value)) return '0,00';
+  return value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 const emptyDraft = (): PlotterCalcDraft => ({
   widthMm: '1000',
   heightMm: '1000',
@@ -173,16 +183,25 @@ export function usePlotterCuttingCalculator({
   const isPlotterValid = Boolean(quote && quote.total >= 0);
   const plotterResult = useMemo(() => {
     if (!quote) return null;
+    const materialLine = quote.lines.find((line) => line.key === 'material');
+    const caption = (line: (typeof quote.lines)[number]) =>
+      `${line.title} · ${formatQuoteQty(line.quantity)} ${line.unit} × ${formatQuoteRate(line.unitPrice)}`;
     return {
       totalCost: quote.total,
       pricePerItem: quote.unitPrice,
       specifications: { quantity: Math.max(1, Math.floor(Number(draft.quantity) || 1)) },
       productionTime: '—',
-      parameterSummary: quote.lines.map((line) => ({
-        label: line.title,
-        value: `${line.total.toFixed(2)}`,
-      })),
-      warnings: quote.warnings,
+      materials: materialLine
+        ? [{ material: caption(materialLine), total: materialLine.total, unitPrice: materialLine.unitPrice }]
+        : [],
+      services: quote.lines
+        .filter((line) => line.key !== 'material')
+        .map((line) => ({
+          service: caption(line),
+          total: line.total,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+        })),
     };
   }, [draft.quantity, quote]);
 

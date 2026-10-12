@@ -65,6 +65,7 @@ export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
   quote,
 }) => {
   const levels = levelOptions(quote);
+  const noMaterial = draft.materialId == null;
 
   return (
     <div className="calculator-section-group calculator-section-unified">
@@ -79,32 +80,30 @@ export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
           displayName={selectedProductName || 'Плоттерная резка'}
           onOpenSelector={onOpenProductSelector}
         />
-        <p className="plotter-bare-calc__lead">
-          Резка плёнки для аппликации. Ставки реза, уровней, выборки, накатки и проверки берутся из раздела «Плоттерная
-          резка». Материалы отмечаются в продуктах. «Без материала» считает только резку.
-        </p>
         {error ? <p className="validation-error">{error}</p> : null}
-        <div className="plotter-bare-calc__grid">
-          <label>
-            Ширина, мм
+        <div className="params-grid">
+          <div className="param-group">
+            <label htmlFor="plotter-width">Ширина, мм</label>
             <input
-              className="form-input"
+              id="plotter-width"
+              className="form-control"
               inputMode="decimal"
               value={draft.widthMm}
               onChange={(e) => onChange({ widthMm: e.target.value })}
             />
-          </label>
-          <label>
-            Длина, мм
+          </div>
+          <div className="param-group">
+            <label htmlFor="plotter-height">Длина, мм</label>
             <input
-              className="form-input"
+              id="plotter-height"
+              className="form-control"
               inputMode="decimal"
               value={draft.heightMm}
               onChange={(e) => onChange({ heightMm: e.target.value })}
             />
-          </label>
-          <label className="param-group param-group--quantity">
-            Количество, шт
+          </div>
+          <div className="param-group param-group--quantity">
+            <label htmlFor="plotter-qty">Количество, шт</label>
             <div className="quantity-controls">
               <button
                 type="button"
@@ -116,6 +115,7 @@ export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
                 −
               </button>
               <input
+                id="plotter-qty"
                 type="number"
                 min={1}
                 inputMode="numeric"
@@ -136,11 +136,12 @@ export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
                 +
               </button>
             </div>
-          </label>
-          <label>
-            Уровень сложности
+          </div>
+          <div className="param-group">
+            <label htmlFor="plotter-level">Уровень сложности</label>
             <select
-              className="form-input"
+              id="plotter-level"
+              className="form-control"
               value={levels.some((row) => row.key === draft.levelKey) ? draft.levelKey : 'auto'}
               onChange={(e) => onChange({ levelKey: e.target.value })}
               disabled={levels.length < 2}
@@ -151,11 +152,12 @@ export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
                 </option>
               ))}
             </select>
-          </label>
-          <label className="plotter-bare-calc__material">
-            Материал
+          </div>
+          <div className="param-group">
+            <label htmlFor="plotter-material">Материал</label>
             <select
-              className="form-input"
+              id="plotter-material"
+              className="form-control"
               value={draft.materialId ?? ''}
               onChange={(e) =>
                 onChange(
@@ -172,62 +174,52 @@ export const PlotterCuttingCalculatorForm: React.FC<Props> = ({
                 </option>
               ))}
             </select>
-          </label>
+          </div>
         </div>
-        <div className="plotter-bare-calc__ops">
-          <label>
-            <input
-              type="checkbox"
-              checked={draft.weeding}
-              disabled={draft.materialId == null || !quote?.operations.weeding}
-              onChange={(e) => onChange({ weeding: e.target.checked })}
-            />
-            Выборка
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={draft.mounting}
-              disabled={draft.materialId == null || !quote?.operations.mounting}
-              onChange={(e) => onChange({ mounting: e.target.checked })}
-            />
-            Накатка монтажной плёнки
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={draft.proof}
-              disabled={draft.materialId == null || !quote?.operations.proof}
-              onChange={(e) => onChange({ proof: e.target.checked })}
-            />
-            Проверка
-          </label>
+        <p className="param-hint">
+          «Без материала» считает только резку. Рулонная резка не меньше 0,3 м²: кусок 1,2 × 0,25 м.
+        </p>
+        <div className="advanced-grid">
+          <div className="param-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.weeding}
+                disabled={noMaterial || !quote?.operations.weeding}
+                onChange={(e) => onChange({ weeding: e.target.checked })}
+              />
+              Выборка
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.mounting}
+                disabled={noMaterial || !quote?.operations.mounting}
+                onChange={(e) => onChange({ mounting: e.target.checked })}
+              />
+              Накатка
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.proof}
+                disabled={noMaterial || !quote?.operations.proof}
+                onChange={(e) => onChange({ proof: e.target.checked })}
+              />
+              Проверка
+            </label>
+          </div>
         </div>
-        {materials.length === 0 ? (
-          <p className="plotter-bare-calc__status">
-            Список плёнок пуст. Отметьте рулоны в продуктах, кнопка «Материалы плоттера».
-          </p>
+        {materials.length === 0 && !loading ? (
+          <p className="param-hint">Список плёнок пуст. Отметьте рулоны в продуктах, кнопка «Материалы плоттера».</p>
         ) : null}
         {draft.materialId != null && !materials.some((row) => row.id === draft.materialId) ? (
-          <p className="plotter-bare-calc__status">Этот рулон больше не отмечен для калькулятора.</p>
+          <p className="param-hint">Этот рулон больше не отмечен для калькулятора.</p>
         ) : null}
-        {loading ? <p className="plotter-bare-calc__status">Считаем…</p> : null}
         {quote?.warnings?.length ? (
           <ul className="plotter-bare-calc__warnings">
             {quote.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        ) : null}
-        {quote ? (
-          <ul className="plotter-bare-calc__lines">
-            {quote.lines.map((line) => (
-              <li key={line.key}>
-                <span>{line.title}</span>
-                <span>
-                  {line.quantity} {line.unit} × {line.unitPrice.toFixed(2)} = {line.total.toFixed(2)}
-                </span>
-              </li>
             ))}
           </ul>
         ) : null}
