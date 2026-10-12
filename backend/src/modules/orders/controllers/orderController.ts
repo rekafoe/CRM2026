@@ -5,7 +5,7 @@ import { logger } from '../../../utils/logger'
 import { getDb } from '../../../config/database'
 import { saveBufferToOrderFiles } from '../../../config/upload'
 import { setLastWebsiteOrderAt } from '../../../utils/poolSync'
-import { normalizeWebsiteItems } from '../utils/websiteOrderNormalize'
+import { normalizeWebsiteItems, PublicCheckoutPricingError } from '../utils/websiteOrderNormalize'
 import {
   attachEditorDraftsToOrderItems,
   prepareWebsiteItemsWithEditorDrafts,
@@ -318,6 +318,14 @@ export class OrderController {
         })
         return
       }
+      if (error instanceof PublicCheckoutPricingError) {
+        res.status(error.status).json({
+          error: error.message,
+          message: 'Invalid checkout pricing',
+          code: error.code,
+        })
+        return
+      }
       res.status(500).json({
         error: getSafeServerErrorMessage('Ошибка создания заказа', error),
         message: 'Internal server error'
@@ -610,6 +618,14 @@ export class OrderController {
         res.status(400).json({
           error: getSafeServerErrorMessage('Ошибка editor draft', error),
           message: 'Invalid editor draft'
+        })
+        return
+      }
+      if (error instanceof PublicCheckoutPricingError) {
+        res.status(error.status).json({
+          error: error.message,
+          message: 'Invalid checkout pricing',
+          code: error.code,
         })
         return
       }

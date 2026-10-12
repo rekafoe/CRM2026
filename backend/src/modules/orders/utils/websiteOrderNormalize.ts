@@ -1,5 +1,7 @@
 /** Общие хелперы для заказов с сайта / Mini App (items + params). */
 
+import { configurationFromItemParams, isSimplifiedProduct } from '../../pricing/services/pricingGroupService';
+
 const INTERNAL_PARAM_KEYS = new Set([
   'layoutHumanLabel',
   'crmNoLayoutDeclared',
@@ -9,6 +11,75 @@ const INTERNAL_PARAM_KEYS = new Set([
   // editorDraftToken — контракт checkout редактора; нужен до prepareWebsiteItemsWithEditorDrafts
   'designEditorMode',
 ]);
+
+export class PublicCheckoutPricingError extends Error {
+  code: 'PUBLIC_CHECKOUT_PRODUCT_REQUIRED' | 'PUBLIC_CHECKOUT_PRODUCT_NOT_SIMPLIFIED';
+  status: number;
+
+  constructor(
+    message: string,
+    code: 'PUBLIC_CHECKOUT_PRODUCT_REQUIRED' | 'PUBLIC_CHECKOUT_PRODUCT_NOT_SIMPLIFIED',
+  ) {
+    super(message);
+    this.name = 'PublicCheckoutPricingError';
+    this.code = code;
+    this.status = 400;
+  }
+}
+
+function readClientLineMoney(item: {
+  price?: unknown;
+  quantity?: unknown;
+  totalCost?: unknown;
+  params?: unknown;
+}): number {
+  if (item.totalCost != null && Number.isFinite(Number(item.totalCost))) {
+    return Math.round(Number(item.totalCost) * 100) / 100;
+  }
+  const params = normalizeItemParams(item.params);
+  if (typeof params.storedTotalCost === 'number' && Number.isFinite(params.storedTotalCost)) {
+    return Math.round(Number(params.storedTotalCost) * 100) / 100;
+  }
+  const qty = Math.max(1, parseInt(String(item.quantity ?? 1), 10) || 1);
+  const price = Number(item.price) || 0;
+  return Math.round(price * qty * 100) / 100;
+}
+
+/**
+ * Сайт / Mini App / public editor: платная позиция без simplified productId
+ * не попадает в recalculateOrderPrices → клиентский totalCost остаётся (underpay).
+ * Бесплатные design-only строки (price/totalCost = 0) без productId допустимы.
+ */
+export async function assertPublicCheckoutItemsHaveSimplifiedProduct(
+  items: Array<{
+    price?: unknown;
+    quantity?: unknown;
+    totalCost?: unknown;
+    params?: unknown;
+  }>,
+): Promise<void> {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const money = readClientLineMoney(item);
+    if (!(money > 0)) continue;
+
+    const params = normalizeItemParams(item.params);
+    const { productId } = configurationFromItemParams(params);
+    if (productId == null) {
+      throw new PublicCheckoutPricingError(
+        `Позиция ${index + 1}: для платной позиции нужен productId каталожного продукта`,
+        'PUBLIC_CHECKOUT_PRODUCT_REQUIRED',
+      );
+    }
+    const simplified = await isSimplifiedProduct(productId);
+    if (!simplified) {
+      throw new PublicCheckoutPricingError(
+        `Позиция ${index + 1}: productId=${productId} не является simplified-продуктом каталога`,
+        'PUBLIC_CHECKOUT_PRODUCT_NOT_SIMPLIFIED',
+      );
+    }
+  }
+}
 
 const HIDDEN_SUMMARY_LABELS = new Set([
   'productionrendersource',

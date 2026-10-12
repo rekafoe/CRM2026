@@ -30,6 +30,7 @@ import {
 } from '../../../types/websiteOrderDelivery'
 import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
 import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
+import { assertPublicCheckoutItemsHaveSimplifiedProduct } from '../utils/websiteOrderNormalize'
 
 export class OrderService {
   private static isMeterUnit(unitRaw: unknown): boolean {
@@ -802,6 +803,11 @@ export class OrderService {
     }
   ) {
     const source = orderData.source || 'crm';
+    // Сайт/miniapp/telegram/editor: без simplified productId recalculate пропускает строку
+    // и оставляет клиентский totalCost/storedTotalCost (underpay). CRM custom/postprint — как раньше.
+    if (source !== 'crm') {
+      await assertPublicCheckoutItemsHaveSimplifiedProduct(orderData.items);
+    }
     const createdOrder = await this.createOrder(
       orderData.customerName,
       orderData.customerPhone,
@@ -885,6 +891,10 @@ export class OrderService {
 
   static async deductMaterialsForExistingOrder(orderId: number, userId?: number) {
     const db = await getDb();
+    // CRM may have created active holds on a miniapp draft via replaceParams before finalize.
+    // Cancel them first so «Принят в работу» cannot spend the same materials a second time.
+    const { cancelActiveReservationsForOrder } = await import('./autoDeductedOrderInventory');
+    await cancelActiveReservationsForOrder(db, orderId);
     const rows = (await db.all(
       'SELECT type, params, quantity FROM items WHERE orderId = ? ORDER BY id ASC',
       [orderId]
