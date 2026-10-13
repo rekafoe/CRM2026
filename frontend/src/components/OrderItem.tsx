@@ -24,7 +24,7 @@ import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 import { AssignableUserSelect } from './orders/AssignableUserSelect';
 import type { AssignableUser } from '../api';
 import { MoneyAmount } from './ui/MoneyAmount';
-import { buildOrderItemEssence, buildOrderPositionFacts } from './order/orderItemCompact';
+import { buildOrderItemEssence } from './order/orderItemCompact';
 
 // Кэш отображаемых имён типов бумаги из склада
 let paperTypeDisplayCache: Record<string, string> | null = null;
@@ -557,7 +557,6 @@ export const OrderItem: React.FC<OrderItemProps> = ({
 
   const materialShortageText = formatMaterialShortage(readMaterialShortage(item.params));
   const essence = useMemo(() => buildOrderItemEssence(item), [item]);
-  const positionFacts = useMemo(() => buildOrderPositionFacts(item), [item]);
   const executorLabel = useMemo(() => {
     const id = item.executor_user_id;
     if (id == null || !Number.isFinite(Number(id)) || Number(id) <= 0) return '—';
@@ -621,11 +620,11 @@ export const OrderItem: React.FC<OrderItemProps> = ({
                   <span className="order-item-title-meta">| {titleParts.metaInline}</span>
                 </>
               ) : null}
-              {showDesc ? <> — {display}</> : null}
+              {showDesc && !(layout === 'table' && showPositionBreakdown) ? <> — {display}</> : null}
               {productionBreakdown && (
                 <span className="order-item-production-breakdown">{productionBreakdown}</span>
               )}
-              {!editing && (
+              {!editing && (layout !== 'table' || editorSummary.kind !== 'clientFiles') && (
                 <div className="order-item-editor-summary">
                   <span className={`order-item-editor-badge order-item-editor-badge--${editorSummary.kind}`}>
                     {editorSummary.label}
@@ -655,11 +654,15 @@ export const OrderItem: React.FC<OrderItemProps> = ({
               {!editing && showPositionBreakdown ? (
                 <OrderItemPositionBreakdown
                   item={item}
-                  header={{
-                    productName: itemDisplayName,
-                    formatText: titleParts.formatText,
-                    quantityText: titleParts.quantityText,
-                  }}
+                  header={
+                    layout === 'table'
+                      ? undefined
+                      : {
+                          productName: itemDisplayName,
+                          formatText: titleParts.formatText,
+                          quantityText: titleParts.quantityText,
+                        }
+                  }
                   assignBar={useBreakdownChrome && assignFields ? assignFields : undefined}
                   tableActions={
                     useBreakdownChrome && !readOnly ? (
@@ -755,7 +758,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
           </>
         )}
       </div>
-      {filteredParameterChips.length > 0 ? (
+      {filteredParameterChips.length > 0 && !(layout === 'table' && showPositionBreakdown) ? (
         <aside className="order-item-sidebar" aria-label="Доп. параметры позиции">
           <div className="order-item-sidebar-card">
             <div className="order-item-sidebar-card__title">Параметры</div>
@@ -827,36 +830,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
           </span>
           <span className="order-position__executor">{executorLabel}</span>
         </div>
-        {expanded ? (
-          <div className="order-position__panel">
-            <div className="order-position__facts">
-              <div>
-                <span className="order-position__fact-label">Печать</span>
-                <span className="order-position__fact-value">{positionFacts.print}</span>
-              </div>
-              <div>
-                <span className="order-position__fact-label">Блок / обложка</span>
-                <span className="order-position__fact-value">{positionFacts.materials}</span>
-              </div>
-              <div>
-                <span className="order-position__fact-label">Раскладка</span>
-                <span className="order-position__fact-value">{positionFacts.layout}</span>
-              </div>
-              {!readOnly && onEditParameters ? (
-                <button
-                  type="button"
-                  className="order-position__edit"
-                  onClick={() => onEditParameters(orderId, item)}
-                >
-                  Изменить
-                </button>
-              ) : (
-                <span />
-              )}
-            </div>
-            {details}
-          </div>
-        ) : null}
+        {expanded ? <div className="order-position__panel">{details}</div> : null}
       </div>
     );
   }

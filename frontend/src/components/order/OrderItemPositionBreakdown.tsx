@@ -56,7 +56,12 @@ function materialDisplayName(
   const summaryForRow =
     originalIndexInMaterials === 0 ? parameterSummary : ([] as SummaryRow[]);
   const base = humanReadablePaperLabel(m, summaryForRow);
-  if (originalIndexInMaterials > 0) return base;
+  if (originalIndexInMaterials > 0) {
+    const density = Number(m.density);
+    const densityPart = Number.isFinite(density) && density > 0 ? `${density} г/м²` : '';
+    if (densityPart && !base.includes(String(density))) return `${base}, ${densityPart}`;
+    return base;
+  }
 
   const density = specs.paperDensity ?? m.density;
   const densityPart =
@@ -120,7 +125,7 @@ export const OrderItemPositionBreakdown: React.FC<Props> = ({
       <div className="order-item-position-breakdown__card order-item-position-breakdown__card--compact">
         {header || assignBar || tableActions ? (
           <div
-            className="order-item-breakdown-meta order-item-breakdown-meta--grid"
+            className={`order-item-breakdown-meta order-item-breakdown-meta--grid${header ? '' : ' order-item-breakdown-meta--controls'}`}
             aria-label="Позиция заказа"
           >
             <div className="order-item-breakdown-meta__col order-item-breakdown-meta__col--product">

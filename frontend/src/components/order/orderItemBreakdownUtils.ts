@@ -109,13 +109,38 @@ export function formatPrintCaptionLine(
   return sidesPhrase;
 }
 
-/** Подпись строки тарифа печати для заказа (стороны, тип бумаги, г/м²). */
+function colorPhraseFromSpecs(specs: Record<string, unknown>): string {
+  const raw = String(specs.print_color_mode || specs.printColorMode || '')
+    .trim()
+    .toLowerCase();
+  if (raw === 'color' || raw === 'цвет' || raw === 'цветная') return 'цвет';
+  if (raw === 'bw' || raw === 'ч/б' || raw === 'mono' || raw === 'черно-белая') return 'ч/б';
+  return '';
+}
+
+function pagesPhraseFromSpecs(
+  specs: Record<string, unknown>,
+  parameterSummary: Array<{ label?: string; key?: string; value?: string }>
+): string {
+  const fromSummary = parameterSummary.find((entry) =>
+    /страниц/i.test(String(entry.label || entry.key || ''))
+  )?.value;
+  const raw = fromSummary || specs.pages || specs.pageCount;
+  const count = Number(String(raw ?? '').replace(/[^\d]/g, ''));
+  if (!Number.isFinite(count) || count <= 1) return '';
+  return `${count} стр.`;
+}
+
+/** Подпись строки тарифа печати для заказа (стороны, цвет, бумага, страницы). */
 export function formatPrintOperationCaption(
   specs: Record<string, unknown>,
   materials: OrderItemMaterialRow[],
   parameterSummary: Array<{ label?: string; key?: string; value?: string }>
 ): string {
-  const sidesPhrase = printSidesPhraseFromSpecs(specs);
+  const color = colorPhraseFromSpecs(specs);
+  const sidesBase = printSidesPhraseFromSpecs(specs);
+  const sidesPhrase =
+    color && !sidesBase.toLowerCase().includes(color) ? `${sidesBase}, ${color}` : sidesBase;
 
   const mainMaterial = materials[0];
   const basePaper = humanReadablePaperLabel(mainMaterial, parameterSummary);
@@ -138,7 +163,10 @@ export function formatPrintOperationCaption(
   const densityPhrase =
     densityNum != null && densityNum > 0 ? `${densityNum} г/м²` : '';
 
-  return formatPrintCaptionLine(sidesPhrase, basePaper, densityPhrase);
+  const caption = formatPrintCaptionLine(sidesPhrase, basePaper, densityPhrase);
+  const pages = pagesPhraseFromSpecs(specs, parameterSummary);
+  if (pages && !caption.toLowerCase().includes('стр')) return `${caption}, ${pages}`;
+  return caption;
 }
 
 /** Как на бэкенде commodityReceiptLabels — для актов/счетов (fallback на фронте). */

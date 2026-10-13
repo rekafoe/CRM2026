@@ -65,6 +65,13 @@ const HIDDEN_OPERATOR_PARAM_LABELS = new Set([
   'срок изготовления',
   'количество страниц',
   'layouthumanlabel',
+  'резка',
+  'биговка',
+  'фальцовка',
+  'ламинация',
+  'скругление',
+  'скругление углов',
+  'перфорация',
 ]);
 
 const stripTechKvFromDescription = (desc: string): string => {
