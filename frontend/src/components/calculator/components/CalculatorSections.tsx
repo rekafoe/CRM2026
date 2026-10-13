@@ -10,7 +10,10 @@ import { DynamicFieldsSection } from './DynamicFieldsSection';
 import { AdvancedSettingsSection } from './AdvancedSettingsSection';
 import { OperationsSection } from './OperationsSection';
 import { SelectedProductCard } from './SelectedProductCard';
-import { getHiddenPlotterRollFinFieldNamesForCalculator } from '../utils/simplifiedConfig';
+import {
+  getHiddenPlotterRollFinFieldNamesForCalculator,
+  isProductPlotterEnabled,
+} from '../utils/simplifiedConfig';
 import { UvPrintSection } from './UvPrintSection';
 import {
   getEffectiveUvPrintConfig,
@@ -110,9 +113,10 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
   const typeIdForPlotterFields = showTypeSelector ? selectedTypeId ?? specs.typeId ?? null : specs.typeId ?? null;
-  const plotterRollFinHiddenFields = getHiddenPlotterRollFinFieldNamesForCalculator(
+  const plotterRollFinHiddenFields = getHiddenPlotterRollFinFieldNamesForCalculator();
+  const plotterCutIncluded = isProductPlotterEnabled(
     backendProductSchema?.template?.simplified,
-    typeIdForPlotterFields ?? null
+    typeIdForPlotterFields ?? null,
   );
   const uvFlatbed = isUvFlatbedProduct(backendProductSchema, typeIdForPlotterFields);
   const uvTemplateConfig = getEffectiveUvPrintConfig(backendProductSchema, typeIdForPlotterFields);
@@ -305,6 +309,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           specs={specs as any}
           updateSpecs={updateSpecs as any}
           hiddenFieldNames={plotterRollFinHiddenFields}
+          showPlotterCutHint={plotterCutIncluded}
         />
 
         <OperationsSection

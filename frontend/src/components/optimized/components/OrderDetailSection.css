@@ -219,27 +219,45 @@
   padding-right: 10px;
 }
 
-/* Шапка с выравниванием: Примечания на одной линии с кнопками, поле опущено */
+/* Шапка заказа: номер, строка кнопок, затем клиент и примечания */
 .detail-header--notes-aligned {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+.detail-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detail-header__title-row h2 {
+  margin: 0;
+  font-weight: 700;
+}
+.detail-header__issued {
+  font-size: 12px;
+  color: #2e7d32;
+  font-weight: 600;
+}
+.detail-header__actions {
+  width: 100%;
+}
+.detail-header__main {
   display: grid;
-  grid-template-columns: auto auto 1fr;
-  grid-template-rows: auto auto;
-  gap: 0 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
+  gap: 12px 16px;
   align-items: start;
 }
 .detail-header__col-left {
-  grid-column: 1;
-  grid-row: 1 / -1;
-  min-width: 200px;
+  min-width: 0;
 }
 .detail-header__col-notes {
-  grid-column: 2;
-  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  width: 300px;
-  padding-top: 10px;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 0;
 }
 .detail-notes-label {
   font-size: 12px;
@@ -247,19 +265,11 @@
   margin-bottom: 0;
   flex-shrink: 0;
 }
-.detail-header__col-notes .detail-notes-input {
-  margin-top: 32px;
-}
-.detail-header--notes-aligned .detail-actions--align-right {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-/* Поле примечаний — как кнопки */
 .detail-notes-input {
-  width: 300px;
-  height: 150px;
-  min-height: 150px;
+  width: 100%;
+  height: 120px;
+  min-height: 96px;
+  margin-top: 0;
   resize: vertical;
   box-sizing: border-box;
 }
@@ -378,55 +388,8 @@
   color: #16a34a;
 }
 
-/* Ноутбук: шапка не разъезжается из-за ряда кнопок и поля примечаний */
-@media (max-width: 1440px) {
-  .detail-header--notes-aligned {
-    grid-template-columns: minmax(0, 1fr) minmax(180px, 240px) auto;
-    gap: 8px 12px;
-  }
-
-  .detail-header__col-left {
-    min-width: 0;
-  }
-
-  .order-detail-actions-row {
-    min-width: 0;
-  }
-
-  .detail-header__col-notes {
-    width: auto;
-    min-width: 0;
-    padding-top: 4px;
-  }
-
-  .detail-notes-input,
-  .detail-header__col-notes .detail-notes-input {
-    width: 100%;
-    height: 96px;
-    min-height: 72px;
-    margin-top: 22px;
-  }
-}
-
 @media (max-width: 1180px) {
-  .detail-header--notes-aligned {
+  .detail-header__main {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .detail-header__col-left,
-  .detail-header__col-notes,
-  .detail-header--notes-aligned .detail-actions--align-right {
-    grid-column: 1;
-    grid-row: auto;
-    width: auto;
-  }
-
-  .detail-header--notes-aligned .detail-actions--align-right {
-    margin-left: 0;
-    justify-content: flex-start;
-  }
-
-  .detail-header__col-notes .detail-notes-input {
-    margin-top: 4px;
   }
 }

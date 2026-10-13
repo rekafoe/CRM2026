@@ -1,9 +1,21 @@
 .plotter-bare-calc .param-hint {
-  margin: 10px 0 0;
+  margin: 0;
+}
+
+.plotter-bare-calc .form-control,
+.plotter-bare-calc .quantity-controls {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.calculator-section-unified .plotter-bare-calc .param-group--quantity .quantity-input {
+  flex: 1 1 auto;
+  max-width: none;
+  min-width: 0;
 }
 
 .plotter-bare-calc .advanced-grid {
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .plotter-bare-calc .checkbox-group label:has(input:disabled) {
@@ -13,8 +25,15 @@
 }
 
 .plotter-bare-calc__warnings {
-  margin: 10px 0 0;
-  padding-left: 18px;
-  color: #9a3412;
-  font-size: 13px;
+  margin: 0;
+  padding: 6px 8px 6px 26px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.plotter-bare-calc__warnings li + li {
+  margin-top: 2px;
 }

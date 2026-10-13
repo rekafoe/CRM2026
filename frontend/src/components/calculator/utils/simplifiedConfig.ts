@@ -107,33 +107,26 @@ function orderedKeys(keys: string[], orderRef: string[]): string[] {
   return orderRef.filter((k) => set.has(k));
 }
 
-/** Поля выборки/накатки считаются только для рулонного плоттера; скрываем в калькуляторе на листовом подтипе. */
+/** Выборка и накатка в калькуляторе продукта не показываются. */
 const PLOTTER_ROLL_FIN_CALC_FIELD_NAMES = ['plotter_weeding', 'plotter_mounting'] as const;
 
-/** Набор имён полей для фильтрации в «Доп. параметры» или undefined = не фильтровать. */
-export function getHiddenPlotterRollFinFieldNamesForCalculator(
+export function getHiddenPlotterRollFinFieldNamesForCalculator(): Set<string> {
+  return new Set(PLOTTER_ROLL_FIN_CALC_FIELD_NAMES);
+}
+
+/** У выбранного подтипа включена плоттерная резка (рулон, лист или авто). */
+export function isProductPlotterEnabled(
   simplified:
     | {
-        types?: unknown[];
-        typeConfigs?: Record<string, { plotter?: { enabled?: boolean; mode?: string } }>;
+        typeConfigs?: Record<string, { plotter?: { enabled?: boolean } }>;
       }
     | null
     | undefined,
-  selectedTypeId: number | null | undefined
-): Set<string> | undefined {
-  const types = simplified?.types;
-  const tcs = simplified?.typeConfigs;
-  if (!Array.isArray(types) || types.length === 0 || !tcs || typeof tcs !== 'object') {
-    return undefined;
-  }
-  if (selectedTypeId == null || !Number.isFinite(Number(selectedTypeId))) {
-    return undefined;
-  }
-  const cfg = tcs[String(selectedTypeId)];
-  if (!cfg) return undefined;
-  const p = cfg.plotter;
-  if (p?.enabled === true && p?.mode === 'roll') return undefined;
-  return new Set(PLOTTER_ROLL_FIN_CALC_FIELD_NAMES);
+  selectedTypeId: number | null | undefined,
+): boolean {
+  if (selectedTypeId == null || !Number.isFinite(Number(selectedTypeId))) return false;
+  const cfg = simplified?.typeConfigs?.[String(selectedTypeId)];
+  return cfg?.plotter?.enabled === true;
 }
 
 function mergeSimplifiedPagesConfig(

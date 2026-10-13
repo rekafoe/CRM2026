@@ -36,9 +36,7 @@ import {
   quotePerM2Finishing,
   resolveWarehouseFeedMeters,
 } from './finishingPerM2';
-import { resolveRollCutLevelMultiplier } from './plotterCutLevel';
 import {
-  billPlotterRollCutAreaM2,
   buildPlotterTiersFromDto,
   findPlotterVolumeTier,
   resolvePlotterTierVolumeQty,
@@ -1586,7 +1584,6 @@ export class SimplifiedPricingService {
     let knifePathMetersTotal = 0;
     let sheetPlotterSheetsNeeded = 0;
     let plotterTariffsBundle: PlotterCuttingTariffsBundleDTO | null = null;
-    let plotterCutLevelMultiplier = 1;
     const plotterCfg = effectivePlotterConfig;
     if (plotterCfg?.enabled === true && plotterCfg.mode) {
       const rollAllow = plotterCfg.roll_allowed_material_ids;
@@ -1628,22 +1625,6 @@ export class SimplifiedPricingService {
       }
 
       plotterTariffsBundle = await PlotterCuttingTariffRepository.getBundle();
-      {
-        const rules =
-          plotterCfg.mode === 'roll'
-            ? plotterTariffsBundle.roll.cut_level_rules
-            : plotterTariffsBundle.sheet.cut_level_rules;
-        if (rules?.length) {
-          const cellLong = Math.max(layoutTrim.width, layoutTrim.height) + 2 * resolvedBleedMm;
-          plotterCutLevelMultiplier = resolveRollCutLevelMultiplier(cellLong, rules);
-          if (plotterCutLevelMultiplier !== 1) {
-            const modeLabel = plotterCfg.mode === 'roll' ? 'рулон' : 'лист';
-            pricingWarnings.push(
-              `Плоттер (${modeLabel}): уровень резки ×${plotterCutLevelMultiplier.toFixed(2)} (длинная сторона ячейки ≈ ${Math.round(cellLong)} мм).`
-            );
-          }
-        }
-      }
 
       const pushPlotterFin = (sid?: number) => {
         if (sid == null || !Number.isFinite(Number(sid))) return;
@@ -1652,15 +1633,15 @@ export class SimplifiedPricingService {
         if (effectiveFinishingToUse.some((f) => Number(f.service_id) === n)) return;
         effectiveFinishingToUse.push({ service_id: n });
       };
+      // Продукт берёт ставку резки и вместимость. Выборка и накатка остаются в отдельном калькуляторе.
       if (plotterCfg.mode === 'roll') pushPlotterFin(PLOTTER_FIN_ROLL);
       else pushPlotterFin(PLOTTER_FIN_SHEET);
-      if (plotterCfg.mode === 'roll' && normalizedConfig.plotter_weeding === true) {
-        pushPlotterFin(PLOTTER_FIN_WEEDING);
-      }
-      if (plotterCfg.mode === 'roll' && normalizedConfig.plotter_mounting === true) {
-        pushPlotterFin(PLOTTER_FIN_MOUNTING);
-      }
     }
+
+    effectiveFinishingToUse = effectiveFinishingToUse.filter((f) => {
+      const n = Number(f?.service_id);
+      return n !== PLOTTER_FIN_WEEDING && n !== PLOTTER_FIN_MOUNTING;
+    });
 
     const pieceCutAreaTrimM2 =
       layoutTrim.width > 0 && layoutTrim.height > 0
@@ -1996,9 +1977,6 @@ export class SimplifiedPricingService {
             } else {
               meterUnits = pieceCutAreaTrimM2 * quantity;
             }
-            if (sidEarly === PLOTTER_FIN_ROLL && !sheetBilledByCount && meterBasis !== 'feed') {
-              meterUnits = billPlotterRollCutAreaM2(meterUnits, limits?.min);
-            }
           }
           const perSheetUnits = isPerSheetOp
             ? (isMaterialMeterBased ? materialMetersNeeded : sheetsNeeded)
@@ -2095,13 +2073,7 @@ export class SimplifiedPricingService {
                       : plotterTierVolumeCtx.sheet.meterBasis,
                   knifePathM: knifePathMetersTotal,
                   feedM: sidNum === PLOTTER_FIN_SHEET ? sheetPlotterSheetsNeeded : metersNeeded,
-                  cutAreaM2:
-                    sidNum === PLOTTER_FIN_ROLL && plotterTierVolumeCtx.roll.meterBasis !== 'feed'
-                      ? billPlotterRollCutAreaM2(
-                          plotterTierVolumeCtx.pieceCutAreaTrimM2 * quantity,
-                          limits?.min,
-                        )
-                      : plotterTierVolumeCtx.pieceCutAreaTrimM2 * quantity,
+                  cutAreaM2: plotterTierVolumeCtx.pieceCutAreaTrimM2 * quantity,
                 })
               : tierQty;
           const tier = isPlotterMainCutSynthetic
@@ -2118,11 +2090,7 @@ export class SimplifiedPricingService {
           }
 
           const priceForTier = this.getPriceForQuantityTier(tier);
-          const plotterRollMul =
-            sidNum === PLOTTER_FIN_ROLL || sidNum === PLOTTER_FIN_SHEET || sidNum === PLOTTER_FIN_WEEDING
-              ? plotterCutLevelMultiplier
-              : 1;
-          const effectivePriceForTier = priceForTier * plotterRollMul;
+          const effectivePriceForTier = priceForTier;
           const serviceMinQty = limits?.min ?? 0;
           // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на позицию (units_per_item); иначе — тираж × units_per_item (per_item и др.)
 
@@ -2642,7 +2610,6 @@ export class SimplifiedPricingService {
       metersPerItem: materialMetersPerItem,
       knifePathByQty,
       sheetCountByQty,
-      plotterCutLevelMultiplier,
       plotterTierVolumeCtx,
       coverPages: separateCoverForTier ? pageSplit.coverPages : 0,
       coverSidesMode: separateCoverForTier ? coverSidesForTier : undefined,
@@ -2962,8 +2929,6 @@ export class SimplifiedPricingService {
     knifePathByQty?: (q: number) => number;
     /** Лист: число листов на тираж q. Для тарифа «по числу листов». */
     sheetCountByQty?: (q: number) => number;
-    /** Множитель уровня резки к ставке. Один на расчёт: режим подтипа уже выбран. */
-    plotterCutLevelMultiplier?: number;
     /** Оси объёма для тиражных ступеней плоттера (synthetic PLOTTER_FIN_*) */
     plotterTierVolumeCtx?: {
       roll: { volumeTierBasis: PlotterVolumeTierBasis | null; meterBasis: 'knife_path' | 'feed' };
@@ -3136,13 +3101,7 @@ export class SimplifiedPricingService {
             : isPerMeterOp
               ? ctx.knifePathByQty?.(q) ?? 0
               : 0;
-        const meterUnits =
-          sidForMeters === PLOTTER_FIN_ROLL && isPerMeterOp && !sheetBilledByCount && meterBasis !== 'feed'
-            ? billPlotterRollCutAreaM2(
-                rawMeterUnits,
-                ctx.serviceLimitsMap?.get(finConfig.service_id)?.min,
-              )
-            : rawMeterUnits;
+        const meterUnits = rawMeterUnits;
         const perSheetUnits = isPerSheetOp ? (ctx.isRollMeterage ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
         const totalCutsForOrder = Math.max(unitsPerItem, 1);
@@ -3193,10 +3152,7 @@ export class SimplifiedPricingService {
                     : ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0
                       ? ctx.metersPerItem! * q
                       : 0,
-                cutAreaM2:
-                  sidFin === PLOTTER_FIN_ROLL && ptv.roll.meterBasis !== 'feed'
-                    ? billPlotterRollCutAreaM2(ptv.pieceCutAreaTrimM2 * q, limitsFin?.min)
-                    : ptv.pieceCutAreaTrimM2 * q,
+                cutAreaM2: ptv.pieceCutAreaTrimM2 * q,
               })
             : tierQty;
         const tier = isPlotterMainCut
@@ -3204,11 +3160,7 @@ export class SimplifiedPricingService {
           : this.findTierForQuantity(tiers, tierQty);
         if (!tier) continue;
         const priceForTier = this.getPriceForQuantityTier(tier);
-        const rollMul =
-          sidFin === PLOTTER_FIN_ROLL || sidFin === PLOTTER_FIN_SHEET || sidFin === PLOTTER_FIN_WEEDING
-            ? (ctx.plotterCutLevelMultiplier ?? 1)
-            : 1;
-        const effectiveTierPrice = priceForTier * rollMul;
+        const effectiveTierPrice = priceForTier;
         const priceUnit = priceUnitFromDb;
         const serviceMinQty = ctx.serviceLimitsMap?.get(finConfig.service_id)?.min ?? 0;
         if (isPerSheetOp) {

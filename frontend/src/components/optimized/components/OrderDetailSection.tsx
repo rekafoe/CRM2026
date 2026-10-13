@@ -317,13 +317,13 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   return (
     <>
       <div className="detail-header detail-header--notes-aligned">
-        <div className="detail-header__col-left">
-          <div className="detail-header__top-row" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <h2 style={{ margin: 0, fontWeight: 700 }}>{selectedOrder.number}</h2>
-            {(selectedOrder.issued_by_me === true || selectedOrder.issued_by_me === 1) && (
-              <span style={{ fontSize: 12, color: '#2e7d32', fontWeight: 600 }}>Выдали вы</span>
-            )}
-            <div className="order-detail-actions-row">
+        <div className="detail-header__title-row">
+          <h2>{selectedOrder.number}</h2>
+          {(selectedOrder.issued_by_me === true || selectedOrder.issued_by_me === 1) && (
+            <span className="detail-header__issued">Выдали вы</span>
+          )}
+        </div>
+        <div className="order-detail-actions-row detail-header__actions">
               <button 
                 onClick={onShowFilesModal}
                 className="order-detail-action-btn order-detail-action-btn--primary"
@@ -600,8 +600,12 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   </div>
                 )}
               </div>
+              <button type="button" className="order-detail-action-btn order-detail-action-btn--primary" onClick={() => onOpenCalculator()}>
+                Добавить продукт
+              </button>
             </div>
-          </div>
+        <div className="detail-header__main">
+        <div className="detail-header__col-left">
           <CustomerSelector
             orderId={selectedOrder.id}
             currentCustomerId={selectedOrder.customer_id}
@@ -711,8 +715,6 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             className="detail-notes-input"
           />
         </div>
-        <div className="detail-actions detail-actions--align-right">
-          <button onClick={() =>onOpenCalculator()}>Добавить продукт</button>
         </div>
       </div>
 
