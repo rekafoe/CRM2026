@@ -1073,9 +1073,34 @@ export class SimplifiedPricingService {
           })
         : null;
     const rollWideMetersNeeded = isRollWideM2Mode ? rollMaterialLayout?.feedMeters ?? 0 : 0;
-    const rollWideMetersPerItem = isRollWideM2Mode && quantity > 0 ? rollWideMetersNeeded / quantity : 0;
-    const materialMetersNeeded = isRollMeterage ? metersNeeded : rollWideMetersNeeded;
-    const materialMetersPerItem = isRollMeterage ? metersPerItem : rollWideMetersPerItem;
+    const plotterRollActive =
+      effectivePlotterConfig?.enabled === true && effectivePlotterConfig.mode === 'roll';
+    // Плоттер и плёнка тянут один и тот же прокат: поля и зазор рулона, сколько штук встаёт поперёк.
+    const plotterRollRunLayout =
+      plotterRollActive && (materialSheetMm?.width ?? 0) > 0
+        ? computeOptimizedRollFeedMeters({
+            rollWidthMm: materialSheetMm!.width,
+            trimMm: layoutTrim,
+            bleedMm: resolvedBleedMm,
+            quantity,
+            margins: resolvePlotterMargins('roll', customMarginMm, customGapMm),
+          })
+        : null;
+    const activeRollLayout = plotterRollRunLayout ?? rollMaterialLayout;
+    const fittedRollMeters =
+      plotterRollRunLayout?.feedMeters && plotterRollRunLayout.feedMeters > 0
+        ? plotterRollRunLayout.feedMeters
+        : rollWideMetersNeeded;
+    // Раскладка по ширине важнее формулы «короткая сторона × тираж»: иначе 105 мм на рулоне 630 мм
+    // списываются как один ряд, хотя поперёк встаёт несколько штук.
+    const materialMetersNeeded =
+      fittedRollMeters > 0 && (plotterRollActive || isRollWideM2Mode)
+        ? fittedRollMeters
+        : isRollMeterage
+          ? metersNeeded
+          : 0;
+    const materialMetersPerItem =
+      quantity > 0 && materialMetersNeeded > 0 ? materialMetersNeeded / quantity : 0;
     const isMaterialMeterBased = materialMetersNeeded > 0 && (isRollMeterage || isRollWideM2Mode);
     const rollWideMaterialWarning =
       isRollWideM2Mode && normalizedConfig.material_id && !isMaterialMeterBased
@@ -2755,15 +2780,23 @@ export class SimplifiedPricingService {
       }
     }
 
+    const useRollNest = Boolean(activeRollLayout && activeRollLayout.feedMeters > 0 && (plotterRollActive || isRollWideM2Mode));
+    const pieceAreaM2 =
+      (Math.max(0, layoutTrim.width) * Math.max(0, layoutTrim.height) * Math.max(0, quantity)) / 1_000_000;
+    const rollWastePercentage =
+      useRollNest && activeRollLayout && activeRollLayout.totalAreaM2 > 0
+        ? Math.max(0, ((activeRollLayout.totalAreaM2 - pieceAreaM2) / activeRollLayout.totalAreaM2) * 100)
+        : layoutCheck.wastePercentage;
     const layoutResult: SimplifiedPricingResult['layout'] = {
-      fitsOnSheet: layoutCheck.fitsOnSheet,
-      itemsPerSheet: layoutCheck.itemsPerSheet,
-      sheetsNeeded: isMaterialMeterBased ? 0 : sheetsNeeded,
+      fitsOnSheet: useRollNest ? true : layoutCheck.fitsOnSheet,
+      // На рулоне «шт/лист» листовой раскладки не показываем: иначе в заказ попадает SRA3.
+      itemsPerSheet: useRollNest ? 1 : layoutCheck.itemsPerSheet,
+      sheetsNeeded: useRollNest || isMaterialMeterBased ? 0 : sheetsNeeded,
       ...(isMaterialMeterBased && { metersNeeded: materialMetersNeeded }),
       ...(isRollWideM2Mode && totalM2Needed > 0 ? { totalM2Needed } : {}),
-      wastePercentage: layoutCheck.wastePercentage,
-      recommendedSheetSize: layoutCheck.recommendedSheetSize,
-      cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
+      wastePercentage: rollWastePercentage,
+      ...(useRollNest ? {} : { recommendedSheetSize: layoutCheck.recommendedSheetSize }),
+      cutsPerSheet: useRollNest ? 0 : (layoutCheck.cutsPerSheet ?? 0),
       bleedMm: resolvedBleedMm,
     };
     const warnings: string[] = [...pricingWarnings];
@@ -2929,11 +2962,13 @@ export class SimplifiedPricingService {
       ...(operationMaterials.length > 0 ? { operationMaterials } : {}),
       tierVolumeForGrouping: usePagesMultiplier
         ? multipageTierPrintUnits
-        : isRollMeterage
-          ? Math.max(1, Math.floor(metersNeeded))
-          : isRollWideM2Mode
-            ? Math.max(0.001, Math.round(totalM2Needed * 1000) / 1000)
-          : quantity,
+        : (plotterRollActive || isRollWideM2Mode) && materialMetersNeeded > 0
+          ? Math.max(1, Math.floor(materialMetersNeeded))
+          : isRollMeterage
+            ? Math.max(1, Math.floor(metersNeeded))
+            : isRollWideM2Mode
+              ? Math.max(0.001, Math.round(totalM2Needed * 1000) / 1000)
+              : quantity,
     };
   }
   

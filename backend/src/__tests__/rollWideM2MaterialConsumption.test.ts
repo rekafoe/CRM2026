@@ -133,4 +133,60 @@ describe('roll_wide_m2 material write-off by running meters', () => {
     expect(result.materialPrice).toBeCloseTo(2.5 * materialPricePerMeter, 4);
     expect(result.materialDetails?.priceForQuantity).toBeCloseTo(2.5 * materialPricePerMeter, 4);
   });
+
+  it('keeps the nested roll layout when a per-meter print row also exists', async () => {
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return {
+            id: 1,
+            name: 'ШФП постер',
+            calculator_type: 'simplified',
+            product_type: 'universal',
+          };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('sheet_width, sheet_height FROM materials')) {
+          return { sheet_width: 610, sheet_height: null };
+        }
+        if (query.includes('sheet_price_single FROM materials')) {
+          return { sheet_price_single: materialPricePerMeter };
+        }
+        if (query.includes('FROM materials m') && query.includes('paper_type_id')) {
+          return { name: 'Баннер 610', density: null, paper_type_id: null };
+        }
+        if (query.includes('FROM print_prices') && query.includes("counter_unit = 'meters'")) {
+          return {
+            id: 9,
+            counter_unit: 'meters',
+            price_bw_per_meter: 1,
+            price_color_per_meter: 2,
+          };
+        }
+        if (query.includes('FROM price_types WHERE key = ?')) {
+          return null;
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'roll',
+        material_id: materialId,
+        print_technology: 'inkjet_solvent',
+        trim_size: { width: 300, height: 500 },
+      },
+      10,
+    );
+
+    // Короткая сторона × тираж дала бы 3.0 м. Раскладка 2×5 остаётся 2.5 м.
+    expect(result.layout?.metersNeeded).toBeCloseTo(2.5, 4);
+    expect(result.materialPrice).toBeCloseTo(2.5 * materialPricePerMeter, 4);
+  });
 });

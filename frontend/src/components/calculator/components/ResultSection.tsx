@@ -173,14 +173,15 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   const addButtonLabel = mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <>Добавить в заказ</>;
   const showFormatWarning = fitsOnSheet === false || warnings.length > 0;
   const costLines = positiveCostLines(result);
+  const rollRun = Number(metersNeeded) > 0 && !(Number(sheetsNeeded) > 0);
   const layoutFacts = [
     sheetsNeeded != null && sheetsNeeded > 0 ? `${formatNumber(sheetsNeeded)} ${sheetWord(sheetsNeeded)}` : null,
-    itemsPerSheet != null && itemsPerSheet > 0 ? `${formatNumber(itemsPerSheet)} шт. на листе` : null,
+    !rollRun && itemsPerSheet != null && itemsPerSheet > 0 ? `${formatNumber(itemsPerSheet)} шт. на листе` : null,
     metersNeeded != null && metersNeeded > 0 ? `подача ${formatNumber(metersNeeded, 'п.м.', true)}` : null,
     totalM2Needed != null && totalM2Needed > 0 ? `площадь ${formatNumber(totalM2Needed, 'м²', true)}` : null,
     sheetSize ? `лист ${sheetSize}` : null,
     bleedMm != null && bleedMm > 0 ? `дозаливка ${bleedMm} мм` : null,
-    cutsPerSheetUi != null && cutsPerSheetUi > 0 ? `${formatNumber(cutsPerSheetUi)} резов на лист` : null,
+    !rollRun && cutsPerSheetUi != null && cutsPerSheetUi > 0 ? `${formatNumber(cutsPerSheetUi)} резов на лист` : null,
     result.layout?.knifePathM != null && result.layout.knifePathM > 0
       ? `длина реза ${formatNumber(result.layout.knifePathM, 'м', true)}`
       : null,

@@ -51,6 +51,18 @@ describe('productPlotterRollFeedMeters', () => {
     expect(feed).not.toBeCloseTo(5.94, 2);
   });
 
+  it('nests 105 mm squares across a 630 mm roll', () => {
+    const feed = productPlotterRollFeedMeters({
+      rollWidthMm: 630,
+      trimMm: { width: 105, height: 105 },
+      bleedMm: 0,
+      quantity: 50,
+    });
+    // 5 шт. поперёк, 10 рядов, поля 10 мм и зазор 2 мм = 1.088 м.
+    // Один ряд дал бы 5.25 м.
+    expect(feed).toBeCloseTo(1.088, 3);
+  });
+
   it('returns null when the roll width is missing or the piece does not fit', () => {
     expect(
       productPlotterRollFeedMeters({
