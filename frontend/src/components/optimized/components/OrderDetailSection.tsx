@@ -12,6 +12,7 @@ import { getOrderAmounts } from '../../../utils/orderTotal';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 import { AppIcon } from '../../ui/AppIcon';
 import { OrderDeliveryBlock } from '../../orders/OrderDeliveryBlock';
+import { OrderDispatchMenu } from '../../orders/OrderDispatchMenu';
 import { PostalShipmentPanel } from '../../orders/PostalShipmentPanel';
 import { OrderCostSheetPanel } from '../../orders/OrderCostSheetPanel';
 import { AssignableUserSelect } from '../../orders/AssignableUserSelect';
@@ -372,6 +373,9 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                 })}
               />
               <OrderCostSheetPanel orderId={selectedOrder.id} />
+              {currentUser?.role === 'admin' ? (
+                <OrderDispatchMenu orderId={selectedOrder.id} customerPhone={selectedOrder.customerPhone} />
+              ) : null}
               {showLegalDocsButton && (
                 <div ref={docsMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
                   <button

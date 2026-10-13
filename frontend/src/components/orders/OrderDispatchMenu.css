@@ -1,5 +1,10 @@
 .order-dispatch {
   position: relative;
+  display: inline-block;
+}
+
+.order-dispatch__toggle--open {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 0 2px rgba(255, 255, 255, 0.35);
 }
 
 .order-dispatch__backdrop {
@@ -7,13 +12,13 @@
   inset: 0;
   border: none;
   background: transparent;
-  z-index: 40;
+  z-index: 999;
 }
 
 .order-dispatch__panel {
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  top: calc(100% + 4px);
+  left: 0;
   width: min(420px, calc(100vw - 24px));
   max-height: min(70vh, 560px);
   display: flex;
@@ -22,7 +27,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
-  z-index: 50;
+  z-index: 1000;
   overflow: hidden;
 }
 

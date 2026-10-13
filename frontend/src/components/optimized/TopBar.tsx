@@ -5,7 +5,6 @@ import { AppIcon } from '../ui/AppIcon';
 import type { Organization } from '../../api';
 import type { InboxNotification } from '../../api';
 import { InboxNotifications } from '../notifications/InboxNotifications';
-import { OrderDispatchMenu } from '../orders/OrderDispatchMenu';
 import './TopBar.css';
 
 interface TopBarProps {
@@ -26,9 +25,6 @@ interface TopBarProps {
   onInboxClose?: () => void;
   onInboxMarkAllRead?: () => void;
   onInboxOpenNotification?: (notification: InboxNotification) => void;
-  /** Выбранный заказ: история почты и SMS прячется в кнопку топбара. */
-  dispatchOrderId?: number | null;
-  dispatchCustomerPhone?: string | null;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -48,8 +44,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   onInboxClose,
   onInboxMarkAllRead,
   onInboxOpenNotification,
-  dispatchOrderId = null,
-  dispatchCustomerPhone = null,
 }) => {
   const navigate = useNavigate();
   const rawLogoUrl = organization?.logo_url;
@@ -92,9 +86,6 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
       <div className="topbar-actions">
-        {isAdmin && dispatchOrderId != null && (
-          <OrderDispatchMenu orderId={dispatchOrderId} customerPhone={dispatchCustomerPhone} />
-        )}
         {onInboxToggle && onInboxClose && onInboxMarkAllRead && onInboxOpenNotification && (
           <InboxNotifications
             unreadCount={inboxUnreadCount}

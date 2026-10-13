@@ -16,16 +16,13 @@ export const OrderDispatchMenu: React.FC<Props> = ({ orderId, customerPhone }) =
     <div className="order-dispatch">
       <button
         type="button"
-        className="app-icon-btn app-icon-btn--with-label"
+        className={`order-detail-action-btn order-detail-action-btn--neutral${open ? ' order-dispatch__toggle--open' : ''}`}
         onClick={() => setOpen((value) => !value)}
         title="Почта и SMS по заказу"
         aria-label="Почта и SMS по заказу"
         aria-expanded={open}
       >
-        <span className="app-icon-btn__icon" aria-hidden="true">
-          <AppIcon name="history" size="sm" />
-        </span>
-        <span className="app-icon-btn__label">Отправления</span>
+        <AppIcon name="history" size="xs" /> Отправления
       </button>
       {open ? (
         <>
