@@ -6,7 +6,7 @@ import {
 } from '../src/modules/pricing/services/plotterLayout'
 
 describe('plotterLayout', () => {
-  test('defaults roll 10/2 sheet 15/4', () => {
+  test('defaults roll 25/2 sheet 15/4', () => {
     expect(resolvePlotterMargins('roll')).toEqual(PLOTTER_DEFAULTS.roll);
     expect(resolvePlotterMargins('sheet')).toEqual(PLOTTER_DEFAULTS.sheet);
   });

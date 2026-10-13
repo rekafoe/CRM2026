@@ -679,6 +679,10 @@ export class SimplifiedPricingService {
         err.status = 400;
         throw err;
       }
+      const plotterPicksRollWidth = typeConfig?.plotter?.enabled === true;
+      const rollPickMargins = plotterPicksRollWidth
+        ? resolvePlotterMargins('roll', customMarginMm, customGapMm)
+        : null;
       resolvedMaterialPrint = await MaterialPrintResolver.resolve({
         requestedMaterialId: Number(normalizedConfig.material_id),
         allowedMaterialIds: effectiveAllowedMaterialIds,
@@ -686,8 +690,8 @@ export class SimplifiedPricingService {
         trimMm: layoutTrim,
         quantity,
         bleedMm: resolvedBleedMm,
-        edgeMm: customMarginMm,
-        gapMm: customGapMm,
+        edgeMm: rollPickMargins?.edgeMm ?? customMarginMm,
+        gapMm: rollPickMargins?.gapMm ?? customGapMm,
         configuredTechnologyCodes: selectedSize.print_prices
           .filter((row) =>
             row.tiers?.some((tier) =>

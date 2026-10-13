@@ -45,9 +45,9 @@ describe('productPlotterRollFeedMeters', () => {
       bleedMm: 0,
       quantity: 20,
     });
-    // 2 шт. поперёк (297 мм), подача 210 мм, поля рулона 10 мм и зазор 2 мм.
-    // Длинная сторона × тираж дала бы 5.94 м.
-    expect(feed).toBeCloseTo(2.138, 3);
+    // Полезная ширина 580 мм: две штуки стороной 210 мм поперёк, подача 297 мм.
+    // Поля 25 мм и зазор 2 мм. Длинная сторона × тираж дала бы 5.94 м.
+    expect(feed).toBeCloseTo(3.038, 3);
     expect(feed).not.toBeCloseTo(5.94, 2);
   });
 
@@ -58,9 +58,9 @@ describe('productPlotterRollFeedMeters', () => {
       bleedMm: 0,
       quantity: 50,
     });
-    // 5 шт. поперёк, 10 рядов, поля 10 мм и зазор 2 мм = 1.088 м.
+    // 5 шт. поперёк, 10 рядов, поля 25 мм и зазор 2 мм = 1.118 м.
     // Один ряд дал бы 5.25 м.
-    expect(feed).toBeCloseTo(1.088, 3);
+    expect(feed).toBeCloseTo(1.118, 3);
   });
 
   it('returns null when the roll width is missing or the piece does not fit', () => {
