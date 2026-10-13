@@ -14,6 +14,7 @@ import { FinishingCard } from './FinishingCard'
 import { SubtypeDesignsCard } from './SubtypeDesignsCard'
 import { AddSizeModal, CopySizesModal } from './SizeModals'
 import { type Tier, defaultTiers, normalizeTiers } from '../utils/tierManagement'
+import { printTierColumnsForTechnology } from '../utils/derivePrintPricesFromCentral'
 import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
 import { computeItemsPerSheet } from './PrintSheetSection'
 import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
@@ -614,8 +615,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     })
   }, [copyFromTypeId, showCopySizes, value.typeConfigs])
 
-  // Получить диапазоны для печати (только из print_prices, материалы имеют свои стандартные диапазоны)
-  const getSizeRanges = useCallback((size: SimplifiedSizeConfig): Tier[] => {
+  // Колонки тиража. Без технологии — первая строка размера (отделка).
+  // С технологией — её собственные ступени, иначе «Заполнить из центральных цен»
+  // пишет цены в строки, а таблица продолжает показывать чужие границы.
+  const getSizeRanges = useCallback((size: SimplifiedSizeConfig, technologyCode?: string): Tier[] => {
+    if (technologyCode) {
+      const tiers = printTierColumnsForTechnology(size, technologyCode)
+      if (tiers && tiers.length > 0) return normalizeTiers(tiers)
+    }
     if (size.print_prices.length > 0 && size.print_prices[0].tiers.length > 0) {
       return normalizeTiers(size.print_prices[0].tiers)
     }

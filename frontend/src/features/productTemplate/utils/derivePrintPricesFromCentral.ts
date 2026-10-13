@@ -18,6 +18,24 @@ export type WarehouseMaterialSheetDims = {
   sheet_height?: number | null
 }
 
+export function samePrintTechnology(a?: string, b?: string): boolean {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
+}
+
+/** Колонки таблицы печати — ступени выбранной технологии, а не первой строки размера. */
+export function printTierColumnsForTechnology(
+  size: SimplifiedSizeConfig,
+  technologyCode: string,
+): Array<{ min_qty: number; max_qty?: number; unit_price: number }> | null {
+  const rows = (size.print_prices || []).filter((row) =>
+    samePrintTechnology(row.technology_code, technologyCode),
+  )
+  const withTiers = rows.filter((row) => Array.isArray(row.tiers) && row.tiers.length > 0)
+  if (withTiers.length === 0) return null
+  const priced = withTiers.find((row) => row.tiers.some((tier) => Number(tier.unit_price) > 0))
+  return (priced ?? withTiers[0]).tiers
+}
+
 export function printVariantKey(
   color_mode: string | undefined,
   sides_mode: string | undefined,
@@ -47,7 +65,7 @@ export function isPerSheetPrintTech(
   printTechs: PrintTechForDerive[],
   technologyCode: string,
 ): boolean {
-  const tech = printTechs.find((t) => String(t.code) === String(technologyCode))
+  const tech = printTechs.find((t) => samePrintTechnology(t.code, technologyCode))
   return tech?.pricing_mode === 'per_sheet'
 }
 
@@ -55,8 +73,8 @@ export function remainingPrintModesForTechnology(
   size: SimplifiedSizeConfig,
   technologyCode: string,
 ): PrintModeForDerive[] {
-  const remainingForTech = (size.print_prices || []).filter(
-    (row) => String(row.technology_code) === String(technologyCode),
+  const remainingForTech = (size.print_prices || []).filter((row) =>
+    samePrintTechnology(row.technology_code, technologyCode),
   )
   const modes: PrintModeForDerive[] = []
   const seenModes = new Set<string>()
@@ -85,11 +103,11 @@ export function mergeDerivedPrintPrices(
   derivedRows: SimplifiedPrintPrice[],
   itemsPerSheet?: number,
 ): SimplifiedSizeConfig {
-  const remainingForTech = (size.print_prices || []).filter(
-    (row) => String(row.technology_code) === String(technologyCode),
+  const remainingForTech = (size.print_prices || []).filter((row) =>
+    samePrintTechnology(row.technology_code, technologyCode),
   )
   const otherTechnologies = (size.print_prices || []).filter(
-    (row) => String(row.technology_code) !== String(technologyCode),
+    (row) => !samePrintTechnology(row.technology_code, technologyCode),
   )
   const derivedByKey = new Map(
     derivedRows.map((row) => [printVariantKey(row.color_mode, row.sides_mode), row] as const),
@@ -199,15 +217,16 @@ export async function deriveSizePrintPricesFromCentral(options: {
         }
         if (data?.items_per_sheet != null) itemsPerSheet = data.items_per_sheet
         const tiers = data?.tiers ?? []
-        if (tiers.length > 0) {
+        const pricedTiers = tiers.filter((tier) => Number(tier.unit_price) > 0)
+        if (pricedTiers.length > 0) {
           derivedRows.push({
             technology_code: tech,
             color_mode: mode.color_mode,
             sides_mode: mode.sides_mode,
             tiers: tiers.map((t) => ({
-              min_qty: t.min_qty,
-              max_qty: t.max_qty,
-              unit_price: t.unit_price ?? 0,
+              min_qty: Number(t.min_qty),
+              max_qty: t.max_qty == null ? undefined : Number(t.max_qty),
+              unit_price: Number(t.unit_price) || 0,
             })),
           })
         } else {

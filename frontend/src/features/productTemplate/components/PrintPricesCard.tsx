@@ -31,7 +31,7 @@ interface PrintPricesCardProps {
   loadingLists: boolean
   isMobile: boolean
   updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
-  getSizeRanges: (size: SimplifiedSizeConfig) => Tier[]
+  getSizeRanges: (size: SimplifiedSizeConfig, technologyCode?: string) => Tier[]
   updateSizeRanges: (sizeId: number | string, newRanges: Tier[]) => void
   /** Материалы склада (для раскладки по ширине/высоте листа при запросе из центральных цен) */
   allMaterials?: Array<{ id: number; sheet_width?: number | null; sheet_height?: number | null }>
@@ -312,11 +312,11 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
         {selected.print_prices.length === 0 ? (
           <div className="text-muted">Выберите технологию печати, чтобы увидеть доступные вариации.</div>
         ) : (() => {
-          const commonRanges = getSizeRanges(selected)
           const techCode =
             selected.default_print?.technology_code
             ?? selected.print_prices[0]?.technology_code
             ?? ''
+          const commonRanges = getSizeRanges(selected, techCode || undefined)
           const activeRows = selected.print_prices.filter(
             (row) => String(row.technology_code) === String(techCode),
           )
@@ -421,19 +421,19 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                   </div>
                 </td>
                 {commonRanges.map((t, ti) => {
-                  const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
+                  const priceTier = row.tiers.find((rt) => Number(rt.min_qty) === Number(t.min_qty))
                   return (
                     <td key={ti}>
                       <PriceCell
                         className="form-input form-input--compact-table"
-                        value={priceTier.unit_price ?? 0}
+                        value={priceTier ? Number(priceTier.unit_price ?? 0) : 0}
                         onChange={(v) => {
                           const next = selected.print_prices.map((r, i) => {
                             if (i !== actualIdx) return r
                             const updatedTiers = commonRanges.map((rt, rti) => {
-                              if (rti === ti) return { ...rt, unit_price: v }
-                              const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
-                              return existingTier || rt
+                              const existingTier = r.tiers.find((tier) => Number(tier.min_qty) === Number(rt.min_qty))
+                              if (rti === ti) return { ...(existingTier ?? rt), unit_price: v }
+                              return existingTier ?? { ...rt, unit_price: 0 }
                             })
                             return { ...r, tiers: updatedTiers }
                           })
@@ -673,7 +673,10 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                         const boundary = Number(tierModal.boundary)
                         if (!boundary || boundary < 1) return
 
-                        const currentRanges = getSizeRanges(selected)
+                        const currentRanges = getSizeRanges(
+                          selected,
+                          selected.default_print?.technology_code || undefined,
+                        )
                         let newRanges: Tier[]
 
                         if (tierModal.type === 'add') {

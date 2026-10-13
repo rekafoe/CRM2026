@@ -25,6 +25,11 @@ import {
   deriveQtyTiersFromTotalM2,
   type RollWideM2TierRow,
 } from '../modules/pricing/services/rollWideM2PricingService'
+import {
+  itemsPerSheetForDerive,
+  resolveCentralSheetTiers,
+  toProductQtyTiers,
+} from '../modules/pricing/utils/deriveSheetPrintTiers'
 
 console.log('Loading pricing routes...')
 
@@ -611,8 +616,10 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       return
     }
     const pp = await db.get<any>(`
-      SELECT id, sheet_width_mm, sheet_height_mm FROM print_prices
-      WHERE technology_code = ? AND is_active = 1 AND counter_unit = 'sheets'
+      SELECT id, sheet_width_mm, sheet_height_mm,
+             price_bw_single, price_bw_duplex, price_color_single, price_color_duplex
+      FROM print_prices
+      WHERE LOWER(technology_code) = LOWER(?) AND is_active = 1 AND counter_unit = 'sheets'
       ORDER BY id DESC LIMIT 1
     `, [technology_code])
     if (!pp) {
@@ -738,25 +745,45 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
     const cutMarginMm = cutMarginQ != null && String(cutMarginQ).trim() !== '' ? Number(cutMarginQ) : undefined
     const cutGapMm = cutGapQ != null && String(cutGapQ).trim() !== '' ? Number(cutGapQ) : undefined
     const itemsOverride = itemsOverrideQ != null && String(itemsOverrideQ).trim() !== '' ? Number(itemsOverrideQ) : undefined
-    const itemsPerSheet = (itemsOverride != null && itemsOverride > 0)
-      ? itemsOverride
-      : calcItemsPerSheet(w, h, sheetW, sheetH, cutMarginMm, cutGapMm)
-    const tiers = await db.all<any>(`
+    const itemsPerSheet = itemsPerSheetForDerive({
+      itemWidthMm: w,
+      itemHeightMm: h,
+      sheetWidthMm: sheetW,
+      sheetHeightMm: sheetH,
+      cutMarginMm,
+      cutGapMm,
+      itemsPerSheetOverride: itemsOverride,
+    })
+    const tierRows = await db.all<any>(`
       SELECT min_sheets, max_sheets, price_per_sheet FROM print_price_tiers
       WHERE print_price_id = ? AND price_mode = ?
       ORDER BY min_sheets
     `, [pp.id, priceMode])
-    if (tiers.length === 0) {
-      res.json({ items_per_sheet: itemsPerSheet, tiers: [], message: 'Добавьте диапазоны тиража в настройках цен печати' })
+    const storedTiers = Array.isArray(tierRows) ? tierRows : []
+    const flatByMode: Record<string, number | null | undefined> = {
+      color_single: pp.price_color_single,
+      color_duplex: pp.price_color_duplex,
+      bw_single: pp.price_bw_single,
+      bw_duplex: pp.price_bw_duplex,
+    }
+    const resolved = resolveCentralSheetTiers(storedTiers, flatByMode[priceMode])
+    if (resolved.tiers.length === 0) {
+      res.json({
+        items_per_sheet: itemsPerSheet,
+        tiers: [],
+        message: 'Добавьте диапазоны тиража или плоскую цену за лист в настройках цен печати',
+      })
       return
     }
-    const derivedTiers = tiers.map((t: any) => {
-      const minQty = t.min_sheets * itemsPerSheet
-      const maxQty = t.max_sheets != null ? (t.max_sheets + 1) * itemsPerSheet - 1 : undefined
-      const unitPrice = t.price_per_sheet / itemsPerSheet
-      return { min_qty: minQty, max_qty: maxQty, unit_price: Math.round(unitPrice * 100) / 100 }
+    const derivedTiers = toProductQtyTiers(resolved.tiers, itemsPerSheet)
+    res.json({
+      items_per_sheet: itemsPerSheet,
+      sheet_size: { width_mm: sheetW, height_mm: sheetH },
+      tiers: derivedTiers,
+      ...(resolved.usedFlat
+        ? { note: 'Взята плоская ставка за лист: положительных диапазонов тиража нет.' }
+        : {}),
     })
-    res.json({ items_per_sheet: itemsPerSheet, sheet_size: { width_mm: sheetW, height_mm: sheetH }, tiers: derivedTiers })
   } catch (e) {
     console.error('derive print prices:', e)
     res.status(500).json({ error: 'Ошибка расчёта' })
@@ -825,20 +852,6 @@ router.get('/print-prices/derive-m2', asyncHandler(async (req, res) => {
     res.status(err.status ?? 500).json({ error: err.message ?? 'Ошибка расчёта УФ' })
   }
 }))
-
-function calcItemsPerSheet(itemW: number, itemH: number, sheetW: number, sheetH: number, customMarginMm?: number, customGapMm?: number): number {
-  const MARGIN = customMarginMm ?? 5
-  const GAP = customGapMm ?? 2
-  const aw = sheetW - MARGIN * 2
-  const ah = sheetH - MARGIN * 2
-  const cols = Math.floor(aw / (itemW + GAP))
-  const rows = Math.floor(ah / (itemH + GAP))
-  const n1 = cols * rows
-  const cols2 = Math.floor(aw / (itemH + GAP))
-  const rows2 = Math.floor(ah / (itemW + GAP))
-  const n2 = cols2 * rows2
-  return Math.max(1, n1, n2)
-}
 
 /** Временные границы тиража (шт) при «Заполнить из центра» для рулона — одна и та же unit_price, пока нет настоящих ступеней по метрам. */
 const ROLL_DERIVE_TIER_MINS = [1, 5, 10, 50, 100, 500, 1000] as const
