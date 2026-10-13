@@ -1408,6 +1408,15 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const db = await getDb()
   const order = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
+  try {
+    await OrderService.assertOrderNotSoftCancelled(id)
+  } catch (cancelErr: any) {
+    if (cancelErr?.code === 'ORDER_SOFT_CANCELLED') {
+      res.status(409).json({ message: cancelErr.message, code: cancelErr.code })
+      return
+    }
+    throw cancelErr
+  }
   let hasPrepaymentUpdatedAt = false
   try {
     hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -1519,6 +1528,15 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
   if (!order) {
     res.status(404).json({ message: 'Заказ не найден' })
     return
+  }
+  try {
+    await OrderService.assertOrderNotSoftCancelled(id)
+  } catch (cancelErr: any) {
+    if (cancelErr?.code === 'ORDER_SOFT_CANCELLED') {
+      res.status(409).json({ message: cancelErr.message, code: cancelErr.code })
+      return
+    }
+    throw cancelErr
   }
 
   const body = (req.body || {}) as {

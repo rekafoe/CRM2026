@@ -426,6 +426,15 @@ export class OrderController {
     }
 
     const orderId = row.id
+    try {
+      await OrderService.assertOrderNotSoftCancelled(orderId)
+    } catch (cancelErr: any) {
+      if (cancelErr?.code === 'ORDER_SOFT_CANCELLED') {
+        res.status(409).json({ error: cancelErr.message, message: cancelErr.message, code: cancelErr.code })
+        return
+      }
+      throw cancelErr
+    }
 
     let hasPrepaymentUpdatedAt = false
     try {
@@ -668,6 +677,10 @@ export class OrderController {
     } catch (error: any) {
       logger.error(`Error updating order ${req.params.id} status`, error)
       const message = error?.message ?? 'Ошибка обновления статуса заказа'
+      if (error?.code === 'ORDER_SOFT_CANCELLED') {
+        res.status(409).json({ error: message, message, code: error.code })
+        return
+      }
       const statusCode = message === 'Некорректный статус заказа' || message === 'Статус отмены назначается только через отмену заказа'
         ? 400
         : 500

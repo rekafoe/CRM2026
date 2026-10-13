@@ -13,6 +13,7 @@ import { computeClicks } from '../../../utils/printing'
 import { isWaitingStatusId } from '../../../utils/orderStatusCatalog'
 import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
+import { OrderService } from '../services/orderService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
@@ -169,6 +170,15 @@ export class OrderItemController {
       if (!orderRow) {
         res.status(404).json({ message: 'Заказ не найден' })
         return
+      }
+      try {
+        await OrderService.assertOrderNotSoftCancelled(orderId)
+      } catch (cancelErr: any) {
+        if (cancelErr?.code === 'ORDER_SOFT_CANCELLED') {
+          res.status(409).json({ message: cancelErr.message, code: cancelErr.code })
+          return
+        }
+        throw cancelErr
       }
       const orderStatus = Number(orderRow.status)
       const skipPresetLookup =
@@ -588,6 +598,15 @@ export class OrderItemController {
       const itemId = Number(req.params.itemId)
       const authUser = (req as AuthenticatedRequest).user as { id: number } | undefined
       const db = await getDb()
+      try {
+        await OrderService.assertOrderNotSoftCancelled(orderId)
+      } catch (cancelErr: any) {
+        if (cancelErr?.code === 'ORDER_SOFT_CANCELLED') {
+          res.status(409).json({ message: cancelErr.message, code: cancelErr.code })
+          return
+        }
+        throw cancelErr
+      }
 
       // Находим позицию и её состав материалов
       const it = await db.get<{
@@ -751,6 +770,15 @@ export class OrderItemController {
     try {
       const orderId = Number(req.params.orderId)
       const itemId = Number(req.params.itemId)
+      try {
+        await OrderService.assertOrderNotSoftCancelled(orderId)
+      } catch (cancelErr: any) {
+        if (cancelErr?.code === 'ORDER_SOFT_CANCELLED') {
+          res.status(409).json({ message: cancelErr.message, code: cancelErr.code })
+          return
+        }
+        throw cancelErr
+      }
       const rawBody = req.body as Record<string, unknown>
       // Нормализуем printerId: поддерживаем и camelCase, и snake_case (printer_id)
       const printerIdRaw = rawBody?.printerId ?? rawBody?.printer_id
