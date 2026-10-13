@@ -21,6 +21,11 @@ interface MemoizedOrderItemProps {
   assignableOnShift?: Array<{ id: number; name: string; department_id?: number | null }>;
   assignableAll?: Array<{ id: number; name: string; department_id?: number | null }>;
   onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
+  layout?: 'card' | 'table';
+  rowIndex?: number;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
+  fresh?: boolean;
 }
 
 export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({
@@ -34,6 +39,11 @@ export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({
   assignableOnShift,
   assignableAll,
   onExecutorChange,
+  layout,
+  rowIndex,
+  expanded,
+  onToggleExpanded,
+  fresh,
 }) => {
   const handleUpdate = useCallback(() => {
     onUpdate();
@@ -52,6 +62,11 @@ export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({
       assignableOnShift={assignableOnShift}
       assignableAll={assignableAll}
       onExecutorChange={onExecutorChange}
+      layout={layout}
+      rowIndex={rowIndex}
+      expanded={expanded}
+      onToggleExpanded={onToggleExpanded}
+      fresh={fresh}
     />
   );
 });

@@ -405,12 +405,21 @@ export interface Expense {
   created_by_name?: string | null;
 }
 
+export interface ExpenseSummaryByCategory {
+  category_id: number;
+  category_name: string;
+  kind: string;
+  total: number;
+  count: number;
+}
+
 export interface ExpenseSummary {
   by_department: Array<{
     department_id: number | null;
     department_name: string;
     total: number;
   }>;
+  by_category?: ExpenseSummaryByCategory[];
   company_wide: number;
   total: number;
 }

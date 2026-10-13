@@ -11,6 +11,7 @@ import {
   type Department,
   type Expense,
   type ExpenseCategory,
+  type ExpenseSummaryByCategory,
 } from '../../api';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { Alert } from '../../components/common';
@@ -45,6 +46,7 @@ export const ExpensesPage: React.FC = () => {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [periodTotal, setPeriodTotal] = useState(0);
+  const [byCategory, setByCategory] = useState<ExpenseSummaryByCategory[]>([]);
   const [dateFrom, setDateFrom] = useState(monthStartIso());
   const [dateTo, setDateTo] = useState(todayIso());
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>('');
@@ -94,6 +96,7 @@ export const ExpensesPage: React.FC = () => {
       const listRes = await getExpenses(listParams);
       setExpenses(listRes.data?.expenses ?? []);
       setPeriodTotal(summaryRes.data?.total ?? 0);
+      setByCategory(summaryRes.data?.by_category ?? []);
     } catch (error) {
       setErrorMessage(getErrorMessage(error, 'Ошибка загрузки расходов'));
     } finally {
@@ -205,7 +208,7 @@ export const ExpensesPage: React.FC = () => {
   return (
     <AdminPageLayout
       title="Расходы"
-      description="Операционные расходы по департаментам и компании."
+      description="Операционные расходы по департаментам, категориям и компании."
       icon={<AppIcon name="receipt" size="lg" />}
       onBack={goBack}
       className="expenses-layout"
@@ -279,6 +282,39 @@ export const ExpensesPage: React.FC = () => {
         </span>
       </div>
       </div>
+
+      <section className="expenses-categories" aria-label="Расходы по категориям">
+        <div className="expenses-categories__head">
+          <h2>По категориям</h2>
+          <p>Доли за выбранный период</p>
+        </div>
+        {loading ? (
+          <div className="expenses-empty">Считаем категории...</div>
+        ) : byCategory.length === 0 ? (
+          <div className="expenses-empty">За период расходов нет — нечего раскладывать по категориям</div>
+        ) : (
+          <ul className="expenses-categories__list">
+            {byCategory.map((row) => {
+              const share = periodTotal > 0 ? row.total / periodTotal : 0;
+              const percent = Math.round(share * 1000) / 10;
+              return (
+                <li key={row.category_id} className="expenses-cat">
+                  <div className="expenses-cat__top">
+                    <span className="expenses-cat__name">{row.category_name}</span>
+                    <span className="expenses-cat__meta">
+                      <MoneyAmount value={row.total} />
+                      <span className="expenses-cat__share">{percent.toLocaleString('ru-RU')}%</span>
+                    </span>
+                  </div>
+                  <div className="expenses-cat__track" aria-hidden="true">
+                    <span style={{ width: `${Math.max(share > 0 ? 2 : 0, Math.min(100, share * 100))}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <form className="expenses-form-card" onSubmit={handleSubmit}>
         <h2 className="expenses-form-title">{editingId ? 'Редактирование расхода' : 'Новый расход'}</h2>

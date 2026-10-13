@@ -23,6 +23,8 @@ import { calcAuthorPayoutPerUnit } from '../pages/admin/designTemplates/designTe
 import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 import { AssignableUserSelect } from './orders/AssignableUserSelect';
 import type { AssignableUser } from '../api';
+import { MoneyAmount } from './ui/MoneyAmount';
+import { buildOrderItemEssence, buildOrderPositionFacts } from './order/orderItemCompact';
 
 // Кэш отображаемых имён типов бумаги из склада
 let paperTypeDisplayCache: Record<string, string> | null = null;
@@ -134,6 +136,12 @@ interface OrderItemProps {
   assignableAll?: AssignableUser[];
   /** Обновить исполнителя позиции */
   onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
+  /** Таблица позиций заказа: свёрнутая строка, детали по клику */
+  layout?: 'card' | 'table';
+  rowIndex?: number;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
+  fresh?: boolean;
 }
 
 export const OrderItem: React.FC<OrderItemProps> = ({
@@ -147,6 +155,11 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   assignableOnShift,
   assignableAll,
   onExecutorChange,
+  layout = 'card',
+  rowIndex,
+  expanded = false,
+  onToggleExpanded,
+  fresh = false,
 }) => {
   const { addToast } = useToast();
   const effectiveExecutorId = useMemo(() => {
@@ -543,10 +556,24 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   ) : null;
 
   const materialShortageText = formatMaterialShortage(readMaterialShortage(item.params));
+  const essence = useMemo(() => buildOrderItemEssence(item), [item]);
+  const positionFacts = useMemo(() => buildOrderPositionFacts(item), [item]);
+  const executorLabel = useMemo(() => {
+    const id = item.executor_user_id;
+    if (id == null || !Number.isFinite(Number(id)) || Number(id) <= 0) return '—';
+    const lists = [...(assignableOnShift ?? []), ...(assignableAll ?? []), ...operatorsToday];
+    const found = lists.find((user) => Number(user.id) === Number(id));
+    return found?.name?.trim() || `№${Number(id)}`;
+  }, [item.executor_user_id, assignableOnShift, assignableAll, operatorsToday]);
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!fresh) return;
+    rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [fresh]);
 
-  return (
-    <div className={`item order-item-row${materialShortageText ? ' order-item-row--shortage' : ''}`}>
-      {materialShortageText ? (
+  const details = (
+    <>
+      {layout !== 'table' && materialShortageText ? (
         <div className="order-item-material-shortage" role="status">
           {materialShortageText}
         </div>
@@ -761,6 +788,82 @@ export const OrderItem: React.FC<OrderItemProps> = ({
         isOpen={showEditorPreview}
         onClose={() => setShowEditorPreview(false)}
       />
+    </>
+  );
+
+  if (layout === 'table') {
+    return (
+      <div
+        ref={rowRef}
+        className={`order-position${expanded ? ' order-position--open' : ''}${fresh ? ' order-position--fresh' : ''}${materialShortageText ? ' order-position--shortage' : ''}`}
+        id={`order-item-${item.id}`}
+      >
+        {materialShortageText ? (
+          <div className="order-item-material-shortage" role="status">
+            {materialShortageText}
+          </div>
+        ) : null}
+        <div
+          className="order-position__row"
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          onClick={() => onToggleExpanded?.()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onToggleExpanded?.();
+            }
+          }}
+        >
+          <span className="order-position__title">
+            {rowIndex != null ? <span className="order-position__index">{rowIndex}</span> : null}
+            <span className="order-position__name">{itemDisplayName}</span>
+          </span>
+          <span className="order-position__essence">{essence}</span>
+          <span className="order-position__qty">{titleParts.quantityText}</span>
+          <span className="order-position__sum">
+            <MoneyAmount value={total} />
+          </span>
+          <span className="order-position__executor">{executorLabel}</span>
+        </div>
+        {expanded ? (
+          <div className="order-position__panel">
+            <div className="order-position__facts">
+              <div>
+                <span className="order-position__fact-label">Печать</span>
+                <span className="order-position__fact-value">{positionFacts.print}</span>
+              </div>
+              <div>
+                <span className="order-position__fact-label">Блок / обложка</span>
+                <span className="order-position__fact-value">{positionFacts.materials}</span>
+              </div>
+              <div>
+                <span className="order-position__fact-label">Раскладка</span>
+                <span className="order-position__fact-value">{positionFacts.layout}</span>
+              </div>
+              {!readOnly && onEditParameters ? (
+                <button
+                  type="button"
+                  className="order-position__edit"
+                  onClick={() => onEditParameters(orderId, item)}
+                >
+                  Изменить
+                </button>
+              ) : (
+                <span />
+              )}
+            </div>
+            {details}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`item order-item-row${materialShortageText ? ' order-item-row--shortage' : ''}`}>
+      {details}
     </div>
   );
 };

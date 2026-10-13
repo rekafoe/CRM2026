@@ -20,6 +20,7 @@ import { OrderTransferModal } from '../../orders/OrderTransferModal';
 import { useAssignableUsers } from '../../../hooks/useAssignableUsers';
 import { Button } from '../../common/Button';
 import { useOrderLegalDocuments } from '../hooks/useOrderLegalDocuments';
+import { useFreshOrderItem } from '../../order/useFreshOrderItem';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -106,6 +107,15 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   }, []);
 
   const items = selectedOrder.items ?? [];
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
+  const freshItemId = useFreshOrderItem(
+    selectedOrder.id,
+    items.map((item) => item.id)
+  );
+
+  useEffect(() => {
+    setExpandedItemId(null);
+  }, [selectedOrder.id]);
   const orderAmounts = React.useMemo(
     () => getOrderAmounts(selectedOrder),
     [selectedOrder],
@@ -729,27 +739,43 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         {selectedOrder.delivery ? (
           <OrderDeliveryBlock delivery={selectedOrder.delivery} />
         ) : null}
-        {items.length === 0 && (
-          <div className="item">Пока нет позиций</div>
-        )}
-
-        {items.map((it) => (
-          <MemoizedOrderItem 
-            key={it.id} 
-            item={it} 
-            orderId={selectedOrder.id}
-            order={{
-              ...selectedOrder,
-              priceType: (selectedOrder as any).priceType ?? items[0]?.params?.priceType ?? (items[0]?.params as any)?.price_type,
-            }}
-            onUpdate={onLoadOrders}
-            onEditParameters={onEditOrderItem}
-            operatorsToday={operatorsToday}
-            assignableOnShift={roleOnShift}
-            assignableAll={roleAll}
-            onExecutorChange={onExecutorChange}
-          />
-        ))}
+        <div className="order-positions">
+          <div className="order-positions__head">
+            <span>Позиция</span>
+            <span>Суть</span>
+            <span>Кол-во</span>
+            <span>Сумма</span>
+            <span>Исполнитель</span>
+          </div>
+          {items.length === 0 ? (
+            <div className="order-positions__empty">Пока нет позиций</div>
+          ) : (
+            items.map((it, index) => (
+              <MemoizedOrderItem
+                key={it.id}
+                item={it}
+                orderId={selectedOrder.id}
+                order={{
+                  ...selectedOrder,
+                  priceType: (selectedOrder as any).priceType ?? items[0]?.params?.priceType ?? (items[0]?.params as any)?.price_type,
+                }}
+                onUpdate={onLoadOrders}
+                onEditParameters={onEditOrderItem}
+                operatorsToday={operatorsToday}
+                assignableOnShift={roleOnShift}
+                assignableAll={roleAll}
+                onExecutorChange={onExecutorChange}
+                layout="table"
+                rowIndex={index + 1}
+                expanded={expandedItemId === it.id}
+                onToggleExpanded={() =>
+                  setExpandedItemId((current) => (current === it.id ? null : it.id))
+                }
+                fresh={freshItemId === it.id}
+              />
+            ))
+          )}
+        </div>
       </div>
 
       <OrderTransferModal
@@ -767,6 +793,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       />
 
       <OrderTotal
+        variant="bar"
         subtotal={orderAmounts.subtotal}
         discountAmount={orderAmounts.discountAmount}
         total={orderAmounts.total}

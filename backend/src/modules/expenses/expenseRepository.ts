@@ -224,6 +224,40 @@ export class ExpenseRepository {
     return Array.isArray(rows) ? rows : []
   }
 
+  static async sumByCategory(filters?: { date_from?: string; date_to?: string }): Promise<
+    Array<{ category_id: number; category_name: string | null; kind: string | null; total: number; cnt: number }>
+  > {
+    const db = await getDb()
+    const where: string[] = ['1=1']
+    const params: unknown[] = []
+
+    if (filters?.date_from) {
+      where.push('e.expense_date >= ?')
+      params.push(filters.date_from)
+    }
+    if (filters?.date_to) {
+      where.push('e.expense_date <= ?')
+      params.push(filters.date_to)
+    }
+
+    const rows = await db.all<
+      Array<{ category_id: number; category_name: string | null; kind: string | null; total: number; cnt: number }>
+    >(
+      `SELECT e.category_id,
+              COALESCE(c.name, 'Без категории') AS category_name,
+              c.kind AS kind,
+              SUM(e.amount) AS total,
+              COUNT(*) AS cnt
+       FROM expenses e
+       LEFT JOIN expense_categories c ON c.id = e.category_id
+       WHERE ${where.join(' AND ')}
+       GROUP BY e.category_id
+       ORDER BY total DESC`,
+      params
+    )
+    return Array.isArray(rows) ? rows : []
+  }
+
   static async sumTotal(filters?: { date_from?: string; date_to?: string }): Promise<number> {
     const db = await getDb()
     const where: string[] = ['1=1']

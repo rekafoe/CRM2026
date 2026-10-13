@@ -6,6 +6,7 @@ import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
 import { useReasonPresets } from '../../common/useReasonPresets';
 import { formatMaterialShortage, readMaterialShortage } from '../../order/materialShortage';
+import { requestOrderItemFocus } from '../../order/useFreshOrderItem';
 
 interface UseOrderHandlersProps {
   orders: Order[];
@@ -88,6 +89,10 @@ export const useOrderHandlers = ({
 
         // Добавляем товар
         const addedItem = await addOrderItem(orderId!, item);
+        const addedId = Number(addedItem.data?.id);
+        if (Number.isFinite(addedId) && addedId > 0) {
+          requestOrderItemFocus(addedId);
+        }
         
         // Оптимистично обновляем локальное состояние заказа
         setOrders((prevOrders: Order[]) => {

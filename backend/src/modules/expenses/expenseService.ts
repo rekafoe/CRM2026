@@ -109,8 +109,9 @@ export class ExpenseService {
     await syncPayrollExpenses(filters?.date_from, filters?.date_to)
     await syncTurnoverTaxExpenses(filters?.date_from, filters?.date_to)
     await syncRecurringExpenses()
-    const [byDeptRows, companyWide, total] = await Promise.all([
+    const [byDeptRows, byCategoryRows, companyWide, total] = await Promise.all([
       ExpenseRepository.sumByDepartment(filters),
+      ExpenseRepository.sumByCategory(filters),
       ExpenseRepository.sumCompanyWide(filters),
       ExpenseRepository.sumTotal(filters),
     ])
@@ -121,8 +122,17 @@ export class ExpenseService {
       total: Number(row.total ?? 0),
     }))
 
+    const by_category = byCategoryRows.map((row) => ({
+      category_id: Number(row.category_id),
+      category_name: String(row.category_name || 'Без категории'),
+      kind: String(row.kind || 'other'),
+      total: Number(row.total ?? 0),
+      count: Number(row.cnt ?? 0),
+    }))
+
     return {
       by_department,
+      by_category,
       company_wide: companyWide,
       total,
     }

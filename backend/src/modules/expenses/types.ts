@@ -62,8 +62,17 @@ export interface ExpenseSummaryByDepartment {
   total: number
 }
 
+export interface ExpenseSummaryByCategory {
+  category_id: number
+  category_name: string
+  kind: string
+  total: number
+  count: number
+}
+
 export interface ExpenseSummary {
   by_department: ExpenseSummaryByDepartment[]
+  by_category: ExpenseSummaryByCategory[]
   company_wide: number
   total: number
 }

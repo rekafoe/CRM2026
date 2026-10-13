@@ -66,6 +66,12 @@ describe('ExpenseService', () => {
     expect(summary.total).toBeGreaterThanOrEqual(250)
     expect(summary.company_wide).toBeGreaterThanOrEqual(250)
     expect(Array.isArray(summary.by_department)).toBe(true)
+    expect(Array.isArray(summary.by_category)).toBe(true)
+    const categoryRow = summary.by_category.find((row) => row.category_id === categoryId)
+    expect(categoryRow).toBeDefined()
+    expect(categoryRow?.total).toBeGreaterThanOrEqual(250)
+    expect(categoryRow?.count).toBeGreaterThanOrEqual(2)
+    expect(categoryRow?.category_name).toBeTruthy()
   })
 
   it('rejects amount <= 0', async () => {

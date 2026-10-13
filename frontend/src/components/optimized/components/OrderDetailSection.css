@@ -393,3 +393,97 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.app:has(> section.detail) {
+  overflow: hidden;
+}
+
+.app:has(> section.detail) > .sidebar {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app:has(> section.detail) > .sidebar .order-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+section.detail {
+  min-height: 0;
+  overflow: hidden;
+}
+
+section.detail > .detail-header,
+section.detail > .progress-bar-container,
+section.detail > .order-total {
+  flex-shrink: 0;
+}
+
+section.detail > .detail-body {
+  min-height: 0;
+}
+
+.detail .order-total.order-total--bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.order-total-bar__cell {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.order-total-bar__cell--center {
+  justify-content: center;
+}
+
+.order-total-bar__cell--end {
+  justify-content: flex-end;
+}
+
+.order-total-bar__label {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.order-total-bar__cell strong {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.order-total-bar__cell.is-debt strong {
+  color: #dc2626;
+}
+
+.order-total-bar__cell.is-paid strong,
+.order-total-bar__cell strong.is-paid {
+  color: #15803d;
+}
+
+.order-total-bar__note {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .detail .order-total.order-total--bar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .order-total-bar__cell--center,
+  .order-total-bar__cell--end {
+    justify-content: space-between;
+  }
+}

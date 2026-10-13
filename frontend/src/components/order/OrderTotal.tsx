@@ -15,6 +15,8 @@ export interface OrderAmountsDisplayProps {
   debt?: number;
   /** Скрыть блок предоплаты/долга (если показывается отдельно, напр. в пуле заказов) */
   showPaymentBreakdown?: boolean;
+  /** Полоска под списком позиций: итог, предоплата и долг в один ряд */
+  variant?: 'stack' | 'bar';
 }
 
 const bynAmount = (n: number) =>
@@ -36,6 +38,7 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
   taxRate = 0,
   debt: debtFromApi,
   showPaymentBreakdown = true,
+  variant = 'stack',
 }) => {
   const disc = discountAmount;
   const rate = Number(taxRate) || 0;
@@ -46,6 +49,36 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
       ? debtFromApi
       : Math.max(0, Math.round((total - prepayment) * 100) / 100);
   const isPaid = isPaidPrepaymentStatus(prepaymentStatus);
+
+  if (variant === 'bar') {
+    return (
+      <div className="order-total order-total--bar">
+        <div className="order-total-bar__cell">
+          <span className="order-total-bar__label">Итого</span>
+          <strong>
+            <BynValue>{total}</BynValue>
+          </strong>
+          {disc > 0 ? (
+            <span className="order-total-bar__note">
+              скидка <BynValue>{disc}</BynValue>
+            </span>
+          ) : null}
+        </div>
+        <div className="order-total-bar__cell order-total-bar__cell--center">
+          <span className="order-total-bar__label">Предоплата</span>
+          <strong className={isPaid && prepayment > 0 ? 'is-paid' : undefined}>
+            <BynValue>{prepayment}</BynValue>
+          </strong>
+        </div>
+        <div className={`order-total-bar__cell order-total-bar__cell--end${debt > 0 ? ' is-debt' : ' is-paid'}`}>
+          <span className="order-total-bar__label">Долг</span>
+          <strong>
+            <BynValue>{debt}</BynValue>
+          </strong>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="order-total">
