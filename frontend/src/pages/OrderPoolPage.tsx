@@ -892,7 +892,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onCancelOrder={() => handleCancelOnline(selectedOrder.id)}
               onPermanentDelete={() => handlePermanentDelete(selectedOrder.id)}
               onCopyPhone={handleCopyPhone}
-              showRemovePrepayment={selectedPrepay > 0}
+              showRemovePrepayment={selectedPrepay > 0 && selectedOrder.is_cancelled !== 1}
               showIssueOrder={
                 selectedOrder.is_cancelled !== 1 &&
                 (selectedDebt > 0 ||
