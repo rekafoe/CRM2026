@@ -238,6 +238,31 @@ export function computeOptimizedRollFeedMeters(input: RollFeedMetersInput): Roll
   };
 }
 
+/**
+ * Подача рулона для резки в продукте: ширина выбранного материала, поля и зазор плоттера.
+ * null — ширины нет или изделие не влезает ни в одной ориентации.
+ */
+export function productPlotterRollFeedMeters(input: {
+  rollWidthMm?: number | null;
+  trimMm: { width: number; height: number };
+  bleedMm?: number;
+  quantity: number;
+  cutMarginMm?: number | null;
+  cutGapMm?: number | null;
+}): number | null {
+  const rollWidthMm = Number(input.rollWidthMm);
+  if (!Number.isFinite(rollWidthMm) || rollWidthMm <= 0) return null;
+  const layout = computeOptimizedRollFeedMeters({
+    rollWidthMm,
+    trimMm: input.trimMm,
+    bleedMm: Math.max(0, Number(input.bleedMm) || 0),
+    quantity: Math.max(1, Math.floor(Number(input.quantity) || 0)),
+    margins: resolvePlotterMargins('roll', input.cutMarginMm, input.cutGapMm),
+  });
+  if (!layout || !(layout.feedMeters > 0)) return null;
+  return layout.feedMeters;
+}
+
 type SheetGrid = {
   cols: number;
   rows: number;

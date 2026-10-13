@@ -25,6 +25,7 @@ import { BindingPricingService, BindingQuoteResult } from './bindingPricingServi
 import {
   computeKnifePathMetersSheet,
   computeOptimizedRollFeedMeters,
+  productPlotterRollFeedMeters,
   resolvePlotterMargins,
   SHEET_PLOTTER_SRA3_MM,
 } from './plotterLayout';
@@ -1632,6 +1633,18 @@ export class SimplifiedPricingService {
       else pushPlotterFin(PLOTTER_FIN_SHEET);
     }
 
+    // Рулонный тариф «за подачу» считает, сколько штук влезает на ширину выбранного материала.
+    // У синтетической услуги резки своего рулона нет — без этого fallback берёт длинную сторону × тираж.
+    const plotterRollFeedMetersFor = (q: number): number | null =>
+      productPlotterRollFeedMeters({
+        rollWidthMm: materialSheetMm?.width,
+        trimMm: layoutTrim,
+        bleedMm: resolvedBleedMm,
+        quantity: q,
+        cutMarginMm: customMarginMm,
+        cutGapMm: customGapMm,
+      });
+
     effectiveFinishingToUse = effectiveFinishingToUse.filter((f) => {
       const n = Number(f?.service_id);
       return n !== PLOTTER_FIN_WEEDING && n !== PLOTTER_FIN_MOUNTING;
@@ -1938,13 +1951,43 @@ export class SimplifiedPricingService {
             variantId != null
               ? variantMeterBasisMap.get(variantId) ?? serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path'
               : serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path';
-          // per_meter + feed: подача по ширине плёнки варианта/услуги (не материала печати)
+          // per_meter + feed: подача по ширине плёнки варианта. Резка рулона — по ширине материала печати.
           const sidEarly = Number(finConfig.service_id);
           const sheetBilledByCount = sidEarly === PLOTTER_FIN_SHEET && meterBasis === 'feed';
           let meterUnits = 0;
           if (isPerMeterOp) {
             if (sheetBilledByCount) {
               meterUnits = sheetPlotterSheetsNeeded;
+            } else if (sidEarly === PLOTTER_FIN_ROLL && meterBasis === 'feed') {
+              const laidFeed = plotterRollFeedMetersFor(quantity);
+              if (laidFeed != null) {
+                meterUnits = laidFeed;
+              } else {
+                const filmFeed = resolveWarehouseFeedMeters({
+                  rollWidthMm: finishingRollWidthMmMap.get(mapKey) ?? null,
+                  layout: {
+                    trimMm: layoutTrim,
+                    bleedMm: resolvedBleedMm,
+                    quantity,
+                    margins: {
+                      edgeMm:
+                        customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+                          ? Number(customMarginMm)
+                          : 0,
+                      gapMm:
+                        customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+                          ? Number(customGapMm)
+                          : 0,
+                    },
+                  },
+                  fallbackMeters: materialMetersNeeded,
+                  materialId: undefined,
+                });
+                meterUnits = filmFeed.feedMeters;
+                pricingWarnings.push(
+                  'Плоттер (рулон): не удалось разложить изделия по ширине рулона. Подача посчитана по длине изделия.'
+                );
+              }
             } else if (meterBasis === 'feed') {
               const filmFeed = resolveWarehouseFeedMeters({
                 rollWidthMm: finishingRollWidthMmMap.get(mapKey) ?? null,
@@ -2066,7 +2109,12 @@ export class SimplifiedPricingService {
                       ? plotterTierVolumeCtx.roll.meterBasis
                       : plotterTierVolumeCtx.sheet.meterBasis,
                   knifePathM: knifePathMetersTotal,
-                  feedM: sidNum === PLOTTER_FIN_SHEET ? sheetPlotterSheetsNeeded : metersNeeded,
+                  feedM:
+                    sidNum === PLOTTER_FIN_SHEET
+                      ? sheetPlotterSheetsNeeded
+                      : sidNum === PLOTTER_FIN_ROLL
+                        ? (plotterRollFeedMetersFor(quantity) ?? metersNeeded)
+                        : metersNeeded,
                   cutAreaM2: plotterTierVolumeCtx.pieceCutAreaTrimM2 * quantity,
                 })
               : tierQty;
@@ -2604,6 +2652,7 @@ export class SimplifiedPricingService {
       metersPerItem: materialMetersPerItem,
       knifePathByQty,
       sheetCountByQty,
+      plotterRollFeedByQty: plotterRollFeedMetersFor,
       plotterTierVolumeCtx,
       coverPages: separateCoverForTier ? pageSplit.coverPages : 0,
       coverSidesMode: separateCoverForTier ? coverSidesForTier : undefined,
@@ -2923,6 +2972,8 @@ export class SimplifiedPricingService {
     knifePathByQty?: (q: number) => number;
     /** Лист: число листов на тираж q. Для тарифа «по числу листов». */
     sheetCountByQty?: (q: number) => number;
+    /** Рулон: погонные метры подачи с раскладкой по ширине материала. null — разложить нельзя. */
+    plotterRollFeedByQty?: (q: number) => number | null;
     /** Оси объёма для тиражных ступеней плоттера (synthetic PLOTTER_FIN_*) */
     plotterTierVolumeCtx?: {
       roll: { volumeTierBasis: PlotterVolumeTierBasis | null; meterBasis: 'knife_path' | 'feed' };
@@ -3079,8 +3130,14 @@ export class SimplifiedPricingService {
         const sidForMeters = Number(finConfig.service_id);
         const sheetBilledByCount =
           isPerMeterOp && sidForMeters === PLOTTER_FIN_SHEET && meterBasis === 'feed';
+        const plotterRollFeed =
+          isPerMeterOp && sidForMeters === PLOTTER_FIN_ROLL && meterBasis === 'feed'
+            ? ctx.plotterRollFeedByQty?.(q)
+            : undefined;
         const rawMeterUnits = sheetBilledByCount
           ? (ctx.sheetCountByQty?.(q) ?? 0)
+          : plotterRollFeed != null
+            ? plotterRollFeed
           : isPerMeterOp && meterBasis === 'feed'
             ? resolveWarehouseFeedMeters({
                 rollWidthMm: rca?.rollWidthByFinKey.get(finKey) ?? null,
@@ -3143,9 +3200,14 @@ export class SimplifiedPricingService {
                 feedM:
                   sidFin === PLOTTER_FIN_SHEET
                     ? (ctx.sheetCountByQty?.(q) ?? 0)
-                    : ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0
-                      ? ctx.metersPerItem! * q
-                      : 0,
+                    : sidFin === PLOTTER_FIN_ROLL
+                      ? (ctx.plotterRollFeedByQty?.(q) ??
+                        (ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0
+                          ? ctx.metersPerItem! * q
+                          : 0))
+                      : ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0
+                        ? ctx.metersPerItem! * q
+                        : 0,
                 cutAreaM2: ptv.pieceCutAreaTrimM2 * q,
               })
             : tierQty;
