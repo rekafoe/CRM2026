@@ -10,6 +10,7 @@ import { completeEditorOrderIntake } from './editorOrderIntakeService';
 import { TelegramUserService } from './telegramUserService';
 import { setLastWebsiteOrderAt } from '../utils/poolSync';
 import { getDb } from '../config/database';
+import { hasColumn } from '../utils/tableSchemaCache';
 import {
   appendMiniappLayoutsPendingNote,
   clearMiniappLayoutsPendingNote,
@@ -306,14 +307,19 @@ async function prepareMiniappCheckoutContext(telegramChatId: string, body: Minia
 
 async function getOwnedMiniappOrderRow(telegramChatId: string, orderId: number) {
   const db = await getDb();
+  const cancelledSel = (await hasColumn('orders', 'is_cancelled').catch(() => false))
+    ? 'COALESCE(is_cancelled, 0) as is_cancelled'
+    : '0 as is_cancelled';
   return db.get<{
     id: number;
     number: string;
     notes?: string | null;
     miniapp_checkout_state?: string | null;
     miniapp_design_help_requested?: number | null;
+    is_cancelled?: number | null;
   }>(
-    `SELECT id, number, notes, miniapp_checkout_state, miniapp_design_help_requested
+    `SELECT id, number, notes, miniapp_checkout_state, miniapp_design_help_requested,
+            ${cancelledSel}
      FROM orders
      WHERE id = ? AND telegram_chat_id = ?`,
     [orderId, telegramChatId]
@@ -363,6 +369,11 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
   ) {
     const err = new Error('Этот заказ уже оформлен');
     (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_DRAFT';
+    throw err;
+  }
+  if (Number(draftOrder.is_cancelled) === 1) {
+    const err = new Error('Заказ отменён и не может быть оформлен');
+    (err as { code?: string }).code = 'MINIAPP_ORDER_CANCELLED';
     throw err;
   }
 
@@ -473,6 +484,7 @@ export function mapMiniappCheckoutErrorToHttp(
     case 'MINIAPP_PRODUCT_NOT_FOUND':
     case 'MINIAPP_LAYOUT_FILES_REQUIRED':
     case 'MINIAPP_ORDER_NOT_DRAFT':
+    case 'MINIAPP_ORDER_CANCELLED':
       return { status: 400, body: { error: e.message, message: e.message } };
     default:
       return null;

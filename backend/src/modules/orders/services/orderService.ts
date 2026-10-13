@@ -885,6 +885,24 @@ export class OrderService {
 
   static async deductMaterialsForExistingOrder(orderId: number, userId?: number) {
     const db = await getDb();
+    try {
+      if (await hasColumn('orders', 'is_cancelled')) {
+        const cancelled = await db.get<{ is_cancelled: number }>(
+          'SELECT COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
+          [orderId]
+        );
+        if (Number(cancelled?.is_cancelled) === 1) {
+          return {
+            success: false,
+            deductedMaterials: [],
+            warnings: [],
+            errors: ['Заказ отменён: списание материалов запрещено'],
+          };
+        }
+      }
+    } catch {
+      // старые схемы без is_cancelled — продолжаем как раньше
+    }
     const rows = (await db.all(
       'SELECT type, params, quantity FROM items WHERE orderId = ? ORDER BY id ASC',
       [orderId]
