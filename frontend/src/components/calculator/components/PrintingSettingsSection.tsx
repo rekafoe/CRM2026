@@ -18,7 +18,7 @@ interface PrintingSettingsSectionProps {
   selectedSizeId?: string | number;
   /** ID выбранного подтипа (для typeConfigs) */
   selectedTypeId?: number | null;
-  /** Блок «Материал» для первой колонки (под «Тип печати») — одна линия по вертикали */
+  /** Блок материала под строкой печати, на всю ширину. */
   materialInFirstColumn?: React.ReactNode;
 }
 
@@ -373,12 +373,8 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   if (allowedPrintTechnologies.length === 0) {
     if (materialInFirstColumn) {
       return (
-        <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
-          <div className="printing-settings-row">
-            <div className="printing-first-column">
-              {materialInFirstColumn}
-            </div>
-          </div>
+        <div className="form-section compact printing-settings" style={{ padding: 0, border: 'none', background: 'transparent' }}>
+          <div className="printing-materials-slot">{materialInFirstColumn}</div>
         </div>
       );
     }
@@ -386,32 +382,8 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   }
 
   return (
-    <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
+    <div className="form-section compact printing-settings" style={{ padding: 0, border: 'none', background: 'transparent' }}>
       <div className="printing-settings-row">
-        {materialInFirstColumn ? (
-          <div className="printing-first-column">
-            <div className="param-group">
-              <label>
-                Тип печати <span style={{ color: 'red' }}>*</span>
-              </label>
-              <select
-                value={printTechnology || (allowedPrintTechnologies.length > 0 ? allowedPrintTechnologies[0].code : '')}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  onPrintTechnologyChange(value);
-                  if (!value) onPrintColorModeChange(null);
-                }}
-                className="form-control"
-                required
-              >
-                {allowedPrintTechnologies.map((tech) => (
-                  <option key={tech.code} value={tech.code}>{tech.name}</option>
-                ))}
-              </select>
-            </div>
-            {materialInFirstColumn}
-          </div>
-        ) : (
           <div className="param-group">
             <label>
               Тип печати <span style={{ color: 'red' }}>*</span>
@@ -431,7 +403,6 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
               ))}
             </select>
           </div>
-        )}
 
         {/* Режим печати - показываем всегда, если выбран тип печати */}
         {printTechnology ? (
@@ -517,6 +488,9 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
           )
         ) : null}
       </div>
+      {materialInFirstColumn ? (
+        <div className="printing-materials-slot">{materialInFirstColumn}</div>
+      ) : null}
     </div>
   );
 };

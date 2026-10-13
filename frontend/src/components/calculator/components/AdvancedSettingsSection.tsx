@@ -77,6 +77,10 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
 
   const currentPriceType = specs.priceType ?? '';
   const isValidPriceType = allowedKeys.length > 0 && allowedKeys.includes(currentPriceType);
+  const schemaFields = backendProductSchema?.fields || [];
+  const hasExtraChecks = ['magnetic', 'cutting', 'folding', 'roundCorners'].some((name) =>
+    schemaFields.some((field: { name?: string }) => field.name === name),
+  );
   const effectivePriceType = isValidPriceType ? currentPriceType : (allowedKeys[0] ?? '');
   const prevEffectiveRef = useRef(effectivePriceType);
 
@@ -145,6 +149,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
           </div>
         )}
 
+        {hasExtraChecks ? (
         <div className="param-group checkbox-group">
           {(backendProductSchema?.fields || []).some((f: any) => f.name === 'magnetic') && (
             <label>
@@ -188,6 +193,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
             </label>
           )}
         </div>
+        ) : null}
       </div>
     </div>
   );

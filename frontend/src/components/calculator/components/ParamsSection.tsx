@@ -395,40 +395,50 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           {validationErrors.quantity && (
             <div className="text-sm text-red-600">{validationErrors.quantity}</div>
           )}
-          {isSimplifiedProduct && minQtyForSize > 1 && (
-            <p className="param-hint">
-              Мин. тираж для размера: {minQtyForSize} шт.
-              {!multipageLike &&
-              itemsPerSheet != null &&
-              itemsPerSheet > 1 &&
-              (selectedSize as any)?.min_qty == null
-                ? ` (на лист помещается ${itemsPerSheet} шт.)`
-                : (selectedSize as any)?.min_qty != null
-                  ? ' (задано в шаблоне)'
-                  : ''}
-            </p>
-          )}
-          {isSimplifiedProduct && specs.quantity != null && specs.quantity < minQtyForSize && (
-            <div className="text-sm text-warning mt-1">
-              Рекомендуемое количество для выбранного размера: {minQtyForSize} шт.
-            </div>
-          )}
-          {!multipageLike &&
+        </div>
+        {(isSimplifiedProduct && minQtyForSize > 1) ||
+        (isSimplifiedProduct && specs.quantity != null && specs.quantity < minQtyForSize) ||
+        (!multipageLike &&
           itemsPerSheet != null &&
           itemsPerSheet > 1 &&
           specs.quantity != null &&
-          specs.quantity > 0 &&
-          (() => {
-            const q = Number(specs.quantity);
-            const currentSheets = Math.ceil(q / itemsPerSheet);
-            const nextPriceChangeQty = currentSheets * itemsPerSheet + 1;
-            return (
-              <div className="text-sm text-muted mt-1">
-                Следующее изменение цены: при {nextPriceChangeQty} шт.
+          specs.quantity > 0) ? (
+          <div className="params-grid__notes">
+            {isSimplifiedProduct && minQtyForSize > 1 && (
+              <p className="param-hint">
+                Мин. тираж для размера: {minQtyForSize} шт.
+                {!multipageLike &&
+                itemsPerSheet != null &&
+                itemsPerSheet > 1 &&
+                (selectedSize as any)?.min_qty == null
+                  ? ` (на лист помещается ${itemsPerSheet} шт.)`
+                  : (selectedSize as any)?.min_qty != null
+                    ? ' (задано в шаблоне)'
+                    : ''}
+              </p>
+            )}
+            {isSimplifiedProduct && specs.quantity != null && specs.quantity < minQtyForSize && (
+              <div className="text-sm text-warning">
+                Рекомендуемое количество для выбранного размера: {minQtyForSize} шт.
               </div>
-            );
-          })()}
-        </div>
+            )}
+            {!multipageLike &&
+            itemsPerSheet != null &&
+            itemsPerSheet > 1 &&
+            specs.quantity != null &&
+            specs.quantity > 0 &&
+            (() => {
+              const q = Number(specs.quantity);
+              const currentSheets = Math.ceil(q / itemsPerSheet);
+              const nextPriceChangeQty = currentSheets * itemsPerSheet + 1;
+              return (
+                <div className="text-sm text-muted">
+                  Следующее изменение цены: при {nextPriceChangeQty} шт.
+                </div>
+              );
+            })()}
+          </div>
+        ) : null}
 
         {/* Стороны печати */}
         {hasField('sides') && (

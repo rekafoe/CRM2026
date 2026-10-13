@@ -3142,3 +3142,125 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Калькулятор продукта: одна колонка на поле, без обрезки 200px и растянутой «стороны» */
+.calculator-section-unified .calculator-product-types__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calculator-section-unified .calculator-product-types__tab {
+  flex: 1 1 148px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.calculator-section-unified .section-group-content .params-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.calculator-section-unified .params-grid__notes {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: -2px;
+}
+
+.calculator-section-unified .params-grid__notes .param-hint,
+.calculator-section-unified .params-grid__notes .text-sm {
+  margin: 0;
+}
+
+.calculator-section-unified .unified-params-row:not(.unified-params-row--uv-materials) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calculator-section-unified .unified-params-row:not(.unified-params-row--uv-materials) .form-section.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.calculator-section-unified .unified-params-row .printing-settings-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  align-items: start;
+}
+
+.calculator-section-unified .material-type-density-row {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  width: 100%;
+  align-items: start;
+}
+
+.calculator-section-unified .material-type-density-row > .param-group,
+.calculator-section-unified .param-group--narrow,
+.calculator-section-unified .param-group--size-block {
+  max-width: none;
+  min-width: 0;
+}
+
+.calculator-section-unified .section-group-content .param-group .form-control,
+.calculator-section-unified .section-group-content .param-group select.form-control {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.calculator-section-unified .param-group--quantity .quantity-controls {
+  width: 100%;
+}
+
+.calculator-section-unified .param-group--quantity .quantity-input {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
+}
+
+.calculator-section-unified .advanced-settings .advanced-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.calculator-section-unified .advanced-settings .advanced-grid.compact > .param-group:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.calculator-subtotal-bar .result-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.calculator-subtotal-bar .result-item {
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 8px;
+}
+
+@media (max-width: 720px) {
+  .calculator-section-unified .section-group-content .params-grid.compact,
+  .calculator-section-unified .unified-params-row .printing-settings-row,
+  .calculator-section-unified .material-type-density-row,
+  .calculator-section-unified .advanced-settings .advanced-grid.compact {
+    grid-template-columns: 1fr !important;
+  }
+
+  .calculator-section-unified .advanced-settings .advanced-grid.compact > .param-group:nth-child(3) {
+    grid-column: auto;
+  }
+}
