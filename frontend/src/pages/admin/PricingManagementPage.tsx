@@ -13,7 +13,7 @@ const PricingManagementPage: React.FC<PricingManagementPageProps> = ({ onBack })
       title="Управление ценами"
       icon={<AppIcon name="receipt" size="md" />}
       onBack={onBack}
-      backTo="/adminpanel/pricing"
+      backTo="/adminpanel/printers"
       className="pricing-page"
     >
       <PricingManagement />

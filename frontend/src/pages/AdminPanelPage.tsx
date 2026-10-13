@@ -30,9 +30,6 @@ const EarningsAdminPage = lazy(() =>
 const WarehousePage = lazy(() =>
   import('./admin/WarehousePage').then((m) => ({ default: m.WarehousePage }))
 );
-const PricingPage = lazy(() =>
-  import('./admin/PricingPage').then((m) => ({ default: m.PricingPage }))
-);
 const PrintersPage = lazy(() => import('./admin/PrintersPage'));
 const PrintPriceEditPage = lazy(() => import('./admin/PrintPriceEditPage'));
 const CountersServicePage = lazy(() => import('./admin/CountersServicePage'));
@@ -144,8 +141,7 @@ const ADMIN_GROUPS: Array<{ id: AdminGroupId; title: string; hint: string; icon:
       { title: 'Продукты калькулятора', description: 'Типы изделий, шаблоны и техпроцесс.', to: '/adminpanel/products', icon: 'puzzle' },
       { title: 'Операции', description: 'Постпечатные услуги и проценты операторов.', to: '/adminpanel/services-management', icon: 'wrench' },
       { title: 'Плоттерная резка', description: 'Тарифы рулона и листа, выборка и накатка.', to: '/adminpanel/plotter-cutting', icon: 'scissors' },
-      { title: 'Принтеры', description: 'Оборудование и привязка к печати.', to: '/adminpanel/printers', icon: 'printer' },
-      { title: 'Ценообразование', description: 'Обзор формул и переход к продуктам.', to: '/adminpanel/pricing', icon: 'chart-up' },
+      { title: 'Принтеры', description: 'Оборудование, центральные ставки, наценки и скидки.', to: '/adminpanel/printers', icon: 'printer' },
     ],
   },
   {
@@ -290,12 +286,11 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/warehouse-reports" element={<ReportsPage />} />
           <Route path="/low-stock-alerts" element={<WarehousePage />} />
           
-          {/* Ценообразование */}
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/cost-calculation" element={<Navigate to="/adminpanel/pricing" replace />} />
+          <Route path="/pricing" element={<Navigate to="/adminpanel" replace />} />
+          <Route path="/cost-calculation" element={<Navigate to="/adminpanel" replace />} />
           <Route path="/services-management" element={<ServicesManagementPage />} />
           <Route path="/plotter-cutting" element={<PlotterCuttingSettingsPage />} />
-          <Route path="/discounts" element={<PricingPage />} />
+          <Route path="/discounts" element={<Navigate to="/adminpanel/printers?tab=discounts" replace />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />
           <Route path="/printers" element={<PrintersPage />} />
           <Route path="/print-prices/new" element={<PrintPriceEditPage />} />

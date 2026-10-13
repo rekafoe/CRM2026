@@ -66,15 +66,9 @@ const PRODUCTION_LINKS: SettingsLink[] = [
   },
   {
     title: 'Принтеры',
-    description: 'Оборудование и привязка к печати.',
+    description: 'Оборудование, центральные ставки, наценки и скидки.',
     to: '/adminpanel/printers',
     icon: 'printer',
-  },
-  {
-    title: 'Ценообразование',
-    description: 'Обзор формул и переход к продуктам калькулятора.',
-    to: '/adminpanel/pricing',
-    icon: 'chart-up',
   },
 ];
 
