@@ -290,20 +290,6 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           ) : null}
         </div>
 
-        {isMultiPageProduct && (
-          <CoverMaterialsSection
-            coverConfig={
-              (backendProductSchema?.template?.simplified as { multiPageStructure?: { cover?: unknown } } | undefined)
-                ?.multiPageStructure?.cover as { mode?: string; allowed_material_ids?: number[]; material_id?: number } | undefined
-            }
-            coverMaterialId={(specs as { cover_material_id?: number }).cover_material_id}
-            updateSpecs={updateSpecs as (u: Record<string, unknown>, instant?: boolean) => void}
-            warehousePaperTypes={warehousePaperTypes}
-            schemaMaterials={backendProductSchema?.materials}
-            validationError={validationErrors.cover_material_id}
-          />
-        )}
-
         <DynamicFieldsSection
           schema={backendProductSchema}
           specs={specs as any}
@@ -312,12 +298,28 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           showPlotterCutHint={plotterCutIncluded}
         />
 
-        <OperationsSection
-          backendProductSchema={backendProductSchema}
-          specs={specs as any}
-          updateSpecs={updateSpecs as any}
-          allowedOperationIds={allowedOperationIds}
-        />
+        <div className={isMultiPageProduct ? 'calculator-extra-row' : undefined}>
+          {isMultiPageProduct && (
+            <CoverMaterialsSection
+              coverConfig={
+                (backendProductSchema?.template?.simplified as { multiPageStructure?: { cover?: unknown } } | undefined)
+                  ?.multiPageStructure?.cover as { mode?: string; allowed_material_ids?: number[]; material_id?: number } | undefined
+              }
+              coverMaterialId={(specs as { cover_material_id?: number }).cover_material_id}
+              updateSpecs={updateSpecs as (u: Record<string, unknown>, instant?: boolean) => void}
+              warehousePaperTypes={warehousePaperTypes}
+              schemaMaterials={backendProductSchema?.materials}
+              validationError={validationErrors.cover_material_id}
+            />
+          )}
+
+          <OperationsSection
+            backendProductSchema={backendProductSchema}
+            specs={specs as any}
+            updateSpecs={updateSpecs as any}
+            allowedOperationIds={allowedOperationIds}
+          />
+        </div>
 
         <AdvancedSettingsSection
           specs={{ priceType: specs.priceType, customerType: specs.customerType, pages: specs.pages, productionDays: specs.productionDays, magnetic: specs.magnetic, cutting: specs.cutting, folding: specs.folding, roundCorners: specs.roundCorners, typeId: specs.typeId } as any}

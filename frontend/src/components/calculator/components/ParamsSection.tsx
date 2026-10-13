@@ -541,7 +541,6 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 {getLabel('pages', 'Страницы')}
                 {isRequired('pages') && <span className="param-required-mark">*</span>}
               </label>
-              {pagesBoundsHint && <p className="param-hint">{pagesBoundsHint}</p>}
               {allowedOptions.length > 0 && (
                 <select
                   value={selectValue}
@@ -583,6 +582,9 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                   updateSpecs={updateSpecs}
                   resetKey={`${selectedSizeId}|${pagesCustomMode}|${allowedOptions.join(',')}`}
                 />
+              )}
+              {pagesBoundsHint && (
+                <p className="param-hint param-hint--bounds">{pagesBoundsHint}</p>
               )}
               {validationErrors.pages && (
                 <p className="param-error">{validationErrors.pages}</p>
