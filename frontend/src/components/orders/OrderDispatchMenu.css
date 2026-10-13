@@ -1,0 +1,49 @@
+.order-dispatch {
+  position: relative;
+}
+
+.order-dispatch__backdrop {
+  position: fixed;
+  inset: 0;
+  border: none;
+  background: transparent;
+  z-index: 40;
+}
+
+.order-dispatch__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.order-dispatch__header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1a202c;
+}
+
+.order-dispatch__body {
+  overflow: auto;
+}
+
+.order-dispatch__body .order-mail-log,
+.order-dispatch__body .order-sms-panel {
+  margin-top: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.order-dispatch__body .order-sms-panel {
+  border-top: 1px solid #e2e8f0;
+}

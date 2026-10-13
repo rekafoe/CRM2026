@@ -28,6 +28,10 @@
   font-weight: 600;
   font-size: 14px;
   color: #1f2937;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar-org--fallback .topbar-org-name {
@@ -106,9 +110,31 @@
   font-weight: 400;
 }
 
+@media (max-width: 1500px) {
+  .topbar-org-name {
+    max-width: 150px;
+  }
+}
+
 @media (max-width: 1400px) {
   .app-icon-btn__label {
     display: none;
+  }
+}
+
+@media (max-width: 1280px) {
+  .app-topbar {
+    gap: 8px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .app-icon-btn {
+    padding: 8px 10px;
+    height: 40px;
+    min-width: 40px;
   }
 }
 

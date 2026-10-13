@@ -10,6 +10,10 @@ html,body,#root{ height:100%; margin:0; font-family: 'Manrope', system-ui, -appl
 .order-item{ padding:8px 10px; margin-bottom:8px; border:1px solid var(--br); border-radius:6px; background:#fff; cursor:pointer }
 .order-item.active{ border-color:var(--p); outline:2px solid rgba(108,142,184,.2) }
 .detail{ flex:1; padding:20px; display:flex; flex-direction:column; gap:16px }
+@media (max-width: 1366px) {
+  .sidebar { width: 220px; padding: 12px; }
+  .detail { padding: 14px 16px; gap: 12px; }
+}
 .detail-header{ display:flex; align-items:center; justify-content:space-between }
 .detail-actions button{ padding:8px 16px; border:1px solid rgba(255,255,255,0.4); background:rgba(108,142,184,0.75); color:#fff; border-radius:999px; cursor:pointer; font-weight:500; box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.1); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px) }
 .detail-body{ flex:1; overflow:auto }

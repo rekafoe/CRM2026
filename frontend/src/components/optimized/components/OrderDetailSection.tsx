@@ -11,8 +11,6 @@ import { parseNumberFlexible } from '../../../utils/numberInput';
 import { getOrderAmounts } from '../../../utils/orderTotal';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 import { AppIcon } from '../../ui/AppIcon';
-import { OrderMailLogPanel } from '../../orders/OrderMailLogPanel';
-import { OrderSmsPanel } from '../../orders/OrderSmsPanel';
 import { OrderDeliveryBlock } from '../../orders/OrderDeliveryBlock';
 import { PostalShipmentPanel } from '../../orders/PostalShipmentPanel';
 import { OrderCostSheetPanel } from '../../orders/OrderCostSheetPanel';
@@ -773,12 +771,6 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         paymentMethod={selectedOrder.paymentMethod === 'telegram' ? 'online' : selectedOrder.paymentMethod}
       />
 
-      {currentUser?.role === 'admin' && (
-        <>
-          <OrderMailLogPanel key={selectedOrder.id} orderId={selectedOrder.id} />
-          <OrderSmsPanel orderId={selectedOrder.id} customerPhone={selectedOrder.customerPhone} />
-        </>
-      )}
     </>
   );
 });

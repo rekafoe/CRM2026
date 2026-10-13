@@ -387,6 +387,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             onInboxClose={() => inbox.setOpen(false)}
             onInboxMarkAllRead={inbox.markAllRead}
             onInboxOpenNotification={handleInboxOpenNotification}
+            dispatchOrderId={selectedOrder?.id ?? null}
+            dispatchCustomerPhone={selectedOrder?.customerPhone}
           />
 
           {showTopPicker && (
