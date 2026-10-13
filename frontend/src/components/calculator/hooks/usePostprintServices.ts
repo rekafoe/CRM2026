@@ -343,9 +343,11 @@ export function usePostprintServices({
       pricePerItem: postprintTotal,
       specifications: { operationsCount: selectedPostprintOperations.length },
       productionTime: '—',
-      parameterSummary: selectedPostprintOperations.map((op) => ({
-        label: op.name,
-        value: `${op.quantity} × ${op.unitPrice.toFixed(2)} бел. руб.`,
+      services: selectedPostprintOperations.map((op) => ({
+        service: op.name,
+        total: op.subtotal,
+        quantity: op.quantity,
+        unitPrice: op.unitPrice,
       })),
     };
   }, [isPostprintValid, postprintTotal, selectedPostprintOperations]);

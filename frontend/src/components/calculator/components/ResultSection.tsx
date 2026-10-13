@@ -78,6 +78,20 @@ function positiveCostLines(result: NonNullable<ResultSectionProps['result']>) {
   return lines;
 }
 
+function sheetWord(count: number): string {
+  const abs = Math.abs(Math.trunc(count)) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return 'листов';
+  if (last === 1) return 'лист';
+  if (last >= 2 && last <= 4) return 'листа';
+  return 'листов';
+}
+
+function hasProductionTime(value: string | undefined): boolean {
+  const text = String(value || '').trim();
+  return text.length > 0 && text !== '—' && text !== '-';
+}
+
 export const ResultSection: React.FC<ResultSectionProps> = ({
   result,
   isValid,
@@ -156,10 +170,21 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   const bleedMm = result.layout?.bleedMm;
   const cutsPerSheetUi = result.layout?.cutsPerSheet;
   const warnings = result.warnings || [];
-  const parameterSummary = result.parameterSummary || [];
   const addButtonLabel = mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <>Добавить в заказ</>;
   const showFormatWarning = fitsOnSheet === false || warnings.length > 0;
   const costLines = positiveCostLines(result);
+  const layoutFacts = [
+    sheetsNeeded != null && sheetsNeeded > 0 ? `${formatNumber(sheetsNeeded)} ${sheetWord(sheetsNeeded)}` : null,
+    itemsPerSheet != null && itemsPerSheet > 0 ? `${formatNumber(itemsPerSheet)} шт. на листе` : null,
+    metersNeeded != null && metersNeeded > 0 ? `подача ${formatNumber(metersNeeded, 'п.м.', true)}` : null,
+    totalM2Needed != null && totalM2Needed > 0 ? `площадь ${formatNumber(totalM2Needed, 'м²', true)}` : null,
+    sheetSize ? `лист ${sheetSize}` : null,
+    bleedMm != null && bleedMm > 0 ? `дозаливка ${bleedMm} мм` : null,
+    cutsPerSheetUi != null && cutsPerSheetUi > 0 ? `${formatNumber(cutsPerSheetUi)} резов на лист` : null,
+    result.layout?.knifePathM != null && result.layout.knifePathM > 0
+      ? `длина реза ${formatNumber(result.layout.knifePathM, 'м', true)}`
+      : null,
+  ].filter((fact): fact is string => Boolean(fact));
 
   return (
     <div className="form-section result-section compact">
@@ -174,29 +199,16 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
         </div>
       )}
       {/* Округляем до 2 знаков — так же, как при добавлении в заказ (storedTotalCost), чтобы сумма в заказе совпадала с калькулятором */}
-      <h3>
-        <AppIcon name="money" size="xs" /> Стоимость: {withByn(result.totalCost, true)}
-        {pricePending ? <span className="result-price-pending"> Пересчёт…</span> : null}
+      <h3 className="result-total">
+        <span><AppIcon name="money" size="xs" /> Стоимость</span>
+        <span>
+          {withByn(result.totalCost, true)}
+          {pricePending ? <span className="result-price-pending"> Пересчёт…</span> : null}
+        </span>
       </h3>
-      <div className="result-details">
-        <div className="result-item">
-          <span>За штуку:</span>
-          <span>{withBynPerUnit(result.pricePerItem)}</span>
-        </div>
-        <div className="result-item">
-          <span>Количество:</span>
-          <span>{formatNumber(result.specifications?.quantity, 'шт.')}</span>
-        </div>
-        {typeof result.specifications.sides !== 'undefined' && (
-          <div className="result-item">
-            <span>Стороны:</span>
-            <span>{result.specifications.sides === 2 ? 'двусторонняя' : 'односторонняя'}</span>
-          </div>
-        )}
-        <div className="result-item">
-          <span>Срок:</span>
-          <span>{result.productionTime}</span>
-        </div>
+      <div className="result-meta">
+        <span>{withBynPerUnit(result.pricePerItem)} за шт.</span>
+        {hasProductionTime(result.productionTime) ? <span>{result.productionTime}</span> : null}
       </div>
       {costLines.length > 0 && (
         <div className="result-cost-lines">
@@ -208,52 +220,8 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
           ))}
         </div>
       )}
-      {parameterSummary.length > 0 && (
-        <div className="result-parameter-summary">
-          {parameterSummary
-            .filter((param) => {
-              //  Исключаем "Тип материала" полностью, если есть "Материал" и они совпадают
-              // Это предотвращает дублирование, так как "Материал" уже показывает тип бумаги
-              // Но если "Тип материала" отличается от "Материал" (например, разные display_name), показываем оба
-              if (param.label === 'Тип материала') {
-                const materialParam = parameterSummary.find((p) => p.label === 'Материал');
-                // Если есть "Материал" и значения совпадают - не показываем "Тип материала"
-                if (materialParam && materialParam.value === param.value) {
-                  return false;
-                }
-              }
-              return true;
-            })
-            .map((param) => (
-              <div className="parameter-chip" key={`${param.label}-${param.value}`}>
-                <span className="parameter-label">{param.label}</span>
-                <span className="parameter-value">{param.value}</span>
-              </div>
-            ))}
-        </div>
-      )}
-      {(sheetsNeeded ||
-        metersNeeded ||
-        totalM2Needed ||
-        itemsPerSheet ||
-        sheetSize ||
-        (bleedMm != null && bleedMm > 0) ||
-        (cutsPerSheetUi != null && cutsPerSheetUi > 0) ||
-        (result.layout?.knifePathM != null && result.layout.knifePathM > 0)) && (
-        <div className="result-sheet-info">
-          {sheetsNeeded != null && <span><AppIcon name="document" size="xs" /> Листов: {sheetsNeeded}</span>}
-          {metersNeeded != null && <span>• Подача рулона: {formatNumber(metersNeeded, 'п.м.', true)}</span>}
-          {totalM2Needed != null && <span>• Печать: {formatNumber(totalM2Needed, 'м²', true)}</span>}
-          {itemsPerSheet != null && <span>• На листе: {itemsPerSheet} шт.</span>}
-          {sheetSize && <span>• Формат листа: {sheetSize}</span>}
-          {bleedMm != null && bleedMm > 0 && <span>• Дозаливка: {bleedMm} мм</span>}
-          {cutsPerSheetUi != null && cutsPerSheetUi > 0 && (
-            <span>• Резов на лист: {cutsPerSheetUi}</span>
-          )}
-          {result.layout?.knifePathM != null && result.layout.knifePathM > 0 && (
-            <span>• Длина реза: {formatNumber(result.layout.knifePathM, 'м', true)}</span>
-          )}
-        </div>
+      {layoutFacts.length > 0 && (
+        <div className="result-sheet-info">{layoutFacts.join(' · ')}</div>
       )}
       {result.tier_prices && result.tier_prices.length > 0 && (
         <details className="result-tier-prices">
