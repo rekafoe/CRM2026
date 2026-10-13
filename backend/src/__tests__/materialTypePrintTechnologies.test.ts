@@ -94,7 +94,7 @@ describe('MaterialPrintTechnologyService.chooseForUsage', () => {
     expect(chosen.technology_code).toBe('solvent')
   })
 
-  it('uses a unique lowest priority and rejects an ambiguous tie', () => {
+  it('picks one technology when several match the same usage', () => {
     expect(
       MaterialPrintTechnologyService.chooseForUsage(
         [link('laser', { priority: 20 }), link('uv', { id: 2, priority: 10 })],
@@ -102,11 +102,21 @@ describe('MaterialPrintTechnologyService.chooseForUsage', () => {
       ).technology_code,
     ).toBe('uv')
 
-    expect(() =>
+    expect(
       MaterialPrintTechnologyService.chooseForUsage(
         [link('laser', { priority: 10 }), link('uv', { id: 2, priority: 10 })],
         'indoor',
-      ),
-    ).toThrow(/неоднозначно/)
+      ).technology_code,
+    ).toBe('laser')
+
+    expect(
+      MaterialPrintTechnologyService.chooseForUsage(
+        [
+          link('laser', { is_default: 1, priority: 30 }),
+          link('uv', { id: 2, is_default: 1, priority: 10 }),
+        ],
+        'indoor',
+      ).technology_code,
+    ).toBe('uv')
   })
 })

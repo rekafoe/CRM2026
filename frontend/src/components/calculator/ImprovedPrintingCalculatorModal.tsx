@@ -654,9 +654,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     backendProductSchema,
     hasProductTypes ? selectedTypeId : specs.typeId,
   );
+  const materialDrivenPrinting =
+    backendProductSchema?.template?.simplified?.material_driven_printing === true;
   const hasPrintParams = isUvFlatbed
     ? hasEnabledUvLayer((specs as { uv_print?: Record<string, unknown> }).uv_print as any)
-    : Boolean(printTechnology && printColorMode);
+    : materialDrivenPrinting
+      ? Boolean(specs.material_id)
+      : Boolean(printTechnology && printColorMode);
   const { instantCalculate } = useAutoCalculate({
     specs,
     selectedProduct,
@@ -830,6 +834,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       productId: selectedProduct.id,
       materialId: specs.material_id,
       typeId: specs.typeId,
+      usage: (specs as { usage_context?: string }).usage_context ?? null,
     })}`;
     if (prevCalcTriggerKeyRef.current === key) return;
     const hadStdKey = prevCalcTriggerKeyRef.current.startsWith('std:');
@@ -840,6 +845,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   }, [
     selectedProduct?.id,
     specs.material_id,
+    (specs as { usage_context?: string }).usage_context,
     specs.typeId,
     specs.size_id,
     specs.quantity,

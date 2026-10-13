@@ -507,18 +507,23 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       }
     }
     const hasM2PrintMode = value.material_driven_printing !== true && activeM2Mode !== 'none'
-    const materialDrivenTechnology = value.material_driven_printing === true
-      ? printTechs.find((technology) => technology.code === selected.default_print?.technology_code)
-      : undefined
-    const hasMaterialDrivenCentralPrint =
-      materialDrivenTechnology != null
-      && materialDrivenTechnology.pricing_mode !== 'per_sheet'
+    const printRows = Array.isArray(selected.print_prices) ? selected.print_prices : []
+    const rowHasPrice = (row: (typeof printRows)[number]) =>
+      Array.isArray(row.tiers) && row.tiers.some((tier) => Number(tier.unit_price ?? 0) > 0)
+    const materialDrivenPrintReady = value.material_driven_printing === true && (() => {
+      const codes = [...new Set(printRows.map((row) => String(row.technology_code || '').trim().toLowerCase()).filter(Boolean))]
+      if (codes.length === 0) return false
+      return codes.every((code) => {
+        const technology = printTechs.find((item) => String(item.code || '').trim().toLowerCase() === code)
+        if (technology && technology.pricing_mode !== 'per_sheet') return true
+        return printRows.some((row) => String(row.technology_code || '').trim().toLowerCase() === code && rowHasPrice(row))
+      })
+    })()
     const hasPrint = hasM2PrintMode
       ? Boolean(selected.default_print?.technology_code)
-      : hasMaterialDrivenCentralPrint
-        ? true
-      : Array.isArray(selected.print_prices) &&
-        selected.print_prices.some((p) => Array.isArray(p.tiers) && p.tiers.some((t) => Number(t.unit_price ?? 0) > 0))
+      : value.material_driven_printing === true
+        ? materialDrivenPrintReady
+      : printRows.some(rowHasPrice)
     return {
       size: Boolean(String(selected.label || '').trim() && selected.width_mm > 0 && selected.height_mm > 0),
       print: hasPrint,
@@ -540,6 +545,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     }
     const pp = selected.print_prices || []
     if (pp.length === 0) return null
+
+    if (value.material_driven_printing === true) {
+      const priced = pp.find((row) => (row.tiers || []).some((tier) => Number(tier.unit_price ?? 0) > 0))
+      const row = priced || pp[0]
+      if (!row) return null
+      return {
+        technology: row.technology_code || '',
+        color: (row.color_mode as 'bw' | 'color') || 'color',
+        sides: row.sides_mode === 'duplex' || row.sides_mode === 'duplex_bw_back' ? 2 : 1,
+      }
+    }
 
     const defaultTech = selected.default_print?.technology_code
     const byDefaultTech = defaultTech
@@ -630,11 +646,15 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   }, [])
 
   // Обновить диапазоны только в печати (материалы имеют фиксированные стандартные диапазоны SRA3)
-  const updateSizeRanges = useCallback((sizeId: number | string, newRanges: Tier[]) => {
+  const updateSizeRanges = useCallback((sizeId: number | string, newRanges: Tier[], technologyCode?: string) => {
     const size = sizes.find(s => String(s.id) === String(sizeId))
     if (!size) return
 
+    const onlyTechnology = String(technologyCode || '').trim().toLowerCase()
     const updatedPrintPrices = size.print_prices.map(pp => {
+      if (onlyTechnology && String(pp.technology_code || '').trim().toLowerCase() !== onlyTechnology) {
+        return pp
+      }
       const priceMap = new Map(pp.tiers.map(t => [t.min_qty, t.unit_price]))
       const newTiers = newRanges.map(r => ({
         ...r,
@@ -1161,8 +1181,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
 
                 {editorTab === 'print' && value.material_driven_printing === true && (
                   <Alert type="info">
-                    Режим печати определяется совместимостью выбранного типа материала.
-                    Листовые тарифы настройте ниже, цены за пог. м и м² — в централизованных ценах печати.
+                    Технологию выбирает тип материала: помещение и улица могут печататься по-разному.
+                    Для каждой листовой технологии укажите цену ниже. Погонные метры и м² берутся из центральных тарифов.
                   </Alert>
                 )}
 
@@ -1172,6 +1192,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                     printTechs={printTechs}
                     loadingLists={loadingLists}
                     isMobile={isMobile}
+                    materialDriven={value.material_driven_printing === true}
                     updateSize={updateSize}
                     getSizeRanges={getSizeRanges}
                     updateSizeRanges={updateSizeRanges}

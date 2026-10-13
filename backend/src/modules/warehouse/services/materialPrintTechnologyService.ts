@@ -207,17 +207,16 @@ export class MaterialPrintTechnologyService {
     }
     if (candidates.length === 1) return candidates[0]
 
+    // Несколько технологий на одно назначение — это нормальный маршрут
+    // (лазер в помещении и сольвент на улице, или две технологии с приоритетом).
+    // Основная побеждает, иначе меньший приоритет, иначе стабильный код.
+    // Расчёт не должен падать из-за ничьей.
     const defaults = candidates.filter((link) => Number(link.is_default) === 1)
-    if (defaults.length === 1) return defaults[0]
-    if (defaults.length > 1) {
-      throw badRequest('Для материала настроено несколько технологий печати по умолчанию')
-    }
-
-    const bestPriority = Math.min(...candidates.map((link) => Number(link.priority)))
-    const best = candidates.filter((link) => Number(link.priority) === bestPriority)
-    if (best.length !== 1) {
-      throw badRequest('Для материала неоднозначно настроена технология печати: задайте default или разные приоритеты')
-    }
-    return best[0]
+    const pool = defaults.length > 0 ? defaults : candidates
+    return [...pool].sort((left, right) => {
+      const priorityDelta = Number(left.priority) - Number(right.priority)
+      if (priorityDelta !== 0) return priorityDelta
+      return String(left.technology_code).localeCompare(String(right.technology_code))
+    })[0]
   }
 }

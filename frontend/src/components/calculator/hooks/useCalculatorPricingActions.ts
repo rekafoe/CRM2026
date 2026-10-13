@@ -67,6 +67,7 @@ interface UseCalculatorPricingActionsReturn {
 export function productRequiresPrint(schema: any, effectiveSizes?: any[]): boolean {
   if (!schema) return false;
   const simp = schema.template?.simplified;
+  if (simp?.material_driven_printing === true) return true;
   if (simp?.uv_print?.mode === 'flatbed_m2') return true;
   if (simp?.roll_m2?.mode === 'roll_wide_m2') return true;
   const typeConfigs = simp?.typeConfigs;

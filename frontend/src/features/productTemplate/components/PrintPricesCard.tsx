@@ -23,6 +23,7 @@ type TierRangeModalState = {
   isOpen: boolean
   boundary: string
   anchorElement?: HTMLElement
+  technologyCode?: string
 }
 
 interface PrintPricesCardProps {
@@ -32,7 +33,9 @@ interface PrintPricesCardProps {
   isMobile: boolean
   updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
   getSizeRanges: (size: SimplifiedSizeConfig, technologyCode?: string) => Tier[]
-  updateSizeRanges: (sizeId: number | string, newRanges: Tier[]) => void
+  updateSizeRanges: (sizeId: number | string, newRanges: Tier[], technologyCode?: string) => void
+  /** Несколько технологий сразу: материал сам выбирает, какую применить. */
+  materialDriven?: boolean
   /** Материалы склада (для раскладки по ширине/высоте листа при запросе из центральных цен) */
   allMaterials?: Array<{ id: number; sheet_width?: number | null; sheet_height?: number | null }>
   /** Разрешённые id материалов для текущего размера (порядок важен: берётся первый с обоими размерами мм) */
@@ -51,6 +54,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
   updateSize,
   getSizeRanges,
   updateSizeRanges,
+  materialDriven = false,
   allMaterials,
   allowedMaterialIds,
   otherSizesForPrintCopy = [],
@@ -72,7 +76,6 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
     boundary: '',
   })
   const tierModalRef = useRef<HTMLDivElement>(null)
-  const addRangeButtonRef = useRef<HTMLButtonElement>(null)
   const tierRangeFloating = useTierRangeFloating(
     tierModal.anchorElement ?? null,
     Boolean(tierModal.isOpen && tierModal.anchorElement && selected)
@@ -107,13 +110,73 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
     }
   }, [tierModal.isOpen])
 
+  const technologyCodesOnSize: string[] = []
+  const seenTechnologyCodes = new Set<string>()
+  for (const row of selected.print_prices) {
+    const code = String(row.technology_code || '').trim()
+    const key = code.toLowerCase()
+    if (!key || seenTechnologyCodes.has(key)) continue
+    seenTechnologyCodes.add(key)
+    technologyCodesOnSize.push(code)
+  }
+  const activeTechnologyCode = selected.default_print?.technology_code || technologyCodesOnSize[0] || ''
+  const visibleTechnologyCodes = materialDriven
+    ? technologyCodesOnSize
+    : (activeTechnologyCode ? [activeTechnologyCode] : [])
+
+  const fillFromCentral = async (technologyCode: string) => {
+    if (!technologyCode) return
+    setDeriveLoading(true)
+    try {
+      const result = await deriveSizePrintPricesFromCentral({
+        size: selected,
+        printTechs,
+        allMaterials,
+        allowedMaterialIds,
+        technologyCode,
+      })
+      if (result.skipped) {
+        toast.error(
+          'Нет параметров печати для заполнения',
+          result.skipped === 'нет параметров печати для заполнения'
+            ? 'Добавьте нужные вариации кнопками внизу и повторите запрос.'
+            : result.skipped,
+        )
+        return
+      }
+      if (result.filledModes > 0) {
+        updateSize(selected.id, {
+          print_prices: result.size.print_prices,
+          ...(result.size.min_qty != null ? { min_qty: result.size.min_qty } : {}),
+        })
+        toast.success(
+          'Цены подставлены из центральных настроек',
+          result.problems.length > 0
+            ? `Не для всех режимов: ${result.problems.slice(0, 3).join(' ')}${result.problems.length > 3 ? '…' : ''}`
+            : undefined,
+        )
+      } else {
+        toast.error(
+          'Не удалось заполнить из центральных цен',
+          result.problems.length > 0
+            ? result.problems.join('\n')
+            : 'Проверьте, что для выбранной технологии в «Цены печати» заданы листовые цены и диапазоны тиража.',
+        )
+      }
+    } finally {
+      setDeriveLoading(false)
+    }
+  }
+
   return (
     <div className="simplified-card">
       <div className="simplified-card__header">
         <div>
           {titleWithHint(
             'Печать (цена за изделие)',
-            'Выберите технологию печати, и система автоматически покажет все доступные вариации с диапазонами цен.',
+            materialDriven
+              ? 'Добавьте каждую технологию, которой может печататься материал. Листовые цены задаются здесь, погонные метры и м² — в центральных тарифах.'
+              : 'Выберите технологию печати, и система автоматически покажет все доступные вариации с диапазонами цен.',
           )}
           {otherSizesForPrintCopy.length > 0 && typeof onCopyPrintFromSize === 'function' && (
             <div
@@ -153,7 +216,8 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
             </div>
           )}
         </div>
-        {selected.default_print?.technology_code
+        {!materialDriven
+          && selected.default_print?.technology_code
           && printTechs.find((technology) => technology.code === selected.default_print?.technology_code)?.pricing_mode === 'per_sheet'
           && selected.width_mm > 0
           && selected.height_mm > 0 && (
@@ -162,55 +226,13 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
             size="sm"
             loading={deriveLoading}
             disabled={deriveLoading}
-            onClick={async () => {
-              const tech = selected.default_print?.technology_code ?? ''
-              if (!tech) return
-              setDeriveLoading(true)
-              try {
-                const result = await deriveSizePrintPricesFromCentral({
-                  size: selected,
-                  printTechs,
-                  allMaterials,
-                  allowedMaterialIds,
-                  technologyCode: tech,
-                })
-                if (result.skipped) {
-                  toast.error(
-                    'Нет параметров печати для заполнения',
-                    result.skipped === 'нет параметров печати для заполнения'
-                      ? 'Добавьте нужные вариации кнопками внизу и повторите запрос.'
-                      : result.skipped,
-                  )
-                  return
-                }
-                if (result.filledModes > 0) {
-                  updateSize(selected.id, {
-                    print_prices: result.size.print_prices,
-                    ...(result.size.min_qty != null ? { min_qty: result.size.min_qty } : {}),
-                  })
-                  toast.success(
-                    'Цены подставлены из центральных настроек',
-                    result.problems.length > 0
-                      ? `Не для всех режимов: ${result.problems.slice(0, 3).join(' ')}${result.problems.length > 3 ? '…' : ''}`
-                      : undefined,
-                  )
-                } else {
-                  toast.error(
-                    'Не удалось заполнить из центральных цен',
-                    result.problems.length > 0
-                      ? result.problems.join('\n')
-                      : 'Проверьте, что для выбранной технологии в «Цены печати» заданы листовые цены и диапазоны тиража.',
-                  )
-                }
-              } finally {
-                setDeriveLoading(false)
-              }
-            }}
+            onClick={() => { void fillFromCentral(selected.default_print?.technology_code ?? '') }}
           >
             Заполнить из центральных цен
           </Button>
         )}
-        {selected.default_print?.technology_code
+        {!materialDriven
+          && selected.default_print?.technology_code
           && printTechs.find((technology) => technology.code === selected.default_print?.technology_code)?.pricing_mode === 'per_sheet'
           && selected.width_mm > 0
           && selected.height_mm > 0 && (
@@ -225,13 +247,14 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
       </div>
       <div className="simplified-card__content">
         <div className="simplified-form-grid mb-3">
-          <FormField label="Технология печати">
+          <FormField label={materialDriven ? 'Добавить технологию' : 'Технология печати'}>
             <select
               className="form-select form-select--compact"
-              value={selected.default_print?.technology_code || ''}
+              value={materialDriven ? '' : (selected.default_print?.technology_code || '')}
               onChange={(e) => {
                 const techCode = e.target.value
                 if (!techCode) {
+                  if (materialDriven) return
                   updateSize(selected.id, { default_print: undefined, print_prices: [] })
                   return
                 }
@@ -301,21 +324,26 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
               }}
               disabled={loadingLists}
             >
-              <option value="">-- Выберите технологию --</option>
-              {printTechs.map(t => (
+              <option value="">{materialDriven ? '— добавить технологию —' : '-- Выберите технологию --'}</option>
+              {printTechs
+                .filter((technology) => (
+                  !materialDriven
+                  || !seenTechnologyCodes.has(String(technology.code || '').trim().toLowerCase())
+                ))
+                .map(t => (
                 <option key={t.code} value={t.code}>{t.name}</option>
               ))}
             </select>
           </FormField>
         </div>
 
-        {selected.print_prices.length === 0 ? (
-          <div className="text-muted">Выберите технологию печати, чтобы увидеть доступные вариации.</div>
-        ) : (() => {
-          const techCode =
-            selected.default_print?.technology_code
-            ?? selected.print_prices[0]?.technology_code
-            ?? ''
+        {visibleTechnologyCodes.length === 0 ? (
+          <div className="text-muted">
+            {materialDriven
+              ? 'Добавьте технологии, которыми может печататься материал.'
+              : 'Выберите технологию печати, чтобы увидеть доступные вариации.'}
+          </div>
+        ) : visibleTechnologyCodes.map((techCode) => {
           const commonRanges = getSizeRanges(selected, techCode || undefined)
           const activeRows = selected.print_prices.filter(
             (row) => String(row.technology_code) === String(techCode),
@@ -323,36 +351,61 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           const colorRows = activeRows.filter(p => p.color_mode === 'color')
           const bwRows = activeRows.filter(p => p.color_mode === 'bw')
           const selectedTech = techCode ? printTechs.find(t => t.code === techCode) : null
-          if (selectedTech?.pricing_mode && selectedTech.pricing_mode !== 'per_sheet') {
-            return (
-              <div className="flex items-center gap-2 text-muted text-sm">
-                <span>
-                  Цена «{selectedTech.name}» берётся из централизованных тарифов
-                  ({selectedTech.pricing_mode}).
-                </span>
+          const removeTechnology = () => {
+            const remaining = selected.print_prices.filter(
+              (row) => String(row.technology_code) !== String(techCode),
+            )
+            const next = remaining[0]
+            updateSize(selected.id, {
+              print_prices: remaining,
+              default_print: next
+                ? {
+                    technology_code: next.technology_code,
+                    color_mode: next.color_mode,
+                    sides_mode: next.sides_mode,
+                  }
+                : undefined,
+            })
+          }
+          const technologyHeading = materialDriven ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <strong>{selectedTech?.name || techCode}</strong>
+              {selectedTech?.pricing_mode === 'per_sheet' && selected.width_mm > 0 && selected.height_mm > 0 && (
                 <Button
-                  type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    const remaining = selected.print_prices.filter(
-                      (row) => String(row.technology_code) !== String(techCode),
-                    )
-                    const next = remaining[0]
-                    updateSize(selected.id, {
-                      print_prices: remaining,
-                      default_print: next
-                        ? {
-                            technology_code: next.technology_code,
-                            color_mode: next.color_mode,
-                            sides_mode: next.sides_mode,
-                          }
-                        : undefined,
-                    })
-                  }}
+                  loading={deriveLoading}
+                  disabled={deriveLoading}
+                  onClick={() => { void fillFromCentral(techCode) }}
                 >
-                  Убрать технологию
+                  Заполнить из центральных цен
                 </Button>
+              )}
+              <Button type="button" variant="secondary" size="sm" onClick={removeTechnology}>
+                Убрать технологию
+              </Button>
+            </div>
+          ) : null
+          if (selectedTech?.pricing_mode && selectedTech.pricing_mode !== 'per_sheet') {
+            return (
+              <div key={techCode} style={{ marginBottom: materialDriven ? 16 : 0 }}>
+                {technologyHeading}
+                <div className="flex items-center gap-2 text-muted text-sm">
+                  <span>
+                    Цена «{selectedTech.name}» берётся из централизованных тарифов
+                    ({selectedTech.pricing_mode}).
+                  </span>
+                  {!materialDriven && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={removeTechnology}
+                    >
+                      Убрать технологию
+                    </Button>
+                  )}
+                </div>
               </div>
             )
           }
@@ -470,7 +523,8 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           )
 
           return (
-            <div className="simplified-tiers-table">
+            <div key={techCode} className="simplified-tiers-table" style={{ marginBottom: materialDriven ? 16 : 0 }}>
+              {technologyHeading}
               <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
                 <thead>
                   <tr>
@@ -489,6 +543,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                                   isOpen: true,
                                   boundary: String(t.min_qty),
                                   anchorElement: e.currentTarget as HTMLElement,
+                                  technologyCode: techCode,
                                 })
                               }}
                             >
@@ -501,7 +556,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                                 style={{ color: 'red', marginRight: '-15px' }}
                                 onClick={() =>{
                                   const newRanges = removeRange(commonRanges, ti)
-                                  updateSizeRanges(selected.id, newRanges)
+                                  updateSizeRanges(selected.id, newRanges, techCode)
                                 }}
                               >
                                 ×
@@ -515,7 +570,6 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                       <div className="cell">
                         <div className="simplified-row__add-range-wrapper">
                           <button
-                            ref={addRangeButtonRef}
                             type="button"
                             className="el-button el-button--info el-button--mini is-plain"
                             style={{ width: '100%', marginLeft: '0px' }}
@@ -525,7 +579,8 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                                 type: 'add',
                                 isOpen: true,
                                 boundary: '',
-                                anchorElement: button
+                                anchorElement: button,
+                                technologyCode: techCode,
                               })
                             }}
                           >
@@ -607,7 +662,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
               })()}
             </div>
           )
-        })()}
+        })}
 
         {tierModal.isOpen && selected && typeof document !== 'undefined' &&
           createPortal(
@@ -675,7 +730,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
 
                         const currentRanges = getSizeRanges(
                           selected,
-                          selected.default_print?.technology_code || undefined,
+                          tierModal.technologyCode || selected.default_print?.technology_code || undefined,
                         )
                         let newRanges: Tier[]
 
@@ -687,7 +742,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                           return
                         }
 
-                        updateSizeRanges(selected.id, newRanges)
+                        updateSizeRanges(selected.id, newRanges, tierModal.technologyCode)
                         setTierModal({ type: 'add', isOpen: false, boundary: '' })
                       }}
                     >

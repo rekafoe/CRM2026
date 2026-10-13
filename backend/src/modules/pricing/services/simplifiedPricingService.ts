@@ -73,6 +73,7 @@ import { sheetLayoutPrintTierQuantity } from '../utils/sheetLayoutPrintTierQuant
 import { smoothedSheetPrintTotal } from '../utils/smoothedSheetPrintTotal';
 import {
   MaterialPrintResolver,
+  pickMaterialDrivenPrintRow,
   type MaterialPrintResolution,
 } from './materialPrintResolver';
 
@@ -705,14 +706,7 @@ export class SimplifiedPricingService {
       );
       const requestedColor = String(normalizedConfig.print_color_mode || '').toLowerCase();
       const requestedSides = String(normalizedConfig.print_sides_mode || '').toLowerCase();
-      const selectedPrintRow =
-        techRows.find(
-          (row) =>
-            String(row.color_mode).toLowerCase() === requestedColor
-            && String(row.sides_mode).toLowerCase() === requestedSides,
-        )
-        ?? techRows.find((row) => String(row.color_mode).toLowerCase() === requestedColor)
-        ?? techRows[0];
+      const selectedPrintRow = pickMaterialDrivenPrintRow(techRows, requestedColor, requestedSides);
 
       normalizedConfig.print_color_mode =
         selectedPrintRow?.color_mode

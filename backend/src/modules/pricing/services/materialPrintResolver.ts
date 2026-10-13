@@ -68,6 +68,61 @@ function placeholders(values: unknown[]): string {
   return values.map(() => '?').join(',')
 }
 
+type CentralPrintRate = {
+  counter_unit: string | null
+  m2_pricing_kind: 'roll_wide' | 'uv_flatbed' | null
+  price_bw_per_meter?: number | null
+  price_color_per_meter?: number | null
+  price_color_per_m2?: number | null
+}
+
+function centralM2IsPriced(row: CentralPrintRate | undefined): boolean {
+  if (!row || String(row.counter_unit || '').trim().toLowerCase() !== 'm2') return false
+  if (row.m2_pricing_kind === 'roll_wide' || row.m2_pricing_kind === 'uv_flatbed') return true
+  return Number(row.price_color_per_m2) > 0
+}
+
+function centralMeterIsPriced(row: CentralPrintRate | undefined): boolean {
+  if (!row || String(row.counter_unit || '').trim().toLowerCase() !== 'meters') return false
+  return Number(row.price_color_per_meter) > 0 || Number(row.price_bw_per_meter) > 0
+}
+
+export function tierHasPositivePrice(tier: {
+  unit_price?: number
+  price?: number
+  tier_prices?: number[]
+} | undefined): boolean {
+  if (!tier) return false
+  return Number(tier.unit_price ?? tier.price ?? tier.tier_prices?.[0] ?? 0) > 0
+}
+
+/** В режиме «печать определяется материалом» клиент не выбирает цвет и стороны.
+ *  Берём запрошенную вариацию, только если у неё есть цена, иначе любую ненулевую. */
+export function pickMaterialDrivenPrintRow<T extends {
+  color_mode?: string
+  sides_mode?: string
+  tiers?: Array<{ unit_price?: number; price?: number; tier_prices?: number[] }>
+}>(rows: T[], requestedColor: string, requestedSides: string): T | undefined {
+  if (rows.length === 0) return undefined
+  const color = requestedColor.trim().toLowerCase()
+  const sides = requestedSides.trim().toLowerCase()
+  const matches = (row: T, wantColor: boolean, wantSides: boolean) => {
+    const rowColor = String(row.color_mode || '').toLowerCase()
+    const rowSides = String(row.sides_mode || '').toLowerCase()
+    if (wantColor && color && rowColor !== color) return false
+    if (wantSides && sides && rowSides !== sides) return false
+    return true
+  }
+  const priced = (row: T) => (row.tiers || []).some((tier) => tierHasPositivePrice(tier))
+  return (
+    rows.find((row) => matches(row, true, true) && priced(row))
+    ?? rows.find((row) => priced(row))
+    ?? rows.find((row) => matches(row, true, true))
+    ?? rows.find((row) => matches(row, true, false))
+    ?? rows[0]
+  )
+}
+
 export class MaterialPrintResolver {
   static async resolve(input: ResolveMaterialPrintInput): Promise<MaterialPrintResolution> {
     const requestedMaterialId = Number(input.requestedMaterialId)
@@ -128,29 +183,42 @@ export class MaterialPrintResolver {
     type CentralPrice = {
       counter_unit: string | null
       m2_pricing_kind: 'roll_wide' | 'uv_flatbed' | null
+      price_bw_per_meter: number | null
+      price_color_per_meter: number | null
+      price_color_per_m2: number | null
     }
     const centralPricesByCode = new Map<string, CentralPrice | undefined>()
     const candidatesWithPrice = []
     for (const link of links) {
       const codeKey = link.technology_code.toLowerCase()
-      const centralPrice = await db.get<CentralPrice>(
-        `SELECT counter_unit, m2_pricing_kind
-         FROM print_prices
-         WHERE LOWER(technology_code) = LOWER(?)
-           AND is_active = 1
-         ORDER BY id DESC
-         LIMIT 1`,
-        [link.technology_code],
-      )
+      const pricingMode = String(link.pricing_mode || '').trim().toLowerCase()
+      // Берём строку с той же единицей, что у технологии. Иначе более новая
+      // листовая запись прячет тариф за пог. м или м², и печать выходит в 0.
+      const centralUnit =
+        pricingMode === 'per_m2' ? 'm2' : pricingMode === 'per_meter' ? 'meters' : null
+      const centralPrice = centralUnit
+        ? await db.get<CentralPrice>(
+            `SELECT counter_unit, m2_pricing_kind,
+                    price_bw_per_meter, price_color_per_meter, price_color_per_m2
+             FROM print_prices
+             WHERE LOWER(technology_code) = LOWER(?)
+               AND is_active = 1
+               AND counter_unit = ?
+             ORDER BY id DESC
+             LIMIT 1`,
+            [link.technology_code, centralUnit],
+          )
+        : undefined
       centralPricesByCode.set(codeKey, centralPrice)
       const hasLocalPrice = configuredCodes.has(codeKey)
-      const pricingMode = String(link.pricing_mode || '').trim().toLowerCase()
       const hasApplicablePrice =
         pricingMode === 'per_sheet'
           ? hasLocalPrice
           : pricingMode === 'per_m2'
-            ? centralPrice?.counter_unit === 'm2'
-            : hasLocalPrice || Boolean(centralPrice)
+            ? centralM2IsPriced(centralPrice)
+            : pricingMode === 'per_meter'
+              ? hasLocalPrice || centralMeterIsPriced(centralPrice)
+              : hasLocalPrice || centralM2IsPriced(centralPrice) || centralMeterIsPriced(centralPrice)
       if (hasApplicablePrice) candidatesWithPrice.push(link)
     }
     if (candidatesWithPrice.length === 0) {
