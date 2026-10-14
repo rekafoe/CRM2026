@@ -2471,7 +2471,12 @@ export class SimplifiedPricingService {
           effectiveConsumptionMode === 'roll_feed' || detailPriceUnit === 'per_m2';
         if (useRollFeedUnits) {
           const matInfo = materialInfoMap.get(src.material_id);
-          const rollWidthMm = Number(matInfo?.sheet_width ?? matInfo?.printable_width ?? 0);
+          // Как у материала печати: printable_width ?? sheet_width (иначе stock даёт лишние колонки).
+          const rollWidthMm = Number(
+            (matInfo?.printable_width != null && Number(matInfo.printable_width) > 0
+              ? matInfo.printable_width
+              : matInfo?.sheet_width) ?? 0
+          );
           const feed = resolveWarehouseFeedMeters({
             rollWidthMm: Number.isFinite(rollWidthMm) && rollWidthMm > 0 ? rollWidthMm : null,
             layout: {

@@ -1,8 +1,13 @@
+jest.mock('../utils/tableSchemaCache', () => ({
+  getTableColumns: jest.fn(async () => new Set()),
+}));
+
 import {
   billedM2ForQuantity,
   defaultRollFeedForPriceUnit,
   finishingFinKey,
   quotePerM2Finishing,
+  resolveRollLayoutWidthMm,
   resolveWarehouseFeedMeters,
 } from '../modules/pricing/services/finishingPerM2';
 
@@ -82,5 +87,29 @@ describe('finishingPerM2', () => {
     expect(defaultRollFeedForPriceUnit('per_m2')).toBe(true);
     expect(defaultRollFeedForPriceUnit('per_meter', 'laminate')).toBe(true);
     expect(defaultRollFeedForPriceUnit('per_item', 'laminate')).toBe(false);
+  });
+
+  it('resolveRollLayoutWidthMm prefers printable_width over wider stock sheet_width', () => {
+    expect(resolveRollLayoutWidthMm(1050, 1030)).toBe(1030);
+    expect(resolveRollLayoutWidthMm(1050, null)).toBe(1050);
+    expect(resolveRollLayoutWidthMm(null, 620)).toBe(620);
+    expect(resolveRollLayoutWidthMm(0, 0)).toBeNull();
+  });
+
+  it('resolveWarehouseFeedMeters with printable width nests fewer cols than stock width', () => {
+    const layout = {
+      trimMm: { width: 600, height: 340 },
+      bleedMm: 0,
+      quantity: 100,
+      margins: { edgeMm: 10, gapMm: 2 },
+    };
+    const onPrintable = resolveWarehouseFeedMeters({ rollWidthMm: 1030, layout });
+    const onStock = resolveWarehouseFeedMeters({ rollWidthMm: 1050, layout });
+    expect(onPrintable.usedRollLayout).toBe(true);
+    expect(onStock.usedRollLayout).toBe(true);
+    // Stock 1050 fits 3 cols → shorter feed; printable 1030 fits 2 → longer feed (correct write-off).
+    expect(onPrintable.feedMeters).toBeGreaterThan(onStock.feedMeters);
+    expect(onPrintable.feedMeters).toBeCloseTo(30.118, 2);
+    expect(onStock.feedMeters).toBeCloseTo(20.5, 1);
   });
 });

@@ -95,9 +95,12 @@ async function clearNonLeafVariantPrices(db: Database, serviceId: number): Promi
   );
 }
 
+/** Ширина раскладки на рулоне: printable_width ?? sheet_width (см. MaterialPrintResolver / finishingPerM2). */
 function parsePositiveRollWidthMm(sheetWidth?: unknown, printableWidth?: unknown): number | null {
-  const w = Number(sheetWidth ?? printableWidth ?? 0);
-  return Number.isFinite(w) && w > 0 ? w : null;
+  const printable = Number(printableWidth ?? 0);
+  if (Number.isFinite(printable) && printable > 0) return printable;
+  const stock = Number(sheetWidth ?? 0);
+  return Number.isFinite(stock) && stock > 0 ? stock : null;
 }
 
 function parametersWithParentSync(
