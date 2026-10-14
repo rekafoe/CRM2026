@@ -64,8 +64,10 @@ export interface ProductSpecs {
     subtype?: string;
     /** Вариант услуги (ламинация и др.) — уходит в finishing.variant_id на бэкенде */
     variantId?: number;
-    /** Для per_m2 / feed — пог. м; для per_sheet — листы; иначе шт */
+    /** Для per_m2 / feed — пог. м; для per_sheet — листы; fixed/per_order/per_hour — на заказ; иначе шт */
     quantity?: number;
+    /** Услуга обязательна в шаблоне размера: нельзя снять и нельзя менять количество. */
+    required?: boolean;
     /** м² биллинга (per_m2), отдельно от quantity в пог. м */
     billedM2?: number;
   }>;

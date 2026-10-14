@@ -3,6 +3,7 @@ import { getServiceVariants } from '../../../services/pricing/api';
 import type { ServiceVariant } from '../../../types/pricing';
 import { getParentVariantId } from '../../../utils/serviceVariantParent';
 import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantLabels';
+import { templateUnitsForOperation } from '../utils/simplifiedConfig';
 
 interface Operation {
   id?: number;
@@ -37,6 +38,8 @@ interface SelectedOperation {
   quantity?: number;
   /** м² биллинга при price_unit=per_m2 */
   billedM2?: number;
+  /** Задано шаблоном продукта: галочку и количество менять нельзя. */
+  required?: boolean;
 }
 
 function getOperationPriceUnit(operation: Operation): string {
@@ -76,6 +79,22 @@ function quantityFieldMeta(operation: Operation): {
       label: 'Количество (листов):',
       step: 1,
       min: 1,
+    };
+  }
+  if (priceUnit === 'per_hour') {
+    return {
+      label: 'Часов на заказ:',
+      step: 0.01,
+      min: 0.01,
+      hint: 'Фиксированное время, без умножения на тираж.',
+    };
+  }
+  if (priceUnit === 'fixed' || priceUnit === 'per_order' || priceUnit === 'per_cut') {
+    return {
+      label: priceUnit === 'per_cut' ? 'Резов на заказ:' : 'Количество на заказ:',
+      step: 1,
+      min: 1,
+      hint: 'Не умножается на тираж.',
     };
   }
   return {
@@ -282,6 +301,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   }, [backendProductSchema?.operations]);
 
   const clampOperationQuantity = useCallback((operationId: number, quantity: number) => {
+    const operation = operations.find((op: Operation) => Number(op.operation_id || op.id) === Number(operationId));
+    if (operation && getOperationPriceUnit(operation) === 'per_hour') {
+      return Math.max(0.01, quantity);
+    }
     const limits = operationLimits.get(operationId);
     const minQty = limits?.min ?? 1;
     const maxQty = limits?.max;
@@ -290,7 +313,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       next = Math.min(maxQty, next);
     }
     return next;
-  }, [operationLimits]);
+  }, [operationLimits, operations]);
 
   // Мемоизируем карту выбранных операций для быстрого доступа
   const selectedOperationsMap = useMemo(() => {
@@ -320,6 +343,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     const currentOps = [...selectedOperations];
 
     if (isSelected) {
+      if (selectedOperationsMap.get(operationId)?.required) return;
       // Удаляем операцию
       const filtered = currentOps.filter((op: SelectedOperation) => op.operationId !== operationId);
       updateSpecs({ selectedOperations: filtered }, true);
@@ -328,10 +352,16 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       const variants = serviceVariants.get(operationId) || [];
       const hasVariants = variants.length > 0;
       const minQuantity = Number(operationLimits.get(operationId)?.min ?? operation.min_quantity ?? 1);
+      const templateUnits = templateUnitsForOperation(
+        backendProductSchema?.template?.simplified,
+        specs.typeId,
+        specs.size_id,
+        operationId,
+      );
       
       let newOp: SelectedOperation = {
         operationId,
-        quantity: clampOperationQuantity(operationId, 1),
+        quantity: templateUnits ?? clampOperationQuantity(operationId, 1),
       };
       
       if (hasVariants) {
@@ -378,10 +408,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       }
       updateSpecs(nextUpdates, true);
     }
-  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, serviceVariants, updateSpecs, specs.quantity, clampOperationQuantity, operationLimits]);
+  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, serviceVariants, updateSpecs, specs.quantity, specs.typeId, specs.size_id, backendProductSchema?.template?.simplified, clampOperationQuantity, operationLimits]);
 
   // Обновляем подтип операции (мемоизированная версия)
   const updateOperationSubtype = useCallback((operationId: number, subtype: string) => {
+    if (selectedOperationsMap.get(operationId)?.required) return;
     const updated = selectedOperations.map((op: SelectedOperation) => {
       if (op.operationId === operationId) {
         return { ...op, subtype };
@@ -389,10 +420,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       return op;
     });
     updateSpecs({ selectedOperations: updated }, true);
-  }, [selectedOperations, updateSpecs]);
+  }, [selectedOperations, selectedOperationsMap, updateSpecs]);
 
   // Обновляем количество операции (мемоизированная версия)
-    const updateOperationQuantity = useCallback((operationId: number, quantity?: number) => {
+  const updateOperationQuantity = useCallback((operationId: number, quantity?: number) => {
+    if (selectedOperationsMap.get(operationId)?.required) return;
     const updated = selectedOperations.map((op: SelectedOperation) => {
       if (op.operationId === operationId) {
         if (!Number.isFinite(quantity)) {
@@ -403,7 +435,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       return op;
     });
     updateSpecs({ selectedOperations: updated }, true);
-  }, [selectedOperations, updateSpecs, clampOperationQuantity]);
+  }, [selectedOperations, selectedOperationsMap, updateSpecs, clampOperationQuantity]);
 
   //  Логирование для отладки
   useEffect(() => {
@@ -435,6 +467,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
           const operationName = operation.operation_name || operation.name || 'Операция';
           const isSelected = isOperationSelected(operationId);
           const selectedData = getSelectedOperationData(operationId);
+          const locked = selectedData?.required === true;
           const limits = operationLimits.get(operationId);
 
           return (
@@ -444,11 +477,14 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   <input
                     type="checkbox"
                     checked={isSelected}
+                    disabled={locked}
+                    title={locked ? 'Обязательная услуга продукта' : undefined}
                     onChange={() => toggleOperation(operation)}
                     className="operation-checkbox"
                   />
                   <span className="operation-name">{operationName}</span>
                 </label>
+                {locked && <span className="operation-limits">обязательная</span>}
                 {limits && (
                   <span className="operation-limits">
                     {'\u00A0'}от {limits.min}{limits.max !== undefined ? ` до ${limits.max}` : ''}
@@ -578,6 +614,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         </label>
                         <select
                           value={selectedTypeName || uniqueTypes[0]?.variantName || ''}
+                          disabled={locked}
                           onChange={(e) => {
                             const newTypeName = e.target.value;
                             const nextTypeVariant = hasTypeHierarchy
@@ -632,6 +669,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           </label>
                           <select
                             value={selectedData?.subtype || uniqueSubtypes[0]?.value || ''}
+                            disabled={locked}
                             onChange={(e) => {
                               const newSubtypeValue = e.target.value;
                               // Находим подтип и его variantId
@@ -677,6 +715,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       <button
                         type="button"
                         className="quantity-btn quantity-btn-minus"
+                        disabled={locked}
                         onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
@@ -697,11 +736,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         min={fieldMin}
                         max={limits?.max}
                         step={step}
+                        disabled={locked}
                         className="quantity-input"
                       />
                       <button
                         type="button"
                         className="quantity-btn quantity-btn-plus"
+                        disabled={locked}
                         onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
@@ -717,6 +758,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       <div className="operation-qty-hint">
                         В цене: {formatQtyHint(Number(billedM2))} м² (ставка за м² рулона)
                       </div>
+                    )}
+                    {qtyMeta.hint && <div className="operation-qty-hint">{qtyMeta.hint}</div>}
+                    {locked && <div className="operation-qty-hint">Количество задано в шаблоне продукта</div>}
+                    {getOperationPriceUnit(operation) === 'per_hour' && Number(selectedData?.quantity) > 0 && (
+                      <div className="operation-qty-hint">{formatQtyHint(Number(selectedData?.quantity) * 60)} мин</div>
                     )}
                   </div>
                         );
@@ -734,6 +780,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         <label className="operation-field-label">Тип операции:</label>
                         <select
                           value={selectedData?.subtype || subtypes[0].value}
+                          disabled={locked}
                           onChange={(e) => updateOperationSubtype(operationId, e.target.value)}
                           className="form-control operation-select"
                         >
@@ -759,6 +806,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         <button
                           type="button"
                           className="quantity-btn quantity-btn-minus"
+                        disabled={locked}
                           onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
@@ -779,11 +827,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           min={fieldMin}
                           max={limits?.max}
                           step={step}
-                          className="quantity-input"
+                          disabled={locked}
+                        className="quantity-input"
                         />
                         <button
                           type="button"
                           className="quantity-btn quantity-btn-plus"
+                        disabled={locked}
                           onClick={() =>{
                           const minQty = fieldMin;
                           const currentQty = Number.isFinite(selectedData?.quantity)
@@ -799,6 +849,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         <div className="operation-qty-hint">
                           В цене: {formatQtyHint(Number(billedM2))} м² (ставка за м² рулона)
                         </div>
+                      )}
+                      {qtyMeta.hint && <div className="operation-qty-hint">{qtyMeta.hint}</div>}
+                      {locked && <div className="operation-qty-hint">Количество задано в шаблоне продукта</div>}
+                      {getOperationPriceUnit(operation) === 'per_hour' && Number(selectedData?.quantity) > 0 && (
+                        <div className="operation-qty-hint">{formatQtyHint(Number(selectedData?.quantity) * 60)} мин</div>
                       )}
                     </div>
                       );

@@ -98,4 +98,26 @@ describe('compact material-driven schema', () => {
     expect(compact.roll_m2).toEqual({ mode: 'roll_wide_m2' })
     expect(JSON.stringify(compact)).not.toContain('1600')
   })
+
+  it('оставляет обязательность и количество услуги', () => {
+    const compact = compactSimplifiedForSite({
+      sizes: [
+        {
+          id: 1,
+          label: 'A6',
+          width_mm: 105,
+          height_mm: 148,
+          finishing: [
+            { service_id: 12, price_unit: 'per_hour', units_per_item: 5 / 60, is_required: true, tiers: [{ min_qty: 1, unit_price: 9 }] },
+            { service_id: 13, price_unit: 'per_item', units_per_item: 1, is_required: false },
+          ],
+        },
+      ],
+    })
+
+    expect(compact.sizes[0].finishing).toEqual([
+      { service_id: 12, price_unit: 'per_hour', units_per_item: 5 / 60, is_required: true },
+      { service_id: 13, price_unit: 'per_item', units_per_item: 1 },
+    ])
+  })
 })

@@ -289,7 +289,8 @@ export function useCalculatorPricingActions({
             | 'fixed'
             | 'per_order'
             | 'per_meter'
-            | 'per_m2';
+            | 'per_m2'
+            | 'per_hour';
           units_per_item: number;
           variant_id?: number;
         };
@@ -329,6 +330,7 @@ export function useCalculatorPricingActions({
                 'per_order',
                 'per_meter',
                 'per_m2',
+                'per_hour',
               ] as const;
               type KnownPu = (typeof KNOWN_UNITS)[number];
               let priceUnit: KnownPu = 'per_item';

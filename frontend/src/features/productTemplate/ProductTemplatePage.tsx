@@ -254,7 +254,7 @@ const ProductTemplatePage: React.FC = () => {
                       { ok: simplifiedChecklist.size, label: 'Размер' },
                       { ok: simplifiedChecklist.print, label: 'Печать' },
                       { ok: simplifiedChecklist.materials, label: 'Материалы' },
-                      { ok: simplifiedChecklist.finishing, label: 'Отделка' },
+                      { ok: simplifiedChecklist.finishing, label: 'Услуги' },
                     ].map((item) => (
                       <span
                         key={item.label}

@@ -1386,13 +1386,69 @@
 
 .simplified-finishing-item__controls {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
+  align-items: end;
 }
 
 .simplified-finishing-item__pricing {
   margin-top: 8px;
+}
+
+.simplified-finishing-lead {
+  margin: 0 0 12px;
+}
+
+.simplified-finishing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary, #4b5563);
+}
+
+.simplified-finishing-field input,
+.simplified-finishing-field select {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+.simplified-finishing-item__hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+}
+
+.simplified-finishing-item__required {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  min-height: 36px;
+}
+
+.simplified-finishing-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.simplified-finishing-add input,
+.simplified-finishing-add select {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+@media (max-width: 720px) {
+  .simplified-finishing-item__controls {
+    grid-template-columns: 1fr;
+  }
 }
 
 .service-pricing-search {

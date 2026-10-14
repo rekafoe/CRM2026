@@ -166,3 +166,142 @@ export function getEffectiveSimplifiedConfig(
     pages: simplified.pages,
   };
 }
+
+export function isFinishingRequiredFlag(value: unknown): boolean {
+  return value === true || value === 1 || value === '1';
+}
+
+export type RequiredOperationSeed = {
+  operationId: number;
+  variantId?: number;
+  subtype?: string;
+  quantity: number;
+  required: true;
+};
+
+type FinishingTemplateRow = {
+  service_id?: number;
+  operation_id?: number;
+  units_per_item?: number;
+  variant_id?: unknown;
+  subtype?: string;
+  is_required?: unknown;
+};
+
+type SizeWithFinishing = { finishing?: unknown; [key: string]: any } | null | undefined;
+
+function finishingRowsOf(size: SizeWithFinishing): FinishingTemplateRow[] {
+  return Array.isArray(size?.finishing) ? (size.finishing as FinishingTemplateRow[]) : [];
+}
+
+function positiveUnits(raw: unknown): number | undefined {
+  const units = Number(raw);
+  return Number.isFinite(units) && units > 0 ? units : undefined;
+}
+
+/** Обязательные услуги выбранного размера: всегда в расчёте, с количеством из шаблона. */
+export function requiredOperationsFromSizeFinishing(size: SizeWithFinishing): RequiredOperationSeed[] {
+  const out: RequiredOperationSeed[] = [];
+  const seen = new Set<number>();
+  for (const row of finishingRowsOf(size)) {
+    if (!isFinishingRequiredFlag(row?.is_required)) continue;
+    const id = Number(row.service_id ?? row.operation_id);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    const variantRaw = row.variant_id;
+    const variantId =
+      variantRaw != null && variantRaw !== '' && Number.isFinite(Number(variantRaw)) && Number(variantRaw) > 0
+        ? Number(variantRaw)
+        : undefined;
+    out.push({
+      operationId: id,
+      quantity: positiveUnits(row.units_per_item) ?? 1,
+      required: true,
+      ...(variantId != null ? { variantId } : {}),
+      ...(row.subtype ? { subtype: String(row.subtype) } : {}),
+    });
+  }
+  return out;
+}
+
+type SelectedOp = {
+  operationId: number;
+  quantity?: number;
+  required?: boolean;
+  variantId?: number;
+  subtype?: string;
+};
+
+/** Снимает обязательные услуги прошлого размера и ставит текущие с их количеством. */
+export function mergeRequiredSelectedOperations<T extends SelectedOp>(
+  current: T[] | null | undefined,
+  required: RequiredOperationSeed[],
+): T[] {
+  const list = Array.isArray(current) ? current : [];
+  const requiredIds = new Set(required.map((row) => Number(row.operationId)));
+  const kept = list.filter((op) => !op.required || requiredIds.has(Number(op.operationId)));
+  let changed = kept.length !== list.length;
+  const next = [...kept];
+  for (const req of required) {
+    const index = next.findIndex((op) => Number(op.operationId) === Number(req.operationId));
+    if (index === -1) {
+      next.push(req as T);
+      changed = true;
+      continue;
+    }
+    const prev = next[index];
+    const variantId = req.variantId ?? prev.variantId;
+    const subtype = req.subtype ?? prev.subtype;
+    if (
+      !prev.required ||
+      prev.quantity !== req.quantity ||
+      prev.variantId !== variantId ||
+      prev.subtype !== subtype
+    ) {
+      next[index] = { ...prev, ...req, required: true, quantity: req.quantity, variantId, subtype };
+      changed = true;
+    }
+  }
+  if (!changed) return list;
+  return next;
+}
+
+/** Если калькулятор ещё не прислал количество, берём его из шаблона размера. */
+export function withTemplateFinishingQuantities<T extends SelectedOp>(
+  ops: T[] | null | undefined,
+  size: SizeWithFinishing,
+): T[] {
+  const list = Array.isArray(ops) ? ops : [];
+  const byId = new Map<number, FinishingTemplateRow>();
+  for (const row of finishingRowsOf(size)) {
+    const id = Number(row?.service_id ?? row?.operation_id);
+    if (Number.isFinite(id) && id > 0) byId.set(id, row);
+  }
+  let changed = false;
+  const next = list.map((op) => {
+    if (Number(op.quantity) > 0) return op;
+    const units = positiveUnits(byId.get(Number(op.operationId))?.units_per_item);
+    if (units == null) return op;
+    changed = true;
+    return { ...op, quantity: units };
+  });
+  return changed ? next : list;
+}
+
+export function templateUnitsForOperation(
+  simplified: { sizes?: any[]; typeConfigs?: Record<string, { sizes?: any[] }> } | null | undefined,
+  typeId: number | string | null | undefined,
+  sizeId: number | string | null | undefined,
+  operationId: number,
+): number | undefined {
+  const sizes =
+    typeId != null && simplified?.typeConfigs
+      ? simplified.typeConfigs[String(typeId)]?.sizes
+      : simplified?.sizes;
+  const sizeList = Array.isArray(sizes) ? sizes : [];
+  const size =
+    sizeList.find((row) => String(row?.id) === String(sizeId)) ??
+    (sizeId == null || sizeId === '' ? sizeList[0] : undefined);
+  const row = finishingRowsOf(size).find((item) => Number(item.service_id ?? item.operation_id) === Number(operationId));
+  return positiveUnits(row?.units_per_item);
+}

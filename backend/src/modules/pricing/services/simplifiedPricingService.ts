@@ -38,6 +38,11 @@ import {
   resolveWarehouseFeedMeters,
 } from './finishingPerM2';
 import {
+  enforceRequiredFinishing,
+  flatFinishingUnits,
+  isTemplateFinishingRequired,
+} from './finishingQuantity';
+import {
   buildPlotterTiersFromDto,
   findPlotterVolumeTier,
   resolvePlotterTierVolumeQty,
@@ -109,6 +114,7 @@ const ALLOWED_FINISHING_PRICE_UNITS = new Set([
   'per_m2',
   'fixed',
   'per_order',
+  'per_hour',
 ]);
 
 function normalizeFinishingPriceUnit(raw: unknown, fallback: string = 'per_item'): string {
@@ -1455,7 +1461,7 @@ export class SimplifiedPricingService {
     const finishingRollWidthMmMap = new Map<string, number>();
 
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
-    // При fallback на selectedSize.finishing фильтруем по is_default/is_required: только операции с галочкой «вкл по умолчанию» участвуют в расчёте
+    // При fallback берём услуги с is_required в шаблоне размера и связи «обязательная / по умолчанию».
     let finishingToUse: Array<{ service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number }>;
     const hasExplicitFinishing = Array.isArray(normalizedConfig.finishing);
     if (hasExplicitFinishing) {
@@ -1474,7 +1480,9 @@ export class SimplifiedPricingService {
             [productId, ...serviceIds]
           )) as Array<{ operation_id: number }>;
           const allowedIds = new Set(allowed.map((r) => Number(r.operation_id)));
-          finishingToUse = sizeFinishing.filter((f: any) => allowedIds.has(Number(f?.service_id)));
+          finishingToUse = sizeFinishing.filter(
+            (f: any) => isTemplateFinishingRequired(f) || allowedIds.has(Number(f?.service_id)),
+          );
         } else {
           finishingToUse = [];
         }
@@ -1526,6 +1534,12 @@ export class SimplifiedPricingService {
         return next;
       });
     }
+
+    // Обязательная услуга размера всегда в расчёте, с количеством из шаблона, даже если клиент её снял или прислал другое число.
+    finishingToUse = enforceRequiredFinishing(
+      finishingToUse,
+      Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
+    );
 
     const configuredBindingServiceId = Number(
       (configuration as any).binding_service_id ??
@@ -2109,6 +2123,7 @@ export class SimplifiedPricingService {
 
           const priceUnit = priceUnitFromDb;
           const unitsPerItem = finConfig.units_per_item ?? 1;
+          const flatUnits = flatFinishingUnits(priceUnit, unitsPerItem);
           // per_cut (обычная резка): тупо сколько внёс резов — столько и считаем. Цена × кол-во внесённых. Раскладку не подставляем.
           const totalCutsForOrder = Math.max(unitsPerItem, 1);
           const billedPerSheetForTier =
@@ -2163,7 +2178,8 @@ export class SimplifiedPricingService {
           const priceForTier = this.getPriceForQuantityTier(tier);
           const effectivePriceForTier = priceForTier;
           const serviceMinQty = limits?.min ?? 0;
-          // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на позицию (units_per_item); иначе — тираж × units_per_item (per_item и др.)
+          // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на заказ;
+          // fixed / per_order / per_hour: units_per_item один раз; иначе — тираж × units_per_item (per_item).
 
           let servicePrice = 0;
           let totalUnits: number;
@@ -2235,6 +2251,10 @@ export class SimplifiedPricingService {
               servicePrice,
             });
             continue;
+          } else if (flatUnits != null) {
+            rawUnits = flatUnits;
+            totalUnits = flatUnits;
+            servicePrice = effectivePriceForTier * totalUnits;
           } else {
             rawUnits = quantity * (unitsPerItem ?? 1);
             totalUnits = rawUnits;
@@ -3267,7 +3287,8 @@ export class SimplifiedPricingService {
         } else if (priceUnit === 'per_m2') {
           finishingPrice += effectiveTierPrice * Math.max(m2Units, serviceMinQty);
         } else {
-          finishingPrice += effectiveTierPrice * (q * (unitsPerItem ?? 1));
+          const flatUnits = flatFinishingUnits(priceUnit, unitsPerItem);
+          finishingPrice += effectiveTierPrice * (flatUnits ?? (q * (unitsPerItem ?? 1)));
         }
       }
 

@@ -20,6 +20,9 @@ import {
   getEffectiveSimplifiedConfig,
   getEffectiveAllowedMaterialIds,
   collectAllowedOperationIdsForTypeConfig,
+  mergeRequiredSelectedOperations,
+  requiredOperationsFromSizeFinishing,
+  withTemplateFinishingQuantities,
 } from './utils/simplifiedConfig';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
 import { useCalculatorEditContext } from './hooks/useCalculatorEditContext';
@@ -513,6 +516,20 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       return { ...prev, selectedOperations: initial };
     });
   }, [selectedProduct?.id, hasProductTypes, backendProductSchema?.operations, setSpecs]);
+
+  // Обязательные услуги выбранного размера всегда включены и с количеством из шаблона.
+  useEffect(() => {
+    const size =
+      effectiveSizes.find((row) => String(row.id) === String(specs.size_id)) ??
+      (specs.size_id == null || specs.size_id === '' ? effectiveSizes[0] : undefined);
+    const required = requiredOperationsFromSizeFinishing(size);
+    setSpecs((prev) => {
+      const merged = mergeRequiredSelectedOperations(prev.selectedOperations, required);
+      const next = withTemplateFinishingQuantities(merged, size);
+      if (next === prev.selectedOperations) return prev;
+      return { ...prev, selectedOperations: next };
+    });
+  }, [effectiveSizes, specs.size_id, setSpecs]);
 
   const handleSelectProductType = useCallback(
     (typeId: number) => {

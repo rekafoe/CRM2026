@@ -727,7 +727,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <h3>
             {headerWithHint(
               'Упрощённый калькулятор',
-              'Настройка цен по размерам: печать (за изделие), материалы (за изделие) и отделка (за рез/биг/фальц).',
+              'Настройка по размерам: печать, материалы и услуги. Обязательная услуга всегда входит в расчёт с заданным количеством.',
             )}
           </h3>
         </div>
@@ -797,7 +797,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           className={`product-tab ${editorTab === 'finishing' ? 'product-tab--active' : ''}`}
           onClick={() =>setEditorTab('finishing')}
         >
-          Отделка
+          Услуги
         </button>
         {productId && selectedTypeId != null && (
           <button
@@ -1224,11 +1224,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                     loadingLists={loadingLists}
                     services={services}
                     loadLists={loadLists}
-                    getSizeRanges={getSizeRanges}
-                    updateSizeRanges={updateSizeRanges}
                     updateSize={updateSize}
                     hasUserInteractedWithServicesRef={hasUserInteractedWithServicesRef}
-                    isMobile={isMobile}
                   />
                 )}
 
