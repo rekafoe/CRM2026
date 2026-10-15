@@ -44,6 +44,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/products\/by-route-key\/[^/]+\/?$/ },
   { method: 'GET', path: /^\/api\/products\/parameter-presets\/?$/ },
   { method: 'GET', path: /^\/api\/products\/categories\/?$/ },
+  { method: 'GET', path: /^\/api\/products\/categories\/by-route-key\/[^/]+\/catalog\/?$/ },
   { method: 'GET', path: /^\/api\/products\/category\/[0-9]+\/?$/ },
   // Один сегмент — route_key (напр. /api/products/fotopechat). Не пересекаемся с /category/…, /categories, служебными путями
   {
