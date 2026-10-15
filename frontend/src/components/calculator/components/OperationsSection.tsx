@@ -94,7 +94,6 @@ function quantityFieldMeta(operation: Operation): {
       label: 'Норма:',
       step: 1,
       min: 0,
-      hint: 'Столько единиц услуги на заказ. Тираж это число не умножает.',
     };
   }
   return {
@@ -760,7 +759,6 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       </div>
                     )}
                     {qtyMeta.hint && <div className="operation-qty-hint">{qtyMeta.hint}</div>}
-                    {locked && <div className="operation-qty-hint">Количество задано в шаблоне продукта</div>}
                     {getOperationPriceUnit(operation) === 'per_hour' && Number(selectedData?.quantity) > 0 && (
                       <div className="operation-qty-hint">{formatQtyHint(Number(selectedData?.quantity) * 60)} мин</div>
                     )}
@@ -851,7 +849,6 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         </div>
                       )}
                       {qtyMeta.hint && <div className="operation-qty-hint">{qtyMeta.hint}</div>}
-                      {locked && <div className="operation-qty-hint">Количество задано в шаблоне продукта</div>}
                       {getOperationPriceUnit(operation) === 'per_hour' && Number(selectedData?.quantity) > 0 && (
                         <div className="operation-qty-hint">{formatQtyHint(Number(selectedData?.quantity) * 60)} мин</div>
                       )}
