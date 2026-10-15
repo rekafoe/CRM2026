@@ -33,6 +33,7 @@ export async function getProductCategories(force: boolean = false): Promise<Prod
  */
 export async function createProductCategory(categoryData: {
   name: string;
+  route_key?: string;
   icon?: string;
   image_url?: string;
   description?: string;
@@ -50,6 +51,7 @@ export async function updateProductCategory(
   id: number,
   data: {
     name: string;
+    route_key?: string;
     icon?: string;
     image_url?: string;
     description?: string;

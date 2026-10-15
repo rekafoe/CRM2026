@@ -677,6 +677,10 @@ API продуктов возвращает данные для отображе
 
 **`GET /api/products/categories`** — список категорий (Визитки, Брошюры и т.д.).
 
+**`GET /api/products/categories/by-route-key/{routeKey}/catalog`** — категория и её
+активные для сайта продукты по стабильному ключу. Для раздела наклеек используйте
+`routeKey=stickers`; числовой ID категории на сайте не фиксируется.
+
 **`GET /api/products`** — список продуктов (id, name, category_id, description, icon и т.д.).
 
 **`GET /api/products/:id/schema`** — полная схема продукта. В `data.template.simplified` содержатся:
@@ -705,6 +709,19 @@ curl -X GET "https://api.printcore.by/api/products/categories?activeOnly=true"
 const res = await fetch('https://api.printcore.by/api/products/categories?activeOnly=true');
 const categories = await res.json();
 // [{ id: 1, name: "Визитки", sort_order: 1, icon: "..." }, ...]
+```
+
+Для самостоятельного раздела «Наклейки»:
+
+```javascript
+const stickersCatalog = await fetch(
+  'https://api.printcore.by/api/products/categories/by-route-key/stickers/catalog?withMinPrice=1'
+).then(res => res.json());
+
+// {
+//   category: { id, name: "Наклейки", route_key: "stickers", ... },
+//   products: [{ id, name, image_url, min_price, ... }]
+// }
 ```
 
 #### 2. Получить продукты (все или по категории)

@@ -5,6 +5,11 @@ import { getCachedData, invalidateCacheByPattern } from '../../../utils/dataCach
 import { hasColumn } from '../../../utils/tableSchemaCache';
 import { extractMinUnitPrice } from './helpers';
 import { MAX_UPLOAD_FILE_SIZE_BYTES, uploadMemory, saveBufferToUploads } from '../../../config/upload';
+import {
+  assertCategoryRouteKeyAllowed,
+  normalizeCategoryRouteKey,
+} from '../utils/categoryRouteKeys';
+import { loadSiteCategoryCatalog } from '../services/siteCategoryCatalogService';
 
 const router = Router();
 
@@ -84,6 +89,47 @@ router.get('/', async (req, res) => {
 
 /**
  * @swagger
+ * /api/products/categories/by-route-key/{routeKey}/catalog:
+ *   get:
+ *     summary: Публичная витрина категории по стабильному ключу
+ *     tags: [Products, Website Catalog]
+ *     parameters:
+ *       - in: path
+ *         name: routeKey
+ *         required: true
+ *         schema: { type: string }
+ *         example: stickers
+ *       - in: query
+ *         name: withMinPrice
+ *         schema: { type: string, enum: ['1'] }
+ *     responses:
+ *       200:
+ *         description: Категория и активные для сайта продукты
+ *       400: { description: Некорректный ключ }
+ *       404: { description: Категория не найдена или выключена }
+ */
+router.get('/by-route-key/:routeKey/catalog', async (req, res) => {
+  try {
+    const routeKey = normalizeCategoryRouteKey(req.params.routeKey);
+    if (!routeKey) {
+      res.status(400).json({ error: 'Не указан ключ категории' });
+      return;
+    }
+    const db = await getDb();
+    const catalog = await loadSiteCategoryCatalog(db, routeKey, req.query.withMinPrice === '1');
+    if (!catalog) {
+      res.status(404).json({ error: 'Категория не найдена или выключена' });
+      return;
+    }
+    res.json(catalog);
+  } catch (error) {
+    logger.error('Error fetching site category catalog', { error });
+    res.status(500).json({ error: 'Failed to fetch site category catalog' });
+  }
+});
+
+/**
+ * @swagger
  * /api/products/categories:
  *   post:
  *     summary: Создать категорию продуктов
@@ -97,6 +143,7 @@ router.get('/', async (req, res) => {
  *             required: [name]
  *             properties:
  *               name: { type: string, description: "Название категории" }
+ *               route_key: { type: string, description: "Стабильный ключ раздела на сайте, например stickers" }
  *               icon: { type: string, description: "Эмодзи или символ" }
  *               description: { type: string }
  *               sort_order: { type: integer }
@@ -107,16 +154,26 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, icon, description, sort_order, image_url } = req.body;
+    const { name, route_key, icon, description, sort_order, image_url } = req.body;
     const db = await getDb();
 
     const hasImageUrl = await hasColumn('product_categories', 'image_url').catch(() => false);
+    const hasRouteKey = await hasColumn('product_categories', 'route_key').catch(() => false);
 
     const columns = ['name', 'icon', 'description', 'sort_order'];
     const values: any[] = [name, icon, description, sort_order || 0];
     if (hasImageUrl) {
       columns.push('image_url');
       values.push(image_url || null);
+    }
+    let normalizedRouteKey: string | null = null;
+    if (hasRouteKey) {
+      normalizedRouteKey = normalizeCategoryRouteKey(route_key);
+      if (normalizedRouteKey) {
+        await assertCategoryRouteKeyAllowed(db, normalizedRouteKey, -1);
+      }
+      columns.push('route_key');
+      values.push(normalizedRouteKey);
     }
 
     const result = await db.run(
@@ -125,10 +182,21 @@ router.post('/', async (req, res) => {
     );
 
     invalidateCacheByPattern('product_categories');
-    res.json({ id: result.lastID, name, icon, description, sort_order, image_url });
-  } catch (error) {
+    res.json({
+      id: result.lastID,
+      name,
+      route_key: normalizedRouteKey,
+      icon,
+      description,
+      sort_order,
+      image_url,
+    });
+  } catch (error: any) {
     logger.error('Error creating product category', error);
-    res.status(500).json({ error: 'Failed to create product category' });
+    const status = Number(error?.statusCode);
+    res.status(status === 400 || status === 409 ? status : 500).json({
+      error: error?.message || 'Failed to create product category',
+    });
   }
 });
 
@@ -198,6 +266,7 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
  *             type: object
  *             properties:
  *               name: { type: string }
+ *               route_key: { type: string }
  *               icon: { type: string }
  *               description: { type: string }
  *               sort_order: { type: integer }
@@ -210,16 +279,25 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, icon, description, sort_order, is_active, image_url } = req.body;
+    const { name, route_key, icon, description, sort_order, is_active, image_url } = req.body;
     const db = await getDb();
 
     const hasImageUrl = await hasColumn('product_categories', 'image_url').catch(() => false);
+    const hasRouteKey = await hasColumn('product_categories', 'route_key').catch(() => false);
 
     const setParts = ['name = ?', 'icon = ?', 'description = ?', 'sort_order = ?', 'is_active = ?'];
     const values: any[] = [name, icon, description, sort_order, is_active];
     if (hasImageUrl) {
       setParts.push('image_url = ?');
       values.push(image_url ?? null);
+    }
+    if (hasRouteKey && route_key !== undefined) {
+      const normalizedRouteKey = normalizeCategoryRouteKey(route_key);
+      if (normalizedRouteKey) {
+        await assertCategoryRouteKeyAllowed(db, normalizedRouteKey, Number(id));
+      }
+      setParts.push('route_key = ?');
+      values.push(normalizedRouteKey);
     }
     setParts.push("updated_at = datetime('now')");
     values.push(id);
@@ -231,9 +309,12 @@ router.put('/:id', async (req, res) => {
 
     invalidateCacheByPattern('product_categories');
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error updating product category', error);
-    res.status(500).json({ error: 'Failed to update product category' });
+    const status = Number(error?.statusCode);
+    res.status(status === 400 || status === 409 ? status : 500).json({
+      error: error?.message || 'Failed to update product category',
+    });
   }
 });
 

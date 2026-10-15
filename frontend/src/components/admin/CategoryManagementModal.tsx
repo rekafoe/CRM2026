@@ -19,6 +19,7 @@ interface CategoryManagementModalProps {
 
 interface CategoryFormData {
   name: string;
+  route_key: string;
   icon: string;
   description: string;
   image_url: string;
@@ -28,6 +29,7 @@ interface CategoryFormData {
 
 const emptyForm: CategoryFormData = {
   name: '',
+  route_key: '',
   icon: '',
   description: '',
   image_url: '',
@@ -63,6 +65,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
     setEditingId(cat.id);
     setForm({
       name: cat.name,
+      route_key: cat.route_key || '',
       icon: cat.icon || '',
       description: cat.description || '',
       image_url: cat.image_url || '',
@@ -90,6 +93,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
       if (creating) {
         await createProductCategory({
           name: form.name.trim(),
+          route_key: form.route_key.trim() || undefined,
           icon: form.icon.trim() || undefined,
           description: form.description.trim() || undefined,
           image_url: form.image_url.trim() || undefined,
@@ -98,6 +102,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
       } else if (editingId != null) {
         await updateProductCategory(editingId, {
           name: form.name.trim(),
+          route_key: form.route_key.trim(),
           icon: form.icon.trim() || undefined,
           description: form.description.trim() || undefined,
           image_url: form.image_url.trim() || undefined,
@@ -167,6 +172,9 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                         {cat.name}
                         {!cat.is_active && <span className="cat-mgmt__badge cat-mgmt__badge--inactive">Скрыта</span>}
                       </div>
+                      {cat.route_key && (
+                        <div className="cat-mgmt__item-desc">Раздел сайта: /{cat.route_key}</div>
+                      )}
                       {cat.description && (
                         <div className="cat-mgmt__item-desc">{cat.description}</div>
                       )}
@@ -202,6 +210,20 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                   placeholder="Например: Визитки"
                   autoFocus
                 />
+              </div>
+
+              <div className="cat-mgmt__field">
+                <label className="cat-mgmt__label">Ключ раздела на сайте</label>
+                <input
+                  className="form-input"
+                  value={form.route_key}
+                  onChange={(e) => setForm({ ...form, route_key: e.target.value.toLowerCase() })}
+                  placeholder="Например: stickers"
+                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                />
+                <span className="cat-mgmt__image-hint">
+                  Латиница, цифры и дефисы. Сайт использует ключ вместо ID категории.
+                </span>
               </div>
 
               <div className="cat-mgmt__field cat-mgmt__field--full">

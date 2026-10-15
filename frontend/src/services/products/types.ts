@@ -5,6 +5,8 @@
 export interface ProductCategory {
   id: number;
   name: string;
+  /** Стабильный сегмент публичного раздела, например stickers */
+  route_key?: string | null;
   icon?: string;
   description?: string;
   image_url?: string;
