@@ -3,7 +3,11 @@ import { getServiceVariants } from '../../../services/pricing/api';
 import type { ServiceVariant } from '../../../types/pricing';
 import { getParentVariantId } from '../../../utils/serviceVariantParent';
 import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantLabels';
-import { templateUnitsForOperation } from '../utils/simplifiedConfig';
+import {
+  getEffectiveSimplifiedConfig,
+  requiredOperationsFromSizeFinishing,
+  templateUnitsForOperation,
+} from '../utils/simplifiedConfig';
 
 interface Operation {
   id?: number;
@@ -284,6 +288,21 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     });
   }, [operations]);
 
+  const requiredOperationIds = useMemo(() => {
+    const simplified = backendProductSchema?.template?.simplified;
+    const hasTypes = Boolean(simplified?.types?.length);
+    const rawTypeId = specs.typeId ?? specs.type_id;
+    const typeId =
+      rawTypeId != null && rawTypeId !== '' && Number.isFinite(Number(rawTypeId))
+        ? Number(rawTypeId)
+        : null;
+    const effective = getEffectiveSimplifiedConfig(simplified, hasTypes ? typeId : null);
+    const size =
+      effective.sizes.find((row) => String(row.id) === String(specs.size_id)) ??
+      (specs.size_id == null || specs.size_id === '' ? effective.sizes[0] : undefined);
+    return new Set(requiredOperationsFromSizeFinishing(size).map((row) => row.operationId));
+  }, [backendProductSchema?.template?.simplified, specs.typeId, specs.type_id, specs.size_id]);
+
   const operationLimits = useMemo(() => {
     const limits = new Map<number, { min: number; max?: number }>();
     const ops = backendProductSchema?.operations;
@@ -450,7 +469,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     });
   }, [operations.length, operationsWithSubtypes.length, serviceVariants.size, selectedOperations.length, backendProductSchema?.operations]);
 
-  if (operations.length === 0) {
+  const visibleOperations = operationsWithSubtypes.filter(({ operation }: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => {
+    const operationId = Number(operation.operation_id || operation.id);
+    if (!Number.isFinite(operationId)) return false;
+    if (requiredOperationIds.has(operationId)) return false;
+    if (selectedOperationsMap.get(operationId)?.required) return false;
+    return true;
+  });
+
+  if (operations.length === 0 || visibleOperations.length === 0) {
     console.log('[OperationsSection] Нет операций для отображения');
     return null;
   }
@@ -459,7 +486,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     <div className="form-section compact operations-section">
       <h3>Операции</h3>
       <div className="advanced-grid compact operations-grid">
-        {operationsWithSubtypes.map(({ operation, subtypes }: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => {
+        {visibleOperations.map(({ operation, subtypes }: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => {
           const operationId = operation.operation_id || operation.id;
           if (!operationId) return null;
 
@@ -483,12 +510,6 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   />
                   <span className="operation-name">{operationName}</span>
                 </label>
-                {locked && <span className="operation-limits">обязательная</span>}
-                {limits && (
-                  <span className="operation-limits">
-                    {'\u00A0'}от {limits.min}{limits.max !== undefined ? ` до ${limits.max}` : ''}
-                  </span>
-                )}
               </div>
 
               {isSelected && (() => {

@@ -7,8 +7,6 @@ interface DynamicFieldsSectionProps {
   updateSpecs: (updates: Record<string, any>, instant?: boolean) => void; //  Добавили instant
   /** Не показывать эти поля (например, выборка/накатка вне рулонного плоттера). */
   hiddenFieldNames?: Set<string>;
-  /** Подсказка, что резка подтипа уже входит в цену. Галочек выборки и накатки нет. */
-  showPlotterCutHint?: boolean;
 }
 
 // Поля, которые уже отрисовываются специализированными секциями
@@ -42,7 +40,6 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
   specs,
   updateSpecs,
   hiddenFieldNames,
-  showPlotterCutHint = false,
 }) => {
   if (!schema || !Array.isArray(schema.fields)) return null;
 
@@ -53,7 +50,7 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
       !hiddenFieldNames?.has(f.name) &&
       !plotterNames.has(f.name)
   );
-  if (fields.length === 0 && !showPlotterCutHint) return null;
+  if (fields.length === 0) return null;
 
   const renderField = (field: any) => {
     const value = (specs as any)[field.name];
@@ -144,12 +141,6 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
 
   return (
     <>
-      {showPlotterCutHint ? (
-        <div className="form-section compact">
-          <h3><AppIcon name="scissors" size="xs" /> Плоттер</h3>
-          <p className="param-hint">Резка уже входит в цену.</p>
-        </div>
-      ) : null}
       {fields.length > 0 && (
         <div className="form-section compact">
           <h3><AppIcon name="puzzle" size="xs" /> Доп. параметры</h3>

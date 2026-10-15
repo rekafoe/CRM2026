@@ -10,10 +10,7 @@ import { DynamicFieldsSection } from './DynamicFieldsSection';
 import { AdvancedSettingsSection } from './AdvancedSettingsSection';
 import { OperationsSection } from './OperationsSection';
 import { SelectedProductCard } from './SelectedProductCard';
-import {
-  getHiddenPlotterRollFinFieldNamesForCalculator,
-  isProductPlotterEnabled,
-} from '../utils/simplifiedConfig';
+import { getHiddenPlotterRollFinFieldNamesForCalculator } from '../utils/simplifiedConfig';
 import { UvPrintSection } from './UvPrintSection';
 import {
   getEffectiveUvPrintConfig,
@@ -114,10 +111,6 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
   const typeIdForPlotterFields = showTypeSelector ? selectedTypeId ?? specs.typeId ?? null : specs.typeId ?? null;
   const plotterRollFinHiddenFields = getHiddenPlotterRollFinFieldNamesForCalculator();
-  const plotterCutIncluded = isProductPlotterEnabled(
-    backendProductSchema?.template?.simplified,
-    typeIdForPlotterFields ?? null,
-  );
   const uvFlatbed = isUvFlatbedProduct(backendProductSchema, typeIdForPlotterFields);
   const uvTemplateConfig = getEffectiveUvPrintConfig(backendProductSchema, typeIdForPlotterFields);
   const uvPrint = ((specs as { uv_print?: UvPrintState }).uv_print ?? {}) as UvPrintState;
@@ -295,7 +288,6 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           specs={specs as any}
           updateSpecs={updateSpecs as any}
           hiddenFieldNames={plotterRollFinHiddenFields}
-          showPlotterCutHint={plotterCutIncluded}
         />
 
         <div className={isMultiPageProduct ? 'calculator-extra-row' : undefined}>

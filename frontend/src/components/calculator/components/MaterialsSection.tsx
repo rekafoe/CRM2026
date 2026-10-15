@@ -118,8 +118,6 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     simplifiedSizesSource && simplifiedSizesSource.length > 0,
   );
   const isMaterialDriven = schema?.template?.simplified?.material_driven_printing === true;
-  const usageContext: 'indoor' | 'outdoor' =
-    specs.usage_context === 'outdoor' ? 'outdoor' : 'indoor';
 
   useEffect(() => {
     if (!isMaterialDriven || specs.usage_context === 'indoor' || specs.usage_context === 'outdoor') {
@@ -485,18 +483,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       const row = byId.get(mid);
       if (row) ordered.push(row);
     }
-    if (!isMaterialDriven) return ordered;
-    return ordered.filter((material) => {
-      const usage = Array.isArray(material.usage) ? material.usage : [];
-      return usage.includes(usageContext);
-    });
+    return ordered;
   }, [
     isSimplifiedProduct,
     sizeIdForMaterials,
     simplifiedSizesSource,
     allMaterials,
-    isMaterialDriven,
-    usageContext,
   ]);
 
   //  Разрешённые материалы-основы (заготовки) для выбранного размера — порядок как в шаблоне
@@ -556,24 +548,26 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [warehousePaperTypes]);
   const applyWarehouseMaterial = useCallback((material: WarehouseMaterialOption) => {
     const materialType = resolveSpecsMaterialType(material);
+    const usage = Array.isArray(material.usage) ? material.usage : [];
+    const usageContext: 'indoor' | 'outdoor' =
+      usage.includes('indoor') || !usage.includes('outdoor') ? 'indoor' : 'outdoor';
     updateSpecs({
       material_id: Number(material.id),
       materialType: materialType as any,
+      ...(isMaterialDriven ? { usage_context: usageContext } : {}),
     }, true);
-  }, [resolveSpecsMaterialType, updateSpecs]);
-  const changeUsageContext = useCallback((nextUsage: 'indoor' | 'outdoor') => {
-    const currentMaterial = allMaterials.find(
-      (material) => Number(material.id) === Number(specs.material_id),
-    );
-    const remainsCompatible =
-      currentMaterial
-      && Array.isArray(currentMaterial.usage)
-      && currentMaterial.usage.includes(nextUsage);
-    updateSpecs({
-      usage_context: nextUsage,
-      ...(!remainsCompatible ? { material_id: undefined } : {}),
-    }, true);
-  }, [allMaterials, specs.material_id, updateSpecs]);
+  }, [isMaterialDriven, resolveSpecsMaterialType, updateSpecs]);
+
+  useEffect(() => {
+    if (!isMaterialDriven || !specs.material_id) return;
+    const material = allMaterials.find((row) => Number(row.id) === Number(specs.material_id));
+    if (!material) return;
+    const usage = Array.isArray(material.usage) ? material.usage : [];
+    const next: 'indoor' | 'outdoor' =
+      usage.includes('indoor') || !usage.includes('outdoor') ? 'indoor' : 'outdoor';
+    if (specs.usage_context === next) return;
+    updateSpecs({ usage_context: next }, true);
+  }, [allMaterials, isMaterialDriven, specs.material_id, specs.usage_context, updateSpecs]);
 
   // Единственная синхронизация внешнего material_id с локальным путём выбора.
   // Если сохранённый материал больше не разрешён, выбираем первый доступный SKU.
@@ -654,32 +648,6 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   // Для рулона вариантом является ширина, для бумаги — плотность.
   const materialBlock = isSimplifiedProduct && sizeIdForMaterials ? (
     <>
-      {isMaterialDriven && (
-        <div className="material-usage-context">
-          <span className="material-usage-context__label">Где будет использоваться?</span>
-          <div className="material-usage-context__options" role="group" aria-label="Условия использования">
-            <button
-              type="button"
-              className={usageContext === 'indoor' ? 'is-active' : ''}
-              aria-pressed={usageContext === 'indoor'}
-              onClick={() =>changeUsageContext('indoor')}
-            >
-              В помещении
-            </button>
-            <button
-              type="button"
-              className={usageContext === 'outdoor' ? 'is-active' : ''}
-              aria-pressed={usageContext === 'outdoor'}
-              onClick={() =>changeUsageContext('outdoor')}
-            >
-              На улице
-            </button>
-          </div>
-          <small>
-            Для помещения доступны бумага и плёнки; для улицы — только стойкие материалы.
-          </small>
-        </div>
-      )}
       <div className="material-type-density-row">
       <div className="param-group param-group--narrow">
         <label>Категория материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>

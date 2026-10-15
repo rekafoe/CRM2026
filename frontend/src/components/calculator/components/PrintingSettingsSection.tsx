@@ -358,12 +358,10 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   }
 
   if (isMaterialDriven) {
+    if (!materialInFirstColumn) return null;
     return (
       <div className="form-section compact printing-settings-material-driven">
         {materialInFirstColumn}
-        <div className="printing-settings-material-driven__hint">
-          Технология печати и рабочий формат материала определятся автоматически.
-        </div>
       </div>
     );
   }
