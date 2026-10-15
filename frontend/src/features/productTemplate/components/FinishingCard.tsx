@@ -17,6 +17,7 @@ type ServiceRow = {
   service_type?: string
   priceUnit?: string
   price_unit?: string
+  unit?: string
   categoryId?: number | null
   category_id?: number | null
   categoryName?: string | null
@@ -57,7 +58,27 @@ function servicePriceUnit(service: ServiceRow | undefined, stored?: string): Pri
   return 'per_item'
 }
 
-function quantityMode(priceUnit: PriceUnit): { mode: QuantityMode; label: string; hint: string } {
+function readableUnit(unit: unknown): string | null {
+  const value = String(unit ?? '').trim()
+  if (!value) return null
+  const lower = value.toLowerCase()
+  if (
+    lower.startsWith('per_') ||
+    lower === 'fixed' ||
+    lower === 'item' ||
+    lower === 'hour' ||
+    lower === 'sheet' ||
+    lower === 'click' ||
+    lower === 'm2'
+  ) {
+    return null
+  }
+  if (lower === 'мин' || lower === 'мин.' || lower === 'минута' || lower === 'минуты' || lower === 'минут') return 'мин'
+  if (/[а-яё]/i.test(value) && value.length <= 16) return value
+  return null
+}
+
+function quantityMode(priceUnit: PriceUnit, unit: unknown): { mode: QuantityMode; label: string; hint: string } {
   if (priceUnit === 'per_sheet' || priceUnit === 'per_meter' || priceUnit === 'per_m2') {
     return {
       mode: 'layout',
@@ -65,31 +86,26 @@ function quantityMode(priceUnit: PriceUnit): { mode: QuantityMode; label: string
       hint: 'Количество считает раскладка. Здесь услуга только подключается к размеру.',
     }
   }
+  const readable = readableUnit(unit)
+  const label = priceUnit === 'per_hour' ? 'Норма, мин' : readable ? `Норма, ${readable}` : 'Норма'
   if (priceUnit === 'per_hour') {
     return {
       mode: 'minutes',
-      label: 'Минут на заказ',
-      hint: 'Фиксированное время, без умножения на тираж. В тарифе услуги цена за час.',
+      label,
+      hint: 'Минуты на заказ. Тираж их не умножает. В тарифе услуги цена за час.',
     }
   }
-  if (priceUnit === 'per_cut') {
+  if (priceUnit === 'per_cut' || priceUnit === 'fixed' || priceUnit === 'per_order') {
     return {
       mode: 'order',
-      label: 'Резов на заказ',
-      hint: 'Фиксированное число резов. Не умножается на тираж.',
-    }
-  }
-  if (priceUnit === 'fixed' || priceUnit === 'per_order') {
-    return {
-      mode: 'order',
-      label: 'Количество на заказ',
-      hint: 'Один раз на заказ. Не умножается на тираж.',
+      label,
+      hint: 'Норма на заказ. Тираж её не умножает.',
     }
   }
   return {
     mode: 'item',
-    label: 'На изделие',
-    hint: 'Умножается на тираж: 2 при 50 шт. даёт 100 единиц услуги.',
+    label,
+    hint: 'Норма на каждое изделие. Умножается на тираж.',
   }
 }
 
@@ -138,6 +154,7 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
 }) => {
   const [query, setQuery] = useState('')
   const [pickId, setPickId] = useState<number | ''>('')
+  const [normDraft, setNormDraft] = useState<Record<number, string>>({})
   const [variantsByService, setVariantsByService] = useState<Map<number, ServiceVariant[]>>(new Map())
 
   const attachedIds = useMemo(
@@ -276,9 +293,12 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
               {selected.finishing.map((row) => {
                 const service = servicesById.get(Number(row.service_id))
                 const priceUnit = servicePriceUnit(service, row.price_unit)
-                const meta = quantityMode(priceUnit)
+                const meta = quantityMode(priceUnit, service?.unit)
                 const options = variantOptions(variantsByService.get(Number(row.service_id)) ?? [])
-                const minutes = meta.mode === 'minutes' ? hoursToMinutes(Number(row.units_per_item) || 1) : 0
+                const storedUnits = Number(row.units_per_item)
+                const units = Number.isFinite(storedUnits) && storedUnits >= 0 ? storedUnits : 1
+                const minutes = meta.mode === 'minutes' ? hoursToMinutes(units) : 0
+                const normValue = normDraft[Number(row.service_id)] ?? String(meta.mode === 'minutes' ? minutes : units)
                 const category = (service?.categoryName ?? service?.category_name ?? '').trim()
                 return (
                   <div key={row.service_id} className="simplified-finishing-item">
@@ -327,15 +347,31 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
                           <span>{meta.label}</span>
                           <input
                             type="number"
-                            min={meta.mode === 'minutes' ? 1 : 1}
+                            min={0}
                             max={100000}
                             step={meta.mode === 'minutes' ? 1 : 1}
-                            value={meta.mode === 'minutes' ? minutes : row.units_per_item}
+                            value={normValue}
                             onChange={(event) => {
-                              const raw = Number(event.target.value)
-                              if (!Number.isFinite(raw) || raw <= 0) return
-                              const units = meta.mode === 'minutes' ? minutesToHours(raw) : Math.round(raw)
-                              patchRow(Number(row.service_id), { units_per_item: units, price_unit: priceUnit })
+                              const text = event.target.value
+                              const serviceId = Number(row.service_id)
+                              setNormDraft((prev) => ({ ...prev, [serviceId]: text }))
+                              if (text.trim() === '') return
+                              const raw = Number(text.replace(',', '.'))
+                              if (!Number.isFinite(raw) || raw < 0) return
+                              const nextUnits = meta.mode === 'minutes' ? minutesToHours(raw) : Math.round(raw)
+                              patchRow(serviceId, { units_per_item: nextUnits, price_unit: priceUnit })
+                            }}
+                            onBlur={() => {
+                              const serviceId = Number(row.service_id)
+                              const text = normDraft[serviceId]
+                              setNormDraft((prev) => {
+                                if (prev[serviceId] === undefined) return prev
+                                const next = { ...prev }
+                                delete next[serviceId]
+                                return next
+                              })
+                              if (text === undefined || text.trim() !== '') return
+                              patchRow(serviceId, { units_per_item: 0, price_unit: priceUnit })
                             }}
                           />
                         </label>

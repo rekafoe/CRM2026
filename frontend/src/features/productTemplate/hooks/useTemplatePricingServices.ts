@@ -53,6 +53,7 @@ export function useTemplatePricingServices(
             service_type: service.service_type ?? service.type,
             priceUnit: service.priceUnit ?? service.price_unit,
             price_unit: service.price_unit ?? service.priceUnit,
+            unit: service.unit,
             categoryId: service.categoryId ?? service.category_id ?? null,
             category_id: service.category_id ?? service.categoryId ?? null,
             categoryName: service.categoryName ?? service.category_name ?? null,

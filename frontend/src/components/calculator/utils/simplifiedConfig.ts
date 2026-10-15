@@ -195,8 +195,10 @@ function finishingRowsOf(size: SizeWithFinishing): FinishingTemplateRow[] {
 }
 
 function positiveUnits(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
   const units = Number(raw);
-  return Number.isFinite(units) && units > 0 ? units : undefined;
+  if (!Number.isFinite(units) || units < 0) return undefined;
+  return units;
 }
 
 /** Обязательные услуги выбранного размера: всегда в расчёте, с количеством из шаблона. */
@@ -279,7 +281,9 @@ export function withTemplateFinishingQuantities<T extends SelectedOp>(
   }
   let changed = false;
   const next = list.map((op) => {
-    if (Number(op.quantity) > 0) return op;
+    if (op.quantity != null && Number.isFinite(Number(op.quantity)) && Number(op.quantity) >= 0) {
+      return op;
+    }
     const units = positiveUnits(byId.get(Number(op.operationId))?.units_per_item);
     if (units == null) return op;
     changed = true;

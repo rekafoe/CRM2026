@@ -46,6 +46,7 @@ type ServiceRow = {
   service_type?: string;
   priceUnit?: string; 
   price_unit?: string;
+  unit?: string;
   categoryId?: number | null;
   category_id?: number | null;
   categoryName?: string | null;

@@ -351,7 +351,12 @@ export function useCalculatorPricingActions({
                 }
               }
 
-              const unitsPerItem = Number(sel.quantity) > 0 ? Number(sel.quantity) : 1;
+              const unitsPerItem =
+                sel.quantity === 0 || sel.quantity === '0'
+                  ? 0
+                  : Number(sel.quantity) > 0
+                    ? Number(sel.quantity)
+                    : 1;
 
               const entry = {
                 service_id: Number(serviceId),
@@ -399,7 +404,12 @@ export function useCalculatorPricingActions({
               return {
                 service_id: sid,
                 price_unit: 'per_item',
-                units_per_item: Number(sel.quantity) > 0 ? Number(sel.quantity) : 1,
+                units_per_item:
+                  sel.quantity === 0 || sel.quantity === '0'
+                    ? 0
+                    : Number(sel.quantity) > 0
+                      ? Number(sel.quantity)
+                      : 1,
                 ...(sel.variantId != null ? { variant_id: Number(sel.variantId) } : {}),
               };
             });

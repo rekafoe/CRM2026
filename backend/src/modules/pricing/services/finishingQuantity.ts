@@ -16,11 +16,12 @@ export function isFlatFinishingPriceUnit(priceUnit: string | null | undefined): 
   return FLAT_FINISHING_UNITS.has(String(priceUnit ?? '').trim().toLowerCase());
 }
 
-/** Сколько единиц взять в счёт один раз. null — услуга считается от тиража или раскладки. */
+/** Сколько единиц взять в счёт один раз. null — услуга считается от тиража или раскладки. 0 остаётся нулём. */
 export function flatFinishingUnits(priceUnit: string | null | undefined, unitsPerItem: unknown): number | null {
   if (!isFlatFinishingPriceUnit(priceUnit)) return null;
+  if (unitsPerItem === undefined || unitsPerItem === null || unitsPerItem === '') return 1;
   const units = Number(unitsPerItem);
-  if (!Number.isFinite(units) || units <= 0) return 1;
+  if (!Number.isFinite(units) || units < 0) return 1;
   return units;
 }
 
@@ -32,9 +33,11 @@ type FinishingRow = {
   is_required?: unknown;
 };
 
-function positiveUnits(raw: unknown): number | undefined {
+function templateUnits(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
   const units = Number(raw);
-  return Number.isFinite(units) && units > 0 ? units : undefined;
+  if (!Number.isFinite(units) || units < 0) return undefined;
+  return units;
 }
 
 function variantIdOf(raw: unknown): number | undefined {
@@ -59,7 +62,7 @@ export function enforceRequiredFinishing<T extends FinishingRow>(
     const serviceId = Number(row.service_id);
     if (!Number.isFinite(serviceId) || serviceId <= 0) continue;
     const variantId = variantIdOf(row.variant_id);
-    const units = positiveUnits(row.units_per_item);
+    const units = templateUnits(row.units_per_item);
     const index = next.findIndex((item) => Number(item.service_id) === serviceId);
     if (index === -1) {
       next.push({

@@ -2125,7 +2125,7 @@ export class SimplifiedPricingService {
           const unitsPerItem = finConfig.units_per_item ?? 1;
           const flatUnits = flatFinishingUnits(priceUnit, unitsPerItem);
           // per_cut (обычная резка): тупо сколько внёс резов — столько и считаем. Цена × кол-во внесённых. Раскладку не подставляем.
-          const totalCutsForOrder = Math.max(unitsPerItem, 1);
+          const totalCutsForOrder = Math.max(unitsPerItem, 0);
           const billedPerSheetForTier =
             isPerSheetOp && limits ? Math.max(perSheetUnits, limits.min ?? 1) : perSheetUnits;
           const billedMeterForTier =
@@ -2194,7 +2194,7 @@ export class SimplifiedPricingService {
             servicePrice = effectivePriceForTier * totalUnits;
           } else if (priceUnit === 'per_cut') {
             rawUnits = totalCutsForOrder;
-            totalUnits = Math.max(totalCutsForOrder, serviceMinQty);
+            totalUnits = totalCutsForOrder === 0 ? 0 : Math.max(totalCutsForOrder, serviceMinQty);
             servicePrice = effectivePriceForTier * totalUnits;
           } else if (priceUnit === 'per_m2') {
             const quoted = quotePerM2Finishing({
@@ -3214,7 +3214,7 @@ export class SimplifiedPricingService {
         const meterUnits = rawMeterUnits;
         const perSheetUnits = isPerSheetOp ? (ctx.isRollMeterage ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
-        const totalCutsForOrder = Math.max(unitsPerItem, 1);
+        const totalCutsForOrder = Math.max(unitsPerItem, 0);
         let m2Units = 0;
         if (isPerM2Op) {
           m2Units = billedM2ForQuantity({
@@ -3283,7 +3283,8 @@ export class SimplifiedPricingService {
         } else if (priceUnit === 'per_meter') {
           finishingPrice += effectiveTierPrice * Math.max(meterUnits, serviceMinQty);
         } else if (priceUnit === 'per_cut') {
-          finishingPrice += effectiveTierPrice * Math.max(totalCutsForOrder, serviceMinQty);
+          const cuts = totalCutsForOrder === 0 ? 0 : Math.max(totalCutsForOrder, serviceMinQty);
+          finishingPrice += effectiveTierPrice * cuts;
         } else if (priceUnit === 'per_m2') {
           finishingPrice += effectiveTierPrice * Math.max(m2Units, serviceMinQty);
         } else {

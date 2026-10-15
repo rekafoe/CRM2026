@@ -91,10 +91,10 @@ function quantityFieldMeta(operation: Operation): {
   }
   if (priceUnit === 'fixed' || priceUnit === 'per_order' || priceUnit === 'per_cut') {
     return {
-      label: priceUnit === 'per_cut' ? 'Резов на заказ:' : 'Количество на заказ:',
+      label: 'Норма:',
       step: 1,
-      min: 1,
-      hint: 'Не умножается на тираж.',
+      min: 0,
+      hint: 'Столько единиц услуги на заказ. Тираж это число не умножает.',
     };
   }
   return {

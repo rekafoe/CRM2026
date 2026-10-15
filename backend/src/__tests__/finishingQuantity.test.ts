@@ -9,7 +9,8 @@ describe('finishing quantity', () => {
     expect(flatFinishingUnits('per_order', 5)).toBe(5);
     expect(flatFinishingUnits('fixed', 2)).toBe(2);
     expect(flatFinishingUnits('per_hour', 5 / 60)).toBeCloseTo(5 / 60);
-    expect(flatFinishingUnits('per_hour', 0)).toBe(1);
+    expect(flatFinishingUnits('per_hour', 0)).toBe(0);
+    expect(flatFinishingUnits('per_order', undefined)).toBe(1);
     expect(flatFinishingUnits('per_item', 5)).toBeNull();
     expect(flatFinishingUnits('per_cut', 5)).toBeNull();
   });
@@ -35,6 +36,14 @@ describe('finishing quantity', () => {
       [{ service_id: 9, is_required: '1', units_per_item: 5, variant_id: 3 }],
     );
     expect(result).toEqual([{ service_id: 9, units_per_item: 5, variant_id: 3 }]);
+  });
+
+  it('сохраняет нулевую норму обязательной услуги', () => {
+    const result = enforceRequiredFinishing(
+      [{ service_id: 9, units_per_item: 5 }],
+      [{ service_id: 9, is_required: true, units_per_item: 0 }],
+    );
+    expect(result).toEqual([{ service_id: 9, units_per_item: 0 }]);
   });
 
   it('не подключает синтетические id плоттера', () => {
