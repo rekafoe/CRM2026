@@ -1,6 +1,7 @@
 import {
   enforceRequiredFinishing,
   flatFinishingUnits,
+  getEffectiveFinishing,
   isTemplateFinishingRequired,
 } from '../modules/pricing/services/finishingQuantity';
 
@@ -50,5 +51,15 @@ describe('finishing quantity', () => {
     expect(
       enforceRequiredFinishing([], [{ service_id: -910003, is_required: true, units_per_item: 5 }]),
     ).toEqual([]);
+  });
+
+  it('берёт общие услуги типа, пока у размера нет своего списка', () => {
+    const common = [{ service_id: 9, units_per_item: 1 }];
+    const own = [{ service_id: 4, units_per_item: 2 }];
+    expect(getEffectiveFinishing({ common_finishing: common }, { finishing: own })).toEqual(common);
+    expect(getEffectiveFinishing({ common_finishing: [] }, { finishing: own })).toEqual(own);
+    expect(getEffectiveFinishing({ common_finishing: common }, { use_own_finishing: true, finishing: own })).toEqual(own);
+    expect(getEffectiveFinishing({ common_finishing: common }, { use_own_finishing: false, finishing: own })).toEqual(common);
+    expect(getEffectiveFinishing(null, { finishing: own })).toEqual(own);
   });
 });

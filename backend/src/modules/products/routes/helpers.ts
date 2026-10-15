@@ -359,6 +359,9 @@ export function compactSimplifiedForSite(simplified: any) {
     if (size?.use_own_materials !== undefined) {
       base.use_own_materials = size.use_own_materials;
     }
+    if (size?.use_own_finishing !== undefined) {
+      base.use_own_finishing = size.use_own_finishing;
+    }
     if (Array.isArray(size?.allowed_base_material_ids) && size.allowed_base_material_ids.length > 0) {
       base.allowed_base_material_ids = size.allowed_base_material_ids;
     }
@@ -446,6 +449,12 @@ export function compactSimplifiedForSite(simplified: any) {
             {
               sizes: Array.isArray(cfg?.sizes) ? cfg.sizes.map(compactSize) : [],
               ...(Array.isArray(cfg?.common_allowed_material_ids) ? { common_allowed_material_ids: cfg.common_allowed_material_ids } : {}),
+              ...(() => {
+                const commonFinishing = Array.isArray(cfg?.common_finishing)
+                  ? cfg.common_finishing.map(compactFinishingItem).filter(Boolean)
+                  : [];
+                return commonFinishing.length > 0 ? { common_finishing: commonFinishing } : {};
+              })(),
               ...(Array.isArray(cfg?.allowed_price_types)
                 ? { allowed_price_types: cfg.allowed_price_types.slice() }
                 : {}),

@@ -120,4 +120,43 @@ describe('compact material-driven schema', () => {
       { service_id: 13, price_unit: 'per_item', units_per_item: 1 },
     ])
   })
+
+  it('отдаёт общие услуги типа и флаг своих услуг размера', () => {
+    const compact = compactSimplifiedForSite({
+      types: [{ id: 1, name: 'Квадратные', default: true }],
+      typeConfigs: {
+        '1': {
+          common_finishing: [
+            { service_id: 9, price_unit: 'per_hour', units_per_item: 5 / 60, is_required: true, tiers: [{ min_qty: 1, unit_price: 1 }] },
+          ],
+          sizes: [
+            {
+              id: 'a',
+              label: 'A6',
+              width_mm: 105,
+              height_mm: 148,
+              use_own_finishing: false,
+              finishing: [{ service_id: 1, price_unit: 'per_item', units_per_item: 1 }],
+            },
+            {
+              id: 'b',
+              label: 'A5',
+              width_mm: 148,
+              height_mm: 210,
+              use_own_finishing: true,
+              finishing: [{ service_id: 2, price_unit: 'fixed', units_per_item: 0 }],
+            },
+          ],
+        },
+      },
+      sizes: [],
+    })
+
+    expect(compact.typeConfigs['1'].common_finishing).toEqual([
+      { service_id: 9, price_unit: 'per_hour', units_per_item: 5 / 60, is_required: true },
+    ])
+    expect(compact.typeConfigs['1'].sizes[0].use_own_finishing).toBe(false)
+    expect(compact.typeConfigs['1'].sizes[1].use_own_finishing).toBe(true)
+    expect(JSON.stringify(compact.typeConfigs['1'].common_finishing)).not.toContain('technology')
+  })
 })

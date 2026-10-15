@@ -34,19 +34,35 @@ export function getEffectiveAllowedMaterialIds(
 }
 
 /**
+ * Эффективный список услуг размера:
+ * свои (use_own_finishing) или общие типа (common_finishing).
+ * Пока флаг не задан и общего списка нет — остаётся список размера.
+ */
+export function getEffectiveFinishing<T>(
+  typeConfig: { common_finishing?: T[] } | null | undefined,
+  size: { use_own_finishing?: boolean; finishing?: T[] } | null | undefined,
+): T[] {
+  if (!size) return [];
+  const common = typeConfig?.common_finishing;
+  if (size.use_own_finishing === true) return size.finishing ?? [];
+  if (size.use_own_finishing === false) return common ?? [];
+  return common != null && common.length > 0 ? common : (size.finishing ?? []);
+}
+
+/**
  * ID услуг (post_processing_services), явно заданные для подтипа:
- * `sizes[].finishing[].service_id` и `initial.operations`.
+ * эффективные `sizes[].finishing` (свои или common_finishing типа) и `initial.operations`.
  * В схеме API операции продукта — объединение по всем подтипам; без этой выборки
  * в калькулятор подмешиваются чужие is_default и остаются лишние чекбоксы.
  */
 export function collectAllowedOperationIdsForTypeConfig(
-  cfg: { sizes?: any[]; initial?: { operations?: any[] } } | null | undefined
+  cfg: { sizes?: any[]; common_finishing?: any[]; initial?: { operations?: any[] } } | null | undefined
 ): Set<number> {
   const ids = new Set<number>();
   if (!cfg || typeof cfg !== 'object') return ids;
   const sizes = Array.isArray(cfg.sizes) ? cfg.sizes : [];
   for (const size of sizes) {
-    const fin = Array.isArray(size?.finishing) ? size.finishing : [];
+    const fin = getEffectiveFinishing(cfg, size);
     for (const f of fin) {
       const sid = f?.service_id ?? f?.operation_id;
       if (sid != null && sid !== '' && Number.isFinite(Number(sid))) {
@@ -142,7 +158,7 @@ export function getEffectiveSimplifiedConfig(
     sizes?: EffectiveSimplifiedConfig['sizes'];
     pages?: EffectiveSimplifiedConfig['pages'];
     types?: Array<{ id: number; name: string; default?: boolean }>;
-    typeConfigs?: Record<string, { sizes?: any[]; pages?: any; common_allowed_material_ids?: number[] }>;
+    typeConfigs?: Record<string, { sizes?: any[]; pages?: any; common_allowed_material_ids?: number[]; common_finishing?: any[] }>;
   } | null | undefined,
   selectedTypeId: number | null
 ): EffectiveSimplifiedConfig {
@@ -155,6 +171,7 @@ export function getEffectiveSimplifiedConfig(
     const sizesWithEffectiveMaterials = rawSizes.map((s: any) => ({
       ...s,
       allowed_material_ids: getEffectiveAllowedMaterialIds(typeConfig as any, s),
+      finishing: getEffectiveFinishing(typeConfig as any, s),
     }));
     return {
       sizes: sizesWithEffectiveMaterials,
@@ -293,19 +310,20 @@ export function withTemplateFinishingQuantities<T extends SelectedOp>(
 }
 
 export function templateUnitsForOperation(
-  simplified: { sizes?: any[]; typeConfigs?: Record<string, { sizes?: any[] }> } | null | undefined,
+  simplified: { sizes?: any[]; typeConfigs?: Record<string, { sizes?: any[]; common_finishing?: any[] }> } | null | undefined,
   typeId: number | string | null | undefined,
   sizeId: number | string | null | undefined,
   operationId: number,
 ): number | undefined {
-  const sizes =
-    typeId != null && simplified?.typeConfigs
-      ? simplified.typeConfigs[String(typeId)]?.sizes
-      : simplified?.sizes;
+  const typeConfig =
+    typeId != null && simplified?.typeConfigs ? simplified.typeConfigs[String(typeId)] : undefined;
+  const sizes = typeConfig ? typeConfig.sizes : simplified?.sizes;
   const sizeList = Array.isArray(sizes) ? sizes : [];
   const size =
     sizeList.find((row) => String(row?.id) === String(sizeId)) ??
     (sizeId == null || sizeId === '' ? sizeList[0] : undefined);
-  const row = finishingRowsOf(size).find((item) => Number(item.service_id ?? item.operation_id) === Number(operationId));
+  const row = getEffectiveFinishing(typeConfig, size).find(
+    (item) => Number(item?.service_id ?? item?.operation_id) === Number(operationId),
+  );
   return positiveUnits(row?.units_per_item);
 }

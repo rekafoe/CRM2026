@@ -40,6 +40,21 @@ function templateUnits(raw: unknown): number | undefined {
   return units;
 }
 
+/**
+ * Услуги размера: свои, общие типа или старый список размера,
+ * пока флаг не задан и общего списка ещё нет.
+ */
+export function getEffectiveFinishing<T>(
+  typeConfig: { common_finishing?: T[] } | null | undefined,
+  size: { use_own_finishing?: boolean; finishing?: T[] } | null | undefined,
+): T[] {
+  if (!size) return [];
+  const common = typeConfig?.common_finishing;
+  if (size.use_own_finishing === true) return size.finishing ?? [];
+  if (size.use_own_finishing === false) return common ?? [];
+  return common != null && common.length > 0 ? common : (size.finishing ?? []);
+}
+
 function variantIdOf(raw: unknown): number | undefined {
   if (raw == null || raw === '') return undefined;
   const id = Number(raw);

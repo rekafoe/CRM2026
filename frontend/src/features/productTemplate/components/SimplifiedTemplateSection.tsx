@@ -4,7 +4,7 @@ import type { CalculatorMaterial } from '../../../services/calculatorMaterialSer
 import { getPaperTypesFromWarehouse, type PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import { getPrintTechnologies } from '../../../api'
 import type { SimplifiedConfig, SimplifiedSizeConfig, ProductTypeId } from '../hooks/useProductTemplate'
-import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/useProductTemplate'
+import { sortSizesByArea, getEffectiveAllowedMaterialIds, getEffectiveFinishing } from '../hooks/useProductTemplate'
 import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes'
 import { PrintPricesCard } from './PrintPricesCard'
 import { UvPrintCard } from './UvPrintCard'
@@ -94,6 +94,21 @@ interface Props {
 
 const uid = () => Date.now() + Math.floor(Math.random() * 1000)
 
+function finishingListKey(rows: SimplifiedSizeConfig['finishing'] | undefined): string {
+  return [...(rows ?? [])]
+    .map((row) =>
+      [
+        Number(row.service_id),
+        row.variant_id ?? '',
+        row.units_per_item ?? '',
+        row.is_required ? 1 : 0,
+        row.price_unit ?? '',
+      ].join(':'),
+    )
+    .sort()
+    .join('|')
+}
+
 const cloneSizeWithNewId = (size: SimplifiedSizeConfig): SimplifiedSizeConfig => ({
   ...size,
   id: uid(),
@@ -103,6 +118,7 @@ const cloneSizeWithNewId = (size: SimplifiedSizeConfig): SimplifiedSizeConfig =>
   })),
   allowed_material_ids: [...(size.allowed_material_ids || [])],
   use_own_materials: size.use_own_materials,
+  use_own_finishing: size.use_own_finishing,
   allowed_base_material_ids: [...(size.allowed_base_material_ids || [])],
   material_prices: (size.material_prices || []).map((mp) => ({
     ...mp,
@@ -159,6 +175,19 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     if (useOwnMaterials) return selected.allowed_material_ids ?? []
     return effectiveConfig.common_allowed_material_ids ?? []
   }, [selected, useOwnMaterials, effectiveConfig.common_allowed_material_ids])
+
+  const useOwnFinishing = useMemo(() => {
+    if (!hasTypes || !selected) return true
+    if (selected.use_own_finishing === true) return true
+    if (selected.use_own_finishing === false) return false
+    const common = effectiveConfig.common_finishing
+    return !common || common.length === 0
+  }, [hasTypes, selected, selected?.use_own_finishing, effectiveConfig.common_finishing])
+
+  const effectiveFinishing = useMemo(
+    () => (selected ? getEffectiveFinishing(effectiveConfig, selected) : []),
+    [selected, effectiveConfig],
+  )
 
   // Превью раскладки для текущего размера (override имеет приоритет над cut_margin/cut_gap)
   // Формула точно соответствует layoutCalculationService на бэкенде
@@ -330,6 +359,51 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       }
     },
     [selected, effectiveConfig.common_allowed_material_ids, updateSize],
+  )
+
+  const updateEffectiveFinishing = useCallback(
+    (finishing: SimplifiedSizeConfig['finishing']) => {
+      if (!selected) return
+      if (useOwnFinishing) {
+        updateSize(selected.id, { finishing })
+      } else {
+        applyToCurrentConfig((prev) => ({ ...prev, common_finishing: finishing }))
+      }
+    },
+    [selected, useOwnFinishing, updateSize, applyToCurrentConfig],
+  )
+
+  const setUseOwnFinishing = useCallback(
+    (own: boolean) => {
+      if (!selected) return
+      if (own) {
+        const common = effectiveConfig.common_finishing ?? []
+        updateSize(selected.id, {
+          use_own_finishing: true,
+          finishing: common.map((row) => ({ ...row })),
+        })
+        return
+      }
+      const common = effectiveConfig.common_finishing ?? []
+      if (common.length === 0) {
+        const finishing = (selected.finishing ?? []).map((row) => ({ ...row }))
+        const sharedKey = finishingListKey(finishing)
+        applyToCurrentConfig((prev) => ({
+          ...prev,
+          common_finishing: finishing,
+          sizes: (prev.sizes || []).map((size) => {
+            if (String(size.id) === String(selected.id)) return { ...size, use_own_finishing: false }
+            if (size.use_own_finishing === true || size.use_own_finishing === false) return size
+            const own = size.finishing ?? []
+            if (own.length === 0 || finishingListKey(own) === sharedKey) return size
+            return { ...size, use_own_finishing: true }
+          }),
+        }))
+        return
+      }
+      updateSize(selected.id, { use_own_finishing: false })
+    },
+    [selected, effectiveConfig.common_finishing, updateSize, applyToCurrentConfig],
   )
 
   const [paperTypes, setPaperTypes] = useState<PaperTypeRow[]>([])
@@ -529,9 +603,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       size: Boolean(String(selected.label || '').trim() && selected.width_mm > 0 && selected.height_mm > 0),
       print: hasPrint,
       materials: effectiveAllowedMaterialIds.length > 0,
-      finishing: Array.isArray(selected.finishing) && selected.finishing.length > 0,
+      finishing: effectiveFinishing.length > 0,
     }
-  }, [selected, effectiveAllowedMaterialIds, activeM2Mode, value.material_driven_printing, printTechs])
+  }, [selected, effectiveAllowedMaterialIds, effectiveFinishing, activeM2Mode, value.material_driven_printing, printTechs])
 
   const quickTestPrintPreset = useMemo(() => {
     if (!selected) return null
@@ -1227,6 +1301,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                     loadLists={loadLists}
                     updateSize={updateSize}
                     hasUserInteractedWithServicesRef={hasUserInteractedWithServicesRef}
+                    hasCommonFinishingFeature={hasTypes}
+                    useOwnFinishing={useOwnFinishing}
+                    finishingRows={effectiveFinishing}
+                    onFinishingChange={updateEffectiveFinishing}
+                    setUseOwnFinishing={setUseOwnFinishing}
                   />
                 )}
 

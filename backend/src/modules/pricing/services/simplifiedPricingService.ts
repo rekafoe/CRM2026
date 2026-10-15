@@ -40,6 +40,7 @@ import {
 import {
   enforceRequiredFinishing,
   flatFinishingUnits,
+  getEffectiveFinishing,
   isTemplateFinishingRequired,
 } from './finishingQuantity';
 import {
@@ -280,6 +281,8 @@ interface SimplifiedSizeConfig {
   allowed_material_ids?: number[];
   /** Если true — размер использует свой список материалов; иначе — общие типа (common_allowed_material_ids) */
   use_own_materials?: boolean;
+  /** Если true — размер использует свой список услуг; иначе — общие типа (common_finishing) */
+  use_own_finishing?: boolean;
   /** Материалы-основы (заготовки): футболки, кружки — расход 1 шт на изделие */
   allowed_base_material_ids?: number[];
   default_print?: {
@@ -299,9 +302,10 @@ interface SimplifiedSizeConfig {
   }>;
   finishing: Array<{
     service_id: number;
-    price_unit: 'per_cut' | 'per_item' | 'per_sheet' | 'fixed' | 'per_order' | 'per_meter';
+    price_unit: 'per_cut' | 'per_item' | 'per_sheet' | 'fixed' | 'per_order' | 'per_meter' | 'per_m2' | 'per_hour';
     units_per_item: number;
     variant_id?: number; //  ID варианта для услуг с вариантами (например, ламинация)
+    is_required?: boolean | number | string;
     //  tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
     // tiers оставлен только для обратной совместимости со старыми данными
     tiers?: SimplifiedQtyTier[]; // Опционально, только для чтения старых данных
@@ -312,6 +316,8 @@ interface SimplifiedTypeConfig {
   sizes: SimplifiedSizeConfig[];
   /** Общие материалы типа: используются размерами с use_own_materials !== true */
   common_allowed_material_ids?: number[];
+  /** Общие услуги типа: используются размерами с use_own_finishing !== true */
+  common_finishing?: SimplifiedSizeConfig['finishing'];
   /** Плоттерная резка: одна точка включения в подтипе */
   plotter?: {
     enabled?: boolean;
@@ -634,6 +640,11 @@ export class SimplifiedPricingService {
       err.status = 400;
       throw err;
     }
+
+    selectedSize = {
+      ...selectedSize,
+      finishing: getEffectiveFinishing(typeConfig, selectedSize),
+    };
 
     const layoutTrim =
       trimInput && Number.isFinite(trimInput.width) && Number.isFinite(trimInput.height)

@@ -130,6 +130,8 @@ export type SimplifiedSizeConfig = {
   allowed_material_ids: number[];
   /** Если true — размер использует свой список материалов; иначе — общие материалы типа (common_allowed_material_ids) */
   use_own_materials?: boolean;
+  /** Если true — размер использует свой список услуг; иначе — общие услуги типа (common_finishing) */
+  use_own_finishing?: boolean;
   /** Материалы-основы (заготовки): футболки, кружки и т.п. — расход 1 шт на изделие */
   allowed_base_material_ids?: number[];
   material_prices: SimplifiedMaterialPrice[];
@@ -195,6 +197,8 @@ export type SimplifiedTypeConfig = {
   sizes: SimplifiedSizeConfig[];
   /** Общие материалы типа: используются всеми размерами, у которых use_own_materials !== true */
   common_allowed_material_ids?: number[];
+  /** Общие услуги типа: используются размерами, у которых use_own_finishing !== true */
+  common_finishing?: SimplifiedFinishingPrice[];
   /** Плоттерная резка — один блок подтипа */
   plotter?: {
     enabled?: boolean;
@@ -502,6 +506,18 @@ export function getEffectiveAllowedMaterialIds(typeConfig: SimplifiedTypeConfig,
   if (size.use_own_materials === true) return size.allowed_material_ids ?? []
   if (size.use_own_materials === false) return common ?? []
   return (common != null && common.length > 0) ? common : (size.allowed_material_ids ?? [])
+}
+
+/** Эффективный список услуг размера: свои или общие типа (по флагу use_own_finishing) */
+export function getEffectiveFinishing(
+  typeConfig: SimplifiedTypeConfig | null | undefined,
+  size: SimplifiedSizeConfig | null | undefined,
+): SimplifiedFinishingPrice[] {
+  if (!size) return []
+  const common = typeConfig?.common_finishing
+  if (size.use_own_finishing === true) return size.finishing ?? []
+  if (size.use_own_finishing === false) return common ?? []
+  return (common != null && common.length > 0) ? common : (size.finishing ?? [])
 }
 
 export function generateTypeId(): ProductTypeId {

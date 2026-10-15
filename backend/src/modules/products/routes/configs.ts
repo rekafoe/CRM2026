@@ -10,6 +10,7 @@ import {
   ensureProductTemplateConfigsTable,
 } from './helpers';
 import { assertSubtypeKeysAllowedForTemplate } from '../utils/routeKeys';
+import { getEffectiveFinishing } from '../../pricing/services/finishingQuantity';
 
 const router = Router();
 
@@ -41,11 +42,20 @@ export async function syncSimplifiedOperations(db: any, productId: number, confi
     // Корневые sizes (legacy / без типов)
     const rootIds = collectServiceIdsFromSizes(simplified.sizes);
     rootIds.forEach((id) => serviceIds.add(id));
-    // typeConfigs[typeId].sizes — для продуктов с подтипами (открытки со сложением и т.д.)
+    // typeConfigs: общие услуги типа и эффективный список каждого размера
     if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
       for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
-        const typeIds = collectServiceIdsFromSizes(cfg?.sizes);
-        typeIds.forEach((id) => serviceIds.add(id));
+        const addRows = (rows: unknown) => {
+          if (!Array.isArray(rows)) return;
+          rows.forEach((finish: any) => {
+            const id = Number(finish?.service_id);
+            if (Number.isFinite(id) && id > 0) serviceIds.add(id);
+          });
+        };
+        addRows(cfg?.common_finishing);
+        if (Array.isArray(cfg?.sizes)) {
+          cfg.sizes.forEach((size: any) => addRows(getEffectiveFinishing(cfg, size)));
+        }
       }
     }
     const bindingServiceId = simplified?.multiPageStructure?.binding?.service_id;

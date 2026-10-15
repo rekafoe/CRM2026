@@ -31,6 +31,12 @@ interface FinishingCardProps {
   loadLists: () => void
   updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
   hasUserInteractedWithServicesRef: React.MutableRefObject<Map<string | number, boolean>>
+  /** Есть типы продуктов: общие услуги типа и флаг «свои услуги» у размера */
+  hasCommonFinishingFeature?: boolean
+  useOwnFinishing?: boolean
+  finishingRows?: SimplifiedFinishingPrice[]
+  onFinishingChange?: (finishing: SimplifiedFinishingPrice[]) => void
+  setUseOwnFinishing?: (value: boolean) => void
 }
 
 const PRICE_UNITS: PriceUnit[] = [
@@ -151,15 +157,21 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
   loadLists,
   updateSize,
   hasUserInteractedWithServicesRef,
+  hasCommonFinishingFeature = false,
+  useOwnFinishing = true,
+  finishingRows,
+  onFinishingChange,
+  setUseOwnFinishing,
 }) => {
+  const rows = finishingRows ?? selected.finishing
   const [query, setQuery] = useState('')
   const [pickId, setPickId] = useState<number | ''>('')
   const [normDraft, setNormDraft] = useState<Record<number, string>>({})
   const [variantsByService, setVariantsByService] = useState<Map<number, ServiceVariant[]>>(new Map())
 
   const attachedIds = useMemo(
-    () => selected.finishing.map((row) => Number(row.service_id)).filter((id) => Number.isFinite(id) && id > 0).join(','),
-    [selected.finishing],
+    () => rows.map((row) => Number(row.service_id)).filter((id) => Number.isFinite(id) && id > 0).join(','),
+    [rows],
   )
 
   useEffect(() => {
@@ -191,7 +203,7 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
   }, [services])
 
   const available = useMemo(() => {
-    const taken = new Set(selected.finishing.map((row) => Number(row.service_id)))
+    const taken = new Set(rows.map((row) => Number(row.service_id)))
     const needle = query.trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е')
     return services
       .filter((service) => !taken.has(Number(service.id)))
@@ -202,15 +214,16 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
         return haystack.includes(needle)
       })
       .sort((a, b) => serviceName(a).localeCompare(serviceName(b), 'ru'))
-  }, [query, selected.finishing, services])
+  }, [query, rows, services])
 
   const persist = (finishing: SimplifiedFinishingPrice[]) => {
     hasUserInteractedWithServicesRef.current.set(selected.id, true)
-    updateSize(selected.id, { finishing })
+    if (onFinishingChange) onFinishingChange(finishing)
+    else updateSize(selected.id, { finishing })
   }
 
   const addService = (serviceId: number) => {
-    if (!Number.isFinite(serviceId) || selected.finishing.some((row) => Number(row.service_id) === serviceId)) return
+    if (!Number.isFinite(serviceId) || rows.some((row) => Number(row.service_id) === serviceId)) return
     const service = servicesById.get(serviceId)
     const priceUnit = servicePriceUnit(service)
     const row: SimplifiedFinishingPrice = {
@@ -219,21 +232,21 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
       units_per_item: 1,
       is_required: false,
     }
-    persist([...selected.finishing, row])
+    persist([...rows, row])
     setPickId('')
     setQuery('')
   }
 
   const patchRow = (serviceId: number, patch: Partial<SimplifiedFinishingPrice>) => {
     persist(
-      selected.finishing.map((row) => (Number(row.service_id) === serviceId ? { ...row, ...patch } : row)),
+      rows.map((row) => (Number(row.service_id) === serviceId ? { ...row, ...patch } : row)),
     )
   }
 
   useEffect(() => {
     if (variantsByService.size === 0) return
     let changed = false
-    const next = selected.finishing.map((row) => {
+    const next = rows.map((row) => {
       if (row.variant_id != null) return row
       const options = variantOptions(variantsByService.get(Number(row.service_id)) ?? [])
       const option = options[0]
@@ -248,7 +261,7 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
       }
     })
     if (changed) persist(next)
-  }, [variantsByService, selected.finishing, selected.id, updateSize, hasUserInteractedWithServicesRef])
+  }, [variantsByService, rows, selected.id, updateSize, onFinishingChange, hasUserInteractedWithServicesRef])
 
   return (
     <div className="simplified-card">
@@ -266,9 +279,25 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
         </div>
       </div>
       <div className="simplified-card__content">
+        {hasCommonFinishingFeature && setUseOwnFinishing && (
+          <div className="materials-card__own-toggle">
+            <label className="materials-card__own-toggle-label">
+              <input
+                type="checkbox"
+                checked={useOwnFinishing}
+                onChange={(event) => {
+                  hasUserInteractedWithServicesRef.current.set(selected.id, true)
+                  setUseOwnFinishing(event.target.checked)
+                }}
+              />
+              <span className="text-sm">У этого размера свои услуги (иначе — общие для типа)</span>
+            </label>
+          </div>
+        )}
         <p className="text-muted text-sm simplified-finishing-lead">
-          Подключите услуги этого размера. Обязательная считается всегда и с заданным количеством.
-          Остальные в калькуляторе включаются отдельно.
+          {hasCommonFinishingFeature && !useOwnFinishing
+            ? 'Эти услуги общие для всех размеров типа. Обязательная считается всегда и с заданным количеством. Остальные в калькуляторе включаются отдельно.'
+            : 'Подключите услуги этого размера. Обязательная считается всегда и с заданным количеством. Остальные в калькуляторе включаются отдельно.'}
         </p>
         {loadingLists ? (
           <div className="text-muted">Загрузка услуг...</div>
@@ -287,10 +316,14 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
         ) : (
           <>
             <div className="simplified-finishing-list">
-              {selected.finishing.length === 0 && (
-                <div className="text-muted text-sm">Для этого размера услуги ещё не подключены.</div>
+              {rows.length === 0 && (
+                <div className="text-muted text-sm">
+                  {hasCommonFinishingFeature && !useOwnFinishing
+                    ? 'Для типа услуги ещё не подключены.'
+                    : 'Для этого размера услуги ещё не подключены.'}
+                </div>
               )}
-              {selected.finishing.map((row) => {
+              {rows.map((row) => {
                 const service = servicesById.get(Number(row.service_id))
                 const priceUnit = servicePriceUnit(service, row.price_unit)
                 const meta = quantityMode(priceUnit, service?.unit)
@@ -312,7 +345,7 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
                       <button
                         type="button"
                         className="el-button el-button--text el-button--mini"
-                        onClick={() => persist(selected.finishing.filter((item) => item.service_id !== row.service_id))}
+                        onClick={() => persist(rows.filter((item) => item.service_id !== row.service_id))}
                       >
                         Убрать
                       </button>
