@@ -2528,26 +2528,11 @@ export class SimplifiedPricingService {
       }
     }
 
-    if (
-      typeConfig?.plotter?.enabled === true &&
-      normalizedConfig.plotter_mounting === true &&
-      typeConfig.plotter.mounting_film_material_id != null &&
-      isMaterialMeterBased &&
-      materialMetersNeeded > 0
-    ) {
-      const mid = typeConfig.plotter.mounting_film_material_id;
-      const mrow = await db.get<{ name: string }>(
-        `SELECT name FROM materials WHERE id = ? AND is_active = 1`,
-        [mid]
-      );
-      if (mrow) {
-        const qMount = materialMetersNeeded;
-        const existing = operationMaterials.find((m) => m.material_id === mid);
-        if (existing) existing.quantity += qMount;
-        else operationMaterials.push({ material_id: mid, material_name: mrow.name, quantity: qMount });
-      }
-    }
-    
+    // После d5a5e602 продукт не считает накатку (PLOTTER_FIN_MOUNTING отфильтрован выше).
+    // Нельзя оставлять списание mounting_film_material_id по устаревшему plotter_mounting:
+    // калькулятор/редактирование старых specs и публичный /pricing/calculate иначе кладут
+    // плёнку в operationMaterials → components без строки накатки в цене.
+
     let coverPrice = 0;
     if (usePagesMultiplier && pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
       coverPrice = await this.calculateMultiPageCoverCost({
