@@ -21,6 +21,7 @@ import {
 import { syncSimplifiedOperations } from './configs';
 import { PricingServiceRepository } from '../../pricing/repositories/serviceRepository';
 import { PriceTypeRepository } from '../../pricing/repositories/priceTypeRepository';
+import { chooseClientPrintTechnologyNames } from './clientPrintTechnologyLabel';
 
 const router = Router();
 
@@ -62,6 +63,49 @@ async function loadMaterialUsageByType(
         return [Number(row.material_type_id), usage];
       }),
     );
+  } catch {
+    return new Map();
+  }
+}
+
+async function loadClientPrintTechnologyNames(
+  db: Awaited<ReturnType<typeof getDb>>,
+  materialTypeIds: unknown[],
+): Promise<Map<number, string>> {
+  const ids = [...new Set(
+    materialTypeIds
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0),
+  )];
+  if (ids.length === 0) return new Map();
+  try {
+    const table = await db.get(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'material_type_print_technologies'",
+    );
+    if (!table) return new Map();
+    const rows = await db.all<Array<{
+      material_type_id: number;
+      technology_name: string;
+      is_default: number;
+      priority: number;
+      supports_indoor: number;
+      supports_outdoor: number;
+    }>>(
+      `SELECT
+         mpt.material_type_id,
+         t.name as technology_name,
+         mpt.is_default,
+         mpt.priority,
+         mpt.supports_indoor,
+         mpt.supports_outdoor
+       FROM material_type_print_technologies mpt
+       JOIN print_technologies t ON LOWER(t.code) = LOWER(mpt.technology_code)
+       WHERE mpt.material_type_id IN (${ids.map(() => '?').join(',')})
+         AND mpt.is_active = 1
+         AND t.is_active = 1`,
+      ids,
+    );
+    return chooseClientPrintTechnologyNames(rows);
   } catch {
     return new Map();
   }
@@ -566,6 +610,7 @@ router.get('/:productId/schema', async (req, res) => {
         paper_type_name?: string;
         material_type_id?: number;
         material_type_name?: string;
+        print_technology_name?: string;
         unit?: string;
       }> = [];
       if (materialIds.length > 0) {
@@ -579,12 +624,19 @@ router.get('/:productId/schema', async (req, res) => {
            WHERE m.id IN (${placeholders}) AND m.is_active = 1`,
           materialIds
         );
-        const materialUsageByType = schema.template.simplified?.material_driven_printing === true
+        const materialDriven = schema.template.simplified?.material_driven_printing === true;
+        const materialUsageByType = materialDriven
           ? await loadMaterialUsageByType(
               db,
               rows.map((row: any) => row.material_type_id),
             )
           : new Map<number, Array<'indoor' | 'outdoor'>>();
+        const printTechnologyByType = materialDriven
+          ? await loadClientPrintTechnologyNames(
+              db,
+              rows.map((row: any) => row.material_type_id),
+            )
+          : new Map<number, string>();
         compactMaterials = rows.map((r) => ({
           id: r.id,
           name:
@@ -600,6 +652,9 @@ router.get('/:productId/schema', async (req, res) => {
             ? { material_type_id: Number(r.material_type_id) }
             : {}),
           ...(r.material_type_name ? { material_type_name: r.material_type_name } : {}),
+          ...(printTechnologyByType.get(Number(r.material_type_id))
+            ? { print_technology_name: printTechnologyByType.get(Number(r.material_type_id)) }
+            : {}),
           ...(materialUsageByType.has(Number(r.material_type_id))
             ? { usage: materialUsageByType.get(Number(r.material_type_id)) }
             : {}),
