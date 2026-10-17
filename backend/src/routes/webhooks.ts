@@ -23,12 +23,24 @@ type BePaidWebhookBody = {
   }
 }
 
+type WebhookOrderRow = {
+  id: number
+  prepaymentAmount?: number | string | null
+  prepaymentStatus?: string | null
+  paymentId?: string | null
+}
+
 function mapBePaidStatus(raw: string): 'paid' | 'failed' | 'pending' | null {
   const s = raw.toLowerCase()
   if (s === 'successful' || s === 'paid' || s === 'success') return 'paid'
   if (s === 'failed' || s === 'error' || s === 'declined' || s === 'expired') return 'failed'
   if (s === 'pending' || s === 'incomplete' || s === 'in_progress') return 'pending'
   return null
+}
+
+function isPaidStatus(status: string | null | undefined): boolean {
+  const s = String(status ?? '').trim().toLowerCase()
+  return s === 'paid' || s === 'successful'
 }
 
 // POST /api/webhooks/bepaid — статус оплаты BePaid (checkout notification)
@@ -62,19 +74,19 @@ router.post(
 
     const db = await getDb()
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
+      ? await db.get<WebhookOrderRow>(
+          'SELECT id, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE paymentId = ?',
           paymentId,
         )
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
+      order = await db.get<WebhookOrderRow>(
+        'SELECT id, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE number = ?',
         trackingId,
       )
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
+        order = await db.get<WebhookOrderRow>(
+          'SELECT id, prepaymentAmount, prepaymentStatus, paymentId FROM orders WHERE id = ?',
           Number(trackingId),
         )
       }
@@ -83,6 +95,27 @@ router.post(
       logger.warn('BePaid webhook: order not found', { paymentId, trackingId, statusRaw })
       res.status(204).end()
       return
+    }
+
+    const storedPaymentId = String(order.paymentId ?? '').trim()
+    // Already-paid seal: offline /prepay clears paymentId/url but leaves status=paid.
+    // Late BePaid success still matches by tracking_id/number and must not overwrite
+    // amount/method/day (same class as Issue seal, without requiring debt_closed).
+    // Idempotent retry: same paymentId as stored is allowed through.
+    if (isPaidStatus(order.prepaymentStatus)) {
+      const samePayment =
+        Boolean(paymentId) && Boolean(storedPaymentId) && paymentId === storedPaymentId
+      if (!samePayment) {
+        logger.info('BePaid webhook ignored: order already paid', {
+          orderId: order.id,
+          paymentId: paymentId || undefined,
+          trackingId: trackingId || undefined,
+          statusRaw,
+          storedPaymentId: storedPaymentId || undefined,
+        })
+        res.status(204).end()
+        return
+      }
     }
 
     let hasPrepaymentUpdatedAt = false

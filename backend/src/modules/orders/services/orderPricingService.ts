@@ -6,7 +6,6 @@ import { getDb } from '../../../config/database';
 import { logger } from '../../../utils/logger';
 import {
   configurationFromItemParams,
-  isGroupableLine,
   isSimplifiedProduct,
   quoteLines,
   type PricingLineInput,
@@ -49,15 +48,16 @@ export class OrderPricingService {
     const { productId, configuration, sheetsNeeded } = configurationFromItemParams(params);
     if (productId == null) return null;
 
-    const line: PricingLineInput = {
+    // Incomplete group keys (no material/tech/color/sides) still go to quoteLines:
+    // with skipNonGroupable:false UnifiedPricingService can fill productionPlan
+    // and price the line. Gating on isGroupableLine here left client totalCost as-is.
+    return {
       lineId: item.id,
       productId,
       quantity: Math.max(1, Number(item.quantity) || 1),
       configuration,
       sheetsNeeded,
     };
-
-    return isGroupableLine(line) ? line : null;
   }
 
   static async getPricingGroupsForOrder(orderId: number): Promise<OrderPricingGroupView[]> {
@@ -89,8 +89,9 @@ export class OrderPricingService {
   }
 
   /**
-   * Пересчитать цены всех groupable simplified-позиций заказа.
-   * Позиции без productId / без ключа группы не меняются.
+   * Пересчитать цены всех simplified-позиций заказа с productId.
+   * Неполные ключи группы всё равно уходят в UnifiedPricingService
+   * (skipNonGroupable:false), иначе клиентский totalCost остаётся как есть.
    */
   static async recalculateOrderPrices(orderId: number): Promise<{
     updatedCount: number;
@@ -123,7 +124,7 @@ export class OrderPricingService {
       return { updatedCount: 0, cartTotal: 0, groups: [] };
     }
 
-    const quoted = await quoteLines(lines);
+    const quoted = await quoteLines(lines, { skipNonGroupable: false });
     let updatedCount = 0;
 
     for (const q of quoted.lines) {

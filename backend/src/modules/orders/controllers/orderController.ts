@@ -26,6 +26,7 @@ import {
   WebsiteCorporateCheckoutError,
   validateWebsiteCorporateCheckout,
 } from '../../../services/websiteCorporateCheckoutService'
+import { planConfirmWebsitePrepaymentSeal } from '../../../utils/confirmWebsitePrepaymentSeal'
 
 function readWebsiteDeliveryFromBody(body: Record<string, unknown>) {
   if (!Object.prototype.hasOwnProperty.call(body, 'delivery')) {
@@ -405,19 +406,26 @@ export class OrderController {
     const orderIdFromPath =
       Number.isFinite(orderIdParam) && orderIdParam > 0 ? Math.trunc(orderIdParam) : null
 
+    type ConfirmOrderRow = {
+      id: number
+      source?: string | null
+      number?: string | null
+      prepaymentAmount?: number | string | null
+      prepaymentStatus?: string | null
+      paymentId?: string | null
+      paymentMethod?: string | null
+    }
+
+    const confirmSelect =
+      'SELECT id, source, number, prepaymentAmount, prepaymentStatus, paymentId, paymentMethod FROM orders WHERE'
+
     const db = await getDb()
     let row = orderIdFromPath
-      ? await db.get<{ id: number; source?: string | null; number?: string | null }>(
-          'SELECT id, source, number FROM orders WHERE id = ?',
-          orderIdFromPath
-        )
+      ? await db.get<ConfirmOrderRow>(`${confirmSelect} id = ?`, orderIdFromPath)
       : undefined
 
     if (!row && orderNumber) {
-      row = await db.get<{ id: number; source?: string | null; number?: string | null }>(
-        'SELECT id, source, number FROM orders WHERE number = ?',
-        orderNumber
-      )
+      row = await db.get<ConfirmOrderRow>(`${confirmSelect} number = ?`, orderNumber)
     }
 
     if (!row) {
@@ -442,6 +450,45 @@ export class OrderController {
         res.status(400).json({ error: 'amount обязателен при successful' })
         return
       }
+
+      let hasDebtClosedEvent = false
+      try {
+        const hasTable = !!(await db.get(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'",
+        ))
+        if (hasTable) {
+          hasDebtClosedEvent = !!(await db.get(
+            'SELECT 1 as c FROM debt_closed_events WHERE order_id = ? LIMIT 1',
+            orderId,
+          ))
+        }
+      } catch {
+        hasDebtClosedEvent = false
+      }
+
+      const seal = planConfirmWebsitePrepaymentSeal({
+        prepaymentStatus: row.prepaymentStatus,
+        storedPaymentId: row.paymentId,
+        incomingPaymentId: paymentId,
+        hasDebtClosedEvent,
+      })
+      if (seal.sealed) {
+        logger.info('Website confirm-prepayment ignored: prepaid sealed', {
+          orderId,
+          reason: seal.reason,
+          paymentId: paymentId || undefined,
+        })
+        res.json({
+          ok: true,
+          skipped: true,
+          reason: seal.reason,
+          prepaymentAmount: Number(row.prepaymentAmount ?? 0),
+          prepaymentStatus: row.prepaymentStatus ?? null,
+          paymentMethod: row.paymentMethod ?? null,
+        })
+        return
+      }
+
       const updateSql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
            paymentUrl = NULL, paymentId = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')

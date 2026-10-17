@@ -8,6 +8,11 @@ const INTERNAL_PARAM_KEYS = new Set([
   'crmCalculateConfiguration',
   // editorDraftToken — контракт checkout редактора; нужен до prepareWebsiteItemsWithEditorDrafts
   'designEditorMode',
+  // Клиентские флаги обхода server reprice: иначе totalCost/storedTotalCost
+  // переживают OrderPricingService.recalculateOrderPrices и фиксируют недоплату.
+  'priceLockedByCalculator',
+  'customProduct',
+  'postprintProduct',
 ]);
 
 const HIDDEN_SUMMARY_LABELS = new Set([
@@ -106,6 +111,11 @@ export function sanitizeWebsiteItemParams(params: Record<string, unknown>): Reco
     if (INTERNAL_PARAM_KEYS.has(key)) {
       delete next[key];
     }
+  }
+
+  // productType=custom — тот же обход, что customProduct (extractPricingLineFromItem → null).
+  if (String(next.productType ?? '').trim().toLowerCase() === 'custom') {
+    delete next.productType;
   }
 
   const parameterSummary = sanitizeParameterSummary(next.parameterSummary, next);

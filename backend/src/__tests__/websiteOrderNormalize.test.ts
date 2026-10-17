@@ -25,4 +25,48 @@ describe('websiteOrderNormalize', () => {
     expect(item.params.layoutHumanLabel).toBeUndefined()
     expect(item.params.designEditorMode).toBeUndefined()
   })
+
+  it('strips priceLockedByCalculator so website totalCost cannot skip server reprice', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: 'Листовки',
+        price: 0.01,
+        quantity: 100,
+        totalCost: 0.01,
+        params: {
+          description: 'A6',
+          productId: 22,
+          storedTotalCost: 0.01,
+          priceLockedByCalculator: true,
+        },
+      },
+    ])
+
+    expect(item.totalCost).toBe(0.01)
+    expect(item.params.priceLockedByCalculator).toBeUndefined()
+    expect(item.params.storedTotalCost).toBe(0.01)
+  })
+
+  it('strips customProduct / postprintProduct / productType=custom so extract can reprice', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: 'Листовки',
+        price: 0.01,
+        quantity: 50,
+        totalCost: 0.01,
+        params: {
+          productId: 22,
+          customProduct: true,
+          postprintProduct: true,
+          productType: 'custom',
+          storedTotalCost: 0.01,
+        },
+      },
+    ])
+
+    expect(item.params.customProduct).toBeUndefined()
+    expect(item.params.postprintProduct).toBeUndefined()
+    expect(item.params.productType).toBeUndefined()
+    expect(item.params.productId).toBe(22)
+  })
 })
