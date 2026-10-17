@@ -166,13 +166,6 @@ describe('cashRegisterDayService', () => {
       stamp,
     )
 
-    const waitingOrder = await db.get<{ id: number }>('SELECT id FROM orders WHERE number = ?', numbers[1])
-    await db.run(
-      'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
-      waitingOrder?.id,
-      day,
-      15,
-    )
     const placedOrder = await db.get<{ id: number }>('SELECT id FROM orders WHERE number = ?', numbers[2])
     await db.run(
       'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
@@ -183,6 +176,7 @@ describe('cashRegisterDayService', () => {
 
     try {
       const payload = await getCashRegisterDay(day)
+      // Предоплата status 0 / «Ожидает» не в кассе; оформленный заказ — да.
       expect(payload.cash_in_today).toBe(25)
       expect(payload.order_volume_work_day).toBe(0)
       expect(payload.issued_today).toBe(10)
@@ -196,6 +190,58 @@ describe('cashRegisterDayService', () => {
         await db.run('DELETE FROM debt_closed_events WHERE order_id = ?', row.id)
         await db.run('DELETE FROM orders WHERE id = ?', row.id)
       }
+    }
+  })
+
+  it('выданный заказ, возвращённый в «Ожидает», остаётся в issued_today и cash_in', async () => {
+    const db = await getDb()
+    let hasPrepayCol = false
+    try {
+      const col = await db.get("SELECT 1 FROM pragma_table_info('orders') WHERE name = 'prepaymentUpdatedAt'")
+      hasPrepayCol = !!col
+    } catch {
+      hasPrepayCol = false
+    }
+    if (!hasPrepayCol) return
+
+    const day = '2099-04-18'
+    const stamp = `${day} 14:00:00`
+    const waitingId = await statusIdByCode('waiting', 'Ожидает', 1)
+    const completedId = await statusIdByCode('completed', 'Завершён', 7)
+    const number = `ISSUE-WAIT-${Date.now()}`
+
+    await db.run(
+      `INSERT INTO orders (number, status, createdAt, created_at, customerName, prepaymentAmount, prepaymentStatus, paymentMethod, prepaymentUpdatedAt)
+       VALUES (?, ?, ?, ?, 'issued then waiting', 50, 'paid', 'offline', ?)`,
+      number,
+      completedId,
+      stamp,
+      stamp,
+      stamp,
+    )
+    const order = await db.get<{ id: number }>('SELECT id FROM orders WHERE number = ?', number)
+    expect(order?.id).toBeTruthy()
+    await db.run(
+      'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+      order!.id,
+      day,
+      30,
+    )
+
+    try {
+      const before = await getCashRegisterDay(day)
+      expect(before.issued_today).toBeGreaterThanOrEqual(30)
+      expect(before.cash_in_today).toBeGreaterThanOrEqual(30)
+
+      await db.run('UPDATE orders SET status = ? WHERE id = ?', waitingId, order!.id)
+
+      const after = await getCashRegisterDay(day)
+      expect(after.issued_today).toBe(before.issued_today)
+      expect(after.cash_in_today).toBe(before.cash_in_today)
+      expect(after.orders_included_count).toBe(before.orders_included_count)
+    } finally {
+      await db.run('DELETE FROM debt_closed_events WHERE order_id = ?', order!.id)
+      await db.run('DELETE FROM orders WHERE id = ?', order!.id)
     }
   })
 })
