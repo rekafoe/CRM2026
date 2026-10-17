@@ -947,10 +947,16 @@ export class OrderService {
   ) {
     const db = await getDb();
 
+    const source = orderData.source || 'crm';
+    let order: Order;
+    let itemIds: number[];
+    let deductionResult: Awaited<ReturnType<typeof OrderService.deductMaterialsForExistingOrder>>;
     try {
       await db.run('BEGIN');
-      const { order, itemIds } = await this.createOrderWithItemsTx(db, orderData);
-      const deductionResult = await this.deductMaterialsForExistingOrder(order.id, orderData.userId);
+      const created = await this.createOrderWithItemsTx(db, orderData);
+      order = created.order;
+      itemIds = created.itemIds;
+      deductionResult = await this.deductMaterialsForExistingOrder(order.id, orderData.userId);
       if (!deductionResult.success) {
         const err = new Error(
           `Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`
@@ -959,24 +965,76 @@ export class OrderService {
         throw err;
       }
       await db.run('COMMIT');
-      const { OrderPricingService } = await import('./orderPricingService');
-      try {
-        await OrderPricingService.recalculateOrderPrices(order.id);
-      } catch (recalcErr) {
-        logger.warn('[createOrderWithAutoDeduction] пересчёт цен по группам не выполнен', {
-          orderId: order.id,
-          error: (recalcErr as Error).message,
-        });
-      }
-      return {
-        order,
-        deductionResult,
-        itemIds,
-      };
     } catch (error) {
-      await db.run('ROLLBACK');
+      try {
+        await db.run('ROLLBACK');
+      } catch {
+        /* already committed or no active transaction */
+      }
       throw error;
     }
+
+    const { OrderPricingService } = await import('./orderPricingService');
+    let recalc: Awaited<ReturnType<typeof OrderPricingService.recalculateOrderPrices>> | null = null;
+    try {
+      recalc = await OrderPricingService.recalculateOrderPrices(order.id);
+    } catch (recalcErr) {
+      logger.warn('[createOrderWithAutoDeduction] пересчёт цен по группам не выполнен', {
+        orderId: order.id,
+        error: (recalcErr as Error).message,
+      });
+      if (source === 'website' || source === 'mini_app') {
+        await this.failWebsiteLikeCreateAfterBadReprice(
+          order.id,
+          orderData.userId,
+          (recalcErr as Error).message,
+        );
+      }
+    }
+    // Сайт/миниапп: ошибка серверного расчёта (мин. тираж, раскладка…) раньше оставляла
+    // клиентский totalCost/price — underpay. Fail-closed: откат списания + soft-cancel.
+    if (
+      (source === 'website' || source === 'mini_app') &&
+      recalc &&
+      recalc.failedLines.length > 0
+    ) {
+      await this.failWebsiteLikeCreateAfterBadReprice(
+        order.id,
+        orderData.userId,
+        recalc.failedLines.map((f) => f.error).join('; '),
+      );
+    }
+
+    return {
+      order,
+      deductionResult,
+      itemIds,
+    };
+  }
+
+  /** После COMMIT: вернуть склад и soft-cancel, чтобы underpay не остался в пуле. */
+  private static async failWebsiteLikeCreateAfterBadReprice(
+    orderId: number,
+    userId: number | undefined,
+    detail: string,
+  ): Promise<never> {
+    await AutoMaterialDeductionService.cancelDeduction(orderId, userId);
+    try {
+      await OrderService.softCancelOrder(
+        orderId,
+        userId,
+        'server reprice failed after website/mini_app create',
+      );
+    } catch (cancelErr) {
+      logger.warn('[createOrderWithAutoDeduction] soft-cancel after reprice failure failed', {
+        orderId,
+        error: (cancelErr as Error).message,
+      });
+    }
+    const err = new Error(`Не удалось пересчитать цены заказа: ${detail}`);
+    (err as { code?: string; status?: number }).code = 'ORDER_REPRICE_FAILED';
+    (err as { code?: string; status?: number }).status = 400;
+    throw err;
   }
 
   /**

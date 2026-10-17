@@ -318,6 +318,14 @@ export class OrderController {
         })
         return
       }
+      if (error?.code === 'ORDER_REPRICE_FAILED') {
+        res.status(400).json({
+          error: error?.message || 'Не удалось пересчитать цены заказа',
+          message: 'Order reprice failed',
+          code: 'ORDER_REPRICE_FAILED',
+        })
+        return
+      }
       res.status(500).json({
         error: getSafeServerErrorMessage('Ошибка создания заказа', error),
         message: 'Internal server error'
@@ -610,6 +618,14 @@ export class OrderController {
         res.status(400).json({
           error: getSafeServerErrorMessage('Ошибка editor draft', error),
           message: 'Invalid editor draft'
+        })
+        return
+      }
+      if (error?.code === 'ORDER_REPRICE_FAILED') {
+        res.status(400).json({
+          error: error?.message || 'Не удалось пересчитать цены заказа',
+          message: 'Order reprice failed',
+          code: 'ORDER_REPRICE_FAILED',
         })
         return
       }
