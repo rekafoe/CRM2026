@@ -133,9 +133,18 @@ export function resolveWarehouseFeedMeters(params: {
   };
 }
 
-function parsePositiveWidth(sheetWidth?: number | null, printableWidth?: number | null): number | null {
-  const w = Number(sheetWidth ?? printableWidth ?? 0);
-  return Number.isFinite(w) && w > 0 ? w : null;
+/**
+ * Ширина для раскладки на рулоне: printable_width ?? sheet_width.
+ * Stock sheet_width шире печатной зоны даёт лишние колонки → недосписание пог. м.
+ */
+export function resolveRollLayoutWidthMm(
+  sheetWidth?: number | null,
+  printableWidth?: number | null
+): number | null {
+  const printable = Number(printableWidth ?? 0);
+  if (Number.isFinite(printable) && printable > 0) return printable;
+  const stock = Number(sheetWidth ?? 0);
+  return Number.isFinite(stock) && stock > 0 ? stock : null;
 }
 
 /**
@@ -207,7 +216,7 @@ export async function loadFinishingRollWidthMmMap(
         [...materialIds]
       );
       for (const m of mats) {
-        const w = parsePositiveWidth(m.sheet_width, m.printable_width);
+        const w = resolveRollLayoutWidthMm(m.sheet_width, m.printable_width);
         if (w != null) widthByMaterialId.set(m.id, w);
       }
     } catch {

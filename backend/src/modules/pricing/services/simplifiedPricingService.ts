@@ -783,16 +783,28 @@ export class SimplifiedPricingService {
         : configuredPlotter;
 
     let materialSheetMm: { width: number; height: number } | null = null;
+    /** Ширина для раскладки на рулоне: printable_width ?? sheet_width (как в MaterialPrintResolver). */
+    let materialRollLayoutWidthMm: number | null = null;
     if (normalizedConfig.material_id) {
-      const matDim = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
-        `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
+      const matDim = await db.get<{
+        sheet_width: number | null;
+        sheet_height: number | null;
+        printable_width: number | null;
+      }>(
+        `SELECT sheet_width, sheet_height, printable_width FROM materials WHERE id = ?`,
         [normalizedConfig.material_id]
       );
       const mw0 = matDim?.sheet_width != null && matDim.sheet_width > 0 ? Number(matDim.sheet_width) : 0;
       const mh0 = matDim?.sheet_height != null && matDim.sheet_height > 0 ? Number(matDim.sheet_height) : 0;
+      const printableW =
+        matDim?.printable_width != null && Number(matDim.printable_width) > 0
+          ? Number(matDim.printable_width)
+          : 0;
       if (mw0 > 0) {
         materialSheetMm = { width: mw0, height: mh0 > 0 ? mh0 : 0 };
       }
+      const rollLayoutW = printableW > 0 ? printableW : mw0;
+      if (rollLayoutW > 0) materialRollLayoutWidthMm = rollLayoutW;
     }
 
     // Учёт раскладки: use_layout=false → 1 изделие на лист (без оптимизации, для крупноформатных и т.п.)
@@ -1074,10 +1086,11 @@ export class SimplifiedPricingService {
     // Длина в направлении подачи: меньшая сторона (594×420 → 0.42 м, т.к. 420 мм вдоль рулона)
     const metersPerItem = isRollMeterage ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
     const metersNeeded = isRollMeterage ? metersPerItem * quantity : 0;
+    const rollLayoutWidthMm = materialRollLayoutWidthMm ?? materialSheetMm?.width ?? 0;
     const rollMaterialLayout =
-      isRollWideM2Mode && (materialSheetMm?.width ?? 0) > 0
+      isRollWideM2Mode && rollLayoutWidthMm > 0
         ? computeOptimizedRollFeedMeters({
-            rollWidthMm: materialSheetMm!.width,
+            rollWidthMm: rollLayoutWidthMm,
             trimMm: layoutTrim,
             bleedMm: resolvedBleedMm,
             quantity,
@@ -1098,9 +1111,9 @@ export class SimplifiedPricingService {
       effectivePlotterConfig?.enabled === true && effectivePlotterConfig.mode === 'roll';
     // Плоттер и плёнка тянут один и тот же прокат: поля и зазор рулона, сколько штук встаёт поперёк.
     const plotterRollRunLayout =
-      plotterRollActive && (materialSheetMm?.width ?? 0) > 0
+      plotterRollActive && rollLayoutWidthMm > 0
         ? computeOptimizedRollFeedMeters({
-            rollWidthMm: materialSheetMm!.width,
+            rollWidthMm: rollLayoutWidthMm,
             trimMm: layoutTrim,
             bleedMm: resolvedBleedMm,
             quantity,
@@ -1125,7 +1138,7 @@ export class SimplifiedPricingService {
     const isMaterialMeterBased = materialMetersNeeded > 0 && (isRollMeterage || isRollWideM2Mode);
     const rollWideMaterialWarning =
       isRollWideM2Mode && normalizedConfig.material_id && !isMaterialMeterBased
-        ? 'Для ШФП рулона не удалось посчитать списание материала в пог. м. Проверьте sheet_width у выбранного материала.'
+        ? 'Для ШФП рулона не удалось посчитать списание материала в пог. м. Проверьте sheet_width/printable_width у выбранного материала.'
         : null;
     const totalM2Needed = isRollWideM2Mode
       ? (Math.max(0, Number(layoutTrim.width)) * Math.max(0, Number(layoutTrim.height)) / 1_000_000) * quantity
@@ -1135,7 +1148,7 @@ export class SimplifiedPricingService {
     if (isRollWideM2Mode && rollMaterialLayout) {
       logger.info('Расход материала ШФП рулон (пог. м)', {
         material_id: normalizedConfig.material_id,
-        rollWidthMm: materialSheetMm?.width,
+        rollWidthMm: materialRollLayoutWidthMm ?? materialSheetMm?.width,
         orientation: rollMaterialLayout.orientation,
         cols: rollMaterialLayout.cols,
         rowsFeed: rollMaterialLayout.rowsFeed,
@@ -1691,7 +1704,7 @@ export class SimplifiedPricingService {
     // У синтетической услуги резки своего рулона нет — без этого fallback берёт длинную сторону × тираж.
     const plotterRollFeedMetersFor = (q: number): number | null =>
       productPlotterRollFeedMeters({
-        rollWidthMm: materialSheetMm?.width,
+        rollWidthMm: materialRollLayoutWidthMm ?? materialSheetMm?.width,
         trimMm: layoutTrim,
         bleedMm: resolvedBleedMm,
         quantity: q,
@@ -2489,7 +2502,12 @@ export class SimplifiedPricingService {
           effectiveConsumptionMode === 'roll_feed' || detailPriceUnit === 'per_m2';
         if (useRollFeedUnits) {
           const matInfo = materialInfoMap.get(src.material_id);
-          const rollWidthMm = Number(matInfo?.sheet_width ?? matInfo?.printable_width ?? 0);
+          // Как у материала печати: printable_width ?? sheet_width (иначе stock даёт лишние колонки).
+          const rollWidthMm = Number(
+            (matInfo?.printable_width != null && Number(matInfo.printable_width) > 0
+              ? matInfo.printable_width
+              : matInfo?.sheet_width) ?? 0
+          );
           const feed = resolveWarehouseFeedMeters({
             rollWidthMm: Number.isFinite(rollWidthMm) && rollWidthMm > 0 ? rollWidthMm : null,
             layout: {
