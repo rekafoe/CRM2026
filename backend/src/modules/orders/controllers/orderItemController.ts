@@ -17,6 +17,7 @@ import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
+import { replaceComponentReservationsInTx } from '../services/replaceComponentReservations'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -819,19 +820,41 @@ export class OrderItemController {
           rawPrev != null && Number.isFinite(Number(rawPrev)) ? Number(rawPrev) : null
       }
 
-      const newQuantity = body.quantity != null ? Math.max(1, Number(body.quantity) || 1) : existing.quantity
-      if (totalCostFromClient != null) {
-        body.price = Math.round((totalCostFromClient / newQuantity) * 100) / 100
-      }
-      const deltaQty = newQuantity - (existing.quantity ?? 1)
       const replaceParams = rawBody.replaceParams === true
       const incomingComponents = Array.isArray(rawBody.components)
         ? (rawBody.components as Array<{ materialId: number; qtyPerItem: number }>)
         : null
       const fullComponentReplace = replaceParams && incomingComponents != null
 
-      await db.run('BEGIN')
+      // IMMEDIATE + re-read: concurrent replaceParams must not cancel the same stale
+      // reservationIds and leave orphan active holds (double write-off on «Принят в работу»).
+      await db.run('BEGIN IMMEDIATE')
       try {
+        const locked = await db.get<ExistingRow & Record<string, unknown>>(
+          `SELECT id, orderId, type, params, price, quantity, ${printerIdCol}, sides, sheets, waste,
+                  ${hasExecutorColForSelect} FROM items WHERE id = ? AND orderId = ?`,
+          itemId,
+          orderId,
+        )
+        if (!locked) {
+          await db.run('ROLLBACK')
+          res.status(404).json({ message: 'Позиция не найдена' })
+          return
+        }
+        // Prefer the row under the write lock for qty/params/holds.
+        Object.assign(existing, locked)
+        if (hasExecutorUserIdEarly) {
+          const rawPrev = (existing as any).executor_user_id
+          previousExecutorUserId =
+            rawPrev != null && Number.isFinite(Number(rawPrev)) ? Number(rawPrev) : null
+        }
+
+        const newQuantity = body.quantity != null ? Math.max(1, Number(body.quantity) || 1) : existing.quantity
+        if (totalCostFromClient != null) {
+          body.price = Math.round((totalCostFromClient / newQuantity) * 100) / 100
+        }
+        const deltaQty = newQuantity - (existing.quantity ?? 1)
+
         if (deltaQty !== 0 && !fullComponentReplace) {
           const paramsObj = JSON.parse(existing.params || '{}') as { description?: string; components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> }
           const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
@@ -979,17 +1002,15 @@ export class OrderItemController {
           let reservedComponents: unknown = incomingComponents ?? undefined
           let replacementShortages: MaterialShortageItem[] | null = null
           if (fullComponentReplace && incomingComponents) {
-            const oldComponents = Array.isArray(existingParams.components) ? existingParams.components : []
-            const reservationIds = oldComponents
-              .map((component) => Number((component as { reservationId?: number }).reservationId))
-              .filter((id) => Number.isFinite(id) && id > 0)
-            if (reservationIds.length > 0) {
-              await db.run(
-                `UPDATE material_reservations SET status = 'cancelled' WHERE id IN (${reservationIds.map(() => '?').join(',')})`,
-                ...reservationIds,
-              )
-            }
-            const reserved = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
+            // Uses locked existingParams (re-read under BEGIN IMMEDIATE) so a parallel
+            // replace cancels the prior request's new holds instead of orphaning them.
+            const reserved = await replaceComponentReservationsInTx(
+              db,
+              orderId,
+              existingParams.components,
+              incomingComponents,
+              newQuantity,
+            )
             reservedComponents = reserved.components
             replacementShortages = reserved.shortages
           }
