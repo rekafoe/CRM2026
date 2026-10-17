@@ -17,6 +17,13 @@ import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
+import {
+  aggregateComponentNeeds,
+  applyComponentNeedsDeltaInTransaction,
+  loadMaterialUnits,
+  orderHasWarehouseSpend,
+  readStoredDeductionComponents,
+} from '../services/autoDeductedOrderInventory'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -978,6 +985,7 @@ export class OrderItemController {
         if (replaceParams && body.params != null && typeof body.params === 'object') {
           let reservedComponents: unknown = incomingComponents ?? undefined
           let replacementShortages: MaterialShortageItem[] | null = null
+          let syncedAutoDeductionComponents = false
           if (fullComponentReplace && incomingComponents) {
             const oldComponents = Array.isArray(existingParams.components) ? existingParams.components : []
             const reservationIds = oldComponents
@@ -989,15 +997,61 @@ export class OrderItemController {
                 ...reservationIds,
               )
             }
-            const reserved = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
-            reservedComponents = reserved.components
-            replacementShortages = reserved.shortages
+            const alreadyAutoDeducted = await orderHasWarehouseSpend(db, orderId)
+            if (alreadyAutoDeducted) {
+              // Website/miniapp already wrote stock off. Do not create holds — accept would double-spend.
+              const normalizedIncoming = incomingComponents
+                .map((component) => ({
+                  materialId: Number(component.materialId),
+                  qtyPerItem: Number(component.qtyPerItem),
+                }))
+                .filter(
+                  (component) =>
+                    Number.isFinite(component.materialId) &&
+                    component.materialId > 0 &&
+                    Number.isFinite(component.qtyPerItem) &&
+                    component.qtyPerItem > 0,
+                )
+              const oldDeductionComponents = readStoredDeductionComponents(existingParams)
+              const unitIds = [
+                ...oldDeductionComponents.map((c) => c.materialId),
+                ...normalizedIncoming.map((c) => c.materialId),
+              ]
+              const units = await loadMaterialUnits(db, unitIds)
+              const oldNeeds = aggregateComponentNeeds(
+                oldDeductionComponents,
+                Number(existing.quantity) || 1,
+                units,
+              )
+              const newNeeds = aggregateComponentNeeds(normalizedIncoming, newQuantity, units)
+              await applyComponentNeedsDeltaInTransaction(db, {
+                orderId,
+                userId: (req as AuthenticatedRequest).user?.id,
+                oldNeeds,
+                newNeeds,
+              })
+              reservedComponents = normalizedIncoming
+              replacementShortages = []
+              syncedAutoDeductionComponents = true
+            } else {
+              const reserved = await reserveComponentsForOrder(db, orderId, incomingComponents, newQuantity)
+              reservedComponents = reserved.components
+              replacementShortages = reserved.shortages
+            }
           }
           paramsPatch = buildReplacedItemParams({
             existing: existingParams,
             incoming: body.params,
             components: reservedComponents,
           })
+          if (syncedAutoDeductionComponents && Array.isArray(reservedComponents)) {
+            paramsPatch._miniappComponents = (
+              reservedComponents as Array<{ materialId: number; qtyPerItem: number }>
+            ).map((component) => ({
+              materialId: Number(component.materialId),
+              qtyPerItem: Number(component.qtyPerItem),
+            }))
+          }
           if (replacementShortages) {
             if (replacementShortages.length > 0) {
               paramsPatch.materialShortage = { items: replacementShortages }
