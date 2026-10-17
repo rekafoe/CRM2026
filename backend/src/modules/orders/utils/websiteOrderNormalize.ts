@@ -8,6 +8,9 @@ const INTERNAL_PARAM_KEYS = new Set([
   'crmCalculateConfiguration',
   // editorDraftToken — контракт checkout редактора; нужен до prepareWebsiteItemsWithEditorDrafts
   'designEditorMode',
+  // Клиентский флаг CRM-калькулятора «плоттер без печати»: иначе extractPricingLineFromItem
+  // возвращает null и totalCost/storedTotalCost с сайта/miniapp не пересчитываются.
+  'plotterBareProduct',
 ]);
 
 const HIDDEN_SUMMARY_LABELS = new Set([
