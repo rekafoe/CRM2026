@@ -220,17 +220,21 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             <button type="button" className="lg-btn" onClick={onShowFiles}>
               Файлы
             </button>
-            <button type="button" className="lg-btn lg-btn--success" onClick={onShowPrepayment}>
-              Предоплата
-            </button>
-            <button
-              type="button"
-              className="lg-btn lg-btn--primary"
-              onClick={onSendPaymentLink}
-              title="Создать ссылку BePaid и отправить клиенту"
-            >
-              Ссылка на оплату
-            </button>
+            {!showCancelled && (
+              <button type="button" className="lg-btn lg-btn--success" onClick={onShowPrepayment}>
+                Предоплата
+              </button>
+            )}
+            {!showCancelled && (
+              <button
+                type="button"
+                className="lg-btn lg-btn--primary"
+                onClick={onSendPaymentLink}
+                title="Создать ссылку BePaid и отправить клиенту"
+              >
+                Ссылка на оплату
+              </button>
+            )}
             {showIssueOrder && (
               <button
                 type="button"

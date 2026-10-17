@@ -55,6 +55,30 @@ export class OrderService {
     invalidateTableSchemaCache('orders')
   }
 
+  /**
+   * Soft-cancelled orders must not accept money/warehouse/status mutations.
+   * Throws Error with code ORDER_SOFT_CANCELLED (HTTP 409 at controllers).
+   */
+  static async assertOrderNotSoftCancelled(orderId: number): Promise<void> {
+    try {
+      if (!(await hasColumn('orders', 'is_cancelled'))) return
+    } catch {
+      return
+    }
+    const db = await getDb()
+    const row = await db.get<{ is_cancelled: number }>(
+      'SELECT COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
+      [orderId],
+    )
+    if (!row) return
+    if (Number(row.is_cancelled) === 1) {
+      const err = new Error('Отменённый заказ нельзя изменять')
+      ;(err as { code?: string; status?: number }).code = 'ORDER_SOFT_CANCELLED'
+      ;(err as { code?: string; status?: number }).status = 409
+      throw err
+    }
+  }
+
   private static normalizeReasonCode(reason: string): string {
     return String(reason || '')
       .trim()
@@ -885,6 +909,24 @@ export class OrderService {
 
   static async deductMaterialsForExistingOrder(orderId: number, userId?: number) {
     const db = await getDb();
+    try {
+      if (await hasColumn('orders', 'is_cancelled')) {
+        const cancelled = await db.get<{ is_cancelled: number }>(
+          'SELECT COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
+          [orderId]
+        );
+        if (Number(cancelled?.is_cancelled) === 1) {
+          return {
+            success: false,
+            deductedMaterials: [],
+            warnings: [],
+            errors: ['Заказ отменён: списание материалов запрещено'],
+          };
+        }
+      }
+    } catch {
+      // старые схемы без is_cancelled — продолжаем как раньше
+    }
     const rows = (await db.all(
       'SELECT type, params, quantity FROM items WHERE orderId = ? ORDER BY id ASC',
       [orderId]
@@ -1622,6 +1664,8 @@ export class OrderService {
       const orderInOrders = await db.get('SELECT id FROM orders WHERE id = ?', [id])
       
       if (orderInOrders) {
+        // Soft-cancelled: block status changes (e.g. «Принят в работу» confirming new holds).
+        await this.assertOrderNotSoftCancelled(id)
         const prevRow = await db.get<{ status: number; source?: Order['source'] | null }>(
           'SELECT status, source FROM orders WHERE id = ?',
           [id]
