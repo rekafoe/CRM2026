@@ -99,6 +99,14 @@ function sanitizeWebsiteDescription(
   return text;
 }
 
+/** Деньги с сайта/Mini App: отрицательные значения не снижают итог заказа. */
+export function nonNegativeMoney(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(String(value).trim().replace(',', '.'));
+  if (!Number.isFinite(n)) return null;
+  return Math.round(Math.max(0, n) * 100) / 100;
+}
+
 export function sanitizeWebsiteItemParams(params: Record<string, unknown>): Record<string, unknown> {
   const next = { ...params };
 
@@ -106,6 +114,12 @@ export function sanitizeWebsiteItemParams(params: Record<string, unknown>): Reco
     if (INTERNAL_PARAM_KEYS.has(key)) {
       delete next[key];
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(next, 'storedTotalCost')) {
+    const money = nonNegativeMoney(next.storedTotalCost);
+    if (money == null) delete next.storedTotalCost;
+    else next.storedTotalCost = money;
   }
 
   const parameterSummary = sanitizeParameterSummary(next.parameterSummary, next);
@@ -158,25 +172,26 @@ export function normalizeWebsiteItems(
   priceType?: string;
   price_type?: string;
 }> {
-  return items.map((it: any) => ({
-    ...(Array.isArray(it?.components) && it.components.length > 0
-      ? {
-          components: it.components
-            .map((c: any) => ({
-              materialId: Math.floor(Number(c?.materialId)),
-              qtyPerItem: Number(c?.qtyPerItem),
-            }))
-            .filter((c: { materialId: number; qtyPerItem: number }) => Number.isFinite(c.materialId) && c.materialId > 0 && Number.isFinite(c.qtyPerItem)),
-        }
-      : {}),
-    type: String(it?.type ?? ''),
-    params: normalizeItemParams(it?.params),
-    price: Number(it?.price) || 0,
-    quantity: Math.max(1, parseInt(String(it?.quantity), 10) || 1),
-    ...(it?.totalCost != null && Number.isFinite(Number(it.totalCost))
-      ? { totalCost: Math.round(Number(it.totalCost) * 100) / 100 }
-      : {}),
-    ...(it?.priceType != null && { priceType: it.priceType }),
-    ...(it?.price_type != null && { price_type: it.price_type }),
-  }));
+  return items.map((it: any) => {
+    const totalCost = nonNegativeMoney(it?.totalCost);
+    return {
+      ...(Array.isArray(it?.components) && it.components.length > 0
+        ? {
+            components: it.components
+              .map((c: any) => ({
+                materialId: Math.floor(Number(c?.materialId)),
+                qtyPerItem: Number(c?.qtyPerItem),
+              }))
+              .filter((c: { materialId: number; qtyPerItem: number }) => Number.isFinite(c.materialId) && c.materialId > 0 && Number.isFinite(c.qtyPerItem)),
+          }
+        : {}),
+      type: String(it?.type ?? ''),
+      params: normalizeItemParams(it?.params),
+      price: nonNegativeMoney(it?.price) ?? 0,
+      quantity: Math.max(1, parseInt(String(it?.quantity), 10) || 1),
+      ...(totalCost != null ? { totalCost } : {}),
+      ...(it?.priceType != null && { priceType: it.priceType }),
+      ...(it?.price_type != null && { price_type: it.price_type }),
+    };
+  });
 }
