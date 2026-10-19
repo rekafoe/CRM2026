@@ -645,7 +645,7 @@ export class OrderItemController {
           (paramsObj as any).postprintProduct === true ||
           (paramsObj as any).plotterBareProduct === true
         if (reservationIds.length > 0) {
-          await UnifiedWarehouseService.cancelReservations(reservationIds)
+          await UnifiedWarehouseService.cancelReservations(reservationIds, { orderId })
         } else if (!skipPresetLookup && (paramsObj as any).description) {
           // Старые записи без резервов — выполняем возврат на склад по составу из product_materials
           const composition = (await db.all<{
@@ -872,7 +872,7 @@ export class OrderItemController {
                 if (c.reservationId) toCancel.push(c.reservationId)
               }
               if (toCancel.length > 0) {
-                await UnifiedWarehouseService.cancelReservations(toCancel)
+                await UnifiedWarehouseService.cancelReservations(toCancel, { orderId })
               }
             }
           } else if (
@@ -985,7 +985,8 @@ export class OrderItemController {
               .filter((id) => Number.isFinite(id) && id > 0)
             if (reservationIds.length > 0) {
               await db.run(
-                `UPDATE material_reservations SET status = 'cancelled' WHERE id IN (${reservationIds.map(() => '?').join(',')})`,
+                `UPDATE material_reservations SET status = 'cancelled' WHERE order_id = ? AND id IN (${reservationIds.map(() => '?').join(',')})`,
+                orderId,
                 ...reservationIds,
               )
             }
