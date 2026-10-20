@@ -324,22 +324,44 @@ export class UnifiedWarehouseService {
     }
   }
 
-  // Отмена резерва
-  static async cancelReservations(reservationIds: number[]): Promise<void> {
+  // Отмена резерва.
+  // orderId обязателен для отмен из карточки заказа: иначе клиентский/чужой
+  // reservationId в params.components мог бы снять hold другого заказа.
+  static async cancelReservations(
+    reservationIds: number[],
+    options?: { orderId?: number },
+  ): Promise<void> {
     try {
       const db = await getDb();
       
       if (reservationIds.length === 0) {
         return;
       }
+
+      const orderId = options?.orderId;
+      if (orderId != null && Number.isFinite(orderId) && orderId > 0) {
+        await db.run(
+          `
+          UPDATE material_reservations 
+          SET status = 'cancelled' 
+          WHERE order_id = ?
+            AND id IN (${reservationIds.map(() => '?').join(',')})
+        `,
+          orderId,
+          ...reservationIds,
+        );
+      } else {
+        await db.run(
+          `
+          UPDATE material_reservations 
+          SET status = 'cancelled' 
+          WHERE id IN (${reservationIds.map(() => '?').join(',')})
+        `,
+          ...reservationIds,
+        );
+      }
       
-      await db.run(`
-        UPDATE material_reservations 
-        SET status = 'cancelled' 
-        WHERE id IN (${reservationIds.map(() => '?').join(',')})
-      `, ...reservationIds);
-      
-      logger.info('Резервы отменены', { count: reservationIds.length });
+      logger.info('Резервы отменены', { count: reservationIds.length, orderId: orderId ?? null });
     } catch (error) {
       logger.error('Ошибка отмены резервов', error);
       throw error;
