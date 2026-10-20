@@ -121,8 +121,13 @@ export class AutoMaterialDeductionService {
           })
         } catch (error: any) {
           logger.error('Ошибка списания материала', error)
+          result.success = false
           result.errors.push(`Ошибка списания материала ID ${requirement.materialId}: ${error.message}`)
         }
+      }
+
+      if (result.errors.length > 0) {
+        result.success = false
       }
 
       logger.info('Автоматическое списание материалов завершено', {
@@ -209,7 +214,10 @@ export class AutoMaterialDeductionService {
   }
 
   /**
-   * Проверить доступность материалов
+   * Проверить доступность материалов с учётом активных резервов
+   * (как WarehouseTransactionService.checkAvailability / MaterialTransactionService.checkAvailability).
+   * Иначе website/miniapp auto-deduct списывает остаток, уже зарезервированный под CRM-заказ,
+   * а «Принят в работу» потом не может подтвердить холд → under-write-off.
    */
   private static async checkMaterialAvailability(
     requirements: MaterialRequirement[]
@@ -217,6 +225,7 @@ export class AutoMaterialDeductionService {
     const db = await getDb()
     const warnings: string[] = []
     const errors: string[] = []
+    const now = new Date().toISOString()
 
     for (const req of requirements) {
       try {
@@ -231,7 +240,18 @@ export class AutoMaterialDeductionService {
           continue
         }
 
-        const availableQuantity = material.quantity
+        const reservedRow = await db.get<{ reserved: number }>(
+          `SELECT COALESCE(SUM(quantity_reserved), 0) as reserved
+           FROM material_reservations
+           WHERE material_id = ?
+             AND status IN ('active', 'reserved')
+             AND (expires_at IS NULL OR expires_at > ?)`,
+          req.materialId,
+          now
+        )
+        const reservedQuantity = Number(reservedRow?.reserved || 0)
+        const onHand = Number(material.quantity)
+        const availableQuantity = onHand - reservedQuantity
         const minQuantity = material.min_quantity || 0
         const remainingAfterDeduction = availableQuantity - req.quantity
 
@@ -239,7 +259,7 @@ export class AutoMaterialDeductionService {
           errors.push(
             `Недостаточно материала "${material.name}". Доступно: ${availableQuantity}, требуется: ${req.quantity}`
           )
-        } else if (remainingAfterDeduction < minQuantity) {
+        } else if (onHand - req.quantity < minQuantity) {
           warnings.push(
             `После списания материала "${material.name}" остаток будет ниже минимального (${minQuantity})`
           )
