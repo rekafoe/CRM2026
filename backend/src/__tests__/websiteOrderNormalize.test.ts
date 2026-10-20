@@ -1,4 +1,7 @@
-import { normalizeWebsiteItems } from '../modules/orders/utils/websiteOrderNormalize'
+import {
+  normalizeWebsiteItems,
+  nonNegativeMoney,
+} from '../modules/orders/utils/websiteOrderNormalize'
 
 describe('websiteOrderNormalize', () => {
   it('preserves editorDraftToken for editor checkout', () => {
@@ -24,5 +27,22 @@ describe('websiteOrderNormalize', () => {
     expect(item.params._crmCalculationSnapshot).toBeUndefined()
     expect(item.params.layoutHumanLabel).toBeUndefined()
     expect(item.params.designEditorMode).toBeUndefined()
+  })
+
+  it('clamps negative price and totalCost so a junk line cannot underpay the order', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: 'Скидка',
+        price: -50,
+        quantity: 1,
+        totalCost: -500.55,
+        params: { storedTotalCost: -120, description: 'crafted' },
+      },
+    ])
+
+    expect(nonNegativeMoney(-500.55)).toBe(0)
+    expect(item.price).toBe(0)
+    expect(item.totalCost).toBe(0)
+    expect(item.params.storedTotalCost).toBe(0)
   })
 })

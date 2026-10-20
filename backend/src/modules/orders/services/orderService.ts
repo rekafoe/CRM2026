@@ -686,13 +686,20 @@ export class OrderService {
         }));
       }
       const qty = Math.max(1, Number(item.quantity) || 1);
-      const effectiveTotal =
+      let effectiveTotal =
         item.totalCost != null && Number.isFinite(Number(item.totalCost))
           ? Math.round(Number(item.totalCost) * 100) / 100
           : (typeof paramsObj.storedTotalCost === 'number' && Number.isFinite(paramsObj.storedTotalCost)
               ? Math.round(Number(paramsObj.storedTotalCost) * 100) / 100
               : null);
+      // Сайт/Mini App: отрицательный client totalCost/price не должен уменьшать сумму заказа.
+      if (isWebsiteLike && effectiveTotal != null && effectiveTotal < 0) {
+        effectiveTotal = 0;
+      }
       let finalPrice = effectiveTotal != null ? effectiveTotal / qty : (Number(item.price) || 0);
+      if (isWebsiteLike && finalPrice < 0) {
+        finalPrice = 0;
+      }
       const priceTypeRaw = extractRawPriceType({
         type: item.type,
         params: paramsObj,
