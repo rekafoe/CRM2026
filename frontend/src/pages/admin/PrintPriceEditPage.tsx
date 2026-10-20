@@ -716,6 +716,10 @@ export const PrintPriceEditPage: React.FC = () => {
           form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.m2_tiers : undefined,
         roll_m2_tiers:
           form.counter_unit === 'm2' && form.m2_pricing_kind === 'roll_wide' ? normalizedRollM2Tiers : undefined,
+        max_width_mm:
+          form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.max_width_mm : null,
+        max_height_mm:
+          form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.max_height_mm : null,
         price_bw_per_meter: technologySupportsBw ? form.price_bw_per_meter : null,
         price_white_per_m2:
           form.counter_unit === 'm2' && form.m2_pricing_kind === 'uv_flatbed' ? form.price_white_per_m2 : null,
@@ -951,7 +955,7 @@ export const PrintPriceEditPage: React.FC = () => {
                   ) : (
                     <div className="print-price-hint-banner mt-3">
                       Профиль ШФП рулон использует только цветную базовую ставку и диапазоны по оси total_m².
-                      Диапазоны редактируются ниже в формате, как для лазерной печати.
+                      Ширина печати берётся с карточки принтера («Макс. ширина, мм»), а не из этой формы.
                     </div>
                   )}
                 </>

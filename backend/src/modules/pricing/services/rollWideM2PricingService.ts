@@ -1,5 +1,5 @@
 import { getDb } from '../../../db'
-import { pieceAreaM2, validateTrimFitsBed } from './uvFlatbedPricingService'
+import { pieceAreaM2 } from './uvFlatbedPricingService'
 
 export interface RollWideM2TierRow {
   min_m2: number
@@ -35,6 +35,28 @@ function normalizeTechnologyCode(technologyCode: string): string {
 
 function normalizeColorMode(raw: string | undefined): 'color' | 'bw' {
   return String(raw || '').trim().toLowerCase() === 'bw' ? 'bw' : 'color'
+}
+
+/** Короткую сторону можно положить поперёк рулона. Длину подачи стол УФ не ограничивает. */
+export function trimFitsRollPrintWidth(widthMm: number, heightMm: number, maxPrintWidthMm: number): boolean {
+  if (!Number.isFinite(widthMm) || !Number.isFinite(heightMm) || widthMm <= 0 || heightMm <= 0) return false
+  if (!Number.isFinite(maxPrintWidthMm) || maxPrintWidthMm <= 0) return false
+  return Math.min(widthMm, heightMm) <= maxPrintWidthMm
+}
+
+async function loadActivePrinterMaxPrintWidthMm(technologyCode: string): Promise<number | null> {
+  const db = await getDb()
+  const row = await db.get<{ max_width_mm: number | null }>(
+    `SELECT MAX(max_width_mm) AS max_width_mm
+     FROM printers
+     WHERE is_active = 1
+       AND LOWER(technology_code) = LOWER(?)
+       AND max_width_mm IS NOT NULL
+       AND max_width_mm > 0`,
+    [technologyCode],
+  )
+  const width = Number(row?.max_width_mm)
+  return Number.isFinite(width) && width > 0 ? width : null
 }
 
 export function lookupRollWideM2Tier(
@@ -185,13 +207,17 @@ export class RollWideM2PricingService {
       tiers = []
     }
 
+    const isRollWide = row.m2_pricing_kind === 'roll_wide'
+    // У рулона ширина — с карточки принтера. 600×900 в print_prices это стол УФ, к сольвенту не относится.
+    const printerWidthMm = isRollWide ? await loadActivePrinterMaxPrintWidthMm(code) : null
+
     return {
       printPriceId: row.id,
       technologyCode: String(row.technology_code || code),
       price_color_per_m2: row.price_color_per_m2,
       min_charge: row.min_charge ?? 0,
-      max_width_mm: row.max_width_mm ?? 1600,
-      max_height_mm: row.max_height_mm ?? 50000,
+      max_width_mm: isRollWide ? (printerWidthMm ?? 0) : (row.max_width_mm ?? 1600),
+      max_height_mm: isRollWide ? 0 : (row.max_height_mm ?? 50000),
       supports_bw: row.supports_bw == null ? true : Number(row.supports_bw) !== 0,
       m2PricingKind: row.m2_pricing_kind ?? null,
       tiers: Array.isArray(tiers) ? tiers : [],
@@ -251,9 +277,18 @@ export class RollWideM2PricingService {
       throw err
     }
 
-    if (!validateTrimFitsBed(params.trimWidthMm, params.trimHeightMm, rates.max_width_mm, rates.max_height_mm)) {
+    if (!(rates.max_width_mm > 0)) {
       const err: Error & { status?: number } = new Error(
-        `Размер ${params.trimWidthMm}×${params.trimHeightMm} мм превышает ограничения оборудования ${rates.max_width_mm}×${rates.max_height_mm} мм.`,
+        `Для технологии «${rates.technologyCode}» не задана ширина печати. ` +
+          'Укажите «Макс. ширина, мм» у активного принтера с этой технологией.',
+      )
+      err.status = 422
+      throw err
+    }
+
+    if (!trimFitsRollPrintWidth(params.trimWidthMm, params.trimHeightMm, rates.max_width_mm)) {
+      const err: Error & { status?: number } = new Error(
+        `Размер ${params.trimWidthMm}×${params.trimHeightMm} мм не помещается в ширину печати ${rates.max_width_mm} мм.`,
       )
       err.status = 400
       throw err

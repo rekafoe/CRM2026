@@ -1513,8 +1513,10 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
         ? (price_varnish_per_m2 ?? null)
         : null
     const minChargeForSave = resolvedCounterUnit === 'm2' ? (min_charge ?? 0) : 0
-    const maxWidthForSave = resolvedCounterUnit === 'm2' ? (max_width_mm ?? 600) : null
-    const maxHeightForSave = resolvedCounterUnit === 'm2' ? (max_height_mm ?? 900) : null
+    const maxWidthForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? (max_width_mm ?? 600) : null
+    const maxHeightForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? (max_height_mm ?? 900) : null
     const costPerImpressionForSave = resolvedCounterUnit === 'sheets' ? optionalNonNegative(cost_per_impression) : null
     const costBwPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_bw_per_meter) : null
     const costColorPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_color_per_meter) : null
@@ -2356,8 +2358,10 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
         ? (price_varnish_per_m2 ?? null)
         : null
     const minChargeForSave = resolvedCounterUnit === 'm2' ? (min_charge ?? 0) : 0
-    const maxWidthForSave = resolvedCounterUnit === 'm2' ? (max_width_mm ?? 600) : null
-    const maxHeightForSave = resolvedCounterUnit === 'm2' ? (max_height_mm ?? 900) : null
+    const maxWidthForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? (max_width_mm ?? 600) : null
+    const maxHeightForSave =
+      resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed' ? (max_height_mm ?? 900) : null
     const costPerImpressionForSave = resolvedCounterUnit === 'sheets' ? optionalNonNegative(cost_per_impression) : null
     const costBwPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_bw_per_meter) : null
     const costColorPerMeterForSave = resolvedCounterUnit === 'meters' ? optionalNonNegative(cost_color_per_meter) : null
