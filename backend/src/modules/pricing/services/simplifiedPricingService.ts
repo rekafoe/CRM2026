@@ -336,6 +336,23 @@ interface SimplifiedTypeConfig {
   };
 }
 
+/** Если у размера заданы заготовки, одна из них обязательна: явный выбор, дефолт шаблона или первая в списке. */
+export function resolveRequiredBaseMaterialId(
+  allowed: Array<number | string> | undefined,
+  requested: unknown,
+  preferred: unknown,
+): number | undefined {
+  const allowedIds = (allowed ?? [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  if (allowedIds.length === 0) return undefined;
+  const requestedId = Number(requested);
+  if (Number.isInteger(requestedId) && allowedIds.includes(requestedId)) return requestedId;
+  const preferredId = Number(preferred);
+  if (Number.isInteger(preferredId) && allowedIds.includes(preferredId)) return preferredId;
+  return allowedIds[0];
+}
+
 function getEffectiveAllowedMaterialIds(typeConfig: SimplifiedTypeConfig, size: SimplifiedSizeConfig): number[] {
   const common = typeConfig.common_allowed_material_ids;
   if ((size as any).use_own_materials === true) return size.allowed_material_ids ?? [];
@@ -1424,13 +1441,23 @@ export class SimplifiedPricingService {
       }
     }
 
-    // Материал-основа (заготовка): футболка, кружка — 1 шт на изделие, цена за штуку
+    // Материал-основа (заготовка): футболка, кружка — 1 шт на изделие, цена за штуку.
+    // Список заготовок у размера делает выбор обязательным: пустой запрос не обнуляет стойку.
     let baseMaterialPrice = 0;
     let selectedBaseMaterialName: string | undefined;
     let baseMaterialDetails: SimplifiedPricingResult['baseMaterialDetails'];
+    if (includeMaterialCost) {
+      const requiredBaseId = resolveRequiredBaseMaterialId(
+        selectedSize.allowed_base_material_ids,
+        normalizedConfig.base_material_id,
+        (typeConfig as { initial?: { base_material_id?: number } } | null)?.initial?.base_material_id
+          ?? (simplifiedConfig as { initial?: { base_material_id?: number } }).initial?.base_material_id,
+      );
+      if (requiredBaseId != null) normalizedConfig.base_material_id = requiredBaseId;
+    }
     if (includeMaterialCost && normalizedConfig.base_material_id) {
-      const allowedBase = selectedSize.allowed_base_material_ids ?? [];
-      const isAllowed = allowedBase.length === 0 || allowedBase.includes(normalizedConfig.base_material_id);
+      const allowedBase = (selectedSize.allowed_base_material_ids ?? []).map((id) => Number(id));
+      const isAllowed = allowedBase.length === 0 || allowedBase.includes(Number(normalizedConfig.base_material_id));
       if (!isAllowed) {
         logger.warn('Материал-основа не в списке разрешённых для размера', { base_material_id: normalizedConfig.base_material_id });
       } else {

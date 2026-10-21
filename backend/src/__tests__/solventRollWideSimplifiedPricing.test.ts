@@ -1,4 +1,4 @@
-import { SimplifiedPricingService } from '../modules/pricing/services/simplifiedPricingService'
+import { SimplifiedPricingService, resolveRequiredBaseMaterialId } from '../modules/pricing/services/simplifiedPricingService'
 import { getDb } from '../db'
 import { RollWideM2PricingService } from '../modules/pricing/services/rollWideM2PricingService'
 
@@ -130,5 +130,158 @@ describe('simplified solvent print uses roll m2, not SRA3', () => {
     expect(result.layout?.metersNeeded).toBeGreaterThan(1)
     expect(result.materialPrice).toBeCloseTo(6 * Number(result.layout?.metersNeeded), 4)
     expect(result.warnings?.join(' ') ?? '').not.toContain('печатный лист')
+    expect(result.selectedBaseMaterial).toBeUndefined()
+  })
+})
+
+describe('resolveRequiredBaseMaterialId', () => {
+  it('берёт явный выбор, затем дефолт шаблона, иначе первую заготовку', () => {
+    expect(resolveRequiredBaseMaterialId([21, 22], 22, 21)).toBe(22)
+    expect(resolveRequiredBaseMaterialId(['21', '22'], undefined, 22)).toBe(22)
+    expect(resolveRequiredBaseMaterialId([21, 22], 99, 21)).toBe(21)
+    expect(resolveRequiredBaseMaterialId([21, 22], undefined, 99)).toBe(21)
+    expect(resolveRequiredBaseMaterialId([], undefined, 21)).toBeUndefined()
+  })
+})
+
+describe('simplified pricing charges a required blank', () => {
+  const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>
+  const mockedLoadRates = RollWideM2PricingService.loadRatesByTechnology as jest.MockedFunction<
+    typeof RollWideM2PricingService.loadRatesByTechnology
+  >
+  const mockedCalculate = RollWideM2PricingService.calculate as jest.MockedFunction<
+    typeof RollWideM2PricingService.calculate
+  >
+
+  function mockDb(basePriceById: Record<number, { name: string; price: number }>) {
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return {
+            id: 7,
+            name: 'Печать мобильных стендов (Roll-up)',
+            calculator_type: 'simplified',
+            product_type: 'universal',
+          }
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return {
+            config_data: JSON.stringify({
+              simplified: {
+                include_material_cost: true,
+                use_layout: true,
+                initial: { base_material_id: 21 },
+                sizes: [
+                  {
+                    id: '85x200',
+                    label: '85x200 см',
+                    width_mm: 850,
+                    height_mm: 2000,
+                    allowed_material_ids: [11],
+                    allowed_base_material_ids: [21, 22],
+                    print_prices: [
+                      {
+                        technology_code: 'inkjet_solvent',
+                        color_mode: 'color',
+                        sides_mode: 'single',
+                        tiers: [{ min_qty: 1, unit_price: 999 }],
+                      },
+                    ],
+                    finishing: [],
+                  },
+                ],
+              },
+            }),
+          }
+        }
+        if (query.includes('sheet_width, sheet_height FROM materials')) {
+          return { sheet_width: 1100, sheet_height: null }
+        }
+        if (query.includes('SELECT name, sheet_price_single, unit FROM materials')) {
+          const id = Number(params?.[0])
+          const row = basePriceById[id]
+          return row ? { name: row.name, sheet_price_single: row.price, unit: 'шт' } : null
+        }
+        if (query.includes('sheet_price_single FROM materials')) {
+          return { sheet_price_single: 6 }
+        }
+        if (query.includes('FROM materials m')) {
+          return { name: 'Баннер матовый', density: null, paper_type_id: null }
+        }
+        if (query.includes('FROM price_types')) return null
+        return null
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any)
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockedLoadRates.mockResolvedValue({
+      printPriceId: 4,
+      technologyCode: 'inkjet_solvent',
+      price_color_per_m2: 24,
+      min_charge: 0,
+      max_width_mm: 1200,
+      max_height_mm: 0,
+      supports_bw: false,
+      m2PricingKind: 'roll_wide',
+      tiers: [],
+    })
+    mockedCalculate.mockResolvedValue({
+      printPrice: 40.8,
+      pieceAreaM2: 1.7,
+      totalM2: 1.7,
+      minChargeApplied: false,
+      ratePerM2: 24,
+      quantity: 1,
+      tier: null,
+    })
+    mockDb({
+      21: { name: 'roll up 85x200', price: 170 },
+      22: { name: 'roll up 100x200', price: 190 },
+    })
+  })
+
+  it('без base_material_id берёт заготовку по умолчанию и добавляет её в цену', async () => {
+    const result = await SimplifiedPricingService.calculatePrice(
+      7,
+      {
+        size_id: '85x200',
+        material_id: 11,
+        print_technology: 'inkjet_solvent',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        finishing: [],
+      },
+      1,
+    )
+
+    expect(result.selectedBaseMaterial).toEqual({
+      material_id: 21,
+      material_name: 'roll up 85x200',
+    })
+    expect(result.baseMaterialDetails?.priceForQuantity).toBe(170)
+    expect(result.materialPrice).toBeCloseTo(6 * Number(result.layout?.metersNeeded) + 170, 4)
+  })
+
+  it('явный выбор другой заготовки из списка размера не подменяется дефолтом', async () => {
+    const result = await SimplifiedPricingService.calculatePrice(
+      7,
+      {
+        size_id: '85x200',
+        material_id: 11,
+        base_material_id: 22,
+        print_technology: 'inkjet_solvent',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        finishing: [],
+      },
+      1,
+    )
+
+    expect(result.selectedBaseMaterial?.material_id).toBe(22)
+    expect(result.baseMaterialDetails?.priceForQuantity).toBe(190)
   })
 })

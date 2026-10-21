@@ -610,13 +610,6 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     updateSpecs,
   ]);
 
-  const baseMaterialTouchedRef = useRef(false);
-  const baseMaterialSizeRef = useRef(sizeIdForMaterials);
-  if (baseMaterialSizeRef.current !== sizeIdForMaterials) {
-    baseMaterialSizeRef.current = sizeIdForMaterials;
-    baseMaterialTouchedRef.current = false;
-  }
-
   const preferredBaseMaterialId = useMemo(() => {
     const simplified = schema?.template?.simplified as {
       initial?: { base_material_id?: number };
@@ -628,27 +621,19 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return typeInitial ?? simplified?.initial?.base_material_id;
   }, [schema, specs.typeId]);
 
-  // Пустой селект при уже посчитанной заготовке: подставляем дефолт шаблона или единственный вариант размера.
+  // Заготовка обязательна, если она задана у размера: дефолт шаблона, иначе первая в списке.
   useEffect(() => {
     if (!isSimplifiedProduct || !sizeIdForMaterials || allowedBaseMaterialsForSize.length === 0) return;
     const allowedIds = allowedBaseMaterialsForSize
       .map((material) => Number(material.id))
       .filter((id) => Number.isFinite(id));
+    if (allowedIds.length === 0) return;
     const currentId = Number(specs.base_material_id);
     if (Number.isFinite(currentId) && allowedIds.includes(currentId)) return;
-    if (baseMaterialTouchedRef.current && (specs.base_material_id == null || specs.base_material_id === '')) return;
     const preferredId = Number(preferredBaseMaterialId);
     const nextId = Number.isFinite(preferredId) && allowedIds.includes(preferredId)
       ? preferredId
-      : allowedIds.length === 1
-        ? allowedIds[0]
-        : undefined;
-    if (nextId == null) {
-      if (specs.base_material_id != null && specs.base_material_id !== '') {
-        updateSpecs({ base_material_id: undefined }, true);
-      }
-      return;
-    }
+      : allowedIds[0];
     updateSpecs({ base_material_id: nextId }, true);
   }, [
     allowedBaseMaterialsForSize,
@@ -669,16 +654,17 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const hasBaseMaterials = allowedBaseMaterialsForSize.length > 0;
   const baseMaterialBlock = isSimplifiedProduct && sizeIdForMaterials && hasBaseMaterials ? (
     <div className="param-group param-group--narrow">
-      <label>Материал-основа (заготовка)</label>
+      <label>Материал-основа (заготовка) <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
       <select
-        value={specs.base_material_id != null && specs.base_material_id !== '' ? String(specs.base_material_id) : ''}
+        value={specs.base_material_id != null && specs.base_material_id !== '' ? String(specs.base_material_id) : String(allowedBaseMaterialsForSize[0]?.id ?? '')}
         onChange={(e) => {
-          baseMaterialTouchedRef.current = true;
-          updateSpecs({ base_material_id: e.target.value ? Number(e.target.value) : undefined }, true);
+          const nextId = Number(e.target.value);
+          if (!Number.isFinite(nextId) || nextId <= 0) return;
+          updateSpecs({ base_material_id: nextId }, true);
         }}
         className="form-control"
+        required
       >
-        <option value="">— Не выбрано —</option>
         {allowedBaseMaterialsForSize.map(m => (
           <option key={m.id} value={String(m.id)}>{m.name}</option>
         ))}
