@@ -769,6 +769,18 @@ export class SimplifiedPricingService {
       });
     }
 
+    // Сольвент в шаблоне часто остаётся листовой строкой print_prices. Если в центре цен
+    // технология — рулон м², считаем по площади и ширине рулона, а не по SRA3.
+    if (!isUvFlatbedMode && !isRollWideM2TemplateMode && normalizedConfig.print_technology) {
+      const detectedRoll = await RollWideM2PricingService.loadRatesByTechnology(
+        normalizedConfig.print_technology,
+      );
+      if (detectedRoll?.m2PricingKind === 'roll_wide') {
+        isRollWideM2TemplateMode = true;
+        rollM2TemplateConfig = { mode: 'roll_wide_m2' };
+      }
+    }
+
     const configuredPlotter = typeConfig?.plotter;
     const configuredPlotterMode = String((configuredPlotter as { mode?: string } | undefined)?.mode || '');
     const effectivePlotterConfig =
