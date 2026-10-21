@@ -656,7 +656,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     <div className="param-group param-group--narrow">
       <label>Материал-основа (заготовка) <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
       <select
-        value={specs.base_material_id != null && specs.base_material_id !== '' ? String(specs.base_material_id) : String(allowedBaseMaterialsForSize[0]?.id ?? '')}
+        value={specs.base_material_id != null ? String(specs.base_material_id) : String(allowedBaseMaterialsForSize[0]?.id ?? '')}
         onChange={(e) => {
           const nextId = Number(e.target.value);
           if (!Number.isFinite(nextId) || nextId <= 0) return;
