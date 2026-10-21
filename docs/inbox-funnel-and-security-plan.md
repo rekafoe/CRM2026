@@ -11,8 +11,8 @@
 | security-critical | Закрыть критические дыры: bcrypt пароли, IDOR файлов, разделение API-ключей, webhook secrets | pending |
 | inbox-schema | Спроектировать и создать миграции: conversations, messages, attachments, events | pending |
 | telegram-ingest | Расширить Telegram webhook: ingest сообщений/файлов в inbox вместо redirect на Mini App | pending |
-| inbox-ui | Собрать CRM UI: список диалогов, чат, ответ, назначение, подпись оператора | pending |
-| website-forms | Endpoint для заявок с сайта → conversation в inbox | pending |
+| inbox-ui | Собрать CRM UI: список диалогов, чат, ответ, назначение, подпись оператора | website: `/adminpanel/chats` |
+| website-forms | Endpoint для заявок с сайта → conversation в inbox | website live-chat: `/api/support` |
 | viber-adapter | Зарегистрировать Viber Public Account + adapter + webhook | pending |
 | instagram-adapter | Meta App + Instagram Business + Messaging API adapter (с учётом App Review) | pending |
 | client-migration | Коммуникация клиентам: перевод на новые точки входа (бот/PA/Business) | pending |

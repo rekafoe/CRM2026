@@ -54,6 +54,10 @@ function assertProductionSecurityEnv(): void {
   if (config.jwtSecret === 'change-me-in-production') {
     logger.warn('JWT_SECRET uses default value in production. Set a strong secret.')
   }
+
+  if (!String(process.env.CRM_SUPPORT_API_KEY || '').trim()) {
+    logger.warn('CRM_SUPPORT_API_KEY is not set. Website support chat returns 503.')
+  }
 }
 
 // За прокси (Railway и др.) req.protocol должен быть https

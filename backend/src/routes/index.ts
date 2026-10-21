@@ -43,6 +43,8 @@ import publicEditorRoutes from './publicEditor'
 import webhooksRoutes from './webhooks'
 import { knowledgeBaseRoutes } from '../modules/knowledge-base'
 import postalCarriersRoutes from './postalCarriers'
+import supportCustomerRoutes from './supportCustomer'
+import supportChatsRoutes from './supportChats'
 
 const router = Router()
 
@@ -88,6 +90,8 @@ router.use('/campaigns', campaignsRoutes)
 router.use('/expenses', expensesRoutes)
 router.use('/public-editor', publicEditorRoutes)
 router.use('/knowledge', knowledgeBaseRoutes)
+router.use('/support', supportCustomerRoutes)
+router.use('/chats', supportChatsRoutes)
 router.use('/products/:productId/subtype-designs', subtypeDesignsRoutes)
 
 console.log('Routes setup complete')

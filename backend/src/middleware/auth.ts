@@ -96,6 +96,11 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/notifications\/telegram\/webhook\/?$/ },
   // Mini App: обмен initData → сессия (без CRM api_token)
   { method: 'POST', path: /^\/api\/miniapp\/auth\/?$/ },
+  // Чат сайта: ключ CRM_SUPPORT_API_KEY и личность клиента проверяет сам маршрут.
+  { method: 'GET', path: /^\/api\/support\/conversations\/?$/ },
+  { method: 'POST', path: /^\/api\/support\/conversations\/?$/ },
+  { method: 'GET', path: /^\/api\/support\/conversations\/[A-Za-z0-9_-]{1,64}\/messages\/?$/ },
+  { method: 'POST', path: /^\/api\/support\/conversations\/[A-Za-z0-9_-]{1,64}\/messages\/?$/ },
 ]
 
 /**

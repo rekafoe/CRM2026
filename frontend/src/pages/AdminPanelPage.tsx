@@ -51,6 +51,9 @@ const PreflightPage = lazy(() =>
 const InboxFunnelPlanPage = lazy(() =>
   import('./admin/InboxFunnelPlanPage').then((m) => ({ default: m.InboxFunnelPlanPage }))
 );
+const ChatsPage = lazy(() =>
+  import('./admin/ChatsPage').then((m) => ({ default: m.ChatsPage }))
+);
 const ServicesManagementPage = lazy(() =>
   import('./admin/ServicesManagementPage').then((m) => ({ default: m.ServicesManagementPage }))
 );
@@ -172,6 +175,7 @@ const ADMIN_GROUPS: Array<{ id: AdminGroupId; title: string; hint: string; icon:
     hint: 'Почта и уведомления',
     icon: 'bell',
     links: [
+      { title: 'Чаты', description: 'Обращения с сайта: взять, ответить, передать.', to: '/adminpanel/chats', icon: 'bell' },
       { title: 'Уведомления', description: 'Каналы оповещений внутри CRM.', to: '/adminpanel/notifications', icon: 'bell' },
       { title: 'Почта заказов', description: 'SMTP и письма при смене статуса.', to: '/adminpanel/notifications?tab=client', icon: 'document' },
       { title: 'Рассылка', description: 'Кампании, сегменты и журнал отправки.', to: '/adminpanel/notifications?tab=campaigns', icon: 'bell-ring' },
@@ -298,6 +302,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/counters" element={<CountersServicePage />} />
           <Route path="/preflight" element={<PreflightPage />} />
           <Route path="/inbox-plan" element={<InboxFunnelPlanPage />} />
+          <Route path="/chats" element={<ChatsPage />} />
           <Route path="/design-templates" element={<DesignTemplatesPage />} />
           <Route path="/design-fonts" element={<DesignFontsPage />} />
           <Route path="/design-assets" element={<DesignAssetsPage />} />
