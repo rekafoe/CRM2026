@@ -77,6 +77,7 @@ import {
   isPlotterCuttingSyntheticServiceId,
 } from '../constants/plotterCuttingFinishingIds';
 import { sheetLayoutPrintTierQuantity } from '../utils/sheetLayoutPrintTierQuantity';
+import { sheetQuantityRecommendation } from '../utils/sheetQuantityRecommendation';
 import { smoothedSheetPrintTotal } from '../utils/smoothedSheetPrintTotal';
 import {
   MaterialPrintResolver,
@@ -237,6 +238,17 @@ export interface SimplifiedPricingResult {
     bleedMm?: number;
   };
   warnings?: string[];
+  /**
+   * Раскладка листа не обязательна. Меньше листа — цена как для одного листа.
+   * Между листами — соседние рекомендуемые тиражи, цена остаётся за введённое количество.
+   */
+  quantityRecommendation?: {
+    itemsPerSheet: number;
+    pricedQuantity: number;
+    recommendedQuantity?: number;
+    lowerQuantity?: number;
+    higherQuantity?: number;
+  };
   breakdown?: {
     coverPrice: number;
     innerBlockPrice: number;
@@ -1038,25 +1050,44 @@ export class SimplifiedPricingService {
       (customTrimActive || customTrimRequested) && trimInput
         ? `${trimInput.width}×${trimInput.height} мм`
         : selectedSize.label;
-    if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
-      const layoutHint =
-        useLayout &&
-        !usePagesMultiplier &&
-        !isOfficePrint &&
-        !isRollPrint &&
-        !isRollWideM2Mode &&
-        !plotterRollMode &&
-        !hasManualItemsPerSheet &&
-        minQtyLimit === itemsPerSheet
-          ? ` (по раскладке: ${itemsPerSheet} шт/лист)`
-          : '';
+    const sheetStepApplies =
+      itemsPerSheet > 1 &&
+      !usePagesMultiplier &&
+      !isRollPrint &&
+      !isRollWideM2Mode &&
+      !plotterRollMode &&
+      !isUvFlatbedMode &&
+      !customTrimActive &&
+      !customTrimRequested;
+    const sheetHint = sheetStepApplies ? sheetQuantityRecommendation(quantity, itemsPerSheet) : null;
+    // Минимум «1 лист» не запрещает меньший тираж: цена считается как для полного листа.
+    const billAsRecommendedSheet =
+      sheetHint?.recommendedQuantity != null && minQtyLimit === itemsPerSheet;
+    const aboveMax = maxQtyLimit !== undefined && quantity > maxQtyLimit;
+    const belowHardMin = quantity < minQtyLimit && !billAsRecommendedSheet;
+    if (quantity < 1 || aboveMax || belowHardMin) {
       const err: any = new Error(
-        maxQtyLimit !== undefined
+        aboveMax
           ? `Тираж для размера "${qtySizeLabel}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`
-          : `Тираж для размера "${qtySizeLabel}" должен быть не меньше ${minQtyLimit}${layoutHint}`
+          : `Тираж для размера "${qtySizeLabel}" должен быть не меньше ${minQtyLimit}`
       );
       err.status = 400;
       throw err;
+    }
+    if (billAsRecommendedSheet && sheetHint?.recommendedQuantity != null) {
+      const priced = await SimplifiedPricingService.calculatePrice(
+        productId,
+        configuration,
+        sheetHint.recommendedQuantity,
+      );
+      return {
+        ...priced,
+        quantityRecommendation: {
+          itemsPerSheet,
+          pricedQuantity: sheetHint.recommendedQuantity,
+          recommendedQuantity: sheetHint.recommendedQuantity,
+        },
+      };
     }
 
     const rawPagesCount = Number((configuration as any).pages);
@@ -3034,6 +3065,16 @@ export class SimplifiedPricingService {
           }
         : {}),
       ...(operationMaterials.length > 0 ? { operationMaterials } : {}),
+      ...(sheetHint?.lowerQuantity != null && sheetHint.higherQuantity != null
+        ? {
+            quantityRecommendation: {
+              itemsPerSheet,
+              pricedQuantity: quantity,
+              lowerQuantity: sheetHint.lowerQuantity,
+              higherQuantity: sheetHint.higherQuantity,
+            },
+          }
+        : {}),
       tierVolumeForGrouping: usePagesMultiplier
         ? multipageTierPrintUnits
         : (plotterRollActive || isRollWideM2Mode) && materialMetersNeeded > 0

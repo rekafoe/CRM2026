@@ -108,6 +108,27 @@ describe('SimplifiedPricingService: листовые ступени печати
       quantity,
     );
 
+  it('тираж меньше листа не отклоняется и стоит как один лист', async () => {
+    const below = await calc(20);
+    const oneSheet = await calc(54);
+    expect(below.finalPrice).toBeCloseTo(oneSheet.finalPrice, 2);
+    expect(below.quantityRecommendation).toEqual({
+      itemsPerSheet: 54,
+      pricedQuantity: 54,
+      recommendedQuantity: 54,
+    });
+  });
+
+  it('промежуточный тираж подсказывает соседние листы и не меняет цену', async () => {
+    const mid = await calc(107);
+    expect(mid.quantityRecommendation).toEqual({
+      itemsPerSheet: 54,
+      pricedQuantity: 107,
+      lowerQuantity: 54,
+      higherQuantity: 108,
+    });
+  });
+
   it('107 и 108 шт. (оба 2 листа) дают одну цену, без провала на кратной раскладке', async () => {
     const p107 = await calc(107);
     const p108 = await calc(108);
