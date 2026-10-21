@@ -30,6 +30,7 @@ import {
 } from '../../../types/websiteOrderDelivery'
 import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
 import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
+import { contactToKeep, resolveColleagueContactUserId, shouldTransferContact } from '../orderTransferContact'
 
 export class OrderService {
   private static isMeterUnit(unitRaw: unknown): boolean {
@@ -1168,7 +1169,8 @@ export class OrderService {
     payload: {
       mode: 'colleague' | 'pavilion'
       userId?: number
-      transferContact?: boolean
+      transferContact?: unknown
+      transfer_contact?: unknown
       department_id?: number
       contact_user_id?: number | null
       responsible_user_id?: number | null
@@ -1207,10 +1209,12 @@ export class OrderService {
       if (!targetUser) {
         throw new Error('Сотрудник не найден')
       }
-      const transferContact = payload.transferContact !== false
+      const transferContactFlag = payload.transferContact ?? payload.transfer_contact
+      const transferContact = shouldTransferContact(transferContactFlag)
+      const nextContact = resolveColleagueContactUserId(transferContactFlag, targetUserId, existing)
       await OrderService.updateOrderAssignees(
         id,
-        transferContact ? targetUserId : undefined,
+        nextContact,
         targetUserId,
         actorUserId,
       )
@@ -1255,7 +1259,7 @@ export class OrderService {
       await OrderService.setFulfillmentDepartmentId(id, departmentId)
 
       const nextContact =
-        payload.contact_user_id !== undefined ? payload.contact_user_id : undefined
+        payload.contact_user_id !== undefined ? payload.contact_user_id : contactToKeep(existing)
       const nextResponsible =
         payload.responsible_user_id !== undefined ? payload.responsible_user_id : null
       await OrderService.updateOrderAssignees(id, nextContact, nextResponsible, actorUserId)

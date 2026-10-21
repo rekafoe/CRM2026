@@ -33,7 +33,7 @@ export const OrderTransferModal: React.FC<OrderTransferModalProps> = ({
 }) => {
   const [mode, setMode] = useState<Mode>('colleague');
   const [colleagueUserId, setColleagueUserId] = useState<number | null>(null);
-  const [transferContact, setTransferContact] = useState(true);
+  const [transferContact, setTransferContact] = useState(false);
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [assignResponsible, setAssignResponsible] = useState(false);
   const [pavilionUserId, setPavilionUserId] = useState<number | null>(null);
@@ -61,7 +61,7 @@ export const OrderTransferModal: React.FC<OrderTransferModalProps> = ({
     if (!isOpen) return;
     setMode('colleague');
     setColleagueUserId(null);
-    setTransferContact(true);
+    setTransferContact(false);
     setDepartmentId(null);
     setAssignResponsible(false);
     setPavilionUserId(null);
@@ -158,7 +158,7 @@ export const OrderTransferModal: React.FC<OrderTransferModalProps> = ({
             </label>
             <p className="order-transfer-modal__hint">
               Точка выполнения не меняется. Ответственный и исполнители всех позиций
-              перейдут выбранному сотруднику.
+              перейдут выбранному сотруднику. Контактёр остаётся прежним, пока галочка не отмечена.
             </p>
           </div>
         ) : (
