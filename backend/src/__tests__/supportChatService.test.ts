@@ -150,6 +150,32 @@ describe('support chats', () => {
     expect(operators.operators.map((item) => item.name)).toEqual(['Иван', 'Мария'])
   })
 
+  it('counts unanswered chats for the pool and for the assignee only', async () => {
+    const free = await SupportService.createForCustomer(anna, {
+      topic: 'print_quality',
+      text: 'Полосы на наклейке',
+    })
+    const taken = await SupportService.createForCustomer(igor, {
+      topic: 'shipping',
+      text: 'Где курьер?',
+    })
+    await SupportService.claim(ivan, taken.conversation.id)
+
+    expect(await SupportService.countAttention(maria)).toEqual({ count: 1 })
+    expect(await SupportService.countAttention(ivan)).toEqual({ count: 2 })
+
+    await SupportService.addOperatorMessage(maria, free.conversation.id, 'Смотрим тираж')
+    expect(await SupportService.countAttention(maria)).toEqual({ count: 0 })
+    expect(await SupportService.countAttention(ivan)).toEqual({ count: 1 })
+
+    await SupportService.addCustomerMessage(igor, taken.conversation.id, 'Уже вечер')
+    expect(await SupportService.countAttention(ivan)).toEqual({ count: 1 })
+    expect(await SupportService.countAttention(maria)).toEqual({ count: 0 })
+
+    await SupportService.close(ivan, taken.conversation.id)
+    expect(await SupportService.countAttention(ivan)).toEqual({ count: 0 })
+  })
+
   it('accepts only the support key and a signed customer', () => {
     expect(keysMatch('support-test-key', 'support-test-key')).toBe(true)
     expect(keysMatch('website-order-key', 'support-test-key')).toBe(false)

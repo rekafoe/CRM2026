@@ -17,6 +17,7 @@ export interface OperatorConversation {
   lastMessagePreview: string;
   lastMessageAt: string;
   operatorUnread: number;
+  awaitingReply: boolean;
 }
 
 export interface OperatorMessage {
@@ -71,6 +72,7 @@ async function send<T>(url: string, body?: unknown, method: 'post' | 'patch' | '
 
 export const supportChatsApi = {
   me: () => get<CurrentStaff>('/auth/me'),
+  attention: () => get<{ count: number }>('/chats/attention'),
   list: (filter: ChatFilter) =>
     get<{ conversations: OperatorConversation[]; unassignedCount: number }>(
       `/chats/conversations?filter=${filter}`,

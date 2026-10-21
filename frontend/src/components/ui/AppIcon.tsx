@@ -12,7 +12,7 @@ export type IconName =
   | 'briefcase' | 'building'
   | 'puzzle' | 'folder'
   | 'settings' | 'wrench' | 'cog'
-  | 'bell' | 'bell-ring'
+  | 'bell' | 'bell-ring' | 'message'
   | 'search' | 'filter'
   | 'plus' | 'check' | 'x' | 'ban'
   | 'edit' | 'pencil' | 'trash' | 'copy'
@@ -163,6 +163,7 @@ const iconDefs: Record<IconName, IconDef> = {
     'M4 2C2.8 3.7 2 5.7 2 8',
     'M22 8c0-2.3-.8-4.3-2-6',
   ],
+  message: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
   search: ['M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z', 'm21 21-4.3-4.3'],
   filter: ['M22 3H2l8 9.46V19l4 2v-8.54L22 3z'],
   plus: ['M5 12h14', 'M12 5v14'],

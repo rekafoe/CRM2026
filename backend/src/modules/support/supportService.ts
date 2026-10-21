@@ -176,6 +176,7 @@ function presentOperator(row: ConversationRow, staffId: number) {
     lastMessagePreview: row.last_message_preview || '',
     lastMessageAt: row.last_message_at,
     operatorUnread: Number(row.operator_unread || 0),
+    awaitingReply: row.status !== 'closed' && row.last_direction === 'in',
   }
 }
 
@@ -530,6 +531,25 @@ export class SupportService {
         },
       }
     })
+  }
+
+  static async countAttention(staff: StaffActor) {
+    const db = await getDb()
+    const row = await db.get<{ c: number }>(
+      `SELECT COUNT(1) as c
+       FROM support_conversations c
+       WHERE c.channel = 'website'
+         AND c.status != 'closed'
+         AND (c.assigned_user_id IS NULL OR c.assigned_user_id = ?)
+         AND (
+           SELECT direction FROM support_messages
+           WHERE conversation_id = c.id
+           ORDER BY id DESC
+           LIMIT 1
+         ) = 'in'`,
+      staff.id,
+    )
+    return { count: Number(row?.c || 0) }
   }
 
   static async listOperators() {

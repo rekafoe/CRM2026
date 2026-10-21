@@ -14,10 +14,12 @@ interface TopBarProps {
   isAdmin: boolean;
   onShowPageSwitcher: () => void;
   onShowOrderPool: () => void;
+  onShowSupportChats: () => void;
   onShowCountersPage: () => void;
   onLogout: () => void;
   /** Новый заказ с сайта/TG в пуле — показываем зелёный бейдж "new" */
   hasNewPoolOrder?: boolean;
+  supportAttentionCount?: number;
   inboxUnreadCount?: number;
   inboxOpen?: boolean;
   inboxItems?: InboxNotification[];
@@ -34,9 +36,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   isAdmin,
   onShowPageSwitcher,
   onShowOrderPool,
+  onShowSupportChats,
   onShowCountersPage,
   onLogout,
   hasNewPoolOrder = false,
+  supportAttentionCount = 0,
   inboxUnreadCount = 0,
   inboxOpen = false,
   inboxItems = [],
@@ -106,6 +110,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="clipboard" size="sm" /></span>
           <span className="app-icon-btn__label">Пул заказов</span>
           {hasNewPoolOrder && <span className="pool-badge pool-badge--new">new</span>}
+        </button>
+        <button
+          onClick={onShowSupportChats}
+          title={supportAttentionCount > 0 ? `Чаты поддержки: ${supportAttentionCount} ждут ответ` : 'Чаты поддержки'}
+          aria-label={supportAttentionCount > 0 ? `Чаты поддержки, ждут ответ: ${supportAttentionCount}` : 'Чаты поддержки'}
+          className="app-icon-btn app-icon-btn--with-label app-icon-btn--support"
+        >
+          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="message" size="sm" /></span>
+          <span className="app-icon-btn__label">Чаты</span>
+          {supportAttentionCount > 0 && (
+            <span className="support-badge">{supportAttentionCount > 99 ? '99+' : supportAttentionCount}</span>
+          )}
         </button>
         <button 
           onClick={onShowCountersPage}

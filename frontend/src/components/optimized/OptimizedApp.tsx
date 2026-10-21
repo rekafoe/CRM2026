@@ -42,6 +42,7 @@ import { OrderList } from './OrderList';
 import { useOptimizedAppData, type OrdersListTab } from './hooks/useOptimizedAppData';
 import { useModalState } from './hooks/useModalState';
 import { usePoolNewBadge } from './hooks/usePoolNewBadge';
+import { useSupportAttention } from './hooks/useSupportAttention';
 import { useOrderHandlers } from './hooks/useOrderHandlers';
 import { OrderDetailSection } from './components/OrderDetailSection';
 import { useReasonPrompt } from '../common/useReasonPrompt';
@@ -123,6 +124,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const modalState = useModalState();
   const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
   const { hasNew: hasNewPoolOrder, markAsSeen: markPoolAsSeen } = usePoolNewBadge();
+  const supportAttentionCount = useSupportAttention(Boolean(currentUser?.id));
 
   // Хук для обработчиков заказов
   const orderHandlers = useOrderHandlers({
@@ -317,6 +319,9 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     markPoolAsSeen();
     navigate('/order-pool');
   }, [markPoolAsSeen, navigate]);
+  const topBarShowSupportChats = useCallback(() => {
+    navigate('/adminpanel/chats');
+  }, [navigate]);
   const topBarShowCountersPage = useCallback(() => setShowCountersPage(true), [setShowCountersPage]);
 
   // Мемоизированные вычисления
@@ -377,9 +382,11 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             isAdmin={currentUser?.role === 'admin'}
             onShowPageSwitcher={topBarShowPageSwitcher}
             onShowOrderPool={topBarShowOrderPool}
+            onShowSupportChats={topBarShowSupportChats}
             onShowCountersPage={topBarShowCountersPage}
             onLogout={handleLogout}
             hasNewPoolOrder={hasNewPoolOrder}
+            supportAttentionCount={supportAttentionCount}
             inboxUnreadCount={inbox.unreadCount}
             inboxOpen={inbox.open}
             inboxItems={inbox.items}

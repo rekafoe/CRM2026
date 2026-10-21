@@ -31,6 +31,10 @@ async function staff(req: AuthenticatedRequest): Promise<StaffActor> {
   }
 }
 
+router.get('/attention', asyncHandler(async (req: AuthenticatedRequest, res) => {
+  res.json(await SupportService.countAttention(await staff(req)))
+}))
+
 router.get('/conversations', asyncHandler(async (req: AuthenticatedRequest, res) => {
   const actor = await staff(req)
   res.json(await SupportService.listForOperator(actor, req.query.filter || 'open'))

@@ -84,6 +84,10 @@
   font: inherit;
 }
 
+.chats-row.is-waiting:not(.is-on) {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
 .chats-row.is-on {
   background: #f0fdff;
   border-color: #a5f3fc;

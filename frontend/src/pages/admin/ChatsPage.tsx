@@ -1,4 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon } from '../../components/ui/AppIcon';
 import {
@@ -55,6 +56,8 @@ function formatListTime(value: string): string {
 
 function assignment(chat: OperatorConversation): { text: string; tone: string } {
   if (chat.status === 'closed') return { text: 'Закрыт', tone: 'closed' };
+  if (chat.awaitingReply && !chat.assignedUserId) return { text: 'Ждёт ответ', tone: '' };
+  if (chat.awaitingReply && chat.mine) return { text: 'Ждёт ответ', tone: '' };
   if (!chat.assignedUserId) return { text: 'Не взят', tone: '' };
   if (chat.mine) return { text: 'Взяли вы', tone: 'mine' };
   return { text: `Взял: ${chat.assignedUserName || 'сотрудник'}`, tone: 'held' };
@@ -72,6 +75,7 @@ function scriptPreview(body: string): string {
 }
 
 export const ChatsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<ChatFilter>('open');
   const [conversations, setConversations] = useState<OperatorConversation[]>([]);
   const [unassignedCount, setUnassignedCount] = useState(0);
@@ -216,7 +220,6 @@ export const ChatsPage: React.FC = () => {
   }, [selected]);
 
   const canSend = Boolean(selected && selected.status !== 'closed' && (selected.mine || !selected.assignedUserId) && draft.trim());
-  const state = selected ? assignment(selected) : null;
 
   return (
     <AdminPageLayout
@@ -224,7 +227,7 @@ export const ChatsPage: React.FC = () => {
       title="Чаты"
       description="Связь · канал «Сайт»"
       icon={<AppIcon name="bell" size="sm" />}
-      backTo="/adminpanel"
+      onBack={() => navigate(me?.role === 'admin' ? '/adminpanel' : '/')}
       headerExtra={(
         <>
           <span className="chats-count">{unassignedCount} не взят</span>
@@ -257,7 +260,7 @@ export const ChatsPage: React.FC = () => {
               const label = assignment(chat);
               const open = chat.id === selectedId;
               return (
-                <article key={chat.id} className={`chats-row${open ? ' is-on' : ''}`}>
+                <article key={chat.id} className={`chats-row${open ? ' is-on' : ''}${chat.awaitingReply ? ' is-waiting' : ''}`}>
                   <button type="button" className="chats-who" onClick={() => choose(chat.id)}>
                     <span className={`chats-ava ${avatarTone(chat.customerName)}`}>{initials(chat.customerName)}</span>
                     <span className="chats-meta">
@@ -376,7 +379,7 @@ export const ChatsPage: React.FC = () => {
                     <span className="chats-chip">{selected.topicLabel}</span>
                   </div>
                 </div>
-                <div className="chats-owner">Ведёт<strong>{state?.text === 'Не взят' ? 'ещё никто' : selected.assignedUserName || 'вы'}</strong></div>
+                <div className="chats-owner">Ведёт<strong>{selected.assignedUserId ? (selected.assignedUserName || 'вы') : 'ещё никто'}</strong></div>
               </header>
               <div className="chats-log" ref={logRef}>
                 {messages.map((message) => (
