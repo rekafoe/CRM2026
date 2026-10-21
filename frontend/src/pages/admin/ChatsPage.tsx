@@ -1,5 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon } from '../../components/ui/AppIcon';
 import {
@@ -65,8 +65,15 @@ function assignment(chat: OperatorConversation): { text: string; tone: string } 
 
 function applyScript(body: string, chat: OperatorConversation): string {
   const name = chat.customerName || 'клиент';
-  const order = chat.orderRef || 'без номера';
-  return body.replace(/\{имя\}/g, name).replace(/\{заказ\}/g, order);
+  const phone = chat.customerPhone || 'без телефона';
+  const order = chat.orderRef || chat.crmOrderNumber || 'без номера';
+  const topic = chat.topicLabel || 'обращение';
+  return body
+    .replace(/\{имя\}/g, name)
+    .replace(/\{телефон\}/g, phone)
+    .replace(/\{номер_заказа\}/g, order)
+    .replace(/\{заказ\}/g, order)
+    .replace(/\{тема\}/g, topic);
 }
 
 function scriptPreview(body: string): string {
@@ -76,6 +83,8 @@ function scriptPreview(body: string): string {
 
 export const ChatsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedId = searchParams.get('chat');
   const [filter, setFilter] = useState<ChatFilter>('open');
   const [conversations, setConversations] = useState<OperatorConversation[]>([]);
   const [unassignedCount, setUnassignedCount] = useState(0);
@@ -123,9 +132,13 @@ export const ChatsPage: React.FC = () => {
     try {
       const data = await supportChatsApi.detail(id);
       setMessages(data.messages);
-      setConversations((current) => current.map((item) => (
-        item.id === data.conversation.id ? { ...item, ...data.conversation } : item
-      )));
+      setConversations((current) => {
+        const exists = current.some((item) => item.id === data.conversation.id);
+        if (!exists) return [data.conversation, ...current];
+        return current.map((item) => (
+          item.id === data.conversation.id ? { ...item, ...data.conversation } : item
+        ));
+      });
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось открыть чат');
@@ -140,6 +153,12 @@ export const ChatsPage: React.FC = () => {
     }).catch(() => setOperators([]));
     void supportChatsApi.scripts().then((data) => setScripts(data.scripts)).catch(() => setScripts([]));
   }, []);
+
+  useEffect(() => {
+    if (!requestedId) return;
+    setSelectedId(requestedId);
+    setMobileThread(true);
+  }, [requestedId]);
 
   useEffect(() => {
     setLoading(true);
@@ -341,7 +360,7 @@ export const ChatsPage: React.FC = () => {
           {scriptsOpen ? (
             <div className="chats-editor">
               <h2>Скрипты ответа</h2>
-              <p className="chats-note">{'{имя}'} и {'{заказ}'} подставятся в текст, когда скрипт вставляют в ответ.</p>
+              <p className="chats-note">{'{имя}'}, {'{телефон}'}, {'{номер_заказа}'} и {'{тема}'} подставятся в текст, когда скрипт вставляют в ответ.</p>
               {scripts.map((script) => (
                 <ScriptCard key={script.id} script={script} disabled={busy} onSave={saveScript} onHide={(id) => void run(async () => {
                   await supportChatsApi.hideScript(id);
@@ -360,7 +379,7 @@ export const ChatsPage: React.FC = () => {
               }}
               >
                 <input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder="Название" aria-label="Название скрипта" />
-                <textarea value={newBody} onChange={(event) => setNewBody(event.target.value)} placeholder="Текст. Можно использовать {имя} и {заказ}" aria-label="Текст скрипта" />
+                <textarea value={newBody} onChange={(event) => setNewBody(event.target.value)} placeholder="Текст. Можно использовать {имя}, {телефон}, {номер_заказа} и {тема}" aria-label="Текст скрипта" />
                 <div className="chats-script-actions">
                   <button type="submit" className="chats-btn go" disabled={busy || !newTitle.trim()}>Добавить</button>
                 </div>
@@ -376,6 +395,11 @@ export const ChatsPage: React.FC = () => {
                   <div className="chats-chips">
                     <span className="chats-chip"><span className="chats-dot" />Сайт</span>
                     {selected.orderRef && <span className="chats-chip">Заказ {selected.orderRef}</span>}
+                    {selected.crmOrderId && (
+                      <Link className="chats-chip chats-chip-link" to={`/?orderId=${selected.crmOrderId}`}>
+                        В CRM {selected.crmOrderNumber || selected.crmOrderId}
+                      </Link>
+                    )}
                     <span className="chats-chip">{selected.topicLabel}</span>
                   </div>
                 </div>

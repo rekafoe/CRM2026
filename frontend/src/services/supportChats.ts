@@ -10,6 +10,8 @@ export interface OperatorConversation {
   topic: string;
   topicLabel: string;
   orderRef: string | null;
+  crmOrderId: number | null;
+  crmOrderNumber: string | null;
   status: 'open' | 'closed';
   assignedUserId: number | null;
   assignedUserName: string | null;

@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { Database } from 'sqlite'
 import { getDb } from '../../config/database'
+import { UserInboxNotificationService } from '../../services/userInboxNotificationService'
 import { WebsiteCustomer } from './supportCustomerAuth'
 import { SupportError } from './supportErrors'
 
@@ -30,6 +31,10 @@ export interface StaffActor {
   name: string
 }
 
+export function assertOperatorRole(role: string) {
+  if (role === 'viewer') throw new SupportError(403, 'Наблюдателю чаты недоступны')
+}
+
 interface ConversationRow {
   id: number
   public_id: string
@@ -47,6 +52,8 @@ interface ConversationRow {
   last_message_at: string
   last_message_preview: string | null
   operator_unread: number
+  crm_order_id: number | null
+  crm_order_number?: string | null
   created_at: string
   updated_at: string
   closed_at: string | null
@@ -169,6 +176,8 @@ function presentOperator(row: ConversationRow, staffId: number) {
     topic: row.topic,
     topicLabel: topicLabel(row.topic),
     orderRef: row.order_ref,
+    crmOrderId: row.crm_order_id ?? null,
+    crmOrderNumber: row.crm_order_number || null,
     status: row.status === 'closed' ? 'closed' as const : 'open' as const,
     assignedUserId: row.assigned_user_id,
     assignedUserName: row.assigned_name,
@@ -195,7 +204,8 @@ const CONVERSATION_SELECT = `
   SELECT
     c.id, c.public_id, c.channel, c.website_user_id, c.customer_name, c.customer_email,
     c.customer_phone, c.topic, c.subject, c.order_ref, c.status, c.assigned_user_id,
-    c.last_message_at, c.last_message_preview, c.operator_unread, c.created_at, c.updated_at, c.closed_at,
+    c.last_message_at, c.last_message_preview, c.operator_unread, c.crm_order_id,
+    c.created_at, c.updated_at, c.closed_at,
     u.name AS assigned_name,
     m.id AS last_id, m.body AS last_body, m.direction AS last_direction,
     m.created_at AS last_created, m.operator_name AS last_operator_name
@@ -244,6 +254,119 @@ async function insertEvent(db: Database, conversationId: number, type: string, a
     payload ? JSON.stringify(payload) : null,
     nowIso(),
   )
+}
+
+function missingSchema(error: unknown): boolean {
+  const message = String((error as Error)?.message || error)
+  return message.includes('no such table') || message.includes('no such column')
+}
+
+function phoneTail(phone: string | null | undefined): string | null {
+  const digits = String(phone || '').replace(/\D/g, '')
+  if (digits.length < 6 || digits.length > 15) return null
+  return digits.length > 9 ? digits.slice(-9) : digits
+}
+
+async function findCrmOrder(
+  db: Database,
+  orderRef: string | null,
+  phone: string | null,
+): Promise<{ id: number; number: string } | null> {
+  if (orderRef) {
+    try {
+      const byNumber = await db.get<{ id: number; number: string }>(
+        'SELECT id, number FROM orders WHERE number = ? LIMIT 1',
+        orderRef,
+      )
+      if (byNumber?.id) return { id: Number(byNumber.id), number: String(byNumber.number) }
+    } catch (error) {
+      if (missingSchema(error)) return null
+      throw error
+    }
+  }
+
+  const tail = phoneTail(phone)
+  if (!tail) return null
+  const phoneSql = `replace(replace(replace(replace(replace(COALESCE(%s, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') LIKE '%' || ? || '%'`
+  try {
+    const byOrderPhone = await db.get<{ id: number; number: string }>(
+      `SELECT id, number FROM orders
+       WHERE ${phoneSql.replace('%s', 'customerPhone')}
+       ORDER BY id DESC LIMIT 1`,
+      tail,
+    )
+    if (byOrderPhone?.id) return { id: Number(byOrderPhone.id), number: String(byOrderPhone.number) }
+  } catch (error) {
+    if (missingSchema(error)) return null
+    throw error
+  }
+
+  try {
+    const byCustomer = await db.get<{ id: number; number: string }>(
+      `SELECT o.id, o.number FROM orders o
+       INNER JOIN customers cu ON cu.id = o.customer_id
+       WHERE ${phoneSql.replace('%s', 'cu.phone')}
+       ORDER BY o.id DESC LIMIT 1`,
+      tail,
+    )
+    if (byCustomer?.id) return { id: Number(byCustomer.id), number: String(byCustomer.number) }
+  } catch (error) {
+    if (missingSchema(error)) return null
+    throw error
+  }
+  return null
+}
+
+async function rememberOrder(db: Database, row: ConversationRow): Promise<ConversationRow> {
+  try {
+    if (row.crm_order_id) {
+      const saved = await db.get<{ number: string }>(
+        'SELECT number FROM orders WHERE id = ?',
+        row.crm_order_id,
+      )
+      return { ...row, crm_order_number: saved?.number ?? null }
+    }
+    const found = await findCrmOrder(db, row.order_ref, row.customer_phone)
+    if (!found) return row
+    await db.run(
+      'UPDATE support_conversations SET crm_order_id = ? WHERE id = ? AND crm_order_id IS NULL',
+      found.id,
+      row.id,
+    )
+    return { ...row, crm_order_id: found.id, crm_order_number: found.number }
+  } catch (error) {
+    if (missingSchema(error)) return row
+    throw error
+  }
+}
+
+async function notifyCustomerWrote(row: ConversationRow, text: string, opened: boolean) {
+  try {
+    const db = await getDb()
+    const table = await db.get<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'user_inbox_notifications'`,
+    )
+    if (!table) return
+    let userIds: number[] = []
+    if (row.assigned_user_id) {
+      userIds = [row.assigned_user_id]
+    } else {
+      const staff = await db.all<Array<{ id: number }>>(
+        `SELECT id FROM users
+         WHERE COALESCE(is_active, 1) = 1 AND COALESCE(role, 'user') != 'viewer'`,
+      )
+      userIds = staff.map((item) => Number(item.id))
+    }
+    await UserInboxNotificationService.createMany({
+      userIds,
+      type: opened ? 'support_opened' : 'support_customer_reply',
+      title: opened ? 'Новое обращение' : 'Клиент ответил в диалоге',
+      message: `${row.customer_name}: ${preview(text)}`,
+      payload: { path: `/adminpanel/chats?chat=${encodeURIComponent(row.public_id)}` },
+    })
+  } catch (error) {
+    if (!missingSchema(error)) throw error
+  }
 }
 
 export class SupportService {
@@ -296,7 +419,9 @@ export class SupportService {
       await insertEvent(db, conversationId, 'opened', null, { topic })
       return requireRow(db, idValue, customer.id)
     })
-    return { conversation: presentCustomer(row) }
+    const linked = await rememberOrder(await getDb(), row)
+    await notifyCustomerWrote(linked, text, true)
+    return { conversation: presentCustomer(linked) }
   }
 
   static async listMessagesForCustomer(customer: WebsiteCustomer, publicIdValue: string) {
@@ -314,7 +439,7 @@ export class SupportService {
   static async addCustomerMessage(customer: WebsiteCustomer, publicIdValue: string, textValue: unknown) {
     const text = cleanMessage(textValue)
     const createdAt = nowIso()
-    const message = await withTx(async (db) => {
+    const saved = await withTx(async (db) => {
       const row = await requireRow(db, publicIdValue, customer.id)
       const reopened = row.status === 'closed'
       await db.run(
@@ -338,15 +463,21 @@ export class SupportService {
         createdAt,
       )
       if (reopened) await insertEvent(db, row.id, 'reopened', null)
-      return presentMessage({
-        id: Number(inserted.lastID),
-        direction: 'in',
-        body: text,
-        operator_name: null,
-        created_at: createdAt,
-      }, row.public_id)
+      return {
+        publicId: row.public_id,
+        message: presentMessage({
+          id: Number(inserted.lastID),
+          direction: 'in',
+          body: text,
+          operator_name: null,
+          created_at: createdAt,
+        }, row.public_id),
+      }
     })
-    return { message }
+    const fresh = await requireRow(await getDb(), saved.publicId, customer.id)
+    const linked = await rememberOrder(await getDb(), fresh)
+    await notifyCustomerWrote(linked, text, false)
+    return { message: saved.message }
   }
 
   static async listForOperator(staff: StaffActor, filterValue: unknown) {
@@ -379,7 +510,7 @@ export class SupportService {
 
   static async getForOperator(staff: StaffActor, publicIdValue: string) {
     const db = await getDb()
-    const row = await requireRow(db, publicIdValue)
+    const row = await rememberOrder(db, await requireRow(db, publicIdValue))
     await db.run('UPDATE support_conversations SET operator_unread = 0 WHERE id = ?', row.id)
     const messages = await db.all<MessageRow[]>(
       `SELECT id, direction, body, operator_name, created_at
@@ -424,7 +555,8 @@ export class SupportService {
     if (!Number.isInteger(userId) || userId <= 0) throw new SupportError(400, 'Выберите сотрудника')
     const row = await withTx(async (db) => {
       const target = await db.get<{ id: number; name: string }>(
-        'SELECT id, name FROM users WHERE id = ? AND COALESCE(is_active, 1) = 1',
+        `SELECT id, name FROM users
+         WHERE id = ? AND COALESCE(is_active, 1) = 1 AND COALESCE(role, 'user') != 'viewer'`,
         userId,
       )
       if (!target) throw new SupportError(400, 'Сотрудник не найден')
@@ -555,7 +687,9 @@ export class SupportService {
   static async listOperators() {
     const db = await getDb()
     const rows = await db.all<Array<{ id: number; name: string }>>(
-      `SELECT id, name FROM users WHERE COALESCE(is_active, 1) = 1 ORDER BY name COLLATE NOCASE LIMIT 200`,
+      `SELECT id, name FROM users
+       WHERE COALESCE(is_active, 1) = 1 AND COALESCE(role, 'user') != 'viewer'
+       ORDER BY name COLLATE NOCASE LIMIT 200`,
     )
     return { operators: rows }
   }

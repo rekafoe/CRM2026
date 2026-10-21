@@ -197,6 +197,7 @@
   border: 1px solid #e2e8f0;
 }
 .chats-dot { width: 7px; height: 7px; border-radius: 99px; background: #0891b2; }
+a.chats-chip-link { color: #0e7490; text-decoration: none; border-color: #a5f3fc; background: #f0fdff; }
 .chats-owner { text-align: right; color: #64748b; font-size: 13px; }
 .chats-owner strong { display: block; color: #0f172a; font-size: 14px; }
 

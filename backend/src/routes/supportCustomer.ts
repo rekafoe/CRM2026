@@ -1,8 +1,9 @@
-import { Router } from 'express'
+import { Request, Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { readSupportCustomer } from '../modules/support/supportCustomerAuth'
 import { SupportError } from '../modules/support/supportErrors'
 import { SupportService } from '../modules/support/supportService'
+import { assertSupportWriteAllowed } from '../modules/support/supportWriteLimit'
 
 const router = Router()
 
@@ -20,6 +21,13 @@ function record(body: unknown): Record<string, unknown> {
   return body as Record<string, unknown>
 }
 
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for']
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded
+  const ip = typeof raw === 'string' ? raw.split(',')[0].trim() : ''
+  return ip || req.ip || 'unknown'
+}
+
 router.get('/conversations', asyncHandler(async (req, res) => {
   const customer = readSupportCustomer(req)
   res.json(await SupportService.listForCustomer(customer))
@@ -27,6 +35,7 @@ router.get('/conversations', asyncHandler(async (req, res) => {
 
 router.post('/conversations', asyncHandler(async (req, res) => {
   const customer = readSupportCustomer(req)
+  assertSupportWriteAllowed(customer.id, clientIp(req))
   const body = record(req.body)
   res.status(201).json(await SupportService.createForCustomer(customer, {
     topic: body.topic,
@@ -42,6 +51,7 @@ router.get('/conversations/:id/messages', asyncHandler(async (req, res) => {
 
 router.post('/conversations/:id/messages', asyncHandler(async (req, res) => {
   const customer = readSupportCustomer(req)
+  assertSupportWriteAllowed(customer.id, clientIp(req))
   const body = record(req.body)
   res.status(201).json(await SupportService.addCustomerMessage(
     customer,

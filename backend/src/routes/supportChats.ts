@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { asyncHandler, AuthenticatedRequest } from '../middleware'
 import { getDb } from '../config/database'
 import { SupportError } from '../modules/support/supportErrors'
-import { StaffActor, SupportService } from '../modules/support/supportService'
+import { assertOperatorRole, StaffActor, SupportService } from '../modules/support/supportService'
 
 const router = Router()
 
@@ -22,6 +22,7 @@ function record(body: unknown): Record<string, unknown> {
 
 async function staff(req: AuthenticatedRequest): Promise<StaffActor> {
   if (!req.user) throw new SupportError(401, 'Нужна авторизация')
+  assertOperatorRole(req.user.role || 'user')
   const db = await getDb()
   const row = await db.get<{ name: string }>('SELECT name FROM users WHERE id = ?', req.user.id)
   return {

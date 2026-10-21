@@ -11,7 +11,7 @@ import {
   updateOrderAssignees,
   unassignOrderByNumber,
 } from "../../api";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { isPoolOrderStatusId, isWaitingOrder } from "../../hooks/useOrderStatuses";
 import AddItemModal from "../AddItemModal";
 import { PrepaymentModal } from "../PrepaymentModal";
@@ -57,6 +57,7 @@ interface OptimizedAppProps {
 // Основной компонент приложения с оптимизацией
 export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [prepayAmount, setPrepayAmount] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<string>('orders');
@@ -98,6 +99,14 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
       .catch(() => setOrganization(null));
   }, []);
 
+  useEffect(() => {
+    const orderId = Number(searchParams.get('orderId'));
+    if (Number.isFinite(orderId) && orderId > 0) {
+      setSelectedId(orderId);
+      setCurrentPage('orders');
+    }
+  }, [searchParams]);
+
   const handleExecutorAssignedNotification = useCallback((notification: InboxNotification) => {
     loadOrders(undefined, true);
     const orderId = Number(notification.payload?.orderId);
@@ -124,7 +133,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const modalState = useModalState();
   const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
   const { hasNew: hasNewPoolOrder, markAsSeen: markPoolAsSeen } = usePoolNewBadge();
-  const supportAttentionCount = useSupportAttention(Boolean(currentUser?.id));
+  const canUseChats = Boolean(currentUser?.id) && currentUser?.role !== 'viewer';
+  const supportAttentionCount = useSupportAttention(canUseChats);
 
   // Хук для обработчиков заказов
   const orderHandlers = useOrderHandlers({
@@ -382,7 +392,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             isAdmin={currentUser?.role === 'admin'}
             onShowPageSwitcher={topBarShowPageSwitcher}
             onShowOrderPool={topBarShowOrderPool}
-            onShowSupportChats={topBarShowSupportChats}
+            onShowSupportChats={canUseChats ? topBarShowSupportChats : undefined}
             onShowCountersPage={topBarShowCountersPage}
             onLogout={handleLogout}
             hasNewPoolOrder={hasNewPoolOrder}

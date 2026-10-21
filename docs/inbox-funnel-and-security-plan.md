@@ -151,10 +151,12 @@ flowchart TB
 - Требования: Instagram Business/Creator + Facebook Page, App Review (обычно 2–4 недели)
 - Webhook: `messages`, `messaging_postbacks`
 
+**Сайт (чат личного кабинета):** уже открыт. Диалоги лежат в `support_conversations` с `channel = website`, сайт ходит в `/api/support`, операторы отвечают на `/adminpanel/chats`. Новое сообщение клиента создаёт уведомление в колокольчике. Формы ниже остаются следующим адаптером, не вторым чатом.
+
 **Сайт (формы):**
 - Новый endpoint `POST /api/inbox/website-inquiry`
 - Каждая заявка = `conversation` + первое `message`
-- Live-chat — отдельная фаза, не обязателен для MVP
+- Live-chat личного кабинета уже сделан отдельным каналом `website`, не этой формой
 
 ### Backend-модули (новые файлы)
 

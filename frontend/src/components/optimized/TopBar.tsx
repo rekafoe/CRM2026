@@ -14,7 +14,7 @@ interface TopBarProps {
   isAdmin: boolean;
   onShowPageSwitcher: () => void;
   onShowOrderPool: () => void;
-  onShowSupportChats: () => void;
+  onShowSupportChats?: () => void;
   onShowCountersPage: () => void;
   onLogout: () => void;
   /** Новый заказ с сайта/TG в пуле — показываем зелёный бейдж "new" */
@@ -111,6 +111,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="app-icon-btn__label">Пул заказов</span>
           {hasNewPoolOrder && <span className="pool-badge pool-badge--new">new</span>}
         </button>
+        {onShowSupportChats && (
         <button
           onClick={onShowSupportChats}
           title={supportAttentionCount > 0 ? `Чаты поддержки: ${supportAttentionCount} ждут ответ` : 'Чаты поддержки'}
@@ -123,6 +124,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="support-badge">{supportAttentionCount > 99 ? '99+' : supportAttentionCount}</span>
           )}
         </button>
+        )}
         <button 
           onClick={onShowCountersPage}
           title="Счётчики принтеров и кассы" 

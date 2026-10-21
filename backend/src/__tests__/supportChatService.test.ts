@@ -2,9 +2,11 @@ import { open, type Database } from 'sqlite'
 import sqlite3 from 'sqlite3'
 import { getDb } from '../config/database'
 import { up } from '../migrations/20261021180000_create_support_chats'
+import { up as linkOrders } from '../migrations/20261021200000_support_chat_order_link'
 import { keysMatch, readSupportCustomer } from '../modules/support/supportCustomerAuth'
 import { SupportError } from '../modules/support/supportErrors'
-import { SupportService } from '../modules/support/supportService'
+import { assertOperatorRole, SupportService } from '../modules/support/supportService'
+import { assertSupportWriteAllowed, resetSupportWriteLimits } from '../modules/support/supportWriteLimit'
 
 jest.mock('../config/database', () => ({
   getDb: jest.fn(),
@@ -40,6 +42,7 @@ describe('support chats', () => {
         (4, 'Архив', 'user', 0);
     `)
     await up(db)
+    await linkOrders(db)
     ;(getDb as jest.Mock).mockResolvedValue(db)
   })
 
@@ -174,6 +177,110 @@ describe('support chats', () => {
 
     await SupportService.close(ivan, taken.conversation.id)
     expect(await SupportService.countAttention(ivan)).toEqual({ count: 0 })
+  })
+
+  it('shows the operator reply to the customer and ignores extra body fields', async () => {
+    const created = await SupportService.createForCustomer(anna, {
+      topic: 'other',
+      text: 'Привет',
+      orderId: '10',
+      ...({ websiteUserId: igor.id, id: igor.id } as object),
+    })
+    const igorList = await SupportService.listForCustomer(igor)
+    expect(igorList.conversations).toHaveLength(0)
+
+    await SupportService.addOperatorMessage(maria, created.conversation.id, "UNION SELECT 'secret'")
+    const thread = await SupportService.listMessagesForCustomer(anna, created.conversation.id)
+    expect(thread.messages.map((item) => item.text)).toContain("UNION SELECT 'secret'")
+    expect(thread.messages[1]).toMatchObject({ sender: 'operator', operatorName: 'Мария' })
+
+    const listed = await SupportService.listForCustomer(anna)
+    expect(listed.conversations[0].status).toBe('waiting')
+    expect(listed.conversations[0].id).toBe(created.conversation.id)
+  })
+
+  it('links a CRM order by number or phone and notifies staff, not a viewer', async () => {
+    await db.exec(`
+      CREATE TABLE orders (
+        id INTEGER PRIMARY KEY,
+        number TEXT,
+        customerPhone TEXT,
+        customer_id INTEGER
+      );
+      CREATE TABLE customers (
+        id INTEGER PRIMARY KEY,
+        phone TEXT
+      );
+      CREATE TABLE user_inbox_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        payload TEXT,
+        actor_user_id INTEGER,
+        is_read INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT,
+        read_at TEXT
+      );
+    `)
+    await db.run(
+      `INSERT INTO orders (id, number, customerPhone) VALUES (7, 'A-7', '+375 29 111-22-33')`,
+    )
+    await db.run(
+      `INSERT INTO orders (id, number, customerPhone, customer_id) VALUES (8, '10482', '+375000000000', 1)`,
+    )
+    await db.run(`INSERT INTO customers (id, phone) VALUES (1, '+375291112233')`)
+    await db.run(
+      `INSERT INTO users (id, name, role, is_active) VALUES (5, 'Наблюдатель', 'viewer', 1)`,
+    )
+
+    const byPhone = await SupportService.createForCustomer(anna, {
+      topic: 'other',
+      text: 'Где мой заказ?',
+    })
+    const phoneChat = await SupportService.getForOperator(maria, byPhone.conversation.id)
+    expect(phoneChat.conversation.crmOrderId).toBe(7)
+    expect(phoneChat.conversation.crmOrderNumber).toBe('A-7')
+
+    const byNumber = await SupportService.createForCustomer(igor, {
+      topic: 'shipping',
+      text: 'Статус',
+      orderId: '10482',
+    })
+    const numberChat = await SupportService.getForOperator(maria, byNumber.conversation.id)
+    expect(numberChat.conversation.crmOrderId).toBe(8)
+    expect(numberChat.conversation.crmOrderNumber).toBe('10482')
+
+    const opened = await db.all<Array<{ user_id: number; title: string }>>(
+      `SELECT user_id, title FROM user_inbox_notifications WHERE title = 'Новое обращение' ORDER BY user_id`,
+    )
+    expect(opened.map((item) => item.user_id)).toEqual([2, 2, 3, 3])
+
+    await SupportService.claim(ivan, byPhone.conversation.id)
+    await SupportService.addCustomerMessage(anna, byPhone.conversation.id, 'Уже вечер')
+    const replies = await db.all<Array<{ user_id: number; title: string; payload: string }>>(
+      `SELECT user_id, title, payload FROM user_inbox_notifications WHERE title = 'Клиент ответил в диалоге'`,
+    )
+    expect(replies).toHaveLength(1)
+    expect(replies[0].user_id).toBe(ivan.id)
+    expect(JSON.parse(replies[0].payload).path).toContain(byPhone.conversation.id)
+    const viewers = await db.get<{ c: number }>(
+      `SELECT COUNT(1) as c FROM user_inbox_notifications WHERE user_id = 5`,
+    )
+    expect(Number(viewers?.c || 0)).toBe(0)
+  })
+
+  it('limits writes per customer and per address, and blocks a viewer', () => {
+    resetSupportWriteLimits()
+    for (let index = 0; index < 20; index += 1) assertSupportWriteAllowed('user-anna', '10.0.0.1')
+    expect(() => assertSupportWriteAllowed('user-anna', '10.0.0.8')).toThrow(SupportError)
+    resetSupportWriteLimits()
+    for (let index = 0; index < 60; index += 1) assertSupportWriteAllowed(`user-${index}`, '10.1.1.1')
+    expect(() => assertSupportWriteAllowed('user-fresh', '10.1.1.1')).toThrow(SupportError)
+    expect(() => assertOperatorRole('viewer')).toThrow(SupportError)
+    expect(() => assertOperatorRole('user')).not.toThrow()
+    resetSupportWriteLimits()
   })
 
   it('accepts only the support key and a signed customer', () => {
