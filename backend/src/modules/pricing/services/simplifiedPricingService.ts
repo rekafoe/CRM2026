@@ -1188,10 +1188,19 @@ export class SimplifiedPricingService {
     const materialMetersPerItem =
       quantity > 0 && materialMetersNeeded > 0 ? materialMetersNeeded / quantity : 0;
     const isMaterialMeterBased = materialMetersNeeded > 0 && (isRollMeterage || isRollWideM2Mode);
-    const rollWideMaterialWarning =
-      isRollWideM2Mode && normalizedConfig.material_id && !isMaterialMeterBased
-        ? 'Для ШФП рулона не удалось посчитать списание материала в пог. м. Проверьте sheet_width у выбранного материала.'
-        : null;
+    // После e5b5f6e6 печать принимает размер по ширине принтера, а материал — по sheet_width.
+    // Если раскладка на рулон не строится, нельзя падать в sheetsNeeded: это 1×sheet_price вместо пог. м
+    // (недосписание склада + занижение материала при заказе, который физически не влезает в рулон).
+    if (isRollWideM2Mode && normalizedConfig.material_id && !isMaterialMeterBased) {
+      const rollW = materialSheetMm?.width ?? 0;
+      const err: any = new Error(
+        rollW > 0
+          ? `Размер ${layoutTrim.width}×${layoutTrim.height} мм не помещается на рулон материала шириной ${rollW} мм. Выберите другой материал или уменьшите обрез.`
+          : 'Для ШФП рулона у материала не задана ширина (sheet_width). Укажите ширину рулона на карточке материала.',
+      );
+      err.status = 400;
+      throw err;
+    }
     const totalM2Needed = isRollWideM2Mode
       ? (Math.max(0, Number(layoutTrim.width)) * Math.max(0, Number(layoutTrim.height)) / 1_000_000) * quantity
       : 0;
@@ -1534,7 +1543,6 @@ export class SimplifiedPricingService {
     if (resolvedMaterialPrint?.warnings.length) {
       pricingWarnings.push(...resolvedMaterialPrint.warnings);
     }
-    if (rollWideMaterialWarning) pricingWarnings.push(rollWideMaterialWarning);
     let finishingPrice = 0;
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
     let serviceTiersMap: Map<string, SimplifiedQtyTier[]> = new Map();
