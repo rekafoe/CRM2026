@@ -248,3 +248,102 @@ describe('SimplifiedPricingService: плавный переход тиражно
   });
 });
 
+describe('SimplifiedPricingService: ступенчатая цена без сглаживания', () => {
+  const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>;
+  const calendarTiers = [
+    { min_qty: 1, max_qty: 1, unit_price: 27 },
+    { min_qty: 2, max_qty: 49, unit_price: 22.8 },
+    { min_qty: 50, max_qty: 99, unit_price: 13.8 },
+    { min_qty: 100, unit_price: 9 },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layoutMock(1));
+    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layoutMock(1));
+  });
+
+  const calc = (quantity: number, smoothing: boolean) => {
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return {
+            id: 1,
+            name: 'Календари квартальные',
+            calculator_type: 'simplified',
+            product_type: 'sheet_single',
+          };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return {
+            config_data: JSON.stringify({
+              simplified: {
+                include_material_cost: false,
+                use_layout: false,
+                sheet_print_smoothing: smoothing,
+                sizes: [
+                  {
+                    id: 910101,
+                    label: 'Квартальный календарь',
+                    width_mm: 210,
+                    height_mm: 297,
+                    min_qty: 1,
+                    items_per_sheet_override: 1,
+                    print_prices: [
+                      {
+                        technology_code: 'laser_prof',
+                        color_mode: 'color',
+                        sides_mode: 'single',
+                        tiers: calendarTiers,
+                      },
+                    ],
+                    material_prices: [],
+                    finishing: [],
+                  },
+                ],
+              },
+            }),
+          };
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    return SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 910101,
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+      } as any,
+      quantity,
+    );
+  };
+
+  it('держит цену ступени на 5 и 10 штуках и оставляет обрыв между 49 и 50', async () => {
+    const one = await calc(1, false);
+    const five = await calc(5, false);
+    const ten = await calc(10, false);
+    const fortyNine = await calc(49, false);
+    const fifty = await calc(50, false);
+    const hundred = await calc(100, false);
+
+    expect(one.finalPrice).toBeCloseTo(27, 2);
+    expect(five.finalPrice).toBeCloseTo(114, 2);
+    expect(ten.finalPrice).toBeCloseTo(228, 2);
+    expect(fortyNine.finalPrice).toBeCloseTo(1117.2, 2);
+    expect(fifty.finalPrice).toBeCloseTo(690, 2);
+    expect(hundred.finalPrice).toBeCloseTo(900, 2);
+    expect(fortyNine.finalPrice).toBeGreaterThan(fifty.finalPrice);
+  });
+
+  it('без флага по-прежнему интерполирует середину диапазона', async () => {
+    const ten = await calc(10, true);
+    expect(ten.finalPrice).toBeCloseTo(153, 2);
+    expect(ten.finalPrice).toBeLessThan(228);
+  });
+});
+

@@ -382,6 +382,11 @@ interface SimplifiedConfig {
   duplex_as_single_x2?: boolean;
   /** Учитывать стоимость материалов: false = materialPrice = 0 */
   include_material_cost?: boolean;
+  /**
+   * false — держать ступенчатую цену шаблона на всём диапазоне.
+   * По умолчанию итог между порогами сглаживается, чтобы меньший тираж не стоил дороже большего.
+   */
+  sheet_print_smoothing?: boolean;
   /** Произвольный trim: тарифы по якорю (pricing_size_id / custom_trim_pricing_size_id) */
   allow_custom_trim?: boolean;
   custom_trim_pricing_size_id?: number | string;
@@ -1355,7 +1360,10 @@ export class SimplifiedPricingService {
           const pricePerSheet = priceForTier * billingItemsPerSheet;
           const discreteSheetTotal = sheetsNeeded * pricePerSheet;
           const smoothedTotal =
-            !usePagesMultiplier && !isRollPrint && !isMaterialMeterBased
+            simplifiedConfig.sheet_print_smoothing !== false &&
+            !usePagesMultiplier &&
+            !isRollPrint &&
+            !isMaterialMeterBased
               ? smoothedSheetPrintTotal(sheetsNeeded, printPriceConfig.tiers, billingItemsPerSheet)
               : null;
           const basePrintPrice = usePagesMultiplier
@@ -2777,6 +2785,7 @@ export class SimplifiedPricingService {
       serviceMeterBasisMap: serviceMeterBasisMap ?? new Map(),
       variantMeterBasisMap: variantMeterBasisMap ?? new Map(),
       currentQuantity: quantity,
+      sheetPrintSmoothing: simplifiedConfig.sheet_print_smoothing !== false,
       isRollPrint,
       isRollMeterage: isMaterialMeterBased,
       metersPerItem: materialMetersPerItem,
@@ -3115,6 +3124,8 @@ export class SimplifiedPricingService {
     variantMeterBasisMap?: Map<number, 'knife_path' | 'feed'>;
     /** Текущее количество — добавляем в boundaries, чтобы «Цена» для выбранного тиража совпадала с итогом */
     currentQuantity?: number;
+    /** false — таблица тиражей повторяет ступени шаблона, без интерполяции между порогами */
+    sheetPrintSmoothing?: boolean;
     isRollPrint?: boolean;
     /** Рулонный метраж материала: roll printers / plotter roll / roll_wide_m2 */
     isRollMeterage?: boolean;
@@ -3222,7 +3233,10 @@ export class SimplifiedPricingService {
           const pricePerSheet = unitPrice * tariffItemsPerSheet;
           const discreteSheetTotal = physicalSheets * pricePerSheet;
           const smoothedTotal =
-            !ctx.usePagesMultiplier && !ctx.isRollPrint && !ctx.isRollMeterage
+            ctx.sheetPrintSmoothing !== false &&
+            !ctx.usePagesMultiplier &&
+            !ctx.isRollPrint &&
+            !ctx.isRollMeterage
               ? smoothedSheetPrintTotal(physicalSheets, ctx.printPriceConfig.tiers, tariffItemsPerSheet)
               : null;
           const basePrintPrice = ctx.usePagesMultiplier
