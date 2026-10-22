@@ -1080,12 +1080,21 @@ export class SimplifiedPricingService {
         configuration,
         sheetHint.recommendedQuantity,
       );
+      // Итог — как за полный лист, но quantity/pricePerUnit относятся к введённому тиражу:
+      // иначе клиенты (Mini App: price × qty) получают долю листа вместо цены листа.
+      const pricedQuantity = sheetHint.recommendedQuantity;
+      const pricePerUnit =
+        quantity > 0
+          ? Math.round((priced.finalPrice / quantity) * 100) / 100
+          : priced.pricePerUnit;
       return {
         ...priced,
+        quantity,
+        pricePerUnit,
         quantityRecommendation: {
           itemsPerSheet,
-          pricedQuantity: sheetHint.recommendedQuantity,
-          recommendedQuantity: sheetHint.recommendedQuantity,
+          pricedQuantity,
+          recommendedQuantity: pricedQuantity,
         },
       };
     }

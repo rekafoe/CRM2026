@@ -112,6 +112,12 @@ describe('SimplifiedPricingService: листовые ступени печати
     const below = await calc(20);
     const oneSheet = await calc(54);
     expect(below.finalPrice).toBeCloseTo(oneSheet.finalPrice, 2);
+    expect(below.quantity).toBe(20);
+    // pricePerUnit × введённый тираж ≈ цена листа (контракт Mini App / price×qty).
+    expect(below.pricePerUnit).toBe(Math.round((below.finalPrice / 20) * 100) / 100);
+    // Старый баг: pricePerUnit листа × 20 давал ~37% от цены листа.
+    expect(Math.abs(below.pricePerUnit * 20 - oneSheet.finalPrice)).toBeLessThan(0.2);
+    expect(below.pricePerUnit).toBeGreaterThan(oneSheet.pricePerUnit);
     expect(below.quantityRecommendation).toEqual({
       itemsPerSheet: 54,
       pricedQuantity: 54,
