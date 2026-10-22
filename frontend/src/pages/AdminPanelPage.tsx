@@ -175,7 +175,7 @@ const ADMIN_GROUPS: Array<{ id: AdminGroupId; title: string; hint: string; icon:
     hint: 'Почта и уведомления',
     icon: 'bell',
     links: [
-      { title: 'Чаты', description: 'Обращения с сайта: взять, ответить, передать.', to: '/adminpanel/chats', icon: 'bell' },
+      { title: 'Чаты', description: 'Обращения с сайта и личная переписка команды.', to: '/adminpanel/chats', icon: 'bell' },
       { title: 'Уведомления', description: 'Каналы оповещений внутри CRM.', to: '/adminpanel/notifications', icon: 'bell' },
       { title: 'Почта заказов', description: 'SMTP и письма при смене статуса.', to: '/adminpanel/notifications?tab=client', icon: 'document' },
       { title: 'Рассылка', description: 'Кампании, сегменты и журнал отправки.', to: '/adminpanel/notifications?tab=campaigns', icon: 'bell-ring' },

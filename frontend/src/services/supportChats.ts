@@ -9,9 +9,11 @@ export interface OperatorConversation {
   customerPhone: string | null;
   topic: string;
   topicLabel: string;
+  channel: 'website' | 'staff';
   orderRef: string | null;
   crmOrderId: number | null;
   crmOrderNumber: string | null;
+  peerUserId?: number | null;
   status: 'open' | 'closed';
   assignedUserId: number | null;
   assignedUserName: string | null;
@@ -79,6 +81,9 @@ export const supportChatsApi = {
     get<{ conversations: OperatorConversation[]; unassignedCount: number }>(
       `/chats/conversations?filter=${filter}`,
     ),
+  listStaff: () => get<{ conversations: OperatorConversation[] }>('/chats/staff'),
+  openStaff: (userId: number) =>
+    send<{ conversation: OperatorConversation }>('/chats/staff', { userId }),
   detail: (id: string) =>
     get<{ conversation: OperatorConversation; messages: OperatorMessage[] }>(
       `/chats/conversations/${encodeURIComponent(id)}`,

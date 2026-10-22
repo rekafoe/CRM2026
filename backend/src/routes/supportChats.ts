@@ -36,6 +36,15 @@ router.get('/attention', asyncHandler(async (req: AuthenticatedRequest, res) => 
   res.json(await SupportService.countAttention(await staff(req)))
 }))
 
+router.get('/staff', asyncHandler(async (req: AuthenticatedRequest, res) => {
+  res.json(await SupportService.listStaff(await staff(req)))
+}))
+
+router.post('/staff', asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const body = record(req.body)
+  res.status(201).json(await SupportService.openStaffThread(await staff(req), body.userId))
+}))
+
 router.get('/conversations', asyncHandler(async (req: AuthenticatedRequest, res) => {
   const actor = await staff(req)
   res.json(await SupportService.listForOperator(actor, req.query.filter || 'open'))

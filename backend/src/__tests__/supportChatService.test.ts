@@ -3,6 +3,7 @@ import sqlite3 from 'sqlite3'
 import { getDb } from '../config/database'
 import { up } from '../migrations/20261021180000_create_support_chats'
 import { up as linkOrders } from '../migrations/20261021200000_support_chat_order_link'
+import { up as staffThreads } from '../migrations/20261022140000_support_staff_threads'
 import { keysMatch, readSupportCustomer } from '../modules/support/supportCustomerAuth'
 import { SupportError } from '../modules/support/supportErrors'
 import { assertOperatorRole, SupportService } from '../modules/support/supportService'
@@ -43,6 +44,7 @@ describe('support chats', () => {
     `)
     await up(db)
     await linkOrders(db)
+    await staffThreads(db)
     ;(getDb as jest.Mock).mockResolvedValue(db)
   })
 
@@ -281,6 +283,57 @@ describe('support chats', () => {
     expect(() => assertOperatorRole('viewer')).toThrow(SupportError)
     expect(() => assertOperatorRole('user')).not.toThrow()
     resetSupportWriteLimits()
+  })
+
+  it('keeps a staff dialogue between two users and out of the customer channel', async () => {
+    await expect(SupportService.openStaffThread(maria, maria.id)).rejects.toMatchObject({ status: 400 })
+    await expect(SupportService.openStaffThread(maria, 4)).rejects.toMatchObject({ status: 400 })
+    await expect(SupportService.openStaffThread(maria, '2 OR 1=1')).rejects.toMatchObject({ status: 400 })
+
+    const opened = await SupportService.openStaffThread(maria, ivan.id)
+    const again = await SupportService.openStaffThread(ivan, maria.id)
+    expect(again.conversation.id).toBe(opened.conversation.id)
+    expect(opened.conversation.customerName).toBe('Иван')
+    expect(again.conversation.customerName).toBe('Мария')
+    const pairs = await db.get<{ c: number }>(
+      `SELECT COUNT(1) as c FROM support_conversations WHERE channel = 'staff'`,
+    )
+    expect(Number(pairs?.c)).toBe(1)
+
+    await SupportService.addOperatorMessage(maria, opened.conversation.id, 'Где макет?')
+    expect(await SupportService.countAttention(ivan)).toEqual({ count: 1 })
+    expect(await SupportService.countAttention(maria)).toEqual({ count: 0 })
+
+    await db.run(`INSERT INTO users (id, name, role, is_active) VALUES (5, 'Олег', 'user', 1)`)
+    const oleg = { id: 5, role: 'user', name: 'Олег' }
+    await expect(SupportService.getForOperator(oleg, opened.conversation.id)).rejects.toMatchObject({ status: 404 })
+    await expect(SupportService.addOperatorMessage(oleg, opened.conversation.id, 'Я тоже')).rejects.toMatchObject({ status: 404 })
+
+    const ivanView = await SupportService.getForOperator(ivan, opened.conversation.id)
+    expect(ivanView.messages[0]).toMatchObject({ direction: 'in', operatorName: 'Мария', text: 'Где макет?' })
+    expect(await SupportService.countAttention(ivan)).toEqual({ count: 0 })
+
+    await SupportService.addOperatorMessage(ivan, opened.conversation.id, 'Макет на почте')
+    expect(await SupportService.countAttention(maria)).toEqual({ count: 1 })
+    const mariaView = await SupportService.getForOperator(maria, opened.conversation.id)
+    expect(mariaView.messages.map((item) => item.direction)).toEqual(['out', 'in'])
+
+    await expect(SupportService.claim(maria, opened.conversation.id)).rejects.toMatchObject({ status: 409 })
+    await expect(SupportService.transfer(maria, opened.conversation.id, ivan.id)).rejects.toMatchObject({ status: 409 })
+    await expect(SupportService.release(ivan, opened.conversation.id)).rejects.toMatchObject({ status: 409 })
+    await expect(SupportService.close(ivan, opened.conversation.id)).rejects.toMatchObject({ status: 409 })
+
+    const site = await SupportService.createForCustomer(anna, { topic: 'other', text: 'Клиент пишет' })
+    const annaList = await SupportService.listForCustomer(anna)
+    expect(annaList.conversations.map((item) => item.id)).toEqual([site.conversation.id])
+    await expect(SupportService.listMessagesForCustomer(anna, opened.conversation.id)).rejects.toMatchObject({ status: 404 })
+
+    const staffList = await SupportService.listStaff(ivan)
+    expect(staffList.conversations).toHaveLength(1)
+    expect(staffList.conversations[0].customerName).toBe('Мария')
+    const siteList = await SupportService.listForOperator(maria, 'open')
+    expect(siteList.conversations.map((item) => item.id)).not.toContain(opened.conversation.id)
+    expect(siteList.conversations.map((item) => item.id)).toContain(site.conversation.id)
   })
 
   it('accepts only the support key and a signed customer', () => {

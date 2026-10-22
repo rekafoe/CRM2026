@@ -42,6 +42,47 @@
   border-right: 1px solid #e6edf5;
 }
 
+.chats-modes {
+  display: flex;
+  gap: 6px;
+  padding: 12px 12px 0;
+}
+
+.chats-mode {
+  flex: 1;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  font: 650 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.chats-mode.is-on {
+  background: #ecfeff;
+  color: #0e7490;
+  border-color: #a5f3fc;
+}
+
+.chats-compose {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 12px 0;
+}
+
+.chats-compose select {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  padding: 0 10px;
+}
+
 .chats-tabs {
   display: flex;
   gap: 16px;

@@ -55,6 +55,10 @@ function formatListTime(value: string): string {
 }
 
 function assignment(chat: OperatorConversation): { text: string; tone: string } {
+  if (chat.channel === 'staff') {
+    if (chat.operatorUnread > 0) return { text: 'Новое', tone: '' };
+    return { text: 'Личный диалог', tone: 'mine' };
+  }
   if (chat.status === 'closed') return { text: 'Закрыт', tone: 'closed' };
   if (chat.awaitingReply && !chat.assignedUserId) return { text: 'Ждёт ответ', tone: '' };
   if (chat.awaitingReply && chat.mine) return { text: 'Ждёт ответ', tone: '' };
@@ -85,7 +89,9 @@ export const ChatsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedId = searchParams.get('chat');
+  const [mode, setMode] = useState<'site' | 'team'>(searchParams.get('mode') === 'team' ? 'team' : 'site');
   const [filter, setFilter] = useState<ChatFilter>('open');
+  const [writeTo, setWriteTo] = useState<number | ''>('');
   const [conversations, setConversations] = useState<OperatorConversation[]>([]);
   const [unassignedCount, setUnassignedCount] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -108,17 +114,21 @@ export const ChatsPage: React.FC = () => {
 
   const selected = conversations.find((item) => item.id === selectedId) || null;
 
-  const loadList = useCallback(async (nextFilter: ChatFilter, silent = false) => {
+  const loadList = useCallback(async (silent = false) => {
     try {
-      const data = await supportChatsApi.list(nextFilter);
-      setConversations(data.conversations);
-      setUnassignedCount(data.unassignedCount);
+      const conversations = mode === 'team'
+        ? (await supportChatsApi.listStaff()).conversations
+        : await supportChatsApi.list(filter).then((data) => {
+          setUnassignedCount(data.unassignedCount);
+          return data.conversations;
+        });
+      setConversations(conversations);
       setError(null);
       if (!silent) {
         setSelectedId((current) => (
-          current && data.conversations.some((item) => item.id === current)
+          current && conversations.some((item) => item.id === current)
             ? current
-            : data.conversations[0]?.id || null
+            : conversations[0]?.id || null
         ));
       }
     } catch (cause) {
@@ -126,7 +136,7 @@ export const ChatsPage: React.FC = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [filter, mode]);
 
   const loadDetail = useCallback(async (id: string) => {
     try {
@@ -155,6 +165,15 @@ export const ChatsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (searchParams.get('mode') === 'team') setMode('team');
+  }, [searchParams]);
+
+  useEffect(() => {
+    const colleague = operators.find((operator) => operator.id !== me?.id);
+    setWriteTo(colleague?.id ?? '');
+  }, [me?.id, operators]);
+
+  useEffect(() => {
     if (!requestedId) return;
     setSelectedId(requestedId);
     setMobileThread(true);
@@ -162,8 +181,8 @@ export const ChatsPage: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    void loadList(filter);
-  }, [filter, loadList]);
+    void loadList();
+  }, [loadList]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -184,11 +203,11 @@ export const ChatsPage: React.FC = () => {
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
-      void loadList(filter, true);
+      void loadList(true);
       if (selectedId) void loadDetail(selectedId);
     }, 8000);
     return () => window.clearInterval(timer);
-  }, [filter, loadDetail, loadList, selectedId]);
+  }, [loadDetail, loadList, selectedId]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -232,32 +251,72 @@ export const ChatsPage: React.FC = () => {
 
   const hint = useMemo(() => {
     if (!selected) return '';
+    if (selected.channel === 'staff') return `Сообщение увидит ${selected.customerName}`;
     if (selected.status === 'closed') return 'Чат закрыт';
     if (!selected.assignedUserId) return 'Отправка заберёт чат на вас';
     if (selected.mine) return 'Сообщение уйдёт клиенту от вашего имени';
     return `Чат ведёт ${selected.assignedUserName || 'другой сотрудник'}`;
   }, [selected]);
 
-  const canSend = Boolean(selected && selected.status !== 'closed' && (selected.mine || !selected.assignedUserId) && draft.trim());
+  const canSend = selected?.channel === 'staff'
+    ? Boolean(draft.trim())
+    : Boolean(selected && selected.status !== 'closed' && (selected.mine || !selected.assignedUserId) && draft.trim());
+
+  const colleagues = operators.filter((operator) => operator.id !== me?.id);
+
+  const startStaffChat = () => {
+    if (writeTo === '' || busy) return;
+    void run(async () => {
+      const result = await supportChatsApi.openStaff(Number(writeTo));
+      setConversations((current) => [
+        result.conversation,
+        ...current.filter((item) => item.id !== result.conversation.id),
+      ]);
+      setSelectedId(result.conversation.id);
+      setMobileThread(true);
+    });
+  };
 
   return (
     <AdminPageLayout
       className="chats-page"
       title="Чаты"
-      description="Связь · канал «Сайт»"
+      description={mode === 'team' ? 'Связь · переписка команды' : 'Связь · канал «Сайт»'}
       icon={<AppIcon name="bell" size="sm" />}
       onBack={() => navigate(me?.role === 'admin' ? '/adminpanel' : '/')}
       headerExtra={(
         <>
-          <span className="chats-count">{unassignedCount} не взят</span>
-          <button type="button" className="chats-btn ghost" onClick={() => setScriptsOpen((value) => !value)}>
-            {scriptsOpen ? 'К переписке' : 'Скрипты'}
-          </button>
+          {mode === 'site' && <span className="chats-count">{unassignedCount} не взят</span>}
+          {mode === 'site' && (
+            <button type="button" className="chats-btn ghost" onClick={() => setScriptsOpen((value) => !value)}>
+              {scriptsOpen ? 'К переписке' : 'Скрипты'}
+            </button>
+          )}
         </>
       )}
     >
       <div className={`chats-shell${mobileThread ? ' is-thread' : ''}`}>
         <section className="chats-list">
+          <div className="chats-modes" role="tablist" aria-label="Канал чатов">
+            <button type="button" className={`chats-mode${mode === 'site' ? ' is-on' : ''}`} onClick={() => { setMode('site'); setScriptsOpen(false); setMobileThread(false); }}>Сайт</button>
+            <button type="button" className={`chats-mode${mode === 'team' ? ' is-on' : ''}`} onClick={() => { setMode('team'); setScriptsOpen(false); setMobileThread(false); }}>Команда</button>
+          </div>
+          {mode === 'team' ? (
+            <div className="chats-compose">
+              {colleagues.length === 0 ? (
+                <p className="chats-empty">В команде пока больше никого нет.</p>
+              ) : (
+                <>
+                  <select aria-label="Кому написать" value={writeTo} onChange={(event) => setWriteTo(Number(event.target.value))}>
+                    {colleagues.map((operator) => (
+                      <option key={operator.id} value={operator.id}>{operator.name}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="chats-btn go" disabled={busy || writeTo === ''} onClick={startStaffChat}>Написать</button>
+                </>
+              )}
+            </div>
+          ) : (
           <div className="chats-tabs" role="tablist" aria-label="Фильтр чатов">
             {FILTERS.map((item) => (
               <button
@@ -270,6 +329,7 @@ export const ChatsPage: React.FC = () => {
               </button>
             ))}
           </div>
+          )}
           <div className="chats-rows">
             {loading && <p className="chats-empty">Загрузка чатов</p>}
             {!loading && conversations.length === 0 && (
@@ -287,15 +347,15 @@ export const ChatsPage: React.FC = () => {
                         <span className="chats-name">{chat.customerName}</span>
                         <span className="chats-time">{formatListTime(chat.lastMessageAt)}</span>
                       </span>
-                      <span className="chats-sub">{chat.topicLabel}{chat.orderRef ? ` · ${chat.orderRef}` : ''}</span>
-                      <span className="chats-preview">{chat.lastMessagePreview || 'Новое обращение'}</span>
+                      <span className="chats-sub">{chat.channel === 'staff' ? 'Команда' : `${chat.topicLabel}${chat.orderRef ? ` · ${chat.orderRef}` : ''}`}</span>
+                      <span className="chats-preview">{chat.lastMessagePreview || (chat.channel === 'staff' ? 'Диалог открыт' : 'Новое обращение')}</span>
                       <span className="chats-foot">
                         <span className={`chats-state ${label.tone}`}>{label.text}</span>
                         {chat.operatorUnread > 0 && <span className="chats-badge">{chat.operatorUnread}</span>}
                       </span>
                     </span>
                   </button>
-                  {open && chat.status !== 'closed' && (
+                  {open && chat.channel !== 'staff' && chat.status !== 'closed' && (
                     <div className="chats-acts">
                       {!chat.assignedUserId && (
                         <button type="button" className="chats-btn go" disabled={busy} onClick={() => void run(async () => {
@@ -393,22 +453,26 @@ export const ChatsPage: React.FC = () => {
                 <div>
                   <h2>{selected.customerName}</h2>
                   <div className="chats-chips">
-                    <span className="chats-chip"><span className="chats-dot" />Сайт</span>
-                    {selected.orderRef && <span className="chats-chip">Заказ {selected.orderRef}</span>}
+                    <span className="chats-chip"><span className="chats-dot" />{selected.channel === 'staff' ? 'Команда' : 'Сайт'}</span>
+                    {selected.channel !== 'staff' && selected.orderRef && <span className="chats-chip">Заказ {selected.orderRef}</span>}
                     {selected.crmOrderId && (
                       <Link className="chats-chip chats-chip-link" to={`/?orderId=${selected.crmOrderId}`}>
                         В CRM {selected.crmOrderNumber || selected.crmOrderId}
                       </Link>
                     )}
-                    <span className="chats-chip">{selected.topicLabel}</span>
+                    {selected.channel !== 'staff' && <span className="chats-chip">{selected.topicLabel}</span>}
                   </div>
                 </div>
-                <div className="chats-owner">Ведёт<strong>{selected.assignedUserId ? (selected.assignedUserName || 'вы') : 'ещё никто'}</strong></div>
+                <div className="chats-owner">{selected.channel === 'staff' ? 'Пишете' : 'Ведёт'}<strong>{selected.channel === 'staff' ? selected.customerName : (selected.assignedUserId ? (selected.assignedUserName || 'вы') : 'ещё никто')}</strong></div>
               </header>
               <div className="chats-log" ref={logRef}>
                 {messages.map((message) => (
                   <article key={message.id} className={`chats-msg ${message.direction === 'out' ? 'out' : 'in'}`}>
-                    <p className="chats-who-line">{message.direction === 'out' ? (message.operatorName || 'Сотрудник') : 'Клиент'}</p>
+                    <p className="chats-who-line">{
+                      selected.channel === 'staff'
+                        ? (message.direction === 'out' ? (me?.name || 'Вы') : (message.operatorName || selected.customerName))
+                        : (message.direction === 'out' ? (message.operatorName || 'Сотрудник') : 'Клиент')
+                    }</p>
                     <div className="chats-bubble"><p>{message.text}</p></div>
                     <p className="chats-stamp">{formatStamp(message.createdAt)}</p>
                   </article>
@@ -421,7 +485,7 @@ export const ChatsPage: React.FC = () => {
                 <form className="chats-dock" onSubmit={onSend}>
                   <span className="chats-crop tl" /><span className="chats-crop tr" />
                   <span className="chats-crop bl" /><span className="chats-crop br" />
-                  <div className="chats-scripts">
+                  {selected.channel !== 'staff' && <div className="chats-scripts">
                     {scripts.map((script) => (
                       <button
                         key={script.id}
@@ -437,7 +501,7 @@ export const ChatsPage: React.FC = () => {
                         <span>{scriptPreview(script.body)}</span>
                       </button>
                     ))}
-                  </div>
+                  </div>}
                   <div className="chats-sheet">
                     {inserted && <div className="chats-inserted">Вставлено из скрипта «{inserted}»</div>}
                     <textarea
@@ -449,8 +513,8 @@ export const ChatsPage: React.FC = () => {
                           onSend();
                         }
                       }}
-                      placeholder="Напишите ответ или вставьте скрипт"
-                      aria-label="Ответ клиенту"
+                      placeholder={selected.channel === 'staff' ? 'Напишите коллеге' : 'Напишите ответ или вставьте скрипт'}
+                      aria-label={selected.channel === 'staff' ? 'Сообщение коллеге' : 'Ответ клиенту'}
                     />
                     <div className="chats-bar">
                       <div className="chats-as"><span className="chats-mini">{initials(me?.name || 'Я')}</span>{hint}</div>

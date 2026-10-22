@@ -62,6 +62,12 @@ interface ConversationRow {
   last_direction: string | null
   last_created: string | null
   last_operator_name: string | null
+  staff_low_id: number | null
+  staff_high_id: number | null
+  staff_low_unread: number | null
+  staff_high_unread: number | null
+  staff_low_name: string | null
+  staff_high_name: string | null
 }
 
 interface MessageRow {
@@ -69,6 +75,7 @@ interface MessageRow {
   direction: string
   body: string
   operator_name: string | null
+  operator_user_id?: number | null
   created_at: string
 }
 
@@ -175,6 +182,7 @@ function presentOperator(row: ConversationRow, staffId: number) {
     customerPhone: row.customer_phone,
     topic: row.topic,
     topicLabel: topicLabel(row.topic),
+    channel: 'website' as const,
     orderRef: row.order_ref,
     crmOrderId: row.crm_order_id ?? null,
     crmOrderNumber: row.crm_order_number || null,
@@ -186,6 +194,34 @@ function presentOperator(row: ConversationRow, staffId: number) {
     lastMessageAt: row.last_message_at,
     operatorUnread: Number(row.operator_unread || 0),
     awaitingReply: row.status !== 'closed' && row.last_direction === 'in',
+  }
+}
+
+function presentStaff(row: ConversationRow, staffId: number) {
+  const viewerIsLow = row.staff_low_id === staffId
+  const peerName = (viewerIsLow ? row.staff_high_name : row.staff_low_name) || 'Сотрудник'
+  const peerId = viewerIsLow ? row.staff_high_id : row.staff_low_id
+  const unread = Number((viewerIsLow ? row.staff_low_unread : row.staff_high_unread) || 0)
+  return {
+    id: row.public_id,
+    channel: 'staff' as const,
+    customerName: peerName,
+    customerEmail: null,
+    customerPhone: null,
+    topic: 'staff',
+    topicLabel: 'Команда',
+    orderRef: null,
+    crmOrderId: null,
+    crmOrderNumber: null,
+    status: 'open' as const,
+    assignedUserId: peerId,
+    assignedUserName: peerName,
+    mine: true,
+    peerUserId: peerId,
+    lastMessagePreview: row.last_message_preview || '',
+    lastMessageAt: row.last_message_at,
+    operatorUnread: unread,
+    awaitingReply: unread > 0,
   }
 }
 
@@ -205,12 +241,16 @@ const CONVERSATION_SELECT = `
     c.id, c.public_id, c.channel, c.website_user_id, c.customer_name, c.customer_email,
     c.customer_phone, c.topic, c.subject, c.order_ref, c.status, c.assigned_user_id,
     c.last_message_at, c.last_message_preview, c.operator_unread, c.crm_order_id,
+    c.staff_low_id, c.staff_high_id, c.staff_low_unread, c.staff_high_unread,
     c.created_at, c.updated_at, c.closed_at,
     u.name AS assigned_name,
+    lowu.name AS staff_low_name, highu.name AS staff_high_name,
     m.id AS last_id, m.body AS last_body, m.direction AS last_direction,
     m.created_at AS last_created, m.operator_name AS last_operator_name
   FROM support_conversations c
   LEFT JOIN users u ON u.id = c.assigned_user_id
+  LEFT JOIN users lowu ON lowu.id = c.staff_low_id
+  LEFT JOIN users highu ON highu.id = c.staff_high_id
   LEFT JOIN support_messages m ON m.id = (
     SELECT id FROM support_messages WHERE conversation_id = c.id ORDER BY id DESC LIMIT 1
   )
@@ -243,6 +283,38 @@ async function requireRow(db: Database, publicIdValue: string, websiteUserId?: s
   const row = await findRow(db, publicIdValue, websiteUserId)
   if (!row) throw new SupportError(404, 'Чат не найден')
   return row
+}
+
+function assertWebsiteChat(row: ConversationRow) {
+  if (row.channel === 'staff') throw new SupportError(409, 'Это личная переписка')
+  if (row.channel !== 'website') throw new SupportError(404, 'Чат не найден')
+}
+
+async function loadConversation(db: Database, publicIdValue: string): Promise<ConversationRow | undefined> {
+  return db.get<ConversationRow>(`${CONVERSATION_SELECT} WHERE c.public_id = ?`, publicIdValue)
+}
+
+async function requireOperatorRow(db: Database, publicIdValue: string, staff: StaffActor): Promise<ConversationRow> {
+  const row = await loadConversation(db, publicIdValue)
+  if (!row) throw new SupportError(404, 'Чат не найден')
+  if (row.channel === 'staff') {
+    if (row.staff_low_id !== staff.id && row.staff_high_id !== staff.id) {
+      throw new SupportError(404, 'Чат не найден')
+    }
+    return row
+  }
+  assertWebsiteChat(row)
+  return row
+}
+
+function cleanStaffUserId(value: unknown): number {
+  const userId = Number(value)
+  if (!Number.isInteger(userId) || userId <= 0) throw new SupportError(400, 'Выберите сотрудника')
+  return userId
+}
+
+function isUniquePair(error: unknown): boolean {
+  return String((error as Error)?.message || error).includes('UNIQUE')
 }
 
 async function insertEvent(db: Database, conversationId: number, type: string, actorId: number | null, payload?: Record<string, unknown>) {
@@ -369,6 +441,27 @@ async function notifyCustomerWrote(row: ConversationRow, text: string, opened: b
   }
 }
 
+async function notifyStaffMessage(peerId: number | null, staff: StaffActor, text: string, publicIdValue: string) {
+  if (!peerId) return
+  try {
+    const db = await getDb()
+    const table = await db.get<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'user_inbox_notifications'`,
+    )
+    if (!table) return
+    await UserInboxNotificationService.create({
+      userId: peerId,
+      type: 'support_staff',
+      title: `Сообщение от ${staff.name}`,
+      message: preview(text),
+      payload: { path: `/adminpanel/chats?chat=${encodeURIComponent(publicIdValue)}&mode=team` },
+      actorUserId: staff.id,
+    })
+  } catch (error) {
+    if (!missingSchema(error)) throw error
+  }
+}
+
 export class SupportService {
   static async listForCustomer(customer: WebsiteCustomer) {
     const db = await getDb()
@@ -480,6 +573,80 @@ export class SupportService {
     return { message: saved.message }
   }
 
+  static async listStaff(staff: StaffActor) {
+    const db = await getDb()
+    const rows = await db.all<ConversationRow[]>(
+      `${CONVERSATION_SELECT}
+       WHERE c.channel = 'staff' AND (c.staff_low_id = ? OR c.staff_high_id = ?)
+       ORDER BY c.last_message_at DESC
+       LIMIT 100`,
+      staff.id,
+      staff.id,
+    )
+    return { conversations: rows.map((row) => presentStaff(row, staff.id)) }
+  }
+
+  static async openStaffThread(staff: StaffActor, userIdValue: unknown) {
+    const userId = cleanStaffUserId(userIdValue)
+    if (userId === staff.id) throw new SupportError(400, 'Нельзя написать самому себе')
+    const db = await getDb()
+    const target = await db.get<{ id: number; name: string }>(
+      `SELECT id, name FROM users
+       WHERE id = ? AND COALESCE(is_active, 1) = 1 AND COALESCE(role, 'user') != 'viewer'`,
+      userId,
+    )
+    if (!target) throw new SupportError(400, 'Сотрудник не найден')
+    const low = Math.min(staff.id, target.id)
+    const high = Math.max(staff.id, target.id)
+    const existing = await db.get<{ public_id: string }>(
+      `SELECT public_id FROM support_conversations
+       WHERE channel = 'staff' AND staff_low_id = ? AND staff_high_id = ?`,
+      low,
+      high,
+    )
+    if (existing) {
+      const row = await loadConversation(db, existing.public_id)
+      if (!row) throw new SupportError(404, 'Чат не найден')
+      return { conversation: presentStaff(row, staff.id) }
+    }
+    const createdAt = nowIso()
+    const idValue = publicId()
+    const lowName = low === staff.id ? staff.name : target.name
+    const highName = high === staff.id ? staff.name : target.name
+    try {
+      await withTx(async (tx) => {
+        await tx.run(
+          `INSERT INTO support_conversations (
+            public_id, channel, website_user_id, customer_name, topic, subject, status,
+            staff_low_id, staff_high_id, staff_low_unread, staff_high_unread,
+            last_message_at, last_message_preview, customer_unread, operator_unread,
+            created_at, updated_at
+          ) VALUES (?, 'staff', ?, ?, 'staff', 'Личная переписка', 'open', ?, ?, 0, 0, ?, '', 0, 0, ?, ?)`,
+          idValue,
+          `staff:${low}:${high}`,
+          `${lowName} · ${highName}`,
+          low,
+          high,
+          createdAt,
+          createdAt,
+          createdAt,
+        )
+      })
+    } catch (error) {
+      if (!isUniquePair(error)) throw error
+    }
+    const row = await db.get<{ public_id: string }>(
+      `SELECT public_id FROM support_conversations
+       WHERE channel = 'staff' AND staff_low_id = ? AND staff_high_id = ?`,
+      low,
+      high,
+    )
+    if (!row) throw new SupportError(404, 'Чат не найден')
+    const loaded = await loadConversation(db, row.public_id)
+    if (!loaded) throw new SupportError(404, 'Чат не найден')
+    return { conversation: presentStaff(loaded, staff.id) }
+  }
+
   static async listForOperator(staff: StaffActor, filterValue: unknown) {
     const filter = typeof filterValue === 'string' && FILTERS.has(filterValue as ChatFilter)
       ? filterValue as ChatFilter
@@ -510,10 +677,42 @@ export class SupportService {
 
   static async getForOperator(staff: StaffActor, publicIdValue: string) {
     const db = await getDb()
-    const row = await rememberOrder(db, await requireRow(db, publicIdValue))
+    const loaded = await requireOperatorRow(db, publicIdValue, staff)
+    if (loaded.channel === 'staff') {
+      await db.run(
+        `UPDATE support_conversations
+         SET staff_low_unread = CASE WHEN staff_low_id = ? THEN 0 ELSE staff_low_unread END,
+             staff_high_unread = CASE WHEN staff_high_id = ? THEN 0 ELSE staff_high_unread END
+         WHERE id = ?`,
+        staff.id,
+        staff.id,
+        loaded.id,
+      )
+      const cleared = {
+        ...loaded,
+        staff_low_unread: loaded.staff_low_id === staff.id ? 0 : loaded.staff_low_unread,
+        staff_high_unread: loaded.staff_high_id === staff.id ? 0 : loaded.staff_high_unread,
+      }
+      const messages = await db.all<MessageRow[]>(
+        `SELECT id, direction, body, operator_name, operator_user_id, created_at
+         FROM support_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 500`,
+        loaded.id,
+      )
+      return {
+        conversation: presentStaff(cleared, staff.id),
+        messages: messages.map((message) => ({
+          id: String(message.id),
+          direction: message.operator_user_id === staff.id ? 'out' as const : 'in' as const,
+          text: message.body,
+          operatorName: message.operator_name,
+          createdAt: message.created_at,
+        })),
+      }
+    }
+    const row = await rememberOrder(db, loaded)
     await db.run('UPDATE support_conversations SET operator_unread = 0 WHERE id = ?', row.id)
     const messages = await db.all<MessageRow[]>(
-      `SELECT id, direction, body, operator_name, created_at
+      `SELECT id, direction, body, operator_name, operator_user_id, created_at
        FROM support_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 500`,
       row.id,
     )
@@ -531,7 +730,8 @@ export class SupportService {
 
   static async claim(staff: StaffActor, publicIdValue: string) {
     const row = await withTx(async (db) => {
-      const current = await requireRow(db, publicIdValue)
+      const current = await requireOperatorRow(db, publicIdValue, staff)
+      assertWebsiteChat(current)
       if (current.status === 'closed') throw new SupportError(409, 'Чат закрыт')
       if (current.assigned_user_id === staff.id) return current
       if (current.assigned_user_id != null) throw new SupportError(409, 'Чат уже ведёт другой сотрудник')
@@ -560,7 +760,8 @@ export class SupportService {
         userId,
       )
       if (!target) throw new SupportError(400, 'Сотрудник не найден')
-      const current = await requireRow(db, publicIdValue)
+      const current = await requireOperatorRow(db, publicIdValue, staff)
+      assertWebsiteChat(current)
       if (current.status === 'closed') throw new SupportError(409, 'Чат закрыт')
       if (current.assigned_user_id === target.id) return current
       await db.run(
@@ -577,7 +778,8 @@ export class SupportService {
 
   static async release(staff: StaffActor, publicIdValue: string) {
     const row = await withTx(async (db) => {
-      const current = await requireRow(db, publicIdValue)
+      const current = await requireOperatorRow(db, publicIdValue, staff)
+      assertWebsiteChat(current)
       if (current.assigned_user_id == null) return current
       if (current.assigned_user_id !== staff.id && staff.role !== 'admin') {
         throw new SupportError(403, 'Снять чат может тот, кто его ведёт')
@@ -596,7 +798,8 @@ export class SupportService {
   static async close(staff: StaffActor, publicIdValue: string) {
     const closedAt = nowIso()
     const row = await withTx(async (db) => {
-      const current = await requireRow(db, publicIdValue)
+      const current = await requireOperatorRow(db, publicIdValue, staff)
+      assertWebsiteChat(current)
       if (current.status !== 'closed') {
         await db.run(
           `UPDATE support_conversations SET status = 'closed', closed_at = ?, updated_at = ? WHERE id = ?`,
@@ -614,8 +817,47 @@ export class SupportService {
   static async addOperatorMessage(staff: StaffActor, publicIdValue: string, textValue: unknown) {
     const text = cleanMessage(textValue)
     const createdAt = nowIso()
-    return withTx(async (db) => {
-      const current = await requireRow(db, publicIdValue)
+    const result = await withTx(async (db) => {
+      const current = await requireOperatorRow(db, publicIdValue, staff)
+      if (current.channel === 'staff') {
+        const inserted = await db.run(
+          `INSERT INTO support_messages (conversation_id, direction, body, operator_user_id, operator_name, created_at)
+           VALUES (?, 'out', ?, ?, ?, ?)`,
+          current.id,
+          text,
+          staff.id,
+          staff.name,
+          createdAt,
+        )
+        await db.run(
+          `UPDATE support_conversations
+           SET last_message_at = ?, last_message_preview = ?, updated_at = ?,
+               staff_low_unread = CASE WHEN staff_low_id = ? THEN 0 ELSE staff_low_unread + 1 END,
+               staff_high_unread = CASE WHEN staff_high_id = ? THEN 0 ELSE staff_high_unread + 1 END
+           WHERE id = ?`,
+          createdAt,
+          preview(text),
+          createdAt,
+          staff.id,
+          staff.id,
+          current.id,
+        )
+        const row = await requireOperatorRow(db, publicIdValue, staff)
+        return {
+          staffMessage: true,
+          peerId: row.staff_low_id === staff.id ? row.staff_high_id : row.staff_low_id,
+          publicId: row.public_id,
+          conversation: presentStaff(row, staff.id),
+          message: {
+            id: String(inserted.lastID),
+            direction: 'out' as const,
+            text,
+            operatorName: staff.name,
+            createdAt,
+          },
+        }
+      }
+      assertWebsiteChat(current)
       if (current.status === 'closed') throw new SupportError(409, 'Чат закрыт')
       if (current.assigned_user_id != null && current.assigned_user_id !== staff.id) {
         throw new SupportError(409, 'Чат ведёт другой сотрудник')
@@ -653,6 +895,9 @@ export class SupportService {
       )
       const row = await requireRow(db, publicIdValue)
       return {
+        staffMessage: false,
+        peerId: null as number | null,
+        publicId: row.public_id,
         conversation: presentOperator(row, staff.id),
         message: {
           id: String(inserted.lastID),
@@ -663,22 +908,36 @@ export class SupportService {
         },
       }
     })
+    if (result.staffMessage) await notifyStaffMessage(result.peerId, staff, text, result.publicId)
+    return { conversation: result.conversation, message: result.message }
   }
 
   static async countAttention(staff: StaffActor) {
     const db = await getDb()
     const row = await db.get<{ c: number }>(
-      `SELECT COUNT(1) as c
-       FROM support_conversations c
-       WHERE c.channel = 'website'
-         AND c.status != 'closed'
-         AND (c.assigned_user_id IS NULL OR c.assigned_user_id = ?)
-         AND (
-           SELECT direction FROM support_messages
-           WHERE conversation_id = c.id
-           ORDER BY id DESC
-           LIMIT 1
-         ) = 'in'`,
+      `SELECT (
+         SELECT COUNT(1)
+         FROM support_conversations c
+         WHERE c.channel = 'website'
+           AND c.status != 'closed'
+           AND (c.assigned_user_id IS NULL OR c.assigned_user_id = ?)
+           AND (
+             SELECT direction FROM support_messages
+             WHERE conversation_id = c.id
+             ORDER BY id DESC
+             LIMIT 1
+           ) = 'in'
+       ) + (
+         SELECT COUNT(1)
+         FROM support_conversations
+         WHERE channel = 'staff'
+           AND (
+             (staff_low_id = ? AND staff_low_unread > 0)
+             OR (staff_high_id = ? AND staff_high_unread > 0)
+           )
+       ) AS c`,
+      staff.id,
+      staff.id,
       staff.id,
     )
     return { count: Number(row?.c || 0) }

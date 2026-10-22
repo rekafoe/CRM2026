@@ -114,8 +114,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         {onShowSupportChats && (
         <button
           onClick={onShowSupportChats}
-          title={supportAttentionCount > 0 ? `Чаты поддержки: ${supportAttentionCount} ждут ответ` : 'Чаты поддержки'}
-          aria-label={supportAttentionCount > 0 ? `Чаты поддержки, ждут ответ: ${supportAttentionCount}` : 'Чаты поддержки'}
+          title={supportAttentionCount > 0 ? `Чаты: ${supportAttentionCount} ждут внимания` : 'Чаты'}
+          aria-label={supportAttentionCount > 0 ? `Чаты, ждут внимания: ${supportAttentionCount}` : 'Чаты'}
           className="app-icon-btn app-icon-btn--with-label app-icon-btn--support"
         >
           <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="message" size="sm" /></span>
