@@ -110,16 +110,54 @@ function cleanTopic(value: unknown): SupportTopic {
   return value as SupportTopic
 }
 
+const ORDER_PREFIXES = ['WEB', 'ORD', 'CRM', 'MAP', 'TG', 'SW', 'MN']
+
 function cleanOrder(value: unknown): string | null {
   if (value == null || value === '') return null
   if (typeof value !== 'string' && typeof value !== 'number') {
     throw new SupportError(400, 'Некорректный номер заказа')
   }
-  const text = String(value).trim()
-  if (!/^[A-Za-z0-9_-]{1,32}$/.test(text)) {
+  const text = String(value)
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-')
+    .replace(/\s+/g, '')
+    .replace(/^#+/, '')
+    .trim()
+  if (!text) return null
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(text)) {
     throw new SupportError(400, 'Некорректный номер заказа')
   }
   return text
+}
+
+function orderLookupKeys(orderRef: string): { numbers: string[]; ids: number[] } {
+  const numbers: string[] = []
+  const ids: number[] = []
+  const pushNumber = (value: string) => {
+    if (value && !numbers.some((item) => item.toLowerCase() === value.toLowerCase())) numbers.push(value)
+  }
+  const pushId = (value: number) => {
+    if (Number.isInteger(value) && value > 0 && value <= 2147483647 && !ids.includes(value)) ids.push(value)
+  }
+
+  pushNumber(orderRef)
+  if (/^\d{1,10}$/.test(orderRef)) {
+    const id = Number(orderRef)
+    pushId(id)
+    const padded = String(id).padStart(4, '0')
+    for (const prefix of ORDER_PREFIXES) {
+      pushNumber(`${prefix}-${orderRef}`)
+      pushNumber(`${prefix}-${padded}`)
+    }
+  }
+  const prefixed = orderRef.match(/^([A-Za-z]{2,4})-0*(\d{1,10})$/)
+  if (prefixed) {
+    const prefix = prefixed[1].toUpperCase()
+    const id = Number(prefixed[2])
+    pushId(id)
+    pushNumber(`${prefix}-${id}`)
+    pushNumber(`${prefix}-${String(id).padStart(4, '0')}`)
+  }
+  return { numbers, ids }
 }
 
 function cleanTitle(value: unknown): string {
@@ -346,11 +384,22 @@ async function findCrmOrder(
 ): Promise<{ id: number; number: string } | null> {
   if (orderRef) {
     try {
-      const byNumber = await db.get<{ id: number; number: string }>(
-        'SELECT id, number FROM orders WHERE number = ? LIMIT 1',
-        orderRef,
-      )
-      if (byNumber?.id) return { id: Number(byNumber.id), number: String(byNumber.number) }
+      const keys = orderLookupKeys(orderRef)
+      for (const number of keys.numbers) {
+        const byNumber = await db.get<{ id: number; number: string }>(
+          'SELECT id, number FROM orders WHERE lower(trim(number)) = lower(?) LIMIT 1',
+          number,
+        )
+        if (byNumber?.id) return { id: Number(byNumber.id), number: String(byNumber.number) }
+      }
+      for (const id of keys.ids) {
+        const byId = await db.get<{ id: number; number: string }>(
+          'SELECT id, number FROM orders WHERE id = ? LIMIT 1',
+          id,
+        )
+        if (byId?.id) return { id: Number(byId.id), number: String(byId.number) }
+      }
+      return null
     } catch (error) {
       if (missingSchema(error)) return null
       throw error

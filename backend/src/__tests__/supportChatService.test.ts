@@ -271,6 +271,36 @@ describe('support chats', () => {
       `SELECT COUNT(1) as c FROM user_inbox_notifications WHERE user_id = 5`,
     )
     expect(Number(viewers?.c || 0)).toBe(0)
+
+    await db.run(
+      `INSERT INTO orders (id, number, customerPhone) VALUES (4604, 'WEB-4604', '+375000000009')`,
+    )
+    const byPublicNumber = await SupportService.createForCustomer(anna, {
+      topic: 'print_quality',
+      text: 'Полосы на тираже',
+      orderId: ' #web‑4604 ',
+    })
+    const publicChat = await SupportService.getForOperator(maria, byPublicNumber.conversation.id)
+    expect(publicChat.conversation.crmOrderId).toBe(4604)
+    expect(publicChat.conversation.crmOrderNumber).toBe('WEB-4604')
+
+    const byBareId = await SupportService.createForCustomer(igor, {
+      topic: 'other',
+      text: 'Только цифры',
+      orderId: '4604',
+    })
+    const bareChat = await SupportService.getForOperator(maria, byBareId.conversation.id)
+    expect(bareChat.conversation.crmOrderId).toBe(4604)
+
+    const nestId = '4c5124d5-1234-4abc-8def-0123456789ab'
+    const byNestId = await SupportService.createForCustomer(anna, {
+      topic: 'other',
+      text: 'Внутренний код сайта',
+      orderId: nestId,
+    })
+    const nestChat = await SupportService.getForOperator(maria, byNestId.conversation.id)
+    expect(nestChat.conversation.crmOrderId).toBeNull()
+    expect(nestChat.conversation.orderRef).toBe(nestId)
   })
 
   it('limits writes per customer and per address, and blocks a viewer', () => {
