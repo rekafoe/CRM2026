@@ -201,6 +201,38 @@ describe('support chats', () => {
     expect(listed.conversations[0].id).toBe(created.conversation.id)
   })
 
+  it('keeps the newest 500 messages when a thread grows past the window', async () => {
+    const created = await SupportService.createForCustomer(anna, {
+      topic: 'other',
+      text: 'start',
+    })
+    const conversation = await db.get<{ id: number }>(
+      'SELECT id FROM support_conversations WHERE public_id = ?',
+      created.conversation.id,
+    )
+    expect(conversation?.id).toBeTruthy()
+    const conversationId = Number(conversation!.id)
+    const createdAt = new Date().toISOString()
+    for (let index = 2; index <= 501; index += 1) {
+      await db.run(
+        `INSERT INTO support_messages (conversation_id, direction, body, created_at) VALUES (?, 'in', ?, ?)`,
+        conversationId,
+        `msg-${index}`,
+        createdAt,
+      )
+    }
+    const customerThread = await SupportService.listMessagesForCustomer(anna, created.conversation.id)
+    expect(customerThread.messages).toHaveLength(500)
+    expect(customerThread.messages[0].text).toBe('msg-2')
+    expect(customerThread.messages[499].text).toBe('msg-501')
+    expect(customerThread.messages.map((item) => item.text)).not.toContain('start')
+
+    const operatorThread = await SupportService.getForOperator(maria, created.conversation.id)
+    expect(operatorThread.messages).toHaveLength(500)
+    expect(operatorThread.messages[0].text).toBe('msg-2')
+    expect(operatorThread.messages[499].text).toBe('msg-501')
+  })
+
   it('links a CRM order by number or phone and notifies staff, not a viewer', async () => {
     await db.exec(`
       CREATE TABLE orders (
@@ -301,6 +333,26 @@ describe('support chats', () => {
     const nestChat = await SupportService.getForOperator(maria, byNestId.conversation.id)
     expect(nestChat.conversation.crmOrderId).toBeNull()
     expect(nestChat.conversation.orderRef).toBe(nestId)
+
+    // Customer may bind another order's numeric id for the operator deep-link, but
+    // customer-facing payloads must not expose crmOrderId / CRM order fields.
+    await db.run(
+      `INSERT INTO orders (id, number, customerPhone) VALUES (99, 'SECRET-99', '+375299999999')`,
+    )
+    const foreignBind = await SupportService.createForCustomer(igor, {
+      topic: 'other',
+      text: 'Чужой id',
+      orderId: '99',
+    })
+    expect(foreignBind.conversation).not.toHaveProperty('crmOrderId')
+    expect(foreignBind.conversation).not.toHaveProperty('crmOrderNumber')
+    expect(foreignBind.conversation.orderId).toBe('99')
+    const listed = await SupportService.listForCustomer(igor)
+    const listedChat = listed.conversations.find((item) => item.id === foreignBind.conversation.id)
+    expect(listedChat).not.toHaveProperty('crmOrderId')
+    const operatorSees = await SupportService.getForOperator(maria, foreignBind.conversation.id)
+    expect(operatorSees.conversation.crmOrderId).toBe(99)
+    expect(operatorSees.conversation.crmOrderNumber).toBe('SECRET-99')
   })
 
   it('limits writes per customer and per address, and blocks a viewer', () => {
