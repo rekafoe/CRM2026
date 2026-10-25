@@ -3019,7 +3019,10 @@ export class SimplifiedPricingService {
               sides_mode: normalizedConfig.print_sides_mode,
             }
           : undefined,
-      selectedMaterial: normalizedConfig.material_id ? {
+      // При include_material_cost=false материал не тарифицируется и не должен
+      // попадать в BOM (unified materials → cart components → auto-deduct),
+      // иначе клиентский material_id списывает склад с unitPrice 0.
+      selectedMaterial: includeMaterialCost && normalizedConfig.material_id ? {
         material_id: normalizedConfig.material_id,
         material_name: materialName,
         density: materialDensity, //  Добавляем плотность материала
