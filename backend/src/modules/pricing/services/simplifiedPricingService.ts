@@ -20,7 +20,12 @@ import {
   RollWideM2PricingService,
   type RollWideM2PricingResult,
 } from './rollWideM2PricingService';
-import { PriceTypeService } from './priceTypeService';
+import {
+  PriceTypeService,
+  productAllowedPriceTypesFromConstraints,
+  resolveAllowedPriceTypeKeys,
+  sanitizePriceTypeKeyForBilling,
+} from './priceTypeService';
 import { BindingPricingService, BindingQuoteResult } from './bindingPricingService';
 import {
   computeKnifePathMetersSheet,
@@ -502,9 +507,9 @@ export class SimplifiedPricingService {
       throw new Error(`Product calculator_type is not 'simplified', got: ${product.calculator_type}`);
     }
     
-    // 2. Загружаем config_data.simplified из product_template_configs
-    const templateConfig = await db.get<{ config_data: string }>(
-      `SELECT config_data FROM product_template_configs 
+    // 2. Загружаем config_data.simplified (+ constraints для allow-list типов цен)
+    const templateConfig = await db.get<{ config_data: string; constraints?: string | null }>(
+      `SELECT config_data, constraints FROM product_template_configs 
        WHERE product_id = ? AND name = 'template' AND is_active = 1
        ORDER BY id DESC LIMIT 1`,
       [productId]
@@ -517,6 +522,16 @@ export class SimplifiedPricingService {
     const configData = typeof templateConfig.config_data === 'string'
       ? JSON.parse(templateConfig.config_data)
       : templateConfig.config_data;
+    let templateConstraints: Record<string, unknown> | null = null;
+    try {
+      const rawConstraints = templateConfig.constraints;
+      if (rawConstraints != null) {
+        templateConstraints =
+          typeof rawConstraints === 'string' ? JSON.parse(rawConstraints) : (rawConstraints as Record<string, unknown>);
+      }
+    } catch {
+      templateConstraints = null;
+    }
     
     const simplifiedConfig: SimplifiedConfig = configData.simplified || { sizes: [] };
     const multiPageStructure = product.product_type === 'multi_page'
@@ -2941,13 +2956,34 @@ export class SimplifiedPricingService {
       );
     }
 
-    // 9. Множитель типа цены (priceType): standard, online, urgent, promo, special
-    const priceTypeKey = String(
+    // 9. Множитель типа цены (priceType): standard, online, urgent, promo, special.
+    // Allow-list из шаблона продукта/подтипа обязателен на сервере: UI CRM/Mini App уже
+    // фильтрует, но public calculate / quote-cart / website reprice принимали любой ключ
+    // (seeded special=0.55) → undercharge даже после «честного» пересчёта.
+    const requestedPriceTypeKey = String(
       (configuration as any).priceType ??
       (configuration as any).price_type ??
       (configuration as any).urgency ??
       'standard'
     ).trim().toLowerCase() || 'standard';
+    const allowedPriceTypeKeys = resolveAllowedPriceTypeKeys({
+      productAllowed: productAllowedPriceTypesFromConstraints(templateConstraints),
+      subtypeAllowed: (typeConfig as { allowed_price_types?: unknown } | null)?.allowed_price_types,
+    });
+    const priceTypeRow = await PriceTypeService.getByKey(requestedPriceTypeKey);
+    const priceTypeKey = sanitizePriceTypeKeyForBilling(
+      requestedPriceTypeKey,
+      allowedPriceTypeKeys,
+      priceTypeRow,
+    );
+    if (priceTypeKey !== requestedPriceTypeKey) {
+      logger.warn('Отклонён недопустимый priceType — считаем как standard', {
+        productId,
+        requestedPriceTypeKey,
+        allowedPriceTypeKeys,
+        priceTypeActive: priceTypeRow?.isActive ?? null,
+      });
+    }
     const priceTypeMult = await PriceTypeService.getMultiplier(priceTypeKey);
     if (priceTypeMult !== 1) {
       logger.info('Применяем множитель типа цены', { priceTypeKey, multiplier: priceTypeMult });
