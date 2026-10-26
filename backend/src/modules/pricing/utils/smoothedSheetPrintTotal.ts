@@ -4,6 +4,11 @@
  * Ступенчатая тиражная скидка иначе даёт обрыв: 30 листов по «дорогому»
  * тарифу могут стоить больше, чем 50 листов по следующему. Итог в узлах
  * делаем неубывающим и линейно интерполируем между соседними порогами.
+ *
+ * Первая ступень — розничная цена одного листа. До следующего порога она
+ * не сглаживается, иначе скидка начинается уже со второго листа. Если
+ * полная цена перед порогом всё же выше итога порога, итог ограничиваем
+ * им, чтобы меньший тираж не стоил дороже большего.
  */
 
 export type SheetPrintQtyTier = {
@@ -74,6 +79,11 @@ export function smoothedSheetPrintTotal(
   const first = knots[0]
   if (sheets <= first.sheets) {
     return Math.min(sheets * first.pricePerSheet, first.total)
+  }
+
+  const second = knots[1]
+  if (second && first.sheets <= 1 && sheets < second.sheets) {
+    return Math.min(sheets * first.pricePerSheet, second.total)
   }
 
   const last = knots[knots.length - 1]

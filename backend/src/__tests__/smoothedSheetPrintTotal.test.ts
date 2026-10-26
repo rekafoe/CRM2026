@@ -37,6 +37,27 @@ describe('smoothedSheetPrintTotal', () => {
     expect(smoothedSheetPrintTotal(60, postcardTiers, ips)).toBeCloseTo(60 * 91 * ips, 6)
   })
 
+  it('до первой тиражной ступени держит цену одного листа', () => {
+    const tiers = [
+      { min_qty: 1, unit_price: 0.65 },
+      { min_qty: 10, unit_price: 0.6 },
+    ]
+    expect(smoothedSheetPrintTotal(1, tiers, 1)).toBeCloseTo(0.65, 6)
+    expect(smoothedSheetPrintTotal(2, tiers, 1)).toBeCloseTo(1.3, 6)
+    expect(smoothedSheetPrintTotal(9, tiers, 1)).toBeCloseTo(5.85, 6)
+    expect(smoothedSheetPrintTotal(10, tiers, 1)).toBeCloseTo(6, 6)
+  })
+
+  it('перед крутой первой ступенью не даёт меньшему тиражу стоить дороже порога', () => {
+    const tiers = [
+      { min_qty: 1, unit_price: 2 },
+      { min_qty: 10, unit_price: 0.5 },
+    ]
+    expect(smoothedSheetPrintTotal(2, tiers, 1)).toBeCloseTo(4, 6)
+    expect(smoothedSheetPrintTotal(3, tiers, 1)).toBeCloseTo(5, 6)
+    expect(smoothedSheetPrintTotal(10, tiers, 1)).toBeCloseTo(5, 6)
+  })
+
   it('игнорирует нулевые ступени, чтобы не обнулить печать', () => {
     const mixed = [
       { min_qty: 10, unit_price: 0 },
