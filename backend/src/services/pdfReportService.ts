@@ -1,5 +1,9 @@
 import { bynSymbolHtmlForPrint } from '../utils/byCurrencyBYN';
-import { formatReceiptPaperCaptionFromItemParams } from './commodityReceiptLabels';
+import {
+  buildCommodityReceiptItemRows,
+  formatReceiptPaperCaptionFromItemParams,
+  receiptPrintLineName,
+} from './commodityReceiptLabels';
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
 import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
@@ -506,7 +510,7 @@ export class PDFReportService {
           // Формируем строку параметров; печать/материал — как в товарном чеке (commodityReceiptLabels)
           const paramParts: string[] = [];
           const specs = params.specifications || {};
-          const paperCaption = formatReceiptPaperCaptionFromItemParams(params);
+          const paperCaption = receiptPrintLineName(params);
 
           if (!paperCaption) {
             const sd = specs.sides;
@@ -1379,52 +1383,12 @@ export class PDFReportService {
 
   /**
    * Разворачивает позицию в отдельные строки для чека только из данных заказа:
-   * 1) Печать (листы) из params.sheetsNeeded / layout; 2) операции из params.services (печать, резка, ламинация и т.д.).
-   * Строки и суммы берутся только из item.params — без подстановок из раскладки.
+   * 1) печать — имя шага productionPlan (технология, материал, плотность), иначе бумага;
+   * 2) операции из params.services (резка, ламинация и т.д.).
+   * Сумма услуги «Печать» переносится на строку печати, вторая строка «Печать» не создаётся.
    */
   private static getOrderItemProductionRows(it: any): Array<{ name: string; quantity: number; unit: string; totalCost?: number }> {
-    const rows: Array<{ name: string; quantity: number; unit: string; totalCost?: number }> = [];
-    try {
-      const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
-      const specs = params.specifications || {};
-      const layout = params.layout || specs.layout || {};
-      const sheetsNeeded = Number(params.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded) || 0;
-      const paperPhrase = this.getOrderItemPaperPhrase(it);
-      const productName = (it.name || params.productName || params.name || it.type || 'Услуга').toString().trim();
-
-      const rawServices = params.services || [];
-
-      if (sheetsNeeded > 0) {
-        rows.push({ name: paperPhrase || 'Печать (листы)', quantity: sheetsNeeded, unit: 'шт.' });
-      }
-      if (Array.isArray(rawServices) && rawServices.length > 0) {
-        for (const s of rawServices) {
-          const name = String(s.operationName || s.service || s.name || '').trim();
-          if (!name || name.toLowerCase() === 'операция') continue;
-          const q = Number(s.quantity);
-          if (!Number.isFinite(q) || q <= 0) continue;
-          const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
-          const isPrintOp = String(s.operationType || s.operation_type || '').toLowerCase() === 'print' || /^печать$/i.test(name);
-          // Печать из operations объединяем с первой строкой «Печать … — материал» (не дублируем строку)
-          if (isPrintOp && rows.length > 0 && typeof totalCost === 'number' && totalCost >= 0) {
-            if (/печать|листы/i.test(rows[0].name)) {
-              rows[0].totalCost = totalCost;
-              continue;
-            }
-          }
-          const pu = String(s.priceUnit || s.unit || '').toLowerCase();
-          const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
-          rows.push({ name, quantity: q, unit, ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}) });
-        }
-      }
-      if (rows.length > 0) return rows;
-      const qty = Number(it.quantity) || 1;
-      rows.push({ name: productName, quantity: qty, unit: 'шт.' });
-    } catch (_) {
-      const qty = Number(it.quantity) || 1;
-      rows.push({ name: (it.name || it.type || 'Позиция').toString(), quantity: qty, unit: 'шт.' });
-    }
-    return rows;
+    return buildCommodityReceiptItemRows(it);
   }
 
   /**

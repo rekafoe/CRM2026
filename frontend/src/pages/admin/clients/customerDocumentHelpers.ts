@@ -1,5 +1,9 @@
 import type { Customer, Order } from '../../../types';
-import { formatReceiptPaperCaptionFromParams } from '../../../components/order/orderItemBreakdownUtils';
+import {
+  formatReceiptPaperCaptionFromParams,
+  plannedPrintStepName,
+  withPaperDensity,
+} from '../../../components/order/orderItemBreakdownUtils';
 import { getOrderAmounts } from '../../../utils/orderTotal';
 
 export const getCustomerDisplayName = (customer: Customer) => {
@@ -124,6 +128,9 @@ export const getOrderItemProductionRows = (
   const sheetsNeeded = Number(params.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded) || 0;
   const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
   const paperPhrase = getOrderItemPaperPhrase(item);
+  const plannedName = plannedPrintStepName(params);
+  const plannedLine = plannedName ? withPaperDensity(plannedName, params) : '';
+  const printLineName = plannedLine || paperPhrase || 'Печать (листы)';
 
   const rawServices = params.services || [];
   const hasCuttingInServices = Array.isArray(rawServices) && rawServices.some((s: any) => {
@@ -135,7 +142,7 @@ export const getOrderItemProductionRows = (
   const rows: Array<{ name: string; quantity: number; unit: string; totalCost?: number }> = [];
 
   if (sheetsNeeded > 0) {
-    rows.push({ name: paperPhrase || 'Печать (листы)', quantity: sheetsNeeded, unit: 'шт.' });
+    rows.push({ name: printLineName, quantity: sheetsNeeded, unit: 'шт.' });
   }
   if (Array.isArray(rawServices) && rawServices.length > 0) {
     for (const s of rawServices) {
@@ -147,16 +154,21 @@ export const getOrderItemProductionRows = (
         typeof s.totalCost === 'number' ? s.totalCost : typeof s.total === 'number' ? s.total : undefined;
       const isPrintOp =
         String(s.operationType || s.operation_type || '').toLowerCase() === 'print' || /^печать$/i.test(name);
-      if (isPrintOp && rows.length > 0 && typeof totalCost === 'number' && totalCost >= 0) {
-        if (/печать|листы/i.test(rows[0].name)) {
-          rows[0].totalCost = totalCost;
-          continue;
-        }
+      const genericPrint = /^печать$/i.test(name);
+      const firstIsPrintLine =
+        rows.length > 0 &&
+        (/печать|листы/i.test(rows[0].name) || (plannedLine.length > 0 && rows[0].name === plannedLine));
+      if (isPrintOp && firstIsPrintLine && typeof totalCost === 'number' && totalCost >= 0) {
+        if (plannedLine && genericPrint) rows[0].name = plannedLine;
+        rows[0].totalCost = totalCost;
+        continue;
       }
+      const displayName = plannedLine && genericPrint ? plannedLine : name;
+      if (plannedLine && genericPrint && rows.some((row) => row.name === plannedLine)) continue;
       const pu = String(s.priceUnit || s.unit || '').toLowerCase();
       const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
       rows.push({
-        name,
+        name: displayName,
         quantity: q,
         unit,
         ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}),

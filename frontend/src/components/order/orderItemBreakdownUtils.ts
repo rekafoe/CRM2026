@@ -142,10 +142,24 @@ export function formatPrintOperationCaption(
   const sidesPhrase =
     color && !sidesBase.toLowerCase().includes(color) ? `${sidesBase}, ${color}` : sidesBase;
 
-  const mainMaterial = materials[0];
-  const basePaper = humanReadablePaperLabel(mainMaterial, parameterSummary);
+  const basePaper = humanReadablePaperLabel(materials[0], parameterSummary);
+  const densityNum = paperDensityGsm(specs, materials, parameterSummary);
+  const densityPhrase =
+    densityNum != null && densityNum > 0 ? `${densityNum} г/м²` : '';
 
+  const caption = formatPrintCaptionLine(sidesPhrase, basePaper, densityPhrase);
+  const pages = pagesPhraseFromSpecs(specs, parameterSummary);
+  if (pages && !caption.toLowerCase().includes('стр')) return `${caption}, ${pages}`;
+  return caption;
+}
+
+function paperDensityGsm(
+  specs: Record<string, unknown>,
+  materials: OrderItemMaterialRow[],
+  parameterSummary: Array<{ label?: string; key?: string; value?: string }>
+): number | undefined {
   let densityNum = parsePaperDensityFromSpecs(specs);
+  const mainMaterial = materials[0];
   if (densityNum == null && mainMaterial?.density != null) {
     const d = Number(mainMaterial.density);
     if (Number.isFinite(d) && d > 0) densityNum = d;
@@ -159,14 +173,40 @@ export function formatPrintOperationCaption(
       if (Number.isFinite(n) && n > 0) densityNum = n;
     }
   }
+  return densityNum;
+}
 
-  const densityPhrase =
-    densityNum != null && densityNum > 0 ? `${densityNum} г/м²` : '';
+/** Имя шага печати из калькулятора — то же, что в карточке заказа. */
+export function plannedPrintStepName(params: Record<string, unknown> | null | undefined): string {
+  if (!params || typeof params !== 'object') return '';
+  const plan = params.productionPlan;
+  if (!plan || typeof plan !== 'object') return '';
+  const steps = (plan as { steps?: unknown }).steps;
+  if (!Array.isArray(steps)) return '';
+  for (const step of steps) {
+    if (!step || typeof step !== 'object') continue;
+    if (String((step as { type?: unknown }).type || '').toLowerCase() !== 'print') continue;
+    const name = String((step as { name?: unknown }).name ?? '').trim();
+    if (name) return name;
+  }
+  return '';
+}
 
-  const caption = formatPrintCaptionLine(sidesPhrase, basePaper, densityPhrase);
-  const pages = pagesPhraseFromSpecs(specs, parameterSummary);
-  if (pages && !caption.toLowerCase().includes('стр')) return `${caption}, ${pages}`;
-  return caption;
+/** Дописывает плотность, если в названии шага её ещё нет. */
+export function withPaperDensity(name: string, params: Record<string, unknown>): string {
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+  const specs = (params.specifications || {}) as Record<string, unknown>;
+  const parameterSummary = Array.isArray(params.parameterSummary)
+    ? (params.parameterSummary as Array<{ label?: string; key?: string; value?: string }>)
+    : [];
+  const materials = Array.isArray(params.materials) ? (params.materials as OrderItemMaterialRow[]) : [];
+  const densityNum = paperDensityGsm(specs, materials, parameterSummary);
+  if (densityNum == null || densityNum <= 0) return trimmed;
+  if (/г\/м/i.test(trimmed)) return trimmed;
+  const escaped = String(densityNum).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (new RegExp(`(?:^|\\D)${escaped}(?:\\D|$)`).test(trimmed)) return trimmed;
+  return `${trimmed}, ${densityNum} г/м²`;
 }
 
 /** Как на бэкенде commodityReceiptLabels — для актов/счетов (fallback на фронте). */
