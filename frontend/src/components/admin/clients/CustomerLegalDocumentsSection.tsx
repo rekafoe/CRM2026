@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   createCustomerLegalDocument,
   deleteCustomerLegalDocument,
+  downloadCustomerLegalDocumentFile,
   getCustomerLegalDocuments,
   updateCustomerLegalDocument,
 } from '../../../api';
 import { Button } from '../../common';
+import { downloadAxiosBlob, getApiErrorMessage } from '../../../utils/downloadBlob';
 import type { CustomerLegalDocument, Order } from '../../../types';
 import './CustomerLegalDocumentsSection.css';
 
@@ -13,6 +15,7 @@ const KIND_OPTIONS: { value: string; label: string }[] = [
   { value: 'act', label: 'Акт' },
   { value: 'invoice', label: 'Счёт' },
   { value: 'contract', label: 'Договор' },
+  { value: 'receipt', label: 'Товарный чек' },
   { value: 'other', label: 'Другое' },
 ];
 
@@ -190,6 +193,16 @@ export const CustomerLegalDocumentsSection: React.FC<{
     }
   };
 
+  const handleDownload = async (row: CustomerLegalDocument) => {
+    setError(null);
+    try {
+      const response = await downloadCustomerLegalDocumentFile(customerId, row.id);
+      downloadAxiosBlob(response, `${row.title || 'документ'}.bin`, 'application/octet-stream');
+    } catch (e: unknown) {
+      setError(await getApiErrorMessage(e, 'Не удалось скачать файл'));
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!window.confirm('Удалить запись о документе?')) return;
     setError(null);
@@ -208,7 +221,7 @@ export const CustomerLegalDocumentsSection: React.FC<{
         <h5>Документы</h5>
         <p className="customers-legal-docs__hint">
           Учёт выдачи и возврата оригиналов — каждая запись привязана к заказу (если в базе есть заказы
-          клиента).
+          клиента). Сохранённый файл скачивается отсюда: повторная печать не собирает документ заново.
         </p>
         <Button
           type="button"
@@ -415,6 +428,11 @@ export const CustomerLegalDocumentsSection: React.FC<{
                     </td>
                     <td className="customers-legal-docs__notes">{r.notes || '—'}</td>
                     <td className="customers-legal-docs__actions">
+                      {r.issued_document_id ? (
+                        <button type="button" className="customers-legal-docs__link" onClick={() => void handleDownload(r)}>
+                          Скачать
+                        </button>
+                      ) : null}
                       <button type="button" className="customers-legal-docs__link" onClick={() =>startEdit(r)}>
                         Изменить
                       </button>

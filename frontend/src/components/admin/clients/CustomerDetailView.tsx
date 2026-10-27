@@ -20,6 +20,8 @@ import {
   getOrderItemProductionRows,
   distributeItemSumToRows,
 } from '../../../pages/admin/clients/customerDocumentHelpers';
+import { pricedSlices } from '../../../pages/admin/clients/pricedSlices';
+import { downloadAxiosBlob, getApiErrorMessage } from '../../../utils/downloadBlob';
 import { getItemLineTotal } from '../../../utils/orderTotal';
 import '../../../pages/admin/CustomersAdminPage.css';
 import './CustomerDetailView.css';
@@ -344,32 +346,18 @@ export const CustomerDetailView: React.FC<{
       if (orderIds.length > 0) {
         try {
           const response = await generateDocumentByTypeFromOrders('act', orderIds);
-          const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          let filename = `АКТ-${formatDateForFile(new Date())}-${customer.id}.xlsx`;
-          const contentDisposition = response.headers['content-disposition'];
-          if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            if (filenameMatch?.[1]) {
-              try {
-                filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
-              } catch {
-                filename = filenameMatch[1].replace(/['"]/g, '');
-              }
-            }
-          }
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(url);
-          void recordLegalExport('act');
+          downloadAxiosBlob(
+            response,
+            `АКТ-${formatDateForFile(new Date())}-${customer.id}.xlsx`,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          );
+          setLegalDocsRefresh((n) => n + 1);
           return;
-        } catch (fromOrdersErr: any) {
-          const msg = fromOrdersErr?.message || '';
-          if (!msg.includes('404') && !msg.includes('не найден') && !msg.includes('Шаблон')) {
+        } catch (fromOrdersErr: unknown) {
+          const msg = await getApiErrorMessage(fromOrdersErr, '');
+          const status = (fromOrdersErr as { status?: number })?.status;
+          const missingTemplate = status === 404 || msg.includes('404') || msg.includes('не найден') || msg.includes('Шаблон');
+          if (!missingTemplate) {
             setError(`Ошибка генерации акта: ${msg || 'Неизвестная ошибка'}`);
             return;
           }
@@ -430,20 +418,19 @@ export const CustomerDetailView: React.FC<{
           const rowAmounts = distributeItemSumToRows(itemAmount, lines);
           lines.forEach((line, idx) => {
             const rowAmount = rowAmounts[idx] ?? 0;
-            const rowPrice = line.quantity > 0 && rowAmount > 0
-              ? Math.round((rowAmount / line.quantity) * 100) / 100
-              : 0;
-            allOrderItems.push({
-              number: itemNumber++,
-              name: line.name,
-              unit: line.unit,
-              quantity: line.quantity,
-              price: rowPrice,
-              amount: rowAmount,
-              vatRate,
-              vatAmount,
-              totalWithVat: rowAmount,
-            });
+            for (const slice of pricedSlices(rowAmount, line.quantity)) {
+              allOrderItems.push({
+                number: itemNumber++,
+                name: slice.adjustment ? 'Округление' : line.name,
+                unit: slice.adjustment ? 'шт.' : line.unit,
+                quantity: slice.quantity,
+                price: slice.price,
+                amount: slice.amount,
+                vatRate,
+                vatAmount,
+                totalWithVat: slice.amount,
+              });
+            }
           });
         }
       }
@@ -563,32 +550,18 @@ export const CustomerDetailView: React.FC<{
       if (orderIds.length > 0) {
         try {
           const response = await generateDocumentByTypeFromOrders('invoice', orderIds);
-          const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          let filename = `СЧЁТ-${formatDateForFile(new Date())}-${customer.id}.xlsx`;
-          const contentDisposition = response.headers['content-disposition'];
-          if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            if (filenameMatch?.[1]) {
-              try {
-                filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
-              } catch {
-                filename = filenameMatch[1].replace(/['"]/g, '');
-              }
-            }
-          }
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(url);
-          void recordLegalExport('invoice');
+          downloadAxiosBlob(
+            response,
+            `СЧЁТ-${formatDateForFile(new Date())}-${customer.id}.xlsx`,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          );
+          setLegalDocsRefresh((n) => n + 1);
           return;
-        } catch (fromOrdersErr: any) {
-          const msg = fromOrdersErr?.message || '';
-          if (!msg.includes('404') && !msg.includes('не найден') && !msg.includes('Шаблон')) {
+        } catch (fromOrdersErr: unknown) {
+          const msg = await getApiErrorMessage(fromOrdersErr, '');
+          const status = (fromOrdersErr as { status?: number })?.status;
+          const missingTemplate = status === 404 || msg.includes('404') || msg.includes('не найден') || msg.includes('Шаблон');
+          if (!missingTemplate) {
             setError(`Ошибка генерации счёта: ${msg || 'Неизвестная ошибка'}`);
             return;
           }
@@ -629,20 +602,19 @@ export const CustomerDetailView: React.FC<{
           const rowAmounts = distributeItemSumToRows(itemAmount, lines);
           lines.forEach((line, idx) => {
             const rowAmount = rowAmounts[idx] ?? 0;
-            const rowPrice = line.quantity > 0 && rowAmount > 0
-              ? Math.round((rowAmount / line.quantity) * 100) / 100
-              : 0;
-            allOrderItems.push({
-              number: itemNumber++,
-              name: line.name,
-              unit: line.unit,
-              quantity: line.quantity,
-              price: rowPrice,
-              amount: rowAmount,
-              vatRate: 'Без НДС',
-              vatAmount: 0,
-              totalWithVat: rowAmount,
-            });
+            for (const slice of pricedSlices(rowAmount, line.quantity)) {
+              allOrderItems.push({
+                number: itemNumber++,
+                name: slice.adjustment ? 'Округление' : line.name,
+                unit: slice.adjustment ? 'шт.' : line.unit,
+                quantity: slice.quantity,
+                price: slice.price,
+                amount: slice.amount,
+                vatRate: 'Без НДС',
+                vatAmount: 0,
+                totalWithVat: slice.amount,
+              });
+            }
           });
         }
       }
@@ -733,7 +705,28 @@ export const CustomerDetailView: React.FC<{
     
     try {
       setGeneratingDocument('contract');
-      
+      const orderIds = countedOrders.map((o) => o.id);
+      if (orderIds.length > 0) {
+        try {
+          const response = await generateDocumentByTypeFromOrders('contract', orderIds);
+          downloadAxiosBlob(
+            response,
+            `ДОГОВОР-${formatDateForFile(new Date())}-${customer.id}.docx`,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          );
+          setLegalDocsRefresh((n) => n + 1);
+          return;
+        } catch (fromOrdersErr: unknown) {
+          const msg = await getApiErrorMessage(fromOrdersErr, '');
+          const status = (fromOrdersErr as { status?: number })?.status;
+          const missingTemplate = status === 404 || msg.includes('404') || msg.includes('не найден') || msg.includes('Шаблон');
+          if (!missingTemplate) {
+            setError(`Ошибка генерации договора: ${msg || 'Неизвестная ошибка'}`);
+            return;
+          }
+        }
+      }
+
       const contractNumber = `CONTRACT-${formatDateForFile(new Date())}-${customer.id}`;
       const customerName = customer.company_name || customer.legal_name || getCustomerDisplayName(customer);
       

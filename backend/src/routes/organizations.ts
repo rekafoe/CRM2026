@@ -22,8 +22,9 @@ function requireAdmin(req: AuthenticatedRequest, res: any): boolean {
 /** GET /api/organizations — список организаций (для выбора при создании заказа) */
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const db = await getDb();
+  const hasVat = await hasColumn('organizations', 'vat_rate').catch(() => false);
   const rows = await db.all<any>(
-    `SELECT id, name, unp, legal_address, phone, email, bank_details, logo_url, is_default, sort_order, created_at, updated_at
+    `SELECT id, name, unp, legal_address, phone, email, bank_details, logo_url, is_default, sort_order, created_at, updated_at${hasVat ? ', vat_rate' : ''}
      FROM organizations
      ORDER BY is_default DESC, sort_order ASC, name ASC`
   );
@@ -70,6 +71,13 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?${wsVal}, ?, ?, datetime('now'))`,
     ...(hasWorkSchedule ? [name || '', unp || null, legal_address || null, phone || null, email || null, bank_details || null, logo_url || null, work_schedule || null, is_default ? 1 : 0, sort_order != null ? Number(sort_order) : 0] : [name || '', unp || null, legal_address || null, phone || null, email || null, bank_details || null, logo_url || null, is_default ? 1 : 0, sort_order != null ? Number(sort_order) : 0])
   );
+  const hasVat = await hasColumn('organizations', 'vat_rate').catch(() => false);
+  if (hasVat && result.lastID) {
+    const rawVat = req.body?.vat_rate;
+    const parsed = rawVat == null || rawVat === '' ? null : Number(rawVat);
+    const vatRate = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    await db.run('UPDATE organizations SET vat_rate = ? WHERE id = ?', vatRate, result.lastID);
+  }
   const row = await db.get<any>('SELECT * FROM organizations WHERE id = ?', result.lastID);
   res.status(201).json(row);
 }));
@@ -92,6 +100,13 @@ router.put('/:id', authenticate, asyncHandler(async (req, res) => {
      WHERE id = ?`,
     ...(hasWorkSchedule ? [name ?? '', unp ?? null, legal_address ?? null, phone ?? null, email ?? null, bank_details ?? null, logo_url ?? null, work_schedule ?? null, is_default ? 1 : 0, sort_order != null ? Number(sort_order) : 0, id] : [name ?? '', unp ?? null, legal_address ?? null, phone ?? null, email ?? null, bank_details ?? null, logo_url ?? null, is_default ? 1 : 0, sort_order != null ? Number(sort_order) : 0, id])
   );
+  const hasVat = await hasColumn('organizations', 'vat_rate').catch(() => false);
+  if (hasVat) {
+    const rawVat = req.body?.vat_rate;
+    const parsed = rawVat == null || rawVat === '' ? null : Number(rawVat);
+    const vatRate = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    await db.run('UPDATE organizations SET vat_rate = ? WHERE id = ?', vatRate, id);
+  }
   const row = await db.get<any>('SELECT * FROM organizations WHERE id = ?', id);
   if (!row) {
     res.status(404).json({ message: 'Организация не найдена' });

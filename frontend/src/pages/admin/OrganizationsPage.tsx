@@ -60,7 +60,7 @@ export const OrganizationsPage: React.FC = () => {
 
   const handleCreate = () => {
     setEditingOrg(null);
-    setForm({ name: '', unp: '', is_default: 0, sort_order: 0 });
+    setForm({ name: '', unp: '', is_default: 0, sort_order: 0, vat_rate: null });
   };
 
   const handleEdit = (org: Organization) => {
@@ -190,6 +190,18 @@ export const OrganizationsPage: React.FC = () => {
               <input type="email" value={form.email || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
               <label>Банковские реквизиты</label>
               <textarea value={form.bank_details || ''} onChange={(e) => setForm({ ...form, bank_details: e.target.value })} rows={3} />
+              <label>Ставка НДС, % (пусто — без НДС)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.vat_rate != null && form.vat_rate > 0 ? String(form.vat_rate) : ''}
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  setForm({ ...form, vat_rate: raw === '' ? null : Number(raw) });
+                }}
+                placeholder="Без НДС"
+              />
               <label className="checkbox-row">
                 <input type="checkbox" checked={!!form.is_default} onChange={(e) => setForm({ ...form, is_default: e.target.checked ? 1 : 0 })} />
                 По умолчанию
@@ -209,6 +221,7 @@ export const OrganizationsPage: React.FC = () => {
                 <tr>
                   <th>Название</th>
                   <th>УНП</th>
+                  <th>НДС</th>
                   <th>По умолчанию</th>
                   <th>Действия</th>
                 </tr>
@@ -218,6 +231,7 @@ export const OrganizationsPage: React.FC = () => {
                   <tr key={org.id}>
                     <td>{org.name}</td>
                     <td>{org.unp || '—'}</td>
+                    <td>{org.vat_rate != null && org.vat_rate > 0 ? `${org.vat_rate}%` : 'Без НДС'}</td>
                     <td>{org.is_default ? 'Да' : ''}</td>
                     <td>
                       <button className="btn-link" onClick={() =>handleEdit(org)}>Изменить</button>

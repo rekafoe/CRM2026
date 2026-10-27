@@ -1,4 +1,8 @@
 import { bynSymbolHtmlForPrint } from '../utils/byCurrencyBYN';
+import { amountInWordsBel as formatAmountInWordsBel } from '../utils/amountInWordsBel';
+import { applyVatToAmounts, normalizeVatRate } from '../utils/documentVat';
+import { pricedSlices } from '../utils/pricedSlices';
+import { documentSourceHash, issueOrReuse } from './issuedDocumentService';
 import {
   buildCommodityReceiptItemRows,
   formatReceiptPaperCaptionFromItemParams,
@@ -6,6 +10,7 @@ import {
 } from './commodityReceiptLabels';
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
+import { hasColumn } from '../utils/tableSchemaCache';
 import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
 import { computeItemLineTotal, computeOrderAmounts, discountedItemAmounts } from '../utils/orderAmounts';
 import * as fs from 'fs';
@@ -1272,11 +1277,12 @@ export class PDFReportService {
   }
 
   /** Реквизиты организации для товарного чека: из БД (organizations) или env fallback */
-  private static async getOrganizationForReceipt(organizationId?: number | null): Promise<{ id: number; name: string; unp: string; legal_address?: string; phone?: string; email?: string; bank_details?: string; work_schedule?: string; logo_url?: string }> {
+  private static async getOrganizationForReceipt(organizationId?: number | null): Promise<{ id: number; name: string; unp: string; legal_address?: string; phone?: string; email?: string; bank_details?: string; work_schedule?: string; logo_url?: string; vat_rate?: number | null }> {
     try {
       const db = await getDb();
       let org: any = null;
-      const sel = 'SELECT id, name, unp, legal_address, phone, email, bank_details, logo_url FROM organizations';
+      const vatCol = (await hasColumn('organizations', 'vat_rate').catch(() => false)) ? ', vat_rate' : '';
+      const sel = `SELECT id, name, unp, legal_address, phone, email, bank_details, logo_url${vatCol} FROM organizations`;
       if (organizationId && Number.isFinite(organizationId)) {
         org = await db.get(`${sel} WHERE id = ?`, organizationId);
       }
@@ -1292,7 +1298,7 @@ export class PDFReportService {
           const ws = await db.get<{ work_schedule?: string }>('SELECT work_schedule FROM organizations WHERE id = ?', org.id);
           work_schedule = ws?.work_schedule ?? undefined;
         } catch { work_schedule = undefined; }
-        return { id: org.id, name: org.name || '', unp: org.unp || '', legal_address: org.legal_address, phone: org.phone, email: org.email, bank_details: org.bank_details, work_schedule, logo_url: org.logo_url };
+        return { id: org.id, name: org.name || '', unp: org.unp || '', legal_address: org.legal_address, phone: org.phone, email: org.email, bank_details: org.bank_details, work_schedule, logo_url: org.logo_url, vat_rate: normalizeVatRate(org.vat_rate) };
       }
     } catch (_) { /* таблица organizations может отсутствовать до миграции */ }
     return {
@@ -1310,61 +1316,9 @@ export class PDFReportService {
     };
   }
 
-  /** Сумма прописью для товарного чека: "(X) белорусских рублей Y копеек". Сначала округляем до 2 знаков, чтобы не было "100 копеек". */
+  /** Сумма прописью для товарного чека: "(X) белорусских рублей Y копеек". */
   private static amountInWordsBel(num: number): string {
-    const ones = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
-    const onesF = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
-    const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
-    const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
-    const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
-
-    const rounded = Math.round(num * 100) / 100;
-    let rub = Math.floor(rounded);
-    let kop = Math.round((rounded - rub) * 100);
-    if (kop >= 100) {
-      kop = 0;
-      rub += 1;
-    }
-
-    const three = (n: number, fem: boolean) => {
-      if (n === 0) return '';
-      const o = fem ? onesF : ones;
-      let r = '';
-      if (n >= 100) r += hundreds[Math.floor(n / 100)] + ' ';
-      const rem = n % 100;
-      if (rem >= 20) r += tens[Math.floor(rem / 10)] + ' ' + o[rem % 10] + ' ';
-      else if (rem >= 10) r += teens[rem - 10] + ' ';
-      else if (rem > 0) r += o[rem] + ' ';
-      return r.trim();
-    };
-
-    let w = '';
-    if (rub >= 1_000_000) {
-      const m = Math.floor(rub / 1_000_000);
-      w += three(m, false) + ' ';
-      const ld = m % 10, l2 = m % 100;
-      w += (l2 >= 11 && l2 <= 19) ? 'миллионов ' : (ld === 1 ? 'миллион ' : ld >= 2 && ld <= 4 ? 'миллиона ' : 'миллионов ');
-    }
-    const th = Math.floor((rub % 1_000_000) / 1000);
-    if (th > 0) {
-      w += three(th, true) + ' ';
-      const ld = th % 10, l2 = th % 100;
-      w += (l2 >= 11 && l2 <= 19) ? 'тысяч ' : (ld === 1 ? 'тысяча ' : ld >= 2 && ld <= 4 ? 'тысячи ' : 'тысяч ');
-    }
-    const u = rub % 1000;
-    w += (u > 0 || rub === 0) ? three(u, false) + ' ' : '';
-    w = w.trim().replace(/\s+/g, ' ');
-
-    let kopStr = '';
-    if (kop > 0) {
-      kopStr = String(kop);
-      if (kop === 1) kopStr += ' копейка';
-      else if (kop >= 2 && kop <= 4) kopStr += ' копейки';
-      else kopStr += ' копеек';
-    } else {
-      kopStr = '00 копеек';
-    }
-    return w ? `(${w}) белорусских рублей ${kopStr}` : kopStr;
+    return formatAmountInWordsBel(num);
   }
 
   /**
@@ -1432,7 +1386,8 @@ export class PDFReportService {
    */
   static buildDocumentRowsFromItems(
     items: Array<{ orderId: number; price: number; quantity: number; params: any; name?: string; type?: string }>,
-    getDiscountPercent: (orderId: number) => number
+    getDiscountPercent: (orderId: number) => number,
+    vatRate: number | null = null,
   ): {
     orderItems: Array<{
       number: number;
@@ -1474,26 +1429,28 @@ export class PDFReportService {
       const lines = this.getOrderItemProductionRows(it);
       const rowAmounts = this.distributeItemSumToRows(itemAmount, lines);
       lines.forEach((line, idx) => {
-        rowNum++;
         const amount = rowAmounts[idx] ?? 0;
-        const price = line.quantity > 0 && amount > 0 ? Math.round((amount / line.quantity) * 100) / 100 : 0;
-        orderItems.push({
-          number: rowNum,
-          name: line.name,
-          unit: line.unit,
-          quantity: line.quantity,
-          price,
-          amount,
-          vatRate: 'Без НДС',
-          vatAmount: 0,
-          totalWithVat: amount,
-        });
-        totalAmount += amount;
-        totalQuantity += line.quantity;
+        for (const slice of pricedSlices(amount, line.quantity)) {
+          rowNum++;
+          orderItems.push({
+            number: rowNum,
+            name: slice.adjustment ? 'Округление' : line.name,
+            unit: slice.adjustment ? 'шт.' : line.unit,
+            quantity: slice.quantity,
+            price: slice.price,
+            amount: slice.amount,
+            vatRate: 'Без НДС',
+            vatAmount: 0,
+            totalWithVat: slice.amount,
+          });
+          totalAmount += slice.amount;
+          totalQuantity += slice.quantity;
+        }
       });
     }
     totalAmount = Math.round(totalAmount * 100) / 100;
-    return { orderItems, totalAmount, totalQuantity };
+    const withVat = applyVatToAmounts(orderItems, vatRate);
+    return { orderItems: withVat, totalAmount, totalQuantity };
   }
 
   /**
@@ -1607,7 +1564,7 @@ export class PDFReportService {
   static async generateCommodityReceipt(
     orderId: number,
     executedBy?: string
-  ): Promise<Buffer> {
+  ): Promise<{ buffer: Buffer; filename: string }> {
     try {
       console.log(`Generating commodity receipt for order ${orderId}...`);
       const db = await getDb();
@@ -1642,7 +1599,6 @@ export class PDFReportService {
         orderDate = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} г.`;
       }
 
-      const receiptNumber = String(order.number || orderId);
       const orderNumber = String(order.number || orderId);
       const discountPercent = Number(order.discount_percent ?? order.discountPercent) || 0;
       const receiptLineTotals = discountedItemAmounts(items || [], discountPercent);
@@ -1654,17 +1610,18 @@ export class PDFReportService {
         const lines = this.getOrderItemProductionRows(it);
         const rowSums = this.distributeItemSumToRows(itemSum, lines);
         lines.forEach((line, idx) => {
-          rowNum++;
           const sum = rowSums[idx] ?? 0;
-          const price = line.quantity > 0 ? Math.round((sum / line.quantity) * 100) / 100 : 0;
-          rows.push({
-            num: rowNum,
-            name: line.name,
-            quantity: line.quantity,
-            unit: line.unit,
-            price,
-            sum,
-          });
+          for (const slice of pricedSlices(sum, line.quantity)) {
+            rowNum++;
+            rows.push({
+              num: rowNum,
+              name: slice.adjustment ? 'Округление' : line.name,
+              quantity: slice.quantity,
+              unit: slice.adjustment ? 'шт.' : line.unit,
+              price: slice.price,
+              sum: slice.amount,
+            });
+          }
         });
       }
       const totalAmount = Math.round(rows.reduce((s: number, r: any) => s + r.sum, 0) * 100) / 100;
@@ -1672,55 +1629,86 @@ export class PDFReportService {
       const manager = order.executedByName || executedBy || '';
 
       const org = await this.getOrganizationForReceipt(order.organization_id);
+      const vatRate = normalizeVatRate(org.vat_rate);
       const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtPrice = (n: number) => {
+        const exactKopecks = Math.abs(n * 100 - Math.round(n * 100)) < 1e-6;
+        return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: exactKopecks ? 2 : 4 });
+      };
       const itemsTable = rows.map((r) => `
         <tr>
           <td>${r.num}</td>
           <td>${this.escapeHtml(r.name)}</td>
           <td>${r.quantity} ${r.unit || 'шт.'}</td>
-          <td>${fmt(r.price)}</td>
+          <td>${fmtPrice(r.price)}</td>
           <td>${fmt(r.sum)}</td>
         </tr>
       `).join('');
-      const summaryLine = `Всего наименований ${rows.length}, на сумму ${fmt(totalAmount)} бел. руб. ${amountInWords}`;
+      const vatNote = vatRate
+        ? ` В том числе НДС ${vatRate}%: ${fmt(Math.round(totalAmount * vatRate / (100 + vatRate) * 100) / 100)}.`
+        : '';
+      const summaryLine = `Всего наименований ${rows.length}, на сумму ${fmt(totalAmount)} бел. руб. ${amountInWords}${vatNote}`;
       const managerLine = manager ? `Менеджер: ${this.escapeHtml(manager)}` : 'Менеджер: ________________';
-
       const templateRow = await db.get<{ html_content: string }>('SELECT html_content FROM receipt_templates WHERE organization_id = ?', org.id);
-      let html: string;
-      if (templateRow?.html_content) {
-        const logoImg = org.logo_url && (org.logo_url.startsWith('data:') || org.logo_url.startsWith('http'))
-          ? `<img src="${org.logo_url.replace(/"/g, '&quot;')}" alt="Logo" style="max-width:150px;max-height:60px;object-fit:contain;" />`
-          : '';
-        html = templateRow.html_content
-          .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
-          .replace(/\{\{unp\}\}/g, this.escapeHtml(org.unp))
-          .replace(/\{\{legalAddress\}\}/g, this.escapeHtml(org.legal_address || ''))
-          .replace(/\{\{phone\}\}/g, this.escapeHtml(org.phone || ''))
-          .replace(/\{\{receiptNumber\}\}/g, this.escapeHtml(receiptNumber))
-          .replace(/\{\{orderNumber\}\}/g, this.escapeHtml(orderNumber))
-          .replace(/\{\{orderDate\}\}/g, this.escapeHtml(orderDate))
-          .replace(/\{\{itemsTable\}\}/g, itemsTable)
-          .replace(/\{\{totalStr\}\}/g, fmt(totalAmount))
-          .replace(/\{\{summaryLine\}\}/g, summaryLine)
-          .replace(/\{\{manager\}\}/g, managerLine)
-          .replace(/\{\{logo\}\}/g, logoImg);
-      } else {
-        html = this.generateCommodityReceiptHTML({
-          receiptNumber,
-          orderNumber,
-          orderDate,
-          companyName: org.name,
-          unp: org.unp,
-          rows,
-          totalAmount,
-          amountInWords,
-          manager,
-          isBlank: false
-        });
-      }
-
-      const pdfBuffer = await this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
-      return pdfBuffer;
+      const sourceHash = documentSourceHash({
+        kind: 'receipt',
+        orderId,
+        orderNumber,
+        orderDate,
+        discountPercent,
+        rows,
+        totalAmount,
+        sellerName: org.name,
+        sellerUnp: org.unp,
+        vatRate,
+        manager,
+      });
+      const issued = await issueOrReuse({
+        kind: 'receipt',
+        orderIds: [Number(orderId)],
+        customerId: Number(order.customer_id ?? order.customerId) || null,
+        organizationId: org.id || null,
+        sourceHash,
+        totalAmount,
+        mimeType: 'application/pdf',
+        filenameFor: (number) => `Товарный-чек-${number}.pdf`,
+        render: async ({ number }) => {
+          let html: string;
+          if (templateRow?.html_content) {
+            const logoImg = org.logo_url && (org.logo_url.startsWith('data:') || org.logo_url.startsWith('http'))
+              ? `<img src="${org.logo_url.replace(/"/g, '&quot;')}" alt="Logo" style="max-width:150px;max-height:60px;object-fit:contain;" />`
+              : '';
+            html = templateRow.html_content
+              .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
+              .replace(/\{\{unp\}\}/g, this.escapeHtml(org.unp))
+              .replace(/\{\{legalAddress\}\}/g, this.escapeHtml(org.legal_address || ''))
+              .replace(/\{\{phone\}\}/g, this.escapeHtml(org.phone || ''))
+              .replace(/\{\{receiptNumber\}\}/g, this.escapeHtml(number))
+              .replace(/\{\{orderNumber\}\}/g, this.escapeHtml(orderNumber))
+              .replace(/\{\{orderDate\}\}/g, this.escapeHtml(orderDate))
+              .replace(/\{\{itemsTable\}\}/g, itemsTable)
+              .replace(/\{\{totalStr\}\}/g, fmt(totalAmount))
+              .replace(/\{\{summaryLine\}\}/g, summaryLine)
+              .replace(/\{\{manager\}\}/g, managerLine)
+              .replace(/\{\{logo\}\}/g, logoImg);
+          } else {
+            html = this.generateCommodityReceiptHTML({
+              receiptNumber: number,
+              orderNumber,
+              orderDate,
+              companyName: org.name,
+              unp: org.unp,
+              rows,
+              totalAmount,
+              amountInWords,
+              manager,
+              isBlank: false,
+            });
+          }
+          return this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
+        },
+      });
+      return { buffer: issued.buffer, filename: issued.filename };
     } catch (error: any) {
       console.error('Error generating commodity receipt:', error);
       throw new Error(`Ошибка генерации товарного чека: ${error?.message || 'Неизвестная ошибка'}`);
@@ -1791,13 +1779,17 @@ export class PDFReportService {
     orderDate: string;
     companyName: string;
     unp: string;
-    rows: Array<{ num: number; name: string; quantity: number; price: number; sum: number }>;
+    rows: Array<{ num: number; name: string; quantity: number; unit?: string; price: number; sum: number }>;
     totalAmount: number;
     amountInWords: string;
     manager: string;
     isBlank: boolean;
   }): string {
     const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtPrice = (n: number) => {
+      const exactKopecks = Math.abs(n * 100 - Math.round(n * 100)) < 1e-6;
+      return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: exactKopecks ? 2 : 4 });
+    };
     const { receiptNumber, orderNumber, orderDate, companyName, unp, rows, totalAmount, amountInWords, manager, isBlank } = data;
 
     const tableRows = isBlank
@@ -1812,8 +1804,8 @@ export class PDFReportService {
         <tr>
           <td>${r.num}</td>
           <td>${this.escapeHtml(r.name)}</td>
-          <td>${r.quantity} шт.</td>
-          <td>${fmt(r.price)}</td>
+          <td>${r.quantity} ${this.escapeHtml(r.unit || 'шт.')}</td>
+          <td>${fmtPrice(r.price)}</td>
           <td>${fmt(r.sum)}</td>
         </tr>
       `).join('');
@@ -1943,17 +1935,18 @@ export class PDFReportService {
         const lines = this.getOrderItemProductionRows(item);
         const rowSums = this.distributeItemSumToRows(itemAmount, lines);
         lines.forEach((line, idx) => {
-          itemNumber++;
           const amount = rowSums[idx] ?? 0;
-          const price = line.quantity > 0 ? Math.round((amount / line.quantity) * 100) / 100 : 0;
-          receiptItems.push({
-            number: itemNumber,
-            name: line.name,
-            quantity: line.quantity,
-            unit: line.unit,
-            price,
-            amount,
-          });
+          for (const slice of pricedSlices(amount, line.quantity)) {
+            itemNumber++;
+            receiptItems.push({
+              number: itemNumber,
+              name: slice.adjustment ? 'Округление' : line.name,
+              quantity: slice.quantity,
+              unit: slice.adjustment ? 'шт.' : line.unit,
+              price: slice.price,
+              amount: slice.amount,
+            });
+          }
         });
       }
 
@@ -2034,82 +2027,7 @@ export class PDFReportService {
     managerName: string;
   }): string {
     const { receiptNumber, orderNumber, orderDate, items, totalAmount, managerName } = data;
-    
-    // Функция для преобразования числа в пропись
-    const numberToWords = (num: number): string => {
-      const ones = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
-      const onesFeminine = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
-      const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
-      const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
-      const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
-      
-      if (num === 0) return 'ноль';
-      const rounded = Math.round(num * 100) / 100;
-      let rubles = Math.floor(rounded);
-      let kopecks = Math.round((rounded - rubles) * 100);
-      if (kopecks >= 100) {
-        kopecks = 0;
-        rubles += 1;
-      }
-      const convertThreeDigits = (n: number, feminine: boolean = false): string => {
-        if (n === 0) return '';
-        
-        const h = Math.floor(n / 100);
-        const t = Math.floor((n % 100) / 10);
-        const o = n % 10;
-        
-        let result = '';
-        if (h > 0) result += hundreds[h] + ' ';
-        if (t === 1) {
-          result += teens[o] + ' ';
-        } else {
-          if (t > 1) result += tens[t] + ' ';
-          if (o > 0) result += (feminine ? onesFeminine[o] : ones[o]) + ' ';
-        }
-        return result.trim();
-      };
-      
-      let rublesText = convertThreeDigits(rubles, true);
-      if (rublesText) {
-        // Склонение рублей
-        const lastDigit = rubles % 10;
-        const lastTwoDigits = rubles % 100;
-        let rubleWord = 'рублей';
-        if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-          rubleWord = 'рублей';
-        } else if (lastDigit === 1) {
-          rubleWord = 'рубль';
-        } else if (lastDigit >= 2 && lastDigit <= 4) {
-          rubleWord = 'рубля';
-        }
-        rublesText += ' ' + rubleWord;
-      } else {
-        rublesText = 'ноль рублей';
-      }
-      
-      // Копейки
-      let kopecksText = '';
-      if (kopecks > 0) {
-        const kopecksWords = convertThreeDigits(kopecks, true);
-        const lastDigit = kopecks % 10;
-        const lastTwoDigits = kopecks % 100;
-        let kopekWord = 'копеек';
-        if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-          kopekWord = 'копеек';
-        } else if (lastDigit === 1) {
-          kopekWord = 'копейка';
-        } else if (lastDigit >= 2 && lastDigit <= 4) {
-          kopekWord = 'копейки';
-        }
-        kopecksText = kopecksWords + ' ' + kopekWord;
-      } else {
-        kopecksText = '00 копеек';
-      }
-      
-      return rublesText + ' ' + kopecksText;
-    };
-
-    const totalInWords = numberToWords(totalAmount);
+    const totalInWords = this.amountInWordsBel(totalAmount);
     const itemsCount = items.length;
     
     const html = `<!DOCTYPE html>

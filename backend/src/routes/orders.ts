@@ -873,13 +873,13 @@ router.get('/:id/commodity-receipt-pdf', asyncHandler(async (req, res) => {
     const user = (req as any).user as { name?: string; email?: string } | undefined;
     const executedBy = user?.name || user?.email || undefined;
 
-    const pdfBuffer = await PDFReportService.generateCommodityReceipt(orderId, executedBy);
+    const pdf = await PDFReportService.generateCommodityReceipt(orderId, executedBy);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="commodity-receipt-${orderId}.pdf"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(pdf.filename)}`);
+    res.setHeader('Content-Length', pdf.buffer.length);
 
-    res.send(pdfBuffer);
+    res.send(pdf.buffer);
   } catch (error: any) {
     console.error('Error generating commodity receipt PDF:', error);
     res.status(500).json({

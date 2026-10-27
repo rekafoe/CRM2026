@@ -19,6 +19,7 @@ router.get('/:id/projects', CustomerController.listProjects)
 router.get('/:id/orders', CustomerController.listOrders)
 
 router.get('/:customerId/legal-documents', CustomerController.listLegalDocuments)
+router.get('/:customerId/legal-documents/:documentId/file', CustomerController.downloadLegalDocumentFile)
 router.post('/:customerId/legal-documents', CustomerController.createLegalDocument)
 router.put('/:customerId/legal-documents/:documentId', CustomerController.updateLegalDocument)
 router.delete('/:customerId/legal-documents/:documentId', CustomerController.deleteLegalDocument)

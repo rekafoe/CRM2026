@@ -22,6 +22,8 @@ export interface CustomerLegalDocument {
   issued_at: string;
   returned_at: string | null;
   notes: string | null;
+  /** Сохранённый файл выданного документа. Пусто у записей, внесённых вручную. */
+  issued_document_id?: number | null;
   created_at: string;
   updated_at: string;
 }

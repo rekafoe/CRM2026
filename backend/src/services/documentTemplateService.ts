@@ -5,6 +5,7 @@ import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 import ExcelJS from 'exceljs';
 import { getDb } from '../config/database';
+import { amountInWordsBel } from '../utils/amountInWordsBel';
 
 export interface DocumentTemplate {
   id: number;
@@ -363,126 +364,7 @@ export class DocumentTemplateService {
         executorAuthorizedPerson: '', // Можно добавить в конфигурацию системы
       };
       
-      // Функция для преобразования числа в пропись (поддержка до миллиона)
-      const numberToWords = (num: number): string => {
-        const ones = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
-        const onesFeminine = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
-        const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
-        const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
-        const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
-        
-        if (num === 0) return 'ноль рублей';
-        
-        const rubles = Math.floor(num);
-        const kopecks = Math.round((num - rubles) * 100);
-        
-        // Функция для преобразования трехзначного числа (0-999)
-        const convertThreeDigits = (n: number, useFeminine: boolean = false): string => {
-          if (n === 0) return '';
-          
-          const onesArray = useFeminine ? onesFeminine : ones;
-          let result = '';
-          
-          // Сотни
-          if (n >= 100) {
-            const h = Math.floor(n / 100);
-            result += hundreds[h] + ' ';
-          }
-          
-          // Десятки и единицы
-          const remainder = n % 100;
-          if (remainder >= 20) {
-            const t = Math.floor(remainder / 10);
-            const o = remainder % 10;
-            result += tens[t] + ' ' + onesArray[o] + ' ';
-          } else if (remainder >= 10) {
-            result += teens[remainder - 10] + ' ';
-          } else if (remainder > 0) {
-            result += onesArray[remainder] + ' ';
-          }
-          
-          return result.trim();
-        };
-        
-        let result = '';
-        
-        // Миллионы (1,000,000 - 999,999,999)
-        if (rubles >= 1000000) {
-          const millions = Math.floor(rubles / 1000000);
-          const millionsPart = convertThreeDigits(millions);
-          result += millionsPart + ' ';
-          
-          // Склонение "миллион"
-          const lastDigit = millions % 10;
-          const lastTwoDigits = millions % 100;
-          if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-            result += 'миллионов ';
-          } else if (lastDigit === 1) {
-            result += 'миллион ';
-          } else if (lastDigit >= 2 && lastDigit <= 4) {
-            result += 'миллиона ';
-          } else {
-            result += 'миллионов ';
-          }
-        }
-        
-        // Тысячи (1,000 - 999,999)
-        const thousands = Math.floor((rubles % 1000000) / 1000);
-        if (thousands > 0) {
-          const thousandsPart = convertThreeDigits(thousands, true); // Для тысяч используем женский род
-          result += thousandsPart + ' ';
-          
-          // Склонение "тысяча"
-          const lastDigit = thousands % 10;
-          const lastTwoDigits = thousands % 100;
-          if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-            result += 'тысяч ';
-          } else if (lastDigit === 1) {
-            result += 'тысяча ';
-          } else if (lastDigit >= 2 && lastDigit <= 4) {
-            result += 'тысячи ';
-          } else {
-            result += 'тысяч ';
-          }
-        }
-        
-        // Единицы (0 - 999)
-        const units = rubles % 1000;
-        if (units > 0 || rubles === 0) {
-          const unitsPart = convertThreeDigits(units);
-          result += unitsPart + ' ';
-        }
-        
-        // Склонение рублей
-        const lastDigit = rubles % 10;
-        const lastTwoDigits = rubles % 100;
-        if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-          result += 'рублей';
-        } else if (lastDigit === 1) {
-          result += 'рубль';
-        } else if (lastDigit >= 2 && lastDigit <= 4) {
-          result += 'рубля';
-        } else {
-          result += 'рублей';
-        }
-        
-        // Копейки
-        if (kopecks > 0) {
-          result += ' ' + kopecks;
-          if (kopecks === 1) {
-            result += ' копейка';
-          } else if (kopecks >= 2 && kopecks <= 4) {
-            result += ' копейки';
-          } else {
-            result += ' копеек';
-          }
-        }
-        
-        return result.trim().replace(/\s+/g, ' '); // Убираем лишние пробелы
-      };
-      
-      templateData.totalAmountInWords = numberToWords(totalAmount || 0);
-      // Алиас для шаблонов, где опечатка: totalAmountinWords (с маленькой "i")
+      templateData.totalAmountInWords = amountInWordsBel(totalAmount || 0);
       templateData.totalAmountinWords = templateData.totalAmountInWords;
       
       // Добавляем все дополнительные поля из data
@@ -1158,6 +1040,13 @@ export class DocumentTemplateService {
       'actDate': 'contractDate',
       'invoiceNumber': 'contractNumber',
       'invoiceDate': 'contractDate',
+      'documentNumber': 'documentNumber',
+      'documentDate': 'documentDate',
+      'sellerName': 'sellerName',
+      'sellerUnp': 'sellerUnp',
+      'sellerAddress': 'sellerAddress',
+      'sellerBankDetails': 'sellerBankDetails',
+      'sellerPhone': 'sellerPhone',
       
       // Суммы и количества
       'totalAmount': 'totalAmount',
@@ -1312,6 +1201,9 @@ export class DocumentTemplateService {
       console.log(`[DocumentTemplate] Вычислен totalAmount из orders: ${preparedData.totalAmount}`);
     }
     
+    preparedData.totalAmountInWords = amountInWordsBel(Number(preparedData.totalAmount) || 0);
+    preparedData.totalAmountinWords = preparedData.totalAmountInWords;
+
     // Если есть маппинг, преобразуем данные
     let mappedData: any = { ...preparedData };
     

@@ -1640,6 +1640,8 @@ export const updateCustomerLegalDocument = (
 ) => api.put<CustomerLegalDocument>(`/customers/${customerId}/legal-documents/${documentId}`, body);
 export const deleteCustomerLegalDocument = (customerId: number, documentId: number) =>
   api.delete(`/customers/${customerId}/legal-documents/${documentId}`);
+export const downloadCustomerLegalDocumentFile = (customerId: number, documentId: number) =>
+  api.get(`/customers/${customerId}/legal-documents/${documentId}/file`, { responseType: 'blob' });
 
 // Document Templates API
 export const getDocumentTemplates = () => 
@@ -1661,8 +1663,8 @@ export const generateDocumentFromTemplate = (id: number, data: TemplateData) =>
 export const generateDocumentByType = (type: 'contract' | 'act' | 'invoice', data: TemplateData) => 
   api.post(`/document-templates/generate/${type}`, data, { responseType: 'blob' });
 
-/** Генерация акта/счёта по списку заказов: расчёт строк и сумм на бэкенде. */
-export const generateDocumentByTypeFromOrders = (type: 'act' | 'invoice', orderIds: number[]) =>
+/** Генерация акта, счёта или договора по заказам: номер и файл сохраняются на бэкенде. */
+export const generateDocumentByTypeFromOrders = (type: 'act' | 'invoice' | 'contract', orderIds: number[]) =>
   api.post(`/document-templates/generate/${type}/from-orders`, { orderIds }, { responseType: 'blob' });
 
 // Анализ шаблона и маппинг полей
@@ -1696,6 +1698,8 @@ export interface Organization {
   bank_details?: string;
   logo_url?: string;
   work_schedule?: string;
+  /** Пусто или 0 — без НДС. Цена для клиента включает НДС, если ставка задана. */
+  vat_rate?: number | null;
   is_default?: number;
   sort_order?: number;
   created_at?: string;

@@ -1,10 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { DocumentTemplateService, TemplateData } from '../services/documentTemplateService';
+import { documentSourceHash, issueOrReuse, IssuedDocumentKind } from '../services/issuedDocumentService';
 import { PDFReportService } from '../services/pdfReportService';
+import { normalizeVatRate } from '../utils/documentVat';
 import { computeOrderAmounts } from '../utils/orderAmounts';
 import { OrderRepository } from '../repositories/orderRepository';
 import { CustomerService } from '../modules/customers/services/customerService';
 import { getDb } from '../config/database';
+import { hasColumn } from '../utils/tableSchemaCache';
 import { upload } from '../config/upload';
 import path from 'path';
 import fs from 'fs';
@@ -291,16 +294,18 @@ router.post('/generate/:type', asyncHandler(async (req: Request, res: Response) 
 }));
 
 /**
- * Генерация акта или счёта по списку заказов: данные и расчёт строк только на бэкенде.
+ * Генерация акта, счёта или договора по списку заказов.
+ * Строки, номер и файл считаются на бэкенде. Повтор без изменения заказа отдаёт сохранённый файл.
  * POST /document-templates/generate/:type/from-orders
  * Body: { orderIds: number[] }
  */
 router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res: Response) => {
   const { type } = req.params;
-  if (!['act', 'invoice'].includes(type)) {
-    res.status(400).json({ message: 'Тип должен быть act или invoice' });
+  if (!['act', 'invoice', 'contract'].includes(type)) {
+    res.status(400).json({ message: 'Тип должен быть act, invoice или contract' });
     return;
   }
+  const kind = type as IssuedDocumentKind;
   const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id) && id > 0) : [];
   if (orderIds.length === 0) {
     res.status(400).json({ message: 'Укажите orderIds (массив id заказов)' });
@@ -308,7 +313,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
   }
 
   try {
-    const template = await DocumentTemplateService.getDefaultTemplate(type as 'act' | 'invoice');
+    const template = await DocumentTemplateService.getDefaultTemplate(kind as 'act' | 'invoice' | 'contract');
     if (!template) {
       res.status(404).json({ message: `Шаблон для типа "${type}" не найден. Загрузите шаблон в разделе "Шаблоны документов".` });
       return;
@@ -319,11 +324,19 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       return;
     }
 
-    type OrderRow = { id: number; number: string; created_at: string; status: number; customer_id: number; discount_percent: number };
+    type OrderRow = {
+      id: number
+      number: string
+      created_at: string
+      status: number
+      customer_id: number
+      organization_id?: number | null
+      discount_percent: number
+    };
     const db = await getDb();
     const placeholders = orderIds.map(() => '?').join(',');
     const rawOrderRows = await db.all<OrderRow>(
-      `SELECT id, number, created_at, status, customer_id, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id IN (${placeholders})`,
+      `SELECT id, number, created_at, status, customer_id, organization_id, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id IN (${placeholders})`,
       ...orderIds
     );
     const orderRows: OrderRow[] = Array.isArray(rawOrderRows) ? rawOrderRows : [];
@@ -333,6 +346,21 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       res.status(404).json({ message: 'Заказы не найдены' });
       return;
     }
+    const customerIds = [...new Set(orders.map((order) => Number(order.customer_id)).filter((id) => id > 0))];
+    if (customerIds.length > 1) {
+      res.status(400).json({ message: 'В один документ можно включить заказы только одного клиента' });
+      return;
+    }
+
+    const organizationId = orders.find((order) => Number(order.organization_id) > 0)?.organization_id ?? null;
+    const vatCol = (await hasColumn('organizations', 'vat_rate').catch(() => false)) ? ', vat_rate' : '';
+    const seller = await db.get<any>(
+      organizationId
+        ? `SELECT id, name, unp, legal_address, phone, bank_details${vatCol} FROM organizations WHERE id = ?`
+        : `SELECT id, name, unp, legal_address, phone, bank_details${vatCol} FROM organizations ORDER BY is_default DESC, id ASC LIMIT 1`,
+      ...(organizationId ? [organizationId] : []),
+    );
+    const vatRate = normalizeVatRate(seller?.vat_rate);
 
     const itemsMap = await OrderRepository.getItemsByOrderIds(orders.map((o) => o.id));
     const flatItems: Array<{ orderId: number; price: number; quantity: number; params: any; name?: string; type?: string }> = [];
@@ -351,7 +379,11 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     }
 
     const getDiscountPercent = (orderId: number) => orderMap.get(orderId)?.discount_percent ?? 0;
-    const { orderItems, totalAmount, totalQuantity } = PDFReportService.buildDocumentRowsFromItems(flatItems, getDiscountPercent);
+    const { orderItems, totalAmount, totalQuantity } = PDFReportService.buildDocumentRowsFromItems(
+      flatItems,
+      getDiscountPercent,
+      vatRate,
+    );
 
     const orderAmounts = new Map<number, number>();
     for (const o of orders) {
@@ -370,7 +402,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     const customerName = customer
       ? (customer.company_name || customer.legal_name || CustomerService.getCustomerDisplayName(customer))
       : '—';
-    const templateData: TemplateData = {
+    const baseData: TemplateData = {
       customerName,
       companyName: customer?.company_name ?? '',
       legalName: customer?.legal_name ?? '',
@@ -378,6 +410,11 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       taxId: customer?.tax_id ?? '—',
       bankDetails: customer?.bank_details ?? '—',
       authorizedPerson: customer?.authorized_person ?? '—',
+      sellerName: seller?.name ?? '',
+      sellerUnp: seller?.unp ?? '',
+      sellerAddress: seller?.legal_address ?? '',
+      sellerBankDetails: seller?.bank_details ?? '',
+      sellerPhone: seller?.phone ?? '',
       orders: orders.map((o) => ({
         number: o.number || `#${o.id}`,
         date: formatDateForDocument(o.created_at),
@@ -388,16 +425,45 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       totalAmount,
       totalQuantity,
     };
-
-    const buffer = await DocumentTemplateService.generateDocumentWithMapping(template.id, templateData);
+    const sourceHash = documentSourceHash({
+      kind,
+      templateId: template.id,
+      sellerUnp: seller?.unp ?? '',
+      vatRate,
+      ...baseData,
+    });
     const ext = path.extname(template.file_path);
     const contentType = ext === '.docx'
       ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    const filename = DocumentTemplateService.generateDocumentFilename(template, templateData);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    res.send(buffer);
+    const issued = await issueOrReuse({
+      kind,
+      orderIds: orders.map((order) => order.id),
+      customerId: customerId || null,
+      organizationId: seller?.id ?? null,
+      sourceHash,
+      totalAmount,
+      mimeType: contentType,
+      filenameFor: (number) => {
+        const named = DocumentTemplateService.generateDocumentFilename(template, {
+          ...baseData,
+          contractNumber: number,
+        });
+        return named || `${kind}-${number}${ext}`;
+      },
+      render: async ({ number, issuedDate }) => DocumentTemplateService.generateDocumentWithMapping(template.id, {
+        ...baseData,
+        contractNumber: number,
+        contractDate: issuedDate,
+        actNumber: number,
+        invoiceNumber: number,
+        documentNumber: number,
+        documentDate: issuedDate,
+      }),
+    });
+    res.setHeader('Content-Type', issued.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(issued.filename)}`);
+    res.send(issued.buffer);
   } catch (error: any) {
     console.error(`[DocumentTemplate] generate from-orders (${type}):`, error);
     res.status(500).json({ message: error?.message || 'Ошибка генерации документа' });

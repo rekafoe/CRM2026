@@ -10,6 +10,7 @@ export interface CustomerLegalDocumentRow {
   issued_at: string;
   returned_at: string | null;
   notes: string | null;
+  issued_document_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,10 @@ export class CustomerLegalDocumentService {
       issued_at: String(row.issued_at ?? ''),
       returned_at: row.returned_at != null ? String(row.returned_at) : null,
       notes: row.notes != null ? String(row.notes) : null,
+      issued_document_id:
+        row.issued_document_id != null && row.issued_document_id !== ''
+          ? Number(row.issued_document_id)
+          : null,
       created_at: String(row.created_at ?? ''),
       updated_at: String(row.updated_at ?? ''),
     };
@@ -69,6 +74,7 @@ export class CustomerLegalDocumentService {
       returned_at?: string | null;
       notes?: string | null;
       order_id?: number | null;
+      issued_document_id?: number | null;
     },
   ): Promise<CustomerLegalDocumentRow> {
     await this.assertLegalCustomer(customerId);
@@ -86,12 +92,16 @@ export class CustomerLegalDocumentService {
       }
     }
 
+    const issuedDocumentId =
+      data.issued_document_id != null && Number(data.issued_document_id) > 0
+        ? Number(data.issued_document_id)
+        : null;
     const db = await getDb();
     const now = new Date().toISOString();
     const result = await db.run(
       `INSERT INTO customer_legal_documents (
-        customer_id, order_id, title, document_kind, issued_at, returned_at, notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        customer_id, order_id, title, document_kind, issued_at, returned_at, notes, issued_document_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerId,
         orderId,
@@ -100,6 +110,7 @@ export class CustomerLegalDocumentService {
         issued,
         data.returned_at?.trim() || null,
         data.notes?.trim() || null,
+        issuedDocumentId,
         now,
         now,
       ],

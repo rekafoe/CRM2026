@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { CustomerService } from '../services/customerService'
 import { CustomerLegalDocumentService } from '../services/customerLegalDocumentService'
+import { readIssuedFileForCustomer } from '../../../services/issuedDocumentService'
 import { listCustomerProjects } from '../../../services/customerProjectService'
 import { OrderService } from '../../orders/services/orderService'
 import { asyncHandler } from '../../../middleware'
@@ -29,6 +30,28 @@ export class CustomerController {
         return
       }
       res.status(500).json({ error: msg })
+    }
+  })
+
+  /**
+   * GET /api/customers/:customerId/legal-documents/:documentId/file
+   * Отдаёт сохранённый файл выданного документа, без повторной сборки.
+   */
+  static downloadLegalDocumentFile = asyncHandler(async (req: Request, res: Response) => {
+    const customerId = parseInt(req.params.customerId, 10)
+    const documentId = parseInt(req.params.documentId, 10)
+    if (isNaN(customerId) || isNaN(documentId)) {
+      res.status(400).json({ error: 'Неверный ID' })
+      return
+    }
+    try {
+      const file = await readIssuedFileForCustomer(customerId, documentId)
+      res.setHeader('Content-Type', file.mimeType)
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`)
+      res.send(file.buffer)
+    } catch (e: any) {
+      const msg = e?.message || 'Файл не найден'
+      res.status(404).json({ error: msg })
     }
   })
 
