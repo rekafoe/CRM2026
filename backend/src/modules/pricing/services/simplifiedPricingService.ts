@@ -21,7 +21,11 @@ import {
   type RollWideM2PricingResult,
 } from './rollWideM2PricingService';
 import { PriceTypeService } from './priceTypeService';
-import { BindingPricingService, BindingQuoteResult } from './bindingPricingService';
+import {
+  BindingPricingService,
+  BindingQuoteResult,
+  resolveConfiguredBindingInput,
+} from './bindingPricingService';
 import {
   computeKnifePathMetersSheet,
   computeOptimizedRollFeedMeters,
@@ -1630,26 +1634,36 @@ export class SimplifiedPricingService {
       Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
     );
 
-    const configuredBindingServiceId = Number(
-      (configuration as any).binding_service_id ??
-      multiPageStructure?.binding?.service_id
-    );
-    const configuredBindingVariantIdRaw =
-      (configuration as any).binding_variant_id ??
-      multiPageStructure?.binding?.variant_id;
-    const configuredBindingVariantId =
-      configuredBindingVariantIdRaw != null && Number.isFinite(Number(configuredBindingVariantIdRaw))
-        ? Number(configuredBindingVariantIdRaw)
-        : undefined;
-    const configuredBindingUnitsRaw =
-      (configuration as any).binding_units_per_item ??
-      multiPageStructure?.binding?.units_per_item;
-    const configuredBindingUnits =
-      configuredBindingUnitsRaw != null && Number.isFinite(Number(configuredBindingUnitsRaw)) && Number(configuredBindingUnitsRaw) > 0
-        ? Number(configuredBindingUnitsRaw)
-        : 1;
+    // binding_service_id с клиента на листовом продукте раньше вырезал ту же услугу из finishing
+    // без вызова BindingPricingService → обязательная отделка становилась бесплатной.
+    const resolvedBinding = resolveConfiguredBindingInput({
+      usePagesMultiplier,
+      templateBinding: multiPageStructure?.binding ?? null,
+      clientBindingServiceId: (configuration as any).binding_service_id,
+      clientBindingVariantId: (configuration as any).binding_variant_id,
+      clientBindingUnitsPerItem: (configuration as any).binding_units_per_item,
+    });
+    let configuredBindingServiceId = resolvedBinding.serviceId ?? 0;
+    const configuredBindingVariantId = resolvedBinding.variantId;
+    const configuredBindingUnits = resolvedBinding.unitsPerItem;
+    let hasConfiguredBinding = configuredBindingServiceId > 0;
 
-    const hasConfiguredBinding = Number.isFinite(configuredBindingServiceId) && configuredBindingServiceId > 0;
+    if (hasConfiguredBinding) {
+      const bindService = await db.get<{ id: number; operation_type?: string | null }>(
+        `SELECT id, operation_type FROM post_processing_services WHERE id = ? AND is_active = 1`,
+        [configuredBindingServiceId],
+      );
+      if (!bindService || String(bindService.operation_type || '').toLowerCase() !== 'bind') {
+        logger.warn('binding_service_id проигнорирован: услуга не является переплётом', {
+          productId,
+          serviceId: configuredBindingServiceId,
+          operation_type: bindService?.operation_type ?? null,
+        });
+        configuredBindingServiceId = 0;
+        hasConfiguredBinding = false;
+      }
+    }
+
     let effectiveFinishingToUse = [...finishingToUse];
     if (hasConfiguredBinding) {
       // Переплет считаем отдельным контуром через BindingPricingService.
