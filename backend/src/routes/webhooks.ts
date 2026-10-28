@@ -61,26 +61,46 @@ router.post(
     }
 
     const db = await getDb()
+    let hasIsCancelled = false
+    try {
+      hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+    } catch {
+      hasIsCancelled = false
+    }
+    const orderSelect = hasIsCancelled
+      ? 'SELECT id, prepaymentAmount, COALESCE(is_cancelled, 0) as is_cancelled FROM orders'
+      : 'SELECT id, prepaymentAmount, 0 as is_cancelled FROM orders'
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
+      ? await db.get<{ id: number; prepaymentAmount?: number | string | null; is_cancelled?: number }>(
+          `${orderSelect} WHERE paymentId = ?`,
           paymentId,
         )
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
+      order = await db.get<{ id: number; prepaymentAmount?: number | string | null; is_cancelled?: number }>(
+        `${orderSelect} WHERE number = ?`,
         trackingId,
       )
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
+        order = await db.get<{ id: number; prepaymentAmount?: number | string | null; is_cancelled?: number }>(
+          `${orderSelect} WHERE id = ?`,
           Number(trackingId),
         )
       }
     }
     if (!order) {
       logger.warn('BePaid webhook: order not found', { paymentId, trackingId, statusRaw })
+      res.status(204).end()
+      return
+    }
+    // Soft-cancel (beyond #58 confirm/prepay): не штамповать prepaid на отменённый заказ.
+    if (Number(order.is_cancelled) === 1) {
+      logger.warn('BePaid webhook: ignore soft-cancelled order', {
+        orderId: order.id,
+        paymentId,
+        trackingId,
+        statusRaw,
+      })
       res.status(204).end()
       return
     }
