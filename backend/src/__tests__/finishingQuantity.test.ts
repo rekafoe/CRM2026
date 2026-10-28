@@ -47,6 +47,14 @@ describe('finishing quantity', () => {
     expect(result).toEqual([{ service_id: 9, units_per_item: 0 }]);
   });
 
+  it('не даёт клиенту обнулить обязательную услугу, если в шаблоне нет нормы', () => {
+    const result = enforceRequiredFinishing(
+      [{ service_id: 9, units_per_item: 0 }],
+      [{ service_id: 9, is_required: true }],
+    );
+    expect(result).toEqual([{ service_id: 9 }]);
+  });
+
   it('не подключает синтетические id плоттера', () => {
     expect(
       enforceRequiredFinishing([], [{ service_id: -910003, is_required: true, units_per_item: 5 }]),

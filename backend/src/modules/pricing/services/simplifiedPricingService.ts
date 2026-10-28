@@ -1625,9 +1625,13 @@ export class SimplifiedPricingService {
     }
 
     // Обязательная услуга размера всегда в расчёте, с количеством из шаблона, даже если клиент её снял или прислал другое число.
-    finishingToUse = enforceRequiredFinishing(
-      finishingToUse,
-      Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
+    const sizeFinishingTemplate = Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [];
+    finishingToUse = enforceRequiredFinishing(finishingToUse, sizeFinishingTemplate);
+    const requiredFinishingServiceIds = new Set(
+      sizeFinishingTemplate
+        .filter((row) => isTemplateFinishingRequired(row))
+        .map((row) => Number((row as any).service_id))
+        .filter((id) => Number.isFinite(id) && id > 0),
     );
 
     const configuredBindingServiceId = Number(
@@ -1702,7 +1706,10 @@ export class SimplifiedPricingService {
         )) as Array<{ id: number; min_quantity?: number | null }>;
         const minByService = new Map(limits.map((r) => [Number(r.id), Number(r.min_quantity ?? 1)]));
         effectiveFinishingToUse = effectiveFinishingToUse.filter((f: any) => {
-          const minQ = minByService.get(Number(f?.service_id)) ?? 1;
+          const sid = Number(f?.service_id);
+          // Обязательные услуги размера не отбрасываем: иначе после be373bb0 их можно «снять» тиражом ниже min_quantity.
+          if (requiredFinishingServiceIds.has(sid)) return true;
+          const minQ = minByService.get(sid) ?? 1;
           return quantity >= minQ;
         });
       }
@@ -2207,6 +2214,17 @@ export class SimplifiedPricingService {
               productId,
               serviceId: finConfig.service_id,
             });
+            // Обязательная услуга без тарифа (часто: цены только на вариантах, а variant_id не выбран)
+            // раньше молча давала $0 — публичный calculate / reprice недоплачивали.
+            if (requiredFinishingServiceIds.has(Number(finConfig.service_id))) {
+              const serviceName =
+                serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
+              const err: any = new Error(
+                `Обязательная услуга «${serviceName}» не имеет тарифа для расчёта. Выберите вариант услуги или задайте цены.`,
+              );
+              err.status = 400;
+              throw err;
+            }
             continue;
           }
 

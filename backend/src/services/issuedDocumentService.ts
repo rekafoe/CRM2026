@@ -81,13 +81,11 @@ async function readStored(kind: IssuedDocumentKind, key: string, sourceHash: str
 
 async function allocateNumber(kind: IssuedDocumentKind): Promise<string> {
   const db = await getDb()
-  await db.run(
-    `INSERT INTO document_number_counters (kind, last_value) VALUES (?, 1)
-     ON CONFLICT(kind) DO UPDATE SET last_value = last_value + 1`,
-    [kind],
-  )
+  // Один statement: UPDATE+RETURNING, без гонки между bump и SELECT на общем соединении.
   const row = await db.get<{ last_value: number }>(
-    'SELECT last_value FROM document_number_counters WHERE kind = ?',
+    `INSERT INTO document_number_counters (kind, last_value) VALUES (?, 1)
+     ON CONFLICT(kind) DO UPDATE SET last_value = last_value + 1
+     RETURNING last_value`,
     [kind],
   )
   const value = Number(row?.last_value || 1)

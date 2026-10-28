@@ -89,11 +89,22 @@ export function enforceRequiredFinishing<T extends FinishingRow>(
       continue;
     }
     const prev = next[index];
-    next[index] = {
+    const patched: FinishingRow = {
       ...prev,
       ...(variantId != null ? { variant_id: variantId } : {}),
-      ...(units != null ? { units_per_item: units } : {}),
     };
+    if (units != null) {
+      // Шаблон задал норму (в том числе 0) — она источник истины.
+      patched.units_per_item = units;
+    } else {
+      // В шаблоне нормы нет: клиентский 0 / мусор не должен обнулить обязательную услугу
+      // (в калькуляторе сработает units_per_item ?? 1).
+      const clientUnits = templateUnits(prev.units_per_item);
+      if (clientUnits == null || clientUnits <= 0) {
+        delete patched.units_per_item;
+      }
+    }
+    next[index] = patched as T;
   }
 
   return next;
