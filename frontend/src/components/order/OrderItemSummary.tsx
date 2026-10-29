@@ -2,6 +2,7 @@ import React from 'react';
 import type { Item } from '../../types';
 import { usePriceTypeLabels } from '../../hooks/pricing/usePriceTypeLabels';
 import { BynSymbol } from '../ui/BynSymbol';
+import { isBareMaterialId, namedPaperTypeFromMaterials } from './orderItemBreakdownUtils';
 import { filterOperatorVisibleParameters, itemParamsHasNoLayout } from './orderItemUtils';
 
 interface ParameterSummaryItem {
@@ -176,7 +177,12 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
         //  Показываем "Тип материала" всегда, если есть materialTypeDisplay или materialTypeRaw
         // Это важно для оператора, чтобы он видел тип бумаги (например, "Глянцевая"), даже если "Материал" показывает то же самое
         // Плотности для материалов разных типов могут быть одинаковыми, поэтому нужен именно тип бумаги
-        const raw = String(fromWarehouse || fromType || materialTypeRaw || '').trim();
+        const candidate = String(fromWarehouse || fromType || materialTypeRaw || '').trim();
+        const raw = isBareMaterialId(candidate)
+          ? namedPaperTypeFromMaterials(
+              item.params.materials as Parameters<typeof namedPaperTypeFromMaterials>[0],
+            ) || candidate
+          : candidate;
         if (!raw) return null;
         
         //  Не скрываем тип материала, даже если он совпадает с "Материал"

@@ -11,6 +11,7 @@ import {
   isAutoDescription,
   sanitizeOrderItemDescription,
 } from './order/orderItemUtils';
+import { isBareMaterialId, namedPaperTypeFromMaterials } from './order/orderItemBreakdownUtils';
 import './OrderItem.css';
 import { OrderItemSummary } from './order/OrderItemSummary';
 import { OrderItemPositionBreakdown } from './order/OrderItemPositionBreakdown';
@@ -356,7 +357,13 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   
   // Извлекаем данные о материале для отображения
   //  Приоритет: materialType (тип материала, например 'coated'), затем paperType (тип бумаги, например 'glossy')
-  const materialTypeRaw = specsAny?.materialType || specsAny?.paperType || null;
+  const materialTypeSource = specsAny?.materialType || specsAny?.paperType || null;
+  const materialTypeFromCalculation = isBareMaterialId(materialTypeSource)
+    ? namedPaperTypeFromMaterials(
+        item.params.materials as Parameters<typeof namedPaperTypeFromMaterials>[0],
+      )
+    : '';
+  const materialTypeRaw = materialTypeFromCalculation || materialTypeSource;
   const materialFormat = specsAny?.format || item.params.formatInfo || sheetSize || null;
   //  Приоритет: плотность из specifications (то, что выбрал пользователь), затем из parameterSummary, затем из params
   const densityFromSummary = parameterSummary.find((p) => p.label === 'Плотность бумаги' || p.label === 'Плотность')?.value;

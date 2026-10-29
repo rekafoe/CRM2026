@@ -1,4 +1,5 @@
 import type { Item } from '../../types';
+import { isBareMaterialId, namedPaperTypeFromMaterials } from './orderItemBreakdownUtils';
 import { sanitizeOrderItemDescription } from './orderItemUtils';
 
 type SummaryRow = { label?: string; value?: string };
@@ -25,9 +26,13 @@ export function buildOrderItemEssence(item: Item): string {
     (typeof params?.formatInfo === 'string' ? params.formatInfo.trim() : '');
   if (size) parts.push(size);
 
-  const material =
+  const materialFromSummary =
     summaryValue(summary, /материал|бумаг|пл[её]нк/i) ||
     (typeof params?.paperName === 'string' ? params.paperName.trim() : '');
+  const material = isBareMaterialId(materialFromSummary)
+    ? namedPaperTypeFromMaterials(params?.materials as Parameters<typeof namedPaperTypeFromMaterials>[0]) ||
+      materialFromSummary
+    : materialFromSummary;
   const density = summaryValue(summary, /плотност/i);
   if (material) {
     parts.push(density && !material.includes(density) ? `${material} ${density}` : material);

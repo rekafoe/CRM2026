@@ -38,10 +38,39 @@ export function isPrintCostRow(s: OrderItemServiceRow): boolean {
   return n === 'печать';
 }
 
+/** Id материала («11») — не название типа бумаги. */
+export function isBareMaterialId(value: unknown): boolean {
+  return /^\d+$/.test(String(value ?? '').trim());
+}
+
+function humanPaperText(value: unknown): string {
+  const text = String(value ?? '').trim();
+  if (!text || isBareMaterialId(text)) return '';
+  return text;
+}
+
+/**
+ * Имя типа из строк расчёта. Короткое paper_type_name важнее SKU «… бумага 350».
+ */
+export function namedPaperTypeFromMaterials(
+  materials: Array<Pick<OrderItemMaterialRow, 'paper_type_name' | 'materialName' | 'material'>> | undefined,
+): string {
+  if (!Array.isArray(materials)) return '';
+  for (const row of materials) {
+    const paper = humanPaperText(row?.paper_type_name);
+    if (paper) return paper;
+  }
+  for (const row of materials) {
+    const name = humanPaperText(row?.materialName || row?.material);
+    if (name) return name;
+  }
+  return '';
+}
+
 /**
  * Подпись типа бумаги для заказа: как в калькуляторе (Мелованная/полуматовая и т.д.),
- * не складское имя позиции.
- * Сводка «Материал» → paper_type_name → materialName.
+ * не складское имя позиции и не id материала.
+ * Сводка с названием → paper_type_name → materialName.
  */
 export function humanReadablePaperLabel(
   row: OrderItemMaterialRow | undefined,
@@ -64,13 +93,14 @@ export function humanReadablePaperLabel(
     if (ptEntry?.value?.trim()) fromSummary = ptEntry.value.trim();
   }
 
-  if (fromSummary) return fromSummary;
+  if (fromSummary && !isBareMaterialId(fromSummary)) return fromSummary;
 
-  const paperType = String(row?.paper_type_name || '').trim();
+  const paperType = humanPaperText(row?.paper_type_name);
   if (paperType) return paperType;
 
-  const raw = String(row?.materialName || row?.material || '').trim();
-  return raw || 'Материал';
+  const raw = humanPaperText(row?.materialName || row?.material);
+  if (raw) return raw;
+  return fromSummary || 'Материал';
 }
 
 /** Стороны печати для подписи заказа (согласовано с калькулятором). */
