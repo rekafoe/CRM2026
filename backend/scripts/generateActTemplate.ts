@@ -224,7 +224,7 @@ cellA28.border = {
 };
 
 const cellI28 = worksheet.getCell('I28');
-cellI28.value = 'должность';
+cellI28.value = '${signerPosition}';
 cellI28.border = {
   bottom: { style: 'thin', color: { argb: 'FF000000' } }
 };
@@ -247,7 +247,7 @@ cellI29.border = {
 
 // Строка 31
 worksheet.getCell('A31').value = '${executorAuthorizedPerson}';
-worksheet.getCell('I31').value = '${authorizedPerson}';
+worksheet.getCell('I31').value = '${signerName}';
 
 // Сохраняем файл
 const outputPath = path.resolve(__dirname, '../../templates/act-template.xlsx');
@@ -291,7 +291,9 @@ workbook.xlsx.writeFile(outputPath)
     console.log('  - ${totalAmount} - Общая сумма');
     console.log('  - ${totalQuantity} - Общее количество услуг');
     console.log('  - ${totalAmountInWords} - Сумма прописью');
-    console.log('  - ${authorizedPerson} - Уполномоченное лицо заказчика');
+    console.log('  - ${signerPosition} - Должность заказчика');
+    console.log('  - ${signerName} - ФИО заказчика');
+    console.log('  - ${authorizedPerson} - ФИО и основание одной строкой');
     console.log('  - ${executorAuthorizedPerson} - Уполномоченное лицо исполнителя');
   })
   .catch((error) => {

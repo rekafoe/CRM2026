@@ -6,6 +6,20 @@ import { listCustomerProjects } from '../../../services/customerProjectService'
 import { OrderService } from '../../orders/services/orderService'
 import { asyncHandler } from '../../../middleware'
 
+function signerFromBody(body: Record<string, unknown>) {
+  const text = (key: string) =>
+    Object.prototype.hasOwnProperty.call(body, key) && typeof body[key] === 'string'
+      ? (body[key] as string)
+      : undefined
+  return {
+    signer_position: text('signer_position'),
+    signer_position_genitive: text('signer_position_genitive'),
+    signer_name: text('signer_name'),
+    signer_name_genitive: text('signer_name_genitive'),
+    authority_basis: text('authority_basis'),
+  }
+}
+
 export class CustomerController {
   /**
    * GET /api/customers/:customerId/legal-documents
@@ -232,6 +246,7 @@ export class CustomerController {
       source,
       marketing_opt_in
     } = req.body
+    const signer = signerFromBody(req.body as Record<string, unknown>)
 
     if (!type || !['individual', 'legal'].includes(type)) {
       res.status(400).json({ error: 'Необходимо указать тип клиента (individual или legal)' })
@@ -249,6 +264,7 @@ export class CustomerController {
         tax_id,
         bank_details,
         authorized_person,
+        ...signer,
         phone,
         email,
         address,
@@ -289,6 +305,7 @@ export class CustomerController {
       notes,
       marketing_opt_in
     } = req.body
+    const signer = signerFromBody(req.body as Record<string, unknown>)
 
     const payload: Parameters<typeof CustomerService.updateCustomer>[1] = {
         type,
@@ -300,6 +317,7 @@ export class CustomerController {
         tax_id,
         bank_details,
         authorized_person,
+        ...signer,
         phone,
         email,
         address,

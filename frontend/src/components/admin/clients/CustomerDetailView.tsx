@@ -14,6 +14,7 @@ import * as XLSX from 'xlsx';
 import '../../admin/ProductManagement.css';
 import {
   getCustomerDisplayName,
+  customerDocumentParty,
   getOrderTotal,
   formatDateValue,
   formatDateForFile,
@@ -32,6 +33,12 @@ import { CustomerDetailProfilePanel } from './customerDetail/CustomerDetailProfi
 import { CustomerDetailOrdersPanel } from './customerDetail/CustomerDetailOrdersPanel';
 import { CustomerDetailAllOrdersPanel } from './customerDetail/CustomerDetailAllOrdersPanel';
 import { CustomerDetailProjectsPanel } from './customerDetail/CustomerDetailProjectsPanel';
+import {
+  emptyLegalForm,
+  legalFormFromCustomer,
+  persistableLegalDetails,
+  type CustomerLegalFormState,
+} from '../../../utils/legalSigner';
 
 export const CustomerDetailView: React.FC<{
   customerId: number;
@@ -47,7 +54,7 @@ export const CustomerDetailView: React.FC<{
   const [activeTab, setActiveTab] = useState<CustomerDetailTab>(DEFAULT_CUSTOMER_DETAIL_TAB);
   const [ordersFrom, setOrdersFrom] = useState('');
   const [ordersTo, setOrdersTo] = useState('');
-  const [legalForm, setLegalForm] = useState({ bank_details: '', authorized_person: '' });
+  const [legalForm, setLegalForm] = useState<CustomerLegalFormState>(emptyLegalForm);
   const [savingLegal, setSavingLegal] = useState(false);
   const [editForm, setEditForm] = useState<{
     first_name: string;
@@ -113,13 +120,10 @@ export const CustomerDetailView: React.FC<{
 
   useEffect(() => {
     if (!customer || customer.type !== 'legal') {
-      setLegalForm({ bank_details: '', authorized_person: '' });
+      setLegalForm(emptyLegalForm());
       return;
     }
-    setLegalForm({
-      bank_details: customer.bank_details || '',
-      authorized_person: customer.authorized_person || '',
-    });
+    setLegalForm(legalFormFromCustomer(customer));
   }, [customer]);
 
   useEffect(() => {
@@ -281,10 +285,7 @@ export const CustomerDetailView: React.FC<{
     if (!customer || customer.type !== 'legal') return;
     try {
       setSavingLegal(true);
-      const { data } = await updateCustomer(customer.id, {
-        bank_details: legalForm.bank_details.trim(),
-        authorized_person: legalForm.authorized_person.trim(),
-      });
+      const { data } = await updateCustomer(customer.id, persistableLegalDetails(legalForm));
       if (data) setCustomer(data);
       await refreshCustomer();
     } catch (err: any) {
@@ -449,13 +450,7 @@ export const CustomerDetailView: React.FC<{
       // Пытаемся использовать шаблон
       try {
         const templateData: TemplateData = {
-          customerName: customer.company_name || customer.legal_name || getCustomerDisplayName(customer),
-          companyName: customer.company_name || '',
-          legalName: customer.legal_name || '',
-          legalAddress: customer.address || '—',
-          taxId: customer.tax_id || '—',
-          bankDetails: customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—'),
-          authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
+          ...customerDocumentParty(customer, legalForm),
           orders: countedOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
@@ -622,13 +617,7 @@ export const CustomerDetailView: React.FC<{
       // Пытаемся использовать шаблон
       try {
         const templateData: TemplateData = {
-          customerName: customer.company_name || customer.legal_name || getCustomerDisplayName(customer),
-          companyName: customer.company_name || '',
-          legalName: customer.legal_name || '',
-          legalAddress: customer.address || '—',
-          taxId: customer.tax_id || '—',
-          bankDetails: customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—'),
-          authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
+          ...customerDocumentParty(customer, legalForm),
           orders: countedOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
@@ -733,13 +722,7 @@ export const CustomerDetailView: React.FC<{
       // Пытаемся использовать шаблон
       try {
         const templateData: TemplateData = {
-          customerName,
-          companyName: customer.company_name || '',
-          legalName: customer.legal_name || '',
-          legalAddress: customer.address || '—',
-          taxId: customer.tax_id || '—',
-          bankDetails: customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—'),
-          authorizedPerson: customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—'),
+          ...customerDocumentParty(customer, legalForm),
           contractNumber,
           contractDate: new Date().toLocaleDateString('ru-RU'),
           orders: countedOrders.map((order, index) => ({
@@ -792,9 +775,9 @@ export const CustomerDetailView: React.FC<{
       
       // Стандартная генерация без шаблона
       const title = `ДОГОВОР № ${contractNumber}`;
-      const bankDetails = customer.type === 'legal' ? (legalForm.bank_details.trim() || customer.bank_details || '—') : (customer.bank_details || '—');
-      const authorizedPerson = customer.type === 'legal' ? (legalForm.authorized_person.trim() || customer.authorized_person || '—') : (customer.authorized_person || '—');
-      const legalAddress = customer.address || '—';
+      const party = customerDocumentParty(customer, legalForm);
+      const bankDetails = party.bankDetails;
+      const legalAddress = party.legalAddress;
 
       const tableRows = [
         new TableRow({
@@ -844,8 +827,16 @@ export const CustomerDetailView: React.FC<{
               }),
               new Paragraph({
                 children: [
-                  new TextRun({ text: 'Уполномоченное лицо: ', bold: true }),
-                  new TextRun({ text: authorizedPerson }),
+                  new TextRun({ text: 'В лице: ', bold: true }),
+                  new TextRun({
+                    text: `${party.signerPositionGenitive} ${party.signerNameGenitive}, на основании ${party.authorityBasis}`,
+                  }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Подпись: ', bold: true }),
+                  new TextRun({ text: `${party.signerPosition} ${party.signerName}` }),
                 ],
               }),
               new Paragraph({ text: ' ', spacing: { after: 200 } }),

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '../../../common';
 import { Customer } from '../../../../types';
+import { signerPreview, type CustomerLegalFormState } from '../../../../utils/legalSigner';
 
 export type CustomerEditFormState = {
   first_name: string;
@@ -22,8 +23,8 @@ interface CustomerDetailProfilePanelProps {
   setEditForm: React.Dispatch<React.SetStateAction<CustomerEditFormState>>;
   onSaveDetails: () => void;
   savingCustomer: boolean;
-  legalForm: { bank_details: string; authorized_person: string };
-  setLegalForm: React.Dispatch<React.SetStateAction<{ bank_details: string; authorized_person: string }>>;
+  legalForm: CustomerLegalFormState;
+  setLegalForm: React.Dispatch<React.SetStateAction<CustomerLegalFormState>>;
   onSaveLegal: () => void;
   savingLegal: boolean;
 }
@@ -165,8 +166,11 @@ export const CustomerDetailProfilePanel: React.FC<CustomerDetailProfilePanelProp
             {savingLegal ? 'Сохранение…' : 'Сохранить'}
           </Button>
         </div>
+        <p className="customers-legal__hint">
+          В договоре нужны должность и ФИО в родительном падеже. В подписи акта и счёта — те же данные в именительном.
+        </p>
         <div className="customers-legal__fields">
-          <label className="customers-legal__field">
+          <label className="customers-legal__field customers-legal__wide">
             <span>Расчётный счёт и банк</span>
             <textarea
               value={legalForm.bank_details}
@@ -175,13 +179,46 @@ export const CustomerDetailProfilePanel: React.FC<CustomerDetailProfilePanelProp
             />
           </label>
           <label className="customers-legal__field">
-            <span>Уполномоченное лицо</span>
-            <textarea
-              value={legalForm.authorized_person}
-              onChange={(e) => setLegalForm((prev) => ({ ...prev, authorized_person: e.target.value }))}
-              placeholder="Действует на основании договора, устава и пр."
+            <span>Должность</span>
+            <input
+              value={legalForm.signer_position}
+              onChange={(e) => setLegalForm((prev) => ({ ...prev, signer_position: e.target.value }))}
+              placeholder="Директор"
             />
           </label>
+          <label className="customers-legal__field">
+            <span>ФИО</span>
+            <input
+              value={legalForm.signer_name}
+              onChange={(e) => setLegalForm((prev) => ({ ...prev, signer_name: e.target.value }))}
+              placeholder="Иванов Иван Иванович"
+            />
+          </label>
+          <label className="customers-legal__field">
+            <span>Должность в родительном падеже</span>
+            <input
+              value={legalForm.signer_position_genitive}
+              onChange={(e) => setLegalForm((prev) => ({ ...prev, signer_position_genitive: e.target.value }))}
+              placeholder="директора"
+            />
+          </label>
+          <label className="customers-legal__field">
+            <span>ФИО в родительном падеже</span>
+            <input
+              value={legalForm.signer_name_genitive}
+              onChange={(e) => setLegalForm((prev) => ({ ...prev, signer_name_genitive: e.target.value }))}
+              placeholder="Иванова Ивана Ивановича"
+            />
+          </label>
+          <label className="customers-legal__field customers-legal__wide">
+            <span>Основание полномочий</span>
+            <input
+              value={legalForm.authority_basis}
+              onChange={(e) => setLegalForm((prev) => ({ ...prev, authority_basis: e.target.value }))}
+              placeholder="Устава, доверенности № 12 от 01.02.2026"
+            />
+          </label>
+          <p className="customers-legal__hint">{signerPreview(legalForm)}</p>
         </div>
       </div>
     )}

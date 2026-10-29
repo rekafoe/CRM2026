@@ -26,6 +26,11 @@ export interface TemplateData {
   taxId?: string;
   bankDetails?: string;
   authorizedPerson?: string;
+  signerPosition?: string;
+  signerPositionGenitive?: string;
+  signerName?: string;
+  signerNameGenitive?: string;
+  authorityBasis?: string;
   
   // Данные договора
   contractNumber?: string;
@@ -357,6 +362,11 @@ export class DocumentTemplateService {
         taxId: data.taxId || '',
         bankDetails: data.bankDetails || '',
         authorizedPerson: data.authorizedPerson || '',
+        signerPosition: data.signerPosition || '',
+        signerPositionGenitive: data.signerPositionGenitive || '',
+        signerName: data.signerName || '',
+        signerNameGenitive: data.signerNameGenitive || '',
+        authorityBasis: data.authorityBasis || '',
         contractNumber: data.contractNumber || '',
         contractDate: data.contractDate || new Date().toLocaleDateString('ru-RU'),
         totalAmount: totalAmount || 0,
@@ -1032,6 +1042,11 @@ export class DocumentTemplateService {
       'taxId': 'taxId',
       'bankDetails': 'bankDetails',
       'authorizedPerson': 'authorizedPerson',
+      'signerPosition': 'signerPosition',
+      'signerPositionGenitive': 'signerPositionGenitive',
+      'signerName': 'signerName',
+      'signerNameGenitive': 'signerNameGenitive',
+      'authorityBasis': 'authorityBasis',
       
       // Поля договора/акта/счета
       'contractNumber': 'contractNumber',

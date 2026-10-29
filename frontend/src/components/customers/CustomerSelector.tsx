@@ -183,7 +183,20 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
             <>
               {selectedCustomer.company_name && <div>Компания: {selectedCustomer.company_name}</div>}
               {selectedCustomer.tax_id && <div>УНП: {selectedCustomer.tax_id}</div>}
-              {selectedCustomer.authorized_person && <div>Уполномоченное лицо: {selectedCustomer.authorized_person}</div>}
+              {(selectedCustomer.signer_position || selectedCustomer.signer_name) && (
+                <div>
+                  Подписант: {[selectedCustomer.signer_position, selectedCustomer.signer_name].filter(Boolean).join(' ')}
+                </div>
+              )}
+              {selectedCustomer.signer_name_genitive && (
+                <div>
+                  В лице: {[selectedCustomer.signer_position_genitive, selectedCustomer.signer_name_genitive].filter(Boolean).join(' ')}
+                </div>
+              )}
+              {selectedCustomer.authority_basis && <div>Основание: {selectedCustomer.authority_basis}</div>}
+              {!selectedCustomer.signer_name && selectedCustomer.authorized_person && (
+                <div>Уполномоченное лицо: {selectedCustomer.authorized_person}</div>
+              )}
               {selectedCustomer.bank_details && <div>Расчётный счёт: {selectedCustomer.bank_details}</div>}
             </>
           ) : (
@@ -227,6 +240,11 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
     legal_name: '',
     tax_id: '',
     authorized_person: '',
+    signer_position: '',
+    signer_position_genitive: '',
+    signer_name: '',
+    signer_name_genitive: '',
+    authority_basis: '',
     bank_details: '',
     phone: '',
     email: '',
@@ -259,9 +277,15 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
 
     try {
       setSaving(true);
+      const signerName = formData.signer_name.trim();
+      const authorityBasis = formData.authority_basis.trim();
       const response = await createCustomer({
         type,
-        ...formData
+        ...formData,
+        authorized_person:
+          signerName && authorityBasis
+            ? `${signerName}, действует на основании: ${authorityBasis}`
+            : signerName || formData.authorized_person,
       });
       addToast({
         type: 'success',
@@ -277,6 +301,11 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
         legal_name: '',
         tax_id: '',
         authorized_person: '',
+        signer_position: '',
+        signer_position_genitive: '',
+        signer_name: '',
+        signer_name_genitive: '',
+        authority_basis: '',
         bank_details: '',
         phone: '',
         email: '',
@@ -334,6 +363,11 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
                       legal_name: '',
                       tax_id: '',
                       authorized_person: '',
+                      signer_position: '',
+                      signer_position_genitive: '',
+                      signer_name: '',
+                      signer_name_genitive: '',
+                      authority_basis: '',
                       bank_details: '',
                     }));
                   } else {
@@ -427,13 +461,57 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
                 <section className="customer-modal__section">
                   <h4 className="customer-modal__section-title">Реквизиты</h4>
                   <div className="customer-modal__field">
-                    <label className="customer-modal__label-sm" htmlFor="create-customer-authorized">Уполномоченное лицо</label>
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-position">Должность</label>
                     <input
-                      id="create-customer-authorized"
+                      id="create-customer-position"
                       type="text"
-                      value={formData.authorized_person}
-                      onChange={(e) => setFormData({ ...formData, authorized_person: e.target.value })}
-                      placeholder="ФИО уполномоченного лица"
+                      value={formData.signer_position}
+                      onChange={(e) => setFormData({ ...formData, signer_position: e.target.value })}
+                      placeholder="Директор"
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-signer">ФИО</label>
+                    <input
+                      id="create-customer-signer"
+                      type="text"
+                      value={formData.signer_name}
+                      onChange={(e) => setFormData({ ...formData, signer_name: e.target.value })}
+                      placeholder="Иванов Иван Иванович"
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-position-gen">Должность в родительном падеже</label>
+                    <input
+                      id="create-customer-position-gen"
+                      type="text"
+                      value={formData.signer_position_genitive}
+                      onChange={(e) => setFormData({ ...formData, signer_position_genitive: e.target.value })}
+                      placeholder="директора"
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-signer-gen">ФИО в родительном падеже</label>
+                    <input
+                      id="create-customer-signer-gen"
+                      type="text"
+                      value={formData.signer_name_genitive}
+                      onChange={(e) => setFormData({ ...formData, signer_name_genitive: e.target.value })}
+                      placeholder="Иванова Ивана Ивановича"
+                      className="customer-modal__input"
+                    />
+                  </div>
+                  <div className="customer-modal__field">
+                    <label className="customer-modal__label-sm" htmlFor="create-customer-basis">Основание полномочий</label>
+                    <input
+                      id="create-customer-basis"
+                      type="text"
+                      value={formData.authority_basis}
+                      onChange={(e) => setFormData({ ...formData, authority_basis: e.target.value })}
+                      placeholder="Устава"
                       className="customer-modal__input"
                     />
                   </div>

@@ -219,15 +219,32 @@
   color: var(--text-secondary, #6b7280);
 }
 
+.customers-legal__field input,
 .customers-legal__field textarea {
-  min-height: 88px;
+  min-height: 38px;
   padding: 8px 10px;
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 6px;
   font-size: 13px;
-  resize: vertical;
   background: var(--bg-primary, #fff);
   color: var(--text-primary, #111827);
+}
+
+.customers-legal__field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.customers-legal__wide,
+.customers-legal__hint {
+  grid-column: 1 / -1;
+}
+
+.customers-legal__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary, #6b7280);
 }
 
 @media (max-width: 900px) {

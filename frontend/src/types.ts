@@ -289,6 +289,11 @@ export interface TemplateData {
   taxId?: string;
   bankDetails?: string;
   authorizedPerson?: string;
+  signerPosition?: string;
+  signerPositionGenitive?: string;
+  signerName?: string;
+  signerNameGenitive?: string;
+  authorityBasis?: string;
   contractNumber?: string;
   contractDate?: string;
   orders?: Array<{

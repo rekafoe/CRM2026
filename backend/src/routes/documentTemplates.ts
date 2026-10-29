@@ -6,6 +6,7 @@ import { normalizeVatRate } from '../utils/documentVat';
 import { computeOrderAmounts } from '../utils/orderAmounts';
 import { OrderRepository } from '../repositories/orderRepository';
 import { CustomerService } from '../modules/customers/services/customerService';
+import { legalSignerTemplateFields } from '../services/legalSigner';
 import { getDb } from '../config/database';
 import { hasColumn } from '../utils/tableSchemaCache';
 import { upload } from '../config/upload';
@@ -409,7 +410,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       legalAddress: customer?.address ?? '—',
       taxId: customer?.tax_id ?? '—',
       bankDetails: customer?.bank_details ?? '—',
-      authorizedPerson: customer?.authorized_person ?? '—',
+      ...legalSignerTemplateFields(customer ?? {}),
       sellerName: seller?.name ?? '',
       sellerUnp: seller?.unp ?? '',
       sellerAddress: seller?.legal_address ?? '',

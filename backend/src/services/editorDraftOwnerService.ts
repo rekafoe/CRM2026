@@ -90,6 +90,13 @@ export async function ensureWebsiteLegalCustomer(
     address: input.address.trim(),
     bank_details: input.bank_details.trim(),
     authorized_person: input.authorized_person.trim(),
+    ...(input.signer_position ? { signer_position: input.signer_position.trim() } : {}),
+    ...(input.signer_position_genitive
+      ? { signer_position_genitive: input.signer_position_genitive.trim() }
+      : {}),
+    ...(input.signer_name ? { signer_name: input.signer_name.trim() } : {}),
+    ...(input.signer_name_genitive ? { signer_name_genitive: input.signer_name_genitive.trim() } : {}),
+    ...(input.authority_basis ? { authority_basis: input.authority_basis.trim() } : {}),
     phone: input.phone.trim(),
     email: input.email.trim().toLowerCase(),
   }

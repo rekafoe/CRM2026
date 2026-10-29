@@ -76,4 +76,34 @@ describe('ensureWebsiteLegalCustomer', () => {
     )
     expect(mockedUpdate).not.toHaveBeenCalled()
   })
+
+  it('передаёт отдельные поля подписанта, не затирая их у старого заказа без этих полей', async () => {
+    const get = jest.fn().mockResolvedValue({ id: 42 })
+    mockedGetDb.mockResolvedValue({ get } as any)
+    mockedUpdate.mockResolvedValue({ id: 42 } as any)
+
+    await ensureWebsiteLegalCustomer({
+      ...input,
+      signer_position: 'Директор',
+      signer_position_genitive: 'директора',
+      signer_name: 'Иванов Иван Иванович',
+      signer_name_genitive: 'Иванова Ивана Ивановича',
+      authority_basis: 'Устава',
+    })
+
+    expect(mockedUpdate).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        signer_position: 'Директор',
+        signer_name_genitive: 'Иванова Ивана Ивановича',
+        authority_basis: 'Устава',
+      }),
+    )
+
+    mockedUpdate.mockClear()
+    await ensureWebsiteLegalCustomer(input)
+    const payload = mockedUpdate.mock.calls[0][1] as Record<string, unknown>
+    expect(payload.signer_position).toBeUndefined()
+    expect(payload.signer_name_genitive).toBeUndefined()
+  })
 })

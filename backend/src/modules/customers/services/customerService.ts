@@ -22,6 +22,16 @@ export interface Customer {
   tax_id?: string;
   bank_details?: string;
   authorized_person?: string;
+  /** Должность в именительном падеже, строка подписи. */
+  signer_position?: string;
+  /** Должность в родительном падеже, «в лице». */
+  signer_position_genitive?: string;
+  /** ФИО в именительном падеже. */
+  signer_name?: string;
+  /** ФИО в родительном падеже, для договора. */
+  signer_name_genitive?: string;
+  /** Устав, доверенность и т.п. */
+  authority_basis?: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -250,6 +260,11 @@ export class CustomerService {
     tax_id?: string
     bank_details?: string
     authorized_person?: string
+    signer_position?: string
+    signer_position_genitive?: string
+    signer_name?: string
+    signer_name_genitive?: string
+    authority_basis?: string
     phone?: string
     email?: string
     address?: string
@@ -281,11 +296,12 @@ export class CustomerService {
         type, first_name, last_name, middle_name,
         company_name, legal_name, tax_id,
         bank_details, authorized_person,
+        signer_position, signer_position_genitive, signer_name, signer_name_genitive, authority_basis,
         phone, email, address, notes,
         source,
         marketing_opt_in, unsubscribe_token,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.type,
         data.first_name || null,
@@ -296,6 +312,11 @@ export class CustomerService {
         data.tax_id || null,
         data.bank_details || null,
         data.authorized_person || null,
+        data.signer_position || null,
+        data.signer_position_genitive || null,
+        data.signer_name || null,
+        data.signer_name_genitive || null,
+        data.authority_basis || null,
         data.phone || null,
         data.email || null,
         data.address || null,
@@ -332,6 +353,11 @@ export class CustomerService {
       tax_id?: string
       bank_details?: string
       authorized_person?: string
+      signer_position?: string
+      signer_position_genitive?: string
+      signer_name?: string
+      signer_name_genitive?: string
+      authority_basis?: string
       phone?: string
       email?: string
       address?: string
@@ -381,6 +407,11 @@ export class CustomerService {
         tax_id = ?,
         bank_details = ?,
         authorized_person = ?,
+        signer_position = ?,
+        signer_position_genitive = ?,
+        signer_name = ?,
+        signer_name_genitive = ?,
+        authority_basis = ?,
         phone = ?,
         email = ?,
         address = ?,
@@ -399,6 +430,11 @@ export class CustomerService {
         data.tax_id !== undefined ? data.tax_id : existing.tax_id,
         data.bank_details !== undefined ? data.bank_details : existing.bank_details,
         data.authorized_person !== undefined ? data.authorized_person : existing.authorized_person,
+        data.signer_position !== undefined ? data.signer_position : existing.signer_position,
+        data.signer_position_genitive !== undefined ? data.signer_position_genitive : existing.signer_position_genitive,
+        data.signer_name !== undefined ? data.signer_name : existing.signer_name,
+        data.signer_name_genitive !== undefined ? data.signer_name_genitive : existing.signer_name_genitive,
+        data.authority_basis !== undefined ? data.authority_basis : existing.authority_basis,
         data.phone !== undefined ? data.phone : existing.phone,
         data.email !== undefined ? data.email : existing.email,
         data.address !== undefined ? data.address : existing.address,
@@ -472,6 +508,11 @@ export class CustomerService {
       tax_id: row.tax_id || undefined,
       bank_details: row.bank_details || undefined,
       authorized_person: row.authorized_person || undefined,
+      signer_position: row.signer_position || undefined,
+      signer_position_genitive: row.signer_position_genitive || undefined,
+      signer_name: row.signer_name || undefined,
+      signer_name_genitive: row.signer_name_genitive || undefined,
+      authority_basis: row.authority_basis || undefined,
       phone: row.phone || undefined,
       email: row.email || undefined,
       address: row.address || undefined,

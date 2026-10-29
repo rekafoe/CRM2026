@@ -1,5 +1,10 @@
 import type { Customer, Order } from '../../../types';
 import {
+  legalSignerTemplateFields,
+  persistableLegalDetails,
+  type CustomerLegalFormState,
+} from '../../../utils/legalSigner';
+import {
   formatReceiptPaperCaptionFromParams,
   plannedPrintStepName,
   withPaperDensity,
@@ -20,6 +25,34 @@ const CUSTOMER_SOURCE_LABELS: Record<string, string> = {
   telegram: 'Telegram',
   mini_app: 'Mini App',
 };
+
+/** Реквизиты и подписант для договора, акта и счёта. */
+export function customerDocumentParty(customer: Customer, legalForm: CustomerLegalFormState) {
+  const legal = customer.type === 'legal';
+  const signer = legalSignerTemplateFields(
+    legal
+      ? persistableLegalDetails(legalForm)
+      : {
+          authorized_person: customer.authorized_person,
+          signer_position: customer.signer_position,
+          signer_position_genitive: customer.signer_position_genitive,
+          signer_name: customer.signer_name,
+          signer_name_genitive: customer.signer_name_genitive,
+          authority_basis: customer.authority_basis,
+        },
+  );
+  return {
+    customerName: customer.company_name || customer.legal_name || getCustomerDisplayName(customer),
+    companyName: customer.company_name || '',
+    legalName: customer.legal_name || '',
+    legalAddress: customer.address || '—',
+    taxId: customer.tax_id || '—',
+    bankDetails: legal
+      ? legalForm.bank_details.trim() || customer.bank_details || '—'
+      : customer.bank_details || '—',
+    ...signer,
+  };
+}
 
 /** Подпись канала по значению `customer.source` (для списка и отчётов). */
 export const getCustomerSourceLabel = (source?: string | null) => {

@@ -14,6 +14,12 @@ export interface WebsiteLegalCustomerInput {
   phone: string
   email: string
   authority_confirmed: true
+  /** Необязательны, пока живой API ещё принимает старый payload. */
+  signer_position?: string
+  signer_position_genitive?: string
+  signer_name?: string
+  signer_name_genitive?: string
+  authority_basis?: string
 }
 
 export class WebsiteCorporateCheckoutError extends Error {
@@ -91,7 +97,24 @@ function parseLegalCustomer(input: unknown): WebsiteLegalCustomerInput {
       400,
     )
   }
-  return { ...result, authority_confirmed: true }
+
+  const signer: Partial<WebsiteLegalCustomerInput> = {}
+  for (const field of [
+    'signer_position',
+    'signer_position_genitive',
+    'signer_name',
+    'signer_name_genitive',
+    'authority_basis',
+  ] as const) {
+    if (!Object.prototype.hasOwnProperty.call(source, field)) continue
+    if (typeof source[field] !== 'string') {
+      throw new WebsiteCorporateCheckoutError(`Поле legalCustomer.${field} должно быть строкой`, 400)
+    }
+    const value = source[field].trim()
+    if (value) signer[field] = value
+  }
+
+  return { ...result, ...signer, authority_confirmed: true }
 }
 
 export async function validateWebsiteCorporateCheckout(

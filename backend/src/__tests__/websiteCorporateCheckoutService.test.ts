@@ -35,6 +35,30 @@ describe('validateWebsiteCorporateCheckout', () => {
 
     expect(result.legalCustomer.address).toBe('Адрес для документов')
     expect(result.taxpayer.isActive).toBe(true)
+    expect(result.legalCustomer.signer_position).toBeUndefined()
+  })
+
+  it('сохраняет должность, родительный падеж и основание, если сайт их прислал', async () => {
+    const result = await validateWebsiteCorporateCheckout(
+      {
+        ...legalCustomer,
+        signer_position: 'Директор',
+        signer_position_genitive: 'директора',
+        signer_name: 'Иванов Иван Иванович',
+        signer_name_genitive: 'Иванова Ивана Ивановича',
+        authority_basis: 'Устава',
+      },
+      async () => taxpayer,
+    )
+
+    expect(result.legalCustomer).toMatchObject({
+      signer_position: 'Директор',
+      signer_position_genitive: 'директора',
+      signer_name: 'Иванов Иван Иванович',
+      signer_name_genitive: 'Иванова Ивана Ивановича',
+      authority_basis: 'Устава',
+      authorized_person: legalCustomer.authorized_person,
+    })
   })
 
   it('rejects missing required requisites', async () => {

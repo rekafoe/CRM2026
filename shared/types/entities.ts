@@ -41,6 +41,11 @@ export interface Customer {
   tax_id?: string;
   bank_details?: string;
   authorized_person?: string;
+  signer_position?: string;
+  signer_position_genitive?: string;
+  signer_name?: string;
+  signer_name_genitive?: string;
+  authority_basis?: string;
   // Общие поля
   phone?: string;
   email?: string;
