@@ -7,14 +7,29 @@ import { computeOrderAmounts } from '../utils/orderAmounts';
 import { OrderRepository } from '../repositories/orderRepository';
 import { CustomerService } from '../modules/customers/services/customerService';
 import { legalSignerTemplateFields } from '../services/legalSigner';
+import { executorSignerTemplateFields } from '../services/executorSigner';
+import { asyncHandler, AuthenticatedRequest } from '../middleware';
 import { getDb } from '../config/database';
 import { hasColumn } from '../utils/tableSchemaCache';
 import { upload } from '../config/upload';
 import path from 'path';
 import fs from 'fs';
-import { asyncHandler } from '../middleware';
 
 const router = Router();
+
+async function executorFieldsForRequest(req: Request) {
+  const userId = Number((req as AuthenticatedRequest).user?.id)
+  if (!Number.isFinite(userId) || userId <= 0) return executorSignerTemplateFields(null)
+  const db = await getDb()
+  const hasBasis = await hasColumn('users', 'signing_basis').catch(() => false)
+  const row = await db.get<{ name?: string | null; signing_basis?: string | null }>(
+    hasBasis
+      ? 'SELECT name, signing_basis FROM users WHERE id = ?'
+      : 'SELECT name FROM users WHERE id = ?',
+    userId,
+  )
+  return executorSignerTemplateFields(row)
+}
 
 function formatDateForDocument(iso: string | undefined): string {
   if (!iso) return '—';
@@ -416,6 +431,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       sellerAddress: seller?.legal_address ?? '',
       sellerBankDetails: seller?.bank_details ?? '',
       sellerPhone: seller?.phone ?? '',
+      ...(await executorFieldsForRequest(req)),
       orders: orders.map((o) => ({
         number: o.number || `#${o.id}`,
         date: formatDateForDocument(o.created_at),

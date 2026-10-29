@@ -7,6 +7,7 @@ import {
   updateCustomer,
   generateDocumentByType,
   generateDocumentByTypeFromOrders,
+  getCurrentUser,
 } from '../../../api';
 import { Customer, Order, TemplateData } from '../../../types';
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
@@ -39,6 +40,7 @@ import {
   persistableLegalDetails,
   type CustomerLegalFormState,
 } from '../../../utils/legalSigner';
+import { executorSignerTemplateFields } from '../../../utils/executorSigner';
 
 export const CustomerDetailView: React.FC<{
   customerId: number;
@@ -55,6 +57,7 @@ export const CustomerDetailView: React.FC<{
   const [ordersFrom, setOrdersFrom] = useState('');
   const [ordersTo, setOrdersTo] = useState('');
   const [legalForm, setLegalForm] = useState<CustomerLegalFormState>(emptyLegalForm);
+  const [executorSigner, setExecutorSigner] = useState({ name: '', signing_basis: '' });
   const [savingLegal, setSavingLegal] = useState(false);
   const [editForm, setEditForm] = useState<{
     first_name: string;
@@ -75,6 +78,24 @@ export const CustomerDetailView: React.FC<{
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [generatingDocument, setGeneratingDocument] = useState<string | null>(null);
   const [legalDocsRefresh, setLegalDocsRefresh] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUser()
+      .then((res) => {
+        if (cancelled) return;
+        setExecutorSigner({
+          name: res.data?.name || '',
+          signing_basis: res.data?.signing_basis || '',
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setExecutorSigner({ name: '', signing_basis: '' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const refreshCustomer = useCallback(async () => {
     try {
@@ -451,6 +472,7 @@ export const CustomerDetailView: React.FC<{
       try {
         const templateData: TemplateData = {
           ...customerDocumentParty(customer, legalForm),
+          ...executorSignerTemplateFields(executorSigner),
           orders: countedOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
@@ -534,7 +556,7 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, countedOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, countedOrders, legalForm, executorSigner, recordLegalExport, customer]);
 
   const handleExportInvoice = useCallback(async () => {
     if (!customer) return;
@@ -618,6 +640,7 @@ export const CustomerDetailView: React.FC<{
       try {
         const templateData: TemplateData = {
           ...customerDocumentParty(customer, legalForm),
+          ...executorSignerTemplateFields(executorSigner),
           orders: countedOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
@@ -687,7 +710,7 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, countedOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, countedOrders, legalForm, executorSigner, recordLegalExport, customer]);
 
   const handleExportContract = useCallback(async () => {
     if (!customer) return;
@@ -723,6 +746,7 @@ export const CustomerDetailView: React.FC<{
       try {
         const templateData: TemplateData = {
           ...customerDocumentParty(customer, legalForm),
+          ...executorSignerTemplateFields(executorSigner),
           contractNumber,
           contractDate: new Date().toLocaleDateString('ru-RU'),
           orders: countedOrders.map((order, index) => ({
@@ -776,6 +800,7 @@ export const CustomerDetailView: React.FC<{
       // Стандартная генерация без шаблона
       const title = `ДОГОВОР № ${contractNumber}`;
       const party = customerDocumentParty(customer, legalForm);
+      const executor = executorSignerTemplateFields(executorSigner);
       const bankDetails = party.bankDetails;
       const legalAddress = party.legalAddress;
 
@@ -839,6 +864,16 @@ export const CustomerDetailView: React.FC<{
                   new TextRun({ text: `${party.signerPosition} ${party.signerName}` }),
                 ],
               }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Исполнитель в лице: ', bold: true }),
+                  new TextRun({
+                    text: executor.executorAuthorityBasis
+                      ? `${executor.executorName}, на основании ${executor.executorAuthorityBasis}`
+                      : executor.executorName || '—',
+                  }),
+                ],
+              }),
               new Paragraph({ text: ' ', spacing: { after: 200 } }),
               new Paragraph({ text: 'Заказы в периоде', spacing: { after: 100 } }),
               new Table({
@@ -865,7 +900,7 @@ export const CustomerDetailView: React.FC<{
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, countedOrders, legalForm, recordLegalExport, customer]);
+  }, [buildOrdersTableRows, countedOrders, legalForm, executorSigner, recordLegalExport, customer]);
 
   if (pageLoading) {
     return (

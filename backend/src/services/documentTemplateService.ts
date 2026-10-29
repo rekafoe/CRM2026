@@ -31,6 +31,9 @@ export interface TemplateData {
   signerName?: string;
   signerNameGenitive?: string;
   authorityBasis?: string;
+  executorName?: string;
+  executorAuthorityBasis?: string;
+  executorAuthorizedPerson?: string;
   
   // Данные договора
   contractNumber?: string;
@@ -367,11 +370,13 @@ export class DocumentTemplateService {
         signerName: data.signerName || '',
         signerNameGenitive: data.signerNameGenitive || '',
         authorityBasis: data.authorityBasis || '',
+        executorName: data.executorName || '',
+        executorAuthorityBasis: data.executorAuthorityBasis || '',
+        executorAuthorizedPerson: data.executorAuthorizedPerson || '',
         contractNumber: data.contractNumber || '',
         contractDate: data.contractDate || new Date().toLocaleDateString('ru-RU'),
         totalAmount: totalAmount || 0,
         totalQuantity: totalQuantity,
-        executorAuthorizedPerson: '', // Можно добавить в конфигурацию системы
       };
       
       templateData.totalAmountInWords = amountInWordsBel(totalAmount || 0);
@@ -1062,6 +1067,9 @@ export class DocumentTemplateService {
       'sellerAddress': 'sellerAddress',
       'sellerBankDetails': 'sellerBankDetails',
       'sellerPhone': 'sellerPhone',
+      'executorName': 'executorName',
+      'executorAuthorityBasis': 'executorAuthorityBasis',
+      'executorAuthorizedPerson': 'executorAuthorizedPerson',
       
       // Суммы и количества
       'totalAmount': 'totalAmount',

@@ -76,6 +76,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
     role: string;
     department_id?: number | null;
     hourly_rate?: number | null;
+    signing_basis?: string | null;
   }) => {
     try {
       setErrorMessage(null);
@@ -96,6 +97,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
       role: string;
       department_id?: number | null;
       hourly_rate?: number | null;
+      signing_basis?: string | null;
     },
   ) => {
     try {
@@ -258,6 +260,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                         <MoneyAmount value={user.hourly_rate} />/ч
                       </span>
                     ) : null}
+                    {user.signing_basis ? <span>{user.signing_basis}</span> : null}
                   </div>
                 </div>
                 <div className="user-actions">
@@ -307,6 +310,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
             role: editingUser.role,
             department_id: editingUser.department_id ?? undefined,
             hourly_rate: editingUser.hourly_rate ?? 0,
+            signing_basis: editingUser.signing_basis ?? '',
           }}
           onSubmit={(data) => handleUpdateUser(editingUser.id, data)}
           onClose={() => setEditingUser(null)}
@@ -385,6 +389,7 @@ interface UserFormModalProps {
     role: string;
     department_id?: number | null;
     hourly_rate?: number | null;
+    signing_basis?: string | null;
   };
   onSubmit: (data: any) => void;
   onClose: () => void;
@@ -407,6 +412,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       initialData?.hourly_rate != null && Number.isFinite(Number(initialData.hourly_rate))
         ? String(initialData.hourly_rate)
         : '',
+    signing_basis: initialData?.signing_basis || '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -519,6 +525,21 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             />
             <p className="user-form-hint">
               Учитывается в ЗП: часы смен × ставка + проценты с заказов
+            </p>
+          </div>
+          <div className="user-form-group">
+            <label className="user-form-label">
+              Основание полномочий
+            </label>
+            <input
+              type="text"
+              value={formData.signing_basis}
+              onChange={(e) => setFormData({ ...formData, signing_basis: e.target.value })}
+              className="user-form-input"
+              placeholder="доверенности № 12 от 01.02.2026"
+            />
+            <p className="user-form-hint">
+              Необязательно. Попадёт в договор, акт и счёт: «в лице {formData.name.trim() || 'имя'}, на основании этого текста». Пустое поле в документ не подставляется.
             </p>
           </div>
           <div className="user-form-actions">

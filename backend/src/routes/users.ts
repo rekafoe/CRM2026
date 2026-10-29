@@ -104,7 +104,8 @@ router.get('/all', requireAdmin, asyncHandler(async (req, res) => {
            LENGTH(u.api_token) > 0 as has_api_token,
            u.department_id,
            d.name as department_name,
-           COALESCE(u.hourly_rate, 0) as hourly_rate
+           COALESCE(u.hourly_rate, 0) as hourly_rate,
+           u.signing_basis
     FROM users u
     LEFT JOIN departments d ON d.id = u.department_id
     ORDER BY u.name
@@ -114,7 +115,7 @@ router.get('/all', requireAdmin, asyncHandler(async (req, res) => {
 
 // POST /api/users — создать пользователя
 router.post('/', requireAdmin, asyncHandler(async (req, res) => {
-  const { name, email, password, role, department_id, hourly_rate } = req.body
+  const { name, email, password, role, department_id, hourly_rate, signing_basis } = req.body
   const db = await getDb()
 
   // Проверяем, существует ли пользователь с таким email
@@ -133,10 +134,11 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const deptId = department_id != null && department_id !== '' ? Number(department_id) : null
   const rateRaw = hourly_rate != null && hourly_rate !== '' ? Number(hourly_rate) : 0
   const rate = Number.isFinite(rateRaw) && rateRaw >= 0 ? rateRaw : 0
+  const basis = typeof signing_basis === 'string' ? signing_basis.trim() : ''
   const result = await db.run(`
-    INSERT INTO users (name, email, password_hash, role, api_token, department_id, hourly_rate, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-  `, [name, email, hashedPassword, role || 'user', apiToken, Number.isFinite(deptId) ? deptId : null, rate])
+    INSERT INTO users (name, email, password_hash, role, api_token, department_id, hourly_rate, signing_basis, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `, [name, email, hashedPassword, role || 'user', apiToken, Number.isFinite(deptId) ? deptId : null, rate, basis || null])
 
   res.json({
     id: result.lastID,
@@ -145,13 +147,14 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
     role: role || 'user',
     department_id: Number.isFinite(deptId) ? deptId : null,
     hourly_rate: rate,
+    signing_basis: basis,
   })
 }))
 
 // PUT /api/users/:id — обновить пользователя
 router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, email, role, department_id, hourly_rate } = req.body
+  const { name, email, role, department_id, hourly_rate, signing_basis } = req.body
   const db = await getDb()
 
   // Проверяем, существует ли другой пользователь с таким email
@@ -164,11 +167,23 @@ router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const deptId = department_id != null && department_id !== '' ? Number(department_id) : null
   const rateRaw = hourly_rate != null && hourly_rate !== '' ? Number(hourly_rate) : 0
   const rate = Number.isFinite(rateRaw) && rateRaw >= 0 ? rateRaw : 0
+  const basisSql = Object.prototype.hasOwnProperty.call(req.body, 'signing_basis')
+    ? ', signing_basis = ?'
+    : ''
+  const basis = typeof signing_basis === 'string' ? signing_basis.trim() : ''
   await db.run(`
     UPDATE users
-    SET name = ?, email = ?, role = ?, department_id = ?, hourly_rate = ?
+    SET name = ?, email = ?, role = ?, department_id = ?, hourly_rate = ?${basisSql}
     WHERE id = ?
-  `, [name, email, role, Number.isFinite(deptId) ? deptId : null, rate, id])
+  `, [
+    name,
+    email,
+    role,
+    Number.isFinite(deptId) ? deptId : null,
+    rate,
+    ...(basisSql ? [basis || null] : []),
+    id,
+  ])
 
   res.json({ message: 'Пользователь обновлен' })
 }))
