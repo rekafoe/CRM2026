@@ -7,7 +7,7 @@ import { computeOrderAmounts } from '../utils/orderAmounts';
 import { OrderRepository } from '../repositories/orderRepository';
 import { CustomerService } from '../modules/customers/services/customerService';
 import { legalSignerTemplateFields } from '../services/legalSigner';
-import { executorSignerTemplateFields } from '../services/executorSigner';
+import { documentExecutorUserId, executorSignerTemplateFields } from '../services/executorSigner';
 import { asyncHandler, AuthenticatedRequest } from '../middleware';
 import { getDb } from '../config/database';
 import { hasColumn } from '../utils/tableSchemaCache';
@@ -17,9 +17,8 @@ import fs from 'fs';
 
 const router = Router();
 
-async function executorFieldsForRequest(req: Request) {
-  const userId = Number((req as AuthenticatedRequest).user?.id)
-  if (!Number.isFinite(userId) || userId <= 0) return executorSignerTemplateFields(null)
+async function executorFieldsForUser(userId: number | null) {
+  if (!userId) return executorSignerTemplateFields(null)
   const db = await getDb()
   const hasBasis = await hasColumn('users', 'signing_basis').catch(() => false)
   const hasGenitive = await hasColumn('users', 'name_genitive').catch(() => false)
@@ -29,6 +28,16 @@ async function executorFieldsForRequest(req: Request) {
     userId,
   )
   return executorSignerTemplateFields(row)
+}
+
+async function executorFieldsForDocument(req: Request, managerUserId: unknown) {
+  const managerId = documentExecutorUserId(managerUserId, null)
+  if (managerId) {
+    const managerFields = await executorFieldsForUser(managerId)
+    if (managerFields.executorName) return managerFields
+  }
+  const requestUserId = (req as AuthenticatedRequest).user?.id
+  return executorFieldsForUser(documentExecutorUserId(null, requestUserId))
 }
 
 function formatDateForDocument(iso: string | undefined): string {
@@ -431,7 +440,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       sellerAddress: seller?.legal_address ?? '',
       sellerBankDetails: seller?.bank_details ?? '',
       sellerPhone: seller?.phone ?? '',
-      ...(await executorFieldsForRequest(req)),
+      ...(await executorFieldsForDocument(req, customer?.manager_user_id)),
       orders: orders.map((o) => ({
         number: o.number || `#${o.id}`,
         date: formatDateForDocument(o.created_at),

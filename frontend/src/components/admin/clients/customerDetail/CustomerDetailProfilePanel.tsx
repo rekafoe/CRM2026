@@ -3,6 +3,18 @@ import { Button } from '../../../common';
 import { Customer } from '../../../../types';
 import { signerPreview, type CustomerLegalFormState } from '../../../../utils/legalSigner';
 
+type CrmUserOption = { id: number; name: string };
+
+function managerDocumentHint(customer: Customer, selectedId: number | null): string | null {
+  if (!selectedId || selectedId !== customer.manager_user_id) return null;
+  const name = customer.manager_name_genitive?.trim() || customer.manager_name?.trim();
+  if (!name) return null;
+  const basis = customer.manager_signing_basis?.trim();
+  return basis
+    ? `В договоре: в лице ${name}, на основании ${basis}. В подписи остаётся имя из карточки пользователя.`
+    : `В договоре: в лице ${name}. Основание полномочий в карточке пользователя не заполнено, в документ оно не попадёт.`;
+}
+
 export type CustomerEditFormState = {
   first_name: string;
   last_name: string;
@@ -27,6 +39,7 @@ interface CustomerDetailProfilePanelProps {
   setLegalForm: React.Dispatch<React.SetStateAction<CustomerLegalFormState>>;
   onSaveLegal: () => void;
   savingLegal: boolean;
+  crmUsers: CrmUserOption[];
 }
 
 export const CustomerDetailProfilePanel: React.FC<CustomerDetailProfilePanelProps> = ({
@@ -39,7 +52,12 @@ export const CustomerDetailProfilePanel: React.FC<CustomerDetailProfilePanelProp
   setLegalForm,
   onSaveLegal,
   savingLegal,
-}) => (
+  crmUsers,
+}) => {
+  const selectedManagerId = legalForm.manager_user_id;
+  const managerKnown = selectedManagerId != null && crmUsers.some((user) => user.id === selectedManagerId);
+  const managerHint = managerDocumentHint(customer, selectedManagerId);
+  return (
   <div className="customer-detail-view__stack">
     <div className="customers-edit-section">
       <h5 className="customers-edit-section__title">Данные клиента</h5>
@@ -171,6 +189,37 @@ export const CustomerDetailProfilePanel: React.FC<CustomerDetailProfilePanelProp
         </p>
         <div className="customers-legal__fields">
           <label className="customers-legal__field customers-legal__wide">
+            <span>Менеджер</span>
+            <select
+              value={selectedManagerId ?? ''}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setLegalForm((prev) => ({
+                  ...prev,
+                  manager_user_id: raw ? Number(raw) : null,
+                }));
+              }}
+            >
+              <option value="">Не закреплён</option>
+              {crmUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+              {selectedManagerId && !managerKnown && (
+                <option value={selectedManagerId}>
+                  {customer.manager_name || `Пользователь #${selectedManagerId}`}
+                </option>
+              )}
+            </select>
+          </label>
+          <p className="customers-legal__hint">
+            Этот человек ведёт клиента: акты, счета и договоры выходят от его имени.
+            Если менеджер не выбран, документ подписывает тот, кто его формирует.
+            Смена менеджера начинает действовать после сохранения.
+          </p>
+          {managerHint && <p className="customers-legal__hint">{managerHint}</p>}
+          <label className="customers-legal__field customers-legal__wide">
             <span>Расчётный счёт и банк</span>
             <textarea
               value={legalForm.bank_details}
@@ -223,4 +272,5 @@ export const CustomerDetailProfilePanel: React.FC<CustomerDetailProfilePanelProp
       </div>
     )}
   </div>
-);
+  );
+};

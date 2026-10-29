@@ -26,6 +26,13 @@ export const CustomerDetailOverviewPanel: React.FC<CustomerDetailOverviewPanelPr
       <div className="customer-detail-view__section-head">
         <h2 className="customer-detail-view__title">{displayName}</h2>
         <p className="customer-detail-view__subtitle">{typeLabel}</p>
+        {customer.type === 'legal' && (
+          <p className="customer-detail-view__subtitle">
+            {customer.manager_name?.trim()
+              ? `Менеджер: ${customer.manager_name.trim()}`
+              : 'Менеджер не закреплён'}
+          </p>
+        )}
       </div>
 
       <div className="customers-summary customer-detail-view__summary">

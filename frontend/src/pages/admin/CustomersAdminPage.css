@@ -220,7 +220,8 @@
 }
 
 .customers-legal__field input,
-.customers-legal__field textarea {
+.customers-legal__field textarea,
+.customers-legal__field select {
   min-height: 38px;
   padding: 8px 10px;
   border: 1px solid var(--border-color, #e5e7eb);
@@ -233,6 +234,10 @@
 .customers-legal__field textarea {
   min-height: 88px;
   resize: vertical;
+}
+
+.customers-legal__field select {
+  width: 100%;
 }
 
 .customers-legal__wide,

@@ -182,6 +182,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
       Email: c.email || '',
       Адрес: c.address || '',
       Примечание: c.notes || '',
+      Менеджер: c.type === 'legal' ? c.manager_name || '' : '',
       'Дата создания': c.created_at ? new Date(c.created_at).toLocaleDateString('ru-RU') : '',
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -388,6 +389,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
               <thead>
                 <tr>
                   <th>Клиент</th>
+                  {activeTab === 'legal' && <th>Менеджер</th>}
                   <th>Телефон</th>
                   <th>Email</th>
                   <th>Последний заказ</th>
@@ -399,14 +401,14 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
               <tbody>
                 {loading && customers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="clients-table-empty">
+                    <td colSpan={activeTab === 'legal' ? 8 : 7} className="clients-table-empty">
                       Загрузка клиентов…
                     </td>
                   </tr>
                 )}
                 {!loading && customers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="clients-table-empty">
+                    <td colSpan={activeTab === 'legal' ? 8 : 7} className="clients-table-empty">
                       {debouncedQuery ? 'Ничего не найдено' : 'Нет клиентов этого типа'}
                     </td>
                   </tr>
@@ -428,6 +430,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
                       tabIndex={0}
                     >
                       <td>{getCustomerDisplayName(c)}</td>
+                      {activeTab === 'legal' && <td>{c.manager_name || '—'}</td>}
                       <td>{c.phone || '—'}</td>
                       <td>{c.email || '—'}</td>
                       <td>{c.last_order_at ? formatDateValue(c.last_order_at) : '—'}</td>

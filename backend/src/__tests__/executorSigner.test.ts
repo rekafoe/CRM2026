@@ -1,4 +1,4 @@
-import { executorSignerTemplateFields } from '../services/executorSigner'
+import { documentExecutorUserId, executorSignerTemplateFields } from '../services/executorSigner'
 
 describe('executor signer', () => {
   it('оставляет основание пустым, если у менеджера его не заполнили', () => {
@@ -31,6 +31,16 @@ describe('executor signer', () => {
       executorAuthorityBasis: '',
       executorAuthorizedPerson: '',
     })
+  })
+
+  it('берёт закреплённого менеджера, а без него — того, кто формирует документ', () => {
+    expect(documentExecutorUserId(7, 3)).toBe(7)
+    expect(documentExecutorUserId('8', 3)).toBe(8)
+    expect(documentExecutorUserId(null, 3)).toBe(3)
+    expect(documentExecutorUserId('', 3)).toBe(3)
+    expect(documentExecutorUserId(0, 3)).toBe(3)
+    expect(documentExecutorUserId(undefined, undefined)).toBeNull()
+    expect(documentExecutorUserId(true, 3)).toBe(3)
   })
 
   it('кладёт родительный падеж отдельно от имени в подписи', () => {

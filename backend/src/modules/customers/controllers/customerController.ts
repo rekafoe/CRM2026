@@ -6,6 +6,16 @@ import { listCustomerProjects } from '../../../services/customerProjectService'
 import { OrderService } from '../../orders/services/orderService'
 import { asyncHandler } from '../../../middleware'
 
+function managerUserIdFromBody(body: Record<string, unknown>): number | null | undefined {
+  if (!Object.prototype.hasOwnProperty.call(body, 'manager_user_id')) return undefined
+  const raw = body.manager_user_id
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'boolean') throw new Error('Некорректный менеджер')
+  const value = typeof raw === 'number' ? raw : Number(String(raw).trim())
+  if (!Number.isInteger(value) || value <= 0) throw new Error('Некорректный менеджер')
+  return value
+}
+
 function signerFromBody(body: Record<string, unknown>) {
   const text = (key: string) =>
     Object.prototype.hasOwnProperty.call(body, key) && typeof body[key] === 'string'
@@ -265,6 +275,7 @@ export class CustomerController {
         bank_details,
         authorized_person,
         ...signer,
+        manager_user_id: managerUserIdFromBody(req.body as Record<string, unknown>),
         phone,
         email,
         address,
@@ -306,6 +317,13 @@ export class CustomerController {
       marketing_opt_in
     } = req.body
     const signer = signerFromBody(req.body as Record<string, unknown>)
+    let manager_user_id: number | null | undefined
+    try {
+      manager_user_id = managerUserIdFromBody(req.body as Record<string, unknown>)
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || 'Некорректный менеджер' })
+      return
+    }
 
     const payload: Parameters<typeof CustomerService.updateCustomer>[1] = {
         type,
@@ -318,6 +336,7 @@ export class CustomerController {
         bank_details,
         authorized_person,
         ...signer,
+        manager_user_id,
         phone,
         email,
         address,

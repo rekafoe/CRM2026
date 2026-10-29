@@ -15,6 +15,7 @@ export type CustomerLegalFormState = {
   signer_name: string;
   signer_name_genitive: string;
   authority_basis: string;
+  manager_user_id: number | null;
 };
 
 const LEGACY_AUTHORIZED_PERSON = /^(.+?),\s*действует на основании:\s*(.+)$/iu;
@@ -72,10 +73,13 @@ export function emptyLegalForm(): CustomerLegalFormState {
     signer_name: '',
     signer_name_genitive: '',
     authority_basis: '',
+    manager_user_id: null,
   };
 }
 
-export function legalFormFromCustomer(customer: LegalSignerSource & { bank_details?: string | null }): CustomerLegalFormState {
+export function legalFormFromCustomer(
+  customer: LegalSignerSource & { bank_details?: string | null; manager_user_id?: number | null },
+): CustomerLegalFormState {
   const parsed = parseLegacyAuthorizedPerson(customer.authorized_person);
   return {
     bank_details: customer.bank_details || '',
@@ -85,6 +89,7 @@ export function legalFormFromCustomer(customer: LegalSignerSource & { bank_detai
     signer_name: customer.signer_name || parsed.name,
     signer_name_genitive: customer.signer_name_genitive || '',
     authority_basis: customer.authority_basis || parsed.basis,
+    manager_user_id: customer.manager_user_id && customer.manager_user_id > 0 ? customer.manager_user_id : null,
   };
 }
 
@@ -103,6 +108,7 @@ export function persistableLegalDetails(form: CustomerLegalFormState) {
     signer_name: signerName,
     signer_name_genitive: form.signer_name_genitive.trim(),
     authority_basis: authorityBasis,
+    manager_user_id: form.manager_user_id && form.manager_user_id > 0 ? form.manager_user_id : null,
   };
 }
 

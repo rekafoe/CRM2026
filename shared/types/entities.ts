@@ -46,6 +46,11 @@ export interface Customer {
   signer_name?: string;
   signer_name_genitive?: string;
   authority_basis?: string;
+  /** Пользователь CRM, который ведёт этого клиента и подписывает его документы. */
+  manager_user_id?: number | null;
+  manager_name?: string | null;
+  manager_name_genitive?: string | null;
+  manager_signing_basis?: string | null;
   // Общие поля
   phone?: string;
   email?: string;

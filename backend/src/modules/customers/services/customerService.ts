@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 import { getDb } from '../../../config/database'
 import { sqlOrderTotalAfterDiscount } from '../../../utils/orderAmountsSql'
 import { notWaitingStatusSql } from '../../../utils/orderFulfillmentScope'
+import { hasColumn } from '../../../utils/tableSchemaCache'
 
 const CUSTOMER_SOURCE_VALUES = new Set(['crm', 'website', 'telegram', 'mini_app'])
 
@@ -32,6 +33,11 @@ export interface Customer {
   signer_name_genitive?: string;
   /** Устав, доверенность и т.п. */
   authority_basis?: string;
+  /** Пользователь CRM, который ведёт клиента и подписывает его документы. */
+  manager_user_id?: number | null;
+  manager_name?: string | null;
+  manager_name_genitive?: string | null;
+  manager_signing_basis?: string | null;
   phone?: string;
   email?: string;
   address?: string;
@@ -64,7 +70,12 @@ export class CustomerService {
       return this.allCustomersCache.data;
     }
     const db = await getDb();
-    const rows = await db.all('SELECT * FROM customers ORDER BY created_at DESC');
+    const rows = await db.all(
+      `SELECT c.*, u.name AS manager_name
+       FROM customers c
+       LEFT JOIN users u ON u.id = c.manager_user_id
+       ORDER BY c.created_at DESC`
+    );
     const data = rows.map(this.mapRowToCustomer);
     this.allCustomersCache = { data, fetchedAt: now };
     return data;
@@ -110,6 +121,7 @@ export class CustomerService {
       customer.tax_id,
       customer.phone,
       customer.email,
+      customer.manager_name,
     ]
       .filter(Boolean)
       .join(' ');
@@ -240,11 +252,27 @@ export class CustomerService {
    */
   static async getCustomerById(id: number): Promise<Customer | null> {
     const db = await getDb()
-    const row = await db.get('SELECT * FROM customers WHERE id = ?', [id])
+    const hasBasis = await hasColumn('users', 'signing_basis').catch(() => false)
+    const hasGenitive = await hasColumn('users', 'name_genitive').catch(() => false)
+    const row = await db.get(
+      `SELECT c.*, u.name AS manager_name,
+              ${hasGenitive ? 'u.name_genitive' : 'NULL'} AS manager_name_genitive,
+              ${hasBasis ? 'u.signing_basis' : 'NULL'} AS manager_signing_basis
+       FROM customers c
+       LEFT JOIN users u ON u.id = c.manager_user_id
+       WHERE c.id = ?`,
+      [id]
+    )
     if (!row) return null
     const c = this.mapRowToCustomer(row)
     const withStats = await this.attachLastOrderStats([c])
     return withStats[0]
+  }
+
+  private static async assertManagerUser(userId: number): Promise<void> {
+    const db = await getDb()
+    const row = await db.get('SELECT id FROM users WHERE id = ?', [userId])
+    if (!row) throw new Error('Менеджер не найден')
   }
 
   /**
@@ -265,6 +293,7 @@ export class CustomerService {
     signer_name?: string
     signer_name_genitive?: string
     authority_basis?: string
+    manager_user_id?: number | null
     phone?: string
     email?: string
     address?: string
@@ -291,17 +320,20 @@ export class CustomerService {
     const src = normalizeCustomerSource(data.source)
     const marketingOptIn = data.marketing_opt_in === 0 ? 0 : 1
     const unsubToken = randomBytes(24).toString('hex')
+    const managerUserId = data.type === 'legal' && data.manager_user_id ? data.manager_user_id : null
+    if (managerUserId) await this.assertManagerUser(managerUserId)
     const result = await db.run(
       `INSERT INTO customers (
         type, first_name, last_name, middle_name,
         company_name, legal_name, tax_id,
         bank_details, authorized_person,
         signer_position, signer_position_genitive, signer_name, signer_name_genitive, authority_basis,
+        manager_user_id,
         phone, email, address, notes,
         source,
         marketing_opt_in, unsubscribe_token,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.type,
         data.first_name || null,
@@ -317,6 +349,7 @@ export class CustomerService {
         data.signer_name || null,
         data.signer_name_genitive || null,
         data.authority_basis || null,
+        managerUserId,
         data.phone || null,
         data.email || null,
         data.address || null,
@@ -358,6 +391,7 @@ export class CustomerService {
       signer_name?: string
       signer_name_genitive?: string
       authority_basis?: string
+      manager_user_id?: number | null
       phone?: string
       email?: string
       address?: string
@@ -389,6 +423,16 @@ export class CustomerService {
       }
     }
 
+    let managerUserId: number | null = existing.manager_user_id ?? null
+    if (finalType !== 'legal') {
+      managerUserId = null
+    } else if (data.manager_user_id !== undefined) {
+      managerUserId = data.manager_user_id
+    }
+    if (managerUserId && managerUserId !== existing.manager_user_id) {
+      await this.assertManagerUser(managerUserId)
+    }
+
     const mOptIn =
       data.marketing_opt_in !== undefined ? data.marketing_opt_in : (existing as Customer).marketing_opt_in ?? 1
     const unsubscribedAt =
@@ -412,6 +456,7 @@ export class CustomerService {
         signer_name = ?,
         signer_name_genitive = ?,
         authority_basis = ?,
+        manager_user_id = ?,
         phone = ?,
         email = ?,
         address = ?,
@@ -435,6 +480,7 @@ export class CustomerService {
         data.signer_name !== undefined ? data.signer_name : existing.signer_name,
         data.signer_name_genitive !== undefined ? data.signer_name_genitive : existing.signer_name_genitive,
         data.authority_basis !== undefined ? data.authority_basis : existing.authority_basis,
+        managerUserId,
         data.phone !== undefined ? data.phone : existing.phone,
         data.email !== undefined ? data.email : existing.email,
         data.address !== undefined ? data.address : existing.address,
@@ -513,6 +559,10 @@ export class CustomerService {
       signer_name: row.signer_name || undefined,
       signer_name_genitive: row.signer_name_genitive || undefined,
       authority_basis: row.authority_basis || undefined,
+      manager_user_id: Number(row.manager_user_id) > 0 ? Number(row.manager_user_id) : null,
+      manager_name: row.manager_name || undefined,
+      manager_name_genitive: row.manager_name_genitive || undefined,
+      manager_signing_basis: row.manager_signing_basis || undefined,
       phone: row.phone || undefined,
       email: row.email || undefined,
       address: row.address || undefined,
