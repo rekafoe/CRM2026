@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Button } from '../../../components/common'
 import { getPricingServicesBundle } from '../../../services/pricing/api'
 import type { ServiceVariant } from '../../../types/pricing'
-import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantLabels'
 import type { SimplifiedFinishingPrice, SimplifiedSizeConfig } from '../hooks/useProductTemplate'
+import { finishingLeafOptions, groupFinishingLeaves, type FinishingLeafOption } from '../finishingVariantTree'
 
 type PriceUnit = SimplifiedFinishingPrice['price_unit']
 
@@ -126,28 +126,13 @@ function minutesToHours(minutes: number): number {
   return Math.round((minutes / 60) * 1e6) / 1e6
 }
 
-type VariantOption = {
-  id: number
-  label: string
-  variantName: string
-  subtype: string
-  density: string
-}
-
-function variantOptions(variants: ServiceVariant[]): VariantOption[] {
-  return variants.map((variant) => {
-    const type = String(variant.parameters?.type || '')
-    const density = String(variant.parameters?.density || '')
-    const suffix = type && density ? `${type} ${density}` : type || density || ''
-    const baseLabel = suffix ? `${variant.variantName}, ${suffix}` : variant.variantName
-    return {
-      id: variant.id,
-      label: formatServiceVariantDisplayLabel(variant, baseLabel),
-      variantName: variant.variantName,
-      subtype: suffix,
-      density,
-    }
-  })
+function leafPatch(option: FinishingLeafOption): Partial<SimplifiedFinishingPrice> {
+  return {
+    variant_id: option.id,
+    variant_name: option.label,
+    subtype: option.subtype,
+    density: option.density,
+  }
 }
 
 export const FinishingCard: React.FC<FinishingCardProps> = ({
@@ -248,16 +233,13 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
     let changed = false
     const next = rows.map((row) => {
       if (row.variant_id != null) return row
-      const options = variantOptions(variantsByService.get(Number(row.service_id)) ?? [])
+      const options = finishingLeafOptions(variantsByService.get(Number(row.service_id)) ?? [])
       const option = options[0]
       if (!option) return row
       changed = true
       return {
         ...row,
-        variant_id: option.id,
-        variant_name: option.variantName,
-        subtype: option.subtype,
-        density: option.density,
+        ...leafPatch(option),
       }
     })
     if (changed) persist(next)
@@ -327,7 +309,12 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
                 const service = servicesById.get(Number(row.service_id))
                 const priceUnit = servicePriceUnit(service, row.price_unit)
                 const meta = quantityMode(priceUnit, service?.unit)
-                const options = variantOptions(variantsByService.get(Number(row.service_id)) ?? [])
+                const options = finishingLeafOptions(variantsByService.get(Number(row.service_id)) ?? [])
+                const groups = groupFinishingLeaves(options)
+                const selected = options.find((option) => option.id === Number(row.variant_id)) ?? options[0]
+                const selectedType = selected?.typeLabel ?? groups[0]?.typeLabel ?? ''
+                const subtypes = groups.find((group) => group.typeLabel === selectedType)?.leaves ?? []
+                const showSubtype = subtypes.some((option) => option.subtypeLabel)
                 const storedUnits = Number(row.units_per_item)
                 const units = Number.isFinite(storedUnits) && storedUnits >= 0 ? storedUnits : 1
                 const minutes = meta.mode === 'minutes' ? hoursToMinutes(units) : 0
@@ -351,20 +338,53 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
                       </button>
                     </div>
                     <div className="simplified-finishing-item__controls">
-                      {options.length > 0 && (
+                      {groups.length > 1 && (
+                        <label className="simplified-finishing-field">
+                          <span>Тип</span>
+                          <select
+                            value={selectedType}
+                            onChange={(event) => {
+                              const next = groups.find((group) => group.typeLabel === event.target.value)?.leaves[0]
+                              if (!next) return
+                              patchRow(Number(row.service_id), leafPatch(next))
+                            }}
+                          >
+                            {groups.map((group) => (
+                              <option key={group.typeLabel} value={group.typeLabel}>
+                                {group.typeLabel}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {showSubtype && (
+                        <label className="simplified-finishing-field">
+                          <span>Подтип</span>
+                          <select
+                            value={selected?.id ?? ''}
+                            onChange={(event) => {
+                              const option = subtypes.find((item) => item.id === Number(event.target.value))
+                              if (!option) return
+                              patchRow(Number(row.service_id), leafPatch(option))
+                            }}
+                          >
+                            {subtypes.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.subtypeLabel || option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {options.length > 0 && groups.length <= 1 && !showSubtype && (
                         <label className="simplified-finishing-field">
                           <span>Вариант</span>
                           <select
-                            value={row.variant_id ?? options[0]?.id ?? ''}
+                            value={selected?.id ?? ''}
                             onChange={(event) => {
                               const option = options.find((item) => item.id === Number(event.target.value))
                               if (!option) return
-                              patchRow(Number(row.service_id), {
-                                variant_id: option.id,
-                                variant_name: option.variantName,
-                                subtype: option.subtype,
-                                density: option.density,
-                              })
+                              patchRow(Number(row.service_id), leafPatch(option))
                             }}
                           >
                             {options.map((option) => (

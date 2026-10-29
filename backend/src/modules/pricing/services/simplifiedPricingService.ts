@@ -37,6 +37,7 @@ import {
   quotePerM2Finishing,
   resolveWarehouseFeedMeters,
 } from './finishingPerM2';
+import { finishingServiceDisplayName } from './finishingServiceCaption';
 import {
   enforceRequiredFinishing,
   flatFinishingUnits,
@@ -1544,6 +1545,7 @@ export class SimplifiedPricingService {
     let serviceMeterBasisMap: Map<number, 'knife_path' | 'feed'> = new Map();
     let serviceConsumptionModeMap: Map<number, 'fixed' | 'roll_feed'> = new Map();
     let variantConsumptionModeMap: Map<number, 'fixed' | 'roll_feed'> = new Map();
+    const variantParamsById = new Map<number, Record<string, unknown>>();
     let variantMeterBasisMap: Map<number, 'knife_path' | 'feed'> = new Map();
     let variantPriceUnitMap: Map<number, string> = new Map();
     /** finKey → ширина рулона мм (для per_m2) */
@@ -2024,6 +2026,7 @@ export class SimplifiedPricingService {
             const paramsConsumption = typeof params.consumption_mode === 'string' ? params.consumption_mode : undefined;
             const paramsMeterBasis = typeof params.meter_basis === 'string' ? params.meter_basis : undefined;
             const paramsPriceUnit = typeof params.price_unit === 'string' ? params.price_unit : undefined;
+            variantParamsById.set(Number(row.id), params);
             const fallbackMeterBasis = parseServiceMeterBasis(row.parameters ?? null);
             variantConsumptionModeMap.set(
               row.id,
@@ -2035,6 +2038,31 @@ export class SimplifiedPricingService {
             );
             if (paramsPriceUnit) {
               variantPriceUnitMap.set(row.id, normalizeFinishingPriceUnit(paramsPriceUnit));
+            }
+          }
+          const missingParentIds = new Set<number>();
+          for (const params of variantParamsById.values()) {
+            const parentId = Number(params.parentVariantId);
+            if (Number.isFinite(parentId) && parentId > 0 && !variantParamsById.has(parentId)) {
+              missingParentIds.add(parentId);
+            }
+          }
+          if (missingParentIds.size > 0) {
+            const parentRows = await db.all<Array<{ id: number; parameters?: string | null }>>(
+              `SELECT id, parameters FROM service_variants WHERE id IN (${[...missingParentIds].map(() => '?').join(',')})`,
+              [...missingParentIds],
+            );
+            for (const row of parentRows) {
+              let params: Record<string, unknown> = {};
+              if (row.parameters) {
+                try {
+                  const parsed = JSON.parse(row.parameters);
+                  if (parsed && typeof parsed === 'object') params = parsed as Record<string, unknown>;
+                } catch {
+                  params = {};
+                }
+              }
+              variantParamsById.set(Number(row.id), params);
             }
           }
         }
@@ -2315,7 +2343,11 @@ export class SimplifiedPricingService {
             finishingDetails.push({
               service_id: finConfig.service_id,
               variant_id: variantId,
-              service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
+              service_name: finishingServiceDisplayName(
+                serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
+                variantId,
+                variantParamsById,
+              ),
               tier: { ...tier, price: effectivePriceForTier },
               units_needed: totalUnits,
               raw_units_needed: rawUnits,
@@ -2370,7 +2402,11 @@ export class SimplifiedPricingService {
           finishingDetails.push({
             service_id: finConfig.service_id,
             variant_id: variantId,
-            service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
+            service_name: finishingServiceDisplayName(
+              serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
+              variantId,
+              variantParamsById,
+            ),
             tier: { ...tier, price: effectivePriceForTier },
             units_needed: totalUnits,
             raw_units_needed: rawUnits,

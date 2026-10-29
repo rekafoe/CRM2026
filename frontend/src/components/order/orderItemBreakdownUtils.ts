@@ -206,6 +206,26 @@ function paperDensityGsm(
   return densityNum;
 }
 
+/** «Ламинация рулонная — Матовая, 30 мк», если в сводке есть тип и подтип. */
+export function serviceNameWithFinishingChoice(
+  name: string,
+  parameterSummary: Array<{ label?: string; key?: string; value?: string }>,
+): string {
+  const base = name.trim() || 'Услуга';
+  if (!/ламин/i.test(base)) return base;
+  const choice =
+    parameterSummary
+      .find((row) => {
+        const label = String(row.label || row.key || '');
+        if (/плотн/i.test(label)) return false;
+        return /дополнительн\w*\s+отделк|ламинац/i.test(label);
+      })
+      ?.value?.trim() || '';
+  if (!choice || choice === 'нет' || /^\d+$/.test(choice)) return base;
+  if (base.toLowerCase().includes(choice.toLowerCase())) return base;
+  return `${base} — ${choice}`;
+}
+
 /** Имя шага печати из калькулятора — то же, что в карточке заказа. */
 export function plannedPrintStepName(params: Record<string, unknown> | null | undefined): string {
   if (!params || typeof params !== 'object') return '';

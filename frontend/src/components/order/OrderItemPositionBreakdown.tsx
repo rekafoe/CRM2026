@@ -8,6 +8,7 @@ import {
   formatServiceQty,
   humanReadablePaperLabel,
   isPrintCostRow,
+  serviceNameWithFinishingChoice,
   materialRowTotal,
   printSidesPhraseFromSpecs,
   serviceRowTotal,
@@ -198,7 +199,12 @@ export const OrderItemPositionBreakdown: React.FC<Props> = ({
               })}
               {otherServices.map((s, i) => (
                 <tr key={`s-${s.operationId ?? i}`}>
-                  <td>{String(s.operationName || s.service || 'Услуга').trim()}</td>
+                  <td>
+                    {serviceNameWithFinishingChoice(
+                      String(s.operationName || s.service || 'Услуга'),
+                      parameterSummary,
+                    )}
+                  </td>
                   <td>{formatServiceQty(s)}</td>
                   <td>{money(serviceRowTotal(s))}</td>
                 </tr>
