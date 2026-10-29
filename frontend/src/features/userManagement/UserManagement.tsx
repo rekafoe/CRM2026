@@ -77,6 +77,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
     department_id?: number | null;
     hourly_rate?: number | null;
     signing_basis?: string | null;
+    name_genitive?: string | null;
   }) => {
     try {
       setErrorMessage(null);
@@ -98,6 +99,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
       department_id?: number | null;
       hourly_rate?: number | null;
       signing_basis?: string | null;
+      name_genitive?: string | null;
     },
   ) => {
     try {
@@ -260,6 +262,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
                         <MoneyAmount value={user.hourly_rate} />/ч
                       </span>
                     ) : null}
+                    {user.name_genitive ? <span>{user.name_genitive}</span> : null}
                     {user.signing_basis ? <span>{user.signing_basis}</span> : null}
                   </div>
                 </div>
@@ -311,6 +314,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack, embedded
             department_id: editingUser.department_id ?? undefined,
             hourly_rate: editingUser.hourly_rate ?? 0,
             signing_basis: editingUser.signing_basis ?? '',
+            name_genitive: editingUser.name_genitive ?? '',
           }}
           onSubmit={(data) => handleUpdateUser(editingUser.id, data)}
           onClose={() => setEditingUser(null)}
@@ -390,6 +394,7 @@ interface UserFormModalProps {
     department_id?: number | null;
     hourly_rate?: number | null;
     signing_basis?: string | null;
+    name_genitive?: string | null;
   };
   onSubmit: (data: any) => void;
   onClose: () => void;
@@ -413,6 +418,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         ? String(initialData.hourly_rate)
         : '',
     signing_basis: initialData?.signing_basis || '',
+    name_genitive: initialData?.name_genitive || '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -529,6 +535,21 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
           <div className="user-form-group">
             <label className="user-form-label">
+              ФИО в родительном падеже
+            </label>
+            <input
+              type="text"
+              value={formData.name_genitive}
+              onChange={(e) => setFormData({ ...formData, name_genitive: e.target.value })}
+              className="user-form-input"
+              placeholder="Ивановой Марии Петровны"
+            />
+            <p className="user-form-hint">
+              Необязательно. В договоре: «в лице менеджера {formData.name_genitive.trim() || '…'}». В подписи остаётся обычное имя. Пустое поле в документ не подставляется.
+            </p>
+          </div>
+          <div className="user-form-group">
+            <label className="user-form-label">
               Основание полномочий
             </label>
             <input
@@ -539,7 +560,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
               placeholder="доверенности № 12 от 01.02.2026"
             />
             <p className="user-form-hint">
-              Необязательно. Попадёт в договор, акт и счёт: «в лице {formData.name.trim() || 'имя'}, на основании этого текста». Пустое поле в документ не подставляется.
+              Необязательно. В договоре: «действующего на основании {formData.signing_basis.trim() || '…'}». Пустое поле в документ не подставляется.
             </p>
           </div>
           <div className="user-form-actions">

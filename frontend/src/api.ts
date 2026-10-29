@@ -335,7 +335,7 @@ export const getDailyReports = (params?: { user_id?: number | ''; from?: string;
   api.get<DailyReport[]>('/daily-reports', { params });
 
 export const getCurrentUser = () =>
-  api.get<{ id: number; name: string; role: string; department_id?: number | null; signing_basis?: string }>('/auth/me');
+  api.get<{ id: number; name: string; role: string; department_id?: number | null; signing_basis?: string; name_genitive?: string }>('/auth/me');
 
 // === ДЕПАРТАМЕНТЫ ===
 export interface Department {
@@ -503,6 +503,8 @@ export interface User {
   hourly_rate?: number | null;
   /** Доверенность, устав и т.п. Пусто — в документ основание не попадает. */
   signing_basis?: string | null;
+  /** ФИО в родительном падеже для оборота «в лице». Пусто — в документ не попадает. */
+  name_genitive?: string | null;
 }
 
 export const getAllUsers = () => api.get<User[]>('/users/all');
@@ -514,6 +516,7 @@ export const createUser = (user: {
   department_id?: number | null;
   hourly_rate?: number | null;
   signing_basis?: string | null;
+  name_genitive?: string | null;
 }) => api.post<User>('/users', user);
 export const updateUser = (
   id: number,
@@ -524,6 +527,7 @@ export const updateUser = (
     department_id?: number | null;
     hourly_rate?: number | null;
     signing_basis?: string | null;
+    name_genitive?: string | null;
   },
 ) => api.put(`/users/${id}`, user);
 export const deleteUser = (id: number) => api.delete(`/users/${id}`);

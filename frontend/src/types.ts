@@ -295,6 +295,7 @@ export interface TemplateData {
   signerNameGenitive?: string;
   authorityBasis?: string;
   executorName?: string;
+  executorNameGenitive?: string;
   executorAuthorityBasis?: string;
   executorAuthorizedPerson?: string;
   contractNumber?: string;

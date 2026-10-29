@@ -52,18 +52,31 @@ export class AuthService {
 
   static async getCurrentUser(token: string) {
     const db = await getDb()
-    let user: { id: number; name: string; role: string; department_id?: number | null } | undefined
+    let user: { id: number; name: string; role: string; department_id?: number | null; signing_basis?: string | null; name_genitive?: string | null } | undefined
     try {
       user = await db.get(
-        'SELECT id, name, role, department_id FROM users WHERE api_token = ?',
+        'SELECT id, name, role, department_id, signing_basis, name_genitive FROM users WHERE api_token = ?',
         token
       )
     } catch {
-      // legacy: колонки department_id может не быть
-      user = await db.get(
-        'SELECT id, name, role FROM users WHERE api_token = ?',
-        token
-      )
+      try {
+        user = await db.get(
+          'SELECT id, name, role, department_id, signing_basis FROM users WHERE api_token = ?',
+          token
+        )
+      } catch {
+        try {
+          user = await db.get(
+            'SELECT id, name, role, department_id FROM users WHERE api_token = ?',
+            token
+          )
+        } catch {
+          user = await db.get(
+            'SELECT id, name, role FROM users WHERE api_token = ?',
+            token
+          )
+        }
+      }
     }
     
     if (!user) {
@@ -75,6 +88,8 @@ export class AuthService {
       name: user.name,
       role: user.role,
       department_id: user.department_id ?? null,
+      signing_basis: typeof user.signing_basis === 'string' ? user.signing_basis.trim() : '',
+      name_genitive: typeof user.name_genitive === 'string' ? user.name_genitive.trim() : '',
     }
   }
 }

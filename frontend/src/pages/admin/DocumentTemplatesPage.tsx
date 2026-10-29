@@ -231,6 +231,7 @@ const DocumentTemplatesPage: React.FC = () => {
     { value: 'sellerBankDetails', label: 'Банк продавца' },
     { value: 'sellerPhone', label: 'Телефон продавца' },
     { value: 'executorName', label: 'Менеджер: имя' },
+    { value: 'executorNameGenitive', label: 'Менеджер: ФИО в родительном падеже' },
     { value: 'executorAuthorityBasis', label: 'Менеджер: основание полномочий' },
     { value: 'executorAuthorizedPerson', label: 'Менеджер строкой: имя, действует на основании' },
     { value: 'contractNumber', label: 'Номер договора' },

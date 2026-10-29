@@ -32,6 +32,7 @@ export interface TemplateData {
   signerNameGenitive?: string;
   authorityBasis?: string;
   executorName?: string;
+  executorNameGenitive?: string;
   executorAuthorityBasis?: string;
   executorAuthorizedPerson?: string;
   
@@ -371,6 +372,7 @@ export class DocumentTemplateService {
         signerNameGenitive: data.signerNameGenitive || '',
         authorityBasis: data.authorityBasis || '',
         executorName: data.executorName || '',
+        executorNameGenitive: data.executorNameGenitive || '',
         executorAuthorityBasis: data.executorAuthorityBasis || '',
         executorAuthorizedPerson: data.executorAuthorizedPerson || '',
         contractNumber: data.contractNumber || '',
@@ -1068,6 +1070,7 @@ export class DocumentTemplateService {
       'sellerBankDetails': 'sellerBankDetails',
       'sellerPhone': 'sellerPhone',
       'executorName': 'executorName',
+      'executorNameGenitive': 'executorNameGenitive',
       'executorAuthorityBasis': 'executorAuthorityBasis',
       'executorAuthorizedPerson': 'executorAuthorizedPerson',
       

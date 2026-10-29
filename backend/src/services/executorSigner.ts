@@ -1,5 +1,6 @@
 export type ExecutorSignerSource = {
   name?: string | null
+  name_genitive?: string | null
   signing_basis?: string | null
 }
 
@@ -13,6 +14,7 @@ function clean(value?: string | null): string {
  */
 export function executorSignerTemplateFields(source?: ExecutorSignerSource | null) {
   const executorName = clean(source?.name)
+  const executorNameGenitive = clean(source?.name_genitive)
   const executorAuthorityBasis = clean(source?.signing_basis)
   const executorAuthorizedPerson =
     executorName && executorAuthorityBasis
@@ -21,6 +23,7 @@ export function executorSignerTemplateFields(source?: ExecutorSignerSource | nul
 
   return {
     executorName,
+    executorNameGenitive,
     executorAuthorityBasis,
     executorAuthorizedPerson,
   }

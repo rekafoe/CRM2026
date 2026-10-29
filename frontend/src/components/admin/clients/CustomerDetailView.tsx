@@ -57,7 +57,7 @@ export const CustomerDetailView: React.FC<{
   const [ordersFrom, setOrdersFrom] = useState('');
   const [ordersTo, setOrdersTo] = useState('');
   const [legalForm, setLegalForm] = useState<CustomerLegalFormState>(emptyLegalForm);
-  const [executorSigner, setExecutorSigner] = useState({ name: '', signing_basis: '' });
+  const [executorSigner, setExecutorSigner] = useState({ name: '', name_genitive: '', signing_basis: '' });
   const [savingLegal, setSavingLegal] = useState(false);
   const [editForm, setEditForm] = useState<{
     first_name: string;
@@ -86,11 +86,12 @@ export const CustomerDetailView: React.FC<{
         if (cancelled) return;
         setExecutorSigner({
           name: res.data?.name || '',
+          name_genitive: res.data?.name_genitive || '',
           signing_basis: res.data?.signing_basis || '',
         });
       })
       .catch(() => {
-        if (!cancelled) setExecutorSigner({ name: '', signing_basis: '' });
+        if (!cancelled) setExecutorSigner({ name: '', name_genitive: '', signing_basis: '' });
       });
     return () => {
       cancelled = true;
@@ -869,8 +870,8 @@ export const CustomerDetailView: React.FC<{
                   new TextRun({ text: 'Исполнитель в лице: ', bold: true }),
                   new TextRun({
                     text: executor.executorAuthorityBasis
-                      ? `${executor.executorName}, на основании ${executor.executorAuthorityBasis}`
-                      : executor.executorName || '—',
+                      ? `${executor.executorNameGenitive || executor.executorName}, на основании ${executor.executorAuthorityBasis}`
+                      : executor.executorNameGenitive || executor.executorName || '—',
                   }),
                 ],
               }),

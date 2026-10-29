@@ -8,7 +8,7 @@
 ДОГОВОР № {contractNumber}
 г. Минск                                                                                                                                              {contractDate}
 
-{sellerName}, именуемое в дальнейшем "Исполнитель", в лице {executorName}, действующего на основании {executorAuthorityBasis}, с одной стороны и {legalName}, именуемое в дальнейшем "Заказчик", в лице {signerPositionGenitive} {signerNameGenitive}, действующего на основании {authorityBasis}, с другой стороны, заключили настоящий договор о нижеследующем:
+{sellerName}, именуемое в дальнейшем "Исполнитель", в лице менеджера {executorNameGenitive}, действующего на основании {executorAuthorityBasis}, с одной стороны и {legalName}, именуемое в дальнейшем "Заказчик", в лице {signerPositionGenitive} {signerNameGenitive}, действующего на основании {authorityBasis}, с другой стороны, заключили настоящий договор о нижеследующем:
 
 1. Предмет договора
 1.1. Заказчик поручает, а Исполнитель выполняет для Заказчика следующие работы:
@@ -90,7 +90,8 @@ ________________ / {signerName}
 | `{signerName}` | `signerName` | ФИО в подписи, именительный падеж |
 | `{authorizedPerson}` | `authorizedPerson` | Старая строка целиком: «ФИО, действует на основании: …» |
 | `{sellerName}` | `sellerName` | Название нашей организации |
-| `{executorName}` | `executorName` | Имя пользователя CRM, который формирует документ |
+| `{executorName}` | `executorName` | Имя пользователя CRM, как в карточке. Для подписи |
+| `{executorNameGenitive}` | `executorNameGenitive` | ФИО менеджера в родительном падеже, «в лице менеджера». Пусто, если поле не заполнено |
 | `{executorAuthorityBasis}` | `executorAuthorityBasis` | Основание менеджера: доверенности №… Пусто, если поле не заполнено |
 | `{executorAuthorizedPerson}` | `executorAuthorizedPerson` | Имя менеджера и основание одной строкой |
 | `{productionDays}` | (новое поле) | Количество рабочих дней на изготовление |

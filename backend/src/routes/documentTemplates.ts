@@ -22,10 +22,10 @@ async function executorFieldsForRequest(req: Request) {
   if (!Number.isFinite(userId) || userId <= 0) return executorSignerTemplateFields(null)
   const db = await getDb()
   const hasBasis = await hasColumn('users', 'signing_basis').catch(() => false)
-  const row = await db.get<{ name?: string | null; signing_basis?: string | null }>(
-    hasBasis
-      ? 'SELECT name, signing_basis FROM users WHERE id = ?'
-      : 'SELECT name FROM users WHERE id = ?',
+  const hasGenitive = await hasColumn('users', 'name_genitive').catch(() => false)
+  const columns = ['name', ...(hasBasis ? ['signing_basis'] : []), ...(hasGenitive ? ['name_genitive'] : [])]
+  const row = await db.get<{ name?: string | null; signing_basis?: string | null; name_genitive?: string | null }>(
+    `SELECT ${columns.join(', ')} FROM users WHERE id = ?`,
     userId,
   )
   return executorSignerTemplateFields(row)
