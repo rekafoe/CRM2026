@@ -55,6 +55,69 @@ function formatIssuedDate(iso: string): string {
   return date.toLocaleDateString('ru-RU')
 }
 
+export type CitedIssuedDocument = {
+  number: string
+  issuedDate: string
+}
+
+/**
+ * Номер текущего документа остаётся в contractNumber: так уже подписаны шаблоны акта и счёта.
+ * invoiceNumber и actNumber — номера своих документов. В договоре это ссылка на уже выданный
+ * счёт или акт по тем же заказам, а не копия номера договора.
+ */
+export function numbersForIssuedDocument(args: {
+  kind: IssuedDocumentKind
+  number: string
+  issuedDate: string
+  invoice?: CitedIssuedDocument | null
+  act?: CitedIssuedDocument | null
+}): {
+  contractNumber: string
+  contractDate: string
+  documentNumber: string
+  documentDate: string
+  invoiceNumber: string
+  invoiceDate: string
+  actNumber: string
+  actDate: string
+} {
+  const invoice = args.kind === 'invoice'
+    ? { number: args.number, issuedDate: args.issuedDate }
+    : args.invoice
+  const act = args.kind === 'act'
+    ? { number: args.number, issuedDate: args.issuedDate }
+    : args.act
+  return {
+    contractNumber: args.number,
+    contractDate: args.issuedDate,
+    documentNumber: args.number,
+    documentDate: args.issuedDate,
+    invoiceNumber: invoice?.number ?? '',
+    invoiceDate: invoice?.issuedDate ?? '',
+    actNumber: act?.number ?? '',
+    actDate: act?.issuedDate ?? '',
+  }
+}
+
+export async function findLatestIssued(
+  kind: IssuedDocumentKind,
+  orderIds: number[],
+): Promise<CitedIssuedDocument | null> {
+  const key = orderKey(orderIds)
+  if (!key) return null
+  const db = await getDb()
+  const row = await db.get<{ number: string; issued_at: string }>(
+    `SELECT number, issued_at
+     FROM issued_documents
+     WHERE kind = ? AND order_key = ?
+     ORDER BY issued_at DESC, id DESC
+     LIMIT 1`,
+    [kind, key],
+  )
+  if (!row?.number) return null
+  return { number: row.number, issuedDate: formatIssuedDate(row.issued_at) }
+}
+
 async function readStored(kind: IssuedDocumentKind, key: string, sourceHash: string): Promise<StoredIssuedDocument | null> {
   const db = await getDb()
   const row = await db.get<{

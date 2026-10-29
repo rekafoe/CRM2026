@@ -2,7 +2,7 @@ import { open, type Database } from 'sqlite'
 import sqlite3 from 'sqlite3'
 import { getDb } from '../config/database'
 import { up } from '../migrations/20261027190000_issued_documents_and_vat_rate'
-import { issueOrReuse, readIssuedFileForCustomer } from '../services/issuedDocumentService'
+import { findLatestIssued, issueOrReuse, numbersForIssuedDocument, readIssuedFileForCustomer } from '../services/issuedDocumentService'
 import { amountInWordsBel } from '../utils/amountInWordsBel'
 import { applyVatToAmounts } from '../utils/documentVat'
 import { pricedSlices } from '../utils/pricedSlices'
@@ -181,5 +181,81 @@ describe('issued documents', () => {
     expect(Number(personRows?.c)).toBe(0)
     const invoice = await db.get<{ number: string }>('SELECT number FROM issued_documents WHERE kind = ?', ['invoice'])
     expect(invoice?.number).toBe('С-00001')
+  })
+
+  it('cites the latest invoice for the same orders and does not invent one', async () => {
+    const issueInvoice = (orderIds: number[], sourceHash: string) => issueOrReuse({
+      kind: 'invoice',
+      orderIds,
+      customerId: 1,
+      organizationId: null,
+      sourceHash,
+      totalAmount: 10,
+      mimeType: 'application/pdf',
+      filenameFor: (number) => `invoice-${number}.pdf`,
+      render: async ({ number }) => Buffer.from(number),
+    })
+
+    await issueInvoice([7, 3], 'inv-1')
+    expect((await findLatestIssued('invoice', [3, 7]))?.number).toBe('С-00001')
+
+    await issueInvoice([3, 7], 'inv-2')
+    const latest = await findLatestIssued('invoice', [3, 7])
+    expect(latest?.number).toBe('С-00002')
+    expect(latest?.issuedDate).toMatch(/\d/)
+    expect(await findLatestIssued('invoice', [3])).toBeNull()
+    expect(await findLatestIssued('contract', [3, 7])).toBeNull()
+
+    const contract = numbersForIssuedDocument({
+      kind: 'contract',
+      number: 'Д-00005',
+      issuedDate: '29.10.2026',
+      invoice: latest,
+    })
+    expect(contract.invoiceNumber).toBe('С-00002')
+    expect(contract.invoiceDate).toBe(latest?.issuedDate)
+    expect(contract.contractNumber).toBe('Д-00005')
+    expect(contract.actNumber).toBe('')
+
+    const withoutInvoice = numbersForIssuedDocument({
+      kind: 'contract',
+      number: 'Д-00005',
+      issuedDate: '29.10.2026',
+      invoice: null,
+    })
+    expect(withoutInvoice.invoiceNumber).toBe('')
+    expect(withoutInvoice.invoiceDate).toBe('')
+
+    const ownInvoice = numbersForIssuedDocument({
+      kind: 'invoice',
+      number: 'С-00017',
+      issuedDate: '29.10.2026',
+      invoice: { number: 'С-00001', issuedDate: '01.01.2020' },
+      act: { number: 'А-00003', issuedDate: '02.02.2020' },
+    })
+    expect(ownInvoice.invoiceNumber).toBe('С-00017')
+    expect(ownInvoice.contractNumber).toBe('С-00017')
+    expect(ownInvoice.actNumber).toBe('А-00003')
+
+    const act = numbersForIssuedDocument({
+      kind: 'act',
+      number: 'А-00001',
+      issuedDate: '29.10.2026',
+      invoice: { number: 'С-00017', issuedDate: '28.10.2026' },
+    })
+    expect(act.actNumber).toBe('А-00001')
+    expect(act.invoiceNumber).toBe('С-00017')
+    expect(act.contractNumber).toBe('А-00001')
+
+    const contractCounter = await db.get<{ last_value: number }>(
+      'SELECT last_value FROM document_number_counters WHERE kind = ?',
+      ['contract'],
+    )
+    expect(contractCounter).toBeUndefined()
+    const invoiceCounter = await db.get<{ last_value: number }>(
+      'SELECT last_value FROM document_number_counters WHERE kind = ?',
+      ['invoice'],
+    )
+    expect(invoiceCounter?.last_value).toBe(2)
   })
 })

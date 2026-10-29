@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { DocumentTemplateService, TemplateData } from '../services/documentTemplateService';
-import { documentSourceHash, issueOrReuse, IssuedDocumentKind } from '../services/issuedDocumentService';
+import { documentSourceHash, findLatestIssued, issueOrReuse, IssuedDocumentKind, numbersForIssuedDocument } from '../services/issuedDocumentService';
 import { PDFReportService } from '../services/pdfReportService';
 import { normalizeVatRate } from '../utils/documentVat';
 import { computeOrderAmounts } from '../utils/orderAmounts';
@@ -442,12 +442,16 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       totalAmount,
       totalQuantity,
     };
+    const issuedOrderIds = orders.map((order) => order.id);
+    const citedInvoice = kind === 'invoice' ? null : await findLatestIssued('invoice', issuedOrderIds);
+    const citedAct = kind === 'act' ? null : await findLatestIssued('act', issuedOrderIds);
     const sourceHash = documentSourceHash({
       kind,
       templateId: template.id,
       sellerUnp: seller?.unp ?? '',
       vatRate,
       ...baseData,
+      ...(kind === 'contract' && citedInvoice?.number ? { citedInvoiceNumber: citedInvoice.number } : {}),
     });
     const ext = path.extname(template.file_path);
     const contentType = ext === '.docx'
@@ -470,12 +474,13 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       },
       render: async ({ number, issuedDate }) => DocumentTemplateService.generateDocumentWithMapping(template.id, {
         ...baseData,
-        contractNumber: number,
-        contractDate: issuedDate,
-        actNumber: number,
-        invoiceNumber: number,
-        documentNumber: number,
-        documentDate: issuedDate,
+        ...numbersForIssuedDocument({
+          kind,
+          number,
+          issuedDate,
+          invoice: citedInvoice,
+          act: citedAct,
+        }),
       }),
     });
     res.setHeader('Content-Type', issued.mimeType);
