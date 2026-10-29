@@ -17,6 +17,7 @@ router.get('/', CustomerController.getAll)
  */
 router.get('/:id/projects', CustomerController.listProjects)
 router.get('/:id/orders', CustomerController.listOrders)
+router.get('/:id/reconciliation', CustomerController.reconciliation)
 
 router.get('/:customerId/legal-documents', CustomerController.listLegalDocuments)
 router.get('/:customerId/legal-documents/:documentId/file', CustomerController.downloadLegalDocumentFile)

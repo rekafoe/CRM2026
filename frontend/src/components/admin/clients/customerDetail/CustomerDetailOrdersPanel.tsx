@@ -15,6 +15,7 @@ export interface CustomerDetailOrdersLegalBlockProps {
   onExportContract: () => void;
   onExportAct: () => void;
   onExportInvoice: () => void;
+  onExportReconciliation: () => void;
 }
 
 interface CustomerDetailOrdersPanelProps {
@@ -33,9 +34,8 @@ export const CustomerDetailOrdersPanel: React.FC<CustomerDetailOrdersPanelProps>
     {legalBlock && (
       <div className="customer-detail-view__legal-exports">
         <p className="customer-detail-view__doc-intro">
-          Выгрузка формирует файлы по заказам за выбранный период; в журнале создаётся отдельная запись на каждый
-          заказ (если в периоде нет заказов — одна запись «без заказа в периоде»). Старые заказы вне периода
-          смотрите во вкладке «Все заказы».
+          Договор, акт и счёт собираются по заказам выбранного периода. Акт сверки за тот же период
+          показывает сумму заказов и уже полученные оплаты; заказы до начала периода входят в сальдо на начало.
         </p>
         <div className="customers-doc-actions customer-detail-view__doc-actions">
           <Button
@@ -61,6 +61,14 @@ export const CustomerDetailOrdersPanel: React.FC<CustomerDetailOrdersPanelProps>
             disabled={legalBlock.ordersLoading || legalBlock.generatingDocument === 'invoice'}
           >
             {legalBlock.generatingDocument === 'invoice' ? 'Генерация...' : 'Счёт Excel'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={legalBlock.onExportReconciliation}
+            disabled={legalBlock.ordersLoading || legalBlock.generatingDocument === 'reconciliation'}
+          >
+            {legalBlock.generatingDocument === 'reconciliation' ? 'Генерация...' : 'Акт сверки'}
           </Button>
         </div>
 

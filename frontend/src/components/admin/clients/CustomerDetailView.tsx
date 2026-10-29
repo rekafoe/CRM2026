@@ -4,6 +4,7 @@ import {
   createCustomerLegalDocument,
   getCustomer,
   getCustomerOrders,
+  downloadCustomerReconciliation,
   updateCustomer,
   generateDocumentByType,
   generateDocumentByTypeFromOrders,
@@ -934,6 +935,29 @@ export const CustomerDetailView: React.FC<{
     }
   }, [buildOrdersTableRows, countedOrders, legalForm, documentExecutor, recordLegalExport, customer]);
 
+  const handleExportReconciliation = useCallback(async () => {
+    if (!customer) return;
+    try {
+      setGeneratingDocument('reconciliation');
+      setError(null);
+      const response = await downloadCustomerReconciliation(customer.id, {
+        from: ordersFrom || undefined,
+        to: ordersTo || undefined,
+      });
+      downloadAxiosBlob(
+        response,
+        `Акт-сверки-${customer.id}.xlsx`,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      setLegalDocsRefresh((n) => n + 1);
+    } catch (error: unknown) {
+      const message = await getApiErrorMessage(error, 'Не удалось создать акт сверки');
+      setError(message);
+    } finally {
+      setGeneratingDocument(null);
+    }
+  }, [customer, ordersFrom, ordersTo]);
+
   if (pageLoading) {
     return (
       <div className="pm-loading">
@@ -1044,6 +1068,7 @@ export const CustomerDetailView: React.FC<{
                       onExportContract: handleExportContract,
                       onExportAct: handleExportAct,
                       onExportInvoice: handleExportInvoice,
+                      onExportReconciliation: handleExportReconciliation,
                     }
                   : null
               }

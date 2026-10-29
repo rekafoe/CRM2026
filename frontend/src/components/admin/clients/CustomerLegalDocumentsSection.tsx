@@ -16,6 +16,7 @@ const KIND_OPTIONS: { value: string; label: string }[] = [
   { value: 'invoice', label: 'Счёт' },
   { value: 'contract', label: 'Договор' },
   { value: 'receipt', label: 'Товарный чек' },
+  { value: 'reconciliation', label: 'Акт сверки' },
   { value: 'other', label: 'Другое' },
 ];
 

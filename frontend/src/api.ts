@@ -1610,6 +1610,14 @@ export const getCustomerProjects = (customerId: number) =>
   api.get(`/customers/${customerId}/projects`);
 export const getCustomerOrders = (customerId: number) =>
   api.get<Order[]>(`/customers/${customerId}/orders`);
+export const downloadCustomerReconciliation = (customerId: number, params?: { from?: string; to?: string }) =>
+  api.get(`/customers/${customerId}/reconciliation`, {
+    params: {
+      from: params?.from || undefined,
+      to: params?.to || undefined,
+    },
+    responseType: 'blob',
+  });
 export const generateOrderItemProduction = (orderId: number, orderItemId: number) =>
   api.post(`/orders/${orderId}/items/${orderItemId}/generate-production`);
 export const getOrderItemProductionStatus = (orderId: number, orderItemId: number) =>

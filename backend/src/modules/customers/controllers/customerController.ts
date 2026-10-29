@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { CustomerService } from '../services/customerService'
 import { CustomerLegalDocumentService } from '../services/customerLegalDocumentService'
 import { readIssuedFileForCustomer } from '../../../services/issuedDocumentService'
+import { issueCustomerReconciliation } from '../../../services/reconciliationActService'
 import { listCustomerProjects } from '../../../services/customerProjectService'
 import { OrderService } from '../../orders/services/orderService'
 import { asyncHandler } from '../../../middleware'
@@ -356,6 +357,51 @@ export class CustomerController {
         return
       }
       res.status(400).json({ error: error.message || 'Ошибка обновления клиента' })
+    }
+  })
+
+  /**
+   * GET /api/customers/:id/reconciliation?from=&to=
+   * Акт сверки: заказы и уже полученные оплаты за период.
+   */
+  static reconciliation = asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
+    }
+    const day = (value: unknown): string | null => {
+      if (value == null || String(value).trim() === '') return null
+      const text = String(value).trim().slice(0, 10)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        throw new Error('Дата периода в формате ГГГГ-ММ-ДД')
+      }
+      return text
+    }
+    try {
+      const from = day(req.query.from)
+      const to = day(req.query.to)
+      if (from && to && from > to) {
+        res.status(400).json({ error: 'Дата начала периода позже даты конца' })
+        return
+      }
+      const issued = await issueCustomerReconciliation(id, { from, to })
+      const buffer = issued.buffer
+      const filename = issued.filename
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`)
+      res.send(buffer)
+    } catch (error: any) {
+      const message = error?.message || 'Не удалось собрать акт сверки'
+      if (message === 'Клиент не найден') {
+        res.status(404).json({ error: message })
+        return
+      }
+      if (message.includes('Дата периода') ) {
+        res.status(400).json({ error: message })
+        return
+      }
+      res.status(500).json({ error: message })
     }
   })
 
