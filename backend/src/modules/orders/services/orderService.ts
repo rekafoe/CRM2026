@@ -29,6 +29,7 @@ import {
   type WebsiteOrderDelivery,
 } from '../../../types/websiteOrderDelivery'
 import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
+import { shouldClearDefaultPrepaymentForLegal } from '../../../utils/legalOrderPrepayment'
 import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
 import { contactToKeep, resolveColleagueContactUserId, shouldTransferContact } from '../orderTransferContact'
 
@@ -987,26 +988,71 @@ export class OrderService {
     const db = await getDb()
     
     // Проверяем существование заказа
-    const order = await db.get('SELECT id FROM orders WHERE id = ?', [id])
+    const order = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
     if (!order) {
       throw new Error('Заказ не найден')
     }
 
-    // Если указан customer_id, проверяем его существование
+    let customerType: string | null = null
     if (customerId !== null) {
-      const customer = await db.get('SELECT id FROM customers WHERE id = ?', [customerId])
+      const customer = await db.get<{ id: number; type?: string | null }>('SELECT id, type FROM customers WHERE id = ?', [customerId])
       if (!customer) {
         throw new Error('Клиент не найден')
       }
+      customerType = customer.type ?? null
     }
 
-    await db.run(
-      'UPDATE orders SET customer_id = ?, updated_at = datetime("now") WHERE id = ?',
-      [customerId, id]
-    )
+    const items = await OrderRepository.getItemsByOrderId(id)
+    const amounts = computeOrderAmounts({
+      items: items as Parameters<typeof computeOrderAmounts>[0]['items'],
+      discount_percent: order.discount_percent ?? 0,
+      prepaymentAmount: order.prepaymentAmount,
+    })
+
+    let hasUpdatedAt = false
+    let hasPaymentChannel = false
+    let hasIsInternal = false
+    let hasPrepaymentUpdatedAt = false
+    try {
+      hasUpdatedAt = await hasColumn('orders', 'updated_at')
+      hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasIsInternal = await hasColumn('orders', 'is_internal')
+      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+    } catch { /* ignore */ }
+
+    const type = String(customerType || '').trim().toLowerCase()
+    const isInternal = hasIsInternal && Number(order.is_internal) === 1
+    const sets = ['customer_id = ?']
+    const params: unknown[] = [customerId]
+    if (hasUpdatedAt) sets.push('updated_at = datetime("now")')
+
+    if (type === 'legal' && hasPaymentChannel) {
+      sets.push("payment_channel = 'invoice'")
+      if (hasIsInternal) sets.push('is_internal = 0')
+    } else if (type === 'individual' && hasPaymentChannel && !isInternal) {
+      sets.push("payment_channel = 'cash'")
+    }
+
+    if (shouldClearDefaultPrepaymentForLegal({
+      customerType,
+      prepaymentAmount: order.prepaymentAmount,
+      orderTotal: amounts.totalAmount,
+    })) {
+      sets.push('prepaymentAmount = 0')
+      sets.push('prepaymentStatus = NULL')
+      sets.push('paymentMethod = NULL')
+      sets.push('paymentUrl = NULL')
+      sets.push('paymentId = NULL')
+      if (hasPrepaymentUpdatedAt) sets.push('prepaymentUpdatedAt = NULL')
+    }
+
+    params.push(id)
+    await db.run(`UPDATE orders SET ${sets.join(', ')} WHERE id = ?`, params)
 
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
-    return OrderService.orderForApi({ ...(updated as any), items: [] }) as Order
+    return OrderService.orderForApi(
+      attachAmountsToOrder({ ...(updated as any), items }) as Order
+    ) as Order
   }
 
   /** Допустимые значения скидки: 0, 5, 10, 15, 20, 25 (%) */

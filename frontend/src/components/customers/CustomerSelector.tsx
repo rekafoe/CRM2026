@@ -65,16 +65,28 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   // Обработка изменения клиента. customer — для автоподстановки канала оплаты (юрлицо → счёт).
   const handleCustomerChange = useCallback(async (customerId: number | null, customer?: Customer | null) => {
     try {
-      await updateOrderCustomer(orderId, customerId);
+      const updated = await updateOrderCustomer(orderId, customerId);
+      const data = updated.data;
       setSelectedCustomerId(customerId);
       const c = customerId ? (customer ?? customers.find((x) => x.id === customerId)) : null;
-      const paymentPatch =
-        c?.type === 'legal'
+      const paymentPatch = data?.payment_channel
+        ? { payment_channel: data.payment_channel }
+        : c?.type === 'legal'
           ? ({ payment_channel: 'invoice' } as const)
           : c?.type === 'individual'
             ? ({ payment_channel: 'cash' } as const)
             : {};
-      onOrderPatch?.(orderId, { customer_id: customerId, ...paymentPatch });
+      onOrderPatch?.(orderId, {
+        customer_id: customerId,
+        ...paymentPatch,
+        ...(typeof data?.prepaymentAmount === 'number' ? { prepaymentAmount: data.prepaymentAmount } : {}),
+        ...('prepaymentStatus' in (data ?? {}) ? { prepaymentStatus: data.prepaymentStatus ?? undefined } : {}),
+        ...('paymentMethod' in (data ?? {}) ? { paymentMethod: data.paymentMethod ?? undefined } : {}),
+        ...(typeof data?.debt === 'number' ? { debt: data.debt } : {}),
+        ...(typeof data?.totalAmount === 'number' ? { totalAmount: data.totalAmount } : {}),
+        ...(typeof data?.subtotal === 'number' ? { subtotal: data.subtotal } : {}),
+        ...(typeof data?.discountAmount === 'number' ? { discountAmount: data.discountAmount } : {}),
+      });
       if (c?.type === 'legal') {
         await updateOrderPaymentChannel(orderId, 'invoice');
       } else if (c?.type === 'individual') {

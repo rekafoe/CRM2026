@@ -15,6 +15,7 @@ import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
+import { shouldAutoFillCashPrepayment } from '../../../utils/legalOrderPrepayment'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
 
@@ -425,12 +426,28 @@ export class OrderItemController {
 
         //  Пересчёт предоплаты при изменении итога: первая позиция или синк при offline
         const qty = Math.max(1, Number(quantity) || 1)
+        let hasPaymentChannel = false
+        try {
+          hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+        } catch {
+          hasPaymentChannel = false
+        }
+        const channelSelect = hasPaymentChannel ? 'o.payment_channel' : 'NULL as payment_channel'
         const paymentRow = await db.get<{
           prepaymentAmount?: number | null
           prepaymentStatus?: string | null
           paymentMethod?: string | null
           discount_percent?: number | null
-        }>('SELECT prepaymentAmount, prepaymentStatus, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
+          payment_channel?: string | null
+          customer_type?: string | null
+        }>(
+          `SELECT o.prepaymentAmount, o.prepaymentStatus, o.paymentMethod, COALESCE(o.discount_percent, 0) as discount_percent,
+                  ${channelSelect}, c.type as customer_type
+           FROM orders o
+           LEFT JOIN customers c ON c.id = o.customer_id
+           WHERE o.id = ?`,
+          [orderId]
+        )
         const itemsAfterAdd = await OrderRepository.getItemsByOrderId(orderId)
         const newAmounts = computeOrderAmounts({
           items: itemsAfterAdd,
@@ -449,17 +466,15 @@ export class OrderItemController {
         const pct = Number(paymentRow?.discount_percent || 0) / 100
         const oldTotal = Math.round(oldSubtotal * (1 - pct) * 100) / 100
         const newTotal = newAmounts.totalAmount
-        const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
-        const prepaymentStatus = paymentRow?.prepaymentStatus
-        const paymentMethod = paymentRow?.paymentMethod
-        const allowAutoPay = paymentMethod !== null && paymentMethod !== undefined
-        const hasPrepayment = prepaymentAmount > 0 || (prepaymentStatus && prepaymentStatus.length > 0)
-        const eps = 0.005
-        const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
-        const shouldSetPrepayment =
-          allowAutoPay &&
-          newTotal > 0 &&
-          (!hasPrepayment || (paymentMethod === 'offline' && inSync))
+        const shouldSetPrepayment = shouldAutoFillCashPrepayment({
+          customerType: paymentRow?.customer_type,
+          paymentChannel: paymentRow?.payment_channel,
+          paymentMethod: paymentRow?.paymentMethod,
+          prepaymentAmount: paymentRow?.prepaymentAmount,
+          prepaymentStatus: paymentRow?.prepaymentStatus,
+          oldTotal,
+          newTotal,
+        })
         if (shouldSetPrepayment) {
           let hasPrepaymentUpdatedAt = false
           try {
