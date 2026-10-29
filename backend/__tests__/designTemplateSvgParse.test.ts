@@ -126,6 +126,31 @@ describe('parseImportedSvgLayers', () => {
     expect(r.warnings.some((w) => w.includes('text_title') && w.includes('оставлен в фоне'))).toBe(true)
   })
 
+  it('берёт фотополе из круга, эллипса и контура, подписанных photo_*', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <circle id="photo_avatar" cx="40" cy="25" r="10"/>
+  <ellipse id="photo_oval" cx="70" cy="20" rx="12" ry="6"/>
+  <g id="photo_slot"><circle cx="15" cy="15" r="5"/></g>
+  <polygon id="photo_badge" points="10,40 22,40 16,48"/>
+  <rect id="photo_box" x="80" y="5" width="10" height="8"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const byName = Object.fromEntries(r.photoRects.map((item) => [item.name, item]))
+    expect(byName.photo_avatar?.shape).toBe('ellipse')
+    expect(byName.photo_avatar?.svg).toMatchObject({ x: 30, y: 15, width: 20, height: 20 })
+    expect(byName.photo_oval?.shape).toBe('ellipse')
+    expect(byName.photo_oval?.svg).toMatchObject({ width: 24, height: 12 })
+    expect(byName.photo_slot?.shape).toBe('ellipse')
+    expect(byName.photo_badge?.shape).toBe('path')
+    expect(byName.photo_badge?.clipPath).toMatch(/^M /)
+    expect(byName.photo_box?.shape).toBe('rect')
+    expect(byName.photo_box?.clipPath).toBeUndefined()
+    expect(r.strippedSvg.includes('photo_avatar')).toBe(false)
+    expect(r.strippedSvg.includes('photo_badge')).toBe(false)
+    expect(r.warnings.some((w) => w.includes('PHOTO_NO_VALID_RECT'))).toBe(false)
+  })
+
   it('оставляет photo_* в фоне, если не найден валидный rect', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">

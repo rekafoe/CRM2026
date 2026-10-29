@@ -2,7 +2,13 @@
  * Пустое фото-поле: группа с однородным фоном и иконкой камеры (как в legacy chrome).
  * Один Fabric Rect на сцене ломал ресайз в Fabric 7 — группа с noop layout и relayoutEmptyPhotoFieldChrome.
  */
-import { Circle, Group, Point, Rect, Text, type Canvas, type FabricObject } from 'fabric';
+import { Circle, Group, Path, Point, Rect, Text, type Canvas, type FabricObject } from 'fabric';
+import {
+  photoFieldFrameRadii,
+  readPhotoFieldClip,
+  readPhotoFieldShape,
+  type PhotoFieldShape,
+} from './photoFieldShape';
 import {
   createPhotoFieldStaticLayoutManager,
   ensurePhotoFieldStaticLayout,
@@ -29,9 +35,14 @@ const EMPTY_PHOTO_LABEL_FILL = '#172554';
 const EMPTY_PHOTO_FIELD_STROKE_WIDTH = 2.5;
 const EMPTY_PHOTO_FIELD_DASH = [8, 4] as const;
 
-function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObject[] {
+function buildEmptyPhotoFieldChrome(
+  frameW: number,
+  frameH: number,
+  shape: PhotoFieldShape = 'rect',
+): FabricObject[] {
   const ox = -frameW / 2;
   const oy = -frameH / 2;
+  const radii = photoFieldFrameRadii(shape, frameW, frameH);
   const frameRect = new Rect({
     left: ox,
     top: oy,
@@ -39,13 +50,13 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
     originY: 'top',
     width: frameW,
     height: frameH,
-    fill: EMPTY_PHOTO_FIELD_FILL,
-    stroke: EMPTY_PHOTO_FIELD_STROKE,
+    fill: shape === 'path' ? 'transparent' : EMPTY_PHOTO_FIELD_FILL,
+    stroke: shape === 'path' ? 'transparent' : EMPTY_PHOTO_FIELD_STROKE,
     strokeWidth: EMPTY_PHOTO_FIELD_STROKE_WIDTH,
     strokeDashArray: [...EMPTY_PHOTO_FIELD_DASH],
     strokeUniform: true,
-    rx: 6,
-    ry: 6,
+    rx: radii.rx,
+    ry: radii.ry,
     selectable: false,
     evented: false,
     objectCaching: false,
@@ -146,6 +157,59 @@ function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObjec
   return [frameRect, badge, camBody, camTop, camLens, photoLabel];
 }
 
+function makePhotoFieldPath(
+  d: string,
+  frameW: number,
+  frameH: number,
+  boxW: number,
+  boxH: number,
+  visible: boolean,
+): FabricObject | null {
+  try {
+    return new Path(d, {
+      originX: 'left',
+      originY: 'top',
+      left: -frameW / 2,
+      top: -frameH / 2,
+      scaleX: frameW / Math.max(1, boxW),
+      scaleY: frameH / Math.max(1, boxH),
+      fill: visible ? EMPTY_PHOTO_FIELD_FILL : 'transparent',
+      stroke: visible ? EMPTY_PHOTO_FIELD_STROKE : undefined,
+      strokeWidth: visible ? EMPTY_PHOTO_FIELD_STROKE_WIDTH : 0,
+      strokeDashArray: visible ? [...EMPTY_PHOTO_FIELD_DASH] : undefined,
+      strokeUniform: true,
+      selectable: false,
+      evented: false,
+      objectCaching: false,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function attachPhotoFieldOutline(
+  group: Group,
+  shape: PhotoFieldShape,
+  clip: { d: string; boxW: number; boxH: number } | null,
+  frameW: number,
+  frameH: number,
+): void {
+  const o = ax(group);
+  if (shape === 'rect') return;
+  o.photoFieldShape = shape;
+  if (shape !== 'path' || !clip) return;
+  o.photoFieldClipPath = clip.d;
+  o.photoFieldClipBoxW = clip.boxW;
+  o.photoFieldClipBoxH = clip.boxH;
+  const outline = makePhotoFieldPath(clip.d, frameW, frameH, clip.boxW, clip.boxH, true);
+  const mask = makePhotoFieldPath(clip.d, frameW, frameH, clip.boxW, clip.boxH, false);
+  if (outline) {
+    ax(outline).photoFieldRole = 'clip-shape';
+    group.add(outline);
+  }
+  if (mask) group.clipPath = mask;
+}
+
 function resolveFieldAnchorTL(field: FabricObject): { x: number; y: number } {
   const tl = resolvePhotoFieldFrameSceneTL(field);
   return { x: tl.x, y: tl.y };
@@ -197,6 +261,8 @@ export function upgradePlainEmptyPhotoField(field: FabricObject): FabricObject |
   const o = ax(field);
   const { fw, fh } = resolvePhotoFieldFrameSize(field);
   const anchor = resolveFieldAnchorTL(field);
+  const shape = readPhotoFieldShape(o);
+  const clip = readPhotoFieldClip(o);
   const upgraded = createEmptyPhotoField({
     id: String(o.id ?? '').trim() || `field-${Date.now()}`,
     left: anchor.x,
@@ -204,6 +270,10 @@ export function upgradePlainEmptyPhotoField(field: FabricObject): FabricObject |
     width: fw,
     height: fh,
     clientAdded: o.photoFieldClientAdded === true,
+    shape,
+    clipPath: clip?.d,
+    clipBoxW: clip?.boxW,
+    clipBoxH: clip?.boxH,
   });
   copyImportStackMetadata(field, upgraded);
   return upgraded;
@@ -240,11 +310,16 @@ export function createEmptyPhotoField(opts: {
   width: number;
   height: number;
   clientAdded?: boolean;
+  shape?: PhotoFieldShape;
+  clipPath?: string;
+  clipBoxW?: number;
+  clipBoxH?: number;
 }): FabricObject {
   const { id, left, top } = opts;
   const frameW = Math.max(32, Math.round(opts.width));
   const frameH = Math.max(32, Math.round(opts.height));
-  const children = buildEmptyPhotoFieldChrome(frameW, frameH);
+  const shape = opts.shape ?? 'rect';
+  const children = buildEmptyPhotoFieldChrome(frameW, frameH, shape);
   const group = new Group(children, {
     left,
     top,
@@ -264,6 +339,20 @@ export function createEmptyPhotoField(opts: {
   o.photoFieldFilled = false;
   o.photoFieldFw = frameW;
   o.photoFieldFh = frameH;
+  o.photoFieldShape = shape;
+  attachPhotoFieldOutline(
+    group,
+    shape,
+    opts.clipPath
+      ? {
+        d: opts.clipPath,
+        boxW: opts.clipBoxW ?? frameW,
+        boxH: opts.clipBoxH ?? frameH,
+      }
+      : null,
+    frameW,
+    frameH,
+  );
   o.id = id;
   if (opts.clientAdded) o.photoFieldClientAdded = true;
   group.set({ scaleX: 1, scaleY: 1 });
@@ -403,6 +492,9 @@ export function dehydrateEmptyPhotoFieldJsonObject(
   const left = Number(obj.left);
   const top = Number(obj.top);
   const angle = Number(obj.angle);
+  const shape = readPhotoFieldShape(obj);
+  const clip = readPhotoFieldClip(obj);
+  const radii = photoFieldFrameRadii(shape, fw, fh);
   const rect: Record<string, unknown> = {
     type: 'rect',
     version: obj.version ?? '6.0.0',
@@ -416,8 +508,8 @@ export function dehydrateEmptyPhotoFieldJsonObject(
     stroke: '#1e3a8a',
     strokeWidth: 2.5,
     strokeDashArray: [8, 4],
-    rx: 6,
-    ry: 6,
+    rx: radii.rx,
+    ry: radii.ry,
     scaleX: 1,
     scaleY: 1,
     angle: Number.isFinite(angle) ? angle : 0,
@@ -426,7 +518,13 @@ export function dehydrateEmptyPhotoFieldJsonObject(
     photoFieldFilled: false,
     photoFieldFw: fw,
     photoFieldFh: fh,
+    photoFieldShape: shape,
   };
+  if (clip) {
+    rect.photoFieldClipPath = clip.d;
+    rect.photoFieldClipBoxW = clip.boxW;
+    rect.photoFieldClipBoxH = clip.boxH;
+  }
   if (obj.importStackIndex != null) rect.importStackIndex = obj.importStackIndex;
   if (obj.isDecorElement != null) rect.isDecorElement = obj.isDecorElement;
   if (obj.decorLayerName != null) rect.decorLayerName = obj.decorLayerName;

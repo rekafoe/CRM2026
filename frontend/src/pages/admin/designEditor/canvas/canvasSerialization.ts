@@ -96,6 +96,10 @@ function serializePhotoFieldFallback(obj: FabricObject): Record<string, unknown>
     photoFieldFilled?: unknown;
     photoFieldClientAdded?: unknown;
     importStackIndex?: unknown;
+    photoFieldShape?: unknown;
+    photoFieldClipPath?: unknown;
+    photoFieldClipBoxW?: unknown;
+    photoFieldClipBoxH?: unknown;
     angle?: number;
   };
   if (meta.photoFieldFilled === true) {
@@ -116,6 +120,10 @@ function serializePhotoFieldFallback(obj: FabricObject): Record<string, unknown>
     isPhotoField: true,
     photoFieldFilled: false,
     photoFieldClientAdded: meta.photoFieldClientAdded === true,
+    photoFieldShape: meta.photoFieldShape,
+    photoFieldClipPath: meta.photoFieldClipPath,
+    photoFieldClipBoxW: meta.photoFieldClipBoxW,
+    photoFieldClipBoxH: meta.photoFieldClipBoxH,
     importStackIndex: meta.importStackIndex,
   });
 }

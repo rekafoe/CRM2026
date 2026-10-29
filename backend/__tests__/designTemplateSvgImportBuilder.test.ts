@@ -116,6 +116,29 @@ describe('fabricTextFromSvgText', () => {
     expect(docWithBg.pages[0]?.designPage.fabricJSON.objects.some((obj) => obj.id === 'locked_bg')).toBe(true)
   })
 
+  it('кладёт круглое photo_* в редактор эллипсом, а не прямоугольником с тем же номером', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <circle id="photo_avatar" cx="40" cy="25" r="10"/>
+  <polygon id="photo_badge" points="10,40 22,40 16,48"/>
+</svg>`
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(svg, 'utf8'),
+      originalname: 'photo-shapes.svg',
+      mimetype: 'image/svg+xml',
+    }, 'photo-shapes', [])
+    const objects = doc.pages[0]!.designPage.fabricJSON.objects
+    const avatar = objects.find((obj) => obj.id === 'photo_avatar') as Record<string, unknown>
+    const badge = objects.find((obj) => obj.id === 'photo_badge') as Record<string, unknown>
+    expect(avatar.isPhotoField).toBe(true)
+    expect(avatar.photoFieldShape).toBe('ellipse')
+    expect(avatar.rx).toBe(Number(avatar.width) / 2)
+    expect(avatar.ry).toBe(Number(avatar.height) / 2)
+    expect(badge.photoFieldShape).toBe('path')
+    expect(String(badge.photoFieldClipPath)).toMatch(/^M /)
+    expect(objects.some((obj) => String(obj.id).startsWith('decor_'))).toBe(false)
+  })
+
   it('конвертирует decor_* и безымянные фигуры в fabric-объекты', () => {
     const warnings: string[] = []
     const svg = `

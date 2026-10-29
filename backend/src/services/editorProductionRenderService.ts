@@ -482,7 +482,14 @@ function buildFilledPhotoFieldHtml(
 
   const frameW = Math.max(1, cssNumber(group.photoFieldFw, cssNumber(group.width, 1)))
   const frameH = Math.max(1, cssNumber(group.photoFieldFh, cssNumber(group.height, 1)))
+  const shape = String(group.photoFieldShape ?? 'rect')
+  const clipCss = shape === 'ellipse'
+    ? 'border-radius:50%'
+    : shape === 'path' && typeof group.photoFieldClipPath === 'string' && group.photoFieldClipPath.trim()
+      ? `clip-path:path('${group.photoFieldClipPath.replace(/'/g, '')}')`
+      : ''
   const outer = buildBoxStyle(group, { width: frameW, height: frameH, overflow: 'hidden' })
+    + (clipCss ? `;${clipCss}` : '')
   const imageW = Math.max(1, cssNumber(image.width, 1) * cssNumber(image.scaleX, 1))
   const imageH = Math.max(1, cssNumber(image.height, 1) * cssNumber(image.scaleY, 1))
   const imageLeft = frameW / 2 + cssNumber(image.left) - originOffset(image.originX, imageW)

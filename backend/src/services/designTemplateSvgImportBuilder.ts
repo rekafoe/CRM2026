@@ -130,6 +130,8 @@ function sanitizeSvg(svg: string): string {
 }
 
 function toFabricRect(rect: SvgRect) {
+  const shape = rect.shape ?? 'rect'
+  const elliptical = shape === 'ellipse'
   return {
     type: 'rect',
     version: '6.0.0',
@@ -143,14 +145,22 @@ function toFabricRect(rect: SvgRect) {
     stroke: '#1e3a8a',
     strokeWidth: 2.5,
     strokeDashArray: [8, 4],
-    rx: 6,
-    ry: 6,
+    rx: elliptical ? rect.scene.width / 2 : 6,
+    ry: elliptical ? rect.scene.height / 2 : 6,
     id: rect.name,
     ...(rect.stackIndex != null ? { importStackIndex: rect.stackIndex } : {}),
     isPhotoField: true,
     photoFieldFilled: false,
     photoFieldFw: rect.scene.width,
     photoFieldFh: rect.scene.height,
+    photoFieldShape: shape,
+    ...(rect.clipPath
+      ? {
+        photoFieldClipPath: rect.clipPath,
+        photoFieldClipBoxW: rect.scene.width,
+        photoFieldClipBoxH: rect.scene.height,
+      }
+      : {}),
   }
 }
 

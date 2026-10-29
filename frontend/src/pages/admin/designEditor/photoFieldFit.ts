@@ -3,6 +3,7 @@ import './fabricDesignSerialization';
 import {
   FabricImage,
   Rect,
+  Path,
   Group,
   LayoutManager,
   LayoutStrategy,
@@ -23,6 +24,7 @@ import {
   type PhotoFitLayout,
   zoomPhotoFieldLayout,
 } from './photoFieldLayout';
+import { readPhotoFieldShape, type PhotoFieldShape } from './photoFieldShape';
 import { resolvePhotoFieldModalPreviewUrl } from './photoFieldModalPreview';
 
 type AnyObj = Record<string, unknown>;
@@ -172,6 +174,10 @@ export function buildFilledPhotoFieldGroup(opts: {
   fitMode?: PhotoFieldFitMode;
   fileSize?: number;
   clientAdded?: boolean;
+  shape?: PhotoFieldShape;
+  clipPath?: string;
+  clipBoxW?: number;
+  clipBoxH?: number;
 }): Group {
   const { left, top, frameW, frameH, image, id } = opts;
   const iw = opts.intrinsicW;
@@ -206,6 +212,7 @@ export function buildFilledPhotoFieldGroup(opts: {
     objectCaching: false,
   });
 
+  const shape = opts.shape ?? 'rect';
   const clipRect = new Rect({
     originX: 'left',
     originY: 'top',
@@ -213,8 +220,28 @@ export function buildFilledPhotoFieldGroup(opts: {
     top: oy,
     width: frameW,
     height: frameH,
+    rx: shape === 'ellipse' ? frameW / 2 : 0,
+    ry: shape === 'ellipse' ? frameH / 2 : 0,
     objectCaching: false,
   });
+  const clipBoxW = Math.max(1, opts.clipBoxW ?? frameW);
+  const clipBoxH = Math.max(1, opts.clipBoxH ?? frameH);
+  let clipObject: FabricObject = clipRect;
+  if (shape === 'path' && opts.clipPath) {
+    try {
+      clipObject = new Path(opts.clipPath, {
+        originX: 'left',
+        originY: 'top',
+        left: ox,
+        top: oy,
+        scaleX: frameW / clipBoxW,
+        scaleY: frameH / clipBoxH,
+        objectCaching: false,
+      });
+    } catch {
+      clipObject = clipRect;
+    }
+  }
 
   const group = new Group([frameAnchor, image], {
     left,
@@ -224,7 +251,7 @@ export function buildFilledPhotoFieldGroup(opts: {
     width: frameW,
     height: frameH,
     layoutManager: createPhotoFieldStaticLayoutManager(),
-    clipPath: clipRect,
+    clipPath: clipObject,
     subTargetCheck: true,
     objectCaching: false,
   });
@@ -234,6 +261,12 @@ export function buildFilledPhotoFieldGroup(opts: {
   g.photoFieldFilled = true;
   g.photoFieldFw = frameW;
   g.photoFieldFh = frameH;
+  g.photoFieldShape = shape;
+  if (shape === 'path' && opts.clipPath) {
+    g.photoFieldClipPath = opts.clipPath;
+    g.photoFieldClipBoxW = clipBoxW;
+    g.photoFieldClipBoxH = clipBoxH;
+  }
   g.photoFieldFitMode = fitMode;
   g.photoFieldPanX = panX;
   g.photoFieldPanY = panY;
@@ -305,7 +338,8 @@ function relayoutFilledPhotoFieldFrame(
     });
   }
   const clip = group.clipPath as FabricObject | undefined;
-  if (clip) {
+  const shape = readPhotoFieldShape(o);
+  if (clip && clip.type !== 'path') {
     clip.set({
       left: ox,
       top: oy,
@@ -315,6 +349,18 @@ function relayoutFilledPhotoFieldFrame(
       height: frameH,
       scaleX: 1,
       scaleY: 1,
+      ...(shape === 'ellipse' ? { rx: frameW / 2, ry: frameH / 2 } : {}),
+    });
+  } else if (clip) {
+    const boxW = Math.max(1, Number(o.photoFieldClipBoxW) || frameW);
+    const boxH = Math.max(1, Number(o.photoFieldClipBoxH) || frameH);
+    clip.set({
+      left: ox,
+      top: oy,
+      originX: 'left',
+      originY: 'top',
+      scaleX: frameW / boxW,
+      scaleY: frameH / boxH,
     });
   }
   ensurePhotoFieldStaticLayout(group);

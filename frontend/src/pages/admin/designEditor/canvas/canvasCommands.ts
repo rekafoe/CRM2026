@@ -12,6 +12,7 @@ import { createEmptyPhotoField, finalizeEmptyPhotoFieldPlacement } from '../phot
 import { resolvePhotoFieldSizeForPage } from '../photoFieldClientSizing';
 import { syncFilledPhotoFieldSceneAnchor } from '../photoFieldGeometry';
 import { isClientAddedPhotoField } from '../designFields';
+import { readPhotoFieldClip, readPhotoFieldShape } from '../photoFieldShape';
 import { copyImportStackMetadata } from '../designFields/importStackOrder';
 import { detachFabricObject } from './canvasObjectDetach';
 import {
@@ -58,6 +59,7 @@ async function applyImageToPhotoField(
 
   // Сначала собираем новую группу — detach только после успеха, иначе поле «пропадёт».
   const { iw, ih } = getFabricImageIntrinsicSize(img);
+  const clip = readPhotoFieldClip(f);
   const group = buildFilledPhotoFieldGroup({
     left: 0,
     top: 0,
@@ -73,6 +75,10 @@ async function applyImageToPhotoField(
     fitMode,
     fileSize: meta.originalSize,
     clientAdded: isClientAddedPhotoField(f),
+    shape: readPhotoFieldShape(f),
+    clipPath: clip?.d,
+    clipBoxW: clip?.boxW,
+    clipBoxH: clip?.boxH,
   });
   copyImportStackMetadata(field, group);
   const groupMeta = asAny(group);

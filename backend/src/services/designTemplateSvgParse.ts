@@ -1,5 +1,6 @@
 /**
- * Именованные слои импортного SVG → photo_* rect, text_* text, decor_* (rect/circle/path/image),
+ * Именованные слои импортного SVG → photo_* (rect, circle, ellipse, path, polygon),
+ * text_* text, decor_* (rect/circle/path/image),
  * trim/bleed/safe → prepress (грубая эстимация мм),
  * locked_bg / locked_bg_* → залоченный SVG-фон (с автонумерацией),
  * фоновый файл без интерактивных элементов и без дубля с редактором overlay.
@@ -32,6 +33,9 @@ import {
   type GeometryRect,
 } from './designTemplateSvgGeometry'
 
+/** rect — прямоугольник; ellipse — круг и эллипс; path — контур, полигон и прочие фигуры. */
+export type PhotoFieldShape = 'rect' | 'ellipse' | 'path'
+
 export type SvgRect = {
   name: string
   /** Исходное имя слоя в SVG (до уникализации instance id). */
@@ -44,6 +48,10 @@ export type SvgRect = {
   height: number
   svg: GeometryRect
   scene: GeometryRect
+  /** Форма фотополя. Прямоугольник, если слой пришёл из <rect>. */
+  shape?: PhotoFieldShape
+  /** Контур в пикселях сцены, начало в левом верхнем углу рамки. Только для shape=path. */
+  clipPath?: string
 }
 
 export type SvgTextStyleSegment = {
@@ -396,6 +404,24 @@ function transformSvgPathData(d: string, t: SvgTransform): string {
     }
   }
   return parts.join(' ')
+}
+
+/** Переносит абсолютный контур в рамку сцены: (0,0) — левый верх bbox, единицы — px сцены. */
+export function localizeSvgPathToFrameScene(
+  pathData: string,
+  svgBox: GeometryRect,
+  sceneBox: GeometryRect,
+): string {
+  const sx = sceneBox.width / Math.max(svgBox.width, 1e-6)
+  const sy = sceneBox.height / Math.max(svgBox.height, 1e-6)
+  return transformSvgPathData(pathData, {
+    a: sx,
+    b: 0,
+    c: 0,
+    d: sy,
+    e: -svgBox.x * sx,
+    f: -svgBox.y * sy,
+  })
 }
 
 function polygonPointsAbsolutePath(points: Array<{ x: number; y: number }>): string | null {
@@ -2415,6 +2441,44 @@ export function parseImportedSvgLayers(
     return { ...parent, ...self }
   }
 
+  function commitPhotoShape(input: {
+    sourceName: string
+    tr: GeometryRect
+    removalStart: number
+    removalEnd: number
+    shape: PhotoFieldShape
+    pathData?: string
+  }): void {
+    if (!(input.tr.width > 0) || !(input.tr.height > 0)) return
+    const mmRect = geometry.svgRectToMm(input.tr)
+    const scene = geometry.mmRectToScene(mmRect)
+    const { fabricId, layerName } = allocateEditableFabricId('photo', input.sourceName, editableIds)
+    const clipPath = input.shape === 'path' && input.pathData
+      ? localizeSvgPathToFrameScene(input.pathData, input.tr, scene)
+      : undefined
+    const photoEntry: SvgRect = {
+      name: fabricId,
+      layerName,
+      stackIndex: nextDocumentStackIndex(documentStack),
+      ...mmRect,
+      svg: input.tr,
+      scene,
+      shape: input.shape,
+      ...(clipPath ? { clipPath } : {}),
+    }
+    photoRects.push(photoEntry)
+    interactiveLayers.push({ kind: 'photo', data: photoEntry })
+    parsedPhotoLayerNames.add(input.sourceName)
+    parsedPhotoLayerNames.add(fabricId)
+    markLayerReport(fabricId, {
+      status: 'parsed_interactive',
+      reasonCode: 'PHOTO_PARSED',
+      bboxSvg: input.tr,
+      bboxScene: scene,
+    })
+    removalRanges.push({ start: input.removalStart, end: input.removalEnd })
+  }
+
   const scanStart = performance.now()
   let i = 0
   while (i < svg.length) {
@@ -2562,27 +2626,13 @@ export function parseImportedSvgLayers(
 
       if (ef?.startsWith('photo_') && width != null && height != null && width > 0 && height > 0) {
         const tr = transformedRect(x, y, width, height, objectTransform)
-        const mmRect = geometry.svgRectToMm(tr)
-        const { fabricId, layerName } = allocateEditableFabricId('photo', ef, editableIds)
-        const photoEntry: SvgRect = {
-          name: fabricId,
-          layerName,
-          stackIndex: nextDocumentStackIndex(documentStack),
-          ...mmRect,
-          svg: tr,
-          scene: geometry.mmRectToScene(mmRect),
-        }
-        photoRects.push(photoEntry)
-        interactiveLayers.push({ kind: 'photo', data: photoEntry })
-        parsedPhotoLayerNames.add(ef)
-        parsedPhotoLayerNames.add(fabricId)
-        markLayerReport(fabricId, {
-          status: 'parsed_interactive',
-          reasonCode: 'PHOTO_PARSED',
-          bboxSvg: tr,
-          bboxScene: photoEntry.scene,
+        commitPhotoShape({
+          sourceName: ef,
+          tr,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          shape: 'rect',
         })
-        removalRanges.push({ start: lt, end: gt + 1 })
       } else {
         const explicitName = getLayerName(attrs)
         const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'rect', autoDecorSeq)
@@ -2612,6 +2662,7 @@ export function parseImportedSvgLayers(
       if (ef) {
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+        if (ef.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       }
       if (explicitName && isLockedBgLayerName(explicitName)) {
         registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
@@ -2628,6 +2679,17 @@ export function parseImportedSvgLayers(
         inheritedTransform,
         parseSvgTransform(attrs.transform, unsupportedFeatures),
       )
+      if (ef?.startsWith('photo_') && rx > 0 && ry > 0) {
+        commitPhotoShape({
+          sourceName: ef,
+          tr: transformedRect(cx - rx, cy - ry, rx * 2, ry * 2, objectTransform),
+          removalStart: lt,
+          removalEnd: gt + 1,
+          shape: 'ellipse',
+        })
+        i = gt + 1
+        continue
+      }
       const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'circle', autoDecorSeq)
       if (decorName && rx > 0 && ry > 0) {
         const tr = transformedRect(cx - rx, cy - ry, rx * 2, ry * 2, objectTransform)
@@ -2654,6 +2716,7 @@ export function parseImportedSvgLayers(
       if (ef) {
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+        if (ef.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       }
       if (explicitName && isLockedBgLayerName(explicitName)) {
         registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
@@ -2669,6 +2732,17 @@ export function parseImportedSvgLayers(
         inheritedTransform,
         parseSvgTransform(attrs.transform, unsupportedFeatures),
       )
+      if (ef?.startsWith('photo_') && r != null && r > 0) {
+        commitPhotoShape({
+          sourceName: ef,
+          tr: transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform),
+          removalStart: lt,
+          removalEnd: gt + 1,
+          shape: 'ellipse',
+        })
+        i = gt + 1
+        continue
+      }
       const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'circle', autoDecorSeq)
       if (decorName && r != null && r > 0) {
         const tr = transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform)
@@ -2695,6 +2769,7 @@ export function parseImportedSvgLayers(
       if (ef) {
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+        if (ef.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       }
       if (explicitName && isLockedBgLayerName(explicitName)) {
         registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
@@ -2706,6 +2781,30 @@ export function parseImportedSvgLayers(
       const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'path', autoDecorSeq)
       const d = attrs.d?.trim()
       const baseBounds = d ? parseSvgPathApproxBounds(d) : null
+      if (ef?.startsWith('photo_') && d && baseBounds && baseBounds.width > 0 && baseBounds.height > 0) {
+        const objectTransform = multiplyTransform(
+          inheritedTransform,
+          parseSvgTransform(attrs.transform, unsupportedFeatures),
+        )
+        const pathData = transformSvgPathData(d, objectTransform)
+        const tr = parseSvgPathApproxBounds(pathData) ?? transformedRect(
+          baseBounds.x,
+          baseBounds.y,
+          baseBounds.width,
+          baseBounds.height,
+          objectTransform,
+        )
+        commitPhotoShape({
+          sourceName: ef,
+          tr,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          shape: 'path',
+          pathData,
+        })
+        i = gt + 1
+        continue
+      }
       if (decorName && d && baseBounds && baseBounds.width > 0 && baseBounds.height > 0) {
         const objectTransform = multiplyTransform(
           inheritedTransform,
@@ -2744,6 +2843,7 @@ export function parseImportedSvgLayers(
       if (ef) {
         markFallbackLayer(ef)
         if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+        if (ef.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       }
       if (explicitName && isLockedBgLayerName(explicitName)) {
         registerLockedBgOnTag(explicitName, lt, gt + 1, attrs)
@@ -2756,6 +2856,32 @@ export function parseImportedSvgLayers(
       const pointsAttr = attrs.points
       const pts = parsePolygonPointPairs(pointsAttr)
       const baseBounds = boundsFromPointPairs(pts)
+      if (ef?.startsWith('photo_') && baseBounds) {
+        const objectTransform = multiplyTransform(
+          inheritedTransform,
+          parseSvgTransform(attrs.transform, unsupportedFeatures),
+        )
+        const transformedPts = pts.map((p) => applyTransform(objectTransform, p.x, p.y))
+        const tr = boundsFromPointPairs(transformedPts) ?? transformedRect(
+          baseBounds.x,
+          baseBounds.y,
+          baseBounds.width,
+          baseBounds.height,
+          objectTransform,
+        )
+        const axisRect = isAxisAlignedRectPoints(transformedPts)
+        const pathData = axisRect ? undefined : polygonPointsAbsolutePath(transformedPts) ?? undefined
+        commitPhotoShape({
+          sourceName: ef,
+          tr,
+          removalStart: lt,
+          removalEnd: gt + 1,
+          shape: axisRect || !pathData ? 'rect' : 'path',
+          pathData,
+        })
+        i = gt + 1
+        continue
+      }
       if (decorName && baseBounds && tagLc === 'polygon') {
         const objectTransform = multiplyTransform(
           inheritedTransform,
@@ -3135,7 +3261,7 @@ export function parseImportedSvgLayers(
     warnWithCode(
       warnings,
       'PHOTO_NO_VALID_RECT',
-      `Слой ${name} оставлен в фоне: не найден валидный rect для photo-поля.`,
+      `Слой ${name} оставлен в фоне: не найдена валидная фигура photo_* (rect, circle, ellipse, path, polygon).`,
     )
   }
   for (const name of seenDecorLayerNames) {

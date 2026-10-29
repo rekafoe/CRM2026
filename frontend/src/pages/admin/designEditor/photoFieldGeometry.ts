@@ -1,6 +1,7 @@
 import type { FabricObject } from 'fabric';
 import type { Group } from 'fabric';
 import { Point } from 'fabric';
+import { readPhotoFieldShape } from './photoFieldShape';
 
 type AnyObj = Record<string, unknown>;
 
@@ -147,6 +148,7 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
   const ox = -frameW / 2;
   const oy = -frameH / 2;
   const frameRect = pickEmptyPhotoFieldFrameRect(group);
+  const shape = readPhotoFieldShape(group);
   if (frameRect) {
     frameRect.set({
       left: ox,
@@ -159,7 +161,36 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       scaleY: 1,
       strokeUniform: true,
       objectCaching: false,
+      ...(shape === 'ellipse' ? { rx: frameW / 2, ry: frameH / 2 } : {}),
     });
+  }
+  if (shape === 'path') {
+    const boxW = Math.max(1, Number(ax(group).photoFieldClipBoxW) || frameW);
+    const boxH = Math.max(1, Number(ax(group).photoFieldClipBoxH) || frameH);
+    const scaleX = frameW / boxW;
+    const scaleY = frameH / boxH;
+    for (const kid of group.getObjects()) {
+      if (ax(kid).photoFieldRole !== 'clip-shape') continue;
+      kid.set({
+        left: ox,
+        top: oy,
+        originX: 'left',
+        originY: 'top',
+        scaleX,
+        scaleY,
+      });
+    }
+    const clip = group.clipPath;
+    if (clip) {
+      clip.set({
+        left: ox,
+        top: oy,
+        originX: 'left',
+        originY: 'top',
+        scaleX,
+        scaleY,
+      });
+    }
   }
 
   const minSide = Math.min(frameW, frameH);
