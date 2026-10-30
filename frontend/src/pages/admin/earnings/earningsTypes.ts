@@ -9,6 +9,14 @@ export type AdminUserRow = {
   totalPreviousNet?: number;
   totalPenalties?: number;
   totalBonuses?: number;
+  /** Сколько юрлиц закреплено за сотрудником сейчас. */
+  salesClients?: number;
+  /** Оборот оформленных заказов этих юрлиц за месяц. */
+  salesTurnover?: number;
+  /** 500 руб. за каждые 10 000 оборота. Уже входит в «к выплате». */
+  salesBonus?: number;
+  salesRemainder?: number;
+  salesUntilNext?: number;
   /** Доля брака месяца. Вычитается из «к выплате», в проценты позиции не входит. */
   totalWaste?: number;
   hourlyRate?: number;

@@ -5,6 +5,7 @@ import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
 import { getAdminEarnings, getAdminEarningsOrders, getCustomCalculatorPercent, updateCustomCalculatorPercent, getRoleOrderPercents, updateRoleOrderPercents, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
 import { earningRoleLabel } from './earnings/earningRoleLabel';
 import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
+import { SalesOutputPanel } from './earnings/SalesOutputPanel';
 import { EarningsBarChart } from './earnings/EarningsBarChart';
 import { employeeYearTotals } from './earnings/earningsAnalytics';
 import type { AdminUserRow } from './earnings/earningsTypes';
@@ -26,7 +27,7 @@ export const EarningsAdminPage: React.FC = () => {
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [departmentId, setDepartmentId] = useState<number | ''>('');
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [activeTab, setActiveTab] = useState<'summary' | 'analytics' | 'employee'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'analytics' | 'employee' | 'sales'>('summary');
   const [analyticsUserId, setAnalyticsUserId] = useState<number | null>(null);
   const [detailUser, setDetailUser] = useState<AdminUserRow | null>(null);
   const [ordersDetail, setOrdersDetail] = useState<{
@@ -512,6 +513,13 @@ export const EarningsAdminPage: React.FC = () => {
         </button>
         <button
           type="button"
+          className={`earn-tab ${activeTab === 'sales' ? 'earn-tab--active' : ''}`}
+          onClick={() => setActiveTab('sales')}
+        >
+          Отдел продаж
+        </button>
+        <button
+          type="button"
           className={`earn-tab ${activeTab === 'employee' ? 'earn-tab--active' : ''}`}
           onClick={() =>setActiveTab('employee')}
         >
@@ -534,10 +542,11 @@ export const EarningsAdminPage: React.FC = () => {
                   <th>Проценты</th>
                   <th>Часы × ставка</th>
                   <th>Премии</th>
+                  <th title="500 руб. за каждые 10 000 руб. оформленных заказов закреплённых юрлиц">Юрлица</th>
                   <th>Штрафы</th>
                   <th title="Доля брака месяца, поровну между исполнителями">Брак</th>
                   <th>К выплате</th>
-                  <th title="К выплате за прошлый месяц: проценты, часы, премии, штрафы и доля брака">Пред. месяц</th>
+                  <th title="К выплате за прошлый месяц: проценты, часы, премии, премия юрлиц, штрафы и доля брака">Пред. месяц</th>
                   <th>Часы</th>
                   <th>Смены</th>
                   <th>Действия</th>
@@ -546,7 +555,7 @@ export const EarningsAdminPage: React.FC = () => {
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={11} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                    <td colSpan={12} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
                       Нет данных за выбранный месяц
                     </td>
                   </tr>
@@ -578,6 +587,19 @@ export const EarningsAdminPage: React.FC = () => {
                     </td>
                     <td className="earn-cell-money earn-cell-money--bonus">
                       <MoneyAmount value={row.totalBonuses ?? 0} signed />
+                    </td>
+                    <td
+                      className="earn-cell-money earn-cell-money--bonus"
+                      title={
+                        (row.salesClients ?? 0) > 0
+                          ? `Оборот ${Number(row.salesTurnover || 0).toFixed(2)}. До следующих 500 руб. осталось ${Number(row.salesUntilNext || 0).toFixed(2)}`
+                          : 'Нет закреплённых юрлиц'
+                      }
+                    >
+                      <MoneyAmount value={row.salesBonus ?? 0} />
+                      {(row.salesClients ?? 0) > 0 ? (
+                        <div className="earn-cell-hint">{row.salesClients} юрл.</div>
+                      ) : null}
                     </td>
                     <td className="earn-cell-money earn-cell-money--penalty">
                       −<MoneyAmount value={row.totalPenalties ?? 0} />
@@ -624,6 +646,10 @@ export const EarningsAdminPage: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {activeTab === 'sales' && (
+        <SalesOutputPanel month={month} departmentId={departmentId} />
       )}
 
       {/* Analytics tab */}
@@ -956,7 +982,7 @@ export const EarningsAdminPage: React.FC = () => {
             <div className="earn-penalty-summary">
               Итого штрафов за {month}: <strong><MoneyAmount value={penaltyTotal} /></strong>
               {' · '}
-              К выплате: <strong><MoneyAmount value={Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.hourlyPay ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal - (penaltyUser.totalWaste ?? 0))} /></strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.hourlyPay ?? 0) + (penaltyUser.totalBonuses ?? 0) + (penaltyUser.salesBonus ?? 0) - penaltyTotal - (penaltyUser.totalWaste ?? 0))} /></strong>
             </div>
             {penaltyLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
@@ -1015,7 +1041,7 @@ export const EarningsAdminPage: React.FC = () => {
             <div className="earn-bonus-summary">
               Итого премий за {month}: <strong><MoneyAmount value={bonusTotal} signed /></strong>
               {' · '}
-              К выплате: <strong><MoneyAmount value={Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + (bonusUser.hourlyPay ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0) - (bonusUser.totalWaste ?? 0))} /></strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + (bonusUser.hourlyPay ?? 0) + bonusTotal + (bonusUser.salesBonus ?? 0) - (bonusUser.totalPenalties ?? 0) - (bonusUser.totalWaste ?? 0))} /></strong>
             </div>
             {bonusLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>

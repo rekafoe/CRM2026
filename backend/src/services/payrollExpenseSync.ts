@@ -1,5 +1,6 @@
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { salesBonusPayrollAmounts } from './salesManagerOutputService'
 
 /** Маркер строк, которые CRM сама пишет из начисленной ЗП. Ручные расходы не трогаем. */
 export const PAYROLL_EXPENSE_NOTE = 'payroll-auto'
@@ -179,6 +180,11 @@ async function doSync(dateFrom?: string, dateTo?: string): Promise<void> {
     )
   }
 
+  const salesRows = await salesBonusPayrollAmounts(db, from, to).catch(() => [])
+  for (const row of salesRows) {
+    addAmount(totals, row.date, row.departmentId, row.amount)
+  }
+
   const wanted = new Map<string, DeptAmount>()
   for (const [key, row] of totals) {
     const amount = roundMoney(row.amount)
@@ -234,7 +240,7 @@ async function doSync(dateFrom?: string, dateTo?: string): Promise<void> {
   }
 }
 
-/** Перезаписывает авторасходы «Зарплата» из процентов, ставки, премий и штрафов. */
+/** Перезаписывает авторасходы «Зарплата» из процентов, ставки, премий, премии юрлиц и штрафов. */
 export function syncPayrollExpenses(dateFrom?: string, dateTo?: string): Promise<void> {
   const run = syncChain.then(() => doSync(dateFrom, dateTo))
   syncChain = run.then(

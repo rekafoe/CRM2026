@@ -41,6 +41,10 @@ export const EarningsPage: React.FC = () => {
   const [bonuses, setBonuses] = useState<Array<{ id: number; amount: number; reason: string; bonusDate: string }>>([]);
   const [showPenaltiesModal, setShowPenaltiesModal] = useState(false);
   const [showBonusesModal, setShowBonusesModal] = useState(false);
+  const [salesClients, setSalesClients] = useState(0);
+  const [salesTurnover, setSalesTurnover] = useState(0);
+  const [salesBonus, setSalesBonus] = useState(0);
+  const [salesUntilNext, setSalesUntilNext] = useState(10000);
 
   const loadData = useCallback(async () => {
     try {
@@ -63,7 +67,12 @@ export const EarningsPage: React.FC = () => {
       setWasteShare(waste);
       setWastePool(Number(payload.wastePool) || 0);
       setWasteOperators(Number(payload.wasteOperators) || 0);
-      setTotalNet(Number(payload.totalNet) ?? Math.max(0, t + tb + hp - tp - waste));
+      const sales = Number(payload.salesBonus) || 0;
+      setSalesClients(Number(payload.salesClients) || 0);
+      setSalesTurnover(Number(payload.salesTurnover) || 0);
+      setSalesBonus(sales);
+      setSalesUntilNext(Number(payload.salesUntilNext) || 10000);
+      setTotalNet(Number(payload.totalNet) ?? Math.max(0, t + tb + sales + hp - tp - waste));
       setPenalties(Array.isArray(payload.penalties) ? payload.penalties : []);
       setBonuses(Array.isArray(payload.bonuses) ? payload.bonuses : []);
     } catch (e: any) {
@@ -239,6 +248,18 @@ export const EarningsPage: React.FC = () => {
               <div className="earnings-muted">из <MoneyAmount value={wastePool} /> на {wasteOperators}</div>
             ) : null}
           </div>
+          {salesClients > 0 && (
+            <div
+              className="earnings-summary-card earnings-summary-card--bonus"
+              title="500 руб. за каждые 10 000 руб. оформленных заказов закреплённых юрлиц. Уже входит в «к выплате»."
+            >
+              <div className="earnings-summary-title">Юрлица</div>
+              <div className="earnings-summary-value"><MoneyAmount value={salesBonus} /></div>
+              <div className="earnings-muted">
+                оборот <MoneyAmount value={salesTurnover} />, до 500 осталось <MoneyAmount value={salesUntilNext} />
+              </div>
+            </div>
+          )}
           <div className="earnings-summary-card earnings-summary-card--net">
             <div className="earnings-summary-title">К выплате</div>
             <div className="earnings-summary-value"><MoneyAmount value={totalNet} /></div>

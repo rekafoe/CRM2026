@@ -9,6 +9,7 @@ import {
 import { normalizeCustomCalculatorPercent } from '../services/earningsOperatorPercent'
 import { getRoleOrderPercents, setRoleOrderPercents } from '../services/earningsRoleRateSettings'
 import { getWasteSharesForMonths } from '../services/earningsWasteService'
+import { loadSalesManagerOutput, salesBonusAmountMap } from '../services/salesManagerOutputService'
 
 const router = Router()
 
@@ -207,13 +208,22 @@ router.get('/me', asyncHandler(async (req, res) => {
   const wastePools = await getWasteSharesForMonths(db, [month]).catch(() => new Map())
   const wastePool = wastePools.get(month)
   const wasteShare = wastePool?.shares.get(authUser.id) || 0
-  const totalNet = Math.max(0, total + totalBonuses + hourlyPay - totalPenalties - wasteShare)
+  const salesOutput = await loadSalesManagerOutput(db, month).catch(() => [])
+  const salesMine = salesOutput.find((row) => row.userId === authUser.id) || null
+  const salesBonus = salesMine?.bonus || 0
+  const totalNet = Math.max(0, total + totalBonuses + salesBonus + hourlyPay - totalPenalties - wasteShare)
 
   res.json({
     month,
     total,
     totalPenalties,
     totalBonuses,
+    salesClients: salesMine?.clients || 0,
+    salesTurnover: salesMine?.turnover || 0,
+    salesBonus,
+    salesRemainder: salesMine?.remainder || 0,
+    salesUntilNext: salesMine?.untilNext ?? 10000,
+    salesOrders: salesMine?.orders || [],
     hourlyRate,
     hours,
     hourlyPay,
@@ -483,6 +493,12 @@ router.get('/admin', asyncHandler(async (req, res) => {
   const wasteMonths = Array.from(new Set([...seriesKeys, month, prevMonth]))
   const wasteByMonth = await getWasteSharesForMonths(db, wasteMonths).catch(() => new Map())
   const wasteShareOf = (userId: number, key: string) => wasteByMonth.get(key)?.shares.get(userId) || 0
+  const salesBonusOfMonth = await salesBonusAmountMap(db, wasteMonths).catch(() => new Map<string, number>())
+  const salesBonusOf = (userId: number, key: string) => salesBonusOfMonth.get(`${userId}_${key}`) || 0
+  const salesCurrent = await loadSalesManagerOutput(db, month).catch(() => [])
+  const salesPrev = await loadSalesManagerOutput(db, prevMonth).catch(() => [])
+  const salesCurrentMap = new Map(salesCurrent.map((row) => [row.userId, row]))
+  const salesPrevMap = new Map(salesPrev.map((row) => [row.userId, row]))
 
   const monthPayout = (userId: number, key: string, hourlyRate: number) => {
     const percent = historyMap.get(`${userId}_${key}`) || 0
@@ -491,10 +507,11 @@ router.get('/admin', asyncHandler(async (req, res) => {
     const bonuses = historyBonusMap.get(`${userId}_${key}`) || 0
     const penalties = historyPenaltyMap.get(`${userId}_${key}`) || 0
     const waste = wasteShareOf(userId, key)
+    const salesBonus = salesBonusOf(userId, key)
     return {
       month: key,
       total: percent,
-      net: Math.max(0, percent + bonuses + hourlyPart - penalties - waste),
+      net: Math.max(0, percent + bonuses + salesBonus + hourlyPart - penalties - waste),
     }
   }
 
@@ -506,18 +523,21 @@ router.get('/admin', asyncHandler(async (req, res) => {
     const hourlyRate = Number(u.hourly_rate) || 0
     const hourlyPay = Math.round(shift.hours * hourlyRate * 100) / 100
     const totalWaste = wasteShareOf(u.id, month)
+    const sales = salesCurrentMap.get(u.id)
+    const salesBonus = sales?.bonus || 0
     const totalNet = Math.max(
       0,
-      Number(earnings) + Number(totalBonuses) + hourlyPay - Number(totalPenalties) - totalWaste,
+      Number(earnings) + Number(totalBonuses) + salesBonus + hourlyPay - Number(totalPenalties) - totalWaste,
     )
     const previousPercent = totalsPrevMap.get(u.id) || 0
     const previousHourlyPay = Math.round((shiftsPrevMap.get(u.id) || 0) * hourlyRate * 100) / 100
     const previousBonuses = bonusesPrevMap.get(u.id) || 0
     const previousPenalties = penaltiesPrevMap.get(u.id) || 0
     const previousWaste = wasteShareOf(u.id, prevMonth)
+    const previousSalesBonus = salesPrevMap.get(u.id)?.bonus || 0
     const totalPreviousNet = Math.max(
       0,
-      Number(previousPercent) + Number(previousBonuses) + previousHourlyPay - Number(previousPenalties) - previousWaste,
+      Number(previousPercent) + Number(previousBonuses) + previousSalesBonus + previousHourlyPay - Number(previousPenalties) - previousWaste,
     )
     const history = historyKeys.map((key) => monthPayout(u.id, key, hourlyRate))
     const yearHistory = yearKeys.map((key) => monthPayout(u.id, key, hourlyRate))
@@ -531,6 +551,11 @@ router.get('/admin', asyncHandler(async (req, res) => {
       totalPreviousNet,
       totalPenalties,
       totalBonuses,
+      salesClients: sales?.clients || 0,
+      salesTurnover: sales?.turnover || 0,
+      salesBonus,
+      salesRemainder: sales?.remainder || 0,
+      salesUntilNext: sales?.untilNext ?? 10000,
       totalWaste,
       hourlyRate,
       hourlyPay,
@@ -543,6 +568,35 @@ router.get('/admin', asyncHandler(async (req, res) => {
   })
 
   res.json({ month, previousMonth: prevMonth, historyMonths, users: result })
+}))
+
+/**
+ * GET /api/earnings/sales-output?month=&department_id=
+ * Оборот и премия по закреплённым юрлицам. Считается само, без ручного ввода.
+ */
+router.get('/sales-output', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser || authUser.role !== 'admin') {
+    res.status(403).json({ message: 'Forbidden' })
+    return
+  }
+  const month = getMonthKey((req.query as any)?.month)
+  const departmentRaw = (req.query as any)?.department_id
+  const departmentId = departmentRaw != null && String(departmentRaw).trim() !== ''
+    ? parseInt(String(departmentRaw), 10)
+    : undefined
+  const db = await getDb()
+  const managers = await loadSalesManagerOutput(
+    db,
+    month,
+    Number.isFinite(departmentId) ? { departmentId } : undefined,
+  )
+  res.json({
+    month,
+    step: 10000,
+    bonusPerStep: 500,
+    managers,
+  })
 }))
 
 /**

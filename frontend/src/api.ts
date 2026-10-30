@@ -908,6 +908,31 @@ export type AdminEarningsOrderRow = {
   lastEarnedDate?: string;
   lines: AdminEarningsOrderLine[];
 };
+export type SalesManagerOrderLine = {
+  orderId: number;
+  number: string;
+  customerId: number;
+  customerName: string;
+  orderDate: string;
+  total: number;
+};
+export type SalesManagerOutput = {
+  userId: number;
+  name: string;
+  departmentId: number | null;
+  clients: number;
+  turnover: number;
+  steps: number;
+  bonus: number;
+  remainder: number;
+  untilNext: number;
+  orders: SalesManagerOrderLine[];
+};
+export const getSalesManagerOutput = (params?: { month?: string; department_id?: number }) =>
+  api.get<{ month: string; step: number; bonusPerStep: number; managers: SalesManagerOutput[] }>(
+    '/earnings/sales-output',
+    { params },
+  );
 export const getAdminEarningsOrders = (params: { user_id: number; month: string }) =>
   api.get<{
     userId: number;
