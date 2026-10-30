@@ -9,6 +9,7 @@ import { notWaitingStatusSql } from '../utils/orderFulfillmentScope'
 import { SQL_ITEMS_SUBTOTAL_BY_ORDER } from '../utils/orderAmountsSql'
 import { completedStatusSql } from '../utils/orderStatusCatalog'
 import { getTodayString } from '../utils/date'
+import { contactOnlyAnyDaySql, contactOnlyOnDaySql } from '../modules/orders/orderReportVisibility'
 import {
   buildOrderQuerySearchClause,
   clampOrderSearchLimit,
@@ -27,6 +28,32 @@ function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(orde
   }
   const { delivery_json: _dj, ...rest } = order
   return { ...rest, delivery } as T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> }
+}
+
+async function loadActiveExecutorOrderIds(
+  db: Awaited<ReturnType<typeof getDb>>,
+  userId: number,
+): Promise<number[]> {
+  let hasCancelled = false
+  try {
+    hasCancelled = await hasColumn('orders', 'is_cancelled')
+  } catch { /* ignore */ }
+  const cancelledSql = hasCancelled ? 'AND COALESCE(o.is_cancelled, 0) = 0' : ''
+  const rows = await db.all<{ orderId: number }>(
+    `SELECT DISTINCT i.orderId as orderId
+       FROM items i
+       JOIN orders o ON o.id = i.orderId
+      WHERE i.executor_user_id = ?
+        AND i.orderId IS NOT NULL
+        ${cancelledSql}`,
+    [userId],
+  )
+  const ids: number[] = []
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const id = Number(row.orderId)
+    if (Number.isFinite(id)) ids.push(id)
+  }
+  return ids
 }
 
 type ListAllOrdersOptions = {
@@ -154,6 +181,7 @@ export const OrderRepository = {
     let hasExecutorUserId = false
     let hasContactUserId = false
     let hasResponsibleUserId = false
+    let hasOpenedOn = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
       hasIsInternal = await hasColumn('orders', 'is_internal')
@@ -162,6 +190,7 @@ export const OrderRepository = {
       hasExecutorUserId = await hasColumn('items', 'executor_user_id')
       hasContactUserId = await hasColumn('orders', 'contact_user_id')
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
+      hasOpenedOn = await hasColumn('orders', 'opened_on')
     } catch { /* ignore */ }
     const paymentChannelSel = hasPaymentChannel
       ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
@@ -170,19 +199,14 @@ export const OrderRepository = {
     const deliverySel = hasDeliveryJson ? 'o.delivery_json' : 'NULL as delivery_json'
     const contactSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
     const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
+    const openedSel = hasOpenedOn ? 'o.opened_on' : 'NULL as opened_on'
 
     // Без correlated EXISTS: один SELECT id, затем IN — иначе SQLite сканит items на каждую строку orders.
+    // Отменённые не входят: снятие заказа с отчёта не должно оставлять пользователя исполнителем.
     const executorOrderIds = new Set<number>()
     if (hasExecutorUserId) {
       try {
-        const rows = await db.all<{ orderId: number }>(
-          `SELECT DISTINCT orderId FROM items WHERE executor_user_id = ? AND orderId IS NOT NULL`,
-          [userId],
-        )
-        for (const row of Array.isArray(rows) ? rows : []) {
-          const id = Number(row.orderId)
-          if (Number.isFinite(id)) executorOrderIds.add(id)
-        }
+        for (const id of await loadActiveExecutorOrderIds(db, userId)) executorOrderIds.add(id)
       } catch { /* ignore */ }
     }
 
@@ -221,7 +245,8 @@ export const OrderRepository = {
     const execIds = executorOrderIds.size > 0 ? Array.from(executorOrderIds) : []
     const execInSql = execIds.length > 0 ? `o.id IN (${execIds.map(() => '?').join(',')})` : null
     const createdDateSql = `date(COALESCE(o.created_at, o.createdAt))`
-    // Отменённые не должны всплывать на главной как «исполнитель»: cancel обнуляет userId, но не executor_user_id.
+    const contactDaySql = hasContactUserId ? contactOnlyOnDaySql({ hasOpenedOn }) : ''
+    const contactAnySql = hasContactUserId ? contactOnlyAnyDaySql() : ''
     if (hasIsCancelled) {
       whereParts.push('COALESCE(o.is_cancelled, 0) = 0')
     }
@@ -243,25 +268,27 @@ export const OrderRepository = {
               ${createdDateSql} = date(?)
               OR (${activeExtra || '1=1'})
             )
-          ))`,
+          )
+          ${contactDaySql ? `OR ${contactDaySql}` : ''})`,
       )
       whereParams.push(userId, day, ...execIds, day)
       if (terminalIds.length > 0 && activeExtra.includes('NOT IN')) {
         whereParams.push(...terminalIds)
       }
+      if (contactDaySql) whereParams.push(userId, day)
     } else if (day) {
-      if (execInSql) {
-        whereParts.push(`(o.userId = ? OR ${execInSql})`)
-        whereParams.push(userId, ...execIds)
-      } else {
-        whereParts.push('o.userId = ?')
-        whereParams.push(userId)
-      }
-      whereParts.push(`${createdDateSql} = date(?)`)
-      whereParams.push(day)
-    } else if (execInSql) {
-      whereParts.push(`(o.userId = ? OR ${execInSql})`)
-      whereParams.push(userId, ...execIds)
+      const ownerOrExec = execInSql ? `(o.userId = ? OR ${execInSql})` : 'o.userId = ?'
+      whereParts.push(
+        `((${ownerOrExec} AND ${createdDateSql} = date(?))${contactDaySql ? ` OR ${contactDaySql}` : ''})`,
+      )
+      if (execInSql) whereParams.push(userId, ...execIds, day)
+      else whereParams.push(userId, day)
+      if (contactDaySql) whereParams.push(userId, day)
+    } else if (execInSql || contactAnySql) {
+      whereParts.push(`(o.userId = ?${execInSql ? ` OR ${execInSql}` : ''}${contactAnySql ? ` OR ${contactAnySql}` : ''})`)
+      whereParams.push(userId)
+      if (execInSql) whereParams.push(...execIds)
+      if (contactAnySql) whereParams.push(userId)
     } else {
       whereParts.push('o.userId = ?')
       whereParams.push(userId)
@@ -278,6 +305,7 @@ export const OrderRepository = {
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         ${contactSel},
         ${responsibleSel},
+        ${openedSel},
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
         ${notesSel},
@@ -863,19 +891,19 @@ export const OrderRepository = {
       params.push(userId)
       if (hasExecutorUserId) {
         try {
-          const execRows = await db.all<{ orderId: number }>(
-            `SELECT DISTINCT orderId FROM items WHERE executor_user_id = ? AND orderId IS NOT NULL`,
-            [userId],
-          )
-          const ids = (Array.isArray(execRows) ? execRows : [])
-            .map((r) => Number(r.orderId))
-            .filter((id) => Number.isFinite(id))
+          const ids = await loadActiveExecutorOrderIds(db, userId)
           if (ids.length > 0) {
             accessParts.push(`o.id IN (${ids.map(() => '?').join(',')})`)
             params.push(...ids)
           }
         } catch { /* ignore */ }
       }
+      try {
+        if (await hasColumn('orders', 'contact_user_id')) {
+          accessParts.push(contactOnlyAnyDaySql())
+          params.push(userId)
+        }
+      } catch { /* ignore */ }
       whereConditions.push(`(${accessParts.join(' OR ')})`)
     }
 

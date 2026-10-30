@@ -149,6 +149,8 @@ export interface Order {
   userId?: number;
   /** Контактёр — создал заказ, общался с клиентом */
   contact_user_id?: number | null;
+  /** День создания. Не сдвигается, когда заказ передают и created_at переносится. */
+  opened_on?: string | null;
   /** Ответственный — оператор, выполняющий заказ */
   responsible_user_id?: number | null;
   /**

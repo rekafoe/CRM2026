@@ -186,6 +186,12 @@ export async function loadDailyOrdersForCashReport(
     tableAlias: 'o',
   })
 
+  let hasCancelled = false
+  try {
+    hasCancelled = await hasColumn('orders', 'is_cancelled')
+  } catch { /* ignore */ }
+  const cancelledSql = hasCancelled ? 'AND COALESCE(o.is_cancelled, 0) = 0' : ''
+
   const orders = (await db.all(
     `SELECT o.id, o.number, o.status,
             COALESCE(o.created_at, o.createdAt) as created_at,
@@ -197,6 +203,7 @@ export async function loadDailyOrdersForCashReport(
        FROM orders o
       WHERE ${dayFilter.whereSql}
         AND ${notWaitingStatusSql('o.status')}
+        ${cancelledSql}
         ${fulfillmentScope.clause}
       ORDER BY o.id DESC`,
     ...dayFilter.params,

@@ -4,6 +4,7 @@ import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { sqlDailyOrderDayFilter } from '../utils/reportOrderCash'
+import { contactOnlyOnDaySql } from '../modules/orders/orderReportVisibility'
 import { attachAmountsToOrder } from '../utils/orderAmounts'
 
 const router = Router()
@@ -308,26 +309,30 @@ router.get('/full/:date', asyncHandler(async (req, res) => {
     hasDebtClosed = false
   }
   const dayFilter = sqlDailyOrderDayFilter(d, { hasPrepaymentUpdatedAt, hasDebtClosed, tableAlias: 'o' })
-  const orders = isGlobal
-    ? await db.all<any>(
-        `SELECT o.id, o.number, o.status, o.createdAt, o.created_at, o.customerName, o.customerPhone, o.customerEmail,
-                o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId,
-                ${hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'}
-         FROM orders o
-         WHERE ${dayFilter.whereSql}
-         ORDER BY o.id DESC`,
-        ...dayFilter.params,
-      )
-    : await db.all<any>(
-        `SELECT o.id, o.number, o.status, o.createdAt, o.created_at, o.customerName, o.customerPhone, o.customerEmail,
-                o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId,
-                ${hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'}
-         FROM orders o
-         WHERE (${dayFilter.whereSql}) AND o.userId = ?
-         ORDER BY o.id DESC`,
-        ...dayFilter.params,
-        targetUserId,
-      )
+  let hasCancelled = false
+  let hasContact = false
+  let hasOpenedOn = false
+  try {
+    hasCancelled = await hasColumn('orders', 'is_cancelled')
+    hasContact = await hasColumn('orders', 'contact_user_id')
+    hasOpenedOn = await hasColumn('orders', 'opened_on')
+  } catch { /* ignore */ }
+  const cancelledSql = hasCancelled ? 'AND COALESCE(o.is_cancelled, 0) = 0' : ''
+  const contactSql = !isGlobal && hasContact ? `OR ${contactOnlyOnDaySql({ hasOpenedOn })}` : ''
+  const personalParams = isGlobal
+    ? [...dayFilter.params]
+    : [...dayFilter.params, targetUserId, ...(hasContact ? [targetUserId, d] : [])]
+  const orders = await db.all<any>(
+    `SELECT o.id, o.number, o.status, o.createdAt, o.created_at, o.customerName, o.customerPhone, o.customerEmail,
+            o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId,
+            ${hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'}
+       FROM orders o
+      WHERE ${isGlobal
+        ? `${dayFilter.whereSql} ${cancelledSql}`
+        : `((${dayFilter.whereSql} AND o.userId = ?) ${contactSql}) ${cancelledSql}`}
+      ORDER BY o.id DESC`,
+    ...personalParams,
+  )
 
   const seen = new Set<number>()
   const uniqueOrders = orders.filter((o: any) => {

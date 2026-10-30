@@ -5,6 +5,7 @@ import { APP_CONFIG } from '../../../types';
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
 import { preserveOrderNotes } from '../../../utils/orderNotes';
+import { isContactOnlyOnDay } from '../../../utils/orderDayVisibility';
 
 const extractDate = (dateString: string | null | undefined): string | null => {
   if (!dateString) return null;
@@ -133,6 +134,7 @@ export const useOptimizedAppData = (
             const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
             const rawDate = (o as any).created_at ?? (o as any).createdAt;
             const onDay = !rawDate || extractDate(rawDate) === targetDate;
+            if (isContactOnlyOnDay(o, uid, targetDate)) return true;
             if (!assigned) return onDay;
             // Чужой executor-заказ другого дня: не тащим завершённые
             if (onDay) return true;
@@ -146,6 +148,7 @@ export const useOptimizedAppData = (
           })
           .filter(o => {
             if (uid == null) return true;
+            if (isContactOnlyOnDay(o, uid, targetDate)) return true;
             // Свои как владелец / без владельца
             if ((o as any).userId == null || (o as any).userId === uid) return true;
             // Назначен исполнителем по позиции
@@ -249,6 +252,7 @@ export const useOptimizedAppData = (
               const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
               const rawDate = (o as any).created_at ?? (o as any).createdAt;
               const onDay = !rawDate || extractDate(rawDate) === targetDate;
+              if (isContactOnlyOnDay(o, uid, targetDate)) return true;
               if (!assigned) return onDay;
               if (onDay) return true;
               const st = Number((o as any).status);
@@ -261,6 +265,7 @@ export const useOptimizedAppData = (
             })
             .filter(o => {
               if (uid == null) return true;
+              if (isContactOnlyOnDay(o, uid, targetDate)) return true;
               if ((o as any).userId == null || (o as any).userId === uid) return true;
               const assigned = (o as any).assigned_as_executor;
               return assigned === true || assigned === 1;

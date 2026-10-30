@@ -4,6 +4,7 @@ import { AppIcon } from '../ui/AppIcon';
 import { useToastNotifications } from '../Toast';
 import { useLogger } from '../../utils/logger';
 import { getOrders } from '../../api';
+import { isCancelledOrderFlag, orderCalendarDay, ownerOrContactDay } from '../../utils/orderDayVisibility';
 import type { Order } from '../../types';
 import './DateSwitcher.css';
 
@@ -60,18 +61,13 @@ export const DateSwitchContainer: React.FC<DateSwitchContainerProps> = ({
       
       // Фильтруем заказы пользователя
       // Показываем ВСЕ заказы пользователя (включая назначенные онлайн заказы)
-      const userOrders = res.data.filter((order: any) => {
-        // Показываем заказы, где пользователь является создателем ИЛИ назначенным исполнителем
-        return order.userId === uid;
-      });
+      const userOrders = res.data.filter((order: any) => ownerOrContactDay(order, uid) != null);
       
       // Группируем по датам и считаем количество заказов
       const dateMap = new Map<string, number>();
       userOrders.forEach((order: any) => {
-        if (order.created_at) {
-          const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-          dateMap.set(orderDate, (dateMap.get(orderDate) || 0) + 1);
-        }
+        const orderDate = ownerOrContactDay(order, uid);
+        if (orderDate) dateMap.set(orderDate, (dateMap.get(orderDate) || 0) + 1);
       });
       
       // Преобразуем в массив и сортируем
@@ -97,16 +93,12 @@ export const DateSwitchContainer: React.FC<DateSwitchContainerProps> = ({
     
     try {
       const res = await getOrders();
-      const filtered = res.data
-        .filter(o => {
-          if (!o.created_at) return false;
-          const orderDate = new Date(o.created_at).toISOString().slice(0, 10);
-          return orderDate === targetDate;
-        })
-        .filter(o => {
-          // Показываем заказы, где пользователь является создателем ИЛИ назначенным исполнителем
-          return o.userId === uid;
-        });
+      const filtered = res.data.filter((o) => {
+        if (isCancelledOrderFlag(o)) return false;
+        if (uid != null && ownerOrContactDay(o, uid) === targetDate) return true;
+        const assigned = (o as any).assigned_as_executor === true || (o as any).assigned_as_executor === 1;
+        return assigned && orderCalendarDay((o as any).created_at ?? (o as any).createdAt) === targetDate;
+      });
       
       // Убираем дубликаты по ID
       const uniqueOrders = filtered.filter((order, index, self) => 
@@ -175,18 +167,13 @@ export const DateSwitchContainer: React.FC<DateSwitchContainerProps> = ({
           
           // Фильтруем заказы пользователя
           // Показываем ВСЕ заказы пользователя (включая назначенные онлайн заказы)
-          const userOrders = res.data.filter((order: any) => {
-            // Показываем заказы, где пользователь является создателем ИЛИ назначенным исполнителем
-            return order.userId === uid;
-          });
+          const userOrders = res.data.filter((order: any) => ownerOrContactDay(order, uid) != null);
           
           // Группируем по датам и считаем количество заказов
           const dateMap = new Map<string, number>();
           userOrders.forEach((order: any) => {
-            if (order.created_at) {
-              const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-              dateMap.set(orderDate, (dateMap.get(orderDate) || 0) + 1);
-            }
+            const orderDate = ownerOrContactDay(order, uid);
+            if (orderDate) dateMap.set(orderDate, (dateMap.get(orderDate) || 0) + 1);
           });
           
           // Преобразуем в массив и сортируем

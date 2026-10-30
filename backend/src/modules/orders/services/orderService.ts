@@ -32,6 +32,7 @@ import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderA
 import { shouldClearDefaultPrepaymentForLegal } from '../../../utils/legalOrderPrepayment'
 import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
 import { contactToKeep, resolveColleagueContactUserId, shouldTransferContact } from '../orderTransferContact'
+import { calendarDay, freezeOpenedOn } from '../orderReportVisibility'
 
 export class OrderService {
   private static isMeterUnit(unitRaw: unknown): boolean {
@@ -414,6 +415,7 @@ export class OrderService {
     let hasIsInternal = false
     let hasContactUserId = false
     let hasResponsibleUserId = false
+    let hasOpenedOn = false
     invalidateTableSchemaCache('orders')
     try {
       hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -421,12 +423,14 @@ export class OrderService {
       hasIsInternal = await hasColumn('orders', 'is_internal')
       hasContactUserId = await hasColumn('orders', 'contact_user_id')
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
+      hasOpenedOn = await hasColumn('orders', 'opened_on')
     } catch {
       hasPrepaymentUpdatedAt = false
       hasPaymentChannel = false
       hasIsInternal = false
       hasContactUserId = false
       hasResponsibleUserId = false
+      hasOpenedOn = false
     }
     const creatorId = userId ?? null
     const channelRaw = paymentChannel && OrderService.ALLOWED_PAYMENT_CHANNELS.has(paymentChannel) ? paymentChannel : 'cash'
@@ -465,6 +469,12 @@ export class OrderService {
     if (hasIsInternal) insertFields.push(['is_internal', isInternal ? 1 : 0])
     if (hasContactUserId) insertFields.push(['contact_user_id', creatorId])
     if (hasResponsibleUserId) insertFields.push(['responsible_user_id', creatorId])
+    if (hasOpenedOn) {
+      const openedOn = dateOnly && /^\d{4}-\d{2}-\d{2}$/.test(dateOnly)
+        ? dateOnly
+        : String(createdAt).slice(0, 10)
+      insertFields.push(['opened_on', openedOn])
+    }
 
     const orderCols = insertFields.map(([col]) => col)
     const orderValues = insertFields.map(([, v]) => v)
@@ -1138,6 +1148,18 @@ export class OrderService {
     )
     const preDay = preRow?.d ? String(preRow.d).slice(0, 10) : null
     const currentDate = getCurrentTimestamp()
+    try {
+      if (await hasColumn('orders', 'opened_on')) {
+        const openedRow = await db.get<{ opened_on?: string | null }>(
+          'SELECT opened_on FROM orders WHERE id = ?',
+          [orderId],
+        )
+        const frozen = freezeOpenedOn(openedRow?.opened_on, preDay)
+        if (frozen && frozen !== calendarDay(openedRow?.opened_on)) {
+          await db.run('UPDATE orders SET opened_on = ? WHERE id = ?', [frozen, orderId])
+        }
+      }
+    } catch { /* колонка появится после миграции */ }
 
     let hasCreatedAt = false
     let hasCreatedAtSnake = false
@@ -1775,6 +1797,7 @@ export class OrderService {
     if (hasUpdatedAt) updates.push('updatedAt = datetime("now")')
     else if (hasUpdatedAtSnake) updates.push('updated_at = datetime("now")')
 
+    await this.setAllItemsExecutor(row.id, null)
     await db.run(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`, [row.id])
     try {
       await db.run(
@@ -1891,6 +1914,18 @@ export class OrderService {
     return { id: row.id, userId: targetUserId }
   }
 
+  /** Снять исполнителя, контактёра и ответственного. Отмена не должна оставлять роли на заказе. */
+  private static async clearCancelledOrderRoles(orderId: number): Promise<void> {
+    await this.setAllItemsExecutor(orderId, null)
+    const db = await getDb()
+    if (await hasColumn('orders', 'contact_user_id').catch(() => false)) {
+      await db.run('UPDATE orders SET contact_user_id = NULL WHERE id = ?', [orderId])
+    }
+    if (await hasColumn('orders', 'responsible_user_id').catch(() => false)) {
+      await db.run('UPDATE orders SET responsible_user_id = NULL WHERE id = ?', [orderId])
+    }
+  }
+
   /**
    * Мягкая отмена: запись остаётся в БД (is_cancelled=1), заказ уходит из активного пула.
    * Для CRM/сайта/TG/mini-app — одна и та же логика. Без физического DELETE.
@@ -1920,6 +1955,7 @@ export class OrderService {
       throw new Error('Заказ не найден')
     }
     if (hasIsCancelled && Number(ord.is_cancelled) === 1) {
+      await this.clearCancelledOrderRoles(id)
       return { softCancelled: true, status: Number(ord.status ?? 0) }
     }
     const cancelledStatusId = await this.getOrCreateCancelledStatusId(db)
@@ -1971,26 +2007,23 @@ export class OrderService {
       } catch {
         // Таблицы страниц заказов может не быть в старых схемах.
       }
-      try {
-        await db.run('UPDATE items SET executor_user_id = NULL WHERE orderId = ?', [id])
-      } catch {
-        // колонки executor_user_id может не быть
-      }
-      try {
-        if (await hasColumn('orders', 'contact_user_id')) {
-          await db.run('UPDATE orders SET contact_user_id = NULL WHERE id = ?', [id])
-        }
-      } catch { /* ignore */ }
-      try {
-        if (await hasColumn('orders', 'responsible_user_id')) {
-          await db.run('UPDATE orders SET responsible_user_id = NULL WHERE id = ?', [id])
-        }
-      } catch { /* ignore */ }
+      await this.clearCancelledOrderRoles(id)
       await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
       await db.run('COMMIT')
-      if (ord?.created_date) {
-        const date = String(ord.created_date).slice(0, 10)
-        await EarningsService.recalculateForDate(date)
+      const earningDays = new Set<string>()
+      if (ord?.created_date) earningDays.add(String(ord.created_date).slice(0, 10))
+      try {
+        if (await hasColumn('orders', 'opened_on')) {
+          const openedRow = await db.get<{ opened_on?: string | null }>(
+            'SELECT opened_on FROM orders WHERE id = ?',
+            [id],
+          )
+          const opened = calendarDay(openedRow?.opened_on)
+          if (/^\d{4}-\d{2}-\d{2}$/.test(opened)) earningDays.add(opened)
+        }
+      } catch { /* ignore */ }
+      for (const date of earningDays) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) await EarningsService.recalculateForDate(date)
       }
       void trySyncWebsiteOrderStatusFromCrm(db, id)
       void syncWebsitePickedUpReadyEmail({

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { isOrderExcludedFromCashCounter } from '../../utils/numberInput';
+import { ownerOrContactDay } from '../../utils/orderDayVisibility';
 import { useOrderStatuses } from '../../hooks/useOrderStatuses';
 import { BynSymbol, MoneyAmount } from '../ui';
 
@@ -76,8 +77,10 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
       // Рассчитываем сумму из заказов за день
       const ordersResponse = await api.get(`/orders`);
       const ordersForDate = ordersResponse.data.filter((order: any) => {
+        if (Number(order.is_cancelled) === 1) return false;
+        if (ownerOrContactDay(order, userId) === date) return true;
         const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-        return orderDate === date && (order.userId === userId || order.userId === null);
+        return orderDate === date && order.userId == null;
       });
       const calculatedCash = ordersForDate.reduce((sum: number, order: any) => {
         if (isOrderExcludedFromCashCounter(order)) return sum;
