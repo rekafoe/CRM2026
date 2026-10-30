@@ -9,7 +9,11 @@ import {
 import { normalizeCustomCalculatorPercent } from '../services/earningsOperatorPercent'
 import { getRoleOrderPercents, setRoleOrderPercents } from '../services/earningsRoleRateSettings'
 import { getWasteSharesForMonths } from '../services/earningsWasteService'
-import { loadSalesManagerOutput, salesBonusAmountMap } from '../services/salesManagerOutputService'
+import {
+  loadSalesManagerOutput,
+  salesBonusAmountMap,
+  type SalesManagerOutput,
+} from '../services/salesManagerOutputService'
 
 const router = Router()
 
@@ -495,10 +499,14 @@ router.get('/admin', asyncHandler(async (req, res) => {
   const wasteShareOf = (userId: number, key: string) => wasteByMonth.get(key)?.shares.get(userId) || 0
   const salesBonusOfMonth = await salesBonusAmountMap(db, wasteMonths).catch(() => new Map<string, number>())
   const salesBonusOf = (userId: number, key: string) => salesBonusOfMonth.get(`${userId}_${key}`) || 0
-  const salesCurrent = await loadSalesManagerOutput(db, month).catch(() => [])
-  const salesPrev = await loadSalesManagerOutput(db, prevMonth).catch(() => [])
-  const salesCurrentMap = new Map(salesCurrent.map((row) => [row.userId, row]))
-  const salesPrevMap = new Map(salesPrev.map((row) => [row.userId, row]))
+  const salesCurrent: SalesManagerOutput[] = await loadSalesManagerOutput(db, month).catch(() => [])
+  const salesPrev: SalesManagerOutput[] = await loadSalesManagerOutput(db, prevMonth).catch(() => [])
+  const salesCurrentMap = new Map<number, SalesManagerOutput>(
+    salesCurrent.map((row) => [row.userId, row] as const),
+  )
+  const salesPrevMap = new Map<number, SalesManagerOutput>(
+    salesPrev.map((row) => [row.userId, row] as const),
+  )
 
   const monthPayout = (userId: number, key: string, hourlyRate: number) => {
     const percent = historyMap.get(`${userId}_${key}`) || 0
