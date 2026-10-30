@@ -74,10 +74,11 @@ describe('предоплата юрлица', () => {
     ).toBe(false)
   })
 
-  it('при привязке юрлица сбрасывает только полную автопредоплату', () => {
+  it('при привязке юрлица сбрасывает только полную offline-автопредоплату', () => {
     expect(
       shouldClearDefaultPrepaymentForLegal({
         customerType: 'legal',
+        paymentMethod: 'offline',
         prepaymentAmount: 100,
         orderTotal: 100,
       })
@@ -86,6 +87,7 @@ describe('предоплата юрлица', () => {
     expect(
       shouldClearDefaultPrepaymentForLegal({
         customerType: 'legal',
+        paymentMethod: 'offline',
         prepaymentAmount: 40,
         orderTotal: 100,
       })
@@ -93,6 +95,7 @@ describe('предоплата юрлица', () => {
     expect(
       shouldClearDefaultPrepaymentForLegal({
         customerType: 'legal',
+        paymentMethod: 'offline',
         prepaymentAmount: 0,
         orderTotal: 100,
       })
@@ -100,6 +103,7 @@ describe('предоплата юрлица', () => {
     expect(
       shouldClearDefaultPrepaymentForLegal({
         customerType: 'individual',
+        paymentMethod: 'offline',
         prepaymentAmount: 100,
         orderTotal: 100,
       })
@@ -107,6 +111,43 @@ describe('предоплата юрлица', () => {
     expect(
       shouldClearDefaultPrepaymentForLegal({
         customerType: null,
+        paymentMethod: 'offline',
+        prepaymentAmount: 100,
+        orderTotal: 100,
+      })
+    ).toBe(false)
+  })
+
+  it('не сбрасывает BePaid/telegram и запись с paymentId при привязке юрлица', () => {
+    expect(
+      shouldClearDefaultPrepaymentForLegal({
+        customerType: 'legal',
+        paymentMethod: 'online',
+        prepaymentAmount: 100,
+        orderTotal: 100,
+      })
+    ).toBe(false)
+    expect(
+      shouldClearDefaultPrepaymentForLegal({
+        customerType: 'legal',
+        paymentMethod: 'telegram',
+        prepaymentAmount: 100,
+        orderTotal: 100,
+      })
+    ).toBe(false)
+    expect(
+      shouldClearDefaultPrepaymentForLegal({
+        customerType: 'legal',
+        paymentMethod: 'offline',
+        paymentId: 'uid_paid_1',
+        prepaymentAmount: 100,
+        orderTotal: 100,
+      })
+    ).toBe(false)
+    expect(
+      shouldClearDefaultPrepaymentForLegal({
+        customerType: 'legal',
+        paymentMethod: null,
         prepaymentAmount: 100,
         orderTotal: 100,
       })

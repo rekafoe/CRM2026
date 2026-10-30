@@ -1047,6 +1047,8 @@ export class OrderService {
       customerType,
       prepaymentAmount: order.prepaymentAmount,
       orderTotal: amounts.totalAmount,
+      paymentMethod: order.paymentMethod,
+      paymentId: order.paymentId,
     })) {
       sets.push('prepaymentAmount = 0')
       sets.push('prepaymentStatus = NULL')

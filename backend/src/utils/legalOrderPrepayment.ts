@@ -55,12 +55,20 @@ export function shouldAutoFillCashPrepayment(input: {
   )
 }
 
-/** Сбрасывать только автоматическую полную предоплату при привязке юрлица. */
+/**
+ * Сбрасывать только кассовую автопредоплату (offline, сумма = итог) при привязке юрлица.
+ * BePaid/telegram (online) и любая запись с paymentId — реальные деньги: не трогаем.
+ */
 export function shouldClearDefaultPrepaymentForLegal(input: {
   customerType?: string | null
   prepaymentAmount?: unknown
   orderTotal: number
+  paymentMethod?: string | null
+  paymentId?: string | null
 }): boolean {
   if (normalized(input.customerType) !== 'legal') return false
+  if (String(input.paymentId ?? '').trim()) return false
+  // Автоподстановка в orderItemController всегда пишет paymentMethod = 'offline'.
+  if (normalized(input.paymentMethod) !== 'offline') return false
   return isFullSyncedPrepayment(input.prepaymentAmount, input.orderTotal)
 }
