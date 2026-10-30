@@ -246,6 +246,27 @@ describe('issued documents', () => {
     expect(act.actNumber).toBe('А-00001')
     expect(act.invoiceNumber).toBe('С-00017')
     expect(act.contractNumber).toBe('А-00001')
+    expect(act.basis).toBe('')
+
+    const tn = numbersForIssuedDocument({
+      kind: 'tn',
+      number: 'ТН-00001',
+      issuedDate: '30.10.2026',
+      invoice: { number: 'С-00017', issuedDate: '28.10.2026' },
+      citedContract: { number: 'Д-00005', issuedDate: '01.10.2026' },
+    })
+    expect(tn.contractNumber).toBe('ТН-00001')
+    expect(tn.invoiceNumber).toBe('С-00017')
+    expect(tn.basis).toBe('Счёт С-00017 от 28.10.2026')
+
+    const tnByContract = numbersForIssuedDocument({
+      kind: 'tn',
+      number: 'ТН-00002',
+      issuedDate: '30.10.2026',
+      citedContract: { number: 'Д-00005', issuedDate: '01.10.2026' },
+    })
+    expect(tnByContract.basis).toBe('Договор Д-00005 от 01.10.2026')
+    expect(tnByContract.invoiceNumber).toBe('')
 
     const contractCounter = await db.get<{ last_value: number }>(
       'SELECT last_value FROM document_number_counters WHERE kind = ?',

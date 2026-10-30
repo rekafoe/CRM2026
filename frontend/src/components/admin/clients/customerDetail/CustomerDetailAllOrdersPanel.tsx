@@ -105,6 +105,14 @@ export const CustomerDetailAllOrdersPanel: React.FC<CustomerDetailAllOrdersPanel
                         >
                           {generatingKey === `${order.id}:invoice` ? 'Генерация...' : 'Счёт'}
                         </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={Boolean(busy)}
+                          onClick={() => void handleGenerate(order, 'tn')}
+                        >
+                          {generatingKey === `${order.id}:tn` ? 'Генерация...' : 'ТН'}
+                        </Button>
                       </div>
                     </td>
                   </tr>

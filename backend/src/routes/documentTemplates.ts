@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { DocumentTemplateService, TemplateData } from '../services/documentTemplateService';
-import { documentSourceHash, findLatestIssued, issueOrReuse, IssuedDocumentKind, numbersForIssuedDocument } from '../services/issuedDocumentService';
+import { DocumentTemplateService, TemplateData, type DocumentTemplateType } from '../services/documentTemplateService';
+import { buildTnDocumentRows, TnDocumentError } from '../services/tnDocumentRows';
+import { documentSourceHash, findLatestIssued, issueOrReuse, numbersForIssuedDocument } from '../services/issuedDocumentService';
 import { PDFReportService } from '../services/pdfReportService';
 import { normalizeVatRate } from '../utils/documentVat';
 import { computeOrderAmounts } from '../utils/orderAmounts';
@@ -16,6 +17,13 @@ import path from 'path';
 import fs from 'fs';
 
 const router = Router();
+
+const TEMPLATE_TYPES: DocumentTemplateType[] = ['contract', 'act', 'invoice', 'tn']
+const SPREADSHEET_TYPES = new Set<DocumentTemplateType>(['act', 'invoice', 'tn'])
+
+function isTemplateType(value: string): value is DocumentTemplateType {
+  return (TEMPLATE_TYPES as string[]).includes(value)
+}
 
 async function executorFieldsForUser(userId: number | null) {
   if (!userId) return executorSignerTemplateFields(null)
@@ -63,11 +71,11 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
  */
 router.get('/type/:type', asyncHandler(async (req: Request, res: Response) => {
   const { type } = req.params;
-  if (!['contract', 'act', 'invoice'].includes(type)) {
+  if (!isTemplateType(type)) {
     res.status(400).json({ message: 'Неверный тип шаблона' });
     return;
   }
-  const templates = await DocumentTemplateService.getTemplatesByType(type as any);
+  const templates = await DocumentTemplateService.getTemplatesByType(type);
   res.json(templates);
 }));
 
@@ -103,7 +111,7 @@ router.post('/', upload.single('template'), asyncHandler(async (req: Request, re
     return;
   }
   
-  if (!['contract', 'act', 'invoice'].includes(type)) {
+  if (!isTemplateType(type)) {
     fs.unlinkSync(file.path);
     res.status(400).json({ message: 'Неверный тип шаблона' });
     return;
@@ -116,9 +124,9 @@ router.post('/', upload.single('template'), asyncHandler(async (req: Request, re
     res.status(400).json({ message: 'Шаблон договора должен быть в формате .docx' });
     return;
   }
-  if ((type === 'act' || type === 'invoice') && !['.xlsx', '.xls'].includes(ext)) {
+  if (SPREADSHEET_TYPES.has(type) && !['.xlsx', '.xls'].includes(ext)) {
     fs.unlinkSync(file.path);
-    res.status(400).json({ message: 'Шаблон акта/счета должен быть в формате .xlsx или .xls' });
+    res.status(400).json({ message: 'Шаблон акта, счёта и накладной должен быть в формате .xlsx или .xls' });
     return;
   }
   
@@ -260,13 +268,13 @@ router.post('/:id/generate', asyncHandler(async (req: Request, res: Response) =>
  */
 router.post('/generate/:type', asyncHandler(async (req: Request, res: Response) => {
   const { type } = req.params;
-  if (!['contract', 'act', 'invoice'].includes(type)) {
+  if (!isTemplateType(type)) {
     res.status(400).json({ message: 'Неверный тип шаблона' });
     return;
   }
   
   try {
-    const template = await DocumentTemplateService.getDefaultTemplate(type as any);
+    const template = await DocumentTemplateService.getDefaultTemplate(type);
     if (!template) {
       res.status(404).json({ message: `Шаблон для типа "${type}" не найден. Загрузите шаблон в разделе "Шаблоны документов"` });
       return;
@@ -319,18 +327,18 @@ router.post('/generate/:type', asyncHandler(async (req: Request, res: Response) 
 }));
 
 /**
- * Генерация акта, счёта или договора по списку заказов.
+ * Генерация акта, счёта, договора или товарной накладной по списку заказов.
  * Строки, номер и файл считаются на бэкенде. Повтор без изменения заказа отдаёт сохранённый файл.
  * POST /document-templates/generate/:type/from-orders
  * Body: { orderIds: number[] }
  */
 router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res: Response) => {
   const { type } = req.params;
-  if (!['act', 'invoice', 'contract'].includes(type)) {
-    res.status(400).json({ message: 'Тип должен быть act, invoice или contract' });
+  if (!isTemplateType(type)) {
+    res.status(400).json({ message: 'Тип должен быть act, invoice, contract или tn' });
     return;
   }
-  const kind = type as IssuedDocumentKind;
+  const kind = type;
   const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds.map((id: any) => Number(id)).filter((id: number) => !isNaN(id) && id > 0) : [];
   if (orderIds.length === 0) {
     res.status(400).json({ message: 'Укажите orderIds (массив id заказов)' });
@@ -338,7 +346,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
   }
 
   try {
-    const template = await DocumentTemplateService.getDefaultTemplate(kind as 'act' | 'invoice' | 'contract');
+    const template = await DocumentTemplateService.getDefaultTemplate(kind);
     if (!template) {
       res.status(404).json({ message: `Шаблон для типа "${type}" не найден. Загрузите шаблон в разделе "Шаблоны документов".` });
       return;
@@ -404,11 +412,30 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     }
 
     const getDiscountPercent = (orderId: number) => orderMap.get(orderId)?.discount_percent ?? 0;
-    const { orderItems, totalAmount, totalQuantity } = PDFReportService.buildDocumentRowsFromItems(
-      flatItems,
-      getDiscountPercent,
-      vatRate,
-    );
+    let orderItems: ReturnType<typeof PDFReportService.buildDocumentRowsFromItems>['orderItems']
+    let totalAmount: number
+    let totalQuantity: number
+    let tnOrderTotals: Map<number, number> | null = null
+    try {
+      if (kind === 'tn') {
+        const built = buildTnDocumentRows(flatItems, getDiscountPercent, vatRate)
+        orderItems = built.orderItems
+        totalAmount = built.totalAmount
+        totalQuantity = built.totalQuantity
+        tnOrderTotals = built.orderTotals
+      } else {
+        const built = PDFReportService.buildDocumentRowsFromItems(flatItems, getDiscountPercent, vatRate)
+        orderItems = built.orderItems
+        totalAmount = built.totalAmount
+        totalQuantity = built.totalQuantity
+      }
+    } catch (error) {
+      if (error instanceof TnDocumentError) {
+        res.status(error.status).json({ message: error.message })
+        return
+      }
+      throw error
+    }
 
     const orderAmounts = new Map<number, number>();
     for (const o of orders) {
@@ -441,10 +468,12 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       sellerBankDetails: seller?.bank_details ?? '',
       sellerPhone: seller?.phone ?? '',
       ...(await executorFieldsForDocument(req, customer?.manager_user_id)),
-      orders: orders.map((o) => ({
+      orders: orders
+        .filter((o) => tnOrderTotals == null || tnOrderTotals.has(o.id))
+        .map((o) => ({
         number: o.number || `#${o.id}`,
         date: formatDateForDocument(o.created_at),
-        amount: orderAmounts.get(o.id) ?? 0,
+        amount: tnOrderTotals?.get(o.id) ?? orderAmounts.get(o.id) ?? 0,
         status: String(o.status ?? '—'),
       })),
       orderItems,
@@ -454,6 +483,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     const issuedOrderIds = orders.map((order) => order.id);
     const citedInvoice = kind === 'invoice' ? null : await findLatestIssued('invoice', issuedOrderIds);
     const citedAct = kind === 'act' ? null : await findLatestIssued('act', issuedOrderIds);
+    const citedContract = kind === 'tn' ? await findLatestIssued('contract', issuedOrderIds) : null;
     const sourceHash = documentSourceHash({
       kind,
       templateId: template.id,
@@ -461,6 +491,12 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       vatRate,
       ...baseData,
       ...(kind === 'contract' && citedInvoice?.number ? { citedInvoiceNumber: citedInvoice.number } : {}),
+      ...(kind === 'tn'
+        ? {
+            citedInvoiceNumber: citedInvoice?.number ?? '',
+            citedContractNumber: citedContract?.number ?? '',
+          }
+        : {}),
     });
     const ext = path.extname(template.file_path);
     const contentType = ext === '.docx'
@@ -489,6 +525,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
           issuedDate,
           invoice: citedInvoice,
           act: citedAct,
+          citedContract,
         }),
       }),
     });

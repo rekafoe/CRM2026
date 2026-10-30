@@ -392,6 +392,31 @@ export const CustomerDetailView: React.FC<{
     []
   );
 
+  const handleExportTn = useCallback(async () => {
+    if (!customer) return;
+    const orderIds = countedOrders.map((order) => order.id);
+    if (orderIds.length === 0) {
+      setError('В выбранном периоде нет заказов для накладной');
+      return;
+    }
+    try {
+      setGeneratingDocument('tn');
+      setError(null);
+      const response = await generateDocumentByTypeFromOrders('tn', orderIds);
+      downloadAxiosBlob(
+        response,
+        `ТН-${formatDateForFile(new Date())}-${customer.id}.xlsx`,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      setLegalDocsRefresh((n) => n + 1);
+    } catch (err: unknown) {
+      const msg = await getApiErrorMessage(err, 'Не удалось сформировать накладную');
+      setError(msg);
+    } finally {
+      setGeneratingDocument(null);
+    }
+  }, [customer, countedOrders]);
+
   const handleExportAct = useCallback(async () => {
     if (!customer) return;
     
@@ -1068,6 +1093,7 @@ export const CustomerDetailView: React.FC<{
                       onExportContract: handleExportContract,
                       onExportAct: handleExportAct,
                       onExportInvoice: handleExportInvoice,
+                      onExportTn: handleExportTn,
                       onExportReconciliation: handleExportReconciliation,
                     }
                   : null

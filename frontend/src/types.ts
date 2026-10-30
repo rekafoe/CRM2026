@@ -278,7 +278,7 @@ export interface MaterialRow {
 export interface DocumentTemplate {
   id: number;
   name: string;
-  type: 'contract' | 'act' | 'invoice';
+  type: 'contract' | 'act' | 'invoice' | 'tn';
   file_path: string;
   created_at: string;
   updated_at: string;

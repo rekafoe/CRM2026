@@ -396,7 +396,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     }}
                     disabled={Boolean(generatingKind)}
                     className={`order-detail-action-btn order-detail-action-btn--legal ${generatingKind ? 'order-detail-action-btn--disabled' : ''}`}
-                    title="Договор, акт и счёт по этому заказу"
+                    title="Договор, акт, счёт и товарная накладная по этому заказу"
                   >
                     {generatingKind
                       ? <><AppIcon name="refresh" size="xs" /> Генерация...</>
@@ -430,6 +430,14 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                         role="menuitem"
                       >
                         Счёт Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => generateLegalDocument('tn')}
+                        className="order-detail-action-menu__item"
+                        role="menuitem"
+                      >
+                        ТН Excel
                       </button>
                     </div>
                   )}

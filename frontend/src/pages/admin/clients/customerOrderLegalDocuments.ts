@@ -5,12 +5,13 @@ import { downloadAxiosBlob } from '../../../utils/downloadBlob';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-export type OrderLegalDocKind = 'contract' | 'act' | 'invoice';
+export type OrderLegalDocKind = 'contract' | 'act' | 'invoice' | 'tn';
 
 export const ORDER_LEGAL_DOC_LABELS: Record<OrderLegalDocKind, string> = {
   contract: 'Договор',
   act: 'Акт',
   invoice: 'Счёт',
+  tn: 'Товарная накладная',
 };
 
 export async function generateCustomerOrderLegalDocument(args: {
@@ -26,6 +27,8 @@ export async function generateCustomerOrderLegalDocument(args: {
       ? `АКТ-${orderRef}.xlsx`
       : kind === 'invoice'
         ? `СЧЁТ-${orderRef}.xlsx`
-        : `ДОГОВОР-${orderRef}.docx`;
+        : kind === 'tn'
+          ? `ТН-${orderRef}.xlsx`
+          : `ДОГОВОР-${orderRef}.docx`;
   downloadAxiosBlob(response, fallbackName, kind === 'contract' ? DOCX_MIME : XLSX_MIME);
 }

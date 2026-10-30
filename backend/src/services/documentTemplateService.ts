@@ -7,10 +7,12 @@ import ExcelJS from 'exceljs';
 import { getDb } from '../config/database';
 import { amountInWordsBel } from '../utils/amountInWordsBel';
 
+export type DocumentTemplateType = 'contract' | 'act' | 'invoice' | 'tn'
+
 export interface DocumentTemplate {
   id: number;
   name: string;
-  type: 'contract' | 'act' | 'invoice';
+  type: DocumentTemplateType;
   file_path: string;
   created_at: string;
   updated_at: string;
@@ -72,7 +74,7 @@ export class DocumentTemplateService {
       CREATE TABLE IF NOT EXISTS document_templates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('contract', 'act', 'invoice')),
+        type TEXT NOT NULL CHECK(type IN ('contract', 'act', 'invoice', 'tn')),
         file_path TEXT NOT NULL,
         is_default INTEGER DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -101,7 +103,7 @@ export class DocumentTemplateService {
    */
   static async saveTemplate(
     name: string,
-    type: 'contract' | 'act' | 'invoice',
+    type: DocumentTemplateType,
     filePath: string,
     isDefault: boolean = false
   ): Promise<DocumentTemplate> {
@@ -175,7 +177,7 @@ export class DocumentTemplateService {
    * Получить шаблон по умолчанию для типа
    * Если шаблон по умолчанию не найден, возвращает первый доступный шаблон этого типа
    */
-  static async getDefaultTemplate(type: 'contract' | 'act' | 'invoice'): Promise<DocumentTemplate | null> {
+  static async getDefaultTemplate(type: DocumentTemplateType): Promise<DocumentTemplate | null> {
     const db = await getDb();
     
     // Сначала ищем шаблон по умолчанию
@@ -223,7 +225,7 @@ export class DocumentTemplateService {
   /**
    * Получить шаблоны по типу
    */
-  static async getTemplatesByType(type: 'contract' | 'act' | 'invoice'): Promise<DocumentTemplate[]> {
+  static async getTemplatesByType(type: DocumentTemplateType): Promise<DocumentTemplate[]> {
     const db = await getDb();
     const rows = await db.all<DocumentTemplate>(
       'SELECT * FROM document_templates WHERE type = ? ORDER BY is_default DESC, name',
@@ -1064,6 +1066,7 @@ export class DocumentTemplateService {
       'invoiceDate': 'invoiceDate',
       'documentNumber': 'documentNumber',
       'documentDate': 'documentDate',
+      'basis': 'basis',
       'sellerName': 'sellerName',
       'sellerUnp': 'sellerUnp',
       'sellerAddress': 'sellerAddress',
@@ -1329,6 +1332,7 @@ export class DocumentTemplateService {
       contract: 'Договор',
       act: 'Акт',
       invoice: 'Счёт',
+      tn: 'ТН',
     };
     const documentType = typeLabels[template.type] || template.type;
     

@@ -27,7 +27,7 @@ const DocumentTemplatesPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadForm, setUploadForm] = useState({
     name: '',
-    type: 'contract' as 'contract' | 'act' | 'invoice',
+    type: 'contract' as 'contract' | 'act' | 'invoice' | 'tn',
     isDefault: false,
   });
   
@@ -71,8 +71,8 @@ const DocumentTemplatesPage: React.FC = () => {
       setError('Шаблон договора должен быть в формате .docx');
       return;
     }
-    if ((uploadForm.type === 'act' || uploadForm.type === 'invoice') && !['xlsx', 'xls'].includes(ext || '')) {
-      setError('Шаблон акта/счета должен быть в формате .xlsx или .xls');
+    if ((uploadForm.type === 'act' || uploadForm.type === 'invoice' || uploadForm.type === 'tn') && !['xlsx', 'xls'].includes(ext || '')) {
+      setError('Шаблон акта, счёта и накладной должен быть в формате .xlsx или .xls');
       return;
     }
 
@@ -247,12 +247,14 @@ const DocumentTemplatesPage: React.FC = () => {
     { value: 'totalAmount', label: 'Общая сумма' },
     { value: 'totalQuantity', label: 'Общее количество' },
     { value: 'totalAmountInWords', label: 'Сумма прописью' },
+    { value: 'basis', label: 'Основание накладной: счёт или договор' },
   ];
 
   const typeLabels = {
     contract: 'Договор',
     act: 'Акт',
     invoice: 'Счёт',
+    tn: 'Товарная накладная',
   };
 
   const groupedTemplates = templates.reduce((acc, template) => {
@@ -266,7 +268,7 @@ const DocumentTemplatesPage: React.FC = () => {
   return (
     <AdminPageLayout
       title="Шаблоны документов"
-      description="Договоры, акты и счета для клиента."
+      description="Договоры, акты, счета и товарные накладные для клиента."
       icon={<AppIcon name="clipboard" size="lg" />}
       onBack={() => navigate('/adminpanel')}
       className="document-templates-layout"
@@ -303,6 +305,7 @@ const DocumentTemplatesPage: React.FC = () => {
                   <option value="contract">Договор (.docx)</option>
                   <option value="act">Акт (.xlsx)</option>
                   <option value="invoice">Счёт (.xlsx)</option>
+                  <option value="tn">Товарная накладная (.xlsx)</option>
                 </select>
               </label>
             </div>
@@ -326,7 +329,7 @@ const DocumentTemplatesPage: React.FC = () => {
                 accept={
                   uploadForm.type === 'contract'
                     ? '.docx'
-                    : uploadForm.type === 'act' || uploadForm.type === 'invoice'
+                    : uploadForm.type === 'act' || uploadForm.type === 'invoice' || uploadForm.type === 'tn'
                     ? '.xlsx,.xls'
                     : ''
                 }
@@ -355,7 +358,7 @@ const DocumentTemplatesPage: React.FC = () => {
             <div className="templates-empty">Нет загруженных шаблонов</div>
           ) : (
             <div className="templates-groups">
-              {(['contract', 'act', 'invoice'] as const).map((type) => {
+              {(['contract', 'act', 'invoice', 'tn'] as const).map((type) => {
                 const typeTemplates = groupedTemplates[type] || [];
                 if (typeTemplates.length === 0) return null;
 

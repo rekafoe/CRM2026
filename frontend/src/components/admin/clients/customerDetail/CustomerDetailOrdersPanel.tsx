@@ -16,6 +16,7 @@ export interface CustomerDetailOrdersLegalBlockProps {
   onExportContract: () => void;
   onExportAct: () => void;
   onExportInvoice: () => void;
+  onExportTn: () => void;
   onExportReconciliation: () => void;
 }
 
@@ -35,7 +36,7 @@ export const CustomerDetailOrdersPanel: React.FC<CustomerDetailOrdersPanelProps>
     {legalBlock && (
       <div className="customer-detail-view__legal-exports">
         <p className="customer-detail-view__doc-intro">
-          Договор, акт и счёт собираются по заказам выбранного периода. Акт сверки за тот же период
+          Договор, акт, счёт и товарная накладная собираются по заказам выбранного периода. В накладной одна строка на изделие, тираж в штуках. Макет и дизайн остаются в акте и счёте. Акт сверки за тот же период
           показывает дебет оформленных заказов и кредит: оплаты заказов и поступления, которые менеджер
           зачислил ниже. Заказы до начала периода входят в сальдо на начало. Просчёт в долг не входит,
           пока заказ не оформят.
@@ -65,6 +66,14 @@ export const CustomerDetailOrdersPanel: React.FC<CustomerDetailOrdersPanelProps>
             disabled={legalBlock.ordersLoading || legalBlock.generatingDocument === 'invoice'}
           >
             {legalBlock.generatingDocument === 'invoice' ? 'Генерация...' : 'Счёт Excel'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={legalBlock.onExportTn}
+            disabled={legalBlock.ordersLoading || legalBlock.generatingDocument === 'tn'}
+          >
+            {legalBlock.generatingDocument === 'tn' ? 'Генерация...' : 'ТН Excel'}
           </Button>
           <Button
             variant="secondary"

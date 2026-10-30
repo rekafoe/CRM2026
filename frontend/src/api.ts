@@ -1701,7 +1701,7 @@ export const downloadCustomerLegalPaymentFile = (customerId: number, paymentId: 
 // Document Templates API
 export const getDocumentTemplates = () => 
   api.get<DocumentTemplate[]>('/document-templates');
-export const getDocumentTemplatesByType = (type: 'contract' | 'act' | 'invoice') => 
+export const getDocumentTemplatesByType = (type: 'contract' | 'act' | 'invoice' | 'tn') => 
   api.get<DocumentTemplate[]>(`/document-templates/type/${type}`);
 export const getDocumentTemplate = (id: number) => 
   api.get<DocumentTemplate>(`/document-templates/${id}`);
@@ -1715,11 +1715,11 @@ export const downloadDocumentTemplate = (id: number) =>
   api.get(`/document-templates/${id}/download`, { responseType: 'blob' });
 export const generateDocumentFromTemplate = (id: number, data: TemplateData) => 
   api.post(`/document-templates/${id}/generate`, data, { responseType: 'blob' });
-export const generateDocumentByType = (type: 'contract' | 'act' | 'invoice', data: TemplateData) => 
+export const generateDocumentByType = (type: 'contract' | 'act' | 'invoice' | 'tn', data: TemplateData) => 
   api.post(`/document-templates/generate/${type}`, data, { responseType: 'blob' });
 
-/** Генерация акта, счёта или договора по заказам: номер и файл сохраняются на бэкенде. */
-export const generateDocumentByTypeFromOrders = (type: 'act' | 'invoice' | 'contract', orderIds: number[]) =>
+/** Генерация акта, счёта, договора или накладной по заказам: номер и файл сохраняются на бэкенде. */
+export const generateDocumentByTypeFromOrders = (type: 'act' | 'invoice' | 'contract' | 'tn', orderIds: number[]) =>
   api.post(`/document-templates/generate/${type}/from-orders`, { orderIds }, { responseType: 'blob' });
 
 // Анализ шаблона и маппинг полей

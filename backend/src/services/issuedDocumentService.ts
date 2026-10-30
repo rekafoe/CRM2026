@@ -2,13 +2,14 @@ import crypto from 'crypto'
 import { getDb } from '../config/database'
 import { CustomerLegalDocumentService } from '../modules/customers/services/customerLegalDocumentService'
 
-export type IssuedDocumentKind = 'receipt' | 'act' | 'invoice' | 'contract'
+export type IssuedDocumentKind = 'receipt' | 'act' | 'invoice' | 'contract' | 'tn'
 
 const NUMBER_PREFIX: Record<IssuedDocumentKind, string> = {
   receipt: 'ТЧ',
   act: 'А',
   invoice: 'С',
   contract: 'Д',
+  tn: 'ТН',
 }
 
 const JOURNAL_TITLE: Record<IssuedDocumentKind, string> = {
@@ -16,6 +17,7 @@ const JOURNAL_TITLE: Record<IssuedDocumentKind, string> = {
   act: 'Акт',
   invoice: 'Счёт',
   contract: 'Договор',
+  tn: 'Товарная накладная',
 }
 
 export type StoredIssuedDocument = {
@@ -64,13 +66,28 @@ export type CitedIssuedDocument = {
  * Номер текущего документа остаётся в contractNumber: так уже подписаны шаблоны акта и счёта.
  * invoiceNumber и actNumber — номера своих документов. В договоре это ссылка на уже выданный
  * счёт или акт по тем же заказам, а не копия номера договора.
+ * В накладной basis — счёт, а если счёта ещё нет, договор по тем же заказам.
  */
+function documentBasis(
+  invoice: CitedIssuedDocument | null | undefined,
+  contract: CitedIssuedDocument | null | undefined,
+): string {
+  if (invoice?.number) {
+    return invoice.issuedDate ? `Счёт ${invoice.number} от ${invoice.issuedDate}` : `Счёт ${invoice.number}`
+  }
+  if (contract?.number) {
+    return contract.issuedDate ? `Договор ${contract.number} от ${contract.issuedDate}` : `Договор ${contract.number}`
+  }
+  return ''
+}
+
 export function numbersForIssuedDocument(args: {
   kind: IssuedDocumentKind
   number: string
   issuedDate: string
   invoice?: CitedIssuedDocument | null
   act?: CitedIssuedDocument | null
+  citedContract?: CitedIssuedDocument | null
 }): {
   contractNumber: string
   contractDate: string
@@ -80,6 +97,7 @@ export function numbersForIssuedDocument(args: {
   invoiceDate: string
   actNumber: string
   actDate: string
+  basis: string
 } {
   const invoice = args.kind === 'invoice'
     ? { number: args.number, issuedDate: args.issuedDate }
@@ -96,6 +114,7 @@ export function numbersForIssuedDocument(args: {
     invoiceDate: invoice?.issuedDate ?? '',
     actNumber: act?.number ?? '',
     actDate: act?.issuedDate ?? '',
+    basis: args.kind === 'tn' ? documentBasis(invoice, args.citedContract) : '',
   }
 }
 
