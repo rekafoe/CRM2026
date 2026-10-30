@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Customer, Order } from '../../types';
-import { getCustomers, updateOrderCustomer, createCustomer, updateOrderPaymentChannel } from '../../api';
+import { getCustomers, getCustomer, updateOrderCustomer, createCustomer, updateOrderPaymentChannel } from '../../api';
 import { useToast } from '../Toast';
+import { LegalCustomerLedgerCard } from './LegalCustomerLedgerCard';
 import './CustomerSelector.css';
 
 interface CustomerSelectorProps {
@@ -12,6 +13,10 @@ interface CustomerSelectorProps {
   onOrderPatch?: (orderId: number, patch: Partial<Order>) => void;
   /** Inline: без лейбла, в одну строку с кнопками (Создать | Селект 160px | Поиск) */
   inline?: boolean;
+  /** Итог заказа: карточка баланса пересчитывается, когда сумма меняется. */
+  orderTotal?: number | null;
+  orderPrepayment?: number | null;
+  orderStatus?: number | null;
 }
 
 export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
@@ -20,6 +25,9 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   onCustomerChange,
   onOrderPatch,
   inline = false,
+  orderTotal,
+  orderPrepayment,
+  orderStatus,
 }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,6 +35,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(currentCustomerId || null);
+  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const { addToast } = useToast();
 
   // Загружаем клиентов
@@ -61,6 +70,28 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   useEffect(() => {
     setSelectedCustomerId(currentCustomerId || null);
   }, [currentCustomerId]);
+
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setDetailsCustomer(null);
+      return;
+    }
+    const found = customers.find((customer) => customer.id === selectedCustomerId);
+    if (found) setDetailsCustomer(found);
+  }, [customers, selectedCustomerId]);
+
+  useEffect(() => {
+    if (!selectedCustomerId) return;
+    let cancelled = false;
+    getCustomer(selectedCustomerId)
+      .then((response) => {
+        if (!cancelled) setDetailsCustomer(response.data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCustomerId]);
 
   // Обработка изменения клиента. customer — для автоподстановки канала оплаты (юрлицо → счёт).
   const handleCustomerChange = useCallback(async (customerId: number | null, customer?: Customer | null) => {
@@ -121,7 +152,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
     }
   };
 
-  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const selectedCustomer = detailsCustomer?.id === selectedCustomerId ? detailsCustomer : null;
 
   return (
       <div className={`customer-selector ${inline ? 'customer-selector--inline' : ''}`}>
@@ -220,6 +251,13 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
           {selectedCustomer.phone && <div>Телефон: {selectedCustomer.phone}</div>}
           {selectedCustomer.email && <div>Email: {selectedCustomer.email}</div>}
         </div>
+      )}
+      {selectedCustomer?.type === 'legal' && (
+        <LegalCustomerLedgerCard
+          customerId={selectedCustomer.id}
+          orderId={orderId}
+          refreshKey={`${orderTotal ?? ''}:${orderPrepayment ?? ''}:${orderStatus ?? ''}`}
+        />
       )}
 
       {showCreateModal && (

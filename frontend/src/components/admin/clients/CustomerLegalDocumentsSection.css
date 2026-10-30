@@ -1,3 +1,20 @@
+.customers-legal-payments__balance {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.customers-legal-payments__file {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #1d4ed8;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+
 .customers-legal-docs {
   margin-top: 20px;
   padding-top: 20px;

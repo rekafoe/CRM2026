@@ -93,4 +93,37 @@ describe('акт сверки', () => {
     expect(source.paymentDate).toBeNull()
     expect(source.orderDate).toBe('2026-03-04')
   })
+
+  it('ставит поступление менеджера в кредит и уменьшает долг', () => {
+    const statement = buildReconciliationStatement(
+      [
+        {
+          id: 5,
+          number: 'ORD-5',
+          orderDate: '2026-03-02',
+          total: 100,
+          collected: 0,
+          paymentDate: null,
+        },
+      ],
+      { from: '2026-03-01', to: '2026-03-31' },
+      [{ id: 7, date: '2026-03-12', amount: 30, document: 'Поступление: платёжка' }],
+    )
+    expect(statement.lines.map((line) => [line.document, line.debit, line.credit, line.balance])).toEqual([
+      ['Заказ ORD-5', 100, 0, 100],
+      ['Поступление: платёжка', 0, 30, 70],
+    ])
+    expect(statement.closingBalance).toBe(70)
+  })
+
+  it('относит раннее поступление в сальдо на начало', () => {
+    const statement = buildReconciliationStatement(
+      [],
+      { from: '2026-03-01', to: '2026-03-31' },
+      [{ id: 8, date: '2026-02-01', amount: 15, document: 'Поступление' }],
+    )
+    expect(statement.lines).toEqual([])
+    expect(statement.openingBalance).toBe(-15)
+    expect(statement.closingBalance).toBe(-15)
+  })
 })

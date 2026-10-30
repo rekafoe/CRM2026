@@ -4,8 +4,35 @@ import { CustomerLegalDocumentService } from '../services/customerLegalDocumentS
 import { readIssuedFileForCustomer } from '../../../services/issuedDocumentService'
 import { issueCustomerReconciliation } from '../../../services/reconciliationActService'
 import { listCustomerProjects } from '../../../services/customerProjectService'
+import { getLegalLedger } from '../../../services/legalLedgerService'
+import {
+  createLegalPayment,
+  deleteLegalPayment,
+  readLegalPaymentFile,
+} from '../../../services/customerLegalPaymentService'
 import { OrderService } from '../../orders/services/orderService'
 import { asyncHandler } from '../../../middleware'
+import { AuthenticatedRequest } from '../../../middleware/auth'
+
+function sendLegalLedgerError(res: Response, error: unknown): void {
+  const message = error instanceof Error ? error.message : 'Ошибка'
+  if (message === 'Клиент не найден' || message === 'Поступление не найдено' || message === 'Файл не найден') {
+    res.status(404).json({ error: message })
+    return
+  }
+  if (
+    message.includes('юридическ') ||
+    message.includes('Сумма') ||
+    message.includes('сумму') ||
+    message.includes('дат') ||
+    message.includes('документ') ||
+    message.includes('Баланс')
+  ) {
+    res.status(400).json({ error: message })
+    return
+  }
+  res.status(500).json({ error: message })
+}
 
 function managerUserIdFromBody(body: Record<string, unknown>): number | null | undefined {
   if (!Object.prototype.hasOwnProperty.call(body, 'manager_user_id')) return undefined
@@ -357,6 +384,94 @@ export class CustomerController {
         return
       }
       res.status(400).json({ error: error.message || 'Ошибка обновления клиента' })
+    }
+  })
+
+  /**
+   * GET /api/customers/:id/legal-ledger?orderId=
+   * Баланс юрлица: дебет оформленных заказов минус полученные деньги.
+   */
+  static legalLedger = asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
+    }
+    const rawOrder = req.query.orderId
+    const orderId = rawOrder == null || String(rawOrder).trim() === ''
+      ? null
+      : parseInt(String(rawOrder), 10)
+    if (orderId != null && (Number.isNaN(orderId) || orderId <= 0)) {
+      res.status(400).json({ error: 'Неверный ID заказа' })
+      return
+    }
+    try {
+      res.json(await getLegalLedger(id, orderId))
+    } catch (error) {
+      sendLegalLedgerError(res, error)
+    }
+  })
+
+  /**
+   * POST /api/customers/:customerId/legal-payments
+   * Кредит: сумма и подтверждающие файлы.
+   */
+  static createLegalPayment = asyncHandler(async (req: Request, res: Response) => {
+    const customerId = parseInt(req.params.customerId, 10)
+    if (isNaN(customerId)) {
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
+    }
+    const files = (Array.isArray(req.files) ? req.files : []) as Array<{
+      buffer?: Buffer
+      originalname?: string
+      mimetype?: string
+    }>
+    try {
+      await createLegalPayment({
+        customerId,
+        amount: req.body?.amount,
+        paidAt: req.body?.paid_at,
+        notes: req.body?.notes,
+        createdBy: (req as AuthenticatedRequest).user?.id ?? null,
+        files,
+      })
+      res.status(201).json(await getLegalLedger(customerId))
+    } catch (error) {
+      sendLegalLedgerError(res, error)
+    }
+  })
+
+  static deleteLegalPayment = asyncHandler(async (req: Request, res: Response) => {
+    const customerId = parseInt(req.params.customerId, 10)
+    const paymentId = parseInt(req.params.paymentId, 10)
+    if (isNaN(customerId) || isNaN(paymentId)) {
+      res.status(400).json({ error: 'Неверный ID' })
+      return
+    }
+    try {
+      await deleteLegalPayment(customerId, paymentId)
+      res.json(await getLegalLedger(customerId))
+    } catch (error) {
+      sendLegalLedgerError(res, error)
+    }
+  })
+
+  static downloadLegalPaymentFile = asyncHandler(async (req: Request, res: Response) => {
+    const customerId = parseInt(req.params.customerId, 10)
+    const paymentId = parseInt(req.params.paymentId, 10)
+    const fileId = parseInt(req.params.fileId, 10)
+    if (isNaN(customerId) || isNaN(paymentId) || isNaN(fileId)) {
+      res.status(400).json({ error: 'Неверный ID' })
+      return
+    }
+    try {
+      const file = await readLegalPaymentFile(customerId, paymentId, fileId)
+      res.setHeader('Content-Type', file.mimeType)
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`)
+      res.send(file.buffer)
+    } catch (error) {
+      sendLegalLedgerError(res, error)
     }
   })
 

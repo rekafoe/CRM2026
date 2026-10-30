@@ -9,6 +9,8 @@ import type { WebsiteOrderDelivery } from './types/websiteOrderDelivery';
 export type {
   Customer,
   CustomerLegalDocument,
+  CustomerLegalLedger,
+  CustomerLegalPayment,
   ProductSpecs,
   CalculationResult,
 } from '../../shared/types/entities';

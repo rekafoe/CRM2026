@@ -28,6 +28,47 @@ export interface CustomerLegalDocument {
   updated_at: string;
 }
 
+export interface CustomerLegalPaymentFile {
+  id: number;
+  original_name: string;
+  mime: string | null;
+  size: number;
+}
+
+export interface CustomerLegalPayment {
+  id: number;
+  customer_id: number;
+  amount: number;
+  paid_at: string;
+  notes: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  files: CustomerLegalPaymentFile[];
+}
+
+export interface CustomerLegalLedger {
+  manager_name: string | null;
+  /** Положительный баланс — клиент должен нам. Отрицательный — переплата. */
+  balance: number;
+  debit_total: number;
+  credit_total: number;
+  order: {
+    included: boolean;
+    debit: number;
+    skip: 'cancelled' | 'waiting' | 'internal' | 'zero' | 'not_found' | null;
+  } | null;
+  last_document: {
+    title: string;
+    document_kind: string | null;
+    number: string | null;
+    order_id: number | null;
+    order_number: string | null;
+    issued_at: string;
+  } | null;
+  payments: CustomerLegalPayment[];
+}
+
 export interface Customer {
   id: number;
   type: 'individual' | 'legal';

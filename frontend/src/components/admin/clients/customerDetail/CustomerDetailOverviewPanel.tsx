@@ -1,6 +1,7 @@
 import React from 'react';
 import { Customer } from '../../../../types';
 import { MoneyAmount } from '../../../ui';
+import { LegalCustomerLedgerCard } from '../../../customers/LegalCustomerLedgerCard';
 
 export interface CustomerDetailMetrics {
   ordersCount: number;
@@ -27,11 +28,7 @@ export const CustomerDetailOverviewPanel: React.FC<CustomerDetailOverviewPanelPr
         <h2 className="customer-detail-view__title">{displayName}</h2>
         <p className="customer-detail-view__subtitle">{typeLabel}</p>
         {customer.type === 'legal' && (
-          <p className="customer-detail-view__subtitle">
-            {customer.manager_name?.trim()
-              ? `Менеджер: ${customer.manager_name.trim()}`
-              : 'Менеджер не закреплён'}
-          </p>
+          <LegalCustomerLedgerCard customerId={customer.id} />
         )}
       </div>
 

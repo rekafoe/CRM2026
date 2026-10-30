@@ -1,0 +1,61 @@
+.legal-ledger-card {
+  margin-top: 10px;
+  max-width: 560px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.legal-ledger-card--muted {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.legal-ledger-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.legal-ledger-card th,
+.legal-ledger-card td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-ledger-card tr:last-child th,
+.legal-ledger-card tr:last-child td {
+  border-bottom: none;
+}
+
+.legal-ledger-card th {
+  width: 38%;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f8fafc;
+}
+
+.legal-ledger-card td {
+  color: #111827;
+}
+
+.legal-ledger-card__debt {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.legal-ledger-card__ok {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.legal-ledger-card__caption {
+  margin-left: 8px;
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 12px;
+}

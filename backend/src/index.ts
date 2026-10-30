@@ -146,6 +146,7 @@ const blockProtectedUploadPath = (_req: express.Request, res: express.Response, 
   if (
     p.startsWith('orders/') || p.startsWith('orders\\')
     || p.startsWith('knowledge-base/') || p.startsWith('knowledge-base\\')
+    || p.startsWith('legal-payments/') || p.startsWith('legal-payments\\')
   ) {
     res.status(404).json({ error: 'Not Found' })
     return

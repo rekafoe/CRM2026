@@ -4,6 +4,7 @@ import { getOrderTotal } from '../../../../pages/admin/clients/customerDocumentH
 import { Button } from '../../../common';
 import { MoneyAmount } from '../../../ui';
 import { CustomerLegalDocumentsSection } from '../CustomerLegalDocumentsSection';
+import { CustomerLegalPaymentsSection } from '../CustomerLegalPaymentsSection';
 
 export interface CustomerDetailOrdersLegalBlockProps {
   customerId: number;
@@ -35,8 +36,11 @@ export const CustomerDetailOrdersPanel: React.FC<CustomerDetailOrdersPanelProps>
       <div className="customer-detail-view__legal-exports">
         <p className="customer-detail-view__doc-intro">
           Договор, акт и счёт собираются по заказам выбранного периода. Акт сверки за тот же период
-          показывает сумму заказов и уже полученные оплаты; заказы до начала периода входят в сальдо на начало.
+          показывает дебет оформленных заказов и кредит: оплаты заказов и поступления, которые менеджер
+          зачислил ниже. Заказы до начала периода входят в сальдо на начало. Просчёт в долг не входит,
+          пока заказ не оформят.
         </p>
+        <CustomerLegalPaymentsSection customerId={legalBlock.customerId} />
         <div className="customers-doc-actions customer-detail-view__doc-actions">
           <Button
             variant="secondary"

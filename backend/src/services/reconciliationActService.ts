@@ -5,12 +5,14 @@ import { CustomerService } from '../modules/customers/services/customerService'
 import { OrderService } from '../modules/orders/services/orderService'
 import { documentSourceHash } from './issuedDocumentService'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { listLegalPaymentCredits } from './customerLegalPaymentService'
 import {
   buildReconciliationStatement,
   formatReconciliationDate,
   reconciliationBalancePhrase,
   reconciliationPeriodLabel,
   reconciliationSourceFromOrder,
+  type ReconciliationSourceOrder,
   type ReconciliationStatement,
 } from './reconciliationStatement'
 
@@ -23,24 +25,32 @@ export type ReconciliationParties = {
 }
 
 const NOTE =
-  'Дебет — сумма заказа. Кредит — деньги, уже полученные по этому заказу. Ожидающая ссылка на оплату не входит. По заказу одна строка оплаты: в CRM хранится текущая сумма, а не список частичных платежей. Просчёты, отменённые и внутренние заказы в акт не попадают.'
+  'Дебет — сумма оформленного заказа. Кредит — деньги, уже полученные по заказу, и поступления, которые менеджер зачислил с подтверждающим документом. Ожидающая ссылка на оплату не входит. Просчёты, отменённые и внутренние заказы в акт не попадают.'
 
 function money(value: number): number | '' {
   return Math.abs(value) < 0.004 ? '' : value
 }
 
-export async function loadCustomerReconciliation(
-  customerId: number,
-  period: { from?: string | null; to?: string | null },
-): Promise<{
-  statement: ReconciliationStatement
-  parties: ReconciliationParties
-  organizationId: number | null
-  customerType: string
-}> {
-  const customer = await CustomerService.getCustomerById(customerId)
-  if (!customer) throw new Error('Клиент не найден')
+export type SettlementSkip = 'cancelled' | 'waiting' | 'internal' | 'zero'
 
+export type SettlementOrderRow = {
+  id: number
+  number: string
+  total: number
+  included: boolean
+  skip: SettlementSkip | null
+}
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+/** Заказы клиента в том же составе, что и акт сверки. Просчёт в дебет не входит. */
+export async function loadCustomerSettlementOrders(customerId: number): Promise<{
+  sources: ReconciliationSourceOrder[]
+  orders: SettlementOrderRow[]
+  organizationId: number | null
+}> {
   const db = await getDb()
   const orders = await OrderService.getOrdersByCustomerId(customerId)
   const statusRows = (await db.all(
@@ -55,12 +65,30 @@ export async function loadCustomerReconciliation(
     if (code === 'cancelled' || name === 'Отменён') cancelledIds.add(Number(row.id))
   }
 
+  const settlement: SettlementOrderRow[] = []
   const included = orders.filter((order) => {
-    if (Number((order as { is_cancelled?: number }).is_cancelled) === 1) return false
-    const status = Number(order.status)
-    if (waitingIds.has(status) || cancelledIds.has(status)) return false
-    const channel = String((order as { payment_channel?: string }).payment_channel || '').toLowerCase()
-    return channel !== 'internal'
+    const cancelled = Number((order as { is_cancelled?: number }).is_cancelled) === 1
+      || cancelledIds.has(Number(order.status))
+    const waiting = waitingIds.has(Number(order.status))
+    const internal = String((order as { payment_channel?: string }).payment_channel || '').toLowerCase() === 'internal'
+    const total = roundMoney(Number(order.totalAmount) || 0)
+    const skip: SettlementSkip | null = cancelled
+      ? 'cancelled'
+      : waiting
+        ? 'waiting'
+        : internal
+          ? 'internal'
+          : total <= 0
+            ? 'zero'
+            : null
+    settlement.push({
+      id: order.id,
+      number: order.number?.trim() || `#${order.id}`,
+      total,
+      included: skip == null,
+      skip,
+    })
+    return !cancelled && !waiting && !internal
   })
 
   const ids = included.map((order) => order.id)
@@ -107,6 +135,26 @@ export async function loadCustomerReconciliation(
       best = count
     }
   }
+
+  return { sources, orders: settlement, organizationId }
+}
+
+export async function loadCustomerReconciliation(
+  customerId: number,
+  period: { from?: string | null; to?: string | null },
+): Promise<{
+  statement: ReconciliationStatement
+  parties: ReconciliationParties
+  organizationId: number | null
+  customerType: string
+}> {
+  const customer = await CustomerService.getCustomerById(customerId)
+  if (!customer) throw new Error('Клиент не найден')
+
+  const db = await getDb()
+  const settlement = await loadCustomerSettlementOrders(customerId)
+  const credits = await listLegalPaymentCredits(customerId)
+  const { organizationId } = settlement
   const seller = await db.get<{ name?: string | null; unp?: string | null }>(
     organizationId
       ? `SELECT name, unp FROM organizations WHERE id = ?`
@@ -115,7 +163,7 @@ export async function loadCustomerReconciliation(
   )
 
   return {
-    statement: buildReconciliationStatement(sources, period),
+    statement: buildReconciliationStatement(settlement.sources, period, credits),
     organizationId,
     customerType: customer.type,
     parties: {

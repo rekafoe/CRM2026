@@ -621,6 +621,9 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             currentCustomerId={selectedOrder.customer_id}
             onCustomerChange={onLoadOrders}
             onOrderPatch={onOrderPatch}
+            orderTotal={selectedOrder.totalAmount}
+            orderPrepayment={selectedOrder.prepaymentAmount}
+            orderStatus={selectedOrder.status}
           />
           
           <div className="detail-meta-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

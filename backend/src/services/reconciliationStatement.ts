@@ -39,6 +39,14 @@ export type ReconciliationStatement = {
   closingBalance: number
 }
 
+/** Поступление, которое менеджер зачислил юрлицу отдельно от предоплаты заказа. */
+export type ReconciliationCredit = {
+  id: number
+  date: string
+  amount: number
+  document: string
+}
+
 export function formatReconciliationDate(iso: string | null | undefined): string {
   const day = reconciliationCalendarDate(iso)
   if (!day) return ''
@@ -69,12 +77,14 @@ function inPeriod(date: string, from: string | null, to: string | null): boolean
 
 /**
  * Акт сверки по заказам клиента.
- * Дебет — сумма заказа в день заказа. Кредит — уже полученная оплата в день её сохранения.
- * По одному заказу одна строка оплаты: CRM хранит текущую сумму, а не цепочку платежей.
+ * Дебет — сумма заказа в день заказа. Кредит — уже полученная оплата в день её сохранения
+ * и поступления, которые менеджер зачислил с подтверждающим документом.
+ * По одному заказу одна строка кассовой оплаты: CRM хранит текущую сумму, а не цепочку платежей.
  */
 export function buildReconciliationStatement(
   orders: ReconciliationSourceOrder[],
   period: { from?: string | null; to?: string | null } = {},
+  credits: ReconciliationCredit[] = [],
 ): ReconciliationStatement {
   const from = reconciliationCalendarDate(period.from) || null
   const to = reconciliationCalendarDate(period.to) || null
@@ -112,6 +122,24 @@ export function buildReconciliationStatement(
           sort: 1,
         })
       }
+    }
+  }
+
+  for (const credit of credits) {
+    const amount = round2(credit.amount)
+    const date = reconciliationCalendarDate(credit.date)
+    if (amount <= 0 || !date) continue
+    if (from && date < from) {
+      openingBalance = round2(openingBalance - amount)
+    } else if (inPeriod(date, from, to)) {
+      movements.push({
+        date,
+        document: credit.document.trim() || 'Поступление',
+        debit: 0,
+        credit: amount,
+        orderId: -Math.abs(credit.id || 0),
+        sort: 2,
+      })
     }
   }
 

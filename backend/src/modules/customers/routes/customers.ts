@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { uploadMemory } from '../../../config/upload'
 import { CustomerController } from '../controllers/customerController'
 
 const router = Router()
@@ -17,6 +18,10 @@ router.get('/', CustomerController.getAll)
  */
 router.get('/:id/projects', CustomerController.listProjects)
 router.get('/:id/orders', CustomerController.listOrders)
+router.get('/:id/legal-ledger', CustomerController.legalLedger)
+router.post('/:customerId/legal-payments', uploadMemory.array('files', 8), CustomerController.createLegalPayment)
+router.get('/:customerId/legal-payments/:paymentId/files/:fileId', CustomerController.downloadLegalPaymentFile)
+router.delete('/:customerId/legal-payments/:paymentId', CustomerController.deleteLegalPayment)
 router.get('/:id/reconciliation', CustomerController.reconciliation)
 
 router.get('/:customerId/legal-documents', CustomerController.listLegalDocuments)

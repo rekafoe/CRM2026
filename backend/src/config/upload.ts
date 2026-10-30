@@ -25,6 +25,9 @@ export const designAssetsDir = path.join(uploadsDir, 'design-assets')
 /** Изображения статей базы знаний — отдаются только через авторизованный API. */
 export const knowledgeBaseAssetsDir = path.join(uploadsDir, 'knowledge-base')
 
+/** Подтверждения оплат юрлиц — только через авторизованный API клиента. */
+export const legalPaymentsDir = path.join(uploadsDir, 'legal-payments')
+
 const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.ttf', '.otf'])
 const DESIGN_ASSET_EXTENSIONS = new Set(['.svg', '.png', '.webp'])
 export const MAX_KNOWLEDGE_BASE_ASSET_BYTES = 10 * 1024 * 1024
@@ -56,6 +59,7 @@ try {
   fs.mkdirSync(designTemplateAssetsDir, { recursive: true })
   fs.mkdirSync(designAssetsDir, { recursive: true })
   fs.mkdirSync(knowledgeBaseAssetsDir, { recursive: true })
+  fs.mkdirSync(legalPaymentsDir, { recursive: true })
 } catch {}
 
 export const storage = multer.diskStorage({
@@ -312,6 +316,21 @@ export function saveBufferToKnowledgeBaseAssets(
   if (!knowledgeBaseImageExtensions.has(ext)) return null
   const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
   const filePath = resolveSafeFilePath(knowledgeBaseAssetsDir, unique)
+  if (!filePath) return null
+  fs.writeFileSync(filePath, buffer)
+  return { filename: unique, size: buffer.length, originalName: raw || unique }
+}
+
+export function saveBufferToLegalPayments(
+  buffer: Buffer | undefined,
+  originalName?: string,
+): { filename: string; size: number; originalName: string } | null {
+  if (!buffer || buffer.length === 0) return null
+  const raw = (originalName || '').trim()
+  const ext = path.extname(raw).toLowerCase()
+  const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
+  fs.mkdirSync(legalPaymentsDir, { recursive: true })
+  const filePath = resolveSafeFilePath(legalPaymentsDir, unique)
   if (!filePath) return null
   fs.writeFileSync(filePath, buffer)
   return { filename: unique, size: buffer.length, originalName: raw || unique }

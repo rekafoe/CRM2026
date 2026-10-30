@@ -1,6 +1,6 @@
 import axios, { type AxiosProgressEvent } from 'axios';
 import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
-import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, CustomerLegalDocument, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
+import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, CustomerLegalDocument, CustomerLegalLedger, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
 import { API_BASE_URL } from './config/constants';
 
 const api = axios.create({
@@ -1658,6 +1658,20 @@ export const deleteCustomerLegalDocument = (customerId: number, documentId: numb
   api.delete(`/customers/${customerId}/legal-documents/${documentId}`);
 export const downloadCustomerLegalDocumentFile = (customerId: number, documentId: number) =>
   api.get(`/customers/${customerId}/legal-documents/${documentId}/file`, { responseType: 'blob' });
+
+export const getCustomerLegalLedger = (customerId: number, orderId?: number) =>
+  api.get<CustomerLegalLedger>(`/customers/${customerId}/legal-ledger`, {
+    params: orderId ? { orderId } : undefined,
+  });
+
+export const createCustomerLegalPayment = (customerId: number, form: FormData) =>
+  api.post<CustomerLegalLedger>(`/customers/${customerId}/legal-payments`, form);
+
+export const deleteCustomerLegalPayment = (customerId: number, paymentId: number) =>
+  api.delete<CustomerLegalLedger>(`/customers/${customerId}/legal-payments/${paymentId}`);
+
+export const downloadCustomerLegalPaymentFile = (customerId: number, paymentId: number, fileId: number) =>
+  api.get(`/customers/${customerId}/legal-payments/${paymentId}/files/${fileId}`, { responseType: 'blob' });
 
 // Document Templates API
 export const getDocumentTemplates = () => 
