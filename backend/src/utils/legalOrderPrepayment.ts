@@ -55,12 +55,17 @@ export function shouldAutoFillCashPrepayment(input: {
   )
 }
 
-/** Сбрасывать только автоматическую полную предоплату при привязке юрлица. */
+/**
+ * Сбрасывать только автоматическую полную предоплату при переводе кассового заказа на юрлицо.
+ * Заказ, который уже идёт по счёту, хранит внесённую менеджером оплату — её не обнуляем.
+ */
 export function shouldClearDefaultPrepaymentForLegal(input: {
   customerType?: string | null
+  paymentChannel?: string | null
   prepaymentAmount?: unknown
   orderTotal: number
 }): boolean {
   if (normalized(input.customerType) !== 'legal') return false
+  if (normalized(input.paymentChannel) === 'invoice') return false
   return isFullSyncedPrepayment(input.prepaymentAmount, input.orderTotal)
 }

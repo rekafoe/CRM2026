@@ -593,6 +593,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           currentPaymentMethod={selectedOrder.paymentMethod === 'telegram' ? 'online' : selectedOrder.paymentMethod}
           currentEmail={selectedOrder.customerEmail || ''}
           totalOrderAmount={getOrderAmounts(selectedOrder).total}
+          invoiceSettlement={selectedOrder.payment_channel === 'invoice'}
           onPrepaymentCreated={async (amount, email, paymentMethod, assignToMe) => {
             try {
               const normalizedMethod = paymentMethod === 'telegram' ? 'online' : paymentMethod;
@@ -606,6 +607,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               const actionText = isEditing ? 'изменена' : 'создана';
               if (amount === 0) {
                 toast.info('Предоплата убрана с заказа');
+              } else if (selectedOrder.payment_channel === 'invoice') {
+                toast.success(`Оплата по счёту ${actionText}`, `Сумма: ${amount} бел. руб. Зачтена в баланс юрлица`);
               } else if (paymentMethod === 'online') {
                 toast.success(`Онлайн предоплата ${actionText}`, `Сумма: ${amount} бел. руб. Ссылка отправлена на ${email}`);
               } else {

@@ -111,5 +111,13 @@ describe('предоплата юрлица', () => {
         orderTotal: 100,
       })
     ).toBe(false)
+    expect(
+      shouldClearDefaultPrepaymentForLegal({
+        customerType: 'legal',
+        paymentChannel: 'invoice',
+        prepaymentAmount: 100,
+        orderTotal: 100,
+      })
+    ).toBe(false)
   })
 })

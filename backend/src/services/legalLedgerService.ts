@@ -20,6 +20,8 @@ export type LegalLedgerLastDocument = {
 export type LegalLedgerOrder = {
   included: boolean
   debit: number
+  /** Уже зачтённая оплата этого заказа (предоплата / платёжка по счёту). */
+  collected: number
   skip: SettlementSkip | 'not_found' | null
 }
 
@@ -33,11 +35,12 @@ export type LegalLedger = {
   payments: LegalPayment[]
 }
 
-function orderState(row: SettlementOrderRow | undefined): LegalLedgerOrder {
-  if (!row) return { included: false, debit: 0, skip: 'not_found' }
+function orderState(row: SettlementOrderRow | undefined, collected: number): LegalLedgerOrder {
+  if (!row) return { included: false, debit: 0, collected: 0, skip: 'not_found' }
   return {
     included: row.included,
     debit: row.total,
+    collected,
     skip: row.skip,
   }
 }
@@ -87,8 +90,12 @@ export async function getLegalLedger(customerId: number, orderId?: number | null
   const settlement = await loadCustomerSettlementOrders(customerId)
   const payments = await listLegalPayments(customerId)
   const statement = buildReconciliationStatement(settlement.sources, {}, creditsFromPayments(payments))
-  const focused = orderId != null && orderId > 0
-    ? orderState(settlement.orders.find((order) => order.id === orderId))
+  const focusedId = orderId != null && orderId > 0 ? orderId : null
+  const focused = focusedId
+    ? orderState(
+        settlement.orders.find((order) => order.id === focusedId),
+        settlement.sources.find((source) => source.id === focusedId)?.collected ?? 0,
+      )
     : null
 
   return {

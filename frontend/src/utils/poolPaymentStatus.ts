@@ -18,6 +18,7 @@ export function getPoolPaymentInfo(order: {
   prepaymentAmount?: string | number | null;
   debt?: number | null;
   totalAmount?: number | null;
+  payment_channel?: string | null;
 }): PoolPaymentInfo {
   const method = String(order.paymentMethod ?? '').toLowerCase();
   const status = String(order.prepaymentStatus ?? '').toLowerCase();
@@ -32,6 +33,18 @@ export function getPoolPaymentInfo(order: {
       : Math.max(0, total - prepay);
   const isOnline = method === 'online';
   const isPaid = isPaidPrepaymentStatus(order.prepaymentStatus);
+  const invoice = String(order.payment_channel ?? '').toLowerCase() === 'invoice';
+
+  if ((status === 'bank' || invoice) && prepay > 0 && status !== 'failed' && status !== 'cancelled' && status !== 'canceled') {
+    return {
+      badge: 'По счёту',
+      tone: 'paid',
+      prepayLabel: 'Зачтено',
+      showPrepayAmount: true,
+      isOnline: false,
+      isAwaitingOnlinePayment: false,
+    };
+  }
 
   if (isOnline && isPaid) {
     return {

@@ -78,6 +78,38 @@ describe('акт сверки', () => {
     expect(reconciliationBalancePhrase(-15)).toBe('Переплата заказчика 15,00 бел. руб.')
   })
 
+  it('засчитывает сумму, внесённую в заказ по счёту, даже если оплата осталась online/pending', () => {
+    const source = reconciliationSourceFromOrder({
+      id: 11,
+      number: 'ORD-11',
+      created_at: '2026-10-02',
+      totalAmount: 200,
+      prepaymentAmount: 200,
+      prepaymentStatus: 'pending',
+      paymentMethod: 'online',
+      paymentChannel: 'invoice',
+      prepaymentUpdatedAt: '2026-10-02 12:00:00',
+    })
+    expect(source.collected).toBe(200)
+    expect(source.paymentDate).toBe('2026-10-02')
+    const statement = buildReconciliationStatement([source], {})
+    expect(statement.closingBalance).toBe(0)
+  })
+
+  it('не засчитывает неуспешную оплату по счёту', () => {
+    const source = reconciliationSourceFromOrder({
+      id: 12,
+      number: 'ORD-12',
+      created_at: '2026-10-02',
+      totalAmount: 80,
+      prepaymentAmount: 80,
+      prepaymentStatus: 'failed',
+      paymentMethod: 'online',
+      paymentChannel: 'invoice',
+    })
+    expect(source.collected).toBe(0)
+  })
+
   it('не считает ожидающую онлайн-оплату полученными деньгами', () => {
     const source = reconciliationSourceFromOrder({
       id: 9,

@@ -56,6 +56,8 @@ export interface CustomerLegalLedger {
   order: {
     included: boolean;
     debit: number;
+    /** Оплата, уже зачтённая по этому заказу. */
+    collected?: number;
     skip: 'cancelled' | 'waiting' | 'internal' | 'zero' | 'not_found' | null;
   } | null;
   last_document: {

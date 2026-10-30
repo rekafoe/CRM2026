@@ -707,12 +707,18 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       try {
         const method = paymentMethod === 'telegram' ? 'online' : paymentMethod;
         const { data } = await createPrepaymentLink(selectedOrder.id, amount, method, assignToMe);
-        toast.success('Успешно', 'Предоплата обновлена');
+        const saved = data as Order;
+        toast.success(
+          'Успешно',
+          selectedOrder.payment_channel === 'invoice'
+            ? 'Оплата по счёту зачтена в баланс юрлица'
+            : 'Предоплата обновлена',
+        );
         const patch: Partial<Order> = {
-          prepaymentAmount: amount,
-          paymentMethod: method,
-          prepaymentStatus: method === 'online' ? 'pending' : 'paid',
-          prepaymentUpdatedAt: (data as Order)?.prepaymentUpdatedAt ?? undefined,
+          prepaymentAmount: saved?.prepaymentAmount ?? amount,
+          paymentMethod: saved?.paymentMethod ?? method,
+          prepaymentStatus: saved?.prepaymentStatus ?? (method === 'online' ? 'pending' : 'paid'),
+          prepaymentUpdatedAt: saved?.prepaymentUpdatedAt ?? undefined,
         };
         if (assignToMe) {
           patch.userId = currentUserId;
@@ -1035,6 +1041,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           currentEmail={selectedOrder.customerEmail || ''}
           totalOrderAmount={getOrderTotal(selectedOrder)}
           context="pool"
+          invoiceSettlement={selectedOrder.payment_channel === 'invoice'}
           onPrepaymentCreated={handlePrepaymentCreated}
         />
       )}

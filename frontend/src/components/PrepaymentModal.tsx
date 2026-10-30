@@ -14,6 +14,8 @@ interface PrepaymentModalProps {
   totalOrderAmount?: number;
   /** pool: оплата при выдаче из пула — дата кассы = сегодня, без «назначить на меня» */
   context?: 'pool' | 'default';
+  /** Заказ по счёту: сумма идёт в баланс юрлица, ссылку BePaid не создаём. */
+  invoiceSettlement?: boolean;
   onPrepaymentCreated: (amount: number, email: string, paymentMethod: 'online' | 'offline' | 'telegram', assignToMe?: boolean) => void;
 }
 
@@ -63,6 +65,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
   currentEmail = '',
   totalOrderAmount = 0,
   context = 'default',
+  invoiceSettlement = false,
   onPrepaymentCreated,
 }) => {
   const total = useMemo(
@@ -96,9 +99,9 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
     if (!isOpen) return;
     syncFromCurrentAmount(parseNumberFlexible(currentAmount, 0));
     setEmail(currentEmail);
-    setPaymentMethod(currentPaymentMethod || 'offline');
+    setPaymentMethod(invoiceSettlement ? 'offline' : currentPaymentMethod || 'offline');
     setAssignToMe(false);
-  }, [isOpen, currentAmount, currentEmail, currentPaymentMethod, syncFromCurrentAmount]);
+  }, [isOpen, currentAmount, currentEmail, currentPaymentMethod, invoiceSettlement, syncFromCurrentAmount]);
 
   const amountNum = useMemo(() => {
     const fromAmount = parseNumberFlexible(amount, 0);
@@ -300,33 +303,37 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
           <div className="pp-field">
             <label className="pp-label">Способ оплаты:</label>
             <div className="pp-radio-group">
-              <label className={`pp-radio-option ${paymentMethod === 'online' ? 'pp-radio-selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="online"
-                  checked={paymentMethod === 'online'}
-                  onChange={(e) => setPaymentMethod(e.target.value as 'online' | 'offline')}
-                />
-                <AppIcon name="card" size="xs" />
-                Онлайн (через ссылку)
-              </label>
-              <label className={`pp-radio-option ${paymentMethod === 'offline' ? 'pp-radio-selected' : ''}`}>
+              {!invoiceSettlement && (
+                <label className={`pp-radio-option ${paymentMethod === 'online' ? 'pp-radio-selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="online"
+                    checked={paymentMethod === 'online'}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'online' | 'offline')}
+                  />
+                  <AppIcon name="card" size="xs" />
+                  Онлайн (через ссылку)
+                </label>
+              )}
+              <label className={`pp-radio-option ${paymentMethod === 'offline' || invoiceSettlement ? 'pp-radio-selected' : ''}`}>
                 <input
                   type="radio"
                   name="paymentMethod"
                   value="offline"
-                  checked={paymentMethod === 'offline'}
+                  checked={paymentMethod === 'offline' || invoiceSettlement}
                   onChange={(e) => setPaymentMethod(e.target.value as 'online' | 'offline')}
                 />
                 <AppIcon name="building" size="xs" />
-                Оффлайн (в кассе)
+                {invoiceSettlement ? 'По счёту (платёжка получена)' : 'Оффлайн (в кассе)'}
               </label>
             </div>
 
-            {paymentMethod === 'offline' && (
+            {(paymentMethod === 'offline' || invoiceSettlement) && (
               <div className="pp-hint-offline">
-                Для оффлайн предоплаты email не требуется — оплата получена в кассе
+                {invoiceSettlement
+                  ? 'Сумма зачислится в баланс юрлица как оплата по счёту'
+                  : 'Для оффлайн предоплаты email не требуется — оплата получена в кассе'}
               </div>
             )}
           </div>
@@ -371,6 +378,8 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
               <>
                 Установка предоплаты в 0 <BynSymbol /> уберёт предоплату с заказа.
               </>
+            ) : invoiceSettlement ? (
+              'Оплата по счёту уменьшает долг юрлица на главной странице.'
             ) : paymentMethod === 'online' ? (
               'Онлайн: После создания предоплаты клиенту будет отправлена ссылка для оплаты на указанный email.'
             ) : (

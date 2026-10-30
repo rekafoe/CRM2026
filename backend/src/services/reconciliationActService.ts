@@ -25,7 +25,7 @@ export type ReconciliationParties = {
 }
 
 const NOTE =
-  'Дебет — сумма оформленного заказа. Кредит — деньги, уже полученные по заказу, и поступления, которые менеджер зачислил с подтверждающим документом. Ожидающая ссылка на оплату не входит. Просчёты, отменённые и внутренние заказы в акт не попадают.'
+  'Дебет — сумма оформленного заказа. Кредит — деньги, уже полученные по заказу (в том числе сумма, внесённая в заказ по счёту), и поступления, которые менеджер зачислил с подтверждающим документом. Ожидающая ссылка BePaid по кассе не входит. Просчёты, отменённые и внутренние заказы в акт не попадают.'
 
 function money(value: number): number | '' {
   return Math.abs(value) < 0.004 ? '' : value
@@ -118,6 +118,7 @@ export async function loadCustomerSettlementOrders(customerId: number): Promise<
       prepaymentAmount: order.prepaymentAmount,
       prepaymentStatus: order.prepaymentStatus,
       paymentMethod: order.paymentMethod,
+      paymentChannel: (order as { payment_channel?: string | null }).payment_channel,
       prepaymentUpdatedAt: more?.prepaymentUpdatedAt,
     })
   })

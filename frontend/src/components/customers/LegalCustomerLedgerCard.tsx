@@ -8,6 +8,7 @@ const KIND_LABELS: Record<string, string> = {
   act: 'Акт',
   invoice: 'Счёт',
   contract: 'Договор',
+  tn: 'Товарная накладная',
   receipt: 'Товарный чек',
   reconciliation: 'Акт сверки',
   other: 'Документ',
@@ -30,8 +31,30 @@ function documentLabel(document: NonNullable<CustomerLegalLedger['last_document'
   return `${kind}${number}${order} · ${formatIssuedAt(document.issued_at)}`;
 }
 
-function orderText(order: NonNullable<CustomerLegalLedger['order']>): React.ReactNode {
+function orderText(order: NonNullable<CustomerLegalLedger['order']>, entitySettled: boolean): React.ReactNode {
   if (order.included) {
+    if (entitySettled && order.debit > 0.004) {
+      return <>оплачен</>;
+    }
+    const collected = Number(order.collected) || 0;
+    const due = Math.round((order.debit - collected) * 100) / 100;
+    if (due <= 0.004 && collected > 0.004) {
+      return (
+        <>
+          оплачен · <MoneyAmount value={collected} className="legal-ledger-card__ok" />
+        </>
+      );
+    }
+    if (collected > 0.004 && due > 0.004) {
+      return (
+        <>
+          к оплате <MoneyAmount value={due} className="legal-ledger-card__debt" />
+          <span className="legal-ledger-card__caption">
+            по заказу зачтено <MoneyAmount value={collected} />
+          </span>
+        </>
+      );
+    }
     return (
       <>
         в дебете <MoneyAmount value={order.debit} className="legal-ledger-card__debt" />
@@ -62,22 +85,28 @@ export const LegalCustomerLedgerCard: React.FC<{
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    getCustomerLegalLedger(customerId, orderId)
-      .then((response) => {
-        if (!cancelled) setLedger(response.data);
-      })
-      .catch((reason: unknown) => {
-        if (cancelled) return;
-        setLedger(null);
-        setError(reason instanceof Error ? reason.message : 'Не удалось посчитать баланс');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const load = () => {
+      setLoading(true);
+      setError(null);
+      getCustomerLegalLedger(customerId, orderId)
+        .then((response) => {
+          if (!cancelled) setLedger(response.data);
+        })
+        .catch((reason: unknown) => {
+          if (cancelled) return;
+          setLedger(null);
+          setError(reason instanceof Error ? reason.message : 'Не удалось посчитать баланс');
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    };
+    load();
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', onFocus);
     };
   }, [customerId, orderId, refreshKey]);
 
@@ -111,10 +140,19 @@ export const LegalCustomerLedgerCard: React.FC<{
               <span className="legal-ledger-card__caption">{walletCaption}</span>
             </td>
           </tr>
+          <tr>
+            <th>Зачтено</th>
+            <td>
+              <MoneyAmount value={ledger.credit_total} className="legal-ledger-card__ok" />
+              <span className="legal-ledger-card__caption">
+                из дебета <MoneyAmount value={ledger.debit_total} />
+              </span>
+            </td>
+          </tr>
           {ledger.order && (
             <tr>
               <th>Этот заказ</th>
-              <td>{orderText(ledger.order)}</td>
+              <td>{orderText(ledger.order, ledger.balance <= 0.004)}</td>
             </tr>
           )}
           <tr>

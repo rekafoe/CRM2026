@@ -1447,14 +1447,18 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   }
 
   const amount = Number(rawAmount ?? order.prepaymentAmount ?? 0)
-  const paymentMethod = (req.body as any)?.paymentMethod ?? 'offline'
+  const requestedMethod = (req.body as any)?.paymentMethod ?? 'offline'
   if (!amount || amount <= 0) { res.status(400).json({ message: 'Сумма предоплаты не задана' }); return }
 
+  // Счёт: деньги уже пришли платёжкой. В кассу дня их не кладём (метод online без ссылки касса пропускает),
+  // в баланс юрлица сумма попадает как кредит заказа.
+  const invoice = String(order.payment_channel || '').toLowerCase() === 'invoice'
+  const paymentMethod = invoice ? 'online' : requestedMethod
   let paymentId: string | null = null
   let paymentUrl: string | null = null
-  const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
+  const prepaymentStatus = invoice ? 'bank' : paymentMethod === 'offline' ? 'paid' : 'pending'
 
-  if (paymentMethod === 'online') {
+  if (!invoice && paymentMethod === 'online') {
     const email = String(order.customerEmail || '').trim()
     if (!isValidEmailAddress(email)) {
       res.status(400).json({ message: 'Для онлайн-оплаты BePaid нужен валидный email клиента' })

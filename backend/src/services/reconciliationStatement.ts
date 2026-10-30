@@ -170,7 +170,16 @@ export function buildReconciliationStatement(
   }
 }
 
-/** Заказ CRM → строка сверки. Ожидающая ссылка на оплату кредитом не становится. */
+function failedPrepaymentStatus(status: string): boolean {
+  return status === 'failed' || status === 'cancelled' || status === 'canceled'
+}
+
+/**
+ * Заказ CRM → строка сверки.
+ * Ожидающая ссылка BePaid по кассе кредитом не становится.
+ * Сумма, которую менеджер внёс в заказ со счётом, кредитом становится:
+ * колонка paymentMethod по умолчанию online, и такая оплата иначе остаётся долгом.
+ */
 export function reconciliationSourceFromOrder(order: {
   id: number
   number?: string | null
@@ -179,9 +188,17 @@ export function reconciliationSourceFromOrder(order: {
   prepaymentAmount?: number | string | null
   prepaymentStatus?: string | null
   paymentMethod?: string | null
+  paymentChannel?: string | null
+  payment_channel?: string | null
   prepaymentUpdatedAt?: string | null
 }): ReconciliationSourceOrder {
-  const collected = collectedPrepaymentAmount(order)
+  const status = String(order.prepaymentStatus ?? '').trim().toLowerCase()
+  const channel = String(order.paymentChannel ?? order.payment_channel ?? '').trim().toLowerCase()
+  const prepay = round2(Number(order.prepaymentAmount) || 0)
+  let collected = collectedPrepaymentAmount(order)
+  if (channel === 'invoice' && prepay > collected && !failedPrepaymentStatus(status)) {
+    collected = prepay
+  }
   const orderDate = reconciliationCalendarDate(order.created_at)
   const paymentDate = collected > 0
     ? reconciliationCalendarDate(order.prepaymentUpdatedAt) || orderDate || null

@@ -62,6 +62,7 @@ export const OrderModals: React.FC<OrderModalsProps> = ({
           currentPaymentMethod={selectedOrder.paymentMethod === 'telegram' ? 'online' : selectedOrder.paymentMethod}
           currentEmail={selectedOrder.customerEmail || ''}
           totalOrderAmount={getOrderAmounts(selectedOrder).total}
+          invoiceSettlement={selectedOrder.payment_channel === 'invoice'}
           onPrepaymentCreated={onPrepaymentCreated}
         />
       )}

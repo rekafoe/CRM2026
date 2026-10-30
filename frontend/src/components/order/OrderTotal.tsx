@@ -48,7 +48,7 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
     typeof debtFromApi === 'number' && Number.isFinite(debtFromApi)
       ? debtFromApi
       : Math.max(0, Math.round((total - prepayment) * 100) / 100);
-  const isPaid = isPaidPrepaymentStatus(prepaymentStatus);
+  const isPaid = isPaidPrepaymentStatus(prepaymentStatus) || String(prepaymentStatus ?? '').toLowerCase() === 'bank';
 
   if (variant === 'bar') {
     return (

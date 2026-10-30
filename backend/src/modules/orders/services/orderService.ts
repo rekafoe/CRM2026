@@ -1045,6 +1045,7 @@ export class OrderService {
 
     if (shouldClearDefaultPrepaymentForLegal({
       customerType,
+      paymentChannel: order.payment_channel,
       prepaymentAmount: order.prepaymentAmount,
       orderTotal: amounts.totalAmount,
     })) {
