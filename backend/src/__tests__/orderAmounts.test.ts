@@ -103,4 +103,22 @@ describe('orderAmounts', () => {
       issueCashRemainder(100, { prepaymentAmount: 100, prepaymentStatus: 'paid', paymentMethod: 'offline' }),
     ).toBe(0);
   });
+
+  it('issue remainder treats invoice bank transfer as already collected', () => {
+    // prepay по счёту: status=bank, method=online — в кассу дня не идёт, но при выдаче остаток 0
+    expect(
+      issueCashRemainder(250, {
+        prepaymentAmount: 250,
+        prepaymentStatus: 'bank',
+        paymentMethod: 'online',
+      }),
+    ).toBe(0);
+    expect(
+      issueCashRemainder(250, {
+        prepaymentAmount: 100,
+        prepaymentStatus: 'bank',
+        paymentMethod: 'online',
+      }),
+    ).toBe(150);
+  });
 });
