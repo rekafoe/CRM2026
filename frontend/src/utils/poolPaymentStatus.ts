@@ -33,9 +33,9 @@ export function getPoolPaymentInfo(order: {
       : Math.max(0, total - prepay);
   const isOnline = method === 'online';
   const isPaid = isPaidPrepaymentStatus(order.prepaymentStatus);
-  const invoice = String(order.payment_channel ?? '').toLowerCase() === 'invoice';
 
-  if ((status === 'bank' || invoice) && prepay > 0 && status !== 'failed' && status !== 'cancelled' && status !== 'canceled') {
+  // Только подтверждённая платёжка (bank). Канал «счёт» + pending BePaid — ещё не оплата.
+  if (status === 'bank' && prepay > 0) {
     return {
       badge: 'По счёту',
       tone: 'paid',
