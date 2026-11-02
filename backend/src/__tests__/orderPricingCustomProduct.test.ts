@@ -20,4 +20,27 @@ describe('OrderPricingService.extractPricingLineFromItem', () => {
       })
     ).toBeNull();
   });
+
+  it('extracts kit lines without material_id so checkout can reprice them', () => {
+    const line = OrderPricingService.extractPricingLineFromItem({
+      id: 9,
+      quantity: 3,
+      params: {
+        productId: 910,
+        specifications: {
+          type_id: 910004,
+          size_id: 910104,
+          print_technology: 'laser_sheet',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+        },
+      },
+    });
+    expect(line).toMatchObject({
+      lineId: 9,
+      productId: 910,
+      quantity: 3,
+    });
+    expect(line?.configuration).not.toHaveProperty('material_id');
+  });
 });

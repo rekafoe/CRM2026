@@ -211,10 +211,10 @@ async function resolveLinePricingVolumes(
 
 export async function quoteLines(
   lines: PricingLineInput[],
-  options?: { skipNonGroupable?: boolean }
+  // Kept for call-site compatibility; non-groupable lines are priced individually
+  // (kit products without material_id must not become $0).
+  _options?: { skipNonGroupable?: boolean }
 ): Promise<QuoteLinesResult> {
-  const skipNonGroupable = options?.skipNonGroupable !== false;
-
   const enriched: Array<
     PricingLineInput & {
       sheetsNeeded: number;
@@ -260,28 +260,6 @@ export async function quoteLines(
       groupKey != null
         ? groupsMap.get(groupKey)?.totalSheets ?? line.sheetsNeeded
         : null;
-
-    if (groupKey == null && skipNonGroupable) {
-      quotedLines.push({
-        lineId: line.lineId,
-        productId: line.productId,
-        quantity: line.quantity,
-        finalPrice: 0,
-        pricePerUnit: 0,
-        sheetsNeeded: line.sheetsNeeded,
-        groupKey: null,
-        groupTotalSheets: null,
-        tierMinQty: null,
-        pricingMeta: {
-          groupKey: null,
-          groupTotalSheets: null,
-          tierMinQty: null,
-          sheetsNeeded: line.sheetsNeeded,
-        },
-        skipped: true,
-      });
-      continue;
-    }
 
     try {
       const configWithContext = {

@@ -232,5 +232,53 @@ describe('pricingGroupService', () => {
         productionPlan,
       });
     });
+
+    it('prices kit lines without material_id individually instead of $0 skip', async () => {
+      const calculatePrice = UnifiedPricingService.calculatePrice as jest.Mock;
+      calculatePrice
+        .mockResolvedValueOnce({
+          finalPrice: 41.4,
+          pricePerUnit: 41.4,
+          sheetsNeeded: 1,
+          tierVolumeForGrouping: 1,
+        })
+        .mockResolvedValueOnce({
+          finalPrice: 41.4,
+          pricePerUnit: 41.4,
+          sheetsNeeded: 1,
+        });
+
+      const result = await quoteLines([
+        {
+          lineId: 'calendar',
+          productId: 910,
+          quantity: 1,
+          configuration: {
+            type_id: 910004,
+            size_id: 910104,
+            print_technology: 'laser_sheet',
+            print_color_mode: 'color',
+            print_sides_mode: 'single',
+          },
+        },
+      ]);
+
+      expect(result.lines[0]).toMatchObject({
+        lineId: 'calendar',
+        finalPrice: 41.4,
+        pricePerUnit: 41.4,
+        groupKey: null,
+      });
+      expect(result.lines[0].skipped).toBeFalsy();
+      expect(result.cartTotal).toBe(41.4);
+      expect(calculatePrice).toHaveBeenCalledTimes(2);
+      expect(calculatePrice).toHaveBeenLastCalledWith(
+        910,
+        expect.not.objectContaining({
+          orderPricingContext: expect.anything(),
+        }),
+        1
+      );
+    });
   });
 });

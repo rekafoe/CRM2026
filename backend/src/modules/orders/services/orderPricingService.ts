@@ -6,7 +6,6 @@ import { getDb } from '../../../config/database';
 import { logger } from '../../../utils/logger';
 import {
   configurationFromItemParams,
-  isGroupableLine,
   isSimplifiedProduct,
   quoteLines,
   type PricingLineInput,
@@ -49,15 +48,15 @@ export class OrderPricingService {
     const { productId, configuration, sheetsNeeded } = configurationFromItemParams(params);
     if (productId == null) return null;
 
-    const line: PricingLineInput = {
+    // Simplified kit products (no material_id) are not "groupable" for sheet-tier pooling,
+    // but must still be extracted so quoteLines / recalculateOrderPrices can set server price.
+    return {
       lineId: item.id,
       productId,
       quantity: Math.max(1, Number(item.quantity) || 1),
       configuration,
       sheetsNeeded,
     };
-
-    return isGroupableLine(line) ? line : null;
   }
 
   static async getPricingGroupsForOrder(orderId: number): Promise<OrderPricingGroupView[]> {
@@ -89,8 +88,9 @@ export class OrderPricingService {
   }
 
   /**
-   * Пересчитать цены всех groupable simplified-позиций заказа.
-   * Позиции без productId / без ключа группы не меняются.
+   * Пересчитать цены всех simplified-позиций заказа.
+   * Groupable линии получают тиражный override; kit без material_id — индивидуальный расчёт.
+   * Позиции без productId / custom / postprint / plotterBare не меняются.
    */
   static async recalculateOrderPrices(orderId: number): Promise<{
     updatedCount: number;
