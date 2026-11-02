@@ -99,6 +99,15 @@ function sanitizeWebsiteDescription(
   return text;
 }
 
+function stripClientReservationIds(components: unknown): unknown {
+  if (!Array.isArray(components)) return components;
+  return components.map((row) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+    const { reservationId: _drop, ...rest } = row as Record<string, unknown>;
+    return rest;
+  });
+}
+
 export function sanitizeWebsiteItemParams(params: Record<string, unknown>): Record<string, unknown> {
   const next = { ...params };
 
@@ -106,6 +115,11 @@ export function sanitizeWebsiteItemParams(params: Record<string, unknown>): Reco
     if (INTERNAL_PARAM_KEYS.has(key)) {
       delete next[key];
     }
+  }
+
+  // Клиентский reservationId не доверяем: deleteItem/qty↓ отменяют по id из params.
+  if (Array.isArray(next.components)) {
+    next.components = stripClientReservationIds(next.components);
   }
 
   const parameterSummary = sanitizeParameterSummary(next.parameterSummary, next);

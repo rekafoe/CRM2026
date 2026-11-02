@@ -25,4 +25,20 @@ describe('websiteOrderNormalize', () => {
     expect(item.params.layoutHumanLabel).toBeUndefined()
     expect(item.params.designEditorMode).toBeUndefined()
   })
+
+  it('strips client reservationId from params.components', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: 'Визитки',
+        price: 10,
+        quantity: 1,
+        params: {
+          description: 'Визитки',
+          components: [{ materialId: 7, qtyPerItem: 2, reservationId: 999 }],
+        },
+      },
+    ])
+
+    expect(item.params.components).toEqual([{ materialId: 7, qtyPerItem: 2 }])
+  })
 })
