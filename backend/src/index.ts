@@ -301,7 +301,7 @@ async function startServer() {
     if (!process.env.UPLOADS_DIR) {
       logger.warn('UPLOADS_DIR not set — images (products, categories, subtypes) will be lost on redeploy. Create a Railway Volume, mount it (e.g. /data/uploads), set UPLOADS_DIR=/data/uploads.')
     }
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       startMailOutboxWorker()
       startWebsiteReadyReminderWorker()
       startSmsDebounceWorker()
@@ -324,6 +324,9 @@ async function startServer() {
       logger.info(`Order files cleanup: ${orderFilesCleanupConfig.enabled ? 'enabled (1.5 weeks retention)' : 'disabled'}`)
       logger.info(`Storage monitor: ${storageMonitorConfig.enabled ? 'enabled (80% threshold)' : 'disabled'}`)
     })
+    // Дефолт Node — 5 минут на всё тело. Большой макет обрывается 408 без CORS, браузер пишет «сервер не отвечает».
+    server.timeout = 0
+    server.requestTimeout = 20 * 60 * 1000
   } catch (error) {
     logger.error('Failed to start server', { error })
     process.exit(1)

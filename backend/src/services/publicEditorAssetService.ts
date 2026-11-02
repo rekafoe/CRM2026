@@ -1,7 +1,8 @@
-import sharp from 'sharp'
 import path from 'path'
 import { getDb } from '../config/database'
 import { EDITOR_DRAFT_MAX_FILE_BYTES, saveBufferToOrderFiles } from '../config/upload'
+import { openEditorImage, runEditorImageJob } from '../utils/editorImageSharp'
+import { logger } from '../utils/logger'
 import {
   EditorDraftFileTooLargeError,
   editorDraftFileTooLargeMessage,
@@ -71,25 +72,28 @@ async function buildImageMetadata(buffer: Buffer | undefined, originalName?: str
   if (!buffer?.length) {
     return { width: null, height: null, thumbFilename: null, uploadStatus: 'error', uploadError: 'empty_file' }
   }
+  const source = buffer
 
   try {
-    const image = sharp(buffer, { failOn: 'none' }).rotate()
-    const meta = await image.metadata()
-    // Крупный thumb для сетки библиотеки / превью клиента (не 420 — выглядит «мыльно»).
-    const thumb = await image
-      .clone()
-      .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 88, mozjpeg: true })
-      .toBuffer()
-    const savedThumb = saveBufferToOrderFiles(thumb, `thumb-${originalName || 'photo'}.jpg`)
+    return await runEditorImageJob(async () => {
+      const image = openEditorImage(source).rotate()
+      const meta = await image.metadata()
+      // Крупный thumb для сетки библиотеки / превью клиента (не 420 — выглядит «мыльно»).
+      const thumb = await image
+        .clone()
+        .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 88, mozjpeg: true })
+        .toBuffer()
+      const savedThumb = saveBufferToOrderFiles(thumb, `thumb-${originalName || 'photo'}.jpg`)
 
-    return {
-      width: meta.width ?? null,
-      height: meta.height ?? null,
-      thumbFilename: savedThumb?.filename ?? null,
-      uploadStatus: 'ready',
-      uploadError: null,
-    }
+      return {
+        width: meta.width ?? null,
+        height: meta.height ?? null,
+        thumbFilename: savedThumb?.filename ?? null,
+        uploadStatus: 'ready',
+        uploadError: null,
+      }
+    })
   } catch (err) {
     return {
       width: null,
@@ -152,7 +156,8 @@ export async function createEditorDraftAsset(
   const saved = saveBufferToOrderFiles(file.buffer, file.originalname)
   if (!saved) throw new Error('Файл пустой или не загружен')
 
-  const meta = await buildImageMetadata(file.buffer, file.originalname)
+  // Превью считаем после ответа: sharp на большом фото держит HTTP, прокси рвёт соединение,
+  // и редактор показывает «сервер не отвечает», хотя файл уже на диске.
   const result = await db.run(
     `INSERT INTO editor_draft_files
       (draft_id, filename, originalName, mime, size, width, height, thumbFilename, uploadStatus, uploadError)
@@ -163,11 +168,11 @@ export async function createEditorDraftAsset(
       saved.originalName,
       file.mimetype ?? null,
       saved.size,
-      meta.width,
-      meta.height,
-      meta.thumbFilename,
-      meta.uploadStatus,
-      meta.uploadError,
+      null,
+      null,
+      null,
+      'ready',
+      null,
     ],
   )
   const row = await db.get<Record<string, unknown>>(
@@ -175,7 +180,33 @@ export async function createEditorDraftAsset(
     [result.lastID, draftId],
   )
   if (!row) throw new Error('Не удалось сохранить asset')
-  return mapDraftFileRow(row)
+  const record = mapDraftFileRow(row)
+  if (file.buffer) scheduleDraftImageMetadata(record.id, file.buffer, file.originalname)
+  return record
+}
+
+function scheduleDraftImageMetadata(fileId: number, buffer: Buffer, originalName?: string): void {
+  void buildImageMetadata(buffer, originalName)
+    .then(async (meta) => {
+      const db = await getDb()
+      await db.run(
+        `UPDATE editor_draft_files
+         SET width = ?, height = ?, thumbFilename = ?, uploadStatus = ?, uploadError = ?
+         WHERE id = ?`,
+        meta.width,
+        meta.height,
+        meta.thumbFilename,
+        meta.uploadStatus,
+        meta.uploadError,
+        fileId,
+      )
+    })
+    .catch((err) => {
+      logger.warn('editor draft image metadata failed', {
+        fileId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    })
 }
 
 export async function listEditorDraftAssets(draftId: number): Promise<EditorDraftFileRecord[]> {

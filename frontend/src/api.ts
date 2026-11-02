@@ -3,39 +3,53 @@ import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
 import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, CustomerLegalDocument, CustomerLegalLedger, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
 import { API_BASE_URL } from './config/constants';
 
+const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000);
+/** Фото и SVG макета: 20 с обрывают загрузку, axios пишет «Нет ответа от сервера». */
+const UPLOAD_TIMEOUT_MS = Number(import.meta.env.VITE_UPLOAD_TIMEOUT_MS || 600_000);
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   // Без timeout клики «зависают» на минуты, пока Railway/SQLite отвечает.
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000),
+  timeout: API_TIMEOUT_MS,
 });
 
 //  Экспортируем api для использования в других компонентах
 export { api };
 
-// FormData: не фиксировать Content-Type — нужен boundary (см. api/client.ts)
-api.interceptors.request.use((config) => {
-  if (config.data instanceof FormData) {
-    const h = config.headers;
-    if (h && typeof (h as any).delete === 'function') {
-      (h as any).delete('Content-Type');
-    } else if (h) {
-      delete (h as Record<string, unknown>)['Content-Type'];
-    }
+function clearFormDataContentType(headers: unknown): void {
+  const h = headers as { delete?: (name: string) => void } | Record<string, unknown> | undefined;
+  if (!h) return;
+  if (typeof (h as { delete?: (name: string) => void }).delete === 'function') {
+    (h as { delete: (name: string) => void }).delete('Content-Type');
+    return;
   }
-  return config;
-});
+  delete (h as Record<string, unknown>)['Content-Type'];
+}
 
-// Attach auth token from localStorage for protected endpoints
+// FormData: не фиксировать Content-Type — нужен boundary (см. api/client.ts).
+// Токен ставим здесь же и не подменяем headers объектом: spread AxiosHeaders возвращает application/json.
 api.interceptors.request.use((config) => {
   try {
     const token = localStorage.getItem(APP_CONFIG?.storage?.token || '') || localStorage.getItem('crmToken');
     if (token) {
-      config.headers = {
-        ...(config.headers || {}),
-        Authorization: `Bearer ${token}`
-      } as any;
+      const headers = config.headers as { set?: (name: string, value: string) => void } | undefined;
+      if (headers && typeof headers.set === 'function') {
+        headers.set('Authorization', `Bearer ${token}`);
+      } else {
+        config.headers = {
+          ...(config.headers || {}),
+          Authorization: `Bearer ${token}`,
+        } as typeof config.headers;
+      }
     }
-  } catch {}
+  } catch { /* ignore storage */ }
+  if (config.data instanceof FormData) {
+    clearFormDataContentType(config.headers);
+    const current = Number(config.timeout ?? API_TIMEOUT_MS);
+    if (current !== 0 && (!Number.isFinite(current) || current < UPLOAD_TIMEOUT_MS)) {
+      config.timeout = UPLOAD_TIMEOUT_MS;
+    }
+  }
   return config;
 });
 
@@ -54,13 +68,17 @@ api.interceptors.response.use(
       wrapped.status = error.response.status;
       wrapped.responseData = error.response.data;
       throw wrapped;
-    } else if (error.request) {
+    }
+    const code = String(error?.code || '');
+    const rawMessage = String(error?.message || '');
+    if (code === 'ECONNABORTED' || code === 'ETIMEDOUT' || /timeout/i.test(rawMessage)) {
+      throw new Error('Сервер не успел ответить. Повторите загрузку.');
+    }
+    if (error.request) {
       // Request was made but no response received
       throw new Error('Нет ответа от сервера');
-    } else {
-      // Something else happened
-      throw new Error(error.message || 'Неизвестная ошибка');
     }
+    throw new Error(error.message || 'Неизвестная ошибка');
   }
 );
 

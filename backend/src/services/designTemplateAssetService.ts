@@ -1,6 +1,7 @@
-import sharp from 'sharp'
 import path from 'path'
 import { getDb } from '../config/database'
+import { openEditorImage, runEditorImageJob } from '../utils/editorImageSharp'
+import { logger } from '../utils/logger'
 import {
   designTemplateAssetsDir,
   resolveSafeExistingPath,
@@ -86,24 +87,27 @@ async function buildImageMetadata(buffer: Buffer | undefined, originalName?: str
   if (!buffer?.length) {
     return { width: null, height: null, thumbFilename: null, uploadStatus: 'error', uploadError: 'empty_file' }
   }
+  const source = buffer
 
   try {
-    const image = sharp(buffer, { failOn: 'none' }).rotate()
-    const meta = await image.metadata()
-    const thumb = await image
-      .clone()
-      .resize({ width: 420, height: 420, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true })
-      .toBuffer()
-    const savedThumb = saveBufferToDesignTemplateAssets(thumb, `thumb-${originalName || 'photo'}.jpg`)
+    return await runEditorImageJob(async () => {
+      const image = openEditorImage(source).rotate()
+      const meta = await image.metadata()
+      const thumb = await image
+        .clone()
+        .resize({ width: 420, height: 420, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82, mozjpeg: true })
+        .toBuffer()
+      const savedThumb = saveBufferToDesignTemplateAssets(thumb, `thumb-${originalName || 'photo'}.jpg`)
 
-    return {
-      width: meta.width ?? null,
-      height: meta.height ?? null,
-      thumbFilename: savedThumb?.filename ?? null,
-      uploadStatus: 'ready',
-      uploadError: null,
-    }
+      return {
+        width: meta.width ?? null,
+        height: meta.height ?? null,
+        thumbFilename: savedThumb?.filename ?? null,
+        uploadStatus: 'ready',
+        uploadError: null,
+      }
+    })
   } catch (err) {
     return {
       width: null,
@@ -143,7 +147,6 @@ export async function createDesignTemplateAsset(
   const saved = saveBufferToDesignTemplateAssets(file.buffer, file.originalname)
   if (!saved) throw new Error('Файл пустой или не загружен')
 
-  const meta = await buildImageMetadata(file.buffer, file.originalname)
   const result = await db.run(
     `INSERT INTO design_template_assets
       (template_id, filename, original_name, mime, size, width, height, thumb_filename, upload_status, upload_error)
@@ -154,11 +157,11 @@ export async function createDesignTemplateAsset(
       saved.originalName,
       file.mimetype ?? null,
       saved.size,
-      meta.width,
-      meta.height,
-      meta.thumbFilename,
-      meta.uploadStatus,
-      meta.uploadError,
+      null,
+      null,
+      null,
+      'ready',
+      null,
     ],
   )
 
@@ -167,7 +170,33 @@ export async function createDesignTemplateAsset(
     [result.lastID, templateId],
   )
   if (!row) throw new Error('Не удалось сохранить asset')
-  return mapAssetRow(row)
+  const record = mapAssetRow(row)
+  if (file.buffer) scheduleTemplateImageMetadata(record.id, file.buffer, file.originalname)
+  return record
+}
+
+function scheduleTemplateImageMetadata(fileId: number, buffer: Buffer, originalName?: string): void {
+  void buildImageMetadata(buffer, originalName)
+    .then(async (meta) => {
+      const db = await getDb()
+      await db.run(
+        `UPDATE design_template_assets
+         SET width = ?, height = ?, thumb_filename = ?, upload_status = ?, upload_error = ?
+         WHERE id = ?`,
+        meta.width,
+        meta.height,
+        meta.thumbFilename,
+        meta.uploadStatus,
+        meta.uploadError,
+        fileId,
+      )
+    })
+    .catch((err) => {
+      logger.warn('design template image metadata failed', {
+        fileId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    })
 }
 
 export async function getDesignTemplateAsset(
