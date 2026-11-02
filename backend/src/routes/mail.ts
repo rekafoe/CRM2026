@@ -21,10 +21,13 @@ import {
   processMailOutboxBatch,
 } from '../services/mailOutboxService';
 import {
+  accountMailingStatus,
   countMarketingOptIn,
   getPublicApiBaseUrl,
+  setAccountMailing,
   unsubscribeByToken,
 } from '../services/customerEmailMarketingService';
+import { keysMatch } from '../modules/support/supportCustomerAuth';
 import { enqueueMarketingTemplateBroadcast } from '../services/mailMarketingBroadcastService';
 import { getTrackingPixelResponse, recordMailOpenByToken } from '../services/mailOpenTrackingService';
 import { isValidEmailAddress } from '../utils/isValidEmail';
@@ -157,6 +160,49 @@ function requireAdmin(req: AuthenticatedRequest, res: import('express').Response
   }
   return true;
 }
+
+function readSupportKey(req: import('express').Request): boolean {
+  const expected = String(process.env.CRM_SUPPORT_API_KEY || '').trim();
+  const provided = String(req.headers['x-api-key'] || '').trim();
+  return Boolean(expected && provided && keysMatch(provided, expected));
+}
+
+/**
+ * Предпочтение рассылки для почты аккаунта сайта. Вызывает только сервер сайта
+ * после проверки сессии, с ключом чата поддержки.
+ */
+router.get(
+  '/account-preference',
+  asyncHandler(async (req, res) => {
+    if (!readSupportKey(req)) {
+      res.status(401).json({ error: 'Требуется авторизация' });
+      return;
+    }
+    const email = String((req.query as { email?: string }).email || '');
+    if (!isValidEmailAddress(email)) {
+      res.status(400).json({ error: 'Некорректный email' });
+      return;
+    }
+    res.json({ status: await accountMailingStatus(email) });
+  })
+);
+
+router.post(
+  '/account-preference',
+  asyncHandler(async (req, res) => {
+    if (!readSupportKey(req)) {
+      res.status(401).json({ error: 'Требуется авторизация' });
+      return;
+    }
+    const email = String((req.body as { email?: string })?.email || '');
+    const subscribed = (req.body as { subscribed?: unknown })?.subscribed;
+    if (!isValidEmailAddress(email) || typeof subscribed !== 'boolean') {
+      res.status(400).json({ error: 'Проверьте запрос' });
+      return;
+    }
+    res.json({ status: await setAccountMailing(email, subscribed) });
+  })
+);
 
 /**
  * GET /api/mail/unsubscribe?token= — публичная отписка (без токена CRM).

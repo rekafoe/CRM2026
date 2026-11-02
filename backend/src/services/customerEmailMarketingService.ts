@@ -69,6 +69,56 @@ export async function countMarketingOptIn(): Promise<number> {
 /**
  * One-click отписка по токену. Идемпотентно.
  */
+export type AccountMailingStatus = 'subscribed' | 'unsubscribed' | 'absent';
+
+function normalizeMail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export async function accountMailingStatus(email: string): Promise<AccountMailingStatus> {
+  const mail = normalizeMail(email);
+  if (!mail) return 'absent';
+  const db = await getDb();
+  const row = await db.get<{ total: number; subscribed: number }>(
+    `SELECT COUNT(1) as total,
+            SUM(CASE WHEN marketing_opt_in = 1 AND email_unsubscribed_at IS NULL THEN 1 ELSE 0 END) as subscribed
+     FROM customers
+     WHERE lower(trim(email)) = ?`,
+    [mail]
+  );
+  const total = Number(row?.total ?? 0);
+  if (total < 1) return 'absent';
+  return Number(row?.subscribed ?? 0) > 0 ? 'subscribed' : 'unsubscribed';
+}
+
+export async function setAccountMailing(email: string, subscribed: boolean): Promise<AccountMailingStatus> {
+  const mail = normalizeMail(email);
+  const current = await accountMailingStatus(mail);
+  if (current === 'absent') return 'absent';
+  const db = await getDb();
+  const now = new Date().toISOString();
+  if (subscribed) {
+    await db.run(
+      `UPDATE customers
+       SET marketing_opt_in = 1,
+           email_unsubscribed_at = NULL,
+           updated_at = ?
+       WHERE lower(trim(email)) = ?`,
+      [now, mail]
+    );
+    return 'subscribed';
+  }
+  await db.run(
+    `UPDATE customers
+     SET marketing_opt_in = 0,
+         email_unsubscribed_at = COALESCE(email_unsubscribed_at, ?),
+         updated_at = ?
+     WHERE lower(trim(email)) = ?`,
+    [now, now, mail]
+  );
+  return 'unsubscribed';
+}
+
 export async function unsubscribeByToken(token: string): Promise<{ ok: boolean; error?: string }> {
   const t = (token || '').trim()
   if (t.length < 16) {
