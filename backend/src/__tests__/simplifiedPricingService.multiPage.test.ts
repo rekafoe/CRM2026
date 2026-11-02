@@ -24,11 +24,15 @@ jest.mock('../modules/pricing/services/layoutCalculationService', () => ({
   },
 }));
 
-jest.mock('../modules/pricing/services/bindingPricingService', () => ({
-  BindingPricingService: {
-    quoteBinding: jest.fn(),
-  },
-}));
+jest.mock('../modules/pricing/services/bindingPricingService', () => {
+  const actual = jest.requireActual('../modules/pricing/services/bindingPricingService');
+  return {
+    ...actual,
+    BindingPricingService: {
+      quoteBinding: jest.fn(),
+    },
+  };
+});
 
 describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
   const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>;
@@ -74,10 +78,15 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     };
 
     mockedGetDb.mockResolvedValue({
-      get: jest.fn(async (query: string) => {
+      get: jest.fn(async (query: string, params?: unknown[]) => {
         if (query.includes('FROM products WHERE id = ?')) return productRow;
         if (query.includes('FROM product_template_configs')) {
           return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services') && query.includes('operation_type')) {
+          const id = Number(params?.[0]);
+          if (id === 77) return { id: 77, operation_type: 'bind' };
+          return { id, operation_type: 'laminate' };
         }
         return null;
       }),

@@ -7,6 +7,67 @@ export interface BindingQuoteRequest {
   unitsPerItem?: number;
 }
 
+export type TemplateBindingRef = {
+  service_id?: number;
+  variant_id?: number;
+  units_per_item?: number;
+};
+
+/**
+ * Источник переплёта для упрощённого расчёта.
+ * На листовых продуктах client binding_service_id игнорируется: иначе id обязательной
+ * отделки вырезается из finishing без BindingPricingService → undercharge.
+ * В multi_page шаблон важнее клиента (service_id / units); variant клиент может выбрать.
+ */
+export function resolveConfiguredBindingInput(opts: {
+  usePagesMultiplier: boolean;
+  templateBinding?: TemplateBindingRef | null;
+  clientBindingServiceId?: unknown;
+  clientBindingVariantId?: unknown;
+  clientBindingUnitsPerItem?: unknown;
+}): { serviceId: number | null; variantId?: number; unitsPerItem: number } {
+  if (!opts.usePagesMultiplier) {
+    return { serviceId: null, unitsPerItem: 1 };
+  }
+
+  const templateSid = Number(opts.templateBinding?.service_id);
+  const clientSid = Number(opts.clientBindingServiceId);
+  const serviceId =
+    Number.isFinite(templateSid) && templateSid > 0
+      ? templateSid
+      : Number.isFinite(clientSid) && clientSid > 0
+        ? clientSid
+        : null;
+
+  if (serviceId == null) {
+    return { serviceId: null, unitsPerItem: 1 };
+  }
+
+  const templateUnits = Number(opts.templateBinding?.units_per_item);
+  const clientUnits = Number(opts.clientBindingUnitsPerItem);
+  const unitsPerItem =
+    Number.isFinite(templateUnits) && templateUnits > 0
+      ? templateUnits
+      : Number.isFinite(clientUnits) && clientUnits >= 1
+        ? clientUnits
+        : 1;
+
+  const templateVid = Number(opts.templateBinding?.variant_id);
+  const clientVid = Number(opts.clientBindingVariantId);
+  const variantId =
+    Number.isFinite(clientVid) && clientVid > 0
+      ? clientVid
+      : Number.isFinite(templateVid) && templateVid > 0
+        ? templateVid
+        : undefined;
+
+  return {
+    serviceId,
+    ...(variantId != null ? { variantId } : {}),
+    unitsPerItem,
+  };
+}
+
 export interface BindingQuoteResult {
   serviceId: number;
   serviceName: string;
