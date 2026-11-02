@@ -366,23 +366,27 @@ export const ChatsPage: React.FC = () => {
                           Взять
                         </button>
                       )}
-                      <select
-                        className="chats-btn"
-                        aria-label="Кому передать"
-                        value={transferTo}
-                        onChange={(event) => setTransferTo(Number(event.target.value))}
-                      >
-                        {operators.map((operator) => (
-                          <option key={operator.id} value={operator.id}>{operator.name}</option>
-                        ))}
-                      </select>
-                      <button type="button" className="chats-btn" disabled={busy || transferTo === ''} onClick={() => void run(async () => {
-                        const result = await supportChatsApi.transfer(chat.id, Number(transferTo));
-                        setConversations((current) => current.map((item) => item.id === chat.id ? result.conversation : item));
-                      })}
-                      >
-                        Передать
-                      </button>
+                      {(chat.mine || me?.role === 'admin' || !chat.assignedUserId) && (
+                        <>
+                          <select
+                            className="chats-btn"
+                            aria-label="Кому передать"
+                            value={transferTo}
+                            onChange={(event) => setTransferTo(Number(event.target.value))}
+                          >
+                            {operators.map((operator) => (
+                              <option key={operator.id} value={operator.id}>{operator.name}</option>
+                            ))}
+                          </select>
+                          <button type="button" className="chats-btn" disabled={busy || transferTo === ''} onClick={() => void run(async () => {
+                            const result = await supportChatsApi.transfer(chat.id, Number(transferTo));
+                            setConversations((current) => current.map((item) => item.id === chat.id ? result.conversation : item));
+                          })}
+                          >
+                            Передать
+                          </button>
+                        </>
+                      )}
                       {(chat.mine || me?.role === 'admin') && chat.assignedUserId && (
                         <button type="button" className="chats-btn warn" disabled={busy} onClick={() => void run(async () => {
                           const result = await supportChatsApi.release(chat.id);
@@ -392,20 +396,22 @@ export const ChatsPage: React.FC = () => {
                           Снять
                         </button>
                       )}
-                      <button type="button" className="chats-btn stop" disabled={busy} onClick={() => {
-                        if (!closeArmed) {
-                          setCloseArmed(true);
-                          return;
-                        }
-                        void run(async () => {
-                          const result = await supportChatsApi.close(chat.id);
-                          setCloseArmed(false);
-                          setConversations((current) => current.map((item) => item.id === chat.id ? result.conversation : item));
-                        });
-                      }}
-                      >
-                        {closeArmed ? 'Точно закрыть' : 'Закрыть'}
-                      </button>
+                      {(chat.mine || me?.role === 'admin' || !chat.assignedUserId) && (
+                        <button type="button" className="chats-btn stop" disabled={busy} onClick={() => {
+                          if (!closeArmed) {
+                            setCloseArmed(true);
+                            return;
+                          }
+                          void run(async () => {
+                            const result = await supportChatsApi.close(chat.id);
+                            setCloseArmed(false);
+                            setConversations((current) => current.map((item) => item.id === chat.id ? result.conversation : item));
+                          });
+                        }}
+                        >
+                          {closeArmed ? 'Точно закрыть' : 'Закрыть'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </article>

@@ -35,6 +35,13 @@ export function assertOperatorRole(role: string) {
   if (role === 'viewer') throw new SupportError(403, 'Наблюдателю чаты недоступны')
 }
 
+/** Claimed website chat: only the assignee (or admin) may transfer/close/release. Unassigned stays open to the pool. */
+function assertAssigneeOrAdmin(row: ConversationRow, staff: StaffActor, message: string) {
+  if (row.assigned_user_id != null && row.assigned_user_id !== staff.id && staff.role !== 'admin') {
+    throw new SupportError(403, message)
+  }
+}
+
 interface ConversationRow {
   id: number
   public_id: string
@@ -812,6 +819,7 @@ export class SupportService {
       const current = await requireOperatorRow(db, publicIdValue, staff)
       assertWebsiteChat(current)
       if (current.status === 'closed') throw new SupportError(409, 'Чат закрыт')
+      assertAssigneeOrAdmin(current, staff, 'Передать чат может тот, кто его ведёт')
       if (current.assigned_user_id === target.id) return current
       await db.run(
         'UPDATE support_conversations SET assigned_user_id = ?, updated_at = ? WHERE id = ?',
@@ -830,9 +838,7 @@ export class SupportService {
       const current = await requireOperatorRow(db, publicIdValue, staff)
       assertWebsiteChat(current)
       if (current.assigned_user_id == null) return current
-      if (current.assigned_user_id !== staff.id && staff.role !== 'admin') {
-        throw new SupportError(403, 'Снять чат может тот, кто его ведёт')
-      }
+      assertAssigneeOrAdmin(current, staff, 'Снять чат может тот, кто его ведёт')
       await db.run(
         'UPDATE support_conversations SET assigned_user_id = NULL, updated_at = ? WHERE id = ?',
         nowIso(),
@@ -849,6 +855,7 @@ export class SupportService {
     const row = await withTx(async (db) => {
       const current = await requireOperatorRow(db, publicIdValue, staff)
       assertWebsiteChat(current)
+      assertAssigneeOrAdmin(current, staff, 'Закрыть чат может тот, кто его ведёт')
       if (current.status !== 'closed') {
         await db.run(
           `UPDATE support_conversations SET status = 'closed', closed_at = ?, updated_at = ? WHERE id = ?`,

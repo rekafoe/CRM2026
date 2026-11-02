@@ -102,6 +102,8 @@ describe('support chats', () => {
     await SupportService.claim(maria, id)
     await expect(SupportService.addOperatorMessage(ivan, id, 'Я отвечу'))
       .rejects.toMatchObject({ status: 409 })
+    await expect(SupportService.transfer(ivan, id, maria.id)).rejects.toMatchObject({ status: 403 })
+    await expect(SupportService.close(ivan, id)).rejects.toMatchObject({ status: 403 })
 
     const sent = await SupportService.addOperatorMessage(maria, id, 'Тираж ушёл в перепечатку')
     expect(sent.message.operatorName).toBe('Мария')
@@ -113,12 +115,28 @@ describe('support chats', () => {
     await expect(SupportService.addOperatorMessage(maria, id, 'Ещё строка'))
       .rejects.toMatchObject({ status: 409 })
     await expect(SupportService.release(maria, id)).rejects.toMatchObject({ status: 403 })
+    await expect(SupportService.close(maria, id)).rejects.toMatchObject({ status: 403 })
 
     const released = await SupportService.release(ivan, id)
     expect(released.conversation.assignedUserId).toBeNull()
     const queue = await SupportService.listForOperator(maria, 'unassigned')
     expect(queue.conversations.map((item) => item.id)).toContain(id)
     expect(queue.unassignedCount).toBe(1)
+  })
+
+  it('lets admin close or transfer a claimed chat that another operator owns', async () => {
+    const created = await SupportService.createForCustomer(anna, {
+      topic: 'shipping',
+      text: 'Где посылка?',
+    })
+    const id = created.conversation.id
+    await SupportService.claim(ivan, id)
+    const admin = { id: 2, role: 'admin', name: 'Мария' }
+    const moved = await SupportService.transfer(admin, id, maria.id)
+    expect(moved.conversation.assignedUserId).toBe(maria.id)
+    await SupportService.close(admin, id)
+    const closed = await SupportService.getForOperator(ivan, id)
+    expect(closed.conversation.status).toBe('closed')
   })
 
   it('closes a chat for operators and lets the customer reopen it', async () => {
