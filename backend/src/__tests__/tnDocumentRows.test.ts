@@ -54,6 +54,43 @@ describe('товарная накладная', () => {
     expect(rows.totalAmount).toBe(computeOrderAmounts({ items: [cards], discount_percent: 0 }).totalAmount)
   })
 
+  it('скидку считает только по товару, без макета в хвосте округления', () => {
+    const goods = { orderId: 5, price: 2.22, quantity: 1, params: { productName: 'Листовки', sheetsNeeded: 1 } }
+    const design = {
+      orderId: 5,
+      price: 2.22,
+      quantity: 1,
+      type: 'design',
+      params: { productName: 'Макет' },
+    }
+    const rows = buildTnDocumentRows([goods, goods, goods, design], () => 10)
+    const expected = computeOrderAmounts({
+      items: [goods, goods, goods],
+      discount_percent: 10,
+    }).totalAmount
+    expect(rows.totalAmount).toBe(expected)
+    expect(rows.orderItems.every((row) => row.name !== 'Макет')).toBe(true)
+  })
+
+  it('режет сумму на срезы, где цена × количество сходится до копейки', () => {
+    const pack = {
+      orderId: 4,
+      price: 3.33,
+      quantity: 3,
+      params: { productName: 'Набор', sheetsNeeded: 1, storedTotalCost: 10 },
+    }
+    const rows = buildTnDocumentRows([pack], () => 0)
+    expect(rows.totalAmount).toBe(10)
+    expect(rows.orderItems.reduce((sum, row) => sum + row.amount, 0)).toBe(10)
+    for (const row of rows.orderItems) {
+      expect(Math.round(row.price * row.quantity * 100)).toBe(Math.round(row.amount * 100))
+    }
+    expect(rows.orderItems.map((row) => [row.quantity, row.price, row.amount])).toEqual([
+      [2, 3.33, 6.66],
+      [1, 3.34, 3.34],
+    ])
+  })
+
   it('оставляет изделие, в названии которого есть «дизайн», если есть тираж на листах', () => {
     const designedCards = {
       ...cards,
