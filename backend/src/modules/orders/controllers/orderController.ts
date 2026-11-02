@@ -16,6 +16,7 @@ import {
   ensureWebsiteLegalCustomer,
 } from '../../../services/editorDraftOwnerService'
 import { mapCrmStatusToWebsiteStatus } from '../../../services/websiteOrderStatusSyncService'
+import { resolveOrderReadyAtMs } from '../../../utils/orderReadySla'
 import { parseWebsiteOrderDelivery } from '../../../types/websiteOrderDelivery'
 import { hasColumn } from '../../../utils/tableSchemaCache'
 import {
@@ -354,8 +355,10 @@ export class OrderController {
       source?: string | null
       status?: number | null
       statusName?: string | null
+      createdAt?: string | null
     }>(
-      `SELECT o.id, o.number, o.source, o.status, os.name as statusName
+      `SELECT o.id, o.number, o.source, o.status, os.name as statusName,
+              COALESCE(o.createdAt, o.created_at) as createdAt
        FROM orders o
        LEFT JOIN order_statuses os ON os.id = o.status
        WHERE o.id = ?`,
@@ -372,12 +375,22 @@ export class OrderController {
     }
 
     const crmStatusId = Number(row.status ?? 0)
+    const itemRows = await db.all<{ type?: string | null; params?: unknown; priceType?: unknown }>(
+      'SELECT type, params FROM items WHERE orderId = ? ORDER BY id ASC',
+      [orderId]
+    )
+    const readyMs = resolveOrderReadyAtMs({
+      createdAt: row.createdAt,
+      source: row.source,
+      items: Array.isArray(itemRows) ? itemRows : [],
+    })
     res.json({
       id: row.id,
       number: row.number,
       crmStatusId,
       crmStatusName: row.statusName ?? null,
       websiteStatus: mapCrmStatusToWebsiteStatus(crmStatusId, row.statusName),
+      readyAt: readyMs != null ? new Date(readyMs).toISOString() : null,
     })
   }
 
