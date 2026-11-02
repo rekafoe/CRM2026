@@ -60,23 +60,24 @@ router.post(
       return
     }
 
+    type OrderPayRow = {
+      id: number
+      prepaymentAmount?: number | string | null
+      prepaymentStatus?: string | null
+      paymentUrl?: string | null
+      paymentId?: string | null
+    }
+    const selectPay =
+      'SELECT id, prepaymentAmount, prepaymentStatus, paymentUrl, paymentId FROM orders WHERE '
+
     const db = await getDb()
     let order = paymentId
-      ? await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE paymentId = ?',
-          paymentId,
-        )
+      ? await db.get<OrderPayRow>(`${selectPay}paymentId = ?`, paymentId)
       : undefined
     if (!order && trackingId) {
-      order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-        'SELECT id, prepaymentAmount FROM orders WHERE number = ?',
-        trackingId,
-      )
+      order = await db.get<OrderPayRow>(`${selectPay}number = ?`, trackingId)
       if (!order && /^\d+$/.test(trackingId)) {
-        order = await db.get<{ id: number; prepaymentAmount?: number | string | null }>(
-          'SELECT id, prepaymentAmount FROM orders WHERE id = ?',
-          Number(trackingId),
-        )
+        order = await db.get<OrderPayRow>(`${selectPay}id = ?`, Number(trackingId))
       }
     }
     if (!order) {
@@ -93,16 +94,33 @@ router.post(
     }
 
     const existingPrepay = Number(order.prepaymentAmount ?? 0)
+    const statusLower = String(order.prepaymentStatus ?? '').toLowerCase()
+    const alreadyCollected =
+      statusLower === 'paid' || statusLower === 'successful' || statusLower === 'bank'
+    // Idempotent retry: same payment uid already applied as paid.
+    if (
+      prepaymentStatus === 'paid' &&
+      statusLower === 'paid' &&
+      paymentId &&
+      String(order.paymentId || '') === paymentId
+    ) {
+      res.status(204).end()
+      return
+    }
+
+    // Follow-up BePaid link после paid/bank: send-payment-link сохраняет сумму и открывает paymentUrl.
+    // Donaчислить installment; иначе SET (первая оплата / website confirm уже записал amount).
+    const hasOpenCheckout = Boolean(String(order.paymentUrl || '').trim())
     const amount =
       prepaymentStatus === 'paid'
         ? amountByn > 0
-          ? amountByn
+          ? alreadyCollected && hasOpenCheckout
+            ? Math.round((existingPrepay + amountByn) * 100) / 100
+            : amountByn
           : existingPrepay > 0
             ? existingPrepay
             : 0
-        : prepaymentStatus === 'failed'
-          ? 0
-          : existingPrepay
+        : existingPrepay
 
     if (prepaymentStatus === 'paid' && amount <= 0) {
       logger.warn('BePaid webhook: paid without amount', { orderId: order.id, paymentId })
@@ -119,13 +137,18 @@ router.post(
            paymentUrl = NULL, paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(sql, amount, paymentId || null, order.id)
     } else if (prepaymentStatus === 'failed') {
+      // Не затираем уже зачтённую предоплату (paid/bank) неуспешной попыткой доплаты.
+      if (alreadyCollected) {
+        res.status(204).end()
+        return
+      }
       const sql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
            paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
         : `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
            paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(sql, paymentId || null, order.id)
-    } else {
+    } else if (!alreadyCollected) {
       const sql = `UPDATE orders SET prepaymentStatus = 'pending', paymentMethod = 'online',
          paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(sql, paymentId || null, order.id)
