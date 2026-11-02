@@ -1,5 +1,6 @@
 import { applyVatToAmounts } from '../utils/documentVat'
 import { discountedItemAmounts, type ItemLike } from '../utils/orderAmounts'
+import { pricedSlices } from '../utils/pricedSlices'
 
 export class TnDocumentError extends Error {
   status = 400
@@ -97,8 +98,9 @@ export function isDesignOnlyItem(item: TnSourceItem): boolean {
 
 /**
  * Одна товарная строка на позицию. Сумма строки — итог позиции после скидки.
- * У заказа только из изделий итог совпадает с актом и счётом.
- * Макет и дизайн в строки не входят.
+ * Макет и дизайн в скидку и в строки не входят: иначе копейка округления
+ * могла остаться на макете, а цена × количество расходилась с суммой.
+ * Как в акте/счёте/чеке, целое количество режется на срезы pricedSlices.
  */
 export function buildTnDocumentRows(
   items: TnSourceItem[],
@@ -113,6 +115,7 @@ export function buildTnDocumentRows(
 } {
   const byOrder = new Map<number, TnSourceItem[]>()
   for (const item of items) {
+    if (isDesignOnlyItem(item)) continue
     const list = byOrder.get(item.orderId) ?? []
     list.push(item)
     byOrder.set(item.orderId, list)
@@ -123,16 +126,18 @@ export function buildTnDocumentRows(
   for (const [orderId, orderItems] of byOrder) {
     const amounts = discountedItemAmounts(orderItems as ItemLike[], getDiscountPercent(orderId))
     orderItems.forEach((item, index) => {
-      if (isDesignOnlyItem(item)) return
       const amount = round2(amounts[index] ?? 0)
       const quantity = tnPieceQuantity(item)
-      raw.push({
-        name: tnGoodsName(item),
-        unit: 'шт.',
-        quantity,
-        price: quantity > 0 ? round2(amount / quantity) : amount,
-        amount,
-      })
+      const name = tnGoodsName(item)
+      for (const slice of pricedSlices(amount, quantity)) {
+        raw.push({
+          name: slice.adjustment ? 'Округление' : name,
+          unit: 'шт.',
+          quantity: slice.quantity,
+          price: slice.price,
+          amount: slice.amount,
+        })
+      }
       orderTotals.set(orderId, round2((orderTotals.get(orderId) ?? 0) + amount))
     })
   }
