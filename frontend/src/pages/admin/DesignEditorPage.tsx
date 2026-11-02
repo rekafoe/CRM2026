@@ -150,8 +150,8 @@ export const DesignEditorPage: React.FC = () => {
   const [pages, setPages] = useState<DesignPage[]>([{ ...EMPTY_PAGE }]);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedObj, setSelectedObj] = useState<SelectedObjProps | null>(null);
-  /** Экранные координаты якоря плавающей панели текста (центр верхней границы bbox) */
-  const [textFloatingAnchor, setTextFloatingAnchor] = useState<{ x: number; y: number } | null>(null);
+  /** Экранные координаты якоря плавающей панели текста */
+  const [textFloatingAnchor, setTextFloatingAnchor] = useState<{ x: number; y: number; placement: 'above' | 'below' } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 

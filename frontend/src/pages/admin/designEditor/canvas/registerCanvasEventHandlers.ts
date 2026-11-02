@@ -60,7 +60,8 @@ import {
   resolvePhotoFieldTarget,
   resolveCanvasMarqueeSelectionEnabled,
   scenePointFromInteractionEvent,
-  scenePointToClient,
+  resolveTextFloatingAnchor,
+  type TextFloatingAnchor,
   activateClonedObjects,
   cloneFabricObjects,
   getKeyboardTargetObjects,
@@ -116,7 +117,7 @@ export interface CanvasEventHandlerDeps {
   canvasWidthRef: MutableRefObject<number>;
   guidesRef: MutableRefObject<{ axis: 'h' | 'v'; pos: number }[] | undefined>;
   snapLinesRef: MutableRefObject<((lines: { axis: 'h' | 'v'; pos: number }[]) => void) | undefined>;
-  onTextFloatingAnchorRef: MutableRefObject<((pos: { x: number; y: number } | null) => void) | undefined>;
+  onTextFloatingAnchorRef: MutableRefObject<((pos: TextFloatingAnchor | null) => void) | undefined>;
   onTextEditCommittedRef: MutableRefObject<(() => void) | undefined>;
   resolveImageFileUrlRef: MutableRefObject<ResolveImageFileUrl | undefined>;
   remoteUrlHandlerRef: MutableRefObject<((url: string) => Promise<void>) | undefined>;
@@ -267,14 +268,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
               cb(null);
               return;
             }
-            const br = active.getBoundingRect();
-            const cx = br.left + br.width / 2;
-            const cy = br.top;
-            const { x, y } = scenePointToClient(canvas, cx, cy);
-            const margin = 72;
-            const clampedX = Math.min(window.innerWidth - margin, Math.max(margin, x));
-            const clampedY = Math.min(window.innerHeight - margin, Math.max(margin, y));
-            cb({ x: clampedX, y: clampedY });
+            cb(resolveTextFloatingAnchor(canvas, active));
           });
         };
         scheduleTextAnchorRef.current = scheduleTextAnchor;

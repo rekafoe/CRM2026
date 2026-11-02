@@ -80,8 +80,10 @@ export {
   normalizeTextForFabric,
   pinFabricHiddenTextarea,
   scenePointToClient,
+  resolveTextFloatingAnchor,
   isMobileTextInputEnvironment,
 } from './canvasTextEditing';
+export type { TextFloatingAnchor } from './canvasTextEditing';
 export { asAny, isTextLikeObject, CLIPBOARD_PASTE_OFFSET_PX } from './canvasUtils';
 export { registerCanvasEventHandlers } from './registerCanvasEventHandlers';
 export type { CanvasEventHandlerDeps, CropModalState } from './registerCanvasEventHandlers';

@@ -16,6 +16,10 @@
   color: #0f172a;
 }
 
+.text-floating-toolbar--below {
+  transform: translate(-50%, 12px);
+}
+
 .text-floating-toolbar::after {
   content: '';
   position: absolute;
@@ -26,6 +30,14 @@
   border-top-color: #fff;
   filter: drop-shadow(0 1px 0 #e2e8f0);
   pointer-events: none;
+}
+
+.text-floating-toolbar--below::after {
+  bottom: auto;
+  top: -7px;
+  border-top-color: transparent;
+  border-bottom-color: #fff;
+  filter: drop-shadow(0 -1px 0 #e2e8f0);
 }
 
 .text-floating-toolbar__edit {

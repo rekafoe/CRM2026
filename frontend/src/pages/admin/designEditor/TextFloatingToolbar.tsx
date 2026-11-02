@@ -4,7 +4,7 @@ import { TextFormattingControls, type TextFormattingHandlers } from './TextForma
 import type { SelectedObjProps } from './types';
 
 export type TextFloatingToolbarProps = TextFormattingHandlers & {
-  anchor: { x: number; y: number };
+  anchor: { x: number; y: number; placement?: 'above' | 'below' };
   selectedObj: SelectedObjProps;
 };
 
@@ -23,6 +23,7 @@ export const TextFloatingToolbar: React.FC<TextFloatingToolbarProps> = ({
       selectedObj={selectedObj}
       variant="floating"
       floatingStyle={{ left: anchor.x, top: anchor.y }}
+      floatingPlacement={anchor.placement ?? 'above'}
       onFloatingMouseDown={stop}
     />,
     document.body,

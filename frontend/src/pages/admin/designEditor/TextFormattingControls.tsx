@@ -29,6 +29,8 @@ interface TextFormattingControlsProps extends TextFormattingHandlers {
   variant: 'floating' | 'panel' | 'mobile-dock';
   /** Позиция только для variant=floating */
   floatingStyle?: React.CSSProperties;
+  /** above — над текстом, выше маркера поворота; below — под текстом, если сверху нет места */
+  floatingPlacement?: 'above' | 'below';
   onFloatingMouseDown?: (e: React.SyntheticEvent) => void;
   /** Выравнивание: в панели по умолчанию с «по ширине» */
   alignOptions?: ('left' | 'center' | 'right' | 'justify')[];
@@ -38,6 +40,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
   selectedObj,
   variant,
   floatingStyle,
+  floatingPlacement = 'above',
   onFloatingMouseDown,
   alignOptions,
   onFontChange,
@@ -240,7 +243,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
   if (variant === 'floating') {
     return (
       <div
-        className="text-floating-toolbar"
+        className={`text-floating-toolbar${floatingPlacement === 'below' ? ' text-floating-toolbar--below' : ''}`}
         style={floatingStyle}
         role="toolbar"
         aria-label="Форматирование текста"

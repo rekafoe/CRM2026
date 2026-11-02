@@ -20,6 +20,12 @@ export function isMobileTextInputEnvironment(): boolean {
   );
 }
 
+export type TextFloatingAnchor = {
+  x: number;
+  y: number;
+  placement: 'above' | 'below';
+};
+
 /** Сцена Fabric → координаты клиента (для плавающей панели над текстом) */
 export function scenePointToClient(canvas: Canvas, sx: number, sy: number): { x: number; y: number } {
   const vpt = canvas.viewportTransform!;
@@ -30,6 +36,77 @@ export function scenePointToClient(canvas: Canvas, sx: number, sy: number): { x:
     x: b.left + (vp.x / upper.width) * b.width,
     y: b.top + (vp.y / upper.height) * b.height,
   };
+}
+
+type RotationMarkerPoint = { x: number; y: number };
+
+function canvasPixelToClient(canvas: Canvas, px: number, py: number): { x: number; y: number } | null {
+  const upper = canvas.upperCanvasEl;
+  if (!upper || upper.width <= 0 || upper.height <= 0) return null;
+  const b = upper.getBoundingClientRect();
+  return {
+    x: b.left + (px / upper.width) * b.width,
+    y: b.top + (py / upper.height) * b.height,
+  };
+}
+
+/** Маркер поворота (mtr) в координатах клиента. oCoords — пиксели viewport холста. */
+function rotationMarkerClientBox(
+  canvas: Canvas,
+  active: FabricObject,
+): { top: number; bottom: number } | null {
+  const upper = canvas.upperCanvasEl;
+  if (!upper || upper.height <= 0) return null;
+  const withCoords = active as FabricObject & { oCoords?: Record<string, RotationMarkerPoint> };
+  if (!withCoords.oCoords?.mtr) {
+    try {
+      active.setCoords();
+    } catch {
+      return null;
+    }
+  }
+  const mtr = withCoords.oCoords?.mtr;
+  if (!mtr || !Number.isFinite(mtr.x) || !Number.isFinite(mtr.y)) return null;
+  const center = canvasPixelToClient(canvas, mtr.x, mtr.y);
+  if (!center) return null;
+  const cssScale = upper.getBoundingClientRect().height / upper.height;
+  const radius = Math.max(16, Number(active.cornerSize ?? 18) * cssScale * 0.65);
+  return { top: center.y - radius, bottom: center.y + radius };
+}
+
+/**
+ * Якорь плавающей панели так, чтобы её низ (или верх) не накрывал маркер поворота.
+ * Панель общая для CRM и сайта.
+ */
+export function resolveTextFloatingAnchor(
+  canvas: Canvas,
+  active: FabricObject,
+): TextFloatingAnchor | null {
+  const upper = canvas.upperCanvasEl;
+  if (!upper?.isConnected) return null;
+  const br = active.getBoundingRect();
+  const cx = br.left + br.width / 2;
+  const top = scenePointToClient(canvas, cx, br.top);
+  const bottom = scenePointToClient(canvas, cx, br.top + br.height);
+  const margin = 72;
+  const x = Math.min(window.innerWidth - margin, Math.max(margin, top.x));
+  const marker = rotationMarkerClientBox(canvas, active);
+  const air = 14;
+  let y = top.y;
+  if (marker && marker.top < top.y + 4) {
+    y = Math.min(y, marker.top - air);
+  } else if (!marker) {
+    y = top.y - 56;
+  }
+  const estimatedToolbarHeight = 72;
+  if (y - estimatedToolbarHeight < 8) {
+    let below = bottom.y;
+    if (marker && marker.bottom > bottom.y - 4) {
+      below = Math.max(below, marker.bottom + air);
+    }
+    return { x, y: below, placement: 'below' };
+  }
+  return { x, y, placement: 'above' };
 }
 
 export function pinFabricHiddenTextarea(canvas: Canvas, text: IText): void {

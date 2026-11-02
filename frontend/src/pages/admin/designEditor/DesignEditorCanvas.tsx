@@ -194,8 +194,8 @@ interface DesignEditorCanvasProps {
   guideLinesPx?: { axis: 'h' | 'v'; pos: number }[];
   /** Callback: вернуть snap-линии для overlay рендера */
   onSnapLinesChange?: (lines: { axis: 'h' | 'v'; pos: number }[]) => void;
-  /** Якорь плавающей панели текста (центр верхней границы bbox), экранные координаты */
-  onTextFloatingAnchor?: (pos: { x: number; y: number } | null) => void;
+  /** Якорь плавающей панели текста, экранные координаты. Панель не накрывает маркер поворота. */
+  onTextFloatingAnchor?: (pos: { x: number; y: number; placement: 'above' | 'below' } | null) => void;
   /** Optional upload hook: returns stable URL that is persisted in Fabric JSON instead of blob:. */
   resolveImageFileUrl?: ResolveImageFileUrl;
   /** basic: напоминание, если после правки текст пустой или шаблонный */
