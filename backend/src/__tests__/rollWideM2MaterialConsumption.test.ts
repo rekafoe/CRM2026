@@ -189,4 +189,76 @@ describe('roll_wide_m2 material write-off by running meters', () => {
     expect(result.layout?.metersNeeded).toBeCloseTo(2.5, 4);
     expect(result.materialPrice).toBeCloseTo(2.5 * materialPricePerMeter, 4);
   });
+
+  it('rejects when print fits the printer but neither side fits the material roll', async () => {
+    // Принтер 1600 мм уже пропустил бы 1400×1300 (короткая сторона ≤ max_width),
+    // а рулон 610 мм — нет. Раньше считали 1×sheet_price вместо отказа.
+    await expect(
+      SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'roll',
+          material_id: materialId,
+          print_technology: 'inkjet_solvent',
+          trim_size: { width: 1400, height: 1300 },
+        },
+        1,
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/не помещается на рулон материала шириной 610/i),
+    });
+  });
+
+  it('rejects roll_wide when material has no sheet_width (no sheet-qty fallback)', async () => {
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return {
+            id: 1,
+            name: 'ШФП постер',
+            calculator_type: 'simplified',
+            product_type: 'universal',
+          };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('sheet_width, sheet_height FROM materials')) {
+          return { sheet_width: null, sheet_height: null };
+        }
+        if (query.includes('sheet_price_single FROM materials')) {
+          return { sheet_price_single: materialPricePerMeter };
+        }
+        if (query.includes('FROM materials m') && query.includes('paper_type_id')) {
+          return { name: 'Баннер без ширины', density: null, paper_type_id: null };
+        }
+        if (query.includes('FROM print_prices') && query.includes("counter_unit = 'meters'")) {
+          return null;
+        }
+        if (query.includes('FROM price_types WHERE key = ?')) {
+          return null;
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    await expect(
+      SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'roll',
+          material_id: materialId,
+          print_technology: 'inkjet_solvent',
+          trim_size: { width: 300, height: 500 },
+        },
+        1,
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/не задана ширина \(sheet_width\)/i),
+    });
+  });
 });
