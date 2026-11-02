@@ -86,7 +86,12 @@ export function attachAmountsToItems<T extends ItemLike>(items: T[]): Array<T & 
   }));
 }
 
-/** Уже полученные деньги. Ссылка BePaid в ожидании и провал оплаты сюда не входят. */
+/**
+ * Уже полученные деньги.
+ * Ссылка BePaid в ожидании и провал оплаты сюда не входят.
+ * Статус bank — платёжка по счёту (paymentMethod остаётся online, чтобы не попасть в кассу дня):
+ * сумма уже у юрлица, при выдаче её нельзя снова класть в debt_closed как наличные.
+ */
 export function collectedPrepaymentAmount(order: {
   prepaymentAmount?: number | string | null
   prepaymentStatus?: string | null
@@ -95,7 +100,7 @@ export function collectedPrepaymentAmount(order: {
   const prepay = round2(parseNum(order.prepaymentAmount))
   if (prepay <= 0) return 0
   const status = String(order.prepaymentStatus ?? '').trim().toLowerCase()
-  if (status === 'paid' || status === 'successful') return prepay
+  if (status === 'paid' || status === 'successful' || status === 'bank') return prepay
   const method = String(order.paymentMethod ?? '').trim().toLowerCase()
   if (method === 'online' || method === 'telegram') return 0
   if (status === 'pending' || status === 'failed' || status === 'cancelled' || status === 'canceled') return 0
