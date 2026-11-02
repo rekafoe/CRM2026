@@ -180,6 +180,19 @@ function enrichParamsWithPreflight(
   }
 }
 
+function raiseClientRenderedPageCount(params: Record<string, unknown>, copiedProductionPages: number): void {
+  if (!(copiedProductionPages > 0)) return
+  if (params.productionRenderSource !== 'client_png') return
+  const manifest = params.clientRenderedPages
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return
+  const record = manifest as Record<string, unknown>
+  if (record.source !== 'client_png') return
+  const current = Math.floor(Number(record.pageCount))
+  if (!Number.isFinite(current) || current < copiedProductionPages) {
+    record.pageCount = copiedProductionPages
+  }
+}
+
 export type PreparedEditorDraftItem = { index: number; tokens: string[] }
 
 export async function prepareWebsiteItemsWithEditorDrafts<
@@ -294,14 +307,16 @@ export async function attachEditorDraftsToOrderItems(
     const orderItemId = itemIds[draftItem.index]
     if (!orderItemId) throw new Error('Не найдена позиция заказа для editor draft')
     const fileNameByDraftFileId = new Map<number, string>()
+    let partOffset = 0
 
     for (const token of draftItem.tokens) {
       const draft = await getEditorDraft(token)
       if (!draft) throw new Error('Draft не найден')
       if (draft.status !== 'draft') throw new Error('Draft уже финализирован')
 
-      const copied = await copyEditorDraftFilesToOrderItem(draft.id, orderId, orderItemId)
-      for (const [fileId, filename] of copied) fileNameByDraftFileId.set(fileId, filename)
+      const copied = await copyEditorDraftFilesToOrderItem(draft.id, orderId, orderItemId, partOffset)
+      partOffset += copied.productionPageCount
+      for (const [fileId, filename] of copied.fileNameByDraftFileId) fileNameByDraftFileId.set(fileId, filename)
 
       await db.run(
         `UPDATE editor_drafts SET status = 'finalized', order_id = ?, updated_at = datetime('now') WHERE token = ?`,
@@ -317,6 +332,7 @@ export async function attachEditorDraftsToOrderItems(
       try {
         const params = JSON.parse(item.params) as Record<string, unknown>
         normalizeDesignStateDraftImageUrls(params.designState, fileNameByDraftFileId)
+        raiseClientRenderedPageCount(params, partOffset)
         const enriched = enrichParamsWithPreflight(params, params.designState, orderItemId)
         await db.run(
           'UPDATE items SET params = ? WHERE id = ? AND orderId = ?',
