@@ -75,6 +75,31 @@ function normalizeMail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+export async function readEmailConsent(email: string): Promise<boolean | null> {
+  const mail = normalizeMail(email);
+  if (!mail) return null;
+  const db = await getDb();
+  const row = await db.get<{ opted_in: number }>(
+    'SELECT opted_in FROM marketing_email_consents WHERE email = ?',
+    [mail]
+  );
+  if (!row) return null;
+  return Number(row.opted_in) === 1;
+}
+
+export async function upsertEmailConsent(email: string, subscribed: boolean): Promise<void> {
+  const mail = normalizeMail(email);
+  if (!mail) return;
+  const db = await getDb();
+  const now = new Date().toISOString();
+  await db.run(
+    `INSERT INTO marketing_email_consents (email, opted_in, updated_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(email) DO UPDATE SET opted_in = excluded.opted_in, updated_at = excluded.updated_at`,
+    [mail, subscribed ? 1 : 0, now]
+  );
+}
+
 export async function accountMailingStatus(email: string): Promise<AccountMailingStatus> {
   const mail = normalizeMail(email);
   if (!mail) return 'absent';
@@ -87,14 +112,16 @@ export async function accountMailingStatus(email: string): Promise<AccountMailin
     [mail]
   );
   const total = Number(row?.total ?? 0);
-  if (total < 1) return 'absent';
-  return Number(row?.subscribed ?? 0) > 0 ? 'subscribed' : 'unsubscribed';
+  if (total > 0) return Number(row?.subscribed ?? 0) > 0 ? 'subscribed' : 'unsubscribed';
+  const consent = await readEmailConsent(mail);
+  if (consent === null) return 'absent';
+  return consent ? 'subscribed' : 'unsubscribed';
 }
 
 export async function setAccountMailing(email: string, subscribed: boolean): Promise<AccountMailingStatus> {
   const mail = normalizeMail(email);
-  const current = await accountMailingStatus(mail);
-  if (current === 'absent') return 'absent';
+  if (!mail) return 'absent';
+  await upsertEmailConsent(mail, subscribed);
   const db = await getDb();
   const now = new Date().toISOString();
   if (subscribed) {
@@ -138,6 +165,11 @@ export async function unsubscribeByToken(token: string): Promise<{ ok: boolean; 
   if (changes < 1) {
     return { ok: false, error: 'Unknown token' }
   }
+  const owner = await db.get<{ email: string | null }>(
+    'SELECT email FROM customers WHERE unsubscribe_token = ?',
+    [t]
+  )
+  if (owner?.email) await upsertEmailConsent(owner.email, false)
   logger.info('Customer unsubscribed from marketing', { tokenPrefix: t.slice(0, 6) + '…' })
   return { ok: true }
 }

@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { readEmailConsent } from '../../../services/customerEmailMarketingService'
 import { getDb } from '../../../config/database'
 import { sqlOrderTotalAfterDiscount } from '../../../utils/orderAmountsSql'
 import { notWaitingStatusSql } from '../../../utils/orderFulfillmentScope'
@@ -318,7 +319,11 @@ export class CustomerService {
     }
 
     const src = normalizeCustomerSource(data.source)
-    const marketingOptIn = data.marketing_opt_in === 0 ? 0 : 1
+    let marketingOptIn: 0 | 1 = data.marketing_opt_in === 0 ? 0 : 1
+    if (data.marketing_opt_in === undefined && data.email) {
+      const storedConsent = await readEmailConsent(data.email)
+      if (storedConsent === false) marketingOptIn = 0
+    }
     const unsubToken = randomBytes(24).toString('hex')
     const managerUserId = data.type === 'legal' && data.manager_user_id ? data.manager_user_id : null
     if (managerUserId) await this.assertManagerUser(managerUserId)
