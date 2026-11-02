@@ -22,13 +22,18 @@ export const SendPaymentLinkModal: React.FC<Props> = ({
   onUpdated,
   onToast,
 }) => {
-  const paid = isPaidPrepaymentStatus(order.prepaymentStatus);
-  const paidAmount = paid ? parseNumberFlexible(order.prepaymentAmount ?? 0) : 0;
+  const statusLower = String(order.prepaymentStatus ?? '').toLowerCase();
+  // bank — платёжка по счёту уже зачтена; не подставлять полный итог и не форсировать recreate.
+  const settled =
+    isPaidPrepaymentStatus(order.prepaymentStatus) || statusLower === 'bank';
+  const paidAmount = settled ? parseNumberFlexible(order.prepaymentAmount ?? 0) : 0;
   const total =
     typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
       ? order.totalAmount
       : 0;
-  const suggested = Math.max(debtAmount, Math.max(0, total - paidAmount));
+  const remainder = Math.max(0, total - paidAmount);
+  // При settled debtAmount с main ещё может игнорировать bank — не раздуваем suggested.
+  const suggested = settled ? remainder : Math.max(debtAmount, remainder);
 
   const [amount, setAmount] = useState(String(suggested > 0 ? suggested.toFixed(2) : ''));
   const [channel, setChannel] = useState<SendPaymentLinkChannel>('both');
@@ -65,7 +70,8 @@ export const SendPaymentLinkModal: React.FC<Props> = ({
       const { data } = await sendOrderPaymentLink(order.id, {
         amount: value,
         channel,
-        recreate: recreate || !paymentUrl,
+        // Без URL у bank/paid не форсируем recreate: бэкенд сам откроет checkout на остаток.
+        recreate: recreate || (!paymentUrl && !settled),
       });
       onUpdated(data);
       const parts: string[] = [];

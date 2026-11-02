@@ -1534,13 +1534,20 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
   const total = Number(order.totalAmount ?? 0)
   const existingPrepay = Number(order.prepaymentAmount ?? 0)
   const statusLower = String(order.prepaymentStatus ?? '').toLowerCase()
-  const isPaid = statusLower === 'paid' || statusLower === 'successful'
-  const paidAmount = isPaid ? existingPrepay : 0
-  const defaultAmount = Math.max(0, total - paidAmount)
+  // paid/successful — уже получено; bank — подтверждённая платёжка по счёту (не BePaid).
+  // Их нельзя переписывать в pending: иначе затирается зачёт и клиенту уходит повторный счёт.
+  const isSettled =
+    statusLower === 'paid' || statusLower === 'successful' || statusLower === 'bank'
+  const paidAmount = isSettled ? existingPrepay : 0
+  const remainder = Math.max(0, total - paidAmount)
 
-  const amount = Number(body.amount ?? defaultAmount)
+  const amount = Number(body.amount ?? remainder)
   if (!Number.isFinite(amount) || amount <= 0) {
     res.status(400).json({ message: 'Сумма оплаты должна быть больше нуля' })
+    return
+  }
+  if (isSettled && amount > remainder + 0.009) {
+    res.status(400).json({ message: 'Сумма превышает остаток долга по заказу' })
     return
   }
 
@@ -1568,8 +1575,7 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
     !paymentUrl ||
     amountChanged ||
     String(order.paymentMethod).toLowerCase() !== 'online' ||
-    String(order.prepaymentStatus).toLowerCase() === 'paid' ||
-    String(order.prepaymentStatus).toLowerCase() === 'successful'
+    isSettled
 
   if (needsNewCheckout) {
     if (!isValidEmailAddress(email)) {
@@ -1604,22 +1610,33 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
       return
     }
 
-    let hasPrepaymentUpdatedAt = false
-    try {
-      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-    } catch {
-      hasPrepaymentUpdatedAt = false
-    }
-    const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
-    const todayLocal = (todayRow?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
-    const prepaymentMoment = `${todayLocal} 12:00:00`
-    const updateSql = hasPrepaymentUpdatedAt
-      ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
-      : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
-    if (hasPrepaymentUpdatedAt) {
-      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', prepaymentMoment, id)
+    if (isSettled) {
+      // Уже зачтённая сумма (в т.ч. bank) остаётся; webhook при оплате доначислит installment.
+      await db.run(
+        `UPDATE orders SET paymentUrl = ?, paymentId = ?, paymentMethod = 'online',
+         updated_at = datetime('now') WHERE id = ?`,
+        paymentUrl,
+        paymentId,
+        id,
+      )
     } else {
-      await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', id)
+      let hasPrepaymentUpdatedAt = false
+      try {
+        hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+      } catch {
+        hasPrepaymentUpdatedAt = false
+      }
+      const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
+      const todayLocal = (todayRow?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+      const prepaymentMoment = `${todayLocal} 12:00:00`
+      const updateSql = hasPrepaymentUpdatedAt
+        ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
+        : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      if (hasPrepaymentUpdatedAt) {
+        await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', prepaymentMoment, id)
+      } else {
+        await db.run(updateSql, amount, 'pending', paymentUrl, paymentId, 'online', id)
+      }
     }
   }
 
