@@ -3,6 +3,7 @@ import {
   computeItemLineTotal,
   computeOrderAmounts,
   discountedItemAmounts,
+  isNonCashCollectedPrepayment,
   issueCashRemainder,
   parseMoneyInput,
 } from '../utils/orderAmounts';
@@ -121,4 +122,22 @@ describe('orderAmounts', () => {
       }),
     ).toBe(150);
   });
+
+  it('marks bank and successful online/telegram as non-cash collected (do not seal offline on issue)', () => {
+    expect(
+      isNonCashCollectedPrepayment({ prepaymentStatus: 'bank', paymentMethod: 'online' }),
+    ).toBe(true)
+    expect(
+      isNonCashCollectedPrepayment({ prepaymentStatus: 'paid', paymentMethod: 'online' }),
+    ).toBe(true)
+    expect(
+      isNonCashCollectedPrepayment({ prepaymentStatus: 'successful', paymentMethod: 'telegram' }),
+    ).toBe(true)
+    expect(
+      isNonCashCollectedPrepayment({ prepaymentStatus: 'paid', paymentMethod: 'offline' }),
+    ).toBe(false)
+    expect(
+      isNonCashCollectedPrepayment({ prepaymentStatus: 'pending', paymentMethod: 'online' }),
+    ).toBe(false)
+  })
 });
