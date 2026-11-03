@@ -5,9 +5,19 @@ import { fontFamilyLooseMatchName } from './fontFamilyNormalize';
 export type FontFileMetadata = {
   family?: string
   preferredFamily?: string
+  /** name ID 2 — Font Subfamily (Bold, Italic, Regular…). */
+  subfamily?: string
+  /** name ID 17 — Typographic Subfamily. */
+  typographicSubfamily?: string
   fullName?: string
   postscript?: string
   allNames: string[]
+}
+
+export type FontFaceVariant = {
+  /** CSS font-weight: 100…900. */
+  weight: string
+  style: 'normal' | 'italic'
 }
 
 function readUint16(view: DataView, offset: number): number {
@@ -98,6 +108,8 @@ export function readFontMetadataFromBuffer(input: ArrayBuffer | Uint8Array): Fon
   return {
     family: pick(1),
     preferredFamily: pick(16) ?? pick(1),
+    subfamily: pick(2),
+    typographicSubfamily: pick(17),
     fullName: pick(4),
     postscript: pick(6),
     allNames,
@@ -131,4 +143,77 @@ export function collectFontNameAliases(meta: FontFileMetadata | null | undefined
     }
   }
   return out
+}
+
+const SUBFAMILY_WEIGHTS: Array<[RegExp, string]> = [
+  [/extra[\s-]?light|ultra[\s-]?light/i, '200'],
+  [/semi[\s-]?bold|demi[\s-]?bold/i, '600'],
+  [/extra[\s-]?bold|ultra[\s-]?bold/i, '800'],
+  [/\bthin\b/i, '100'],
+  [/\blight\b/i, '300'],
+  [/\bmedium\b/i, '500'],
+  [/\b(black|heavy)\b/i, '900'],
+  [/\bbold\b/i, '700'],
+  [/\b(regular|normal|roman|book)\b/i, '400'],
+]
+
+/** CSS font-weight для Fabric и @font-face. `normal` → 400, `bold` → 700. */
+export function cssFontWeightToken(value: unknown): string {
+  if (value === 'bold' || value === 'bolder') return '700'
+  if (value === 'normal' || value === 'lighter' || value == null || value === '') return '400'
+  const n = typeof value === 'number' ? value : Number(String(value).trim())
+  if (!Number.isFinite(n)) return '400'
+  const snapped = Math.round(n / 100) * 100
+  return String(Math.min(900, Math.max(100, snapped)))
+}
+
+function variantFromSubfamily(subfamily: string | undefined): { weight?: string; italic: boolean } {
+  if (!subfamily?.trim()) return { italic: false }
+  const italic = /italic|oblique|itallic/i.test(subfamily)
+  let weight: string | undefined
+  for (const [re, token] of SUBFAMILY_WEIGHTS) {
+    if (re.test(subfamily)) {
+      weight = token
+      break
+    }
+  }
+  return { weight, italic }
+}
+
+function readOs2Selection(bytes: Uint8Array): { weight: number; italic: boolean } | null {
+  const table = findTable(bytes, 'OS/2')
+  if (!table || table.length < 64 || table.offset + 64 > bytes.length) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  return {
+    weight: view.getUint16(table.offset + 4, false),
+    italic: (view.getUint16(table.offset + 62, false) & 1) === 1,
+  }
+}
+
+/**
+ * Вес и стиль из файла. Браузер сверяет OS/2 usWeightClass с CSS font-weight:
+ * Bold-файл, зарегистрированный как normal, для обычного текста не выбирается.
+ */
+export function readFontFaceVariant(input: ArrayBuffer | Uint8Array): FontFaceVariant | null {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input)
+  if (!isSfnt(bytes)) return null
+  const meta = readFontMetadataFromBuffer(bytes)
+  const os2 = readOs2Selection(bytes)
+  const fromName = variantFromSubfamily(meta?.typographicSubfamily || meta?.subfamily || meta?.fullName)
+  let weight = '400'
+  if (os2 && os2.weight >= 1 && os2.weight <= 1000) weight = cssFontWeightToken(os2.weight)
+  else if (fromName.weight) weight = fromName.weight
+  const italic = Boolean(os2?.italic) || fromName.italic
+  return { weight, style: italic ? 'italic' : 'normal' }
+}
+
+/** Начертание, которое надо записать в текст. Regular не трогаем — его можно сделать жирным синтетически. */
+export function linkedFontPropsFromStored(
+  weight: unknown,
+  style: unknown,
+): { fontWeight: string; fontStyle: string } | null {
+  const cssWeight = cssFontWeightToken(weight)
+  const cssStyle = style === 'italic' || style === 'oblique' ? 'italic' : 'normal'
+  if (cssWeight === '400' && cssStyle === 'normal') return null
+  return { fontWeight: cssWeight, fontStyle: cssStyle }
 }

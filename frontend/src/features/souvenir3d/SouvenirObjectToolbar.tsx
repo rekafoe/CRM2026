@@ -1,10 +1,16 @@
 import React, { useRef } from 'react';
+import { SOUVENIR_CANVAS_PX_PER_MM } from '../../../../backend/src/utils/souvenirFabricCoords';
 import type { SouvenirSelectedObject } from './types';
+
+function fontSizeMm(selected: SouvenirSelectedObject): number {
+  const scaleX = selected.scaleX && selected.scaleX !== 0 ? selected.scaleX : 1;
+  return Math.round(((selected.fontSize ?? 28) * scaleX) / SOUVENIR_CANVAS_PX_PER_MM);
+}
 
 type Props = {
   selected: SouvenirSelectedObject | null;
   anchor: { x: number; y: number } | null;
-  onTextChange: (patch: { text?: string; fill?: string; fontSize?: number }) => void;
+  onTextChange: (patch: { text?: string; fill?: string; fontSizeMm?: number }) => void;
   onOpacityChange: (opacity: number) => void;
   onScale: (factor: number) => void;
   onRotate: (deltaDegrees: number) => void;
@@ -92,13 +98,13 @@ export const SouvenirObjectToolbar: React.FC<Props> = ({
           />
           <div className="souvenir3d-object-toolbar__row">
             <label>
-              Размер
+              Размер, мм
               <input
                 type="number"
-                min={8}
-                max={240}
-                value={Math.round(selected.fontSize ?? 28)}
-                onChange={(event) => onTextChange({ fontSize: Number(event.target.value) })}
+                min={4}
+                max={180}
+                value={fontSizeMm(selected)}
+                onChange={(event) => onTextChange({ fontSizeMm: Number(event.target.value) })}
               />
             </label>
             <label>
@@ -152,7 +158,7 @@ export const SouvenirObjectToolbar: React.FC<Props> = ({
         <GestureButton
           className="souvenir3d-object-toolbar__gesture"
           title="Потяните для поворота"
-          label="↻ Поворот"
+          label="Поворот"
           onDelta={(dx) => onRotate(dx * 0.7)}
         />
       </div>

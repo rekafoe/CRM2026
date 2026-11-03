@@ -58,6 +58,8 @@ export type SouvenirSelectedObject = {
   text?: string;
   fill?: string;
   fontSize?: number;
+  /** Множитель Fabric. Визуальный кегль в мм = fontSize * scaleX / SOUVENIR_CANVAS_PX_PER_MM. */
+  scaleX?: number;
   opacity: number;
 };
 

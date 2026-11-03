@@ -5,6 +5,7 @@ import {
   getSubtypeDesigns,
 } from '../../api';
 import { buildEmptyDesignState } from '../../pages/admin/designEditor/designEditorState';
+import { SOUVENIR_CANVAS_PX_PER_MM } from '../../../../backend/src/utils/souvenirFabricCoords';
 import type { ProductPrintAreaConfig, SimplifiedConfig, SimplifiedSizeConfig } from '../productTemplate/hooks/useProductTemplate';
 import { DEFAULT_PRINT_AREA_TSHIRT, parsePrintAreas } from './types';
 
@@ -308,11 +309,12 @@ export async function ensureSouvenirBlankDesignTemplate(input: {
     pageWidth: area.widthMm,
     pageHeight: area.heightMm,
     pageCount: areas.length,
-    // Явный scale=1: координаты объектов и production PDF в одном пространстве.
+    // Явный scale=1: координаты в px при 96 DPI, как у полиграфии.
     // Не угадываем 3/6 — иначе макет в PDF уезжает вверх-влево.
     sceneScale: 1,
   });
   designState.editorKind = 'souvenir_3d';
+  designState.souvenirPxPerMm = SOUVENIR_CANVAS_PX_PER_MM;
   designState.activePrintAreaId = area.id;
   designState.usedPrintAreaIds = [];
   designState.pages = areas.map((printArea) => ({

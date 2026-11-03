@@ -1,6 +1,13 @@
 import { API_BASE_URL } from '../config/constants';
 import { APP_CONFIG } from '../types';
-import { collectFontNameAliases, readFontMetadataFromBuffer } from './fontFileMetadata';
+import {
+  collectFontNameAliases,
+  cssFontWeightToken,
+  linkedFontPropsFromStored,
+  readFontFaceVariant,
+  readFontMetadataFromBuffer,
+  type FontFaceVariant,
+} from './fontFileMetadata';
 import { fontFamilyCompactKey, fontFamilyBaseCompactKey, fontFamilyLooseMatchName, normalizeFontFamilyName } from './fontFamilyNormalize';
 
 export type RequiredFontSpecEntry = {
@@ -18,6 +25,8 @@ export type CrmLibraryFont = {
   name_aliases?: string[];
   url?: string;
   format?: string;
+  weight?: string;
+  style?: string;
 };
 
 /** Сопоставление family из макета с записью библиотеки CRM (family_name + алиасы). */
