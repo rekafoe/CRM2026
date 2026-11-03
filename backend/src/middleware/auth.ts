@@ -186,11 +186,14 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   // где дополнительно проверяются заказ/source и payload.
   const websiteOrderFilesPath = /\/api\/orders\/[0-9]+\/files$/
   const websiteExternalFilesPath = /\/api\/orders\/[0-9]+\/external-files(?:\/[0-9]+)?$/
+  const websiteCrmPhotoPdfPath = /\/api\/orders\/[0-9]+\/crm-photo-pdf$/
   const requestPath = req.originalUrl?.split('?')[0] || req.path
   const isWebsiteOrderFilesPath = req.method === 'POST' && (websiteOrderFilesPath.test(req.path) || websiteOrderFilesPath.test(requestPath))
   const isWebsiteExternalFilesPath = (req.method === 'POST' || req.method === 'PATCH')
     && (websiteExternalFilesPath.test(req.path) || websiteExternalFilesPath.test(requestPath))
-  const isWebsiteOrderFilesWithWebsiteKey = (isWebsiteOrderFilesPath || isWebsiteExternalFilesPath) && isWebsiteOrderApiKeyValid(req)
+  const isWebsiteCrmPhotoPdfPath = req.method === 'POST'
+    && (websiteCrmPhotoPdfPath.test(req.path) || websiteCrmPhotoPdfPath.test(requestPath))
+  const isWebsiteOrderFilesWithWebsiteKey = (isWebsiteOrderFilesPath || isWebsiteExternalFilesPath || isWebsiteCrmPhotoPdfPath) && isWebsiteOrderApiKeyValid(req)
 
   const isOpenPath = isRecalcPath
     || isWebsiteOrderFilesWithWebsiteKey
