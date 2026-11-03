@@ -550,6 +550,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                 <span>{new Date(file.uploadedAt).toLocaleDateString('ru-RU')}</span>
               )}
               {file.partNumber != null && <span>часть {file.partNumber}</span>}
+              {file.builtByCrm && <span className="fm-chip">CRM</span>}
               {file.artifactType && <span className="fm-chip">{file.artifactType}</span>}
               {external && (
                 <span className="fm-chip fm-chip--muted">

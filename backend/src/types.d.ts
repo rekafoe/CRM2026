@@ -16,6 +16,16 @@ declare module 'pdf-lib' {
   export interface PDFFont {
     name: string;
   }
+  export interface PDFImage {
+    width: number;
+    height: number;
+  }
+  export function clip(): any;
+  export function degrees(angle: number): any;
+  export function endPath(): any;
+  export function popGraphicsState(): any;
+  export function pushGraphicsState(): any;
+  export function rectangle(x: number, y: number, width: number, height: number): any;
   export class PDFDocument {
     static load(data: ArrayBuffer | Uint8Array, options?: PDFDocumentLoadOptions): Promise<PDFDocument>;
     static create(): Promise<PDFDocument>;
@@ -26,12 +36,19 @@ declare module 'pdf-lib' {
     addPage(size?: [number, number] | PDFPage): PDFPage;
     copyPages(source: PDFDocument, indices: number[]): Promise<PDFPage[]>;
     embedFont(font: string): Promise<PDFFont>;
+    embedJpg(jpg: Uint8Array | ArrayBuffer): Promise<PDFImage>;
+    embedPng(png: Uint8Array | ArrayBuffer): Promise<PDFImage>;
+    setTitle(title: string): void;
     save(): Promise<Uint8Array>;
   }
   export class PDFPage {
     getSize(): { width: number; height: number };
     getBleedBox?(): { x: number; y: number; width: number; height: number };
     drawText(text: string, options?: { x?: number; y?: number; size?: number; font?: PDFFont; color?: RGB }): void;
+    drawImage(image: PDFImage, options?: any): void;
+    drawRectangle(options?: any): void;
+    drawLine(options?: any): void;
+    pushOperators(...operators: any[]): void;
   }
 }
 

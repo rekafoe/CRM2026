@@ -35,10 +35,23 @@ import {
 } from '../services/editorProductionJobService'
 import { logger } from '../utils/logger'
 import { PhotoQueueRetryError, retryWebsitePhotoFiles } from '../services/photoQueueRetryService'
+import { CrmPhotoPdfError, startCrmPhotoPdf } from '../services/crmPhotoPdfService'
 import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition'
 import { Readable } from 'stream'
 
 const router = Router()
+
+function fileBuiltByCrm(row: { filename?: string; originalName?: string; metadata?: unknown }): boolean {
+  const name = `${row?.filename || ''} ${row?.originalName || ''}`
+  if (/_crm\.pdf$/i.test(name)) return true
+  if (!row?.metadata) return false
+  try {
+    const parsed = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata
+    return Boolean(parsed && typeof parsed === 'object' && (parsed as { origin?: unknown }).origin === 'crm')
+  } catch {
+    return false
+  }
+}
 
 function sanitizeOrderFileForClient(row: any): any {
   if (!row || !row.storage || row.storage === 'local') return row
@@ -49,6 +62,7 @@ function sanitizeOrderFileForClient(row: any): any {
     hasExternalKey: Boolean(externalKey),
     hasExternalBucket: Boolean(externalBucket),
     hasExternalMetadata: Boolean(metadata),
+    builtByCrm: fileBuiltByCrm(row),
   }
 }
 
@@ -585,6 +599,26 @@ router.patch('/:id/external-files/:fileId', (req, res, next) => {
   })
 
   res.json(sanitizeOrderFileForClient(file))
+}))
+
+/** Второй PDF фото. Сайт не ждёт сборку: ответ сразу, PDF пишется рядом с пометкой _crm. */
+router.post('/:id/crm-photo-pdf', requireWebsiteOrderApiKey, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  if (!Number.isFinite(orderId)) {
+    res.status(400).json({ message: 'Некорректный orderId' })
+    return
+  }
+  try {
+    const result = await startCrmPhotoPdf(orderId, req.body?.orders)
+    res.json({ ok: true, ...result })
+  } catch (error) {
+    if (error instanceof CrmPhotoPdfError) {
+      res.status(error.status).json({ message: error.message })
+      return
+    }
+    const message = error instanceof Error ? error.message : 'Не удалось запустить сборку CRM'
+    res.status(500).json({ message })
+  }
 }))
 
 /** Лёгкий эндпоинт до authenticate: только in-memory timestamp (см. PUBLIC_ROUTE_RULES). */

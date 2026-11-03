@@ -380,6 +380,8 @@ export interface OrderFile {
   hasExternalKey?: boolean;
   hasExternalBucket?: boolean;
   hasExternalMetadata?: boolean;
+  /** Второй PDF, собранный на бэкенде CRM. */
+  builtByCrm?: boolean;
 }
 
 export interface Printer {
