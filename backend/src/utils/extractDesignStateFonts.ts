@@ -1,3 +1,4 @@
+import { linkedFontPropsFromStored } from './fontFileMetadata'
 import {
   fontFamilyBaseCompactKey,
   fontFamilyCompactKey,
@@ -213,48 +214,63 @@ export function applyLibraryFontFallbacksToDesignState(
   return { ...(designState as Record<string, unknown>), pages: nextPages }
 }
 
-/** Приводит fontFamily в fabricJSON к family_name из библиотеки по алиасам (имя в SVG ≠ имя в файле). */
-export function normalizeDesignStateFontFamilies(
-  designState: unknown,
-  libraryFonts: Array<{ family_name: string; name_aliases?: string[] }>,
-): unknown {
-  if (!designState || typeof designState !== 'object' || Array.isArray(designState)) return designState
-  const pages = (designState as Record<string, unknown>).pages
-  if (!Array.isArray(pages)) return designState
+type LibraryFontLink = { family_name: string; name_aliases?: string[]; weight?: string; style?: string }
 
-  const aliasToCanonical = new Map<string, string>()
-  for (const font of libraryFonts) {
+function libraryFontByName(fonts: LibraryFontLink[]): Map<string, LibraryFontLink> {
+  const map = new Map<string, LibraryFontLink>()
+  for (const font of fonts) {
     const canonical = normalizeFontFamilyName(font.family_name)
     if (!canonical) continue
     const names = [canonical, ...(font.name_aliases ?? [])]
     for (const name of names) {
       for (const key of [fontFamilyCompactKey(name), fontFamilyBaseCompactKey(name)]) {
-        if (key) aliasToCanonical.set(key, canonical)
+        if (key) map.set(key, font)
       }
     }
   }
+  return map
+}
+
+function applyLibraryFontLink(
+  record: FabricObj,
+  inheritedFamily: string | undefined,
+  fontsByName: Map<string, LibraryFontLink>,
+  keepVariant = false,
+): string | undefined {
+  const raw = normalizeFontFamilyName(String(record.fontFamily ?? '')) || inheritedFamily || ''
+  if (!raw) return inheritedFamily
+  const font = fontsByName.get(fontFamilyCompactKey(raw)) ?? fontsByName.get(fontFamilyBaseCompactKey(raw))
+  const canonical = font ? normalizeFontFamilyName(font.family_name) : ''
+  if (record.fontFamily && canonical) record.fontFamily = canonical
+  if (keepVariant || record.fontVariantPinned === true) return canonical || raw
+  const linked = font ? linkedFontPropsFromStored(font.weight, font.style) : null
+  if (linked) {
+    record.fontWeight = linked.fontWeight
+    record.fontStyle = linked.fontStyle
+  }
+  return canonical || raw
+}
+
+/** Приводит fontFamily к имени из библиотеки и ставит вес/стиль загруженного файла. */
+export function normalizeDesignStateFontFamilies(
+  designState: unknown,
+  libraryFonts: LibraryFontLink[],
+): unknown {
+  if (!designState || typeof designState !== 'object' || Array.isArray(designState)) return designState
+  const pages = (designState as Record<string, unknown>).pages
+  if (!Array.isArray(pages)) return designState
+
+  const fontsByName = libraryFontByName(libraryFonts)
 
   const normalizeFabric = (value: unknown): void => {
     walkFabric(value, (obj) => {
-      const current = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
-      if (current) {
-        const canonical = aliasToCanonical.get(fontFamilyCompactKey(current))
-          ?? aliasToCanonical.get(fontFamilyBaseCompactKey(current))
-        if (canonical) obj.fontFamily = canonical
-      }
+      const family = applyLibraryFontLink(obj, undefined, fontsByName)
+      const keepVariant = obj.fontVariantPinned === true
       walkFabricTextStyles(obj, (style) => {
-        const segFont = normalizeFontFamilyName(String(style.fontFamily ?? ''))
-        if (!segFont) return
-        const canonical = aliasToCanonical.get(fontFamilyCompactKey(segFont))
-          ?? aliasToCanonical.get(fontFamilyBaseCompactKey(segFont))
-        if (canonical) style.fontFamily = canonical
+        applyLibraryFontLink(style, family, fontsByName, keepVariant)
       })
       walkFabricTextStyleRuns(obj, (run) => {
-        const segFont = normalizeFontFamilyName(String(run.fontFamily ?? ''))
-        if (!segFont) return
-        const canonical = aliasToCanonical.get(fontFamilyCompactKey(segFont))
-          ?? aliasToCanonical.get(fontFamilyBaseCompactKey(segFont))
-        if (canonical) run.fontFamily = canonical
+        applyLibraryFontLink(run as FabricObj, family, fontsByName, keepVariant)
       })
     })
   }

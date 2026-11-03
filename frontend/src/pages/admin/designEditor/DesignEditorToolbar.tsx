@@ -4,6 +4,7 @@ import { Button } from '../../../components/common';
 import { mergeFontSelectOptions, useCrmDesignFonts } from '../../../hooks/useCrmDesignFonts';
 import { fontFamilyCompactKey } from '../../../utils/fontFamilyNormalize';
 import { TEXT_FONTS } from './constants';
+import { isBoldFontWeight } from './textFormattingPresets';
 import type { SelectedObjProps } from './types';
 
 interface DesignEditorToolbarProps {
@@ -161,7 +162,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
           />
           <button
             type="button"
-            className={`design-editor-toolbar-icon-btn design-editor-fmt-btn${selectedObj.fontWeight === 'bold' ? ' is-active' : ''}`}
+            className={`design-editor-toolbar-icon-btn design-editor-fmt-btn${isBoldFontWeight(selectedObj.fontWeight) ? ' is-active' : ''}`}
             onClick={onFontWeightToggle}
             title="Жирный"
           >

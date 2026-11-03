@@ -34,6 +34,7 @@ import {
   isFabricTextObjectType,
 } from './designEditor/patchFabricTextObjects';
 import { applyDocumentTextPatch } from './designEditor/applyDocumentTextPatch';
+import { isBoldFontWeight } from './designEditor/textFormattingPresets';
 import { hasBlobUrl } from './designEditor/fabricJsonValidation';
 import { TextPatchScopeDialog } from './designEditor/TextPatchScopeDialog';
 import { useDesignTemplateAssetUpload } from './designEditor/useDesignTemplateAssetUpload';
@@ -687,7 +688,7 @@ export const DesignEditorPage: React.FC = () => {
   }, [activeCanvas]);
 
   const handleFontWeightToggle = useCallback(() => {
-    const w = selectedObj?.fontWeight === 'bold' ? 'normal' : 'bold';
+    const w = isBoldFontWeight(selectedObj?.fontWeight) ? 'normal' : 'bold';
     activeCanvas()?.setTextProp('fontWeight', w);
   }, [selectedObj?.fontWeight, activeCanvas]);
 

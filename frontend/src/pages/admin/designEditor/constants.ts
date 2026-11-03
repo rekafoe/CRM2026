@@ -93,6 +93,8 @@ export const FABRIC_CUSTOM_PROPS = [
   'textStyleRuns',
   /** Пользователь правил текст/формат — иначе после flip soft-load откатывает оформление. */
   'textFieldUserEdited',
+  /** Пользователь сам выбрал начертание — не подменять весом файла при перезагрузке шрифтов. */
+  'fontVariantPinned',
   'textFieldLayoutWidth',
   'textFieldUserLayoutWidth',
   /** Порядок слоя при SVG-импорте (z-order). */

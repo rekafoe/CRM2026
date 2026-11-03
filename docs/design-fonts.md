@@ -27,6 +27,8 @@ API пакетной загрузки: `POST /api/design-fonts/batch` (поле 
 
 После загрузки FontFace холст Fabric **пересчитывает** текстовые объекты (`reloadTextFonts`) — иначе в UI остаётся системный fallback (Times/Arial), хотя в списке выбран правильный `family_name`.
 
+Начертание берётся из файла: OS/2 `usWeightClass` и бит italic (если OS/2 нет — из name subfamily). В библиотеке по-прежнему **один файл на `family_name`**, и этот файл и есть начертание в редакторе и в PDF. Regular (400 / normal) текст не переписывает — жирность можно включить кнопкой. Остальные веса записываются в `fontWeight` / `fontStyle`, а `@font-face` регистрируется и на точный вес, и на диапазон `100 900`, чтобы браузер не отбросил Bold-файл для текста с `font-weight: normal`.
+
 Таблица: `design_fonts`. Файлы: `uploads/design-fonts/`.
 
 ## Контракт: SVG → fabricJSON (приоритет)

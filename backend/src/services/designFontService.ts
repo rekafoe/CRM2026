@@ -19,6 +19,8 @@ import {
 } from '../utils/extractDesignStateFonts'
 import {
   collectFontNameAliases,
+  cssFontWeightToken,
+  readFontFaceVariant,
   readFontMetadataFromBuffer,
 } from '../utils/fontFileMetadata'
 import {
@@ -95,7 +97,46 @@ function mapRow(row: DesignFontRow) {
   }
 }
 
+let variantSync: Promise<void> | null = null
+
+/** Один раз за процесс: вес и стиль в базе берутся из OS/2 файла, а не остаются normal. */
+async function syncDesignFontVariantsFromFiles(): Promise<void> {
+  if (variantSync) return variantSync
+  variantSync = (async () => {
+    const db = await getDb()
+    const rows = await db.all(
+      'SELECT id, filename, weight, style FROM design_fonts',
+    ) as Array<{ id: number; filename: string; weight: string; style: string }>
+    for (const row of rows ?? []) {
+      const filePath = resolveDesignFontFilePath(row.filename)
+      if (!filePath) continue
+      let variant: ReturnType<typeof readFontFaceVariant> = null
+      try {
+        variant = readFontFaceVariant(fs.readFileSync(filePath))
+      } catch {
+        continue
+      }
+      if (!variant) continue
+      const style = row.style === 'italic' || row.style === 'oblique' ? 'italic' : 'normal'
+      if (cssFontWeightToken(row.weight) === variant.weight && style === variant.style) continue
+      await db.run(
+        `UPDATE design_fonts SET weight = ?, style = ?, updated_at = datetime('now') WHERE id = ?`,
+        [variant.weight, variant.style, row.id],
+      )
+    }
+  })().catch((err) => {
+    variantSync = null
+    throw err
+  })
+  return variantSync
+}
+
 export async function listDesignFonts(activeOnly = false): Promise<ReturnType<typeof mapRow>[]> {
+  try {
+    await syncDesignFontVariantsFromFiles()
+  } catch {
+    /* файла может не быть на диске — список всё равно отдаём */
+  }
   const db = await getDb()
   const rows = await db.all(
     `SELECT * FROM design_fonts
@@ -240,6 +281,7 @@ export async function createDesignFont(
 
   const stored = saveBufferToDesignFonts(file.buffer, file.originalname, family_name)
   if (!stored) throw new Error('Не удалось сохранить файл шрифта (woff2, woff, ttf, otf)')
+  const face = readFontFaceVariant(file.buffer) ?? { weight: '400', style: 'normal' as const }
 
   const db = await getDb()
   const result = await db.run(
@@ -251,8 +293,8 @@ export async function createDesignFont(
       input.label?.trim() || family_name,
       stored.filename,
       stored.format,
-      input.weight?.trim() || 'normal',
-      input.style?.trim() || 'normal',
+      face.weight,
+      face.style,
       Number.isFinite(input.sort_order) ? input.sort_order! : 0,
       input.is_active === false ? 0 : 1,
       JSON.stringify(name_aliases),
@@ -274,7 +316,14 @@ export async function updateDesignFont(
   let filename = existing.filename
   let format = existing.format
   let name_aliases = input.name_aliases ?? existing.name_aliases
+  let nextWeight = input.weight?.trim() || existing.weight
+  let nextStyle = input.style?.trim() || existing.style
   if (file?.buffer?.length) {
+    const face = readFontFaceVariant(file.buffer)
+    if (face) {
+      nextWeight = face.weight
+      nextStyle = face.style
+    }
     const resolved = resolveFontUploadNames(
       file,
       input.family_name != null ? input.family_name : existing.family_name,
@@ -311,8 +360,8 @@ export async function updateDesignFont(
       input.label?.trim() || existing.label,
       filename,
       format,
-      input.weight?.trim() || existing.weight,
-      input.style?.trim() || existing.style,
+      nextWeight,
+      nextStyle,
       input.sort_order != null ? input.sort_order : existing.sort_order,
       input.is_active === false ? 0 : input.is_active === true ? 1 : (existing.is_active ? 1 : 0),
       JSON.stringify(name_aliases),
@@ -406,19 +455,27 @@ export async function enrichSpecWithRequiredFonts(
 export async function resolveFontFilesForDesignState(
   designState: unknown,
   templateSpec?: Record<string, unknown> | null,
-): Promise<Array<{ family: string; filePath: string; format: string }>> {
+): Promise<Array<{ family: string; filePath: string; format: string; weight?: string; style?: string }>> {
   const bundled = templateSpec && Array.isArray(templateSpec.fonts)
     ? templateSpec.fonts as BundledTemplateFont[]
     : []
   const required = await buildRequiredFontsForDesignState(designState, bundled)
-  const resolved: Array<{ family: string; filePath: string; format: string }> = []
+  const resolved: Array<{ family: string; filePath: string; format: string; weight?: string; style?: string }> = []
   for (const entry of required) {
     if (entry.source === 'missing' || !entry.url) continue
     if (entry.source === 'global' && entry.fontId) {
       const font = await getDesignFontById(entry.fontId)
       if (!font) continue
       const filePath = resolveDesignFontFilePath(font.filename)
-      if (filePath) resolved.push({ family: entry.family, filePath, format: font.format })
+      if (filePath) {
+        resolved.push({
+          family: entry.family,
+          filePath,
+          format: font.format,
+          weight: font.weight,
+          style: font.style,
+        })
+      }
       continue
     }
     if (entry.source === 'bundled') {
@@ -427,10 +484,18 @@ export async function resolveFontFilesForDesignState(
       if (!filename) continue
       const filePath = resolveSafeExistingPath([uploadsDir, designFontsDir], filename)
       if (filePath) {
+        let face: ReturnType<typeof readFontFaceVariant> = null
+        try {
+          face = readFontFaceVariant(fs.readFileSync(filePath))
+        } catch {
+          face = null
+        }
         resolved.push({
           family: entry.family,
           filePath,
           format: bundledEntry?.format ?? 'woff2',
+          weight: face?.weight,
+          style: face?.style,
         })
       }
     }

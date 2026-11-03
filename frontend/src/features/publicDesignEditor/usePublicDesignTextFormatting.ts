@@ -3,6 +3,7 @@ import type { RefObject } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { TextFormattingHandlers } from '../../pages/admin/designEditor/TextFormattingControls';
 import type { SelectedObjProps } from '../../pages/admin/designEditor/types';
+import { isBoldFontWeight } from '../../pages/admin/designEditor/textFormattingPresets';
 
 export function usePublicDesignTextFormatting(
   canvasHandleRef: RefObject<DesignEditorCanvasHandle | null>,
@@ -25,7 +26,7 @@ export function usePublicDesignTextFormatting(
   }, [canvasHandleRef]);
 
   const handleFontWeightToggle = useCallback(() => {
-    canvasHandleRef.current?.setTextProp('fontWeight', selectedObj?.fontWeight === 'bold' ? 'normal' : 'bold');
+    canvasHandleRef.current?.setTextProp('fontWeight', isBoldFontWeight(selectedObj?.fontWeight) ? 'normal' : 'bold');
   }, [canvasHandleRef, selectedObj?.fontWeight]);
 
   const handleFontStyleToggle = useCallback(() => {

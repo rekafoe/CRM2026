@@ -215,6 +215,71 @@ describe('normalizeDesignStateFontFamilies', () => {
     const obj = (normalized.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
     expect(obj.fontFamily).toBe('Sign That S (kerning)')
   })
+
+  it('ставит вес и стиль файла, если начертание не Regular', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            fontFamily: 'Comfortaa',
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            text: 'Hello',
+          }],
+        },
+      }],
+    }
+    const normalized = normalizeDesignStateFontFamilies(designState, [{
+      family_name: 'Comfortaa',
+      weight: '700',
+      style: 'normal',
+    }]) as typeof designState
+    const obj = (normalized.pages[0].fabricJSON as {
+      objects: Array<{ fontFamily: string; fontWeight: string; fontStyle: string }>
+    }).objects[0]
+    expect(obj.fontFamily).toBe('Comfortaa')
+    expect(obj.fontWeight).toBe('700')
+    expect(obj.fontStyle).toBe('normal')
+  })
+
+  it('не сбрасывает жирность, если файл Regular или начертание закреплено', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            fontFamily: 'Voguella',
+            fontWeight: 'bold',
+            fontStyle: 'normal',
+            text: 'Hello',
+          }, {
+            type: 'textbox',
+            fontFamily: 'Comfortaa',
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            fontVariantPinned: true,
+            text: 'Pinned',
+          }],
+        },
+      }],
+    }
+    const normalized = normalizeDesignStateFontFamilies(designState, [{
+      family_name: 'Voguella',
+      weight: '400',
+      style: 'normal',
+    }, {
+      family_name: 'Comfortaa',
+      weight: '700',
+      style: 'normal',
+    }]) as typeof designState
+    const objects = (normalized.pages[0].fabricJSON as {
+      objects: Array<{ fontWeight: string; fontStyle: string }>
+    }).objects
+    expect(objects[0].fontWeight).toBe('bold')
+    expect(objects[1].fontWeight).toBe('normal')
+    expect(objects[1].fontStyle).toBe('normal')
+  })
 })
 
 describe('extractUsedFontFamiliesFromDesignState textStyleRuns', () => {

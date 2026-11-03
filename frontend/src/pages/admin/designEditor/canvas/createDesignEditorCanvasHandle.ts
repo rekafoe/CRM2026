@@ -13,6 +13,7 @@ import {
 } from 'fabric';
 import type { CollageLayout, DesignTemplate } from '../../../../api';
 import { reloadFabricCanvasFonts } from '../../../../utils/fabricFontReload';
+import { linkedFontProps } from '../../../../utils/loadDesignFonts';
 import { finalizeEmptyPhotoFieldPlacement } from '../photoFieldEmpty';
 import { createEmptyPhotoField, createClientTextbox } from '../designFields';
 import { applyImportStackOrder } from '../designFields/importStackOrder';
@@ -573,7 +574,15 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
           d.saveSnapshot({ debounce: true });
           return;
         }
-        applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, { [key]: value });
+        const textObj = active as IText & { textStyleRuns?: TextStyleRun[]; fontVariantPinned?: boolean };
+        if (key === 'fontWeight' || key === 'fontStyle') textObj.fontVariantPinned = true;
+        let patch: Record<string, unknown> = { [key]: value };
+        if (key === 'fontFamily' && typeof value === 'string') {
+          textObj.fontVariantPinned = false;
+          const linked = linkedFontProps(value);
+          if (linked) patch = { fontFamily: value, ...linked };
+        }
+        applyFormatToTextField(textObj, patch);
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
         // Кегль/формат — без debounce, иначе flip страницы до таймера теряет правку.
@@ -584,7 +593,9 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         if (!canvas) return;
         const active = canvas.getActiveObject();
         if (!active || !isTextLikeObject(active)) return;
-        applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, props);
+        const textObj = active as IText & { textStyleRuns?: TextStyleRun[]; fontVariantPinned?: boolean };
+        textObj.fontVariantPinned = true;
+        applyFormatToTextField(textObj, props);
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
         d.saveSnapshot({ debounce: true });

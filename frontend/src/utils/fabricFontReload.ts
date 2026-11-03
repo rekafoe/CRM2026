@@ -13,7 +13,7 @@ import {
   tightenDraftTextboxWidthOnLoad,
   type TextLikeObject,
 } from '../pages/admin/designEditor/textStyleRuns';
-import { ensureDesignFontLoaded } from './loadDesignFonts';
+import { alignTextObjectFontVariant, ensureDesignFontLoaded } from './loadDesignFonts';
 
 function isTextObject(obj: FabricObject): boolean {
   const type = obj.type?.toLowerCase();
@@ -89,6 +89,10 @@ export async function reloadFabricCanvasFonts(
       }
     }),
   );
+  walkObjects(canvas.getObjects(), (obj) => {
+    if (!isTextObject(obj)) return;
+    alignTextObjectFontVariant(obj);
+  });
 
   const loads = new Set<string>();
   walkObjects(canvas.getObjects(), (obj) => {

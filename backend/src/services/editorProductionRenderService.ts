@@ -23,6 +23,7 @@ import { captureProductionTextLayoutSnapshots } from '../utils/fabricTextLayoutP
 import { resolveProductionSceneScale } from '../utils/productionSceneScale'
 import { extractUsedFontFamiliesFromDesignState } from '../utils/extractDesignStateFonts'
 import { getDesignTemplate } from './designTemplateService'
+import { cssFontWeightToken } from '../utils/fontFileMetadata'
 import { logger } from '../utils/logger'
 
 const MM_TO_PX = 96 / 25.4
@@ -623,7 +624,7 @@ function fontMimeType(format: string): string {
 
 /** Data URL вместо file:// — иначе Puppeteer не подгружает @font-face в setContent. */
 function buildFontFaceCss(
-  fonts: Array<{ family: string; filePath: string; format: string }>,
+  fonts: Array<{ family: string; filePath: string; format: string; weight?: string; style?: string }>,
 ): string {
   return fonts.map((font) => {
     const family = font.family.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
@@ -636,7 +637,17 @@ function buildFontFaceCss(
       const fileUrl = `file://${font.filePath.replace(/\\/g, '/')}`
       src = `url('${fileUrl}')`
     }
-    return `@font-face{font-family:'${family}';src:${src} format('${cssFontFormat(font.format)}');font-weight:normal;font-style:normal;font-display:block;}`
+    const style = font.style === 'italic' ? 'italic' : 'normal'
+    const weight = cssFontWeightToken(font.weight)
+    const face = (cssWeight: string, cssStyle: string) => (
+      `@font-face{font-family:'${family}';src:${src} format('${cssFontFormat(font.format)}');font-weight:${cssWeight};font-style:${cssStyle};font-display:block;}`
+    )
+    const rules = [face(weight, style)]
+    if (weight !== '400' || style === 'italic') {
+      rules.push(face('100 900', style))
+      if (style === 'italic') rules.push(face('100 900', 'normal'))
+    }
+    return rules.join('\n')
   }).join('\n')
 }
 

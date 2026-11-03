@@ -4,7 +4,7 @@ import { mergeFontSelectOptions, useCrmDesignFonts } from '../../../hooks/useCrm
 import { fontFamilyCompactKey } from '../../../utils/fontFamilyNormalize';
 import { TEXT_FONTS } from './constants';
 import type { SelectedObjProps } from './types';
-import { TEXT_PRESET_STYLE, textPresetIdFromSelection } from './textFormattingPresets';
+import { fontVariantSelectOption, isBoldFontWeight, TEXT_PRESET_STYLE, textPresetIdFromSelection } from './textFormattingPresets';
 import './TextFloatingToolbar.css';
 import './TextFormattingControls.css';
 
@@ -76,7 +76,9 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
     1,
   );
   const preset = textPresetIdFromSelection(selectedObj);
-  const isBold = selectedObj.fontWeight === 'bold';
+  const extraVariant = fontVariantSelectOption(selectedObj.fontWeight, selectedObj.fontStyle);
+  const variantOptions = extraVariant ? [...TEXT_PRESET_STYLE, extraVariant] : TEXT_PRESET_STYLE;
+  const isBold = isBoldFontWeight(selectedObj.fontWeight);
   const isItalic = selectedObj.fontStyle === 'italic';
 
   const aligns =
@@ -128,12 +130,12 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
         className="text-floating-toolbar__select text-floating-toolbar__select--narrow"
         value={preset}
         onChange={(e) => {
-          const p = TEXT_PRESET_STYLE.find((x) => x.id === e.target.value);
+          const p = variantOptions.find((x) => x.id === e.target.value);
           if (p) onFontVariantChange(p.fontWeight, p.fontStyle);
         }}
         title="Начертание"
       >
-        {TEXT_PRESET_STYLE.map((p) => (
+        {variantOptions.map((p) => (
           <option key={p.id} value={p.id}>
             {p.label}
           </option>
@@ -285,11 +287,11 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
             className="text-panel-format__select"
             value={preset}
             onChange={(e) => {
-              const p = TEXT_PRESET_STYLE.find((x) => x.id === e.target.value);
+              const p = variantOptions.find((x) => x.id === e.target.value);
               if (p) onFontVariantChange(p.fontWeight, p.fontStyle);
             }}
           >
-            {TEXT_PRESET_STYLE.map((p) => (
+            {variantOptions.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
               </option>
