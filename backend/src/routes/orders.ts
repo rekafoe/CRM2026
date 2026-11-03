@@ -34,6 +34,7 @@ import {
   requestManualProductionRegeneration,
 } from '../services/editorProductionJobService'
 import { logger } from '../utils/logger'
+import { PhotoQueueRetryError, retryWebsitePhotoFiles } from '../services/photoQueueRetryService'
 import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition'
 import { Readable } from 'stream'
 
@@ -1691,6 +1692,39 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
     smsError,
     emailError,
   })
+}))
+
+/** Админ: заново собрать фотофайлы заказа на сайте. Секрет очереди в браузер не отдаётся. */
+router.post('/:id/retry-photo-files', asyncHandler(async (req, res) => {
+  const user = (req as any).user as { role?: string } | undefined
+  if (!user || user.role !== 'admin') {
+    res.status(403).json({ message: 'Только администратор может перезапустить сборку фото' })
+    return
+  }
+
+  const orderId = Number(req.params.id)
+  if (!Number.isFinite(orderId) || orderId <= 0) {
+    res.status(400).json({ message: 'Некорректный заказ' })
+    return
+  }
+
+  const db = await getDb()
+  const order = await db.get('SELECT id FROM orders WHERE id = ?', orderId)
+  if (!order) {
+    res.status(404).json({ message: 'Заказ не найден' })
+    return
+  }
+
+  try {
+    const result = await retryWebsitePhotoFiles(orderId)
+    res.json(result)
+  } catch (error) {
+    if (error instanceof PhotoQueueRetryError) {
+      res.status(error.status).json({ message: error.message })
+      return
+    }
+    throw error
+  }
 }))
 
 /** Admin: ручная отправка SMS клиенту (8:30–20:00 Minsk, SMS_ENABLED) */

@@ -9,6 +9,7 @@ import {
   getCurrentUser,
   getOrderFileAccessLogs,
   getPreflightReport,
+  retryOrderPhotoFiles,
   getOrderItemEditorProductionManifest,
   type OrderFileAccessLog,
   type PreflightReport,
@@ -64,6 +65,28 @@ function getExternalStatusLabel(status?: string | null): string {
   return status || 'Статус неизвестен';
 }
 
+function isPhotoArchiveFile(file: OrderFile): boolean {
+  const artifact = String(file.artifactType || '');
+  if (artifact === 'sra3_pdf' || artifact === 'processed_jpg') return true;
+  const name = `${file.filename || ''} ${file.originalName || ''}`.toLowerCase();
+  return name.includes('fotopechat');
+}
+
+function isPhotoOrderItem(item: Item): boolean {
+  const specs = item.params?.specifications;
+  const productType = specs && typeof specs === 'object' ? String(specs.productType || '') : '';
+  const blob = `${item.type || ''} ${item.params?.description || ''} ${productType}`.toLowerCase();
+  return blob.includes('фото') || blob.includes('полароид') || blob.includes('photo');
+}
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const data = (error as { response?: { data?: { message?: unknown } } }).response?.data;
+    if (typeof data?.message === 'string' && data.message.trim()) return data.message.trim();
+  }
+  return fallback;
+}
+
 export const FilesModal: React.FC<FilesModalProps> = ({
   isOpen,
   onClose,
@@ -94,6 +117,8 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     Record<number, { loadedBytes: number; totalBytes: number | null }>
   >({});
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [photoRetryBusy, setPhotoRetryBusy] = useState(false);
+  const [photoRetryNotice, setPhotoRetryNotice] = useState<string | null>(null);
   const [downloadAllSummary, setDownloadAllSummary] = useState<{
     total: number;
     completed: number;
@@ -112,6 +137,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     setDownloadProgressByFileId({});
     setDownloadNotice(null);
     setDownloadAllSummary(null);
+    setPhotoRetryNotice(null);
   }, [isOpen, orderId]);
 
   const loadCurrentUserRole = async () => {
@@ -120,6 +146,28 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       setIsAdmin(res.data?.role === 'admin');
     } catch {
       setIsAdmin(false);
+    }
+  };
+
+  const canRetryPhotoFiles = isAdmin && (items.some(isPhotoOrderItem) || files.some(isPhotoArchiveFile));
+
+  const handleRetryPhotoFiles = async () => {
+    if (!isAdmin || photoRetryBusy) return;
+    setPhotoRetryBusy(true);
+    setPhotoRetryNotice(null);
+    try {
+      const response = await retryOrderPhotoFiles(orderId);
+      const count = response.data?.count ?? 0;
+      setPhotoRetryNotice(
+        count > 0
+          ? 'Сборка фото запущена. Файлы обновятся, когда сайт закончит.'
+          : 'Сайт не нашёл сборку фото для этого заказа.'
+      );
+      await loadFiles();
+    } catch (error) {
+      setPhotoRetryNotice(apiErrorMessage(error, 'Не удалось перезапустить сборку фото'));
+    } finally {
+      setPhotoRetryBusy(false);
     }
   };
 
@@ -657,6 +705,19 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             </select>
           )}
 
+          {canRetryPhotoFiles && (
+            <button
+              type="button"
+              className="fm-btn fm-btn--ghost"
+              onClick={() => void handleRetryPhotoFiles()}
+              disabled={photoRetryBusy}
+              title="Заново собрать PDF и архивы фото на сайте"
+            >
+              <AppIcon name="refresh" size="xs" />
+              {photoRetryBusy ? 'Запускаем…' : 'Собрать фото заново'}
+            </button>
+          )}
+
           {files.length > 0 && (
             <button
               type="button"
@@ -695,6 +756,14 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             )}
           </label>
         </div>
+
+        {photoRetryNotice && (
+          <div className="fm-download-status" role="status" aria-live="polite">
+            <div className="fm-download-status__text">
+              <span>{photoRetryNotice}</span>
+            </div>
+          </div>
+        )}
 
         {(downloadSummaryLabel || downloadNotice) && (
           <div className="fm-download-status" role="status" aria-live="polite">

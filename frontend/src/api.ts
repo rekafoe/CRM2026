@@ -1035,6 +1035,8 @@ export const uploadOrderFile = async (orderId: number, file: File, orderItemId?:
 };
 export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`/orders/${orderId}/files/${fileId}`);
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
+export const retryOrderPhotoFiles = (orderId: number) =>
+  api.post<{ ok: true; started: boolean; count: number }>(`/orders/${orderId}/retry-photo-files`, {});
 
 /** Префлайт: проверка макета (PDF, JPG, PNG, TIFF) */
 export interface PreflightReport {
