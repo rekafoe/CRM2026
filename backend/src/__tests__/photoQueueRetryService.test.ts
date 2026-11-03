@@ -39,7 +39,7 @@ describe('retryWebsitePhotoFiles', () => {
       count: 1,
     })
 
-    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://printcore.by/api/orders/crm/photo-queue-retry')
     expect(init.body).toBe(JSON.stringify({ q: '13825', processNow: true }))
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-secret')
