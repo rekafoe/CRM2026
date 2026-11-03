@@ -142,6 +142,10 @@ export async function startCrmPhotoPdf(
       return { started: false, count: 0, alreadyRunning: false }
     }
 
+    for (const part of pending) {
+      await registerPart(orderId, part, 'processing')
+    }
+
     void buildOrder(orderId, parts).catch((error) => {
       logger.error('CRM photo PDF failed', {
         orderId,
