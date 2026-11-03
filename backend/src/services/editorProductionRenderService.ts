@@ -21,6 +21,10 @@ import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
 import { prepareFabricJsonTextForProduction } from '../utils/fabricTextProductionPrepare'
 import { captureProductionTextLayoutSnapshots } from '../utils/fabricTextLayoutPreservation'
 import { resolveProductionSceneScale } from '../utils/productionSceneScale'
+import {
+  scaleSouvenirFabricPlacement,
+  souvenirPlacementScaleFactor,
+} from '../utils/souvenirFabricCoords'
 import { extractUsedFontFamiliesFromDesignState } from '../utils/extractDesignStateFonts'
 import { getDesignTemplate } from './designTemplateService'
 import { cssFontWeightToken } from '../utils/fontFileMetadata'
@@ -1575,7 +1579,11 @@ export async function renderDesignStateProductionPdf(
 
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index]
-    const fabricJSON = parseJsonObject(page.page).fabricJSON ?? page.page
+    const rawFabricJSON = parseJsonObject(page.page).fabricJSON ?? page.page
+    const placementScale = souvenirPlacementScaleFactor(state)
+    const fabricJSON = placementScale === 1
+      ? rawFabricJSON
+      : scaleSouvenirFabricPlacement(rawFabricJSON, placementScale)
     const diagnostics = collectProductionPageDiagnostics(fabricJSON, fileNameByUrl)
     if (diagnostics.unresolvedImages.length > 0 || diagnostics.groups > 0 || diagnostics.clipPaths > 0) {
       logger.info('Editor production page diagnostics', {

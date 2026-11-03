@@ -1,4 +1,5 @@
 import type { DesignPage, DesignState } from '../../pages/admin/designEditor/types';
+import { SOUVENIR_CANVAS_PX_PER_MM } from '../../../../backend/src/utils/souvenirFabricCoords';
 import type { PrintAreaConfig } from './types';
 
 const EMPTY_FABRIC_JSON: Record<string, unknown> = { version: '7.2.0', objects: [] };
@@ -73,6 +74,7 @@ export function buildSouvenirDesignState(input: {
     editorKind: 'souvenir_3d',
     activePrintAreaId: input.activePrintAreaId,
     usedPrintAreaIds,
+    souvenirPxPerMm: SOUVENIR_CANVAS_PX_PER_MM,
   };
 }
 

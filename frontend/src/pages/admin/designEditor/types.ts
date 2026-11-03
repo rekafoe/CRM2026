@@ -96,4 +96,9 @@ export interface DesignState {
   editorKind?: 'flat' | 'souvenir_3d';
   activePrintAreaId?: string;
   usedPrintAreaIds?: string[];
+  /**
+   * Пикселей Fabric на 1 мм зоны. Нет поля — старый сувенирный холст, где 1 px = 1 мм.
+   * Актуальный редактор пишет 96/25.4, как полиграфический sceneScale = 1.
+   */
+  souvenirPxPerMm?: number;
 }

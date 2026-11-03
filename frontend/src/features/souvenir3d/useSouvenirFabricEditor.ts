@@ -27,6 +27,11 @@ import type {
   SouvenirSurfacePointerHandler,
 } from './types';
 import { uvToFabricCoords } from './uvToFabricCoords';
+import {
+  scaleSouvenirFabricPlacement,
+  SOUVENIR_CANVAS_PX_PER_MM,
+  souvenirPlacementScaleFactor,
+} from '../../../../backend/src/utils/souvenirFabricCoords';
 
 type ObjectWithProps = FabricObject & Record<string, any>;
 
@@ -47,7 +52,7 @@ export type SouvenirFabricEditorController = {
   addText: () => void;
   addPhoto: (file: File) => Promise<void>;
   replacePhoto: (file: File) => Promise<void>;
-  updateText: (patch: { text?: string; fill?: string; fontSize?: number }) => void;
+  updateText: (patch: { text?: string; fill?: string; fontSizeMm?: number }) => void;
   updateOpacity: (opacity: number) => void;
   scaleSelected: (factor: number) => void;
   rotateSelected: (deltaDegrees: number) => void;
@@ -86,6 +91,7 @@ function selectionFromObject(object: ObjectWithProps | null): SouvenirSelectedOb
     text: kind === 'text' ? String(object.text ?? '') : undefined,
     fill: kind === 'text' && typeof object.fill === 'string' ? object.fill : undefined,
     fontSize: kind === 'text' ? Number(object.fontSize || 28) : undefined,
+    scaleX: Number.isFinite(Number(object.scaleX)) && Number(object.scaleX) !== 0 ? Number(object.scaleX) : 1,
     opacity: Number.isFinite(Number(object.opacity)) ? Number(object.opacity) : 1,
   };
 }
@@ -111,6 +117,23 @@ function readTemplateDesignState(response: unknown): DesignState | null {
 function readDraftDesignState(payload: Record<string, unknown> | undefined): DesignState | null {
   const raw = payload?.designState ?? payload?.productionDesignState;
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as DesignState : null;
+}
+
+function areaCanvasPx(area: PrintAreaConfig): { width: number; height: number } {
+  return {
+    width: Math.max(1, Math.round(area.widthMm * SOUVENIR_CANVAS_PX_PER_MM)),
+    height: Math.max(1, Math.round(area.heightMm * SOUVENIR_CANVAS_PX_PER_MM)),
+  };
+}
+
+/** Старый холст 1 px = 1 мм приводим к 96 DPI один раз, дальше в state уже новое пространство. */
+function pagesInProductionSpace(pages: DesignPage[], state: DesignState | null): DesignPage[] {
+  const factor = souvenirPlacementScaleFactor(state);
+  if (factor === 1) return pages;
+  return pages.map((page) => ({
+    ...page,
+    fabricJSON: scaleSouvenirFabricPlacement(page.fabricJSON, factor),
+  }));
 }
 
 export function useSouvenirFabricEditor({
@@ -243,9 +266,10 @@ export function useSouvenirFabricEditor({
     suppressEventsRef.current = true;
     try {
       canvas.discardActiveObject();
+      const size = areaCanvasPx(area);
       canvas.setDimensions({
-        width: Math.max(1, Math.round(area.widthMm)),
-        height: Math.max(1, Math.round(area.heightMm)),
+        width: size.width,
+        height: size.height,
       });
       await canvas.loadFromJSON(page.fabricJSON ?? {});
       canvas.getObjects().forEach((object) => {
@@ -267,9 +291,10 @@ export function useSouvenirFabricEditor({
     const element = canvasElementRef.current;
     if (!element || areas.length === 0) return undefined;
     const first = areas[0];
+    const firstSize = areaCanvasPx(first);
     const canvas = new Canvas(element, {
-      width: Math.max(1, Math.round(first.widthMm)),
-      height: Math.max(1, Math.round(first.heightMm)),
+      width: firstSize.width,
+      height: firstSize.height,
       backgroundColor: 'transparent',
       preserveObjectStacking: true,
       selection: false,
@@ -302,7 +327,10 @@ export function useSouvenirFabricEditor({
         }
         const state = readDraftDesignState(draftResponse?.payloadParsed)
           ?? readTemplateDesignState(templateResponse);
-        pagesRef.current = normalizeSouvenirPages(state?.pages, areas);
+        pagesRef.current = pagesInProductionSpace(
+          normalizeSouvenirPages(state?.pages, areas),
+          state,
+        );
         const preferredAreaId = state?.activePrintAreaId;
         const initialArea = areas.some((area) => area.id === preferredAreaId)
           ? preferredAreaId!
@@ -485,10 +513,17 @@ export function useSouvenirFabricEditor({
     markChanged();
   }, [markChanged]);
 
-  const updateText = useCallback((patch: { text?: string; fill?: string; fontSize?: number }) => {
+  const updateText = useCallback((patch: { text?: string; fill?: string; fontSizeMm?: number }) => {
     const object = canvasRef.current?.getActiveObject() as ObjectWithProps | undefined;
     if (!object || objectKind(object) !== 'text') return;
-    updateSelected(patch);
+    const next: Record<string, unknown> = {};
+    if (patch.text != null) next.text = patch.text;
+    if (patch.fill != null) next.fill = patch.fill;
+    if (patch.fontSizeMm != null && Number.isFinite(patch.fontSizeMm)) {
+      const scaleX = Number(object.scaleX) || 1;
+      next.fontSize = Math.max(1, (patch.fontSizeMm * SOUVENIR_CANVAS_PX_PER_MM) / scaleX);
+    }
+    updateSelected(next);
   }, [updateSelected]);
 
   const updateOpacity = useCallback((opacity: number) => {
