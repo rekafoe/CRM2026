@@ -3,6 +3,7 @@
 import React from 'react';
 import { OrderStatusAnalyticsData } from '../types';
 import { BynSymbol, MoneyAmount } from '../../../components/ui';
+import { OrderStamp } from '../../../components/order/OrderStamp';
 
 interface OrderStatusAnalyticsProps {
   data: OrderStatusAnalyticsData;
@@ -29,7 +30,7 @@ export const OrderStatusAnalytics: React.FC<OrderStatusAnalyticsProps> = ({ data
                 color: 'var(--text-secondary)',
                 fontWeight: 'bold'
               }}>
-                {status.status_name}
+                <OrderStamp status={{ id: status.status, name: status.status_name }} />
               </div>
               <div style={{
                 flex: 1,

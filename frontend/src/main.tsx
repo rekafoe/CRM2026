@@ -14,6 +14,14 @@ import './styles/utilities.css';
 import './styles/skeleton.css';
 import { APP_CONFIG } from './types';
 import { ErrorBoundary } from './components/optimized/ErrorBoundary';
+import { ensureCrmAppearance, useCrmAppearance } from './hooks/useCrmAppearance';
+
+ensureCrmAppearance();
+
+const CrmAppearance: React.FC = () => {
+  useCrmAppearance();
+  return null;
+};
 
 const LoadingFallback: React.FC = () => (
   <div className="loading-overlay">Загрузка...</div>
@@ -114,6 +122,7 @@ root.render(
   <ErrorBoundary>
     <QueryProvider>
       <ToastProvider>
+        <CrmAppearance />
         <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
           <Routes>
           <Route path="/login" element={<LoginPage />} />

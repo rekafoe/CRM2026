@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../LoadingSpinner';
 import { ErrorDisplay } from '../ErrorStates';
 import { isWaitingOrder, useOrderStatuses } from '../../hooks/useOrderStatuses';
 import { MoneyAmount } from '../ui';
+import { OrderStamp } from '../order/OrderStamp';
 import './OrdersManagement.css';
 
 interface OrdersManagementProps {
@@ -628,12 +629,11 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                   </div>
                   
                   <div className="order-status">
-                    <span 
-                      className="status-badge"
-                      style={{ backgroundColor: status?.color || '#9e9e9e' }}
-                    >
-                      {status?.name || `Статус ${order.status}`}
-                    </span>
+                    <OrderStamp
+                      status={status ?? { id: Number(order.status), name: '' }}
+                      statuses={orderStatuses}
+                      onlineCancelled={order.is_cancelled === 1}
+                    />
                   </div>
                   
                   <div className="order-customer">

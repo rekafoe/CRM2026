@@ -4,14 +4,15 @@ import { parseNumberFlexible } from '../../utils/numberInput';
 import { getOrderAmounts } from '../../utils/orderTotal';
 import { MoneyAmount } from '../ui';
 import { readMaterialShortage } from '../order/materialShortage';
-import { useOrderStatusClasses } from './hooks/useOrderStatusClasses';
 import type { OrdersListTab } from './hooks/useOptimizedAppData';
+import { OrderStamp } from '../order/OrderStamp';
 import './styles/OrderList.css';
 
 interface StatusInfo {
   id: number;
   name: string;
   color?: string;
+  code?: string | null;
   sort_order: number;
 }
 
@@ -28,17 +29,17 @@ const OrderItemStatus = memo<{
   statusInfo: StatusInfo | undefined;
   status: number;
   progress: number;
-}>(({ statusInfo, status, progress }) => {
-  const { pillClass, barClass } = useOrderStatusClasses(statusInfo, status);
-
+  onlineCancelled?: boolean;
+}>(({ statusInfo, status, progress, onlineCancelled }) => {
   return (
     <div className="order-item__status">
-      <span className={`status-pill ${pillClass}`}>
-        {statusInfo?.name || `Статус ${status}`}
-      </span>
+      <OrderStamp
+        status={statusInfo ?? { id: status, name: `Статус ${status}` }}
+        onlineCancelled={onlineCancelled}
+      />
       <div className="status-bar">
         <div
-          className={`status-bar__fill ${barClass}`}
+          className="status-bar__fill"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -137,6 +138,7 @@ const OrderItem = memo<{
         statusInfo={statusInfo}
         status={statusValue}
         progress={progress}
+        onlineCancelled={order.is_cancelled === 1}
       />
     </li>
   );

@@ -12,7 +12,8 @@ import {
   poolFulfillmentShowsBanner,
 } from './orderPoolUtils';
 import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
-import { isPoolOrderStatusId } from '../../hooks/useOrderStatuses';
+import { isPoolOrderStatusId, useOrderStatuses } from '../../hooks/useOrderStatuses';
+import { OrderStamp } from '../order/OrderStamp';
 
 const OrderCard = React.memo<{
   order: Order;
@@ -35,6 +36,8 @@ const OrderCard = React.memo<{
   getOrderTotal,
   onCopyPhone,
 }) => {
+  const { statuses } = useOrderStatuses();
+  const statusInfo = statuses.find((status) => status.id === Number(order.status));
   const payment = getPoolPaymentInfo(order);
   const debt = getOrderDebt(order);
   const prepay = getOrderPrepayment(order);
@@ -87,7 +90,11 @@ const OrderCard = React.memo<{
                 {fulfillmentChip.label}
               </span>
             ) : null}
-            {isCancelled ? <span className="order-pool-card__tag is-error">Отменён</span> : null}
+            <OrderStamp
+              status={statusInfo ?? { id: Number(order.status), name: '' }}
+              statuses={statuses}
+              onlineCancelled={isCancelled}
+            />
             {!isAssigned && !isCancelled ? (
               <span className="order-pool-card__tag is-open">В пуле</span>
             ) : null}

@@ -33,7 +33,7 @@ export const useOptimizedAppData = (
   const logger = useLogger('OptimizedApp');
   
   const [orders, setOrders] = useState<Order[]>([]);
-  const [statuses, setStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
+  const [statuses, setStatuses] = useState<Array<{ id: number; name: string; color?: string; code?: string | null; sort_order: number }>>([]);
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<{ id: number; name: string; role: string } | null>(null);
