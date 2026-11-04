@@ -577,10 +577,6 @@ export async function loadDesignPageScene(input: {
         });
       }
     } catch {}
-
-    if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
-      await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
-    }
   } else {
     canvas.clear();
     (canvas as unknown as AnyObj).backgroundColor = 'white';
