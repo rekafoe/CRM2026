@@ -195,32 +195,11 @@ export const TopBar: React.FC<TopBarProps> = ({
               <AppIcon name="chart-up" size="sm" />
               <span>Отчёты</span>
             </button>
-            <button
-              type="button"
-              className={navClass(sectionActive('/adminpanel'), true)}
-              onClick={() => { window.location.href = '/adminpanel'; }}
-              title="Админ панель"
-              aria-label="Админ панель"
-              aria-current={sectionActive('/adminpanel') ? 'page' : undefined}
-            >
-              <AppIcon name="settings" size="sm" />
-            </button>
           </>
         ) : null}
       </nav>
 
       <div className="pc-topbar__tools">
-        {onInboxToggle && onInboxClose && onInboxMarkAllRead && onInboxOpenNotification ? (
-          <InboxNotifications
-            unreadCount={inboxUnreadCount}
-            open={inboxOpen}
-            items={inboxItems}
-            onToggle={onInboxToggle}
-            onClose={onInboxClose}
-            onMarkAllRead={onInboxMarkAllRead}
-            onOpenNotification={onInboxOpenNotification}
-          />
-        ) : null}
         <div className="pc-profile" ref={profileRef}>
           <button
             type="button"
@@ -270,6 +249,38 @@ export const TopBar: React.FC<TopBarProps> = ({
             </div>
           ) : null}
         </div>
+        <button
+          type="button"
+          className="pc-icon-btn"
+          title="Выйти"
+          aria-label="Выйти"
+          onClick={onLogout}
+        >
+          <AppIcon name="power" size="sm" />
+        </button>
+        {isAdmin ? (
+          <button
+            type="button"
+            className={navClass(sectionActive('/adminpanel'), true)}
+            onClick={() => { window.location.href = '/adminpanel'; }}
+            title="Админ панель"
+            aria-label="Админ панель"
+            aria-current={sectionActive('/adminpanel') ? 'page' : undefined}
+          >
+            <AppIcon name="settings" size="sm" />
+          </button>
+        ) : null}
+        {onInboxToggle && onInboxClose && onInboxMarkAllRead && onInboxOpenNotification ? (
+          <InboxNotifications
+            unreadCount={inboxUnreadCount}
+            open={inboxOpen}
+            items={inboxItems}
+            onToggle={onInboxToggle}
+            onClose={onInboxClose}
+            onMarkAllRead={onInboxMarkAllRead}
+            onOpenNotification={onInboxOpenNotification}
+          />
+        ) : null}
       </div>
     </header>
   );
