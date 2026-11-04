@@ -392,6 +392,16 @@ interface SimplifiedConfig {
    * По умолчанию итог между порогами сглаживается, чтобы меньший тираж не стоил дороже большего.
    */
   sheet_print_smoothing?: boolean;
+  /**
+   * Цена штуки задана ступенями в шаблоне (размер × тираж).
+   * Не подменять её автоопределением ШФП по м², даже если технология sol_m в центре цен — рулон.
+   */
+  fixed_unit_prices?: boolean;
+  /**
+   * Множитель типа цены только для этого продукта. Глобальный справочник price_types не трогаем:
+   * например срочно ×1,30 у холста, когда в справочнике срочно ×1,5.
+   */
+  price_type_multipliers?: Record<string, number>;
   /** Произвольный trim: тарифы по якорю (pricing_size_id / custom_trim_pricing_size_id) */
   allow_custom_trim?: boolean;
   custom_trim_pricing_size_id?: number | string;
@@ -786,7 +796,7 @@ export class SimplifiedPricingService {
           dimensions_mode: 'presets_and_custom',
         };
         rollM2TemplateConfig = undefined;
-      } else if (resolvedMaterialPrint.m2PricingKind === 'roll_wide') {
+      } else if (resolvedMaterialPrint.m2PricingKind === 'roll_wide' && simplifiedConfig.fixed_unit_prices !== true) {
         rollM2TemplateConfig = { mode: 'roll_wide_m2' };
         uvTemplateConfig = undefined;
       } else {
@@ -810,7 +820,13 @@ export class SimplifiedPricingService {
 
     // Сольвент в шаблоне часто остаётся листовой строкой print_prices. Если в центре цен
     // технология — рулон м², считаем по площади и ширине рулона, а не по SRA3.
-    if (!isUvFlatbedMode && !isRollWideM2TemplateMode && normalizedConfig.print_technology) {
+    // fixed_unit_prices — готовая цена размера (холст с подрамником): ступени шаблона важнее м².
+    if (
+      simplifiedConfig.fixed_unit_prices !== true &&
+      !isUvFlatbedMode &&
+      !isRollWideM2TemplateMode &&
+      normalizedConfig.print_technology
+    ) {
       const detectedRoll = await RollWideM2PricingService.loadRatesByTechnology(
         normalizedConfig.print_technology,
       );
@@ -3000,7 +3016,11 @@ export class SimplifiedPricingService {
       (configuration as any).urgency ??
       'standard'
     ).trim().toLowerCase() || 'standard';
-    const priceTypeMult = await PriceTypeService.getMultiplier(priceTypeKey);
+    const productMultiplier = simplifiedConfig.price_type_multipliers?.[priceTypeKey];
+    const priceTypeMult =
+      productMultiplier != null && Number.isFinite(Number(productMultiplier))
+        ? Number(productMultiplier)
+        : await PriceTypeService.getMultiplier(priceTypeKey);
     if (priceTypeMult !== 1) {
       logger.info('Применяем множитель типа цены', { priceTypeKey, multiplier: priceTypeMult });
       printPrice *= priceTypeMult;
