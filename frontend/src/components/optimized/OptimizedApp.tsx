@@ -99,28 +99,11 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [workplaceQuery, setWorkplaceQuery] = useState('');
-
-  const workplaceOrders = useMemo(() => {
-    const query = workplaceQuery.trim().toLowerCase();
-    if (!query) return orders;
-    const digits = query.replace(/\s/g, '');
-    return orders.filter((order) => {
-      const number = String(order.number || '').toLowerCase();
-      const name = String(order.customerName || '').toLowerCase();
-      const phone = String(order.customerPhone || '').toLowerCase();
-      return number.includes(query) || name.includes(query) || phone.includes(digits);
-    });
-  }, [orders, workplaceQuery]);
 
   const workplaceDayTotal = useMemo(
     () => orders.reduce((sum, order) => sum + getOrderAmounts(order).total, 0),
     [orders],
   );
-
-  useEffect(() => {
-    setWorkplaceQuery('');
-  }, [ordersListTab, contextDate]);
 
   useEffect(() => {
     getOperatorsToday(contextDate).then(res => setOperatorsToday(res.data ?? [])).catch(() => setOperatorsToday([]));
@@ -520,18 +503,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 Выданные{ordersListTab === 'issued' ? ` ${orders.length}` : ''}
               </button>
             </div>
-            <label className="pc-workplace-search">
-              <AppIcon name="search" size="xs" />
-              <input
-                type="search"
-                value={workplaceQuery}
-                onChange={(event) => setWorkplaceQuery(event.target.value)}
-                placeholder="Номер, клиент, телефон"
-                aria-label="Поиск по заказам дня"
-              />
-            </label>
             <OrderList
-              orders={workplaceOrders}
+              orders={orders}
               selectedId={selectedId}
               statuses={statuses}
               onSelect={setSelectedId}
