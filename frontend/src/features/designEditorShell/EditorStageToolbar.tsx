@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '../../components/common';
+import { AppIcon } from '../../components/ui/AppIcon';
 import { EditorViewControls, type EditorViewOptions } from './EditorViewControls';
 
 interface EditorStageToolbarProps {
@@ -41,8 +42,12 @@ export const EditorStageToolbar: React.FC<EditorStageToolbarProps> = ({
           <EditorViewControls value={viewOptions} onChange={onViewOptionsChange} />
         </div>
       </details>
-      <Button variant="secondary" size="sm" onClick={onUndo} disabled={!canUndo} title="Отменить">↶</Button>
-      <Button variant="secondary" size="sm" onClick={onRedo} disabled={!canRedo} title="Повторить">↷</Button>
+      <Button variant="secondary" size="sm" onClick={onUndo} disabled={!canUndo} title="Отменить" aria-label="Отменить">
+        <AppIcon name="history" size="xs" />
+      </Button>
+      <Button variant="secondary" size="sm" onClick={onRedo} disabled={!canRedo} title="Повторить" aria-label="Повторить">
+        <AppIcon name="refresh" size="xs" />
+      </Button>
     </div>
   </div>
 );

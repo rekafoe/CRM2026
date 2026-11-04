@@ -14,6 +14,10 @@ interface EditorTopBarProps {
   savingLabel?: string;
   /** Компактная шапка для телефона: имя шаблона в бренде, без центра и кнопки «Помощь». */
   compact?: boolean;
+  /** Слева от названия: «← Шаблоны» в админском редакторе. */
+  leading?: React.ReactNode;
+  /** Спецтеги формата, вылетов и страниц. */
+  tags?: React.ReactNode;
   onSaveRetry?: () => void;
   onHelpToggle?: () => void;
   onPrimaryAction?: () => void;
@@ -39,6 +43,8 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   orderLabel = 'Заказать',
   savingLabel = 'Готовим...',
   compact = false,
+  leading,
+  tags,
   onSaveRetry,
   onHelpToggle,
   onPrimaryAction,
@@ -77,8 +83,9 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       </div>
       {!compact && (
         <div className="public-design-editor__title">
+          {leading}
           <div className="public-design-editor__title-main">
-            <span className="public-design-editor__eyebrow">{documentLabel}</span>
+            {tags ?? <span className="public-design-editor__eyebrow">{documentLabel}</span>}
             <h1>{templateName}</h1>
             {saveChipNearTitle ? saveChip : null}
           </div>

@@ -376,9 +376,9 @@
 
 /* Grid */
 .design-fonts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .design-fonts-empty {
@@ -393,14 +393,14 @@
 
 /* Card */
 .design-fonts-card {
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: grid;
+  grid-template-columns: minmax(200px, 1.1fr) minmax(180px, 0.9fr) minmax(240px, auto);
+  align-items: center;
+  background: var(--pc-surface, #fff);
+  border: 1px solid var(--pc-border, #e2dfd7);
+  border-radius: var(--pc-r-card, 10px);
+  box-shadow: none;
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .design-fonts-card:hover {
@@ -461,7 +461,7 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .design-fonts-badge--format {
@@ -479,7 +479,7 @@
   flex: 1;
   padding: 16px;
   min-height: 100px;
-  background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
+  background: var(--pc-surface-subtle, #efece6);
 }
 
 .design-fonts-card__preview {
@@ -538,6 +538,12 @@
   padding: 6px 10px;
   font-size: 13px;
   gap: 6px;
+}
+
+@media (max-width: 900px) {
+  .design-fonts-card {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
