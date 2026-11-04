@@ -47,6 +47,8 @@ import { useOrderHandlers } from './hooks/useOrderHandlers';
 import { OrderDetailSection } from './components/OrderDetailSection';
 import { useReasonPrompt } from '../common/useReasonPrompt';
 import { getOrderAmounts } from '../../utils/orderTotal';
+import { MoneyAmount } from '../ui';
+import './workplace.css';
 import { useInboxNotifications } from '../../hooks/useInboxNotifications';
 import type { InboxNotification } from '../../api';
 
@@ -55,6 +57,15 @@ interface OptimizedAppProps {
 }
 
 // Основной компонент приложения с оптимизацией
+function ordersCountWord(count: number): string {
+  const n = Math.abs(count) % 100;
+  const last = n % 10;
+  if (n > 10 && n < 20) return 'заказов';
+  if (last === 1) return 'заказ';
+  if (last >= 2 && last <= 4) return 'заказа';
+  return 'заказов';
+}
+
 export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -88,6 +99,28 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
   const [organization, setOrganization] = useState<Organization | null>(null);
+  const [workplaceQuery, setWorkplaceQuery] = useState('');
+
+  const workplaceOrders = useMemo(() => {
+    const query = workplaceQuery.trim().toLowerCase();
+    if (!query) return orders;
+    const digits = query.replace(/\s/g, '');
+    return orders.filter((order) => {
+      const number = String(order.number || '').toLowerCase();
+      const name = String(order.customerName || '').toLowerCase();
+      const phone = String(order.customerPhone || '').toLowerCase();
+      return number.includes(query) || name.includes(query) || phone.includes(digits);
+    });
+  }, [orders, workplaceQuery]);
+
+  const workplaceDayTotal = useMemo(
+    () => orders.reduce((sum, order) => sum + getOrderAmounts(order).total, 0),
+    [orders],
+  );
+
+  useEffect(() => {
+    setWorkplaceQuery('');
+  }, [ordersListTab, contextDate]);
 
   useEffect(() => {
     getOperatorsToday(contextDate).then(res => setOperatorsToday(res.data ?? [])).catch(() => setOperatorsToday([]));
@@ -433,10 +466,11 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             </div>
           )}
 
-          <aside className="sidebar">
-            <div className="sidebar-actions-row">
+          <aside className="sidebar pc-workplace-side">
+            <div className="pc-workplace-side__actions">
               <button
-                className="icon-btn"
+                type="button"
+                className="pc-workplace-new"
                 title="Добавить заказ"
                 aria-label="Добавить заказ"
                 onClick={async () =>{
@@ -446,15 +480,15 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                       openCalculator(undefined, order.id);
                     }
                   } catch (e) {
-                    // ошибка уже показана в handleCreateOrder
                     console.error('create order click failed', e);
                   }
                 }}
               >
-                <AppIcon name="plus" size="sm" />
+                <AppIcon name="plus" size="xs" /> Новый заказ
               </button>
               <button
-                className="icon-btn"
+                type="button"
+                className="pc-workplace-pool"
                 title="Вернуть выбранный заказ в пул"
                 aria-label="Вернуть выбранный заказ в пул"
                 disabled={!selectedOrder}
@@ -463,30 +497,50 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                   await handleReturnOrderToPool(selectedOrder);
                 }}
               >
-                <AppIcon name="trash" size="sm" />
-              </button>
-              <button
-                type="button"
-                className={`orders-list-tab ${ordersListTab === 'orders' ? 'active' : ''}`}
-                onClick={() =>setOrdersListTab('orders')}
-              >
-                Заказы
-              </button>
-              <button
-                type="button"
-                className={`orders-list-tab ${ordersListTab === 'issued' ? 'active' : ''}`}
-                onClick={() =>setOrdersListTab('issued')}
-              >
-                Выданные
+                В пул
               </button>
             </div>
+            <div className="pc-workplace-tabs" role="tablist" aria-label="Список заказов">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={ordersListTab === 'orders'}
+                className={ordersListTab === 'orders' ? 'is-active' : ''}
+                onClick={() => setOrdersListTab('orders')}
+              >
+                Заказы{ordersListTab === 'orders' ? ` ${orders.length}` : ''}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={ordersListTab === 'issued'}
+                className={ordersListTab === 'issued' ? 'is-active' : ''}
+                onClick={() => setOrdersListTab('issued')}
+              >
+                Выданные{ordersListTab === 'issued' ? ` ${orders.length}` : ''}
+              </button>
+            </div>
+            <label className="pc-workplace-search">
+              <AppIcon name="search" size="xs" />
+              <input
+                type="search"
+                value={workplaceQuery}
+                onChange={(event) => setWorkplaceQuery(event.target.value)}
+                placeholder="Номер, клиент, телефон"
+                aria-label="Поиск по заказам дня"
+              />
+            </label>
             <OrderList
-              orders={orders}
+              orders={workplaceOrders}
               selectedId={selectedId}
               statuses={statuses}
               onSelect={setSelectedId}
               ordersListTab={ordersListTab}
             />
+            <footer className="pc-workplace-total">
+              <span>{orders.length} {ordersCountWord(orders.length)}</span>
+              <strong><MoneyAmount value={workplaceDayTotal} /></strong>
+            </footer>
           </aside>
 
           <section className="detail">
@@ -517,22 +571,12 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 onOrderPatch={(id, patch) => setOrders(prev => prev.map(o => o.id === id ? { ...o, ...patch } : o))}
               />
             ) : (
-              <div style={{ padding: '20px', textAlign: 'center' }}>
+              <div className="pc-workplace-empty">
                 {ordersListTab === 'issued' && orders.length === 0 ? (
                   <>
                     <p>За выбранную дату выданных заказов нет</p>
                     {selectedId && (
-                      <button 
-                        onClick={() =>setSelectedId(null)}
-                        style={{ 
-                          marginTop: '10px', 
-                          padding: '8px 16px', 
-                          backgroundColor: '#f5f5f5', 
-                          border: '1px solid #ddd', 
-                          borderRadius: '4px',
-                          cursor: 'pointer'
-                        }}
-                      >
+                      <button type="button" className="pc-btn" onClick={() => setSelectedId(null)}>
                         Сбросить выбор
                       </button>
                     )}
@@ -541,20 +585,10 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                   <>
                     <p>Выберите заказ слева</p>
                     {selectedId && (
-                      <div style={{ marginTop: '10px', color: '#666', fontSize: '14px' }}>
+                      <div>
                         <p>Заказ с ID {selectedId} не найден в списке</p>
                         <p>Всего заказов: {orders.length}</p>
-                        <button 
-                          onClick={() =>setSelectedId(null)}
-                          style={{ 
-                            marginTop: '10px', 
-                            padding: '8px 16px', 
-                            backgroundColor: '#f5f5f5', 
-                            border: '1px solid #ddd', 
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
+                        <button type="button" className="pc-btn" onClick={() => setSelectedId(null)}>
                           Сбросить выбор
                         </button>
                       </div>

@@ -1,0 +1,46 @@
+.pc-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-r-card, 10px);
+  box-shadow: var(--pc-shadow-pop);
+}
+
+.pc-menu__item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pc-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pc-menu__item small {
+  display: block;
+  margin-top: 2px;
+  color: var(--pc-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.pc-menu__item:hover {
+  background: var(--pc-surface-subtle);
+}
+
+.pc-menu__item.is-selected {
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-ink);
+}
