@@ -7,6 +7,7 @@ import { AppIcon, MoneyAmount } from '../components/ui';
 import { getMyEarnings } from '../api';
 import { earningRoleLabel } from './admin/earnings/earningRoleLabel';
 import './EarningsPage.css';
+import '../styles/admin-surface.css';
 
 type EarningsItem = {
   orderId: number;

@@ -337,7 +337,7 @@
   font-weight: 600;
   font-size: 14px;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
 }
 
 .earnings-aux-total--bonus {
@@ -428,7 +428,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
   border: 1px solid rgba(209, 213, 219, 0.6);
   background: rgba(229, 231, 235, 0.88);
   color: #475569;
@@ -502,7 +502,7 @@
 
 /* Liquid glass для header extra (месяц, кнопки) */
 .earnings-page .admin-page-header__extra input.form-input {
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
   border: 1px solid rgba(209, 213, 219, 0.6);
   background: rgba(229, 231, 235, 0.88);
   padding: 8px 14px;
@@ -519,7 +519,7 @@
 }
 
 .earnings-page .admin-page-header__extra .btn {
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
   border: 1px solid rgba(209, 213, 219, 0.6);
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
@@ -583,7 +583,7 @@
   color: #166534;
   background: rgba(209, 250, 229, 0.8);
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
   border: 1px solid rgba(34, 197, 94, 0.3);
 }
 

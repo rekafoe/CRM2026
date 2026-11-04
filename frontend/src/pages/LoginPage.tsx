@@ -3,6 +3,7 @@ import { api, createShift, getShifts, setAuthToken } from '../api';
 import { APP_CONFIG } from '../types';
 import { useNavigate } from 'react-router-dom';
 import './LoginPage.css';
+import '../styles/admin-surface.css';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');

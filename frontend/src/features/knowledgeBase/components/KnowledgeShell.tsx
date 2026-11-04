@@ -6,6 +6,7 @@ import { InboxNotifications } from '../../../components/notifications/InboxNotif
 import { useCurrentUser } from '../../../hooks/useCurrentUser';
 import { useInboxNotifications } from '../../../hooks/useInboxNotifications';
 import '../knowledgeBase.css';
+import '../../../styles/admin-surface.css';
 
 interface KnowledgeShellProps {
   children: React.ReactNode;
