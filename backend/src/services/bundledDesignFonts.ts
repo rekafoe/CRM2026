@@ -69,6 +69,8 @@ export async function ensureBundledDesignFonts(): Promise<BundledDesignFontSeedR
       family_name: BUNDLED_MANROPE_FAMILY,
       label: BUNDLED_MANROPE_FAMILY,
       is_active: true,
+      // Не пустой массив: createDesignFont при length=0 берёт все name table, включая «Regular».
+      name_aliases: [BUNDLED_MANROPE_FAMILY],
     },
     { buffer, originalname: BUNDLED_MANROPE_FILENAME },
   )

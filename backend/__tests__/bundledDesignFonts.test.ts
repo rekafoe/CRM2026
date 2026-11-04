@@ -49,6 +49,7 @@ describe('ensureBundledDesignFonts', () => {
     expect(font?.style).toBe('normal')
     expect(font?.is_active).toBe(true)
     expect(font?.format).toBe('ttf')
+    expect(font?.name_aliases).toEqual([])
     const storedPath = resolveDesignFontFilePath(font!.filename)
     expect(storedPath).toBeTruthy()
     expect(fs.existsSync(storedPath as string)).toBe(true)
