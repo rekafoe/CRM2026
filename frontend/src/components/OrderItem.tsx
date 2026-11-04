@@ -842,10 +842,8 @@ export const OrderItem: React.FC<OrderItemProps> = ({
             }
           }}
         >
-          <span className="order-position__title">
-            {rowIndex != null ? <span className="order-position__index">{rowIndex}</span> : null}
-            <span className="order-position__name">{itemDisplayName}</span>
-          </span>
+          <span className="order-position__index">{rowIndex != null ? String(rowIndex).padStart(2, '0') : ''}</span>
+          <span className="order-position__name">{itemDisplayName}</span>
           <span className="order-position__essence">{essence}</span>
           <span className="order-position__qty">{titleParts.quantityText}</span>
           <span className="order-position__sum">

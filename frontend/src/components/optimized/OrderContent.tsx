@@ -39,6 +39,7 @@ export const OrderContent: React.FC<OrderContentProps> = ({
     <div className="detail-body">
       <div className="order-positions">
         <div className="order-positions__head">
+          <span>#</span>
           <span>Позиция</span>
           <span>Суть</span>
           <span>Кол-во</span>

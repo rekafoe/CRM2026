@@ -659,6 +659,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         ) : null}
         <div className="order-positions">
           <div className="order-positions__head">
+            <span>#</span>
             <span>Позиция</span>
             <span>Суть</span>
             <span>Кол-во</span>

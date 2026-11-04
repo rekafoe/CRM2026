@@ -349,31 +349,40 @@
 }
 
 .pc-order-data .detail-notes-input {
-  background: var(--pc-surface-sunken);
-  border: 1px solid var(--pc-border);
-  border-radius: var(--pc-r-input);
+  height: auto;
+  min-height: 72px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   color: var(--pc-text);
   font-family: inherit;
   font-size: 13px;
   font-weight: 400;
+  line-height: 1.45;
   box-shadow: none;
 }
 
-.pc-order-data .detail-notes-input:hover {
-  border-color: var(--pc-border-strong);
-}
-
+.pc-order-data .detail-notes-input:hover,
 .pc-order-data .detail-notes-input:focus {
   outline: none;
-  border-color: var(--pc-focus-ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc-focus-ring) 18%, transparent);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.pc-order-data .detail-notes-input::placeholder {
+  color: var(--pc-faint);
 }
 
 .pc-order-data .legal-ledger-card {
-  max-width: 100%;
-  background: var(--pc-surface-sunken);
-  border: 1px solid var(--pc-border);
-  border-radius: var(--pc-r-input);
+  max-width: none;
+  margin-top: 10px;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   color: var(--pc-text);
   box-shadow: none;
 }
@@ -382,19 +391,49 @@
   color: var(--pc-muted);
 }
 
+.pc-order-data .legal-ledger-card table,
+.pc-order-data .legal-ledger-card tbody {
+  display: block;
+  width: 100%;
+}
+
+.pc-order-data .legal-ledger-card tr {
+  display: grid;
+  grid-template-columns: max-content minmax(16px, 1fr) minmax(0, 1.6fr);
+  align-items: baseline;
+  gap: 0 10px;
+  padding: 3px 0;
+}
+
+.pc-order-data .legal-ledger-card tr::after {
+  content: "";
+  grid-column: 2;
+  border-bottom: 1px dotted var(--pc-border-strong);
+  transform: translateY(-3px);
+}
+
 .pc-order-data .legal-ledger-card th,
 .pc-order-data .legal-ledger-card td {
-  border-bottom-color: var(--pc-border);
+  border: none;
+  background: none;
+  padding: 0;
 }
 
 .pc-order-data .legal-ledger-card th {
-  background: transparent;
+  width: auto;
   color: var(--pc-muted);
+  font-size: 12px;
   font-weight: 500;
+  text-align: left;
 }
 
 .pc-order-data .legal-ledger-card td {
+  grid-column: 3;
+  min-width: 0;
   color: var(--pc-text);
+  font-size: 13px;
+  text-align: right;
+  white-space: normal;
 }
 
 .pc-order-data .legal-ledger-card__debt {
