@@ -1,9 +1,10 @@
 import React from 'react';
+import { AppIcon } from '../ui/AppIcon';
 import '../../styles/utilities.css';
 
 interface ButtonProps {
   children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'success' | 'error' | 'warning' | 'info';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   loading?: boolean;
@@ -31,6 +32,7 @@ export const Button: React.FC<ButtonProps> = ({
   const getVariantClasses = (variant: string) => {
     switch (variant) {
       case 'secondary': return 'btn-secondary';
+      case 'ghost': return 'btn-ghost';
       case 'success': return 'btn-success';
       case 'error': return 'btn-error';
       case 'warning': return 'btn-warning';
@@ -62,7 +64,7 @@ export const Button: React.FC<ButtonProps> = ({
     if (loading) {
       return (
         <>
-          <span className="animate-spin">⟳</span>
+          <AppIcon name="loader" size="xs" className="btn__spinner" />
           Загрузка...
         </>
       );

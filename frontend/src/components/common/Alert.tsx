@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../ui/AppIcon';
 import '../../styles/utilities.css';
 
 interface AlertProps {
@@ -22,7 +23,7 @@ export const Alert: React.FC<AlertProps> = ({
       className="btn btn-sm btn-secondary ml-auto"
       aria-label="Закрыть"
     >
-      ×
+      <AppIcon name="x" size="xs" />
     </button>
   ) : null;
 

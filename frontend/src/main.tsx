@@ -6,6 +6,8 @@ import { getCurrentUser } from './api';
 import LoginPage from './pages/LoginPage';
 import { QueryProvider } from './providers/QueryProvider';
 import { ToastProvider } from './components/Toast';
+import './styles/fonts.css';
+import './styles/tokens.css';
 import './index.css';
 import './styles/themes.css';
 import './styles/utilities.css';

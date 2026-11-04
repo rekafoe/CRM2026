@@ -186,7 +186,7 @@
 /* Алерты */
 .alert {
   padding: 0.75rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: var(--pc-r-control);
   border: 1px solid;
   margin-bottom: 1rem;
 }
@@ -219,8 +219,8 @@
 .card {
   background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-radius: var(--pc-r-card);
+  box-shadow: none;
   padding: 1.5rem;
   margin-bottom: 1rem;
 }
@@ -243,14 +243,23 @@
   align-items: center;
   justify-content: center;
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: var(--pc-r-control);
   border: 1px solid transparent;
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--pc-motion), border-color var(--pc-motion), color var(--pc-motion);
   gap: 0.5rem;
+}
+
+.btn:focus-visible,
+.btn-secondary:focus-visible,
+.btn-error:focus-visible,
+.btn-warning:focus-visible,
+.btn-info:focus-visible {
+  outline: 2px solid var(--pc-focus-ring);
+  outline-offset: 2px;
 }
 
 .btn:disabled {
@@ -258,52 +267,92 @@
   cursor: not-allowed;
 }
 
+.btn__spinner {
+  animation: pc-spin 0.8s linear infinite;
+}
+
+@keyframes pc-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn__spinner { animation-duration: 2.4s; }
+}
+
+/* Четыре вида: primary, secondary, ghost, danger. success, error, warning и info — прежние имена, отображаются через них.
+ * Контур светлых видов — outline со смещением -1px: часть экранов глобально задаёт `.btn { border: none }`,
+ * а outline совпадает с рамкой, если она есть, и не меняет размер кнопки. */
 .btn-primary {
-  /* Fallback важен: если themes.css/переменные не подгрузились, кнопка не должна стать "белая на белом" */
-  background-color: var(--accent-primary, #1976d2) !important;
-  border-color: var(--accent-primary, #1976d2) !important;
-  color: #fff !important;
+  /* Fallback важен: если токены не подгрузились, кнопка не должна стать "белая на белом" */
+  background-color: var(--pc-accent, #1D4ED8) !important;
+  border-color: var(--pc-accent, #1D4ED8) !important;
+  color: var(--pc-on-accent, #fff) !important;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--accent-secondary, #1565c0) !important;
-  border-color: var(--accent-secondary, #1565c0) !important;
-}
-
-.btn-primary:disabled {
-  /* В disabled состоянии кнопка всё равно должна быть читаемой */
-  background-color: var(--accent-light, #6c757d) !important;
-  border-color: var(--accent-light, #6c757d) !important;
-  color: #fff !important;
+  background-color: var(--pc-accent-hover, #1A45C2) !important;
+  border-color: var(--pc-accent-hover, #1A45C2) !important;
 }
 
 .btn-secondary {
-  background-color: #94a3b8 !important;
-  border-color: #94a3b8 !important;
-  color: #1e293b !important;
+  background-color: var(--pc-surface) !important;
+  border-color: var(--pc-border-strong) !important;
+  color: var(--pc-text) !important;
+  outline: 1px solid var(--pc-border-strong);
+  outline-offset: -1px;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #cbd5e1 !important;
-  border-color: #cbd5e1 !important;
+  background-color: var(--pc-surface-subtle) !important;
+  border-color: var(--pc-border-strong) !important;
+}
+
+.btn-ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--pc-text);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--pc-surface-subtle);
 }
 
 .btn-success {
-  background-color: var(--success);
-  border-color: var(--success);
-  color: white;
+  background-color: var(--pc-accent);
+  border-color: var(--pc-accent);
+  color: var(--pc-on-accent);
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: var(--pc-accent-hover);
+  border-color: var(--pc-accent-hover);
 }
 
 .btn-error {
-  background-color: var(--error);
-  border-color: var(--error);
-  color: white;
+  background-color: var(--pc-surface);
+  border-color: var(--pc-danger-border);
+  color: var(--pc-danger-ink);
+  outline: 1px solid var(--pc-danger-border);
+  outline-offset: -1px;
 }
 
-.btn-warning {
-  background-color: var(--warning);
-  border-color: var(--warning);
-  color: white;
+.btn-error:hover:not(:disabled) {
+  background-color: var(--pc-danger-soft);
+  border-color: var(--pc-danger-ink);
+}
+
+.btn-warning,
+.btn-info {
+  background-color: var(--pc-surface);
+  border-color: var(--pc-border-strong);
+  color: var(--pc-text);
+  outline: 1px solid var(--pc-border-strong);
+  outline-offset: -1px;
+}
+
+.btn-warning:hover:not(:disabled),
+.btn-info:hover:not(:disabled) {
+  background-color: var(--pc-surface-subtle);
 }
 
 /* Формы */
@@ -322,12 +371,12 @@
 .form-control {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 0.375rem;
+  border: 1px solid var(--pc-border-control);
+  border-radius: var(--pc-r-input);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-size: 0.875rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color var(--pc-motion), box-shadow var(--pc-motion);
 }
 
 .form-input,
@@ -335,12 +384,12 @@
 .form-textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 0.375rem;
+  border: 1px solid var(--pc-border-control);
+  border-radius: var(--pc-r-input);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-size: 0.875rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color var(--pc-motion), box-shadow var(--pc-motion);
   box-sizing: border-box;
   display: block;
 }
@@ -352,16 +401,16 @@
 
 .form-control:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+  border-color: var(--pc-focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc-focus-ring) 18%, transparent);
 }
 
 .form-input:focus,
 .form-select:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+  border-color: var(--pc-focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc-focus-ring) 18%, transparent);
 }
 
 .form-control:disabled {
@@ -385,8 +434,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
+  background-color: var(--pc-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -397,8 +445,7 @@
 .common-modal__backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
+  background-color: var(--pc-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -407,8 +454,8 @@
 
 .modal-content {
   background-color: var(--bg-primary);
-  border-radius: 0.75rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  border-radius: var(--pc-r-card);
+  box-shadow: var(--pc-shadow-pop);
   max-width: 90vw;
   max-height: 90vh;
   overflow: auto;
@@ -436,7 +483,7 @@
 }
 
 .table tbody tr:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--pc-row-hover);
 }
 
 /* Списки */
@@ -456,7 +503,7 @@
 }
 
 .list-item:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--pc-row-hover);
 }
 
 /* Утилиты для текста */
@@ -501,29 +548,27 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 0.75rem;
+  background: var(--pc-surface-sunken);
+  border-radius: var(--pc-r-card);
   border: 1px solid var(--border-color);
 }
 
 .wizard-steps .step {
   padding: 0.625rem 1.25rem;
-  border-radius: 2rem;
+  border-radius: var(--pc-r-control);
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-muted);
-  background: white;
+  background: var(--pc-surface);
   border: 2px solid transparent;
-  transition: all 0.3s ease;
+  transition: background-color var(--pc-motion), border-color var(--pc-motion), color var(--pc-motion);
   white-space: nowrap;
 }
 
 .wizard-steps .step.active {
-  background: var(--btn-tab-bg-active, #d4c8e8);
-  color: var(--btn-tab-text-active, #4a3d62);
-  border-color: var(--accent-primary, #9b87c4);
-  box-shadow: 0 4px 12px rgba(155, 135, 196, 0.25);
-  transform: translateY(-2px);
+  background: var(--btn-tab-bg-active);
+  color: var(--btn-tab-text-active);
+  border-color: var(--pc-accent);
 }
 
 .wizard-content {
