@@ -280,6 +280,26 @@ describe('normalizeDesignStateFontFamilies', () => {
     expect(objects[1].fontWeight).toBe('normal')
     expect(objects[1].fontStyle).toBe('normal')
   })
+
+  it('не меняет JSON текста Manrope, если в библиотеке Regular 400', () => {
+    const object = {
+      type: 'textbox',
+      fontFamily: 'Manrope',
+      fontWeight: '600',
+      fontStyle: 'normal',
+      text: 'Визитка',
+    }
+    const designState = {
+      pages: [{ fabricJSON: { objects: [object] } }],
+    }
+    const normalized = normalizeDesignStateFontFamilies(designState, [{
+      family_name: 'Manrope',
+      weight: '400',
+      style: 'normal',
+    }]) as typeof designState
+    const next = (normalized.pages[0].fabricJSON as { objects: Array<typeof object> }).objects[0]
+    expect(JSON.stringify(next)).toBe(JSON.stringify(object))
+  })
 })
 
 describe('extractUsedFontFamiliesFromDesignState textStyleRuns', () => {
@@ -394,6 +414,27 @@ describe('buildRequiredFontEntries', () => {
       url: '/api/uploads/comfortaa-bold.ttf',
       weight: '700',
       style: 'normal',
+    })
+  })
+
+  it('отдаёт Manrope из библиотеки как global с url для сайта', () => {
+    const entries = buildRequiredFontEntries({
+      families: ['Manrope'],
+      globalByFamily: new Map([
+        ['manrope', {
+          id: 21,
+          url: '/api/design-fonts/public/21/content',
+          format: 'ttf',
+          family: 'Manrope',
+        }],
+      ]),
+    })
+    expect(entries[0]).toMatchObject({
+      family: 'Manrope',
+      source: 'global',
+      fontId: 21,
+      url: '/api/design-fonts/public/21/content',
+      format: 'ttf',
     })
   })
 })

@@ -78,6 +78,12 @@ export async function initDB(): Promise<Database> {
     }
 
     dbInstance = db
+    try {
+      const { ensureBundledDesignFonts } = await import('./services/bundledDesignFonts')
+      await ensureBundledDesignFonts()
+    } catch (error) {
+      console.log('Bundled design fonts seed failed', error)
+    }
     return db
   })()
 
