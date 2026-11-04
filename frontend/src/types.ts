@@ -23,6 +23,8 @@ export interface ItemParams {
   printerId?: number;
   paperDensity?: number;
   paperName?: string;
+  /** Свободная суть позиции: ламинация, ширина рулона и прочие параметры оператора. */
+  characteristics?: string;
   lamination?: LaminationType;
   specifications?: {
     sides?: number;
