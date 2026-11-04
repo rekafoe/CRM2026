@@ -13,7 +13,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--pc-bg);
   z-index: 9999;
 }
 
@@ -28,35 +28,32 @@
 }
 
 .error-title {
-  color: #d32f2f;
+  color: var(--pc-danger-ink);
+  font-family: var(--pc-font-display);
   font-size: 24px;
   font-weight: 600;
   margin: 0 0 12px 0;
 }
 
 .error-message {
-  color: #666;
+  color: var(--pc-muted);
   font-size: 16px;
   line-height: 1.5;
   margin: 0 0 24px 0;
 }
 
 .retry-button {
-  background: #1976d2;
-  color: white;
+  background: var(--pc-accent);
+  color: var(--pc-on-accent);
   border: none;
   padding: 12px 24px;
-  border-radius: 4px;
+  border-radius: var(--pc-r-control);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background-color var(--pc-motion);
 }
 
 .retry-button:hover {
-  background: #1565c0;
-}
-
-.retry-button:active {
-  transform: translateY(1px);
+  background: var(--pc-accent-hover);
 }

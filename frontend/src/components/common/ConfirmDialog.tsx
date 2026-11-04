@@ -29,15 +29,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const variantStyles = {
     danger: {
-      button: 'bg-red-600 hover:bg-red-700 text-white',
+      button: 'btn-error',
       icon: ''
     },
     warning: {
-      button: 'bg-yellow-600 hover:bg-yellow-700 text-white',
+      button: 'btn-primary',
       icon: ''
     },
     info: {
-      button: 'bg-blue-600 hover:bg-blue-700 text-white',
+      button: 'btn-primary',
       icon: ''
     }
   };
@@ -54,13 +54,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            className="btn btn-secondary"
           >
             {cancelText}
           </button>
           <button
             onClick={handleConfirm}
-            className={`px-4 py-2 rounded-md transition-colors ${style.button}`}
+            className={`btn ${style.button}`}
           >
             {confirmText}
           </button>
