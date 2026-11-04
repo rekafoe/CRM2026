@@ -352,6 +352,7 @@ function imageMimeFromFilePath(filePath: string): string {
   if (ext === '.png') return 'image/png'
   if (ext === '.webp') return 'image/webp'
   if (ext === '.gif') return 'image/gif'
+  if (ext === '.svg') return 'image/svg+xml'
   return 'application/octet-stream'
 }
 
@@ -369,6 +370,15 @@ function inlineLocalFabricImageSources(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => inlineLocalFabricImageSources(item))
   if (!value || typeof value !== 'object') return value
   const obj: FabricObj = { ...(value as FabricObj) }
+  const type = String(obj.type ?? '').toLowerCase()
+  const id = String(obj.id ?? '').toLowerCase()
+  if (
+    type === 'path'
+    && (obj.isDecorElement === true || id.startsWith('decor_'))
+    && typeof obj.fillRule !== 'string'
+  ) {
+    obj.fillRule = 'evenodd'
+  }
   if (typeof obj.src === 'string') {
     const filePath = fileUrlToExistingPath(obj.src)
     if (filePath) {

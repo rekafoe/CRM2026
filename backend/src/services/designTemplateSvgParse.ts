@@ -103,6 +103,7 @@ export type SvgDecor = {
   stackIndex?: number
   shape: SvgDecorShape
   fill?: SvgPaint
+  fillRule?: 'nonzero' | 'evenodd'
   stroke?: SvgPaint
   strokeWidth?: number
   opacity?: number
@@ -525,6 +526,12 @@ function transformedRect(
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
 }
 
+function normalizeSvgFillRule(value: string | undefined): 'nonzero' | 'evenodd' | undefined {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === 'evenodd' || normalized === 'nonzero') return normalized
+  return undefined
+}
+
 function resolveDecorPresentation(
   attrs: Record<string, string>,
   inheritedStyle: Record<string, string>,
@@ -533,13 +540,14 @@ function resolveDecorPresentation(
   objectSvg: GeometryRect,
   coordSpace: 'pathLocal' | 'sceneBox',
   objectScene?: GeometryRect,
-): Pick<SvgDecor, 'fill' | 'stroke' | 'strokeWidth' | 'opacity'> {
+): Pick<SvgDecor, 'fill' | 'fillRule' | 'stroke' | 'strokeWidth' | 'opacity'> {
   const style = {
     ...inheritedStyle,
     ...styleFromClassNames(attrs.class, cssClassStyles),
     ...parseStyle(attrs.style),
   }
   if (attrs.fill?.trim()) style.fill = attrs.fill.trim()
+  if (attrs['fill-rule']?.trim()) style['fill-rule'] = attrs['fill-rule'].trim()
   if (attrs.stroke?.trim()) style.stroke = attrs.stroke.trim()
   if (attrs['stroke-width']?.trim()) style['stroke-width'] = attrs['stroke-width'].trim()
   if (attrs.opacity?.trim()) style.opacity = attrs.opacity.trim()
@@ -551,6 +559,7 @@ function resolveDecorPresentation(
     objectScene,
     normalizeSvgPaintColor,
   )
+  const fillRule = normalizeSvgFillRule(style['fill-rule'])
   const stroke = resolveSvgPaint(
     style.stroke,
     gradients,
@@ -563,6 +572,7 @@ function resolveDecorPresentation(
   const opacity = parseNumber(style.opacity) ?? undefined
   return {
     ...(fill ? { fill } : {}),
+    ...(fillRule ? { fillRule } : {}),
     ...(stroke ? { stroke } : {}),
     ...(strokeWidth != null ? { strokeWidth: Math.max(0, strokeWidth) } : {}),
     ...(opacity != null ? { opacity: Math.min(1, Math.max(0, opacity)) } : {}),
@@ -2421,9 +2431,15 @@ export function parseImportedSvgLayers(
     }
   }
 
+  const rootPresentationStyle: Record<string, string> = {
+    ...styleFromClassNames(dims.svgAttrs.class, cssClassStyles),
+    ...parseStyle(dims.svgAttrs.style),
+    ...(dims.svgAttrs['fill-rule']?.trim() ? { 'fill-rule': dims.svgAttrs['fill-rule'].trim() } : {}),
+    ...(dims.svgAttrs['clip-rule']?.trim() ? { 'clip-rule': dims.svgAttrs['clip-rule'].trim() } : {}),
+  }
   const groupStack: (string | null)[] = [null]
   const transformStack: SvgTransform[] = [IDENTITY_TRANSFORM]
-  const groupStyleStack: Array<Record<string, string>> = [{}]
+  const groupStyleStack: Array<Record<string, string>> = [rootPresentationStyle]
   const groupFrameStack: Array<{ openLt: number; removable: boolean; layerName: string | null }> = []
 
   function mergeGroupPresentationStyle(attrs: Record<string, string>): Record<string, string> {
@@ -2437,6 +2453,8 @@ export function parseImportedSvgLayers(
     if (attrs['text-anchor']?.trim()) self['text-anchor'] = attrs['text-anchor'].trim()
     if (attrs['text-align']?.trim()) self['text-align'] = attrs['text-align'].trim()
     if (attrs.fill?.trim()) self.fill = attrs.fill.trim()
+    if (attrs['fill-rule']?.trim()) self['fill-rule'] = attrs['fill-rule'].trim()
+    if (attrs['clip-rule']?.trim()) self['clip-rule'] = attrs['clip-rule'].trim()
     if (attrs.color?.trim()) self.color = attrs.color.trim()
     return { ...parent, ...self }
   }

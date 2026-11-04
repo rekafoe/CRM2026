@@ -246,4 +246,112 @@ describe('fabricTextFromSvgText', () => {
     expect(decorObjects[0]?.decorLayerName).toBe('decor_id')
     expect(decorObjects[1]?.decorLayerName).toBe('decor_id')
   })
+
+  it('переносит fill-rule evenodd из корневого <svg style> на составной decor_ path Corel', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="61mm" height="92mm" viewBox="0 0 6100 9200" style="fill-rule:evenodd; clip-rule:evenodd">
+  <defs>
+    <style type="text/css">
+      .fil1 {fill:#B32621}
+      .fil2 {fill:#B7CBD8;fill-rule:nonzero}
+    </style>
+  </defs>
+  <g id="Layer_1">
+    <path id="decor_" class="fil1" d="M1284.21 996.58l0 0c106.44,0 193.51,87.07 193.51,193.51l0 528.23c0,106.44 -87.07,193.51 -193.51,193.51l0 0c-106.44,0 -193.51,-87.07 -193.51,-193.51l0 -528.23c0,-106.44 87.07,-193.51 193.51,-193.51zm0 99.97l0 0c66.17,0 120.29,54.16 120.29,120.29l0 481.61c0,66.12 -54.12,120.29 -120.29,120.29l0 0c-66.17,0 -120.29,-54.13 -120.29,-120.29l0 -481.61c0,-66.17 54.12,-120.29 120.29,-120.29z"/>
+    <path id="decor__2" class="fil2" d="M10 10 L100 10 L100 100 Z"/>
+  </g>
+</svg>`
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(svg, 'utf8'),
+      originalname: '1,1-17.svg',
+      mimetype: 'image/svg+xml',
+    }, 'card-17', [])
+    const objects = doc.pages[0]!.designPage.fabricJSON.objects as Array<{
+      id?: string
+      decorLayerName?: string
+      fillRule?: string
+    }>
+    const digit = objects.find((obj) => obj.decorLayerName === 'decor_')
+    const stripe = objects.find((obj) => obj.id === 'decor__2')
+    expect(digit?.id).toBe('decor_1')
+    expect(digit?.fillRule).toBe('evenodd')
+    expect(stripe?.fillRule).toBe('nonzero')
+  })
+
+  it('читает семейство и начертание (OS/2 weight + italic) из TTF внутри ZIP и сохраняет полное превью', () => {
+    const PizZip = require('pizzip') as new () => {
+      file: (name: string, data: string | Buffer) => void
+      generate: (opts: { type: 'nodebuffer' }) => Buffer
+    }
+    const u16 = (n: number) => {
+      const b = Buffer.alloc(2)
+      b.writeUInt16BE(n)
+      return b
+    }
+    const u32 = (n: number) => {
+      const b = Buffer.alloc(4)
+      b.writeUInt32BE(n >>> 0)
+      return b
+    }
+    const utf16 = (s: string) => {
+      const b = Buffer.alloc(s.length * 2)
+      for (let i = 0; i < s.length; i += 1) b.writeUInt16BE(s.charCodeAt(i), i * 2)
+      return b
+    }
+    const fam = utf16('TestCardDisplay')
+    const sub = utf16('Bold Italic')
+    const nameTbl = Buffer.concat([
+      u16(0), u16(2), u16(6 + 24),
+      u16(3), u16(1), u16(0x0409), u16(1), u16(fam.length), u16(0),
+      u16(3), u16(1), u16(0x0409), u16(2), u16(sub.length), u16(fam.length),
+      fam, sub,
+    ])
+    const os2Tbl = Buffer.alloc(64)
+    os2Tbl.writeUInt16BE(700, 4)
+    os2Tbl.writeUInt16BE(1, 62)
+    const dirOffset = 12 + 32
+    const sfntBuf = Buffer.concat([
+      u32(0x00010000), u16(2), u16(0), u16(0), u16(0),
+      Buffer.from('OS/2', 'ascii'), u32(0), u32(dirOffset), u32(os2Tbl.length),
+      Buffer.from('name', 'ascii'), u32(0), u32(dirOffset + os2Tbl.length), u32(nameTbl.length),
+      os2Tbl,
+      nameTbl,
+    ])
+
+    const zip = new PizZip()
+    zip.file('fonts/file_01.ttf', sfntBuf)
+    zip.file(
+      '1.svg',
+      `<svg xmlns="http://www.w3.org/2000/svg" width="61mm" height="92mm" viewBox="0 0 610 920">`
+      + `<rect id="photo_" x="50" y="50" width="510" height="820" fill="#cccccc"/>`
+      + `<text id="text_title" x="100" y="100" font-family="TestCardDisplay Bold" font-size="24">Карта</text>`
+      + `</svg>`,
+    )
+
+    const warnings: string[] = []
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: zip.generate({ type: 'nodebuffer' }),
+      originalname: 'cards-with-font.zip',
+      mimetype: 'application/zip',
+    }, 'cards-zip', warnings)
+
+    expect(doc.bundledFonts).toHaveLength(1)
+    expect(doc.bundledFonts[0]).toMatchObject({
+      family: 'TestCardDisplay',
+      weight: '700',
+      style: 'italic',
+    })
+    const textObj = doc.pages[0]!.designPage.fabricJSON.objects.find((obj) => obj.id === 'text_title') as {
+      fontFamily?: string
+      fontWeight?: string
+      fontStyle?: string
+    } | undefined
+    expect(textObj).toMatchObject({
+      fontFamily: 'TestCardDisplay',
+      fontWeight: '700',
+      fontStyle: 'italic',
+    })
+    expect(doc.previewUrl).not.toBe(doc.normalizedFileUrl)
+    expect(doc.previewUrl).toContain('preview')
+  })
 })

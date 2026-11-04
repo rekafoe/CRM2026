@@ -372,4 +372,28 @@ describe('buildRequiredFontEntries', () => {
       fontId: 12,
     })
   })
+
+  it('сопоставляет bundled-шрифт из ZIP по алиасу и пробрасывает weight/style', () => {
+    const entries = buildRequiredFontEntries({
+      families: ['ofont.ru_Comfortaa Bold'],
+      globalByFamily: new Map(),
+      bundledFonts: [{
+        family: 'Comfortaa',
+        source: 'bundled',
+        filename: 'comfortaa-bold.ttf',
+        url: '/api/uploads/comfortaa-bold.ttf',
+        format: 'ttf',
+        name_aliases: ['Comfortaa Bold', 'Comfortaa-Bold'],
+        weight: '700',
+        style: 'normal',
+      }],
+    })
+    expect(entries[0]).toMatchObject({
+      family: 'Comfortaa',
+      source: 'bundled',
+      url: '/api/uploads/comfortaa-bold.ttf',
+      weight: '700',
+      style: 'normal',
+    })
+  })
 })

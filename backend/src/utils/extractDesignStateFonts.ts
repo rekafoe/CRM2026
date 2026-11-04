@@ -68,6 +68,9 @@ export type BundledTemplateFont = {
   filename: string
   url: string
   format?: string
+  name_aliases?: string[]
+  weight?: string
+  style?: string
 }
 
 export type RequiredFontEntry = {
@@ -77,6 +80,8 @@ export type RequiredFontEntry = {
   url?: string
   format?: string
   name_aliases?: string[]
+  weight?: string
+  style?: string
 }
 
 export type GlobalFontRef = {
@@ -86,6 +91,40 @@ export type GlobalFontRef = {
   /** Каноническое имя в библиотеке CRM (family_name). */
   family: string
   name_aliases?: string[]
+  weight?: string
+  style?: string
+}
+
+export function matchBundledFontByFamily(
+  family: string,
+  bundled: BundledTemplateFont[],
+): BundledTemplateFont | undefined {
+  const targetKey = fontFamilyCompactKey(family)
+  const targetBase = fontFamilyBaseCompactKey(family)
+  if (!targetKey && !targetBase) return undefined
+  return bundled.find((b) => {
+    const names = [b.family, ...(b.name_aliases ?? [])].filter(Boolean)
+    return names.some((name) => {
+      if (fontFamilyNamesMatch(name, family)) return true
+      const k = fontFamilyCompactKey(name)
+      const base = fontFamilyBaseCompactKey(name)
+      return Boolean((targetKey && k === targetKey) || (targetBase && base === targetBase))
+    })
+  })
+}
+
+export function bundledFontsToLibraryLinks(
+  bundled: BundledTemplateFont[] | undefined,
+): Array<{ family_name: string; name_aliases?: string[]; weight?: string; style?: string }> {
+  if (!bundled?.length) return []
+  return bundled
+    .filter((b) => Boolean(b?.family?.trim()))
+    .map((b) => ({
+      family_name: b.family,
+      name_aliases: b.name_aliases,
+      weight: b.weight,
+      style: b.style,
+    }))
 }
 
 export function buildRequiredFontEntries(input: {
@@ -105,15 +144,20 @@ export function buildRequiredFontEntries(input: {
         url: global.url,
         format: global.format,
         name_aliases: global.name_aliases,
+        ...(global.weight ? { weight: global.weight } : {}),
+        ...(global.style ? { style: global.style } : {}),
       }
     }
-    const bundledMatch = bundled.find((b) => fontFamilyNamesMatch(b.family, family))
+    const bundledMatch = matchBundledFontByFamily(family, bundled)
     if (bundledMatch) {
       return {
-        family,
+        family: normalizeFontFamilyName(bundledMatch.family) || family,
         source: 'bundled' as const,
         url: bundledMatch.url,
         format: bundledMatch.format,
+        ...(bundledMatch.name_aliases?.length ? { name_aliases: bundledMatch.name_aliases } : {}),
+        ...(bundledMatch.weight ? { weight: bundledMatch.weight } : {}),
+        ...(bundledMatch.style ? { style: bundledMatch.style } : {}),
       }
     }
     return { family, source: 'missing' as const }
@@ -224,7 +268,7 @@ function libraryFontByName(fonts: LibraryFontLink[]): Map<string, LibraryFontLin
     const names = [canonical, ...(font.name_aliases ?? [])]
     for (const name of names) {
       for (const key of [fontFamilyCompactKey(name), fontFamilyBaseCompactKey(name)]) {
-        if (key) map.set(key, font)
+        if (key && !map.has(key)) map.set(key, font)
       }
     }
   }

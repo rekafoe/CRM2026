@@ -2,13 +2,22 @@ import path from 'path'
 import PizZip from 'pizzip'
 import { detectFontFormat, isFontUploadExtension, saveBufferToUploads } from '../config/upload'
 import {
+  fontFamilyBaseCompactKey,
   fontFamilyCompactKey,
+  fontFamilyNamesMatch,
   guessFontFamilyFromFilename,
   isGenericFontFamily,
   isUnsetFontFamily,
+  normalizeFontFamilyName,
 } from '../utils/fontFamilyNormalize'
+import {
+  collectFontNameAliases,
+  linkedFontPropsFromStored,
+  readFontFaceVariant,
+  readFontMetadataFromBuffer,
+} from '../utils/fontFileMetadata'
 import { measureDesignFontText } from '../utils/designFontMetrics'
-import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
+import { matchBundledFontByFamily, type BundledTemplateFont } from '../utils/extractDesignStateFonts'
 import {
   parseImportedSvgLayers,
   type PrepressFromSvgGuides,
@@ -296,7 +305,10 @@ function toFabricPathCommands(pathData: string): Array<[string, ...number[]]> | 
       continue
     }
     for (let i = 0; i + step - 1 < args.length; i += step) {
-      commands.push([cmd, ...args.slice(i, i + step)])
+      const subCmd = i > 0 && (cmd === 'M' || cmd === 'm')
+        ? (cmd === 'M' ? 'L' : 'l')
+        : cmd
+      commands.push([subCmd, ...args.slice(i, i + step)])
     }
   }
   return commands.length > 0 ? commands : null
@@ -377,6 +389,7 @@ function toFabricDecor(item: SvgDecor): Record<string, unknown> {
     // Без fill в SVG не подставляем тёмный дефолт — иначе page underlay / пустые фигуры
     // превращаются в чёрный прямоугольник на весь лист.
     fill: item.fill ?? 'transparent',
+    ...(item.fillRule ? { fillRule: item.fillRule } : {}),
     ...(item.stroke ? { stroke: item.stroke } : {}),
     ...(item.strokeWidth != null ? { strokeWidth: item.strokeWidth } : {}),
     ...(item.opacity != null ? { opacity: item.opacity } : {}),
@@ -708,26 +721,46 @@ function readZipFontEntries(
   }
 
   const fonts: BundledTemplateFont[] = []
-  for (const [name, entry] of Object.entries(zip.files)) {
+  const seenBasenames = new Set<string>()
+  const entries = Object.entries(zip.files).sort(([a], [b]) => {
+    const aInFonts = /(?:^|\/)fonts\//i.test(a.replace(/\\/g, '/')) ? 0 : 1
+    const bInFonts = /(?:^|\/)fonts\//i.test(b.replace(/\\/g, '/')) ? 0 : 1
+    if (aInFonts !== bInFonts) return aInFonts - bInFonts
+    return sortPageEntryNames(a, b)
+  })
+  for (const [name, entry] of entries) {
     if (entry.dir || shouldSkipZipEntry(name)) continue
     const normalized = name.replace(/\\/g, '/')
     const basename = path.posix.basename(normalized)
     const ext = path.extname(basename).toLowerCase()
     if (!isFontUploadExtension(ext)) continue
-    const inFontsFolder = /(?:^|\/)fonts\//i.test(normalized)
-    if (!inFontsFolder && Object.keys(zip.files).some((k) => /fonts\//i.test(k.replace(/\\/g, '/')))) {
-      continue
-    }
+    const baseKey = basename.toLowerCase()
+    if (seenBasenames.has(baseKey)) continue
+    seenBasenames.add(baseKey)
     const buffer = entry.asNodeBuffer()
     const stored = saveBufferToUploads(buffer, basename, `${templateName}-font`)
     if (!stored) continue
-    const family = guessFontFamilyFromFilename(basename)
+    const meta = readFontMetadataFromBuffer(buffer)
+    const variant = readFontFaceVariant(buffer)
+    const fromMeta = normalizeFontFamilyName(meta?.preferredFamily || meta?.family || '')
+    const fromFile = guessFontFamilyFromFilename(basename)
+    const family = fromMeta || fromFile
+    const aliases = collectFontNameAliases(meta)
+    for (const extra of [fromFile, meta?.fullName, meta?.postscript]) {
+      const trimmed = extra?.trim()
+      if (trimmed && !aliases.some((a) => a.toLowerCase() === trimmed.toLowerCase())) {
+        aliases.push(trimmed)
+      }
+    }
     fonts.push({
       family,
       source: 'bundled',
       filename: stored.filename,
       url: `/api/uploads/${stored.filename}`,
       format: detectFontFormat(basename),
+      ...(aliases.length ? { name_aliases: aliases } : {}),
+      ...(variant?.weight ? { weight: variant.weight } : {}),
+      ...(variant?.style ? { style: variant.style } : {}),
     })
   }
 
@@ -782,16 +815,26 @@ function matchBundledFontToTextLayer(
 ): BundledTemplateFont | undefined {
   const rawSuffix = textName.replace(/^text_/i, '').trim()
   const suffixKey = fontFamilyCompactKey(rawSuffix)
-  if (!suffixKey) return undefined
+  const suffixBase = fontFamilyBaseCompactKey(rawSuffix)
+  if (!suffixKey && !suffixBase) return undefined
   const normalizedHint = rawSuffix.replace(/[_-]+/g, ' ')
   const hasExplicitFontHint = /\b(font|fnt|family|typeface)\b/i.test(normalizedHint)
   return bundled.find((font) => {
-    const familyKey = fontFamilyCompactKey(font.family)
-    const fileKey = fontFamilyCompactKey(guessFontFamilyFromFilename(font.filename))
-    if (familyKey === suffixKey || fileKey === suffixKey) return true
-    if (!hasExplicitFontHint) return false
-    return familyKey.includes(suffixKey) || suffixKey.includes(familyKey)
-      || fileKey.includes(suffixKey) || suffixKey.includes(fileKey)
+    const candidates = [
+      font.family,
+      guessFontFamilyFromFilename(font.filename),
+      ...(font.name_aliases ?? []),
+    ].filter(Boolean)
+    for (const candidate of candidates) {
+      if (fontFamilyNamesMatch(candidate, rawSuffix)) return true
+      const cKey = fontFamilyCompactKey(candidate)
+      const cBase = fontFamilyBaseCompactKey(candidate)
+      if ((suffixKey && cKey === suffixKey) || (suffixBase && cBase === suffixBase)) return true
+      if (hasExplicitFontHint && suffixKey && cKey && (cKey.includes(suffixKey) || suffixKey.includes(cKey))) {
+        return true
+      }
+    }
+    return false
   })
 }
 
@@ -818,8 +861,7 @@ function warnFontsNotInBundledZip(
   pageIndex: number,
 ): void {
   if (usedFamilies.length === 0 || bundledFonts.length === 0) return
-  const bundledKeys = new Set(bundledFonts.map((font) => fontFamilyCompactKey(font.family)))
-  const notInZip = usedFamilies.filter((family) => !bundledKeys.has(fontFamilyCompactKey(family)))
+  const notInZip = usedFamilies.filter((family) => !matchBundledFontByFamily(family, bundledFonts))
   if (notInZip.length > 0) {
     warnings.push(
       `Страница ${pageIndex + 1}: в SVG шрифты «${notInZip.join('», «')}» не совпадают с папкой fonts/ `
@@ -840,15 +882,40 @@ function applyBundledFontFallbacks(
   for (const layer of parsed.interactiveLayers) {
     if (layer.kind !== 'text') continue
     const text = layer.data
-    const matched = matchBundledFontToTextLayer(text.name, bundledFonts)
+    const matchedByHint = matchBundledFontToTextLayer(text.name, bundledFonts)
     // Только пустой family; Arial из Corel оставляем как есть.
-    if (matched && isUnsetFontFamily(text.fontFamily)) {
-      text.fontFamily = matched.family
+    if (matchedByHint && isUnsetFontFamily(text.fontFamily)) {
+      text.fontFamily = matchedByHint.family
     }
-    if (matched && text.textStyles?.length) {
+    const matchedByFamily = text.fontFamily
+      ? matchBundledFontByFamily(text.fontFamily, bundledFonts)
+      : undefined
+    const effective = matchedByFamily ?? (isUnsetFontFamily(text.fontFamily) ? matchedByHint : undefined)
+    if (effective) {
+      text.fontFamily = normalizeFontFamilyName(effective.family) || effective.family
+      const linked = linkedFontPropsFromStored(effective.weight, effective.style)
+      if (linked) {
+        text.fontWeight = linked.fontWeight
+        text.fontStyle = linked.fontStyle
+      }
+    }
+    if (text.textStyles?.length) {
       for (const seg of text.textStyles) {
-        if (isUnsetFontFamily(seg.fontFamily)) {
-          seg.fontFamily = matched.family
+        if (matchedByHint && isUnsetFontFamily(seg.fontFamily)) {
+          seg.fontFamily = matchedByHint.family
+        }
+        const segMatch = seg.fontFamily
+          ? matchBundledFontByFamily(seg.fontFamily, bundledFonts)
+          : effective
+        if (segMatch) {
+          if (seg.fontFamily) {
+            seg.fontFamily = normalizeFontFamilyName(segMatch.family) || segMatch.family
+          }
+          const linked = linkedFontPropsFromStored(segMatch.weight, segMatch.style)
+          if (linked) {
+            seg.fontWeight = linked.fontWeight
+            seg.fontStyle = linked.fontStyle
+          }
         }
       }
     }
@@ -955,7 +1022,18 @@ function buildPageFromSvg(input: {
   )
   if (!stored) importError(`Не удалось сохранить SVG страницы ${input.pageIndex + 1}.`, input.warnings)
 
-  const previewUrl = `/api/uploads/${stored.filename}`
+  const normalizedFileUrl = `/api/uploads/${stored.filename}`
+  let previewUrl = normalizedFileUrl
+  if (input.pageIndex === 0 && parsed.removalRanges.length > 0) {
+    const previewStored = saveBufferToUploads(
+      Buffer.from(sanitized, 'utf8'),
+      input.originalName,
+      `${input.templateName}-preview`,
+    )
+    if (previewStored) {
+      previewUrl = `/api/uploads/${previewStored.filename}`
+    }
+  }
   const prepress =
     parsed.prepressHints && Object.keys(parsed.guideRectsMm).length > 0
       ? buildImportedPrepress(parsed.prepressHints, parsed.guideRectsMm)
@@ -964,7 +1042,7 @@ function buildPageFromSvg(input: {
   return {
     originalName: input.originalName,
     previewUrl,
-    normalizedFileUrl: previewUrl,
+    normalizedFileUrl,
     normalizedOriginalName: stored.originalName,
     normalizedSize: stored.size,
     parsed,
@@ -974,7 +1052,7 @@ function buildPageFromSvg(input: {
         version: '6.0.0',
         objects: [
           ...(parsed.lockedBgDetected
-            ? [toFabricBackground(previewUrl, parsed.geometry.scenePx, parsed.geometry.sceneScale)]
+            ? [toFabricBackground(normalizedFileUrl, parsed.geometry.scenePx, parsed.geometry.sceneScale)]
             : []),
           ...parsed.interactiveLayers.map((layer) => (
             layer.kind === 'photo'

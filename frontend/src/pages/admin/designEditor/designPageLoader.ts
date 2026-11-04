@@ -49,6 +49,15 @@ export function fabricDeserializeReviver(
     if (!Object.prototype.hasOwnProperty.call(serializedObj, key)) continue;
     target[key] = serializedObj[key];
   }
+  const type = String(serializedObj.type ?? '').toLowerCase();
+  const id = String(serializedObj.id ?? '').toLowerCase();
+  if (
+    type === 'path'
+    && (serializedObj.isDecorElement === true || id.startsWith('decor_'))
+    && typeof serializedObj.fillRule !== 'string'
+  ) {
+    target.fillRule = 'evenodd';
+  }
 }
 
 function asAny(value: unknown): AnyObj {

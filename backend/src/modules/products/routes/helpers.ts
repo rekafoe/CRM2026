@@ -482,6 +482,7 @@ export function compactSimplifiedForSite(simplified: any) {
     pages: simplifiedOrdered.pages || null,
     multiPageStructure: simplifiedOrdered.multiPageStructure || null,
     design_editor_mode: simplifiedOrdered.design_editor_mode ?? null,
+    ...(simplifiedOrdered.lock_client_spreads === true ? { lock_client_spreads: true } : {}),
     prepress: simplifiedOrdered.prepress || null,
     printAreas: Array.isArray(simplifiedOrdered.printAreas) ? simplifiedOrdered.printAreas : null,
     sizes: Array.isArray(simplifiedOrdered.sizes) ? simplifiedOrdered.sizes.map(compactSize) : [],

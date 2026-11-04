@@ -17,6 +17,8 @@ export type RequiredFontSpecEntry = {
   format?: string;
   fontId?: number;
   name_aliases?: string[];
+  weight?: string;
+  style?: string;
 };
 
 export type CrmLibraryFont = {
@@ -546,6 +548,15 @@ export async function loadDesignFontsFromSpec(
     }
 
     let ok = false;
+    const storedLinked = linkedFontPropsFromStored(entry.weight, entry.style);
+    const entryVariant: FontFaceVariant | null = storedLinked
+      ? { weight: storedLinked.fontWeight, style: storedLinked.fontStyle as 'normal' | 'italic' }
+      : (entry.weight || entry.style)
+        ? {
+          weight: cssFontWeightToken(entry.weight ?? '400'),
+          style: entry.style === 'italic' ? 'italic' : 'normal',
+        }
+        : null;
     if (entry.source !== 'missing' && entry.url) {
       if (entry.source === 'global' && entry.fontId) {
         ok = await loadDesignFontFromLibrary({
@@ -554,11 +565,16 @@ export async function loadDesignFontsFromSpec(
           name_aliases: entry.name_aliases,
           url: entry.url,
           format: entry.format,
+          weight: entry.weight,
+          style: entry.style,
         });
       }
       if (!ok && entry.url) {
         const src = resolveFontAssetUrl(entry.url);
-        ok = await loadFontFaceFromSource(family, src, entry.format, entry.fontId);
+        const names = [family, ...(entry.name_aliases ?? [])].map((n) => n.trim()).filter(Boolean);
+        ok = names.length > 1
+          ? await loadFontFaceAliases(names, src, entry.format, entry.fontId, entryVariant)
+          : await loadFontFaceFromSource(family, src, entry.format, entry.fontId, entryVariant);
       }
     }
 

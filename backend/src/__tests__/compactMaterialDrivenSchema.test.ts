@@ -99,6 +99,18 @@ describe('compact material-driven schema', () => {
     expect(JSON.stringify(compact)).not.toContain('1600')
   })
 
+  it('отдаёт запрет разворотов клиенту только когда он включён', () => {
+    expect(compactSimplifiedForSite({
+      design_editor_mode: 'multipage',
+      lock_client_spreads: true,
+      sizes: [],
+    }).lock_client_spreads).toBe(true)
+    expect(compactSimplifiedForSite({
+      design_editor_mode: 'multipage',
+      sizes: [],
+    }).lock_client_spreads).toBeUndefined()
+  })
+
   it('оставляет обязательность и количество услуги', () => {
     const compact = compactSimplifiedForSite({
       sizes: [

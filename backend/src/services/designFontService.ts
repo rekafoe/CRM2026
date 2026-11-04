@@ -9,9 +9,11 @@ import {
 } from '../config/upload'
 import {
   buildRequiredFontEntries,
+  bundledFontsToLibraryLinks,
   extractUsedFontFamiliesFromDesignState,
   hasMissingRequiredFonts,
   applyLibraryFontFallbacksToDesignState,
+  matchBundledFontByFamily,
   normalizeDesignStateFontFamilies,
   type BundledTemplateFont,
   type GlobalFontRef,
@@ -403,6 +405,8 @@ async function buildGlobalFontMap(): Promise<Map<string, GlobalFontRef>> {
       format: font.format,
       family: font.family_name,
       name_aliases: font.name_aliases,
+      weight: font.weight,
+      style: font.style,
     }
     const names = [font.family_name, ...font.name_aliases]
     for (const name of names) {
@@ -414,23 +418,66 @@ async function buildGlobalFontMap(): Promise<Map<string, GlobalFontRef>> {
   return map
 }
 
+function hydrateBundledFontMetadata(bundled: BundledTemplateFont[]): BundledTemplateFont[] {
+  return bundled.map((item) => {
+    if (!item || typeof item !== 'object') return item
+    if (item.weight && item.style && Array.isArray(item.name_aliases) && item.name_aliases.length > 0) {
+      return item
+    }
+    const filename = item.filename?.trim()
+    if (!filename) return item
+    const filePath = resolveSafeExistingPath([uploadsDir, designFontsDir], filename)
+    if (!filePath) return item
+    try {
+      const buf = fs.readFileSync(filePath)
+      const meta = readFontMetadataFromBuffer(buf)
+      const face = readFontFaceVariant(buf)
+      const fromMeta = normalizeFontFamilyName(meta?.preferredFamily || meta?.family || '')
+      const fromFile = guessFontFamilyFromFilename(filename)
+      const aliases = collectFontNameAliases(meta)
+      for (const extra of [item.family, fromFile, meta?.fullName, meta?.postscript]) {
+        const trimmed = extra?.trim()
+        if (trimmed && !aliases.some((a) => a.toLowerCase() === trimmed.toLowerCase())) {
+          aliases.push(trimmed)
+        }
+      }
+      return {
+        ...item,
+        family: fromMeta || item.family || fromFile,
+        ...(aliases.length ? { name_aliases: aliases } : {}),
+        ...(face?.weight ? { weight: face.weight } : {}),
+        ...(face?.style ? { style: face.style } : {}),
+      }
+    } catch {
+      return item
+    }
+  })
+}
+
 export async function buildRequiredFontsForDesignState(
   designState: unknown,
   bundledFonts: BundledTemplateFont[] = [],
 ): Promise<RequiredFontEntry[]> {
   const families = extractUsedFontFamiliesFromDesignState(designState)
   const globalByFamily = await buildGlobalFontMap()
-  return buildRequiredFontEntries({ families, globalByFamily, bundledFonts })
+  const hydratedBundled = hydrateBundledFontMetadata(bundledFonts)
+  return buildRequiredFontEntries({ families, globalByFamily, bundledFonts: hydratedBundled })
 }
 
 export async function enrichSpecWithRequiredFonts(
   spec: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const libraryFonts = await listDesignFonts(true)
-  const withLibraryFallbacks = applyLibraryFontFallbacksToDesignState(spec.designState, libraryFonts)
-  const normalizedDesignState = normalizeDesignStateFontFamilies(withLibraryFallbacks, libraryFonts)
-  const bundled = Array.isArray(spec.fonts) ? spec.fonts as BundledTemplateFont[] : []
-  const requiredFonts = await buildRequiredFontsForDesignState(normalizedDesignState, bundled)
+  const rawBundled = Array.isArray(spec.fonts) ? spec.fonts as BundledTemplateFont[] : []
+  const bundled = hydrateBundledFontMetadata(rawBundled)
+  const combinedFonts = [...libraryFonts, ...bundledFontsToLibraryLinks(bundled)]
+  const withLibraryFallbacks = applyLibraryFontFallbacksToDesignState(spec.designState, combinedFonts)
+  const normalizedDesignState = normalizeDesignStateFontFamilies(withLibraryFallbacks, combinedFonts)
+  const requiredFonts = await buildRequiredFontEntries({
+    families: extractUsedFontFamiliesFromDesignState(normalizedDesignState),
+    globalByFamily: await buildGlobalFontMap(),
+    bundledFonts: bundled,
+  })
   const fontWarnings = requiredFonts
     .filter((f) => f.source === 'missing')
     .map((f) => `Шрифт «${f.family}» не найден в библиотеке CRM и не приложен к шаблону.`)
@@ -442,6 +489,7 @@ export async function enrichSpecWithRequiredFonts(
   }
   return {
     ...spec,
+    ...(Array.isArray(spec.fonts) ? { fonts: bundled } : {}),
     designState: normalizedDesignState,
     requiredFonts,
     fontsResolved: !hasMissingRequiredFonts(requiredFonts),
@@ -456,9 +504,10 @@ export async function resolveFontFilesForDesignState(
   designState: unknown,
   templateSpec?: Record<string, unknown> | null,
 ): Promise<Array<{ family: string; filePath: string; format: string; weight?: string; style?: string }>> {
-  const bundled = templateSpec && Array.isArray(templateSpec.fonts)
+  const rawBundled = templateSpec && Array.isArray(templateSpec.fonts)
     ? templateSpec.fonts as BundledTemplateFont[]
     : []
+  const bundled = hydrateBundledFontMetadata(rawBundled)
   const required = await buildRequiredFontsForDesignState(designState, bundled)
   const resolved: Array<{ family: string; filePath: string; format: string; weight?: string; style?: string }> = []
   for (const entry of required) {
@@ -479,7 +528,8 @@ export async function resolveFontFilesForDesignState(
       continue
     }
     if (entry.source === 'bundled') {
-      const bundledEntry = bundled.find((b) => fontFamilyNamesMatch(b.family, entry.family))
+      const bundledEntry = matchBundledFontByFamily(entry.family, bundled)
+        ?? bundled.find((b) => fontFamilyNamesMatch(b.family, entry.family))
       const filename = bundledEntry?.filename
       if (!filename) continue
       const filePath = resolveSafeExistingPath([uploadsDir, designFontsDir], filename)
@@ -494,8 +544,8 @@ export async function resolveFontFilesForDesignState(
           family: entry.family,
           filePath,
           format: bundledEntry?.format ?? 'woff2',
-          weight: face?.weight,
-          style: face?.style,
+          weight: face?.weight ?? bundledEntry?.weight ?? entry.weight,
+          style: face?.style ?? bundledEntry?.style ?? entry.style,
         })
       }
     }

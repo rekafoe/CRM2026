@@ -230,6 +230,25 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
                 <small className="template-summary-card__field-hint">{selectedEditorModeHint}</small>
               )}
             </label>
+            {selectedEditorMode === 'multipage' && (
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={value.lock_client_spreads === true}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      lock_client_spreads: e.target.checked,
+                    })
+                  }
+                />
+                Клиент без разворотов
+                <small className="template-summary-card__field-hint">
+                  Переключатель скрыт, макет открывается отдельными страницами. Для карт.
+                  Фотокнига без галочки по-прежнему листается разворотами.
+                </small>
+              </label>
+            )}
             {selectedEditorMode === 'souvenir_3d' && (
               <div className="template-summary-card__field-group">
                 <span className="template-summary-card__field-title">Зоны печати (3D)</span>

@@ -233,6 +233,11 @@ export type SimplifiedConfig = {
   /** Какой сценарий макетов открывать для продукта на сайте/в CRM. */
   design_editor_mode?: DesignEditorMode;
   /**
+   * Многостраничный редактор: клиент не видит переключатель разворотов
+   * и не может включить разворот. Макет открывается отдельными страницами.
+   */
+  lock_client_spreads?: boolean;
+  /**
    * Зоны печати для souvenir_3d: мм + modelUrl/meshName.
    * designState.pageWidth/Height берутся из активной зоны.
    */
