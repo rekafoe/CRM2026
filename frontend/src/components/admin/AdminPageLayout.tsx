@@ -11,6 +11,8 @@ interface AdminPageLayoutProps {
   titleSuffix?: string | null;
   /** Явный callback «Назад» (приоритет над backTo и авто-иерархией) */
   onBack?: () => void;
+  /** Подпись кнопки назад. По умолчанию «← Назад». */
+  backLabel?: string;
   /** Родительский маршрут, если не задан onBack */
   backTo?: string;
   children: React.ReactNode;
@@ -26,6 +28,7 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
   icon,
   titleSuffix,
   onBack,
+  backLabel = '← Назад',
   backTo,
   children,
   className = '',
@@ -40,7 +43,7 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
     <div className={`admin-page-layout ${className}`}>
       <div className="admin-page-header">
         <button type="button" onClick={onBack ?? goBack} className="back-btn">
-          ← Назад
+          {backLabel}
         </button>
         <div className="admin-page-header__title-block">
         <h1>
