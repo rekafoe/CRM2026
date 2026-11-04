@@ -43,6 +43,7 @@ import { resolvePublicEditorNextAction } from './publicDesignTaskFlow';
 import {
   DEFAULT_PUBLIC_DESIGN_PREPRESS_CONFIG,
   usePublicDesignBootstrap,
+  type PublicDesignBlankPageSpec,
 } from './usePublicDesignBootstrap';
 import { usePublicDesignDraftActions } from './usePublicDesignDraftActions';
 import { usePublicDesignGuidedActions } from './usePublicDesignGuidedActions';
@@ -130,7 +131,11 @@ function formatPageCountRu(count: number): string {
 }
 
 interface PublicDesignEditorProps {
-  templateId: number;
+  templateId?: number | null;
+  productId?: number;
+  typeId?: number | string;
+  sizeId?: string;
+  blankPageSpec?: PublicDesignBlankPageSpec;
   initialDraftToken?: string | null;
   onDraftTokenChange?: (token: string) => void;
   adapter?: PublicDesignEditorAdapter;
@@ -151,6 +156,10 @@ interface PublicDesignEditorProps {
 
 export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   templateId,
+  productId,
+  typeId,
+  sizeId,
+  blankPageSpec,
   initialDraftToken,
   onDraftTokenChange,
   adapter = crmPreviewPublicDesignEditorAdapter,
@@ -166,7 +175,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   pageCountLimits,
   onPageCountChange,
 }) => {
-  const bootstrapKey = `${documentMode}:${templateId}`;
+  const effectiveTemplateId = templateId != null && Number.isFinite(templateId) ? templateId : 0;
+  const bootstrapKey = `${documentMode}:${effectiveTemplateId}:${sizeId ?? ''}`;
   const bootstrapDraftTokenRef = useRef<{ key: string; token: string | null } | null>(null);
   if (!bootstrapDraftTokenRef.current || bootstrapDraftTokenRef.current.key !== bootstrapKey) {
     bootstrapDraftTokenRef.current = { key: bootstrapKey, token: initialDraftToken ?? null };
@@ -255,7 +265,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     adapter,
     documentMode,
     initialDraftToken: bootstrapDraftToken,
-    templateId,
+    templateId: effectiveTemplateId,
+    blankPageSpec,
     setCoverPages,
     setError,
     setPageSpec,
@@ -443,12 +454,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const thumbnailCacheScope = useMemo(() => {
     if (!template) return null;
     return {
-      templateId,
+      templateId: effectiveTemplateId,
       draftToken,
       pageWidthPx: sceneGeometry.pageWidthPx,
       pageHeightPx: sceneGeometry.pageHeightPx,
     };
-  }, [draftToken, sceneGeometry.pageHeightPx, sceneGeometry.pageWidthPx, template, templateId]);
+  }, [draftToken, effectiveTemplateId, sceneGeometry.pageHeightPx, sceneGeometry.pageWidthPx, template]);
 
   const handlePageThumbReady = useCallback((pageIdx: number, dataUrl: string) => {
     if (thumbnailCacheScope) {
@@ -485,7 +496,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   usePublicDesignThumbnailPrefetch({
     enabled: !loading && Boolean(template),
-    templateId,
+    templateId: effectiveTemplateId,
     draftToken,
     pages,
     pageCount: pageSpec.pageCount,
@@ -666,7 +677,10 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     prepressConfig,
     saving,
     spreadMode,
-    templateId,
+    templateId: effectiveTemplateId,
+    productId,
+    typeId,
+    sizeId,
     setActiveTaskTab,
     setDraftToken,
     setError,

@@ -18,11 +18,21 @@ export const DEFAULT_PUBLIC_DESIGN_PREPRESS_CONFIG: DesignPrepressConfig = {
   cutMarks: true,
 };
 
+export interface PublicDesignBlankPageSpec {
+  widthMm?: number;
+  heightMm?: number;
+  pageCount?: number;
+  bleedMm?: number;
+  safeZoneMm?: number;
+  title?: string;
+}
+
 interface UsePublicDesignBootstrapInput {
   adapter: PublicDesignEditorAdapter;
   documentMode: PublicDesignDocumentMode;
   initialDraftToken?: string | null;
-  templateId: number;
+  templateId?: number | null;
+  blankPageSpec?: PublicDesignBlankPageSpec;
   setCoverPages: (value: number) => void;
   setError: (message: string | null) => void;
   setPageSpec: (value: PublicDesignPageSpec) => void;
@@ -37,6 +47,7 @@ export function usePublicDesignBootstrap({
   documentMode,
   initialDraftToken,
   templateId,
+  blankPageSpec,
   setCoverPages,
   setError,
   setPageSpec,
@@ -53,6 +64,13 @@ export function usePublicDesignBootstrap({
   const [fontsLoadedTick, setFontsLoadedTick] = useState(0);
   const [fontsBootstrapDone, setFontsBootstrapDone] = useState(false);
 
+  const blankWidthMm = blankPageSpec?.widthMm;
+  const blankHeightMm = blankPageSpec?.heightMm;
+  const blankPageCount = blankPageSpec?.pageCount;
+  const blankBleedMm = blankPageSpec?.bleedMm;
+  const blankSafeZoneMm = blankPageSpec?.safeZoneMm;
+  const blankTitle = blankPageSpec?.title;
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -60,14 +78,46 @@ export function usePublicDesignBootstrap({
         setLoading(true);
         setFontsBootstrapDone(false);
         setError(null);
-        const res = await getPublicDesignTemplate(templateId);
-        if (cancelled) return;
-        const t = res.data;
+        const hasTemplateId = templateId != null && Number.isFinite(templateId) && templateId > 0;
+        let t: DesignTemplate;
+        if (hasTemplateId) {
+          const res = await getPublicDesignTemplate(templateId);
+          if (cancelled) return;
+          t = res.data;
+        } else {
+          const defaultW = Number.isFinite(Number(blankWidthMm)) && Number(blankWidthMm) > 0 ? Number(blankWidthMm) : 90;
+          const defaultH = Number.isFinite(Number(blankHeightMm)) && Number(blankHeightMm) > 0 ? Number(blankHeightMm) : 50;
+          const defaultPages = Number.isFinite(Number(blankPageCount)) && Number(blankPageCount) > 0
+            ? Math.floor(Number(blankPageCount))
+            : (documentMode === 'multipage' ? 4 : 1);
+          t = {
+            id: 0,
+            design_code: '',
+            name: blankTitle?.trim() || 'Конструктор макета',
+            description: null,
+            category_id: null,
+            category: null,
+            preview_url: null,
+            site_preview_url: null,
+            spec: JSON.stringify({
+              width_mm: defaultW,
+              height_mm: defaultH,
+              page_count: defaultPages,
+              prepress: {
+                ...(Number.isFinite(Number(blankBleedMm)) ? { bleedMm: Number(blankBleedMm) } : {}),
+                ...(Number.isFinite(Number(blankSafeZoneMm)) ? { safeZoneMm: Number(blankSafeZoneMm) } : {}),
+              },
+            }),
+            is_active: 1,
+            sort_order: 0,
+          };
+        }
         const spec = readDesignTemplateSpec(t);
         const ds = spec.designState;
         const sourceState = initialDraftToken
           ? (adapter ? (await adapter.getDraft(initialDraftToken)).payloadParsed?.designState as typeof ds | undefined : undefined) ?? ds
           : ds;
+        if (cancelled) return;
         const w = sourceState?.pageWidth ?? spec.width_mm ?? 90;
         const h = sourceState?.pageHeight ?? spec.height_mm ?? 55;
         const statePageCount = Number(sourceState?.pageCount ?? spec.page_count ?? 1);
@@ -125,6 +175,12 @@ export function usePublicDesignBootstrap({
     return () => { cancelled = true; };
   }, [
     adapter,
+    blankBleedMm,
+    blankHeightMm,
+    blankPageCount,
+    blankSafeZoneMm,
+    blankTitle,
+    blankWidthMm,
     documentMode,
     initialDraftToken,
     setCoverPages,

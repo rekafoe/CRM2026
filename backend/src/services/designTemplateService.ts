@@ -23,6 +23,10 @@ export interface DesignTemplateRow {
   author_percent: number
   created_at: string
   updated_at: string
+  /** Список доступных size_id для семьи design_code в рамках подтипа (для единой страницы подтипа + #calculator). */
+  available_size_ids?: string[]
+  /** Карта sizeId -> designTemplateId варианта семьи для мгновенного переключения размера в #calculator без доп. запросов. */
+  variant_by_size?: Record<string, number>
 }
 
 export type DesignTemplateListRow = DesignTemplateRow & {
@@ -124,14 +128,30 @@ async function enrichPublicTemplateSpec(spec: string | null): Promise<string | n
   }
 }
 
+type DesignTemplateRowWithLinkedSize = DesignTemplateRow & {
+  linked_size_id?: string | null
+}
+
+function extractRowSizeId(row: DesignTemplateRowWithLinkedSize): string {
+  const fromLink = row.linked_size_id != null ? String(row.linked_size_id).trim() : ''
+  if (fromLink) return fromLink
+  if (!row.spec) return ''
+  try {
+    const parsed = JSON.parse(row.spec) as Record<string, unknown>
+    return parsed.sizeId != null ? String(parsed.sizeId).trim() : ''
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Лёгкий spec для сетки каталога: без designState / fabricJSON / шрифтов.
  * Полный designState — только в GET /public/:id (редактор).
  */
-function toPublicListSpec(spec: string | null): string | null {
-  if (!spec) return null
+function toPublicListSpec(spec: string | null, fallbackSizeId?: string): string | null {
+  if (!spec && !fallbackSizeId) return null
   try {
-    const parsed = JSON.parse(spec) as Record<string, unknown>
+    const parsed = spec ? (JSON.parse(spec) as Record<string, unknown>) : {}
     const designState =
       parsed.designState && typeof parsed.designState === 'object' && !Array.isArray(parsed.designState)
         ? (parsed.designState as Record<string, unknown>)
@@ -146,6 +166,9 @@ function toPublicListSpec(spec: string | null): string | null {
     for (const key of ['productId', 'typeId', 'sizeId', 'width_mm', 'height_mm'] as const) {
       if (parsed[key] != null) light[key] = parsed[key]
     }
+    if (light.sizeId == null && fallbackSizeId) {
+      light.sizeId = fallbackSizeId
+    }
     if (pageCount > 0) light.page_count = pageCount
     const importMeta = parsed.import
     if (importMeta && typeof importMeta === 'object' && !Array.isArray(importMeta)) {
@@ -157,7 +180,7 @@ function toPublicListSpec(spec: string | null): string | null {
     }
     return Object.keys(light).length > 0 ? JSON.stringify(light) : null
   } catch {
-    return null
+    return fallbackSizeId ? JSON.stringify({ sizeId: fallbackSizeId }) : null
   }
 }
 
@@ -169,11 +192,13 @@ async function enrichPublicTemplateRow(row: DesignTemplateRow): Promise<DesignTe
   }
 }
 
-function mapPublicListRow(row: DesignTemplateRow): DesignTemplateRow {
-  const stripped = stripAuthorRoyaltyFields(row)
+function mapPublicListRow(row: DesignTemplateRowWithLinkedSize): DesignTemplateRow {
+  const fallbackSizeId = extractRowSizeId(row)
+  const { linked_size_id: _linkedSizeId, ...withoutLinked } = row
+  const stripped = stripAuthorRoyaltyFields(withoutLinked)
   return {
     ...stripped,
-    spec: toPublicListSpec(stripped.spec),
+    spec: toPublicListSpec(stripped.spec, fallbackSizeId || undefined),
   }
 }
 
@@ -226,9 +251,11 @@ function rowHasPublicPreview(row: DesignTemplateRow): boolean {
 /**
  * Одна карточка на design_code.
  * Превью общее для семьи: берём site_preview_url / preview_url с любого варианта.
+ * Дополнительно агрегирует available_size_ids и variant_by_size (sizeId -> templateId)
+ * для единой страницы подтипа + #calculator без дополнительных запросов.
  */
-function dedupePublicByDesignCode(rows: DesignTemplateRow[]): DesignTemplateRow[] {
-  const groups = new Map<string, DesignTemplateRow[]>()
+function dedupePublicByDesignCode(rows: DesignTemplateRowWithLinkedSize[]): DesignTemplateRowWithLinkedSize[] {
+  const groups = new Map<string, DesignTemplateRowWithLinkedSize[]>()
   const order: string[] = []
   for (const row of rows) {
     const code = String((row as { design_code?: string }).design_code ?? '').trim()
@@ -245,10 +272,26 @@ function dedupePublicByDesignCode(rows: DesignTemplateRow[]): DesignTemplateRow[
     const preferred = group.find(rowHasPublicPreview) ?? group[0]!
     const siteDonor = group.find((r) => String(r.site_preview_url ?? '').trim())
     const previewDonor = group.find((r) => String(r.preview_url ?? '').trim())
+    const availableSizeIds: string[] = []
+    const variantBySize: Record<string, number> = {}
+    for (const r of group) {
+      const sid = extractRowSizeId(r)
+      if (!sid) continue
+      if (!(sid in variantBySize)) {
+        availableSizeIds.push(sid)
+        variantBySize[sid] = Number(r.id)
+      }
+    }
     return {
       ...preferred,
       site_preview_url: preferred.site_preview_url || siteDonor?.site_preview_url || null,
       preview_url: preferred.preview_url || previewDonor?.preview_url || null,
+      ...(availableSizeIds.length > 0
+        ? {
+          available_size_ids: availableSizeIds,
+          variant_by_size: variantBySize,
+        }
+        : {}),
     }
   })
 }
@@ -445,23 +488,27 @@ export async function getPublicDesignTemplates(params: {
 }): Promise<DesignTemplateRow[]> {
   await ensureFamilySitePreviewBackfill()
   const db = await getDb()
-  let rows: DesignTemplateRow[]
-  if (params.productId && params.typeId) {
+  let rows: DesignTemplateRowWithLinkedSize[]
+  if (params.productId && params.productId > 0) {
+    const hasTypeFilter = params.typeId != null && Number.isFinite(params.typeId) && params.typeId > 0
     const sizeId = params.sizeId != null ? String(params.sizeId).trim() : ''
+    const typeClause = hasTypeFilter ? 'AND psd.type_id = ?' : ''
+    const baseArgs = hasTypeFilter ? [params.productId, params.typeId] : [params.productId]
+
     if (sizeId) {
       rows = await db.all(
-        `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
+        `SELECT ${PUBLIC_TEMPLATE_COLUMNS}, psd.size_id AS linked_size_id
          FROM ${PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK}
-         WHERE psd.product_id = ? AND psd.type_id = ? AND psd.size_id = ? AND dt.is_active = 1
+         WHERE psd.product_id = ? ${typeClause} AND psd.size_id = ? AND dt.is_active = 1
          ORDER BY psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
-        [params.productId, params.typeId, sizeId],
-      ) as DesignTemplateRow[]
+        [...baseArgs, sizeId],
+      ) as DesignTemplateRowWithLinkedSize[]
       const legacy = await db.all(
-        `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
+        `SELECT ${PUBLIC_TEMPLATE_COLUMNS}, psd.size_id AS linked_size_id
          FROM ${PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK}
-         WHERE psd.product_id = ? AND psd.type_id = ? AND (psd.size_id IS NULL OR psd.size_id = '') AND dt.is_active = 1`,
-        [params.productId, params.typeId],
-      ) as DesignTemplateRow[]
+         WHERE psd.product_id = ? ${typeClause} AND (psd.size_id IS NULL OR psd.size_id = '') AND dt.is_active = 1`,
+        baseArgs,
+      ) as DesignTemplateRowWithLinkedSize[]
       // Legacy-линки без size_id: только если в spec явно указан тот же sizeId.
       // Раньше `spec.sizeId == null` попадал в ответ для ЛЮБОГО размера →
       // на сайте размер без sibling семьи ошибочно считался доступным.
@@ -477,14 +524,19 @@ export async function getPublicDesignTemplates(params: {
       for (const row of legacyFiltered) {
         if (!seen.has(row.id)) rows.push(row)
       }
+      rows = rows.map((row) => ({
+        ...row,
+        available_size_ids: [sizeId],
+        variant_by_size: { [sizeId]: Number(row.id) },
+      }))
     } else {
       rows = await db.all(
-        `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
+        `SELECT ${PUBLIC_TEMPLATE_COLUMNS}, psd.size_id AS linked_size_id
          FROM ${PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK}
-         WHERE psd.product_id = ? AND psd.type_id = ? AND dt.is_active = 1
+         WHERE psd.product_id = ? ${typeClause} AND dt.is_active = 1
          ORDER BY psd.size_id ASC, psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
-        [params.productId, params.typeId],
-      ) as DesignTemplateRow[]
+        baseArgs,
+      ) as DesignTemplateRowWithLinkedSize[]
     }
   } else {
     rows = await db.all(
@@ -492,7 +544,7 @@ export async function getPublicDesignTemplates(params: {
        FROM ${PUBLIC_TEMPLATE_JOIN}
        WHERE dt.is_active = 1
        ORDER BY dt.sort_order ASC, dt.design_code ASC, dt.name ASC`,
-    ) as DesignTemplateRow[]
+    ) as DesignTemplateRowWithLinkedSize[]
   }
 
   // Без sizeId — одна карточка на семью; с sizeId уже отфильтрованы варианты размера.

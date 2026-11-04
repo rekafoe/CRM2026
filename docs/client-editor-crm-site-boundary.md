@@ -26,14 +26,14 @@ flowchart TD
   draft --> orderPool
 ```
 
-### Четыре экрана сайта (контекст для API)
+### Четыре шага на 2 страницах сайта (контекст для API)
 
-| # | Экран | CRM |
-|---|--------|-----|
-| 1 | Продукт | `productId`, `design_editor_mode` |
-| 2 | Подтип | `typeId` из `types[]` |
-| 3 | Галерея макетов | `GET /api/design-templates/public?productId&typeId` (+ `sizeId`) |
-| 4 | Калькулятор → редактор | `calculate`, `GET public/:id`, `POST/PATCH` draft |
+| # | Экран / Блок | CRM |
+|---|--------------|-----|
+| 1 | Страница продукта (`/services/poligrafy/{route_key}`) | `productId`, `design_editor_mode`, список подтипов `types[]` (прямые ссылки без модалки) |
+| 2 | Верх страницы подтипа (`/services/poligrafy/{route_key}/{type.key}`) | Карточки «Свой макет», «Создать в редакторе» + галерея `GET /api/design-templates/public?productId&typeId` (включая `available_size_ids` и `variant_by_size`) |
+| 3 | Якорь `#calculator` на странице подтипа | `calculate`, выбор размера/тиража, привязка выбранного `designTemplateId` из `variant_by_size[sizeId]` |
+| 4 | Редактор (`/order/editor`) → Корзина | `GET public/:id` (или чистый лист без `templateId`), `POST/PATCH` draft, checkout |
 
 Полная матрица id, примеры запросов, превью и smoke-проверка: **[site-design-gallery-integration.md](./site-design-gallery-integration.md)**.
 

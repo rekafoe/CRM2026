@@ -1817,6 +1817,10 @@ export interface DesignTemplate {
   author_percent?: number;
   author_name?: string | null;
   subtype_link_count?: number;
+  /** Доступные size_id для семьи design_code в рамках подтипа */
+  available_size_ids?: string[];
+  /** Карта sizeId -> designTemplateId варианта семьи */
+  variant_by_size?: Record<string, number>;
   created_at?: string;
   updated_at?: string;
 }

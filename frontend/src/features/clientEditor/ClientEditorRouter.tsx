@@ -7,6 +7,7 @@ import {
 } from '../publicDesignEditor/publicDesignEditorAdapter';
 import type { PublicDesignDocumentMode } from '../publicDesignEditor/useDesignDocumentNavigation';
 import type { PublicDesignPageCountLimits } from '../publicDesignEditor/usePublicDesignPageActions';
+import type { PublicDesignBlankPageSpec } from '../publicDesignEditor/usePublicDesignBootstrap';
 import { Souvenir3dEditor } from '../souvenir3d';
 import { ClientPhotoBatchEditor } from './ClientPhotoBatchEditor';
 import './clientEditor.css';
@@ -18,7 +19,12 @@ export interface ClientEditorRouterProps {
   productId?: number;
   typeId?: number | string;
   sizeId?: string;
-  templateId?: number;
+  /** ID шаблона из галереи; если не передан (или <= 0) для single/multipage — открывается конструктор с чистого листа */
+  templateId?: number | null;
+  /** ID пустого 3D-шаблона из product schema (`simplified.souvenirBlankTemplateId`) для режима souvenir_3d без выбранного дизайна */
+  souvenirBlankTemplateId?: number | null;
+  /** Размеры и параметры чистого листа (для сценария «Создать макет в редакторе с нуля») */
+  blankPageSpec?: PublicDesignBlankPageSpec;
   initialDraftToken?: string | null;
   onDraftTokenChange?: (token: string) => void;
   adapter?: PublicDesignEditorAdapter;
@@ -58,6 +64,8 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
   typeId,
   sizeId,
   templateId,
+  souvenirBlankTemplateId,
+  blankPageSpec,
   initialDraftToken,
   onDraftTokenChange,
   adapter = crmPreviewPublicDesignEditorAdapter,
@@ -72,6 +80,12 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
 }) => {
   const scenario = SCENARIO_COPY[mode];
   const showIntro = mode === 'photo_batch';
+  const resolvedSouvenirTemplateId =
+    templateId != null && Number.isFinite(templateId) && templateId > 0
+      ? templateId
+      : (souvenirBlankTemplateId != null && Number.isFinite(souvenirBlankTemplateId) && souvenirBlankTemplateId > 0
+        ? souvenirBlankTemplateId
+        : null);
 
   return (
     <div className={`client-editor client-editor--${mode}`}>
@@ -101,9 +115,9 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
           sizeId={sizeId}
         />
       ) : mode === 'souvenir_3d' ? (
-        templateId != null && Number.isFinite(templateId) ? (
+        resolvedSouvenirTemplateId != null ? (
           <Souvenir3dEditor
-            templateId={templateId}
+            templateId={resolvedSouvenirTemplateId}
             initialDraftToken={initialDraftToken}
             onDraftTokenChange={onDraftTokenChange}
             adapter={adapter}
@@ -117,11 +131,15 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
             printAreas={printAreas}
           />
         ) : (
-          <Alert type="error">Для сувенирного редактора нужен templateId.</Alert>
+          <Alert type="error">Для сувенирного редактора нужен templateId или souvenirBlankTemplateId.</Alert>
         )
-      ) : templateId != null && Number.isFinite(templateId) ? (
+      ) : (
         <PublicDesignEditor
           templateId={templateId}
+          productId={productId}
+          typeId={typeId}
+          sizeId={sizeId}
+          blankPageSpec={blankPageSpec}
           initialDraftToken={initialDraftToken}
           onDraftTokenChange={onDraftTokenChange}
           adapter={adapter}
@@ -134,8 +152,6 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
           pageCountLimits={pageCountLimits}
           onPageCountChange={onPageCountChange}
         />
-      ) : (
-        <Alert type="error">Для редактора макета нужен templateId.</Alert>
       )}
     </div>
   );

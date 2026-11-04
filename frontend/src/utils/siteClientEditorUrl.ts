@@ -13,22 +13,30 @@ export type SiteEditorOpenParams = {
   productSlug: string;
   /** types[].key или numeric typeId; `0` / `single` — продукт без подтипа */
   typeIdParam: string;
-  templateId: number;
+  /** ID шаблона из галереи; если не передан (или <= 0) — открывается чистый конструктор */
+  templateId?: number | null;
+  /** sizeId из калькулятора подтипа (для конструктора с нуля или выбранного формата) */
+  sizeId?: string;
   /** single | multipage | souvenir_3d — сайт может пока игнорировать неизвестные */
   mode?: string;
 };
 
 /** URL сайтового редактора: /services/poligrafy/{slug}/{type}/order/editor?templateId= */
 export function buildSitePoligrafyEditorUrl(params: SiteEditorOpenParams): string {
-  const slug = String(params.productSlug || '').trim() || String(params.templateId);
+  const slug = String(params.productSlug || '').trim() || String(params.templateId || '0');
   const typeSeg = String(params.typeIdParam || '').trim() || '0';
-  const q = new URLSearchParams({
-    templateId: String(params.templateId),
-  });
+  const q = new URLSearchParams();
+  if (params.templateId != null && Number.isFinite(params.templateId) && params.templateId > 0) {
+    q.set('templateId', String(params.templateId));
+  }
+  if (params.sizeId && params.sizeId.trim()) {
+    q.set('sizeId', params.sizeId.trim());
+  }
   if (params.mode && params.mode !== 'single') {
     q.set('mode', params.mode);
   }
-  return `${PUBLIC_SITE_BASE}/services/poligrafy/${encodeURIComponent(slug)}/${encodeURIComponent(typeSeg)}/order/editor?${q.toString()}`;
+  const qs = q.toString();
+  return `${PUBLIC_SITE_BASE}/services/poligrafy/${encodeURIComponent(slug)}/${encodeURIComponent(typeSeg)}/order/editor${qs ? `?${qs}` : ''}`;
 }
 
 export function openSiteClientEditor(params: SiteEditorOpenParams): void {

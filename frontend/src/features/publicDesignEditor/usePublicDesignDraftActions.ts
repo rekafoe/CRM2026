@@ -51,7 +51,10 @@ interface UsePublicDesignDraftActionsInput {
   prepressConfig: DesignPrepressConfig;
   saving: boolean;
   spreadMode: boolean;
-  templateId: number;
+  templateId?: number | null;
+  productId?: number;
+  typeId?: number | string;
+  sizeId?: string;
   setActiveTaskTab: (tab: 'photo' | 'text' | 'check') => void;
   setDraftToken: (token: string) => void;
   setError: (message: string | null) => void;
@@ -159,6 +162,9 @@ export function usePublicDesignDraftActions({
   saving,
   spreadMode,
   templateId,
+  productId,
+  typeId,
+  sizeId,
   setActiveTaskTab,
   setDraftToken,
   setError,
@@ -236,8 +242,14 @@ export function usePublicDesignDraftActions({
 
   const ensureDraft = useCallback(async () => {
     if (draftToken) return draftToken;
+    const numericTypeId = typeof typeId === 'number' && Number.isFinite(typeId)
+      ? typeId
+      : (typeId != null && /^\d+$/.test(String(typeId).trim()) ? Number(String(typeId).trim()) : undefined);
     const res = await adapter.createDraft({
-      designTemplateId: templateId,
+      ...(templateId != null && Number.isFinite(templateId) && templateId > 0 ? { designTemplateId: templateId } : {}),
+      ...(productId != null && Number.isFinite(productId) && productId > 0 ? { productId } : {}),
+      ...(numericTypeId != null ? { typeId: numericTypeId } : {}),
+      ...(sizeId && String(sizeId).trim() ? { sizeId: String(sizeId).trim() } : {}),
       mode: draftMode || documentMode,
       payload: { ...(draftPayloadExtras ?? {}) },
     });
@@ -247,7 +259,7 @@ export function usePublicDesignDraftActions({
     setDraftToken(token);
     onDraftTokenChange?.(token);
     return token;
-  }, [adapter, documentMode, draftMode, draftPayloadExtras, draftToken, onDraftTokenChange, setDraftToken, templateId]);
+  }, [adapter, documentMode, draftMode, draftPayloadExtras, draftToken, onDraftTokenChange, productId, setDraftToken, sizeId, templateId, typeId]);
 
   const hydrateDraftVersion = useCallback(async (token: string) => {
     if (!token) return;
