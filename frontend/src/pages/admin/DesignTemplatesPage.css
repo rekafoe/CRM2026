@@ -55,7 +55,7 @@
   padding: 0;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .design-templates-page.product-management .lg-btn--icon .app-icon,
@@ -443,7 +443,7 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   border: 2px solid #2563eb;
   color: #0ea5e9;
   font-size: 22px;
@@ -1110,7 +1110,7 @@
   gap: 4px;
   padding: 6px 12px;
   border: 1px solid rgba(59, 130, 246, 0.35);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 13px;
   font-weight: 500;
   color: #1d4ed8;
@@ -1550,4 +1550,53 @@
   .design-template-compact-fields .design-template-field--wide {
     grid-column: auto;
   }
+}
+
+.design-templates-view {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.design-templates-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--pc-surface, #fff);
+  font-size: 13px;
+}
+
+.design-templates-table th {
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--pc-muted, #5c626c);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--pc-border, #e2dfd7);
+}
+
+.design-templates-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--pc-border, #e2dfd7);
+  vertical-align: middle;
+}
+
+.design-templates-table__mono {
+  font-family: var(--pc-font-mono, ui-monospace, monospace);
+}
+
+.design-templates-table__preview {
+  display: block;
+  width: 48px;
+  height: 36px;
+  object-fit: contain;
+  background: var(--pc-surface-sunken, #f9f8f5);
+  border: 1px solid var(--pc-border, #e2dfd7);
+  border-radius: 4px;
+}
+
+.design-templates-table__actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
 }

@@ -1,0 +1,230 @@
+/*
+ * Этап 6. Вид остальных админ-страниц на токенах.
+ * Редактор, шаблоны дизайна, шрифты и ассеты не покрываются: это этап 7.
+ * Меняются цвет, радиус, тень и размытие. Поля ввода сохраняют padding, font-size и box-sizing.
+ */
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout),
+.admin-panel-page .cnt-page,
+.admin-panel-page .earn-admin,
+.admin-panel-page .product-management:not(.design-templates-page),
+.admin-panel-page .reports-page,
+.admin-panel-page .expenses-page,
+.earnings-page,
+.login-page,
+.kb-app {
+  background: var(--pc-bg);
+  color: var(--pc-text);
+}
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) .admin-page-header,
+.earnings-page .admin-page-header {
+  background: var(--pc-surface);
+  border-bottom-color: var(--pc-border);
+}
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) .admin-page-header h1,
+.admin-panel-page .product-management:not(.design-templates-page) .product-management__title,
+.admin-panel-page .cnt-page__title,
+.admin-panel-page .earn-admin__title,
+.admin-panel-page .reports-header-title,
+.earnings-page .admin-page-header h1 {
+  color: var(--pc-text);
+}
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) .admin-page-header__description,
+.admin-panel-page .product-management:not(.design-templates-page) .product-management__subtitle,
+.admin-panel-page .cnt-page__subtitle,
+.admin-panel-page .earn-admin__subtitle,
+.admin-panel-page .reports-header-description {
+  color: var(--pc-muted);
+}
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) :is(.lg-btn, .back-btn, .btn),
+.admin-panel-page :is(.cnt-page, .earn-admin, .reports-page, .expenses-page) :is(.lg-btn, .back-btn, .btn),
+.admin-panel-page .product-management:not(.design-templates-page) :is(.lg-btn, .back-btn, .btn),
+.earnings-page :is(.lg-btn, .back-btn, .btn),
+.login-page .login-button,
+.kb-app .kb-button {
+  border-radius: var(--pc-r-control);
+  border: 1px solid var(--pc-border);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform: none;
+}
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) :is(.lg-btn--primary, .btn-primary, .btn.btn-primary),
+.admin-panel-page :is(.cnt-page, .earn-admin, .reports-page, .expenses-page) :is(.lg-btn--primary, .btn-primary, .btn.btn-primary),
+.admin-panel-page .product-management:not(.design-templates-page) :is(.lg-btn--primary, .btn-primary),
+.earnings-page :is(.lg-btn--primary, .btn-primary),
+.login-page .login-button,
+.kb-app .kb-button--primary,
+.admin-panel-page .chats-btn.go {
+  background: var(--pc-accent);
+  border-color: var(--pc-accent);
+  color: var(--pc-on-accent);
+}
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) :is(.lg-btn--danger, .btn-error, .btn.btn-error),
+.admin-panel-page :is(.cnt-page, .earn-admin, .reports-page, .expenses-page, .product-management:not(.design-templates-page)) :is(.lg-btn--danger, .btn-error),
+.kb-app .kb-button--danger,
+.admin-panel-page .chats-btn.stop,
+.admin-panel-page .chats-btn.warn {
+  background: var(--pc-danger-soft);
+  border-color: var(--pc-border);
+  color: var(--pc-danger-ink);
+}
+
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) :is(.lg-btn--success, .btn-success),
+.admin-panel-page :is(.cnt-page, .earn-admin, .reports-page, .expenses-page) .lg-btn--success {
+  background: var(--pc-success-soft);
+  border-color: var(--pc-border);
+  color: var(--pc-success-ink);
+}
+
+.admin-panel-page :is(
+  .product-management:not(.design-templates-page) .product-management__header,
+  .cnt-page__header,
+  .earn-admin__header,
+  .earn-admin__card,
+  .earn-stat-card,
+  .reports-header,
+  .preflight-card,
+  .user-stat-card,
+  .expenses-page
+) ,
+.admin-panel-page .settings-page :is(.settings-nav, .settings-panel),
+.earnings-page .earnings-summary-card,
+.login-page .login-card {
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-r-card);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.admin-panel-page .settings-page .settings-nav__btn {
+  border-radius: var(--pc-r-control);
+  border-color: transparent;
+  background: transparent;
+  color: var(--pc-text);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.admin-panel-page .settings-page .settings-nav__btn--active,
+.admin-panel-page .settings-page .settings-nav__btn--active:hover {
+  background: var(--pc-row-selected);
+  border-color: transparent;
+  color: var(--pc-text);
+}
+
+.admin-panel-page .settings-page .settings-nav__hint,
+.admin-panel-page .settings-page .settings-link__body span {
+  color: var(--pc-muted);
+}
+
+.admin-panel-page .chats-page {
+  background: var(--pc-bg);
+}
+
+.admin-panel-page .chats-list,
+.admin-panel-page .chats-stage {
+  background: var(--pc-surface);
+  border-color: var(--pc-border);
+}
+
+.admin-panel-page :is(.chats-count, .chats-badge, .chats-mode, .chats-btn, .chats-row) {
+  border-radius: var(--pc-r-control);
+}
+
+.admin-panel-page .chats-mode.is-on,
+.admin-panel-page .chats-tab.is-on {
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-ink);
+  border-color: var(--pc-accent);
+}
+
+.admin-panel-page .chats-tab.is-on {
+  background: transparent;
+  border-bottom-color: var(--pc-accent);
+}
+
+.admin-panel-page :is(.cnt-page, .earn-admin, .reports-page, .expenses-page) :is(input, select, textarea),
+.admin-panel-page .product-management:not(.design-templates-page) :is(input, select, textarea),
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) :is(input, select, textarea),
+.earnings-page :is(input, select, textarea),
+.login-page .login-input,
+.kb-app :is(input, select, textarea) {
+  border-color: var(--pc-border-control);
+  border-radius: var(--pc-r-input);
+  background-color: var(--pc-surface);
+  color: var(--pc-text);
+  box-shadow: none;
+}
+
+.admin-panel-page :is(.cnt-page, .earn-admin, .reports-page, .product-management:not(.design-templates-page), .expenses-page) table th,
+.admin-panel-page .admin-page-layout:not(.design-editor-fullbleed):not(.design-templates-layout):not(.design-fonts-layout):not(.design-assets-layout) table th {
+  color: var(--pc-muted);
+  background: var(--pc-surface-sunken);
+}
+
+.admin-panel-page :is(.cnt-page, .earn-admin, .reports-page, .product-management:not(.design-templates-page)) tbody tr:hover,
+.admin-panel-page .chats-row:hover {
+  background: var(--pc-row-hover);
+}
+
+.admin-panel-page .postal-tracking__tab,
+.admin-panel-page .earn-tab,
+.admin-panel-page .reports-page button,
+.admin-panel-page .cnt-page button,
+.admin-panel-page .earn-admin button {
+  border-radius: var(--pc-r-control);
+}
+
+.admin-panel-page .postal-tracking__tab--active,
+.admin-panel-page .earn-tab--active {
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-ink);
+  border-color: var(--pc-accent);
+}
+
+.earnings-page .earnings-summary-card,
+.earnings-page button {
+  border-radius: var(--pc-r-control);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.login-page .login-title {
+  color: var(--pc-text);
+}
+
+.login-page .login-shift-info,
+.login-page .login-error {
+  color: var(--pc-danger);
+}
+
+.login-page .login-shift-info {
+  color: var(--pc-muted);
+}
+
+.admin-panel-page .product-template-page :is(.back-btn, .template-topbar-btn, .btn) {
+  border-radius: var(--pc-r-control) !important;
+  background: var(--pc-surface) !important;
+  border-color: var(--pc-border) !important;
+  color: var(--pc-text) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.admin-panel-page .product-template-page :is(.btn-primary, .lg-btn--primary) {
+  background: var(--pc-accent) !important;
+  border-color: var(--pc-accent) !important;
+  color: var(--pc-on-accent) !important;
+}

@@ -50,6 +50,14 @@ function recentDates(days: number) {
   return dates;
 }
 
+function formatPeriodBound(iso: string, withYear = false) {
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString('ru-RU', withYear
+    ? { day: '2-digit', month: '2-digit', year: 'numeric' }
+    : { day: '2-digit', month: '2-digit' });
+}
+
 function plural(count: number, one: string, few: string, many: string) {
   const abs = Math.abs(count) % 100;
   const last = abs % 10;
@@ -162,6 +170,14 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
   const periodDays = Math.max(timeline.length, 1);
   const average = overallTotal.total_amount / periodDays;
   const hasActivity = overallTotal.orders_count > 0;
+  const bestDay = timeline.reduce<DailyTotal | null>((best, day) => {
+    if (day.orders_count <= 0) return best;
+    if (!best || day.total_amount > best.total_amount) return day;
+    return best;
+  }, null);
+  const todayIso = formatIso(new Date());
+  const rangeStart = timeline[0]?.date;
+  const rangeEnd = timeline[timeline.length - 1]?.date;
   const maxChartValue = Math.max(
     ...timeline.map((day) => (chartMode === 'orders' ? day.orders_count : day.total_amount)),
     1,
@@ -171,6 +187,11 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
   return (
     <div className="daily-activity-overview">
       <div className="daily-activity-overview__toolbar">
+        {rangeStart && rangeEnd ? (
+          <div className="daily-activity-overview__range">
+            {formatPeriodBound(rangeStart)} — {formatPeriodBound(rangeEnd, true)}
+          </div>
+        ) : null}
         <div className="daily-activity-overview__pills" role="group" aria-label="Период">
           {PERIODS.map((days) => (
             <button
@@ -221,10 +242,25 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
             <MoneyAmount value={average} />
           </div>
         </div>
+        <div className="daily-activity-overview__card">
+          <div className="daily-activity-overview__card-label">Лучший день</div>
+          <div className="daily-activity-overview__card-value">
+            {bestDay ? <MoneyAmount value={bestDay.total_amount} /> : '—'}
+          </div>
+          {bestDay ? (
+            <div className="daily-activity-overview__card-note">
+              {formatDate(bestDay.date)}
+              {' · '}
+              {bestDay.orders_count} {plural(bestDay.orders_count, 'заказ', 'заказа', 'заказов')}
+              {' · '}
+              {bestDay.operators_count} {plural(bestDay.operators_count, 'оператор', 'оператора', 'операторов')}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {hasActivity ? (
-        <>
+        <div className="daily-activity-overview__board">
           <div className="daily-activity-overview__chart-section">
             <h3 className="daily-activity-overview__chart-title">
               {chartMode === 'revenue' ? 'Выручка по дням' : 'Заказы по дням'}
@@ -234,15 +270,36 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
                 const value = chartMode === 'orders' ? day.orders_count : day.total_amount;
                 const height = value > 0 && maxChartValue > 0 ? (value / maxChartValue) * 100 : 0;
                 const showLabel = index % labelStep === 0 || index === timeline.length - 1;
+                const isSelected = selectedDate === day.date;
+                const isToday = day.date === todayIso;
                 const tip = chartMode === 'revenue'
                   ? `${formatDate(day.date)}: ${formatAmountText(value)}`
                   : `${formatDate(day.date)}: ${value} ${plural(value, 'заказ', 'заказа', 'заказов')}`;
                 return (
-                  <div key={day.date} className="daily-activity-overview__chart-bar-wrap" title={tip}>
+                  <div
+                    key={day.date}
+                    className="daily-activity-overview__chart-bar-wrap"
+                    title={tip}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    onClick={() => handleDateClick(day.date)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleDateClick(day.date);
+                      }
+                    }}
+                  >
                     <div className="daily-activity-overview__chart-track">
                       <div
-                        className={`daily-activity-overview__chart-bar${value <= 0 ? ' daily-activity-overview__chart-bar--zero' : ''}`}
-                        style={value >0 ? { height: `${Math.max(height, 8)}%` } : undefined}
+                        className={[
+                          'daily-activity-overview__chart-bar',
+                          value <= 0 ? 'daily-activity-overview__chart-bar--zero' : '',
+                          isSelected ? 'daily-activity-overview__chart-bar--selected' : '',
+                          isToday ? 'daily-activity-overview__chart-bar--today' : '',
+                        ].filter(Boolean).join(' ')}
+                        style={value > 0 ? { height: `${Math.max(height, 8)}%` } : undefined}
                       />
                     </div>
                     <div className="daily-activity-overview__chart-label">
@@ -257,7 +314,16 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
           </div>
 
           <div className="daily-activity-overview__table-section">
-            <h3 className="daily-activity-overview__table-title">Дни с заказами</h3>
+            <h3 className="daily-activity-overview__table-title">
+              Дни с заказами
+              <span>{activeDays.length} из {timeline.length}</span>
+            </h3>
+            <div className="daily-activity-overview__cols" aria-hidden="true">
+              <span>День</span>
+              <span>Операторы</span>
+              <span>Заказы</span>
+              <span>Сумма</span>
+            </div>
             <div className="daily-activity-overview__list">
               {activeDays.map((dayTotal) => {
                 const dayUsers = dailyByUser.filter((user) => user.date === dayTotal.date);
@@ -315,7 +381,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
               })}
             </div>
           </div>
-        </>
+        </div>
       ) : (
         <p className="daily-activity-overview__empty">
           За {period} {plural(period, 'день', 'дня', 'дней')} заказов не было.

@@ -153,6 +153,8 @@ export const DesignTemplatesPage: React.FC = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [catalogView, setCatalogView] = useState<'grid' | 'table'>('grid');
+  const [siteBusyId, setSiteBusyId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [bindingFilter, setBindingFilter] = useState<BindingFilter>('all');
   const [authorFilter, setAuthorFilter] = useState<string>('all');
@@ -922,6 +924,24 @@ export const DesignTemplatesPage: React.FC = () => {
           <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-assets')}>
             <AppIcon name="puzzle" size="xs" /> Клипарты
           </button>
+          <div className="design-templates-view" role="group" aria-label="Вид каталога">
+            <button
+              type="button"
+              className={`lg-btn${catalogView === 'table' ? ' lg-btn--primary' : ''}`}
+              aria-pressed={catalogView === 'table'}
+              onClick={() => setCatalogView('table')}
+            >
+              Таблица
+            </button>
+            <button
+              type="button"
+              className={`lg-btn${catalogView === 'grid' ? ' lg-btn--primary' : ''}`}
+              aria-pressed={catalogView === 'grid'}
+              onClick={() => setCatalogView('grid')}
+            >
+              Сетка
+            </button>
+          </div>
           <input
             type="search"
             className="design-templates-search"
@@ -1024,9 +1044,74 @@ export const DesignTemplatesPage: React.FC = () => {
                   </button>
                   {!collapsed && (
                     <div className="design-templates-category-card__body">
+                      {catalogView === 'table' ? (
+                        <table className="design-templates-table">
+                          <thead>
+                            <tr>
+                              <th>Превью</th>
+                              <th>Семья</th>
+                              <th>Вариант</th>
+                              <th>Формат</th>
+                              <th>Страницы</th>
+                              <th>Категория</th>
+                              <th>Публикация</th>
+                              <th>Дата</th>
+                              <th>Автор</th>
+                              <th />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {groupTemplatesIntoFamilies(section.items).flatMap((family) => family.variants.map((variant) => {
+                              const parsed = parseTemplateSpec(variant);
+                              const code = family.design_code ?? formatDesignCodeLabel(family.primary);
+                              const previewSrc = resolveTemplatePreviewUrl(variant.preview_url || resolveFamilyPreviewUrl(family), API_BASE_URL);
+                              const status = getTemplateCatalogStatus(variant);
+                              const stamp = variant.updated_at || variant.created_at;
+                              const stampDate = stamp ? new Date(stamp) : null;
+                              const stampLabel = stampDate && !Number.isNaN(stampDate.getTime())
+                                ? stampDate.toLocaleDateString('ru-RU')
+                                : '—';
+                              return (
+                                <tr key={variant.id}>
+                                  <td>
+                                    {previewSrc ? <img className="design-templates-table__preview" src={previewSrc} alt="" /> : <span className="design-templates-table__preview design-templates-table__preview--empty" />}
+                                  </td>
+                                  <td className="design-templates-table__mono">{code}</td>
+                                  <td className="design-templates-table__mono">#{variant.id}</td>
+                                  <td>{formatTemplateSize(parsed) ?? '—'}</td>
+                                  <td>{parsed.page_count ?? '—'}</td>
+                                  <td>{variant.category || section.label}</td>
+                                  <td><span className={`design-template-status design-template-status--${status}`}>{STATUS_LABELS[status]}</span></td>
+                                  <td>{stampLabel}</td>
+                                  <td>{variant.author_name ?? family.primary.author_name ?? '—'}</td>
+                                  <td className="design-templates-table__actions">
+                                    <button type="button" className="lg-btn lg-btn--sm lg-btn--primary" onClick={() => navigate(`/adminpanel/design-editor/${variant.id}`)}>
+                                      Макет
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="lg-btn lg-btn--sm"
+                                      disabled={siteBusyId === variant.id}
+                                      onClick={() => {
+                                        setSiteBusyId(variant.id);
+                                        void openSiteSandboxForDesignTemplate(variant)
+                                          .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Не удалось открыть редактор на сайте'))
+                                          .finally(() => setSiteBusyId(null));
+                                      }}
+                                    >
+                                      {siteBusyId === variant.id ? '…' : 'На сайте'}
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            }))}
+                          </tbody>
+                        </table>
+                      ) : (
                       <div className="design-templates-grid">
                         {groupTemplatesIntoFamilies(section.items).map((family) => renderFamilyCard(family))}
                       </div>
+                      )}
                     </div>
                   )}
                 </section>

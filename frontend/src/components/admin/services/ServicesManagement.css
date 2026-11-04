@@ -126,7 +126,7 @@
   min-width: 22px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
   background: #e2e8f0;
   color: #475569;
   font-size: 11px;
@@ -676,7 +676,7 @@
   color: #334155;
   background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
   border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 .services-category-group__panel {
@@ -1284,7 +1284,7 @@
   padding: 8px 12px 8px 8px;
   background: var(--sm-glass-bg);
   border: 1px solid var(--sm-glass-border);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control);
   box-shadow: var(--sm-glass-inset), 0 2px 8px rgba(15, 23, 42, 0.04);
   backdrop-filter: var(--sm-glass-blur);
   -webkit-backdrop-filter: var(--sm-glass-blur);
@@ -1337,39 +1337,39 @@
   border-color: rgba(59, 130, 246, 0.5);
 }
 
-/* Единый набор кнопок: нейтральное стекло, акцент — синева, удаление — красный */
+/* Единый набор кнопок на токенах */
 .services-management .btn,
 .sm-ui-modal .btn {
-  border-radius: 999px !important;
+  border-radius: var(--pc-r-control) !important;
   font-weight: 500;
-  border: 1px solid var(--sm-glass-border) !important;
-  background: rgba(241, 245, 249, 0.82) !important;
-  color: #1e293b !important;
-  box-shadow: var(--sm-glass-inset), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
-  backdrop-filter: var(--sm-glass-blur);
-  -webkit-backdrop-filter: var(--sm-glass-blur);
-  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  border: 1px solid var(--pc-border) !important;
+  background: var(--pc-surface) !important;
+  color: var(--pc-text) !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .services-management .btn:hover:not(:disabled),
 .sm-ui-modal .btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(148, 163, 184, 0.5) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  background: var(--pc-surface-subtle) !important;
+  border-color: var(--pc-border-strong) !important;
+  box-shadow: none !important;
 }
 
 .services-management .btn-primary,
 .sm-ui-modal .btn-primary {
-  background: rgba(59, 130, 246, 0.2) !important;
-  border-color: rgba(59, 130, 246, 0.4) !important;
-  color: #1d4ed8 !important;
+  background: var(--pc-accent) !important;
+  border-color: var(--pc-accent) !important;
+  color: var(--pc-on-accent) !important;
 }
 
 .services-management .btn-primary:hover:not(:disabled),
 .sm-ui-modal .btn-primary:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.3) !important;
-  border-color: rgba(59, 130, 246, 0.5) !important;
-  color: #1d4ed8 !important;
+  background: var(--pc-accent-hover) !important;
+  border-color: var(--pc-accent-hover) !important;
+  color: var(--pc-on-accent) !important;
 }
 
 .services-management .btn-secondary,
@@ -1387,9 +1387,9 @@
 
 .services-management .btn-error,
 .sm-ui-modal .btn-error {
-  background: rgba(239, 68, 68, 0.16) !important;
-  border-color: rgba(239, 68, 68, 0.38) !important;
-  color: #b91c1c !important;
+  background: var(--pc-danger-soft) !important;
+  border-color: var(--pc-border) !important;
+  color: var(--pc-danger-ink) !important;
 }
 
 .services-management .btn-error:hover:not(:disabled),
@@ -1400,26 +1400,34 @@
 }
 
 .sm-ui-modal .modal-close-btn.btn {
-  border-radius: 999px !important;
-  background: rgba(241, 245, 249, 0.88) !important;
-  border: 1px solid var(--sm-glass-border) !important;
-  color: #334155 !important;
-  box-shadow: var(--sm-glass-inset), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
-  backdrop-filter: var(--sm-glass-blur);
-  -webkit-backdrop-filter: var(--sm-glass-blur);
+  border-radius: var(--pc-r-control) !important;
+  background: var(--pc-surface) !important;
+  border: 1px solid var(--pc-border) !important;
+  color: var(--pc-text) !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .services-create-modal__tab {
-  background: rgba(241, 245, 249, 0.5);
+  background: var(--pc-surface-subtle);
   border: 1px solid transparent;
-  border-radius: 10px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  border-radius: var(--pc-r-control);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .services-create-modal__tab.is-active {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid var(--sm-glass-border);
-  box-shadow: var(--sm-glass-inset), 0 2px 6px rgba(15, 23, 42, 0.06);
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border);
+  box-shadow: none;
+}
+
+.services-management,
+.services-management *,
+.sm-ui-modal,
+.sm-ui-modal * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 

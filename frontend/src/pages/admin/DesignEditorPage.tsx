@@ -38,6 +38,8 @@ import { isBoldFontWeight } from './designEditor/textFormattingPresets';
 import { hasBlobUrl } from './designEditor/fabricJsonValidation';
 import { TextPatchScopeDialog } from './designEditor/TextPatchScopeDialog';
 import { useDesignTemplateAssetUpload } from './designEditor/useDesignTemplateAssetUpload';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { openSiteSandboxForDesignTemplate } from '../../features/designTemplates/openSiteSandboxForDesignTemplate';
 import { useTextPatchScopeDialog } from './designEditor/useTextPatchScopeDialog';
 import type {
   DesignPrepressConfig,
@@ -329,6 +331,8 @@ export const DesignEditorPage: React.FC = () => {
   const { sort: photoSort } = photoPanel;
 
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [siteBusy, setSiteBusy] = useState(false);
+  const currentUser = useCurrentUser();
   const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null);
 
   /** Ошибки в рабочем режиме (загрузка по URL, сохранение и т.д.) */
@@ -983,7 +987,7 @@ export const DesignEditorPage: React.FC = () => {
       title={`Редактор: ${template.name}`}
       icon={<AppIcon name="image" size="sm" />}
       onBack={() => navigate(catalogPath)}
-      className="design-editor-fullbleed"
+      className="design-editor-fullbleed design-editor-single-bar"
     >
       <div className="public-design-editor public-design-editor--admin">
         <EditorTopBar
@@ -999,9 +1003,46 @@ export const DesignEditorPage: React.FC = () => {
                   ? 'saved'
                   : 'idle'
           }
-          orderLabel="Сохранить"
+          leading={(
+            <button type="button" className="de-admin-back" onClick={() => navigate(catalogPath)}>
+              <AppIcon name="arrow-left" size="xs" /> Шаблоны
+            </button>
+          )}
+          tags={(
+            <span className="de-admin-tags">
+              <span>{pageWidth}×{pageHeight} мм</span>
+              <span>вылеты +{prepressConfig.bleedMm} мм</span>
+              <span>{pageCount} стр.</span>
+            </span>
+          )}
+          orderLabel="Сохранить шаблон"
           savingLabel="Сохраняем..."
           onPrimaryAction={() => void handleSave()}
+          actionBar={(
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={siteBusy}
+                onClick={() => {
+                  setSiteBusy(true);
+                  void openSiteSandboxForDesignTemplate(template)
+                    .catch((err: unknown) => {
+                      setEditorError(err instanceof Error ? err.message : 'Не удалось открыть редактор на сайте');
+                    })
+                    .finally(() => setSiteBusy(false));
+                }}
+              >
+                {siteBusy ? '…' : 'Открыть на сайте'}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => void handleExportPdf()} disabled={exportingPdf}>
+                {exportingPdf ? `PDF ${exportProgress}%` : 'PDF'}
+              </Button>
+              <span className="de-admin-profile" title={currentUser?.name || 'Профиль'}>
+                {(currentUser?.name || '—').split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase() || '—'}
+              </span>
+            </>
+          )}
         />
 
         <div className="design-editor public-design-editor__workspace public-design-editor__workspace--admin">

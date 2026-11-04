@@ -2,15 +2,15 @@
    min-height: 100vh;
    display: grid;
    place-items: center;
-   background: #f6f7f8;
+   background: var(--pc-bg);
  }
  
  .login-card {
    width: 320px;
    padding: 16px;
-   border: 1px solid #e5e7eb;
-   border-radius: 8px;
-   background: #fff;
+   border: 1px solid var(--pc-border);
+   border-radius: var(--pc-r-card);
+   background: var(--pc-surface);
  }
  
  .login-title {
@@ -26,16 +26,16 @@
  
  .login-input {
    padding: 8px 10px;
-   border: 1px solid #e5e7eb;
-   border-radius: 6px;
+   border: 1px solid var(--pc-border-control);
+   border-radius: var(--pc-r-input);
  }
  
  .login-button {
    padding: 10px;
-   border-radius: 6px;
-   border: 1px solid #1976d2;
-   background: #1976d2;
-   color: #fff;
+   border-radius: var(--pc-r-control);
+   border: 1px solid var(--pc-accent);
+   background: var(--pc-accent);
+   color: var(--pc-on-accent);
  }
  
  .login-error {

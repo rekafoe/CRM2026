@@ -49,7 +49,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: var(--pc-r-card, 10px);
 }
 
 .public-design-editor--admin .design-editor-main > .public-design-editor__page-strip {
@@ -240,4 +240,199 @@
   background: rgba(37, 99, 235, 0.06);
   border-color: rgba(37, 99, 235, 0.18);
   border-radius: 14px;
+}
+
+.design-editor-single-bar.design-editor-fullbleed .admin-page-header {
+  display: none;
+}
+
+.public-design-editor--admin .public-design-editor__topbar {
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  background: var(--pc-surface, #fff);
+  border-bottom: 1px solid var(--pc-border, #e2dfd7);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.public-design-editor--admin .public-design-editor__logo-text {
+  display: none;
+}
+
+.public-design-editor--admin .public-design-editor__logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--pc-accent, #1d4ed8);
+  box-shadow: none;
+}
+
+.public-design-editor--admin .public-design-editor__title {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  padding: 0;
+  text-align: left;
+}
+
+.public-design-editor--admin .public-design-editor__title-main {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.public-design-editor--admin .public-design-editor__title-main h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.de-admin-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--pc-text, #141619);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.de-admin-tags {
+  display: inline-flex;
+  gap: 6px;
+  color: var(--pc-muted, #5c626c);
+  font-family: var(--pc-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.de-admin-profile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--pc-r-control, 8px);
+  background: var(--pc-surface-subtle, #efece6);
+  color: var(--pc-text, #141619);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.public-design-editor--admin .design-editor-sidebar {
+  width: 68px;
+  min-width: 68px;
+}
+
+.public-design-editor--admin .design-editor-sidebar-item.is-active {
+  color: var(--pc-text, #141619);
+  background: var(--pc-row-selected, #f1f4fc);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.public-design-editor--admin .design-editor-panel {
+  width: 292px;
+  min-width: 292px;
+  margin: 0;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--pc-border, #e2dfd7);
+  box-shadow: none;
+  background: var(--pc-surface, #fff);
+}
+
+.public-design-editor--admin .design-editor .btn,
+.public-design-editor--admin .design-editor-toolbar .btn,
+.public-design-editor--admin .design-editor-panel .btn,
+.public-design-editor--admin .design-editor-toolbar-icon-btn,
+.public-design-editor--admin .design-editor-page-btn,
+.public-design-editor--admin .photo-panel__btn-primary,
+.public-design-editor--admin .design-editor-panel-add-text,
+.public-design-editor--admin .design-editor-panel .font-library__select,
+.public-design-editor--admin .design-editor-panel .photo-panel__select,
+.public-design-editor--admin .design-editor-toolbar .design-editor-font-select,
+.public-design-editor--admin .design-editor-toolbar .design-editor-font-size {
+  border-radius: var(--pc-r-control, 8px) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.public-design-editor--admin .design-editor .btn,
+.public-design-editor--admin .design-editor-toolbar .btn,
+.public-design-editor--admin .design-editor-panel .btn,
+.public-design-editor--admin .design-editor-toolbar-icon-btn,
+.public-design-editor--admin .design-editor-page-btn {
+  background: var(--pc-surface, #fff) !important;
+  border: 1px solid var(--pc-border-control, #d4d0c8) !important;
+  color: var(--pc-text, #141619) !important;
+}
+
+.public-design-editor--admin .design-editor .btn.btn-primary,
+.public-design-editor--admin .public-design-editor__top-actions .btn.btn-primary {
+  background: var(--pc-accent, #1d4ed8) !important;
+  border-color: var(--pc-accent, #1d4ed8) !important;
+  color: var(--pc-on-accent, #fff) !important;
+}
+
+.public-design-editor--admin .design-editor-panel-header,
+.public-design-editor--admin .photo-panel__header,
+.public-design-editor--admin .ps-header {
+  background: var(--pc-surface, #fff);
+  border-bottom: 1px solid var(--pc-border, #e2dfd7);
+}
+
+.public-design-editor--admin .ps-root {
+  background: var(--pc-surface, #fff);
+  border: 1px solid var(--pc-border, #e2dfd7);
+  border-radius: var(--pc-r-card, 10px);
+  box-shadow: none;
+}
+
+.public-design-editor--admin .psitem,
+.public-design-editor--admin .ps-add-btn {
+  border-radius: var(--pc-r-control, 8px);
+  box-shadow: none;
+}
+
+.public-design-editor--admin .public-design-editor__save-chip,
+.public-design-editor--admin .public-design-editor__top-actions .btn,
+.public-design-editor--admin .public-design-editor__canvas-actions .btn-secondary,
+.public-design-editor--admin .public-design-editor__view-controls,
+.public-design-editor--admin .public-design-editor__view-toggle,
+.public-design-editor--admin .public-design-editor__stage-hints summary,
+.public-design-editor--admin .public-design-editor__page-caption em {
+  border-radius: var(--pc-r-control, 8px) !important;
+  box-shadow: none !important;
+}
+
+.public-design-editor--admin .public-design-editor__top-actions .btn-primary {
+  background: var(--pc-accent, #1d4ed8) !important;
+  border-color: var(--pc-accent, #1d4ed8) !important;
+  color: var(--pc-on-accent, #fff) !important;
+}
+
+.public-design-editor--admin .public-design-editor__stage-toolbar {
+  background: var(--pc-surface, #fff);
+  border-bottom: 1px solid var(--pc-border, #e2dfd7);
+}
+
+.public-design-editor--admin .public-design-editor__stage {
+  border-radius: var(--pc-r-card, 10px);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
