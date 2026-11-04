@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../components/admin/AdminPageLayout';
 import { useAdminBack } from '../hooks/useAdminBack';
@@ -200,12 +200,39 @@ const ADMIN_GROUP_IDS = new Set<string>(ADMIN_GROUPS.map((group) => group.id));
 const AdminPanelHome: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [sectionQuery, setSectionQuery] = useState('');
   const requested = searchParams.get('group');
   const groupId: AdminGroupId = requested && ADMIN_GROUP_IDS.has(requested) ? requested as AdminGroupId : 'overview';
   const group = useMemo(
     () => ADMIN_GROUPS.find((item) => item.id === groupId) ?? ADMIN_GROUPS[0],
     [groupId],
   );
+  const sectionHits = useMemo(() => {
+    const query = sectionQuery.trim().toLowerCase();
+    if (!query) return null;
+    const hits: Array<
+      | { kind: 'group'; id: AdminGroupId; title: string; hint: string; icon: IconName }
+      | { kind: 'link'; to: string; title: string; description: string; icon: IconName; groupTitle: string }
+    > = [];
+    ADMIN_GROUPS.forEach((item) => {
+      if (item.title.toLowerCase().includes(query) || item.hint.toLowerCase().includes(query)) {
+        hits.push({ kind: 'group', id: item.id, title: item.title, hint: item.hint, icon: item.icon });
+      }
+      item.links?.forEach((link) => {
+        if (`${link.title} ${link.description}`.toLowerCase().includes(query)) {
+          hits.push({
+            kind: 'link',
+            to: link.to,
+            title: link.title,
+            description: link.description,
+            icon: link.icon,
+            groupTitle: item.title,
+          });
+        }
+      });
+    });
+    return hits;
+  }, [sectionQuery]);
 
   return (
     <AdminPageLayout
@@ -213,16 +240,68 @@ const AdminPanelHome: React.FC = () => {
       description="Заказы, производство, клиенты и доступы."
       icon={<AppIcon name="settings" size="lg" />}
       onBack={() => navigate('/')}
+      backLabel="← В рабочее место"
       className="admin-home"
+      headerExtra={(
+        <label className="admin-home-search">
+          <AppIcon name="search" size="xs" />
+          <input
+            value={sectionQuery}
+            onChange={(event) => setSectionQuery(event.target.value)}
+            placeholder="Раздел, отчёт, настройка…"
+            aria-label="Поиск по разделам"
+          />
+        </label>
+      )}
     >
       <div className="settings-shell">
         <nav className="settings-nav" aria-label="Разделы админки">
-          {ADMIN_GROUPS.map((item) => (
+          <div className="settings-nav__label">Разделы</div>
+          {sectionHits ? (
+            sectionHits.length === 0 ? (
+              <p className="settings-nav__empty">Ничего не найдено</p>
+            ) : sectionHits.map((hit) => (
+              hit.kind === 'group' ? (
+                <button
+                  key={`group-${hit.id}`}
+                  type="button"
+                  className={`settings-nav__btn${hit.id === groupId ? ' settings-nav__btn--active' : ''}`}
+                  onClick={() => {
+                    setSearchParams({ group: hit.id });
+                    setSectionQuery('');
+                  }}
+                >
+                  <span className="settings-nav__icon">
+                    <AppIcon name={hit.icon} size="sm" />
+                  </span>
+                  <span className="settings-nav__text">
+                    <span className="settings-nav__title">{hit.title}</span>
+                    <span className="settings-nav__hint">{hit.hint}</span>
+                  </span>
+                </button>
+              ) : (
+                <button
+                  key={`link-${hit.to}-${hit.title}`}
+                  type="button"
+                  className="settings-nav__btn"
+                  onClick={() => navigate(hit.to)}
+                >
+                  <span className="settings-nav__icon">
+                    <AppIcon name={hit.icon} size="sm" />
+                  </span>
+                  <span className="settings-nav__text">
+                    <span className="settings-nav__title">{hit.title}</span>
+                    <span className="settings-nav__hint">{hit.groupTitle}</span>
+                  </span>
+                </button>
+              )
+            ))
+          ) : ADMIN_GROUPS.map((item) => (
             <button
               key={item.id}
               type="button"
               className={`settings-nav__btn${item.id === groupId ? ' settings-nav__btn--active' : ''}`}
-              onClick={() =>setSearchParams({ group: item.id })}
+              onClick={() => setSearchParams({ group: item.id })}
               aria-current={item.id === groupId ? 'page' : undefined}
             >
               <span className="settings-nav__icon">
@@ -232,14 +311,27 @@ const AdminPanelHome: React.FC = () => {
                 <span className="settings-nav__title">{item.title}</span>
                 <span className="settings-nav__hint">{item.hint}</span>
               </span>
+              {item.links?.length ? (
+                <span className="settings-nav__count">{item.links.length}</span>
+              ) : null}
             </button>
           ))}
         </nav>
 
         <section className="settings-panel" aria-labelledby="admin-group-title">
           <header className="settings-panel__header">
-            <h2 id="admin-group-title">{group.title}</h2>
-            <p>{group.hint}</p>
+            {group.id === 'overview' ? (
+              <>
+                <p className="admin-overview-kicker">Обзор</p>
+                <h2 id="admin-group-title">Заказы и выручка</h2>
+                <p>Оборот по дате работы заказа. Касса за день — в разделе «Счётчики».</p>
+              </>
+            ) : (
+              <>
+                <h2 id="admin-group-title">{group.title}</h2>
+                <p>{group.hint}</p>
+              </>
+            )}
           </header>
 
           {group.id === 'overview' && <DailyActivityOverview />}
