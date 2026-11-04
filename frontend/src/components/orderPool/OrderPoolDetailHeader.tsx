@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Order } from '../../types';
 import { StatusBadge } from '../common/StatusBadge';
 import { AssignableUserSelect } from '../orders/AssignableUserSelect';
@@ -16,6 +16,7 @@ import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
 import { isPoolOrderStatusId } from '../../hooks/useOrderStatuses';
 import { OrderDeliveryBlock } from '../orders/OrderDeliveryBlock';
 import { OrderPoolPaymentSummary } from './OrderPoolPaymentSummary';
+import { Menu, MenuItem } from '../ui/Menu';
 
 interface OrderPoolDetailHeaderProps {
   order: Order;
@@ -77,6 +78,8 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   issuing,
 }) => {
   const [transferOpen, setTransferOpen] = useState(false);
+  const [prepayMenuOpen, setPrepayMenuOpen] = useState(false);
+  const prepayMenuRef = useRef<HTMLDivElement>(null);
   const responsibleId = getEffectiveResponsibleUserId(order);
   const canReassign = isPoolOrderStatusId(Number(order.status));
   const showCancelled = order.is_cancelled === 1;
@@ -90,6 +93,22 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const showFulfillmentBanner = poolFulfillmentShowsBanner(fulfillmentChip);
   const showDeliveryDetails = Boolean(order.delivery);
   const showFulfillmentPoint = !showDeliveryDetails && Boolean(order.fulfillment_department_name);
+
+  useEffect(() => {
+    if (!prepayMenuOpen) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!prepayMenuRef.current?.contains(event.target as Node)) setPrepayMenuOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPrepayMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [prepayMenuOpen]);
 
   return (
     <div className="order-pool-detail-header">
@@ -220,17 +239,27 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             <button type="button" className="lg-btn" onClick={onShowFiles}>
               Файлы
             </button>
-            <button type="button" className="lg-btn lg-btn--success" onClick={onShowPrepayment}>
-              Предоплата
-            </button>
-            <button
-              type="button"
-              className="lg-btn lg-btn--primary"
-              onClick={onSendPaymentLink}
-              title="Создать ссылку BePaid и отправить клиенту"
-            >
-              Ссылка на оплату
-            </button>
+            <div className="pc-menu-anchor" ref={prepayMenuRef}>
+              <button
+                type="button"
+                className="lg-btn"
+                aria-expanded={prepayMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setPrepayMenuOpen((open) => !open)}
+              >
+                Предоплата ▾
+              </button>
+              {prepayMenuOpen ? (
+                <Menu label="Предоплата">
+                  <MenuItem onClick={() => { setPrepayMenuOpen(false); onShowPrepayment(); }}>
+                    Внести предоплату
+                  </MenuItem>
+                  <MenuItem onClick={() => { setPrepayMenuOpen(false); onSendPaymentLink(); }}>
+                    Ссылка на оплату · BePaid
+                  </MenuItem>
+                </Menu>
+              ) : null}
+            </div>
             {showIssueOrder && (
               <button
                 type="button"
