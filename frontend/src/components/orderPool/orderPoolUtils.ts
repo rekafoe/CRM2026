@@ -1,4 +1,5 @@
 import { Order } from '../../types';
+import { orderCalendarDay } from '../../utils/orderDayVisibility';
 import {
   getOrderGoverningSla,
   HOUR_SLA_MS,
@@ -319,4 +320,57 @@ export function orderPoolFiltersReducer(state: FilterState, action: FilterAction
     default:
       return state;
   }
+}
+
+/** День работы: день открытия, если он есть, иначе день создания. */
+export function orderWorkDayKey(order: Pick<Order, 'opened_on' | 'created_at'> & { createdAt?: string | null }): string {
+  return orderCalendarDay(order.opened_on) || orderCalendarDay(order.created_at ?? order.createdAt) || '';
+}
+
+export function formatWorkDayLabel(key: string, now = new Date()): string {
+  if (!key) return 'Без даты';
+  const today = now.toISOString().slice(0, 10);
+  const yesterday = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
+  const [, month, day] = key.split('-');
+  const short = day && month ? `${day}.${month}` : key;
+  if (key === today) return `Сегодня · ${short}`;
+  if (key === yesterday) return `Вчера · ${short}`;
+  return `${short}.${key.slice(0, 4)}`;
+}
+
+export function groupOrdersByWorkDay<T extends Pick<Order, 'opened_on' | 'created_at'>>(
+  orders: T[],
+): Array<{ key: string; orders: T[] }> {
+  const groups: Array<{ key: string; orders: T[] }> = [];
+  const index = new Map<string, number>();
+  orders.forEach((order) => {
+    const key = orderWorkDayKey(order);
+    const at = index.get(key);
+    if (at == null) {
+      index.set(key, groups.length);
+      groups.push({ key, orders: [order] });
+    } else {
+      groups[at].orders.push(order);
+    }
+  });
+  return groups;
+}
+
+export function describeOrderPoolFilter(filters: FilterState): string {
+  const parts: string[] = [];
+  if (filters.assigned === 'not_assigned') parts.push('неназначенные');
+  else if (filters.assigned === 'assigned') parts.push('назначенные');
+  if (filters.cancelled === 'cancelled') parts.push('отменённые');
+  else if (filters.cancelled === 'all') parts.push('включая отменённые');
+  if (filters.quickFilter === 'debt') parts.push('с долгом');
+  else if (filters.quickFilter === 'prepay') parts.push('с предоплатой');
+  else if (filters.quickFilter === 'awaiting_payment') parts.push('ожидает оплату');
+  if (filters.source === 'website') parts.push('онлайн (сайт)');
+  else if (filters.source === 'crm') parts.push('CRM');
+  else if (filters.source === 'telegram') parts.push('Telegram');
+  else if (filters.source === 'mini_app') parts.push('Mini App');
+  else parts.push('все источники');
+  const query = filters.searchTerm.trim();
+  if (query) parts.push(`поиск «${query}»`);
+  return parts.join(' · ');
 }

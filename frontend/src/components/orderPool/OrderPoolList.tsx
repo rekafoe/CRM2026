@@ -1,27 +1,49 @@
 import React from 'react';
-import { Order } from '../../types';
+import { Item, Order } from '../../types';
 import { MoneyAmount } from '../ui';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 import {
-  formatPoolDateTime,
-  formatPoolDateTimeFull,
+  formatWorkDayLabel,
   getEffectiveResponsibleUserId,
-  getOrderReadyLabel,
-  getPoolFulfillmentChip,
   getSourceLabel,
-  poolFulfillmentShowsBanner,
+  groupOrdersByWorkDay,
 } from './orderPoolUtils';
-import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
 import { isPoolOrderStatusId, useOrderStatuses } from '../../hooks/useOrderStatuses';
 import { OrderStamp } from '../order/OrderStamp';
 
-const OrderCard = React.memo<{
+function clockLabel(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+function positionLine(item: Item): string {
+  const named = String(item.params?.productName || '').trim();
+  const described = String(item.params?.description || '').trim();
+  const fallback = described && described !== 'Без описания' && described !== 'Описание товара'
+    ? described
+    : item.type || 'Позиция';
+  const name = named || fallback;
+  const qty = Number(item.quantity);
+  return Number.isFinite(qty) && qty > 0 ? `${name} · ${qty} шт.` : name;
+}
+
+function compositionText(order: Order): string {
+  const items = order.items ?? [];
+  if (items.length === 0) return '—';
+  const first = positionLine(items[0]);
+  if (items.length === 1) return first;
+  return `${first} · ещё ${items.length - 1}`;
+}
+
+const OrderRow = React.memo<{
   order: Order;
   isSelected: boolean;
   onSelect: (order: Order) => void;
   onTakeOrder?: (order: Order) => void;
   currentUserId: number;
-  getOrderPrepayment: (order: Order) => number;
+  users: Array<{ id: number; name: string }>;
   getOrderDebt: (order: Order) => number;
   getOrderTotal: (order: Order) => number;
   onCopyPhone?: (phone: string) => void;
@@ -31,7 +53,7 @@ const OrderCard = React.memo<{
   onSelect,
   onTakeOrder,
   currentUserId,
-  getOrderPrepayment,
+  users,
   getOrderDebt,
   getOrderTotal,
   onCopyPhone,
@@ -40,153 +62,104 @@ const OrderCard = React.memo<{
   const statusInfo = statuses.find((status) => status.id === Number(order.status));
   const payment = getPoolPaymentInfo(order);
   const debt = getOrderDebt(order);
-  const prepay = getOrderPrepayment(order);
   const responsibleId = getEffectiveResponsibleUserId(order);
   const isAssigned = responsibleId != null;
-  const isMine = responsibleId === currentUserId;
   const isCancelled = order.is_cancelled === 1;
-  const canTake =
-    !isCancelled
-    && !isAssigned
-    && isPoolOrderStatusId(Number(order.status));
-  const readiness = getOrderReadyLabel(order);
+  const canTake = !isCancelled && !isAssigned && isPoolOrderStatusId(Number(order.status));
   const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
-  const fulfillmentChip = getPoolFulfillmentChip(order);
+  const responsibleName = responsibleId == null
+    ? '—'
+    : users.find((user) => user.id === responsibleId)?.name || 'назначен';
+  const composition = compositionText(order);
 
   return (
-    <article
-      role="button"
-      tabIndex={0}
+    <tr
       className={[
-        'order-pool-card',
+        'pool-sheet__row',
         isSelected ? 'is-selected' : '',
-        isAssigned ? 'is-assigned' : 'is-open',
         isCancelled ? 'is-cancelled' : '',
-        isMine ? 'is-mine' : '',
-        payment.tone === 'pending' ? 'has-awaiting-pay' : '',
-        debt > 0 ? 'has-debt' : '',
-        poolFulfillmentShowsBanner(fulfillmentChip) ? 'has-fulfillment' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        responsibleId === currentUserId ? 'is-mine' : '',
+      ].filter(Boolean).join(' ')}
       onClick={() => onSelect(order)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
           onSelect(order);
         }
       }}
+      tabIndex={0}
+      aria-selected={isSelected}
     >
-      <div className="order-pool-card__accent" aria-hidden="true" />
-      <div className="order-pool-card__main">
-        <div className="order-pool-card__top">
-          <div className="order-pool-card__id">
-            <span className="order-pool-card__number">{order.number}</span>
-            {order.source ? (
-              <span className="order-pool-card__source">{getSourceLabel(order.source)}</span>
-            ) : null}
-            {fulfillmentChip && !poolFulfillmentShowsBanner(fulfillmentChip) ? (
-              <span className="order-pool-card__fulfillment" title={fulfillmentChip.title}>
-                {fulfillmentChip.label}
-              </span>
-            ) : null}
-            <OrderStamp
-              status={statusInfo ?? { id: Number(order.status), name: '' }}
-              statuses={statuses}
-              onlineCancelled={isCancelled}
-            />
-            {!isAssigned && !isCancelled ? (
-              <span className="order-pool-card__tag is-open">В пуле</span>
-            ) : null}
-            {isMine ? <span className="order-pool-card__tag is-mine">Мой</span> : null}
-          </div>
-          <div className="order-pool-card__dates">
-            <time className="order-pool-card__date" dateTime={createdAt} title="Дата оформления">
-              {formatPoolDateTime(createdAt)}
-            </time>
-            <span
-              className={[
-                'order-pool-card__ready',
-                readiness.isHourSla ? 'is-hour-sla' : '',
-              ].filter(Boolean).join(' ')}
-              title={`Готовность: ${formatPoolDateTimeFull(readiness.readyAt?.toISOString())}${readiness.label ? ` · ${readiness.label}` : ''}`}
-            >
-              до {readiness.readyAtLabel}
-            </span>
-            {readiness.label ? (
-              <span className={['order-pool-card__ready-sla', readiness.isHourSla ? 'is-hour-sla' : ''].filter(Boolean).join(' ')}>
-                {readiness.label}
-              </span>
-            ) : null}
-          </div>
+      <td>
+        <div className="pool-sheet__number">{order.number}</div>
+        <div className="pool-sheet__meta">
+          {order.source ? <span>{getSourceLabel(order.source)}</span> : null}
+          <time dateTime={createdAt}>{clockLabel(createdAt)}</time>
         </div>
-
-        <OrderPoolFulfillmentBanner chip={fulfillmentChip} size="card" />
-
-        <div className="order-pool-card__client">
-          <span className="order-pool-card__name" title={order.customerName || undefined}>
-            {order.customerName || 'Клиент не указан'}
-          </span>
-          {order.customerPhone ? (
-            <button
-              type="button"
-              className="order-pool-card__phone"
-              title="Скопировать телефон"
-              onClick={(e) =>{
-                e.stopPropagation();
-                onCopyPhone?.(order.customerPhone!);
-              }}
-            >
-              {order.customerPhone}
-            </button>
-          ) : (
-            <span className="order-pool-card__phone is-muted">—</span>
-          )}
-        </div>
-
-        <div className="order-pool-card__footer">
-          <div className={`order-pool-card__pay order-pool-card__pay--${payment.tone}`}>
-            <span>{payment.badge}</span>
-            {(payment.showPrepayAmount || prepay > 0) && (
-              <small>
-                <MoneyAmount value={prepay} />
-              </small>
-            )}
-          </div>
-          <div className="order-pool-card__money">
-            <span className={`order-pool-card__debt ${debt >0 ? 'is-due' : ''}`}>
-              долг <MoneyAmount value={debt} />
-            </span>
-            <span className="order-pool-card__total">
-              <MoneyAmount value={getOrderTotal(order)} />
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {canTake && onTakeOrder ? (
-        <button
-          type="button"
-          className="order-pool-card__take"
-          title="Назначить себя ответственным"
-          onClick={(e) =>{
-            e.stopPropagation();
-            onTakeOrder(order);
-          }}
-        >
-          Взять
-        </button>
-      ) : null}
-    </article>
+      </td>
+      <td>
+        <div className="pool-sheet__client">{order.customerName || 'Клиент не указан'}</div>
+        {order.customerPhone ? (
+          <button
+            type="button"
+            className="pool-sheet__phone"
+            title="Скопировать телефон"
+            onClick={(event) => {
+              event.stopPropagation();
+              onCopyPhone?.(order.customerPhone!);
+            }}
+          >
+            {order.customerPhone}
+          </button>
+        ) : (
+          <div className="pool-sheet__meta">—</div>
+        )}
+      </td>
+      <td className="pool-sheet__composition" title={composition}>{composition}</td>
+      <td>
+        <OrderStamp
+          status={statusInfo ?? { id: Number(order.status), name: '' }}
+          statuses={statuses}
+          onlineCancelled={isCancelled}
+        />
+        {payment.tone === 'pending' ? (
+          <div className="pool-sheet__pay">{payment.badge}</div>
+        ) : null}
+      </td>
+      <td className="pool-sheet__who">
+        {responsibleName}
+        {responsibleId === currentUserId ? <span className="pool-sheet__mine"> мой</span> : null}
+      </td>
+      <td className="pool-sheet__money"><MoneyAmount value={getOrderTotal(order)} /></td>
+      <td className={debt > 0 ? 'pool-sheet__money is-due' : 'pool-sheet__money'}>
+        <MoneyAmount value={debt} />
+      </td>
+      <td>
+        {canTake && onTakeOrder ? (
+          <button
+            type="button"
+            className="pool-sheet__take"
+            title="Назначить себя ответственным"
+            onClick={(event) => {
+              event.stopPropagation();
+              onTakeOrder(order);
+            }}
+          >
+            Взять
+          </button>
+        ) : null}
+      </td>
+    </tr>
   );
 });
 
-OrderCard.displayName = 'OrderPoolCard';
+OrderRow.displayName = 'OrderPoolRow';
 
 interface OrderPoolListProps {
   orders: Order[];
   selectedOrderId: number | null | undefined;
   currentUserId: number;
+  users?: Array<{ id: number; name: string }>;
   onSelect: (order: Order) => void;
   onTakeOrder?: (order: Order) => void;
   onCopyPhone?: (phone: string) => void;
@@ -201,15 +174,17 @@ export const OrderPoolList: React.FC<OrderPoolListProps> = ({
   orders,
   selectedOrderId,
   currentUserId,
+  users = [],
   onSelect,
   onTakeOrder,
   onCopyPhone,
   searchLoading,
   emptyMessage = 'Нет заказов по текущим фильтрам',
-  getOrderPrepayment,
   getOrderDebt,
   getOrderTotal,
 }) => {
+  const groups = React.useMemo(() => groupOrdersByWorkDay(orders), [orders]);
+
   if (orders.length === 0) {
     return (
       <div className="order-list-empty">
@@ -220,29 +195,58 @@ export const OrderPoolList: React.FC<OrderPoolListProps> = ({
   }
 
   return (
-    <div className={`order-list order-list--cards ${searchLoading ? 'order-list--searching' : ''}`}>
+    <div className={`order-list pool-sheet-wrap ${searchLoading ? 'order-list--searching' : ''}`}>
       {searchLoading && (
         <div className="order-pool-search-hint" role="status">
           <span className="order-pool-search-hint__pulse" />
           Обновляем результаты
         </div>
       )}
-      <div className="order-pool-card-list" role="list">
-        {orders.map((order) => (
-          <OrderCard
-            key={order.id}
-            order={order}
-            isSelected={selectedOrderId === order.id}
-            currentUserId={currentUserId}
-            onSelect={onSelect}
-            onTakeOrder={onTakeOrder}
-            onCopyPhone={onCopyPhone}
-            getOrderPrepayment={getOrderPrepayment}
-            getOrderDebt={getOrderDebt}
-            getOrderTotal={getOrderTotal}
-          />
-        ))}
-      </div>
+      <table className="pool-sheet">
+        <thead>
+          <tr>
+            <th>Номер</th>
+            <th>Клиент</th>
+            <th>Состав</th>
+            <th>Статус</th>
+            <th>Ответственный</th>
+            <th>Сумма</th>
+            <th>Долг</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((group) => {
+            const dayTotal = group.orders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+            return (
+              <React.Fragment key={group.key || 'none'}>
+                <tr className="pool-sheet__day">
+                  <td colSpan={8}>
+                    <span>{formatWorkDayLabel(group.key)}</span>
+                    <span className="pool-sheet__day-count">
+                      {' · '}{group.orders.length}{' · '}<MoneyAmount value={dayTotal} />
+                    </span>
+                  </td>
+                </tr>
+                {group.orders.map((order) => (
+                  <OrderRow
+                    key={order.id}
+                    order={order}
+                    isSelected={selectedOrderId === order.id}
+                    currentUserId={currentUserId}
+                    users={users}
+                    onSelect={onSelect}
+                    onTakeOrder={onTakeOrder}
+                    onCopyPhone={onCopyPhone}
+                    getOrderDebt={getOrderDebt}
+                    getOrderTotal={getOrderTotal}
+                  />
+                ))}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 };
