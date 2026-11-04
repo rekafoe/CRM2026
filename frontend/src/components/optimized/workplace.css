@@ -348,6 +348,71 @@
   text-transform: uppercase;
 }
 
+.pc-order-data .detail-notes-input {
+  background: var(--pc-surface-sunken);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-r-input);
+  color: var(--pc-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+.pc-order-data .detail-notes-input:hover {
+  border-color: var(--pc-border-strong);
+}
+
+.pc-order-data .detail-notes-input:focus {
+  outline: none;
+  border-color: var(--pc-focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc-focus-ring) 18%, transparent);
+}
+
+.pc-order-data .legal-ledger-card {
+  max-width: 100%;
+  background: var(--pc-surface-sunken);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-r-input);
+  color: var(--pc-text);
+  box-shadow: none;
+}
+
+.pc-order-data .legal-ledger-card--muted {
+  color: var(--pc-muted);
+}
+
+.pc-order-data .legal-ledger-card th,
+.pc-order-data .legal-ledger-card td {
+  border-bottom-color: var(--pc-border);
+}
+
+.pc-order-data .legal-ledger-card th {
+  background: transparent;
+  color: var(--pc-muted);
+  font-weight: 500;
+}
+
+.pc-order-data .legal-ledger-card td {
+  color: var(--pc-text);
+}
+
+.pc-order-data .legal-ledger-card__debt {
+  background: none;
+  color: var(--pc-danger-ink);
+  font-weight: 600;
+}
+
+.pc-order-data .legal-ledger-card__ok {
+  background: none;
+  color: var(--pc-success-ink);
+  font-weight: 600;
+}
+
+.pc-order-data .legal-ledger-card__caption {
+  color: var(--pc-faint);
+}
+
 .pc-passport {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
