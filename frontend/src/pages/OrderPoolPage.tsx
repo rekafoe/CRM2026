@@ -27,6 +27,7 @@ import { collectedPrepaymentAmount, parseNumberFlexible } from '../utils/numberI
 import { isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
 import { mergeSelectedOrderFromList } from '../utils/orderNotes';
+import { MoneyAmount } from '../components/ui';
 import { OrderContent } from '../components/optimized/OrderContent';
 import { StatusTrack } from '../components/order/StatusTrack';
 import { OrderTotal } from '../components/order/OrderTotal';
@@ -43,6 +44,7 @@ import {
   OrderPoolList,
   OrderPoolDetailHeader,
   getEffectiveResponsibleUserId,
+  describeOrderPoolFilter,
   initialOrderPoolFilters,
   orderPoolFiltersReducer,
   ORDER_POOL_SEARCH_LIMIT,
@@ -527,6 +529,28 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     };
   }, [orders, filters.source, filters.searchTerm, getOrderDebt, getOrderPrepayment]);
 
+  const poolSummary = useMemo(() => {
+    let open = 0;
+    let awaiting = 0;
+    let debt = 0;
+    orders.forEach((order) => {
+      if (order.is_cancelled === 1) return;
+      if (getEffectiveResponsibleUserId(order) == null) open += 1;
+      if (isAwaitingOnlinePayment(order)) awaiting += 1;
+      debt += getOrderDebt(order);
+    });
+    return { open, awaiting, debt };
+  }, [orders, getOrderDebt]);
+
+  const poolFilterLabel = useMemo(() => {
+    const departmentName = poolDepartmentId === ''
+      ? ''
+      : departments.find((department) => department.id === poolDepartmentId)?.name || '';
+    return [describeOrderPoolFilter(filters), departmentName ? `точка ${departmentName}` : '']
+      .filter(Boolean)
+      .join(' · ');
+  }, [filters, poolDepartmentId, departments]);
+
   const handleCopyPhone = useCallback(
     (phone: string) => {
       void navigator.clipboard.writeText(phone).then(
@@ -838,6 +862,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           }}
           onCopyPhone={handleCopyPhone}
           searchLoading={searchLoading}
+          users={allUsers}
           getOrderPrepayment={getOrderPrepayment}
           getOrderDebt={getOrderDebt}
           getOrderTotal={getOrderTotal}
@@ -1026,6 +1051,17 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         )}
       </div>
       </div>
+
+      <footer className="order-pool-footer">
+        <span>Показано {visibleOrders.length} из {orders.length} · фильтр {poolFilterLabel}</span>
+        <span>
+          В пуле: {poolSummary.open}
+          {' · '}
+          ждут оплату BePaid: {poolSummary.awaiting}
+          {' · '}
+          долг по пулу: <MoneyAmount value={poolSummary.debt} />
+        </span>
+      </footer>
 
       {showFilesModal && selectedOrder && (
         <FilesModal
