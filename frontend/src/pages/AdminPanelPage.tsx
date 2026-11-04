@@ -7,6 +7,7 @@ import { DailyActivityOverview } from '../components/admin/DailyActivityOverview
 import SystemFeaturesPanel from '../components/admin/SystemFeaturesPanel';
 import { AppIcon, type IconName } from '../components/ui/AppIcon';
 import '../styles/admin-panel.css';
+import '../styles/admin-surface.css';
 import '../components/notifications/NotificationsManager.css';
 import './NotificationsPage.css';
 import './admin/SettingsPage.css';
