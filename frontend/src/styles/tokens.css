@@ -1,0 +1,196 @@
+/*
+ * Токены интерфейса CRM «PrintCore Tactile Studio».
+ * Темы: светлая (по умолчанию), [data-theme='powder'] «Пудра», [data-theme='dark'] Deep Ink — на <html>.
+ * У смысловых цветов три роли: базовый (заливки, линии, крупный текст), -ink (мелкий текст, ≥ 4.5:1
+ * на поверхностях темы и на своём -soft), -soft (фон штампов и плашек).
+ * --pc-accent-alt — второй тон действия (графики, заливки под белым текстом), --pc-text-disabled — неактивный текст.
+ * Компонентный слой ниже базовых токенов: в светлой и Deep Ink он ссылается на базовые,
+ * «Пудра» задаёт свои акценты.
+ */
+
+:root {
+  --pc-bg: #F6F5F2;
+  --pc-surface: #FFFFFF;
+  --pc-surface-subtle: #EFECE6;
+  --pc-surface-sunken: #F9F8F5;
+  --pc-text: #141619;
+  --pc-muted: #5C626C;
+  --pc-faint: #646973;
+  --pc-text-disabled: #A3A7AE;
+  --pc-border: #E2DFD7;
+  --pc-border-strong: #D0CCC2;
+  --pc-border-control: #8A867E;
+
+  --pc-accent: #1D4ED8;
+  --pc-accent-hover: #1A45C2;
+  --pc-accent-soft: #E9EEFB;
+  --pc-accent-ink: #1D4ED8;
+  --pc-on-accent: #FFFFFF;
+  --pc-accent-alt: #4A70D6;
+
+  --pc-accent-warm: #C84B31;
+  --pc-accent-warm-ink: #A83A23;
+  --pc-accent-warm-soft: #F7E9E4;
+  --pc-on-accent-warm: #FFFFFF;
+
+  --pc-success: #15803D;
+  --pc-success-ink: #136C35;
+  --pc-success-soft: #E6F1EA;
+  --pc-warning: #B45309;
+  --pc-warning-ink: #964406;
+  --pc-warning-soft: #F8EEDF;
+  --pc-danger: #B91C1C;
+  --pc-danger-ink: #B91C1C;
+  --pc-danger-soft: #F8E6E6;
+  --pc-neutral-soft: #EFECE6;
+
+  --pc-row-hover: #FAF9F6;
+  --pc-row-selected: #F1F4FC;
+
+  --pc-info: var(--pc-accent);
+  --pc-info-ink: var(--pc-accent-ink);
+  --pc-info-soft: var(--pc-accent-soft);
+  --pc-row-group: var(--pc-bg);
+  --pc-row-expanded: var(--pc-row-selected);
+  --pc-list-selected: var(--pc-surface);
+  --pc-nav-active: var(--pc-text);
+  --pc-counter-bg: var(--pc-accent-warm);
+  --pc-on-counter: var(--pc-on-accent-warm);
+  --pc-badge-quiet-bg: var(--pc-surface-subtle);
+  --pc-badge-quiet-ink: var(--pc-text);
+  --pc-dot: var(--pc-accent-warm);
+  --pc-control-checked: var(--pc-text);
+  --pc-control-checked-soft: var(--pc-surface);
+  --pc-focus-ring: var(--pc-accent);
+  --pc-mark: var(--pc-accent-warm);
+  --pc-mark-ink: var(--pc-accent-warm-ink);
+  --pc-divider-accent: var(--pc-border);
+  --pc-danger-border: var(--pc-border);
+  --pc-debt-marker: none;
+
+  --pc-overlay: rgba(20, 22, 25, 0.45);
+  --pc-shadow-pop: 0 8px 24px rgba(20, 22, 25, 0.12);
+
+  --pc-font-display: 'PC UI Display', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --pc-font-sans: 'PC UI Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --pc-font-mono: 'PC UI Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --pc-r-control: 8px;
+  --pc-r-input: 6px;
+  --pc-r-card: 10px;
+  --pc-r-stamp: 5px;
+
+  --pc-h-control: 32px;
+  --pc-h-row: 40px;
+
+  --pc-motion: 140ms ease;
+}
+
+:root[data-density='compact'] {
+  --pc-h-control: 28px;
+  --pc-h-row: 34px;
+}
+
+:root[data-theme='powder'] {
+  --pc-bg: #FAF8F9;
+  --pc-surface: #FFFFFF;
+  --pc-surface-subtle: #F4F0F2;
+  --pc-surface-sunken: #FBF9FA;
+  --pc-text: #1E191B;
+  --pc-muted: #5D5458;
+  --pc-faint: #6A6165;
+  --pc-text-disabled: #ADA3A7;
+  --pc-border: #EEE6E9;
+  --pc-border-strong: #DCCFD4;
+  --pc-border-control: #8F7F86;
+
+  --pc-accent: #B5186A;
+  --pc-accent-hover: #9C1459;
+  --pc-accent-soft: #FCE7F1;
+  --pc-accent-ink: #B5186A;
+  --pc-on-accent: #FFFFFF;
+  --pc-accent-alt: #C24A78;
+
+  --pc-accent-warm: #7A3718;
+  --pc-accent-warm-ink: #7A3718;
+  --pc-accent-warm-soft: #F6E8DF;
+  --pc-on-accent-warm: #FFFFFF;
+
+  --pc-success: #3F7F58;
+  --pc-success-ink: #2F6A48;
+  --pc-success-soft: #E5F0E9;
+  --pc-warning: #9A7A00;
+  --pc-warning-ink: #7D6300;
+  --pc-warning-soft: #F7EFDA;
+  --pc-danger: #7A3718;
+  --pc-danger-ink: #7A3718;
+  --pc-danger-soft: #F6E8DF;
+  --pc-neutral-soft: #F0EBED;
+
+  --pc-row-hover: #FEF6F9;
+  --pc-row-selected: #F9E0EB;
+
+  --pc-info: #4A6890;
+  --pc-info-ink: #3E5A84;
+  --pc-info-soft: #EBF0F7;
+  --pc-row-group: #FDF1F6;
+  --pc-row-expanded: #FEF6F9;
+  --pc-list-selected: #F9E0EB;
+  --pc-nav-active: #B5186A;
+  --pc-counter-bg: #B5186A;
+  --pc-on-counter: #FFFFFF;
+  --pc-badge-quiet-bg: #FCE7F1;
+  --pc-badge-quiet-ink: #B5186A;
+  --pc-dot: #B5186A;
+  --pc-control-checked: #B5186A;
+  --pc-control-checked-soft: #FCE7F1;
+  --pc-focus-ring: #B5186A;
+  --pc-mark: #B5186A;
+  --pc-mark-ink: #B5186A;
+  --pc-divider-accent: #F2CEDC;
+  --pc-danger-border: #B98A73;
+  --pc-debt-marker: inline-flex;
+}
+
+:root[data-theme='dark'] {
+  --pc-bg: #111317;
+  --pc-surface: #181B21;
+  --pc-surface-subtle: #20242C;
+  --pc-surface-sunken: #14171C;
+  --pc-text: #F3F2EE;
+  --pc-muted: #A1A7B1;
+  --pc-faint: #8A919C;
+  --pc-text-disabled: #5E646E;
+  --pc-border: rgba(255, 255, 255, 0.09);
+  --pc-border-strong: rgba(255, 255, 255, 0.18);
+  --pc-border-control: #6B707A;
+
+  --pc-accent: #2563EB;
+  --pc-accent-hover: #3B74F0;
+  --pc-accent-soft: rgba(59, 130, 246, 0.14);
+  --pc-accent-ink: #7CA7F8;
+  --pc-on-accent: #FFFFFF;
+  --pc-accent-alt: #1E4AB8;
+
+  --pc-accent-warm: #E0694F;
+  --pc-accent-warm-ink: #EE8A73;
+  --pc-accent-warm-soft: rgba(224, 105, 79, 0.14);
+  --pc-on-accent-warm: #111317;
+
+  --pc-success: #3FA96A;
+  --pc-success-ink: #5BC184;
+  --pc-success-soft: rgba(63, 169, 106, 0.14);
+  --pc-warning: #D98C3A;
+  --pc-warning-ink: #E6A35C;
+  --pc-warning-soft: rgba(217, 140, 58, 0.14);
+  --pc-danger: #E05252;
+  --pc-danger-ink: #F07A7A;
+  --pc-danger-soft: rgba(224, 82, 82, 0.14);
+  --pc-neutral-soft: #20242C;
+
+  --pc-row-hover: #1C2027;
+  --pc-row-selected: rgba(59, 130, 246, 0.10);
+
+  --pc-overlay: rgba(0, 0, 0, 0.6);
+  --pc-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
