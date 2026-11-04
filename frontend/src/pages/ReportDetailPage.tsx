@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { getFullDailyReport, updateOrderStatus, cancelOnlineOrder, duplicateOrder } from '../api';
 import { isWaitingOrder, useOrderStatuses } from '../hooks/useOrderStatuses';
 import { Order, DailyReport } from '../types';
-import { ProgressBar } from '../components/order/ProgressBar';
+import { StatusTrack } from '../components/order/StatusTrack';
+import { OrderStamp } from '../components/order/OrderStamp';
 import { OrderItem } from '../components/OrderItem';
 import { useReasonPrompt } from '../components/common/useReasonPrompt';
 import { useReasonPresets } from '../components/common/useReasonPresets';
@@ -203,22 +204,22 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
               key={status.id}
               style={{
                 padding: '16px',
-                backgroundColor: status.color ? `${status.color}20` : '#f5f5f5',
+                backgroundColor: 'var(--pc-surface)',
                 borderRadius: '8px',
-                border: `2px solid ${status.color || '#e0e0e0'}`,
+                border: '1px solid var(--pc-border)',
                 textAlign: 'center'
               }}
             >
               <div style={{ 
                 fontSize: '20px', 
                 fontWeight: 'bold', 
-                color: status.color || '#333',
+                color: 'var(--pc-text)',
                 marginBottom: '8px'
               }}>
                 {statusOrders.length}
               </div>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>
-                {status.name}
+              <div style={{ fontSize: '14px', color: 'var(--pc-muted)', marginBottom: '4px' }}>
+                <OrderStamp status={status} />
               </div>
               <div style={{ fontSize: '12px', color: '#888' }}>
                 <MoneyAmount value={statusRevenue} decimals={0} />
@@ -350,14 +351,13 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                     )}
                   </div>
 
-                  {/* Прогресс-бар статуса */}
                   <div style={{ marginBottom: '12px' }}>
-                    <ProgressBar
-                      current={order.status}
+                    <StatusTrack
+                      currentStatusId={Number(order.status)}
                       statuses={statuses}
                       onStatusChange={(newStatusId) => handleStatusChange(order.id, newStatusId)}
-                      width="100%"
-                      height="8px"
+                      createdAt={order.created_at}
+                      readyAt={order.actualCompletion ?? null}
                     />
                   </div>
 

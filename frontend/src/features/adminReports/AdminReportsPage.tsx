@@ -15,6 +15,7 @@ import { AnalyticsTab } from './types';
 import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getYearlyRevenue, getDepartments, getExpenseSummary, updateReasonPresetsSettings, type Department } from '../../api';
 import { Button } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
+import { OrderStamp } from '../../components/order/OrderStamp';
 import { useReasonPresets } from '../../components/common/useReasonPresets';
 
 import './AdminReportsPage.css';
@@ -1460,7 +1461,14 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                       <tr key={order.id}>
                         <td>{order.number || `#${order.id}`}</td>
                         <td>{String(order.created_at || '').slice(0, 16).replace('T', ' ')}</td>
-                        <td>{order.status_name ?? order.status}</td>
+                        <td>
+                          <OrderStamp
+                            status={{
+                              id: Number.isFinite(Number(order.status)) ? Number(order.status) : undefined,
+                              name: order.status_name ? String(order.status_name) : undefined,
+                            }}
+                          />
+                        </td>
                         <td>{order.prepayment_status_label ?? order.prepayment_status ?? '—'}</td>
                         <td>{order.user_name || '—'}</td>
                         <td><MoneyAmount value={Number(order.prepayment_amount || 0)} decimals={0} /></td>

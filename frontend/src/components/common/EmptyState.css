@@ -19,37 +19,32 @@
 }
 
 .empty-state-title {
-  color: #333;
+  color: var(--pc-text);
+  font-family: var(--pc-font-display);
   font-size: 20px;
   font-weight: 600;
   margin: 0 0 12px 0;
 }
 
 .empty-state-description {
-  color: #666;
+  color: var(--pc-muted);
   font-size: 14px;
   line-height: 1.6;
   margin: 0 0 24px 0;
 }
 
 .empty-state-action {
-  background: #1976d2;
-  color: white;
+  background: var(--pc-accent);
+  color: var(--pc-on-accent);
   border: none;
   padding: 12px 24px;
-  border-radius: 4px;
+  border-radius: var(--pc-r-control);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color var(--pc-motion);
 }
 
 .empty-state-action:hover {
-  background: #1565c0;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.empty-state-action:active {
-  transform: translateY(0);
+  background: var(--pc-accent-hover);
 }

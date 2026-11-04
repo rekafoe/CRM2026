@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { AppIcon } from '../ui/AppIcon';
 import '../../styles/utilities.css';
 
 interface ModalProps {
@@ -81,7 +82,7 @@ export const Modal: React.FC<ModalProps> = ({
               className="modal-close-btn btn btn-sm btn-secondary shrink-0"
               aria-label="Закрыть"
             >
-              ×
+              <AppIcon name="x" size="xs" />
             </button>
           </div>
         )}

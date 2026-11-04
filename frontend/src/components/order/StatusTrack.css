@@ -1,0 +1,79 @@
+.pc-track {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  padding: 8px 0 2px;
+}
+
+.pc-track__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 2px 4px;
+  border: none;
+  background: transparent;
+  color: var(--pc-faint);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.pc-track__step:disabled {
+  cursor: default;
+}
+
+.pc-track__step:not(:disabled):hover .pc-track__name {
+  color: var(--pc-text);
+}
+
+.pc-track__step:focus-visible {
+  outline: 2px solid var(--pc-focus-ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.pc-track__mark {
+  display: block;
+  width: calc(100% - 8px);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--pc-border);
+}
+
+.pc-track__step.is-done .pc-track__mark,
+.pc-track__step.is-current .pc-track__mark {
+  background: var(--pc-accent);
+}
+
+.pc-track__name {
+  display: block;
+  max-width: 100%;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.pc-track__step.is-current .pc-track__name,
+.pc-track__step.is-done .pc-track__name {
+  color: var(--pc-text);
+}
+
+.pc-track__date {
+  display: block;
+  font-family: var(--pc-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--pc-muted);
+}
+
+@media (max-width: 720px) {
+  .pc-track {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 10px;
+  }
+}

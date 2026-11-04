@@ -28,7 +28,7 @@ import { isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
 import { mergeSelectedOrderFromList } from '../utils/orderNotes';
 import { OrderContent } from '../components/optimized/OrderContent';
-import { OrderStatusTimeline } from '../components/order/OrderStatusTimeline';
+import { StatusTrack } from '../components/order/StatusTrack';
 import { OrderTotal } from '../components/order/OrderTotal';
 import { FilesModal } from '../components/FilesModal';
 import { PrepaymentModal } from '../components/PrepaymentModal';
@@ -916,13 +916,19 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             {orderStatuses.length > 0 && (
               <details className="order-pool-collapsible">
                 <summary className="order-pool-collapsible__summary">Статусы</summary>
-                <OrderStatusTimeline
+                <StatusTrack
                   statuses={orderStatuses}
                   currentStatusId={Number(selectedOrder.status)}
                   createdAt={selectedOrder.created_at ?? (selectedOrder as { createdAt?: string }).createdAt}
-                  readyAt={(selectedOrder as { readyAt?: string | null }).readyAt ?? null}
-                  hasItems={(selectedOrder.items?.length ?? 0) > 0}
+                  readyAt={
+                    selectedOrder.actualCompletion
+                    ?? (selectedOrder as { readyAt?: string | null }).readyAt
+                    ?? null
+                  }
                 />
+                {(selectedOrder.items?.length ?? 0) === 0 ? (
+                  <div className="order-status-timeline__empty">Пока нет позиций</div>
+                ) : null}
               </details>
             )}
 

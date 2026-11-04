@@ -178,6 +178,10 @@
 
 /* Ряд мета-полей (Контактёр, Ответственный, Дата) — компактный, контент помещается */
 .detail-meta-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
   flex-shrink: 0;
   overflow: visible;
 }

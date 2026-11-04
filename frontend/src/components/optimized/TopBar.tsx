@@ -1,10 +1,13 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Logo } from '../Logo.tsx';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AppIcon } from '../ui/AppIcon';
 import type { Organization } from '../../api';
 import type { InboxNotification } from '../../api';
 import { InboxNotifications } from '../notifications/InboxNotifications';
+import {
+  currentAppearanceUserId,
+  saveCrmAppearance,
+} from '../../hooks/useCrmAppearance';
 import './TopBar.css';
 
 interface TopBarProps {
@@ -17,7 +20,7 @@ interface TopBarProps {
   onShowSupportChats?: () => void;
   onShowCountersPage: () => void;
   onLogout: () => void;
-  /** Новый заказ с сайта/TG в пуле — показываем зелёный бейдж "new" */
+  /** Новый заказ с сайта/TG в пуле — статичный штамп «new» */
   hasNewPoolOrder?: boolean;
   supportAttentionCount?: number;
   inboxUnreadCount?: number;
@@ -50,47 +53,164 @@ export const TopBar: React.FC<TopBarProps> = ({
   onInboxOpenNotification,
 }) => {
   const navigate = useNavigate();
-  const rawLogoUrl = organization?.logo_url;
-  const logoUrl = rawLogoUrl && typeof rawLogoUrl === 'string' && rawLogoUrl.length > 10
-    ? (rawLogoUrl.startsWith('/') ? `${window.location.origin}${rawLogoUrl}` : rawLogoUrl)
-    : null;
-  const isDataOrHttp = logoUrl &&
-    (logoUrl.startsWith('data:') || logoUrl.startsWith('http') || logoUrl.startsWith('blob:'));
-  const [logoError, setLogoError] = React.useState(false);
-  React.useEffect(() => setLogoError(false), [rawLogoUrl]);
-  const hasLogo = isDataOrHttp && !logoError;
+  const location = useLocation();
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const profileRef = React.useRef<HTMLDivElement>(null);
+  const orgName = organization?.name?.trim() || '';
+
+  React.useEffect(() => {
+    if (!profileOpen) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [profileOpen]);
+
+  const sectionActive = (path: string) => {
+    if (path === '/adminpanel/reports') return location.pathname.startsWith('/adminpanel/reports');
+    if (path === '/adminpanel') {
+      return location.pathname.startsWith('/adminpanel') && !location.pathname.startsWith('/adminpanel/reports');
+    }
+    if (path === '/knowledge') return location.pathname.startsWith('/knowledge');
+    return location.pathname === path;
+  };
+
+  const keepLight = () => {
+    saveCrmAppearance(currentAppearanceUserId());
+  };
+
   return (
-    <div className="app-topbar">
-      <div className="topbar-logo">
-        {hasLogo ? (
-          <div className="topbar-org">
-            <img
-              src={logoUrl!}
-              alt={organization!.name || 'Лого'}
-              className="topbar-org-logo"
-              onError={() => setLogoError(true)}
-            />
-            {organization?.name && <span className="topbar-org-name">{organization.name}</span>}
-          </div>
-        ) : (
-          <div className="topbar-org topbar-org--fallback">
-            <Logo size="small" showText={false} />
-            {organization?.name && <span className="topbar-org-name">{organization.name}</span>}
-          </div>
-        )}
+    <header className="app-topbar">
+      <div className="pc-topbar__brand" title={orgName || 'CRM'}>
+        <span className="pc-topbar__mark" aria-hidden="true" />
+        <span className="pc-topbar__brand-text">
+          CRM
+          {orgName ? <span className="pc-topbar__org"> · {orgName}</span> : null}
+        </span>
       </div>
-      <div className="topbar-info">
-        <button 
-          className="chip chip--clickable" 
-          onClick={onShowPageSwitcher} 
-          title="Переключиться между страницами заказов" 
-          aria-label="Переключиться между страницами заказов"
+
+      <button
+        type="button"
+        className="pc-topbar__context"
+        onClick={onShowPageSwitcher}
+        title="Переключиться между страницами заказов"
+        aria-label="Переключиться между страницами заказов"
+      >
+        <AppIcon name="calendar" size="xs" />
+        <span>{contextDate}</span>
+        <span className="pc-topbar__context-sep" aria-hidden="true">·</span>
+        <AppIcon name="user" size="xs" />
+        <span>{currentUserName}</span>
+      </button>
+
+      <nav className="pc-topbar__nav" aria-label="Разделы">
+        <button
+          type="button"
+          className={navClass(sectionActive('/order-pool'))}
+          onClick={onShowOrderPool}
+          title="Пул заказов"
+          aria-label="Пул заказов"
+          aria-current={sectionActive('/order-pool') ? 'page' : undefined}
         >
-          <AppIcon name="calendar" size="xs" /> {contextDate} · <AppIcon name="user" size="xs" /> {currentUserName}
+          <AppIcon name="clipboard" size="sm" />
+          <span>Пул заказов</span>
+          {hasNewPoolOrder ? <span className="pc-pool-stamp">new</span> : null}
         </button>
-      </div>
-      <div className="topbar-actions">
-        {onInboxToggle && onInboxClose && onInboxMarkAllRead && onInboxOpenNotification && (
+        {onShowSupportChats ? (
+          <button
+            type="button"
+            className="pc-nav-btn"
+            onClick={onShowSupportChats}
+            title={supportAttentionCount > 0 ? `Чаты: ${supportAttentionCount} ждут внимания` : 'Чаты'}
+            aria-label={supportAttentionCount > 0 ? `Чаты, ждут внимания: ${supportAttentionCount}` : 'Чаты'}
+          >
+            <AppIcon name="message" size="sm" />
+            <span>Чаты</span>
+            {supportAttentionCount > 0 ? (
+              <span className="pc-count-stamp">{supportAttentionCount > 99 ? '99+' : supportAttentionCount}</span>
+            ) : null}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="pc-nav-btn"
+          onClick={onShowCountersPage}
+          title="Счётчики принтеров и кассы"
+          aria-label="Счётчики принтеров и кассы"
+        >
+          <AppIcon name="chart-bar" size="sm" />
+          <span>Счётчики</span>
+        </button>
+        <button
+          type="button"
+          className={navClass(sectionActive('/earnings'))}
+          onClick={() => navigate('/earnings')}
+          title="Мои проценты"
+          aria-label="Мои проценты"
+          aria-current={sectionActive('/earnings') ? 'page' : undefined}
+        >
+          <AppIcon name="money" size="sm" />
+          <span>Мои проценты</span>
+        </button>
+        <button
+          type="button"
+          className={navClass(sectionActive('/clients'))}
+          onClick={() => navigate('/clients')}
+          title="Клиенты CRM"
+          aria-label="Клиенты CRM"
+          aria-current={sectionActive('/clients') ? 'page' : undefined}
+        >
+          <AppIcon name="users" size="sm" />
+          <span>Клиенты</span>
+        </button>
+        <button
+          type="button"
+          className={navClass(sectionActive('/knowledge'))}
+          onClick={() => navigate('/knowledge')}
+          title="База знаний"
+          aria-label="База знаний"
+          aria-current={sectionActive('/knowledge') ? 'page' : undefined}
+        >
+          <AppIcon name="document" size="sm" />
+          <span>База знаний</span>
+        </button>
+        {isAdmin ? (
+          <>
+            <button
+              type="button"
+              className={navClass(sectionActive('/adminpanel/reports'))}
+              onClick={() => { window.location.href = '/adminpanel/reports'; }}
+              title="Аналитика и отчёты"
+              aria-label="Аналитика и отчёты"
+              aria-current={sectionActive('/adminpanel/reports') ? 'page' : undefined}
+            >
+              <AppIcon name="chart-up" size="sm" />
+              <span>Отчёты</span>
+            </button>
+            <button
+              type="button"
+              className={navClass(sectionActive('/adminpanel'), true)}
+              onClick={() => { window.location.href = '/adminpanel'; }}
+              title="Админ панель"
+              aria-label="Админ панель"
+              aria-current={sectionActive('/adminpanel') ? 'page' : undefined}
+            >
+              <AppIcon name="settings" size="sm" />
+            </button>
+          </>
+        ) : null}
+      </nav>
+
+      <div className="pc-topbar__tools">
+        {onInboxToggle && onInboxClose && onInboxMarkAllRead && onInboxOpenNotification ? (
           <InboxNotifications
             unreadCount={inboxUnreadCount}
             open={inboxOpen}
@@ -100,93 +220,61 @@ export const TopBar: React.FC<TopBarProps> = ({
             onMarkAllRead={onInboxMarkAllRead}
             onOpenNotification={onInboxOpenNotification}
           />
-        )}
-        <button 
-          onClick={onShowOrderPool}
-          title="Пул заказов" 
-          aria-label="Пул заказов" 
-          className="app-icon-btn app-icon-btn--with-label app-icon-btn--pool"
-        >
-          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="clipboard" size="sm" /></span>
-          <span className="app-icon-btn__label">Пул заказов</span>
-          {hasNewPoolOrder && <span className="pool-badge pool-badge--new">new</span>}
-        </button>
-        {onShowSupportChats && (
-        <button
-          onClick={onShowSupportChats}
-          title={supportAttentionCount > 0 ? `Чаты: ${supportAttentionCount} ждут внимания` : 'Чаты'}
-          aria-label={supportAttentionCount > 0 ? `Чаты, ждут внимания: ${supportAttentionCount}` : 'Чаты'}
-          className="app-icon-btn app-icon-btn--with-label app-icon-btn--support"
-        >
-          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="message" size="sm" /></span>
-          <span className="app-icon-btn__label">Чаты</span>
-          {supportAttentionCount > 0 && (
-            <span className="support-badge">{supportAttentionCount > 99 ? '99+' : supportAttentionCount}</span>
-          )}
-        </button>
-        )}
-        <button 
-          onClick={onShowCountersPage}
-          title="Счётчики принтеров и кассы" 
-          aria-label="Счётчики принтеров и кассы" 
-          className="app-icon-btn app-icon-btn--with-label"
-        >
-          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="chart-bar" size="sm" /></span>
-          <span className="app-icon-btn__label">Счётчики</span>
-        </button>
-        <button
-          onClick={() =>navigate('/earnings')}
-          title="Мои проценты"
-          aria-label="Мои проценты"
-          className="app-icon-btn app-icon-btn--with-label"
-        >
-          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="money" size="sm" /></span>
-          <span className="app-icon-btn__label">Мои проценты</span>
-        </button>
-        <button
-          onClick={() =>navigate('/clients')}
-          title="Клиенты CRM"
-          aria-label="Клиенты CRM"
-          className="app-icon-btn app-icon-btn--with-label"
-        >
-          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="users" size="sm" /></span>
-          <span className="app-icon-btn__label">Клиенты</span>
-        </button>
-        <button
-          onClick={() =>navigate('/knowledge')}
-          title="База знаний"
-          aria-label="База знаний"
-          className="app-icon-btn app-icon-btn--with-label"
-        >
-          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="document" size="sm" /></span>
-          <span className="app-icon-btn__label">База знаний</span>
-        </button>
-        {isAdmin && (
-          <>
-            <button 
-              onClick={() =>window.location.href = '/adminpanel/reports'}
-              title="Аналитика и отчёты" 
-              aria-label="Аналитика и отчёты" 
-              className="app-icon-btn app-icon-btn--with-label"
-            >
-              <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="chart-up" size="sm" /></span>
-              <span className="app-icon-btn__label">Отчёты</span>
-            </button>
-            <button 
-              onClick={() =>window.location.href = '/adminpanel'}
-              title="Админ панель" 
-              aria-label="Админ панель" 
-              className="app-icon-btn"
-            >
-              <AppIcon name="settings" size="sm" />
-            </button>
-          </>
-        )}
-        <button onClick={onLogout} title="Выйти" aria-label="Выйти" className="app-icon-btn">
-          <AppIcon name="power" size="sm" />
-        </button>
+        ) : null}
+        <div className="pc-profile" ref={profileRef}>
+          <button
+            type="button"
+            className="pc-icon-btn"
+            title="Профиль"
+            aria-label="Профиль"
+            aria-expanded={profileOpen}
+            aria-haspopup="menu"
+            onClick={() => setProfileOpen((open) => !open)}
+          >
+            <AppIcon name="user" size="sm" />
+          </button>
+          {profileOpen ? (
+            <div className="pc-profile__menu" role="menu" aria-label="Профиль">
+              <div className="pc-profile__heading">Оформление</div>
+              <div className="pc-profile__group" role="radiogroup" aria-label="Тема">
+                <button type="button" role="radio" aria-checked="true" className="is-selected" onClick={keepLight}>
+                  Светлая
+                </button>
+                <button type="button" role="radio" aria-checked="false" disabled title="Пока недоступно">
+                  Пудра
+                </button>
+                <button type="button" role="radio" aria-checked="false" disabled title="Пока недоступно">
+                  Deep Ink
+                </button>
+              </div>
+              <div className="pc-profile__group" role="radiogroup" aria-label="Плотность">
+                <button type="button" role="radio" aria-checked="true" className="is-selected" onClick={keepLight}>
+                  Обычная
+                </button>
+                <button type="button" role="radio" aria-checked="false" disabled title="Пока недоступно">
+                  Компактная
+                </button>
+              </div>
+              <button
+                type="button"
+                className="pc-profile__logout"
+                role="menuitem"
+                onClick={() => {
+                  setProfileOpen(false);
+                  onLogout();
+                }}
+              >
+                <AppIcon name="power" size="xs" />
+                Выйти
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
-      
-    </div>
+    </header>
   );
 };
+
+function navClass(active: boolean, iconOnly = false): string {
+  return ['pc-nav-btn', active ? 'is-active' : '', iconOnly ? 'pc-nav-btn--icon' : ''].filter(Boolean).join(' ');
+}

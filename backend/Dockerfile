@@ -67,6 +67,7 @@ RUN npm ci --omit=dev \
   && node -e "const fs=require('fs'); const p=require('puppeteer').executablePath(); if(!fs.existsSync(p)) { throw new Error('Chrome not found at '+p) }; fs.writeFileSync('.chrome-path', p); console.log('Chrome:', p);"
 COPY --from=builder /usr/src/app/dist ./dist
 COPY public ./public
+COPY assets ./assets
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

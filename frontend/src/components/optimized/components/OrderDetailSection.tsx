@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Order } from '../../../types';
-import { ProgressBar } from '../../order/ProgressBar';
+import { StatusTrack } from '../../order/StatusTrack';
+import { OrderStamp } from '../../order/OrderStamp';
+import { getSourceLabel } from '../../orderPool/orderPoolUtils';
+import { Menu, MenuItem } from '../../ui/Menu';
 import './OrderDetailSection.css';
+import '../workplace.css';
 import { OrderTotal } from '../../order/OrderTotal';
 import { MemoizedOrderItem } from '../MemoizedOrderItem';
 import { OrderDates } from '../../order/OrderDates';
@@ -18,7 +22,6 @@ import { OrderCostSheetPanel } from '../../orders/OrderCostSheetPanel';
 import { AssignableUserSelect } from '../../orders/AssignableUserSelect';
 import { OrderTransferModal } from '../../orders/OrderTransferModal';
 import { useAssignableUsers } from '../../../hooks/useAssignableUsers';
-import { Button } from '../../common/Button';
 import { useOrderLegalDocuments } from '../hooks/useOrderLegalDocuments';
 import { useFreshOrderItem } from '../../order/useFreshOrderItem';
 
@@ -121,6 +124,20 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
     [selectedOrder],
   );
   const discountPercent = orderAmounts.discountPercent;
+  const statusInfo = statuses.find((status) => status.id === Number(selectedOrder.status));
+  const canIssue = Boolean(
+    onIssueOrder
+    && (orderAmounts.debt > 0 || (orderAmounts.debt === 0 && orderAmounts.total > 0))
+    && Number(selectedOrder.status) !== 7,
+  );
+  const createdAt = selectedOrder.created_at ? new Date(selectedOrder.created_at) : null;
+  const createdLabel = createdAt && !Number.isNaN(createdAt.getTime())
+    ? createdAt.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : '';
+  const sourceLabel = selectedOrder.source ? getSourceLabel(selectedOrder.source) : '';
+  const eyebrow = [sourceLabel && sourceLabel !== 'Неизвестно' ? sourceLabel : '', createdLabel ? `создан ${createdLabel}` : '']
+    .filter(Boolean)
+    .join(' · ');
 
   useEffect(() => {
     if (!receiptMenuOpen) return;
@@ -262,6 +279,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
     { value: 'internal' as const, label: 'Внутренние работы', desc: 'Не в кассе и не в ЗП' },
   ];
   const paymentChannel = (selectedOrder.payment_channel || 'cash') as 'cash' | 'invoice' | 'not_cashed' | 'internal';
+  const channelLabel = PAYMENT_CHANNELS.find((channel) => channel.value === paymentChannel)?.label ?? paymentChannel;
   const handleSetPaymentChannel = useCallback(async (ch: 'cash' | 'invoice' | 'not_cashed' | 'internal') => {
     try {
       setPaymentChannelMenuOpen(false);
@@ -326,50 +344,71 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
 
   return (
     <>
-      <div className="detail-header detail-header--notes-aligned">
-        <div className="detail-header__title-row">
-          <h2>{selectedOrder.number}</h2>
+      <header className="pc-order-head">
+        <div className="pc-order-head__eyebrow">{eyebrow || 'Заказ'}</div>
+        <div className="pc-order-head__title">
+          <h2 className="pc-order-head__number">{selectedOrder.number}</h2>
+          <OrderStamp
+            status={statusInfo ?? { id: Number(selectedOrder.status), name: '' }}
+            statuses={statuses}
+            onlineCancelled={selectedOrder.is_cancelled === 1}
+          />
+          <span className="pc-order-tag">{channelLabel}</span>
           {(selectedOrder.issued_by_me === true || selectedOrder.issued_by_me === 1) && (
-            <span className="detail-header__issued">Выдали вы</span>
+            <span className="pc-order-tag">Выдали вы</span>
           )}
         </div>
-        <div className="order-detail-actions-row detail-header__actions">
-              <button 
+        <div className="pc-order-head__actions">
+          <button type="button" className="pc-btn" onClick={() => onOpenCalculator()}>
+            <AppIcon name="plus" size="xs" /> Добавить продукт
+          </button>
+          {canIssue && onIssueOrder ? (
+            <button
+              type="button"
+              className="pc-btn pc-btn--primary"
+              title="Выдать заказ (100% остатка, долг закрыт)"
+              onClick={() => onIssueOrder(selectedOrder.id)}
+            >
+              <AppIcon name="check" size="xs" /> Выдать заказ
+            </button>
+          ) : null}
+        </div>
+      </header>
+      <div className="detail-header detail-header--notes-aligned">
+        <div className="pc-order-actions">
+              <div className="pc-btn-group">
+              <button
+                type="button"
                 onClick={onShowFilesModal}
-                className="order-detail-action-btn order-detail-action-btn--primary"
+                className="pc-btn"
                 title="Файлы макетов"
               >
                 <AppIcon name="folder" size="xs" /> Файлы
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={onShowPrepaymentModal}
-                className="order-detail-action-btn order-detail-action-btn--success"
+                className="pc-btn"
                 title="Внести предоплату"
               >
                 <AppIcon name="card" size="xs" /> Внести предоплату
               </button>
+              </div>
               {orderAmounts.prepayment > 0 && onRemovePrepayment && (
-                <button 
-                  onClick={() =>onRemovePrepayment(selectedOrder.id)}
-                  className="order-detail-action-btn order-detail-action-btn--danger"
+                <button
+                  type="button"
+                  onClick={() => onRemovePrepayment(selectedOrder.id)}
+                  className="pc-btn pc-btn--danger-text"
                   title="Удалить предоплату по заказу"
                 >
                   <AppIcon name="trash" size="xs" /> Удалить предоплату
                 </button>
               )}
-              {onIssueOrder && (orderAmounts.debt > 0 || (orderAmounts.debt === 0 && orderAmounts.total > 0)) && Number(selectedOrder.status) !== 7 && (
-                <button 
-                  onClick={() =>onIssueOrder(selectedOrder.id)}
-                  className="order-detail-action-btn order-detail-action-btn--info"
-                  title="Выдать заказ (100% остатка, долг закрыт)"
-                >
-                  <AppIcon name="check" size="xs" /> Выдать заказ
-                </button>
-              )}
-              <button 
+              <button
+                type="button"
                 onClick={handleGenerateBlank}
                 disabled={isGeneratingPdf}
-                className={`order-detail-action-btn order-detail-action-btn--danger ${isGeneratingPdf ? 'order-detail-action-btn--disabled' : ''}`}
+                className="pc-btn"
                 title="Создать PDF бланк заказа"
               >
                 {isGeneratingPdf ? <><AppIcon name="refresh" size="xs" /> Генерация...</> : <><AppIcon name="document" size="xs" /> Бланк</>}
@@ -387,7 +426,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                 <OrderDispatchMenu orderId={selectedOrder.id} customerPhone={selectedOrder.customerPhone} />
               ) : null}
               {showLegalDocsButton && (
-                <div ref={docsMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <div className="pc-menu-anchor" ref={docsMenuRef}>
                   <button
                     type="button"
                     onClick={(e) =>{
@@ -395,55 +434,24 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                       if (!generatingKind) setDocsMenuOpen((v) => !v);
                     }}
                     disabled={Boolean(generatingKind)}
-                    className={`order-detail-action-btn order-detail-action-btn--legal ${generatingKind ? 'order-detail-action-btn--disabled' : ''}`}
+                    className="pc-btn"
                     title="Договор, акт, счёт и товарная накладная по этому заказу"
                   >
                     {generatingKind
                       ? <><AppIcon name="refresh" size="xs" /> Генерация...</>
-                      : <><AppIcon name="briefcase" size="xs" /> Документы ▼</>}
+                      : <><AppIcon name="briefcase" size="xs" /> Документы</>}
                   </button>
                   {docsMenuOpen && !generatingKind && (
-                    <div
-                      className="order-detail-action-menu"
-                      role="menu"
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>generateLegalDocument('contract')}
-                        className="order-detail-action-menu__item"
-                        role="menuitem"
-                      >
-                        Договор Word
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>generateLegalDocument('act')}
-                        className="order-detail-action-menu__item"
-                        role="menuitem"
-                      >
-                        Акт Excel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>generateLegalDocument('invoice')}
-                        className="order-detail-action-menu__item"
-                        role="menuitem"
-                      >
-                        Счёт Excel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => generateLegalDocument('tn')}
-                        className="order-detail-action-menu__item"
-                        role="menuitem"
-                      >
-                        ТН Excel
-                      </button>
-                    </div>
+                    <Menu label="Документы">
+                      <MenuItem onClick={() => generateLegalDocument('contract')}>Договор Word</MenuItem>
+                      <MenuItem onClick={() => generateLegalDocument('act')}>Акт Excel</MenuItem>
+                      <MenuItem onClick={() => generateLegalDocument('invoice')}>Счёт Excel</MenuItem>
+                      <MenuItem onClick={() => generateLegalDocument('tn')}>ТН Excel</MenuItem>
+                    </Menu>
                   )}
                 </div>
               )}
-              <div ref={receiptMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <div className="pc-menu-anchor" ref={receiptMenuRef}>
                 <button
                   type="button"
                   onClick={(e) =>{
@@ -451,179 +459,85 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     if (!isGeneratingReceipt) setReceiptMenuOpen((v) => !v);
                   }}
                   disabled={isGeneratingReceipt}
-                  className={`order-detail-action-btn order-detail-action-btn--info ${isGeneratingReceipt ? 'order-detail-action-btn--disabled' : ''}`}
+                  className="pc-btn"
                   title="Товарный чек: по заказу или бланк"
                 >
-                  {isGeneratingReceipt ? <><AppIcon name="refresh" size="xs" /> Генерация...</> : <><AppIcon name="receipt" size="xs" /> Товарный чек ▼</>}
+                  {isGeneratingReceipt ? <><AppIcon name="refresh" size="xs" /> Генерация...</> : <><AppIcon name="receipt" size="xs" /> Товарный чек</>}
                 </button>
                 {receiptMenuOpen && !isGeneratingReceipt && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: 4,
-                      background: '#fff',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      zIndex: 1000,
-                      minWidth: '140px'
-                    }}
-                    role="menu"
-                  >
-                    <button
-                      type="button"
-                      onClick={handleGenerateReceipt}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        border: 'none',
-                        background: 'none',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                      role="menuitem"
-                    >
-                      По заказу
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleGenerateReceiptBlank}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        border: 'none',
-                        background: 'none',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        borderTop: '1px solid #eee'
-                      }}
-                      role="menuitem"
-                    >
-                      Бланк
-                    </button>
-                  </div>
+                  <Menu label="Товарный чек">
+                    <MenuItem onClick={handleGenerateReceipt}>По заказу</MenuItem>
+                    <MenuItem onClick={handleGenerateReceiptBlank}>Бланк</MenuItem>
+                  </Menu>
                 )}
               </div>
-              <div ref={discountMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <div className="pc-menu-anchor" ref={discountMenuRef}>
                 <button
                   type="button"
                   onClick={(e) =>{
                     e.stopPropagation();
                     setDiscountMenuOpen((v) => !v);
                   }}
-                  className={`order-detail-action-btn ${discountPercent > 0 ? 'order-detail-action-btn--discount' : 'order-detail-action-btn--neutral'}`}
+                  className="pc-btn"
                   title="Скидка на итог заказа"
                 >
-                  {discountPercent > 0 ? <><AppIcon name="tag" size="xs" /> Скидка {discountPercent}% ▼</> : <><AppIcon name="tag" size="xs" /> Скидка ▼</>}
+                  <AppIcon name="tag" size="xs" /> {discountPercent > 0 ? `Скидка ${discountPercent}%` : 'Скидка'}
                 </button>
                 {discountMenuOpen && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: 4,
-                      background: '#fff',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      zIndex: 1000,
-                      minWidth: '120px'
-                    }}
-                    role="menu"
-                  >
-                    {DISCOUNT_OPTIONS.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() =>handleSetDiscount(p)}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '8px 12px',
-                          textAlign: 'left',
-                          border: 'none',
-                          background: p === discountPercent ? 'var(--btn-tab-bg-active, #d4c8e8)' : 'none',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          borderTop: p === 0 ? 'none' : '1px solid #eee'
-                        }}
-                        role="menuitem"
+                  <Menu label="Скидка">
+                    {DISCOUNT_OPTIONS.map((percent) => (
+                      <MenuItem
+                        key={percent}
+                        selected={percent === discountPercent}
+                        onClick={() => handleSetDiscount(percent)}
                       >
-                        {p === 0 ? 'Без скидки' : `${p}%`}
-                      </button>
+                        {percent === 0 ? 'Без скидки' : `${percent}%`}
+                      </MenuItem>
                     ))}
-                  </div>
+                  </Menu>
                 )}
               </div>
-              <div ref={paymentChannelMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <div className="pc-menu-anchor" ref={paymentChannelMenuRef}>
                 <button
                   type="button"
                   onClick={(e) =>{
                     e.stopPropagation();
                     setPaymentChannelMenuOpen((v) => !v);
                   }}
-                  className={`order-detail-action-btn ${paymentChannel === 'cash' ? 'order-detail-action-btn--success' : paymentChannel === 'invoice' ? 'order-detail-action-btn--primary' : 'order-detail-action-btn--neutral'}`}
+                  className="pc-btn"
                   title="Канал оплаты"
                 >
-                  {paymentChannel === 'cash' && <><AppIcon name="money" size="xs" /> Касса ▼</>}
-                  {paymentChannel === 'invoice' && <><AppIcon name="document" size="xs" /> Счёт ▼</>}
-                  {paymentChannel === 'internal' && <><AppIcon name="briefcase" size="xs" /> Внутренние ▼</>}
-                  {paymentChannel === 'not_cashed' && '— ▼'}
+                  Канал: {channelLabel}
                 </button>
                 {paymentChannelMenuOpen && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: 4,
-                      background: '#fff',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      zIndex: 1000,
-                      minWidth: '180px'
-                    }}
-                    role="menu"
-                  >
-                    {PAYMENT_CHANNELS.map((p) => (
-                      <button
-                        key={p.value}
-                        type="button"
-                        onClick={() =>handleSetPaymentChannel(p.value)}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '8px 12px',
-                          textAlign: 'left',
-                          border: 'none',
-                          background: p.value === paymentChannel ? 'var(--btn-tab-bg-active, #d4c8e8)' : 'none',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          borderTop: p.value === 'cash' ? 'none' : '1px solid #eee'
-                        }}
-                        role="menuitem"
+                  <Menu label="Канал оплаты">
+                    {PAYMENT_CHANNELS.map((channel) => (
+                      <MenuItem
+                        key={channel.value}
+                        selected={channel.value === paymentChannel}
+                        onClick={() => handleSetPaymentChannel(channel.value)}
                       >
-                        <span style={{ fontWeight: 500 }}>{p.label}</span>
-                        <span style={{ display: 'block', fontSize: 11, color: '#666' }}>{p.desc}</span>
-                      </button>
+                        {channel.label}
+                        {channel.desc ? <small>{channel.desc}</small> : null}
+                      </MenuItem>
                     ))}
-                  </div>
+                  </Menu>
                 )}
               </div>
-              <button type="button" className="order-detail-action-btn order-detail-action-btn--primary" onClick={() => onOpenCalculator()}>
-                Добавить продукт
-              </button>
+              {((roleOnShift.length > 0 || roleAll.length > 0) && onAssigneesChange) ? (
+                <button
+                  type="button"
+                  className="pc-btn"
+                  onClick={() => setTransferOpen(true)}
+                  title="Передать коллеге или в другой павильон"
+                >
+                  Передать
+                </button>
+              ) : null}
             </div>
-        <div className="detail-header__main">
+        <div className="detail-header__main pc-order-data">
         <div className="detail-header__col-left">
+          <h3>Клиент</h3>
           <CustomerSelector
             orderId={selectedOrder.id}
             currentCustomerId={selectedOrder.customer_id}
@@ -633,8 +547,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             orderPrepayment={selectedOrder.prepaymentAmount}
             orderStatus={selectedOrder.status}
           />
-          
-          <div className="detail-meta-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        </div>
+        <div className="pc-order-work">
+          <h3>Работа по заказу</h3>
+          <div className="detail-meta-row">
             {((roleOnShift.length > 0 || roleAll.length > 0) && onAssigneesChange) ? (
               <>
                 <div className="detail-meta-field">
@@ -662,16 +578,6 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     all={roleAll}
                   />
                 </div>
-                <span className="detail-meta-divider" />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setTransferOpen(true)}
-                  title="Передать коллеге или в другой павильон"
-                >
-                  Передать
-                </Button>
                 <span className="detail-meta-divider" />
               </>
             ) : null}
@@ -727,7 +633,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
           </div>
         </div>
         <div className="detail-header__col-notes">
-          <label className="detail-notes-label">Примечания</label>
+          <h3>Примечания</h3>
           <textarea
             value={notesValue}
             onChange={handleNotesChange}
@@ -739,11 +645,12 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         </div>
       </div>
 
-      <ProgressBar
-        current={selectedOrder.status}
+      <StatusTrack
+        currentStatusId={Number(selectedOrder.status)}
         statuses={statuses}
         onStatusChange={handleStatusChange}
-        height="12px"
+        createdAt={selectedOrder.created_at}
+        readyAt={selectedOrder.actualCompletion ?? null}
       />
 
       <div className="detail-body">
@@ -804,7 +711,9 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       />
 
       <OrderTotal
-        variant="bar"
+        variant="passport"
+        discountPercent={discountPercent}
+        prepaymentUpdatedAt={selectedOrder.prepaymentUpdatedAt}
         subtotal={orderAmounts.subtotal}
         discountAmount={orderAmounts.discountAmount}
         total={orderAmounts.total}

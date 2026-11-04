@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, FormField, Modal } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
+import { OrderStamp } from '../../components/order/OrderStamp';
 import { getAdminEarnings, getAdminEarningsOrders, getCustomCalculatorPercent, updateCustomCalculatorPercent, getRoleOrderPercents, updateRoleOrderPercents, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus, type AdminEarningsOrderRow } from '../../api';
 import { earningRoleLabel } from './earnings/earningRoleLabel';
 import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
@@ -843,7 +844,7 @@ export const EarningsAdminPage: React.FC = () => {
                         >
                           <td className="earn-cell-name">{order.orderNumber}</td>
                           <td>
-                            <span className="earn-status-pill">{order.statusName}</span>
+                            <OrderStamp status={{ id: order.statusId, name: order.statusName }} />
                           </td>
                           <td>
                             {order.lastEarnedDate

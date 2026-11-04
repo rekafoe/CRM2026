@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Customer, Order } from '../../types';
 import { getCustomers, getCustomer, updateOrderCustomer, createCustomer, updateOrderPaymentChannel } from '../../api';
@@ -11,7 +11,7 @@ interface CustomerSelectorProps {
   currentCustomerId?: number | null;
   onCustomerChange?: () => void;
   onOrderPatch?: (orderId: number, patch: Partial<Order>) => void;
-  /** Inline: без лейбла, в одну строку с кнопками (Создать | Селект 160px | Поиск) */
+  /** Inline: без лейбла «Клиент» */
   inline?: boolean;
   /** Итог заказа: карточка баланса пересчитывается, когда сумма меняется. */
   orderTotal?: number | null;
@@ -34,6 +34,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [comboOpen, setComboOpen] = useState(false);
+  const comboRef = useRef<HTMLDivElement>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(currentCustomerId || null);
   const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const { addToast } = useToast();
@@ -93,6 +95,28 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
     };
   }, [selectedCustomerId]);
 
+  useEffect(() => {
+    if (!comboOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (comboRef.current && !comboRef.current.contains(event.target as Node)) {
+        setComboOpen(false);
+        setSearchQuery('');
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setComboOpen(false);
+        setSearchQuery('');
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [comboOpen]);
+
   // Обработка изменения клиента. customer — для автоподстановки канала оплаты (юрлицо → счёт).
   const handleCustomerChange = useCallback(async (customerId: number | null, customer?: Customer | null) => {
     try {
@@ -123,6 +147,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
       } else if (c?.type === 'individual') {
         await updateOrderPaymentChannel(orderId, 'cash');
       }
+      setComboOpen(false);
+      setSearchQuery('');
       addToast({
         type: 'success',
         title: 'Успешно',
@@ -153,39 +179,52 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   };
 
   const selectedCustomer = detailsCustomer?.id === selectedCustomerId ? detailsCustomer : null;
+  const selectedLabel = selectedCustomer
+    ? `${getCustomerDisplayName(selectedCustomer)}${selectedCustomer.phone ? ` (${selectedCustomer.phone})` : ''}`
+    : '';
 
   return (
       <div className={`customer-selector ${inline ? 'customer-selector--inline' : ''}`}>
       {!inline && <label className="customer-selector__label">Клиент</label>}
       <div className="customer-selector__row">
-        <select
-          value={selectedCustomerId || ''}
-          onChange={(e) => {
-            const value = e.target.value;
-            const id = value ? Number(value) : null;
-            const c = id ? customers.find((x) => x.id === id) : undefined;
-            handleCustomerChange(id, c);
-          }}
-          className="customer-selector__select"
-        >
-          <option value="">— Без клиента —</option>
-          {customers.map(customer => (
-            <option key={customer.id} value={customer.id}>
-              {getCustomerDisplayName(customer)}
-              {customer.phone ? ` (${customer.phone})` : ''}
-            </option>
-          ))}
-        </select>
-        <div className="customer-selector__search">
+        <div className="customer-selector__combo" ref={comboRef}>
           <input
             type="text"
-            placeholder="Поиск по имени, телефону, УНП..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="customer-selector__search-input"
+            role="combobox"
+            aria-expanded={comboOpen}
+            aria-autocomplete="list"
+            aria-label="Клиент"
+            className="customer-selector__combo-input"
+            placeholder={selectedLabel || 'Имя, телефон, УНП'}
+            value={comboOpen ? searchQuery : selectedLabel}
+            onFocus={() => {
+              setComboOpen(true);
+              setSearchQuery('');
+            }}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setComboOpen(true);
+            }}
           />
-          {searchQuery.trim().length > 0 && (
-            <div className="customer-selector__suggestions">
+          <button
+            type="button"
+            className="customer-selector__combo-toggle"
+            aria-label={comboOpen ? 'Закрыть список клиентов' : 'Открыть список клиентов'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              setComboOpen((open) => !open);
+              setSearchQuery('');
+            }}
+          />
+          {comboOpen && (
+            <div className="customer-selector__suggestions" role="listbox" onMouseDown={(event) => event.preventDefault()}>
+              <button
+                type="button"
+                className="customer-selector__suggestion"
+                onClick={() => handleCustomerChange(null)}
+              >
+                <span className="customer-selector__suggestion-name">Без клиента</span>
+              </button>
               {loading ? (
                 <div className="customer-selector__suggestion muted">Поиск...</div>
               ) : customers.length === 0 ? (
@@ -195,11 +234,10 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
                   <button
                     key={customer.id}
                     type="button"
-                    className="customer-selector__suggestion"
-                    onClick={() =>{
-                      handleCustomerChange(customer.id, customer);
-                      setSearchQuery('');
-                    }}
+                    role="option"
+                    aria-selected={customer.id === selectedCustomerId}
+                    className={`customer-selector__suggestion${customer.id === selectedCustomerId ? ' is-selected' : ''}`}
+                    onClick={() => handleCustomerChange(customer.id, customer)}
                   >
                     <span className="customer-selector__suggestion-name">
                       {getCustomerDisplayName(customer)}
@@ -214,7 +252,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
           )}
         </div>
         <button
-          onClick={() =>setShowCreateModal(true)}
+          type="button"
+          onClick={() => setShowCreateModal(true)}
           className="customer-selector__create"
         >
           Создать

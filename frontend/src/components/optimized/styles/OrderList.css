@@ -188,7 +188,7 @@
   height: 100%;
   border-radius: 2px;
   transition: width 0.3s ease;
-  background-color: var(--status-color-default);
+  background-color: var(--pc-accent);
 }
 
 /* Модификаторы прогресс-баров */

@@ -16,7 +16,7 @@ export type IconName =
   | 'search' | 'filter'
   | 'plus' | 'check' | 'x' | 'ban'
   | 'edit' | 'pencil' | 'trash' | 'copy'
-  | 'save' | 'refresh'
+  | 'save' | 'refresh' | 'loader'
   | 'print-action' | 'download'
   | 'camera' | 'image'
   | 'scissors' | 'layers'
@@ -202,6 +202,8 @@ const iconDefs: Record<IconName, IconDef> = {
     'M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16',
     'M8 16H3v5',
   ],
+  /** Lucide: loader-circle */
+  loader: ['M21 12a9 9 0 1 1-6.219-8.56'],
   'print-action': [
     'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2',
     'M6 9V3h12v6',

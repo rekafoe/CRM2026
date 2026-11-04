@@ -14,14 +14,14 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--pc-bg);
   z-index: 9999;
 }
 
 /* Spinner */
 .loading-spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #1976d2;
+  border: 4px solid var(--pc-surface-subtle);
+  border-top: 4px solid var(--pc-accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -52,7 +52,7 @@
 /* Message */
 .loading-message {
   margin: 0;
-  color: #666;
+  color: var(--pc-muted);
   font-size: 14px;
   font-weight: 500;
 }

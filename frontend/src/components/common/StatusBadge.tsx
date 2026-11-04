@@ -16,10 +16,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 }) => {
   const getColorClasses = (color: string) => {
     switch (color) {
-      case 'success': return 'bg-success text-white';
-      case 'warning': return 'bg-warning text-white';
-      case 'error': return 'bg-error text-white';
-      case 'info': return 'bg-info text-white';
+      case 'success': return 'bg-success text-success';
+      case 'warning': return 'bg-warning text-warning';
+      case 'error': return 'bg-error text-error';
+      case 'info': return 'bg-info text-info';
       default: return 'bg-secondary text-primary';
     }
   };
@@ -32,7 +32,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     }
   };
 
-  const baseClasses = 'inline-flex items-center rounded-full font-medium';
+  const baseClasses = 'inline-flex items-center rounded font-medium';
   const colorClasses = getColorClasses(color);
   const sizeClasses = getSizeClasses(size);
 

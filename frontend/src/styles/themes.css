@@ -1,149 +1,69 @@
-/* CSS переменные для темной и светлой темы - СЕРО-СИНИЕ ПАСТЕЛЬ */
+/* Прежние имена переменных — ссылки на токены styles/tokens.css. Тема переключается атрибутом data-theme на <html>. */
 :root {
-  /* Светлая тема (по умолчанию) - серый фон */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
-  --bg-hover: #f1f3f4;
-  --text-primary: #212529;
-  --text-secondary: #495057;
-  --text-disabled: #adb5bd;
-  --text-muted: #6c757d;
-  --border-color: #dee2e6;
-  --border-light: #f1f3f4;
-  --shadow: rgba(0, 0, 0, 0.08);
-  --shadow-light: rgba(0, 0, 0, 0.04);
+  --bg-primary: var(--pc-surface);
+  --bg-secondary: var(--pc-surface-sunken);
+  --bg-tertiary: var(--pc-surface-subtle);
+  --bg-hover: var(--pc-surface-subtle);
+  --text-primary: var(--pc-text);
+  --text-secondary: var(--pc-muted);
+  --text-disabled: var(--pc-text-disabled);
+  --text-muted: var(--pc-faint);
+  --border-color: var(--pc-border);
+  --border-light: var(--pc-surface-subtle);
+  --shadow: rgba(20, 22, 25, 0.08);
+  --shadow-light: rgba(20, 22, 25, 0.04);
 
-  /* Серо-синие пастельные акценты */
-  --accent-primary: #6c8eb8;
-  --accent-secondary: #8fa3c4;
-  --accent-light: #b8c9e0;
-  --accent-dark: #4a6a94;
+  --accent-primary: var(--pc-accent);
+  --accent-secondary: var(--pc-accent-hover);
+  --accent-light: var(--pc-accent-alt);
+  --accent-dark: var(--pc-accent-ink);
 
-  /* Пастельные состояния */
-  --success: #7a9a8a;
-  --warning: #a89b7a;
-  --error: #b88a8a;
-  --info: #7a9ab8;
+  --success: var(--pc-success-ink);
+  --warning: var(--pc-warning-ink);
+  --error: var(--pc-danger-ink);
+  --info: var(--pc-info-ink);
 
-  /* Расширенные цвета для состояний */
-  --success-light: #f8f9fa;
-  --success-border: #dee2e6;
-  --warning-light: #f8f9fa;
-  --warning-border: #dee2e6;
-  --error-light: #f8f9fa;
-  --error-border: #dee2e6;
-  --info-light: #f8f9fa;
-  --info-border: #dee2e6;
+  --success-light: var(--pc-success-soft);
+  --success-border: var(--pc-border);
+  --warning-light: var(--pc-warning-soft);
+  --warning-border: var(--pc-border);
+  --error-light: var(--pc-danger-soft);
+  --error-border: var(--pc-border);
+  --info-light: var(--pc-info-soft);
+  --info-border: var(--pc-border);
 
-  /* Цвета для текста */
-  --text-light: #6c757d;
-  --text-lighter: #adb5bd;
+  --text-light: var(--pc-faint);
+  --text-lighter: var(--pc-text-disabled);
 
-  /* Цвета для фонов */
-  --bg-warning: #f8f9fa;
-  --bg-success: #f8f9fa;
-  --bg-error: #f8f9fa;
-  --bg-info: #f8f9fa;
+  --bg-warning: var(--pc-warning-soft);
+  --bg-success: var(--pc-success-soft);
+  --bg-error: var(--pc-danger-soft);
+  --bg-info: var(--pc-info-soft);
 
-  /* Цвета для границ */
-  --border-warning: #dee2e6;
-  --border-success: #dee2e6;
-  --border-error: #dee2e6;
-  --border-info: #dee2e6;
+  --border-warning: var(--pc-border);
+  --border-success: var(--pc-border);
+  --border-error: var(--pc-border);
+  --border-info: var(--pc-border);
 
-  /* Цвета для изменений цен */
-  --price-increase: #4a6a94;
-  --price-decrease: #6c757d;
-  --price-neutral: #adb5bd;
+  --price-increase: var(--pc-accent-ink);
+  --price-decrease: var(--pc-muted);
+  --price-neutral: var(--pc-text-disabled);
 
-  /* Серо-синие пастельные кнопки и табы */
-  --btn-tab-bg: #e9ecef;
-  --btn-tab-bg-hover: #dee2e6;
-  --btn-tab-bg-active: #b8c9e0;
-  --btn-tab-text: #1f2937;
-  --btn-tab-text-active: #111827;
-  --btn-tab-border: #dee2e6;
-  --btn-primary-bg: #8fa3c4;
-  --btn-primary-bg-hover: #6c8eb8;
-  --btn-primary-text: #ffffff;
-}
-
-[data-theme="dark"] {
-  /* Темная тема - пастельная монохромная палитра */
-  --bg-primary: #1a1820;
-  --bg-secondary: #25222d;
-  --bg-tertiary: #302c3a;
-  --bg-hover: #2a2635;
-  --text-primary: #e8e4f0;
-  --text-secondary: #c4b8d8;
-  --text-disabled: #7a6b94;
-  --text-muted: #9b8ab8;
-  --border-color: #3d3551;
-  --border-light: #25222d;
-  --shadow: rgba(0, 0, 0, 0.3);
-  --shadow-light: rgba(0, 0, 0, 0.2);
-
-  /* Пастельные акценты (темная тема) */
-  --accent-primary: #b8a9d4;
-  --accent-secondary: #9b87c4;
-  --accent-light: #6b5b8a;
-  --accent-dark: #d4c8e8;
-
-  /* Пастельные кнопки и табы (темная тема) */
-  --btn-tab-bg: #302c3a;
-  --btn-tab-bg-hover: #3d3551;
-  --btn-tab-bg-active: #4a3d62;
-  --btn-tab-text: #c4b8d8;
-  --btn-tab-text-active: #e8e4f0;
-  --btn-tab-border: #3d3551;
-  --btn-primary-bg: #6b5b8a;
-  --btn-primary-bg-hover: #7a6b94;
-  --btn-primary-text: #e8e4f0;
-
-  /* Монохромные состояния (темная тема) */
-  --success: #b0b0b0;
-  --warning: #888888;
-  --error: #b0b0b0;
-  --info: #b0b0b0;
-
-  /* Расширенные цвета для состояний (темная тема) - монохромные */
-  --success-light: #1e1e1e;
-  --success-border: #333333;
-  --warning-light: #1e1e1e;
-  --warning-border: #333333;
-  --error-light: #1e1e1e;
-  --error-border: #333333;
-  --info-light: #1e1e1e;
-  --info-border: #333333;
-
-  /* Цвета для текста (темная тема) */
-  --text-light: #b0b0b0;
-  --text-lighter: #888888;
-
-  /* Цвета для фонов (темная тема) */
-  --bg-warning: #1e1e1e;
-  --bg-success: #1e1e1e;
-  --bg-error: #1e1e1e;
-  --bg-info: #1e1e1e;
-
-  /* Цвета для границ (темная тема) */
-  --border-warning: #333333;
-  --border-success: #333333;
-  --border-error: #333333;
-  --border-info: #333333;
-
-  /* Цвета для изменений цен (темная тема) - монохромные */
-  --price-increase: #b0b0b0;
-  --price-decrease: #888888;
-  --price-neutral: #666666;
+  --btn-tab-bg: var(--pc-surface-subtle);
+  --btn-tab-bg-hover: var(--pc-border);
+  --btn-tab-bg-active: var(--pc-accent-soft);
+  --btn-tab-text: var(--pc-text);
+  --btn-tab-text-active: var(--pc-accent-ink);
+  --btn-tab-border: var(--pc-border);
+  --btn-primary-bg: var(--pc-accent);
+  --btn-primary-bg-hover: var(--pc-accent-hover);
+  --btn-primary-text: var(--pc-on-accent);
 }
 
 /* Базовые стили с использованием CSS переменных */
 body {
-  background-color: var(--bg-primary);
+  background-color: var(--pc-bg);
   color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .card {
@@ -197,7 +117,7 @@ body {
   background-color: var(--bg-primary);
   border-color: var(--accent-primary);
   color: var(--text-primary);
-  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc-focus-ring) 18%, transparent);
 }
 
 /* Стили для таблиц */
