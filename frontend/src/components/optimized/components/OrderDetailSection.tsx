@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Order } from '../../../types';
-import { ProgressBar } from '../../order/ProgressBar';
+import { StatusTrack } from '../../order/StatusTrack';
 import './OrderDetailSection.css';
 import { OrderTotal } from '../../order/OrderTotal';
 import { MemoizedOrderItem } from '../MemoizedOrderItem';
@@ -739,11 +739,12 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         </div>
       </div>
 
-      <ProgressBar
-        current={selectedOrder.status}
+      <StatusTrack
+        currentStatusId={Number(selectedOrder.status)}
         statuses={statuses}
         onStatusChange={handleStatusChange}
-        height="12px"
+        createdAt={selectedOrder.created_at}
+        readyAt={selectedOrder.actualCompletion ?? null}
       />
 
       <div className="detail-body">

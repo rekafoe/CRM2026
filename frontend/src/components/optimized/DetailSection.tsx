@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order, Item } from '../../types';
-import { ProgressBar } from '../order/ProgressBar';
+import { StatusTrack } from '../order/StatusTrack';
 import { OrderTotal } from '../order/OrderTotal';
 import { OrderHeader } from './OrderHeader';
 import { OrderMeta } from './OrderMeta';
@@ -91,13 +91,14 @@ export const DetailSection: React.FC<DetailSectionProps> = ({
         />
       </div>
 
-      <ProgressBar
-        current={selectedOrder.status}
+      <StatusTrack
+        currentStatusId={Number(selectedOrder.status)}
         statuses={statuses}
-        onStatusChange={async (newStatus) => {
-          await onUpdateOrderStatus(selectedOrder.id, newStatus);
+        onStatusChange={(newStatus) => {
+          void onUpdateOrderStatus(selectedOrder.id, newStatus);
         }}
-        height="12px"
+        createdAt={selectedOrder.created_at}
+        readyAt={selectedOrder.actualCompletion ?? null}
       />
 
       <OrderContent

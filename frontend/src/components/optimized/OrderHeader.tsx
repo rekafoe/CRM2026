@@ -1,5 +1,6 @@
 import React from 'react';
 import { Order } from '../../types';
+import { OrderStamp } from '../order/OrderStamp';
 
 interface OrderHeaderProps {
   order: Order;
@@ -12,21 +13,16 @@ export const OrderHeader: React.FC<OrderHeaderProps> = ({
   onShowFilesModal,
   onShowPrepaymentModal,
 }) => {
-  const showCancelled = Number(order.status) === 0 && Number((order as any).is_cancelled || 0) === 1;
+  const showCancelled = Number(order.is_cancelled || 0) === 1;
   return (
     <div className="detail-header-content">
       <div className="detail-header-title">
         <h2>{order.number}</h2>
         {showCancelled && (
-          <span style={{
-            marginLeft: '8px',
-            padding: '2px 6px',
-            borderRadius: '6px',
-            background: '#ef5350',
-            color: 'white',
-            fontSize: '12px',
-            fontWeight: 600
-          }}>Отменён (online)</span>
+          <OrderStamp
+            status={{ id: Number(order.status) || 0, name: 'Отменён', code: 'cancelled' }}
+            onlineCancelled
+          />
         )}
         <div className="detail-header-actions">
           <button 

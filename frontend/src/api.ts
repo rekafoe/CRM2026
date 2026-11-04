@@ -1009,7 +1009,7 @@ export const createShift = (data: { user_id?: number; date?: string; hours: numb
 export const updateShift = (id: number, data: { hours?: number; comment?: string; date?: string }) =>
   api.put(`/shifts/${id}`, data);
 
-export const getOrderStatuses = () => api.get<Array<{ id: number; name: string; color?: string; sort_order: number }>>('/order-statuses');
+export const getOrderStatuses = () => api.get<Array<{ id: number; name: string; color?: string; code?: string | null; sort_order: number }>>('/order-statuses');
 
 // Files API
 export const listOrderFiles = (orderId: number) => api.get<OrderFile[]>(`/orders/${orderId}/files`);
