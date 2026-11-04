@@ -1875,9 +1875,9 @@
 }
 
 .order-pool-sidebar {
-  flex: 1 1 auto;
-  width: auto;
-  max-width: none;
+  flex: 0 0 30%;
+  width: 30%;
+  max-width: 30%;
   min-width: 0;
   background: transparent;
   border: none;
@@ -1886,10 +1886,10 @@
 }
 
 .order-pool-detail {
-  flex: 0 0 440px;
-  width: 440px;
-  min-width: 420px;
-  max-width: 480px;
+  flex: 0 0 70%;
+  width: 70%;
+  min-width: 0;
+  max-width: 70%;
   background: var(--pc-surface, #fff);
   border-left: 1px solid var(--pc-border, #e2dfd7);
   padding: 12px 14px 24px;
@@ -2102,6 +2102,7 @@
 @media (max-width: 768px) {
   .order-pool-sidebar {
     width: 100%;
+    max-width: none;
     flex: 0 0 auto;
   }
 
