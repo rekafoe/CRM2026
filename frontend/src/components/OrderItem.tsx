@@ -449,6 +449,22 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   const filteredParameterChips = useMemo(() => {
     return filterOperatorVisibleParameters(parameterSummary);
   }, [parameterSummary]);
+  const techCardRows = useMemo(() => {
+    const visible = filterOperatorVisibleParameters(parameterSummary);
+    const extra = parameterSummary.filter((row) => {
+      const label = String(row.label || row.key || '');
+      if (!/ламинац|рулон/i.test(label)) return false;
+      const value = String(row.value || '').trim();
+      if (!value || value === 'нет') return false;
+      return !visible.some((item) => item.label === row.label && String(item.value) === value);
+    });
+    const rows = [...visible, ...extra];
+    const characteristics = String((item.params as { characteristics?: unknown })?.characteristics || '').trim();
+    if (characteristics && !rows.some((row) => String(row.value || '').trim() === characteristics)) {
+      rows.push({ label: 'Характеристики', value: characteristics });
+    }
+    return rows;
+  }, [parameterSummary, item.params]);
 
   /** Формат / тираж для строки без таблицы и для шапки таблицы разбивки */
   const titleParts = useMemo(() => {
@@ -837,7 +853,22 @@ export const OrderItem: React.FC<OrderItemProps> = ({
           </span>
           <span className="order-position__executor">{executorLabel}</span>
         </div>
-        {expanded ? <div className="order-position__panel">{details}</div> : null}
+        {expanded ? (
+          <div className="order-position__panel">
+            {techCardRows.length > 0 ? (
+              <div className="pc-spec-list" aria-label="Техкарта позиции">
+                {techCardRows.map((row) => (
+                  <div className="pc-spec-row" key={`${row.label}-${row.value}`}>
+                    <span className="pc-spec-row__label">{row.label}</span>
+                    <span className="pc-spec-row__leader" aria-hidden="true" />
+                    <span className="pc-spec-row__value">{String(row.value)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {details}
+          </div>
+        ) : null}
       </div>
     );
   }

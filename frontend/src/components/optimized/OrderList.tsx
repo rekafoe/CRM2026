@@ -37,12 +37,6 @@ const OrderItemStatus = memo<{
         status={statusInfo ?? { id: status, name: `Статус ${status}` }}
         onlineCancelled={onlineCancelled}
       />
-      <div className="status-bar">
-        <div
-          className="status-bar__fill"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
     </div>
   );
 });

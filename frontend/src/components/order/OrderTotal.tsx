@@ -16,7 +16,9 @@ export interface OrderAmountsDisplayProps {
   /** Скрыть блок предоплаты/долга (если показывается отдельно, напр. в пуле заказов) */
   showPaymentBreakdown?: boolean;
   /** Полоска под списком позиций: итог, предоплата и долг в один ряд */
-  variant?: 'stack' | 'bar';
+  variant?: 'stack' | 'bar' | 'passport';
+  discountPercent?: number;
+  prepaymentUpdatedAt?: string | null;
 }
 
 const bynAmount = (n: number) =>
@@ -39,6 +41,8 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
   debt: debtFromApi,
   showPaymentBreakdown = true,
   variant = 'stack',
+  discountPercent = 0,
+  prepaymentUpdatedAt,
 }) => {
   const disc = discountAmount;
   const rate = Number(taxRate) || 0;
@@ -49,6 +53,41 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
       ? debtFromApi
       : Math.max(0, Math.round((total - prepayment) * 100) / 100);
   const isPaid = isPaidPrepaymentStatus(prepaymentStatus) || String(prepaymentStatus ?? '').toLowerCase() === 'bank';
+
+  if (variant === 'passport') {
+    const paidNote = isPaid && prepayment > 0 ? 'оплачено' : '';
+    const paidDate = prepaymentUpdatedAt
+      ? new Date(prepaymentUpdatedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+      : '';
+    const prepayNote = [paidNote, paidDate && !Number.isNaN(new Date(prepaymentUpdatedAt || '').getTime()) ? paidDate : '']
+      .filter(Boolean)
+      .join(' · ');
+    return (
+      <div className="pc-passport">
+        <div className="pc-passport__cell">
+          <span className="pc-passport__label">Подытог</span>
+          <span className="pc-passport__value"><BynValue>{subtotal}</BynValue></span>
+        </div>
+        <div className="pc-passport__cell">
+          <span className="pc-passport__label">{discountPercent > 0 ? `Скидка ${discountPercent}%` : 'Скидка'}</span>
+          <span className="pc-passport__value"><BynValue>{disc}</BynValue></span>
+        </div>
+        <div className="pc-passport__cell">
+          <span className="pc-passport__label">Предоплата</span>
+          <span className="pc-passport__value"><BynValue>{prepayment}</BynValue></span>
+          {prepayNote ? <span className="pc-passport__note">{prepayNote}</span> : null}
+        </div>
+        <div className={`pc-passport__cell${debt > 0 ? ' pc-passport__cell--debt' : ''}`}>
+          <span className="pc-passport__label">Остаток к выдаче</span>
+          <span className="pc-passport__value"><BynValue>{debt}</BynValue></span>
+        </div>
+        <div className="pc-passport__cell pc-passport__cell--total">
+          <span className="pc-passport__label">Итого</span>
+          <span className="pc-passport__value"><BynValue>{total}</BynValue></span>
+        </div>
+      </div>
+    );
+  }
 
   if (variant === 'bar') {
     return (

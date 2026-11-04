@@ -1,5 +1,7 @@
  .customer-selector {
-   margin-bottom: 16px;
+   margin-bottom: 8px;
+   min-width: 0;
+   max-width: 100%;
  }
 
  .customer-selector__label {
@@ -12,44 +14,52 @@
  
  .customer-selector__row {
    display: flex;
-   gap: 10px;
+   gap: 8px;
    align-items: center;
+   min-width: 0;
+   max-width: 100%;
  }
- 
- /* Селект и поиск — как кнопки: 10px радиус, тень, без увеличения */
- .customer-selector__select {
-   width: 300px;
-   flex: 0 0 300px;
-   padding: 8px 36px 8px 12px;
-   appearance: none;
-   background-color: #fff;
-   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-   background-repeat: no-repeat;
-   background-position: right 12px center;
- }
- 
- .customer-selector__search {
+
+ .customer-selector__combo {
    position: relative;
-   width: 220px;
-   flex-shrink: 0;
+   flex: 1 1 auto;
+   min-width: 0;
  }
- 
- .customer-selector__search-input {
+
+ .customer-selector__combo-input {
    width: 100%;
+   height: 32px;
+   padding-right: 28px;
+ }
+
+ .customer-selector__combo-toggle {
+   position: absolute;
+   top: 1px;
+   right: 1px;
+   width: 28px;
+   height: 30px;
+   border: none;
+   border-radius: 0 6px 6px 0;
+   background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center no-repeat;
+   cursor: pointer;
  }
  
  .customer-selector__suggestions {
    position: absolute;
-   top: calc(100% + 6px);
+   top: calc(100% + 4px);
    left: 0;
    right: 0;
-   background: #fff;
-   border: 1px solid #e5e7eb;
+   background: var(--pc-surface, #fff);
+   border: 1px solid var(--pc-border, #e5e7eb);
    border-radius: 8px;
-   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+   box-shadow: var(--pc-shadow-pop, 0 4px 12px rgba(0, 0, 0, 0.08));
    max-height: 260px;
    overflow: auto;
-   z-index: 20;
+   z-index: 40;
+ }
+
+ .customer-selector__suggestion.is-selected {
+   background: var(--pc-accent-soft, #f1f4fc);
  }
  
  .customer-selector__suggestion {
@@ -85,6 +95,7 @@
  }
  
 .customer-selector__create {
+  flex: none;
   padding: 8px 16px;
   background: #4a6a94;
   color: #fff;
