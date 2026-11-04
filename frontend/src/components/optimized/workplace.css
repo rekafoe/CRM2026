@@ -348,6 +348,110 @@
   text-transform: uppercase;
 }
 
+.pc-order-data .detail-notes-input {
+  height: auto;
+  min-height: 72px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--pc-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  box-shadow: none;
+}
+
+.pc-order-data .detail-notes-input:hover,
+.pc-order-data .detail-notes-input:focus {
+  outline: none;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.pc-order-data .detail-notes-input::placeholder {
+  color: var(--pc-faint);
+}
+
+.pc-order-data .legal-ledger-card {
+  max-width: none;
+  margin-top: 10px;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--pc-text);
+  box-shadow: none;
+}
+
+.pc-order-data .legal-ledger-card--muted {
+  color: var(--pc-muted);
+}
+
+.pc-order-data .legal-ledger-card table,
+.pc-order-data .legal-ledger-card tbody {
+  display: block;
+  width: 100%;
+}
+
+.pc-order-data .legal-ledger-card tr {
+  display: grid;
+  grid-template-columns: max-content minmax(16px, 1fr) minmax(0, 1.6fr);
+  align-items: baseline;
+  gap: 0 10px;
+  padding: 3px 0;
+}
+
+.pc-order-data .legal-ledger-card tr::after {
+  content: "";
+  grid-column: 2;
+  border-bottom: 1px dotted var(--pc-border-strong);
+  transform: translateY(-3px);
+}
+
+.pc-order-data .legal-ledger-card th,
+.pc-order-data .legal-ledger-card td {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.pc-order-data .legal-ledger-card th {
+  width: auto;
+  color: var(--pc-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.pc-order-data .legal-ledger-card td {
+  grid-column: 3;
+  min-width: 0;
+  color: var(--pc-text);
+  font-size: 13px;
+  text-align: right;
+  white-space: normal;
+}
+
+.pc-order-data .legal-ledger-card__debt {
+  background: none;
+  color: var(--pc-danger-ink);
+  font-weight: 600;
+}
+
+.pc-order-data .legal-ledger-card__ok {
+  background: none;
+  color: var(--pc-success-ink);
+  font-weight: 600;
+}
+
+.pc-order-data .legal-ledger-card__caption {
+  color: var(--pc-faint);
+}
+
 .pc-passport {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

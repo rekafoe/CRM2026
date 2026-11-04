@@ -48,6 +48,11 @@ export function buildOrderItemEssence(item: Item): string {
   const binding = summaryValue(summary, /перепл|скрепл|пружин|скрепк/i);
   if (binding) parts.push(binding);
 
+  const characteristics = typeof params?.characteristics === 'string' ? params.characteristics.trim() : '';
+  if (characteristics && !parts.some((part) => part.includes(characteristics))) {
+    parts.push(characteristics);
+  }
+
   if (parts.length > 0) return parts.join(', ');
 
   const desc = sanitizeOrderItemDescription(String(params?.description || ''), item.type);
