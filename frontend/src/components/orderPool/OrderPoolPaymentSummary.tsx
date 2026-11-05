@@ -8,6 +8,8 @@ interface OrderPoolPaymentSummaryProps {
   prepay: number;
   debt: number;
   onCopyPaymentUrl: () => void;
+  /** Только ссылка BePaid, без плашки оплаты. */
+  linkOnly?: boolean;
 }
 
 export const OrderPoolPaymentSummary: React.FC<OrderPoolPaymentSummaryProps> = ({
@@ -15,8 +17,27 @@ export const OrderPoolPaymentSummary: React.FC<OrderPoolPaymentSummaryProps> = (
   prepay,
   debt,
   onCopyPaymentUrl,
+  linkOnly = false,
 }) => {
   const payment = getPoolPaymentInfo(order);
+
+  if (linkOnly) {
+    if (!order.paymentUrl) return null;
+    return (
+      <div className="order-detail-payment__url pool-passport__paylink">
+        <a href={order.paymentUrl} target="_blank" rel="noreferrer">
+          BePaid
+        </a>
+        <button
+          type="button"
+          className="lg-btn order-detail-payment__copy"
+          onClick={onCopyPaymentUrl}
+        >
+          Копировать ссылку
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="order-detail-payment">
