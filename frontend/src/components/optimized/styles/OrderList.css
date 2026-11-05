@@ -34,9 +34,9 @@
 }
 
 .order-list .order-item.active {
-  border-color: #1976d2;
-  outline: 2px solid rgba(25, 118, 210, 0.15);
-  background: #f0f7ff;
+  border-color: var(--pc-accent, #1976d2);
+  outline: 2px solid color-mix(in srgb, var(--pc-accent, #1976d2) 18%, transparent);
+  background: var(--pc-row-selected, #f0f7ff);
 }
 
 .order-list .order-item.order-item--executor {

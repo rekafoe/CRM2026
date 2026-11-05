@@ -192,10 +192,10 @@
 
 .pc-order-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    'eyebrow'
-    'title';
+    'eyebrow eyebrow'
+    'title actions';
   gap: 4px 16px;
   align-items: center;
   margin-bottom: 8px;
@@ -203,23 +203,32 @@
 
 .pc-track-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px 16px;
   margin: 2px 0 8px;
+  width: 100%;
+  min-width: 0;
 }
 
-.pc-track-row .pc-btn {
+.pc-track-row .pc-btn,
+.pc-order-head__actions .pc-btn {
   white-space: nowrap;
 }
 
 .pc-track-row .pc-track {
+  grid-column: 1;
   min-width: 0;
   padding-top: 0;
 }
 
-.pc-track-row__end {
-  width: 132px;
+.pc-track-row .pc-track:last-child {
+  grid-column: 1 / -1;
+}
+
+.pc-track-row__issue {
+  grid-column: 2;
+  justify-self: end;
 }
 
 .pc-order-head__eyebrow {
@@ -548,17 +557,16 @@
 
 @media (max-width: 1100px) {
   .pc-track-row {
-    grid-template-columns: auto auto;
-    justify-content: space-between;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .pc-track-row .pc-track {
-    grid-column: 1 / -1;
-    order: -1;
+    grid-column: 1;
+    order: 0;
   }
 
-  .pc-track-row__end {
-    width: 0;
+  .pc-track-row .pc-track:last-child {
+    grid-column: 1 / -1;
   }
 
   .pc-order-data {
