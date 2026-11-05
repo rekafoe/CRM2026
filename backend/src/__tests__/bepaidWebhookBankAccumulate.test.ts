@@ -88,4 +88,32 @@ describe('POST /api/webhooks/bepaid bank accumulate', () => {
     expect(res.status).toBe(204)
     expect(runMock).not.toHaveBeenCalled()
   })
+
+  it('does not SET-wipe invoice bank when there is no open checkout', async () => {
+    getMock.mockResolvedValueOnce({
+      id: 57,
+      prepaymentAmount: 200,
+      prepaymentStatus: 'bank',
+      paymentUrl: null,
+      paymentId: null,
+    })
+
+    const app = createApp()
+    const res = await request(app)
+      .post('/api/webhooks/bepaid')
+      .send({
+        transaction: {
+          uid: 'tx-stale-1',
+          status: 'successful',
+          amount: 5000,
+          tracking_id: 'ORD-0057',
+        },
+      })
+
+    expect(res.status).toBe(204)
+    const paidCall = runMock.mock.calls.find((c) => String(c[0]).includes("prepaymentStatus = 'paid'"))
+    expect(paidCall).toBeTruthy()
+    // Keep collected 200; do not replace with stale BePaid 50
+    expect(paidCall?.[1]).toBe(200)
+  })
 })
