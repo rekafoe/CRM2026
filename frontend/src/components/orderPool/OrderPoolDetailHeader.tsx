@@ -18,13 +18,11 @@ import { OrderPoolPaymentSummary } from './OrderPoolPaymentSummary';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 import { Menu, MenuItem } from '../ui/Menu';
 import { OrderStamp } from '../order/OrderStamp';
-import { MoneyAmount } from '../ui';
 import { AppIcon } from '../ui/AppIcon';
 
 interface OrderPoolDetailHeaderProps {
   order: Order;
   currentUserId: number;
-  total: number;
   prepay: number;
   debt: number;
   onCopyPaymentUrl: () => void;
@@ -73,7 +71,6 @@ function invoiceLine(channel?: string | null): string {
 
 export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   order,
-  total,
   prepay,
   debt,
   onCopyPaymentUrl,
@@ -161,9 +158,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
         <div className="pool-passport__tags">
           {needsAssign ? <span className="pc-order-tag pc-order-tag--open">Без ответственного</span> : null}
           {channel ? <span className="pc-order-tag">{channel}</span> : null}
-          {payment.tone === 'pending' || payment.tone === 'failed' ? (
-            <span className="pc-order-tag">{payment.badge}</span>
-          ) : null}
+          {payment.tone !== 'none' ? <span className="pc-order-tag">{payment.badge}</span> : null}
         </div>
 
         <div className="pool-passport__section">Клиент</div>
@@ -223,6 +218,11 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
               ) : null}
             </span>
           </div>
+          <div className="pc-spec-row">
+            <span className="pc-spec-row__label">Счёт</span>
+            <span className="pc-spec-row__leader" />
+            <span className="pc-spec-row__value">{invoiceLine(order.payment_channel)}</span>
+          </div>
         </div>
 
         {(showFulfillmentBanner || showDeliveryDetails || showFulfillmentPoint) ? (
@@ -275,30 +275,6 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
       </div>
 
       {children}
-
-      <div className="pool-passport__section">Оплата</div>
-      <div className="pc-spec-list pool-passport__pay">
-        <div className="pc-spec-row pc-spec-row--total">
-          <span className="pc-spec-row__label">Итого</span>
-          <span className="pc-spec-row__leader" />
-          <span className="pc-spec-row__value"><MoneyAmount value={total} /></span>
-        </div>
-        <div className="pc-spec-row">
-          <span className="pc-spec-row__label">Предоплата</span>
-          <span className="pc-spec-row__leader" />
-          <span className="pc-spec-row__value"><MoneyAmount value={prepay} /></span>
-        </div>
-        <div className="pc-spec-row">
-          <span className="pc-spec-row__label">Счёт</span>
-          <span className="pc-spec-row__leader" />
-          <span className="pc-spec-row__value">{invoiceLine(order.payment_channel)}</span>
-        </div>
-        <div className={`pc-spec-row${debt > 0 ? ' is-due' : ''}`}>
-          <span className="pc-spec-row__label">Долг</span>
-          <span className="pc-spec-row__leader" />
-          <span className="pc-spec-row__value"><MoneyAmount value={debt} /></span>
-        </div>
-      </div>
 
       <OrderPoolPaymentSummary
         order={order}
