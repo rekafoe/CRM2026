@@ -1986,14 +1986,25 @@
   min-height: 0;
   min-width: 0;
   padding: 0 8px 12px;
-  overflow: auto;
+  overflow-x: scroll;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.pool-sheet-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.pool-sheet-wrap::-webkit-scrollbar-thumb {
+  background: var(--pc-border-strong, #d0ccc2);
+  border-radius: 6px;
 }
 
 .pool-sheet {
-  width: 100%;
-  min-width: 0;
+  width: max-content;
+  min-width: 960px;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
   font-size: 13px;
 }
 
@@ -2024,6 +2035,8 @@
   padding: 8px;
   border-bottom: 1px solid var(--pc-border, #e2dfd7);
   vertical-align: top;
+  overflow: visible;
+  white-space: nowrap;
 }
 
 .pool-sheet__row {
@@ -2092,9 +2105,8 @@
 }
 
 .pool-sheet__composition {
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: none;
+  overflow: visible;
   white-space: nowrap;
 }
 
@@ -2642,14 +2654,34 @@
   padding: 0;
 }
 
-.pool-sheet th:nth-child(1) { width: 16%; }
-.pool-sheet th:nth-child(2) { width: 18%; }
-.pool-sheet th:nth-child(3) { width: 22%; }
-.pool-sheet th:nth-child(4) { width: 12%; }
-.pool-sheet th:nth-child(5) { width: 12%; }
+.pool-sheet th,
+.pool-sheet td {
+  white-space: nowrap;
+}
+
+.pool-sheet th:nth-child(1),
+.pool-sheet td:nth-child(1) { min-width: 128px; }
+.pool-sheet th:nth-child(2),
+.pool-sheet td:nth-child(2) { min-width: 156px; }
+.pool-sheet th:nth-child(3),
+.pool-sheet td:nth-child(3) { min-width: 200px; }
+.pool-sheet th:nth-child(4),
+.pool-sheet td:nth-child(4) { min-width: 118px; }
+.pool-sheet th:nth-child(5),
+.pool-sheet td:nth-child(5) { min-width: 124px; }
 .pool-sheet th:nth-child(6),
-.pool-sheet th:nth-child(7) { width: 8%; }
-.pool-sheet th:nth-child(8) { width: 72px; }
+.pool-sheet td:nth-child(6),
+.pool-sheet th:nth-child(7),
+.pool-sheet td:nth-child(7) { min-width: 88px; }
+.pool-sheet th:nth-child(8),
+.pool-sheet td:nth-child(8) { min-width: 76px; }
+
+.pool-sheet .pc-stamp,
+.pool-sheet .pc-stamp__label {
+  overflow: visible;
+  max-width: none;
+  text-overflow: unset;
+}
 
 .pool-sheet__meta {
   text-transform: uppercase;
@@ -2664,13 +2696,12 @@
 
 .pool-sheet__composition {
   max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
   white-space: nowrap;
 }
 
-.pool-sheet td {
-  overflow: hidden;
+.pool-sheet__take {
+  white-space: nowrap;
 }
 
 .order-pool-detail .pc-order-tag {
