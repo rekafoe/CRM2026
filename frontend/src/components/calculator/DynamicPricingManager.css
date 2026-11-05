@@ -1,7 +1,7 @@
 .dynamic-pricing-modal {
-  width: 95vw !important;
-  max-width: 1400px !important;
-  height: 90vh !important;
+  width: 95vw;
+  max-width: 1400px;
+  height: 90vh;
 }
 
 .dynamic-pricing-content {

@@ -37,8 +37,8 @@
 }
 
 .customer-detail-projects__meta {
-  color: #64748b !important;
-  font-size: 12px !important;
+  color: #64748b;
+  font-size: 12px;
 }
 
 .customer-detail-projects--loading,

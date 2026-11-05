@@ -19,7 +19,7 @@
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: #ecfeff;
   color: #0e7490;
   font-size: 12px;
@@ -231,7 +231,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: #fff;
   color: #334155;
   font-size: 12px;

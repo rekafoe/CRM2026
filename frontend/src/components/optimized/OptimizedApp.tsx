@@ -780,7 +780,6 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         /* Модалка счётчиков принтеров и кассы — визуальные улучшения */
         .counters-modal-overlay {
           background: rgba(0, 0, 0, 0.45);
-          backdrop-filter: blur(4px);
           padding: 24px;
         }
         
@@ -917,7 +916,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 type="button"
                 aria-label="Закрыть"
               >
-                ✕
+                <AppIcon name="x" size="xs" />
               </button>
             </div>
             <div className="new-order-management-content">

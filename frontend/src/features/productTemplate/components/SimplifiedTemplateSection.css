@@ -80,17 +80,17 @@
 
 /* Для simplified убираем визуальный "разрез" между вкладками и контентом */
 .simplified-template .simplified-template__editor-tabs.product-tabs {
-  border-bottom: none !important;
-  border-radius: 12px !important;
+  border-bottom: none;
+  border-radius: 12px;
   padding-bottom: 2px;
 }
 
 .simplified-template .simplified-template__editor-tabs .product-tab {
-  border-radius: 999px !important;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .simplified-template .simplified-template__editor-tabs .product-tab--active::after {
-  display: none !important;
+  display: none;
 }
 
 .simplified-card--inline-calculator .simplified-card__content {
@@ -139,8 +139,8 @@
 /* Кнопки в стиле админки: чистые, без тяжёлого вида */
 .simplified-template__save-btn,
 .simplified-template .simplified-template__header-actions .btn {
-  background: #3b82f6 !important;
-  color: #fff !important;
+  background: #3b82f6;
+  color: #fff;
   border: none;
   padding: 10px 20px;
   border-radius: 6px;
@@ -151,19 +151,19 @@
 }
 .simplified-template__save-btn:hover:not(:disabled),
 .simplified-template .simplified-template__header-actions .btn:hover:not(:disabled) {
-  background: #2563eb !important;
+  background: #2563eb;
 }
 .simplified-template__save-btn:disabled,
 .simplified-template .simplified-template__header-actions .btn:disabled {
-  background: #94a3b8 !important;
+  background: #94a3b8;
   cursor: not-allowed;
 }
 
 .simplified-template__action-btn,
 .simplified-template__sizes-actions .btn {
-  background: #fff !important;
-  color: #374151 !important;
-  border: 1px solid #d1d5db !important;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
   padding: 8px 14px;
   border-radius: 6px;
   font-size: 13px;
@@ -173,57 +173,57 @@
 }
 .simplified-template__action-btn:hover,
 .simplified-template__sizes-actions .btn:hover {
-  background: #f9fafb !important;
-  border-color: #9ca3af !important;
+  background: #f9fafb;
+  border-color: #9ca3af;
 }
 
 /* Все кнопки в упрощённом шаблоне: убираем серый фон с чёрным текстом */
 .simplified-template .btn-secondary,
 .simplified-template__types .btn-secondary,
 .simplified-template .btn[class*="secondary"] {
-  background: #fff !important;
-  color: #3b82f6 !important;
-  border: 1px solid #3b82f6 !important;
+  background: #fff;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
 }
 .simplified-template .btn-secondary:hover:not(:disabled),
 .simplified-template__types .btn-secondary:hover:not(:disabled),
 .simplified-template .btn[class*="secondary"]:hover:not(:disabled) {
-  background: #eff6ff !important;
-  border-color: #2563eb !important;
-  color: #2563eb !important;
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #2563eb;
 }
 .simplified-template .btn-secondary:disabled,
 .simplified-template__types .btn-secondary:disabled {
-  background: #f1f5f9 !important;
-  color: #94a3b8 !important;
-  border-color: #e2e8f0 !important;
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
 }
 
 .simplified-template .btn-primary,
 .simplified-template .btn[class*="primary"] {
-  background: #3b82f6 !important;
-  color: #fff !important;
-  border: none !important;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
 }
 .simplified-template .btn-primary:hover:not(:disabled),
 .simplified-template .btn[class*="primary"]:hover:not(:disabled) {
-  background: #2563eb !important;
+  background: #2563eb;
 }
 .simplified-template .btn-primary:disabled,
 .simplified-template .btn[class*="primary"]:disabled {
-  background: #94a3b8 !important;
-  color: #fff !important;
+  background: #94a3b8;
+  color: #fff;
 }
 
 .simplified-template .btn-error,
 .simplified-template .btn[class*="error"] {
-  background: #dc2626 !important;
-  color: #fff !important;
-  border: none !important;
+  background: #dc2626;
+  color: #fff;
+  border: none;
 }
 .simplified-template .btn-error:hover:not(:disabled),
 .simplified-template .btn[class*="error"]:hover:not(:disabled) {
-  background: #b91c1c !important;
+  background: #b91c1c;
 }
 
 /* Модалки внутри simplified-template (добавить размер, скопировать) */
@@ -235,19 +235,19 @@
 }
 .simplified-add-size .btn-secondary,
 .simplified-add-size__actions .btn-secondary {
-  background: #fff !important;
-  color: #3b82f6 !important;
-  border: 1px solid #3b82f6 !important;
+  background: #fff;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
 }
 .simplified-add-size .btn-secondary:hover:not(:disabled),
 .simplified-add-size__actions .btn-secondary:hover:not(:disabled) {
-  background: #eff6ff !important;
+  background: #eff6ff;
 }
 .simplified-add-size .btn-primary,
 .simplified-add-size__actions .btn-primary {
-  background: #3b82f6 !important;
-  color: #fff !important;
-  border: none !important;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
 }
 
 .simplified-size {
@@ -271,7 +271,7 @@
   width: 20px;
   height: 20px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: #fee2e2;
   color: #dc2626;
   font-size: 14px;
@@ -320,7 +320,7 @@
 .simplified-label-hint {
   width: 16px;
   height: 16px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   border: 1px solid #cbd5e1;
   color: #64748b;
   font-size: 11px;
@@ -338,18 +338,18 @@
 }
 
 .simplified-card--size .simplified-size-input {
-  width: 150px !important;
-  min-width: 150px !important;
-  max-width: 150px !important;
+  width: 150px;
+  min-width: 150px;
+  max-width: 150px;
   height: 32px;
   padding: 5px 8px;
   font-size: 13px;
 }
 
 .simplified-card--size .simplified-size-input--name {
-  width: 140px !important;
-  min-width: 140px !important;
-  max-width: 140px !important;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
 }
 
 .simplified-template__editor {
@@ -665,7 +665,7 @@
   border-bottom: 1px solid var(--border-color, #e2e8f0);
   background: var(--bg-primary, #fff);
   flex-shrink: 0;
-  padding: 6px 8px !important;
+  padding: 6px 8px;
   gap: 0.5rem;
 }
 
@@ -686,21 +686,21 @@
 .simplified-template__type-edit-modal.modal-content {
   display: flex;
   flex-direction: column;
-  max-width: min(1200px, 98vw) !important;
+  max-width: min(1200px, 98vw);
   width: 100%;
   /* Почти весь экран — без лишнего внутреннего скролла из-за заниженного потолка */
-  max-height: 98vh !important;
+  max-height: 98vh;
   /* utilities.css задаёт overflow: auto — убираем лишнюю полосу прокрутки у всего окна */
-  overflow: hidden !important;
+  overflow: hidden;
   /* Сброс второй тени из utilities.css, оставляем одну у .simplified-template__type-edit-modal */
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.22) !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.22);
   border: none;
 }
 
 /* base/modals.css: .modal-body { max-height: calc(90vh - 140px) } — сбрасываем. */
 .simplified-template__type-edit-modal .modal-body {
-  padding: 0 !important;
-  max-height: none !important;
+  padding: 0;
+  max-height: none;
   overflow: visible;
   display: flex;
   flex-direction: column;
@@ -869,7 +869,7 @@
   margin: 0;
   padding: 6px 12px;
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: #fff;
   cursor: pointer;
   font-size: 13px;
@@ -1242,12 +1242,10 @@
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.36);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 14px 34px rgba(15, 23, 42, 0.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .simplified-size-modal .modal-header {
-  padding: 14px 18px !important;
+  padding: 14px 18px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.28);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(248, 250, 252, 0.65) 100%);
 }
@@ -1265,35 +1263,35 @@
   height: 32px;
   min-height: 32px;
   min-width: 32px;
-  padding: 0 !important;
-  border-radius: 8px !important;
-  border: 1px solid rgba(148, 163, 184, 0.45) !important;
-  background: rgba(241, 245, 249, 0.9) !important;
-  color: #334155 !important;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(241, 245, 249, 0.9);
+  color: #334155;
   font-size: 18px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 .simplified-size-modal .modal-close-btn:hover {
-  background: rgba(226, 232, 240, 0.95) !important;
-  border-color: rgba(100, 116, 139, 0.5) !important;
+  background: rgba(226, 232, 240, 0.95);
+  border-color: rgba(100, 116, 139, 0.5);
 }
 
 .simplified-size-modal .modal-body {
-  padding: 16px 18px 18px !important;
+  padding: 16px 18px 18px;
   background: rgba(255, 255, 255, 0.46);
 }
 
 .simplified-size-modal .form-input,
 .simplified-size-modal .form-select,
 .simplified-size-modal textarea {
-  background: rgba(255, 255, 255, 0.78) !important;
-  border: 1px solid rgba(148, 163, 184, 0.4) !important;
-  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 12px;
   color: #0f172a;
 }
 
@@ -1304,25 +1302,25 @@
 }
 
 .simplified-size-modal .simplified-add-size__actions .btn-secondary {
-  background: rgba(255, 255, 255, 0.82) !important;
-  border: 1px solid rgba(148, 163, 184, 0.45) !important;
-  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: #0f172a;
 }
 
 .simplified-size-modal .simplified-add-size__actions .btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.96) !important;
-  border-color: rgba(100, 116, 139, 0.5) !important;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(100, 116, 139, 0.5);
 }
 
 .simplified-size-modal .simplified-add-size__actions .btn-primary {
-  background: rgba(59, 130, 246, 0.28) !important;
-  border: 1px solid rgba(59, 130, 246, 0.42) !important;
-  color: #1d4ed8 !important;
+  background: rgba(59, 130, 246, 0.28);
+  border: 1px solid rgba(59, 130, 246, 0.42);
+  color: #1d4ed8;
 }
 
 .simplified-size-modal .simplified-add-size__actions .btn-primary:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.36) !important;
-  border-color: rgba(59, 130, 246, 0.52) !important;
+  background: rgba(59, 130, 246, 0.36);
+  border-color: rgba(59, 130, 246, 0.52);
 }
 
 .simplified-add-size__actions {
@@ -1543,9 +1541,9 @@
 
 /* Заголовки категорий в таблице отделки */
 .simplified-table__category-row td {
-  padding: 10px 8px 6px !important;
-  background: transparent !important;
-  border-bottom: none !important;
+  padding: 10px 8px 6px;
+  background: transparent;
+  border-bottom: none;
 }
 
 .simplified-table__category-title {
@@ -1562,7 +1560,7 @@
 }
 
 .simplified-table__service-row + .simplified-table__category-row td {
-  padding-top: 16px !important;
+  padding-top: 16px;
 }
 
 /* Иерархия строк в таблице */
@@ -1571,13 +1569,13 @@
 }
 
 .simplified-table__parent-row td {
-  background-color: #f8fafc !important;
+  background-color: #f8fafc;
   font-weight: 500;
   color: #1e293b;
 }
 
 .simplified-table__parent-cell {
-  padding-left: 10px !important;
+  padding-left: 10px;
 }
 
 .simplified-table__child-row {
@@ -1585,7 +1583,7 @@
 }
 
 .simplified-table__child-cell {
-  padding-left: 32px !important;
+  padding-left: 32px;
   position: relative;
 }
 
@@ -1645,7 +1643,7 @@
 }
 
 .simplified-table .el-input__inner[readonly][style*="background-color: #f5f7fa"] {
-  background-color: #f5f7fa !important;
+  background-color: #f5f7fa;
 }
 
 .simplified-table td {
@@ -2285,51 +2283,49 @@
 .product-template .simplified-template .btn,
 .product-template .simplified-template__save-btn,
 .product-template .simplified-template__action-btn {
-  border-radius: 999px !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+  border-radius: var(--pc-r-control, 8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
 .product-template .simplified-template .btn-primary,
 .product-template .simplified-template__save-btn {
-  background: rgba(59, 130, 246, 0.26) !important;
-  border: 1px solid rgba(59, 130, 246, 0.42) !important;
-  color: #1d4ed8 !important;
+  background: rgba(59, 130, 246, 0.26);
+  border: 1px solid rgba(59, 130, 246, 0.42);
+  color: #1d4ed8;
 }
 
 .product-template .simplified-template .btn-primary:hover:not(:disabled),
 .product-template .simplified-template__save-btn:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.36) !important;
-  border-color: rgba(59, 130, 246, 0.54) !important;
+  background: rgba(59, 130, 246, 0.36);
+  border-color: rgba(59, 130, 246, 0.54);
 }
 
 .product-template .simplified-template .btn-secondary,
 .product-template .simplified-template__action-btn,
 .product-template .simplified-template__sizes-actions .btn {
-  background: rgba(255, 255, 255, 0.82) !important;
-  border: 1px solid rgba(148, 163, 184, 0.38) !important;
-  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  color: #0f172a;
 }
 
 .product-template .simplified-template .btn-secondary:hover:not(:disabled),
 .product-template .simplified-template__action-btn:hover:not(:disabled),
 .product-template .simplified-template__sizes-actions .btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: rgba(100, 116, 139, 0.44) !important;
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(100, 116, 139, 0.44);
 }
 
 .product-template .simplified-template .btn-error,
 .product-template .simplified-template .btn[class*="error"] {
-  background: rgba(239, 68, 68, 0.2) !important;
-  border: 1px solid rgba(239, 68, 68, 0.42) !important;
-  color: #b91c1c !important;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.42);
+  color: #b91c1c;
 }
 
 .product-template .simplified-template .btn-error:hover:not(:disabled),
 .product-template .simplified-template .btn[class*="error"]:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.3) !important;
-  border-color: rgba(220, 38, 38, 0.5) !important;
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(220, 38, 38, 0.5);
 }
 
 .product-template .simplified-template .simplified-card,
@@ -2337,19 +2333,17 @@
 .product-template .simplified-template .simplified-row,
 .product-template .simplified-template .simplified-finishing-item,
 .product-template .simplified-template .simplified-print-group {
-  background: rgba(255, 255, 255, 0.74) !important;
-  border: 1px solid rgba(148, 163, 184, 0.32) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 8px 24px rgba(15, 23, 42, 0.07) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 8px 24px rgba(15, 23, 42, 0.07);
 }
 
 .product-template .simplified-template .form-input,
 .product-template .simplified-template textarea,
 .product-template .simplified-template select {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border: 1px solid rgba(148, 163, 184, 0.42) !important;
-  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 12px;
 }
 
 .multipage-structure {

@@ -74,7 +74,7 @@
 /* Кнопки — liquid glass */
 .btn {
   padding: 10px 20px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -89,8 +89,6 @@
   background: rgba(229, 231, 235, 0.88);
   color: var(--btn-tab-text, #1f2937);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .btn:hover {

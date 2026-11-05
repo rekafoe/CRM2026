@@ -13,11 +13,11 @@
 
 /* Дополнительные утилиты для калькулятора */
 .calculator-hidden {
-  display: none !important;
+  display: none;
 }
 
 .calculator-visible {
-  display: block !important;
+  display: block;
 }
 
 .calculator-fade-in {

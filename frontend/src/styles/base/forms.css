@@ -232,27 +232,27 @@
 /* Варианты ширины полей */
 .form-input--full,
 .form-select--full {
-  width: 100% !important;
+  width: 100%;
 }
 
 .form-input--wide {
-  width: 300px !important;
+  width: 300px;
 }
 
 .form-input--narrow {
-  width: 120px !important;
+  width: 120px;
 }
 
 .form-input--compact {
-  width: 100px !important;
-  min-width: 80px !important;
-  max-width: 120px !important;
+  width: 100px;
+  min-width: 80px;
+  max-width: 120px;
 }
 
 .form-select--compact {
-  width: 140px !important;
-  min-width: 120px !important;
-  max-width: 180px !important;
+  width: 140px;
+  min-width: 120px;
+  max-width: 180px;
 }
 
 /* Адаптивность */

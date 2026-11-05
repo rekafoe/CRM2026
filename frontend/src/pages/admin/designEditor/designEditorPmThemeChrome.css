@@ -98,13 +98,11 @@
 }
 
 .design-editor-fmt-btn {
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   border: 1px solid var(--de-lg-border);
   background: var(--de-lg-bg);
   color: #1f2937;
   box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .design-editor-fmt-btn:hover {

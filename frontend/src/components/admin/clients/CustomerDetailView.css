@@ -5,8 +5,8 @@
 }
 
 .customer-detail-view__chips {
-  padding-top: 0 !important;
-  border-top: none !important;
+  padding-top: 0;
+  border-top: none;
 }
 
 .management-content.customer-detail-view__content {

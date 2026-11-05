@@ -588,7 +588,7 @@
   min-width: 22px;
   margin-left: 6px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: rgba(255, 255, 255, 0.72);
   color: #1e3a8a;
   font-size: 12px;
@@ -607,7 +607,7 @@
   min-height: 40px;
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   color: #64748b;
 }

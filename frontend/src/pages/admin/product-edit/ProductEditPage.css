@@ -299,12 +299,12 @@
 .product-form-grid .form-input,
 .product-form-grid .form-select,
 .product-form-grid .form-input--full {
-  width: 100% !important;
+  width: 100%;
   box-sizing: border-box;
 }
 
 .product-form-grid .form-textarea {
-  width: 100% !important;
+  width: 100%;
   box-sizing: border-box;
   resize: vertical;
   min-height: 80px;
@@ -649,11 +649,11 @@
 
 .service-filters .service-search {
   flex: 1;
-  width: auto !important;
+  width: auto;
 }
 
 .service-filters .service-filter {
-  width: 180px !important;
+  width: 180px;
   flex-shrink: 0;
 }
 

@@ -11,6 +11,7 @@ import './styles/tokens.css';
 import './index.css';
 import './styles/themes.css';
 import './styles/utilities.css';
+import './styles/theme-polish.css';
 import './styles/skeleton.css';
 import { APP_CONFIG } from './types';
 import { ErrorBoundary } from './components/optimized/ErrorBoundary';

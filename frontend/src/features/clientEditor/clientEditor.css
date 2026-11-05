@@ -64,7 +64,7 @@
   color: #1d4ed8;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 12px;
   font-weight: 700;
 }

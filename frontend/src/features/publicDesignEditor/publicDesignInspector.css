@@ -229,7 +229,7 @@
   padding: 4px 8px;
   color: #92400e;
   background: rgba(245, 158, 11, 0.14);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
   font-weight: 950;
   white-space: nowrap;
@@ -253,7 +253,7 @@
   min-height: 30px;
   padding: 6px 10px;
   background: #f8fafc;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor--client .public-design-editor__task-actions button:hover {
@@ -276,7 +276,7 @@
   color: #ffffff;
   background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue));
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font: inherit;
   font-weight: 950;
@@ -310,7 +310,7 @@
   padding: 0 7px;
   color: var(--pc-muted);
   background: #f8fafc;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
 }
 

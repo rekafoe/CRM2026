@@ -200,13 +200,13 @@
 }
 
 .custom-format-option {
-  border-style: dashed !important;
-  border-color: #667eea !important;
+  border-style: dashed;
+  border-color: #667eea;
 }
 
 .custom-format-option:hover {
-  border-color: #5a67d8 !important;
-  background: #f0f4ff !important;
+  border-color: #5a67d8;
+  background: #f0f4ff;
 }
 
 .custom-format-input {

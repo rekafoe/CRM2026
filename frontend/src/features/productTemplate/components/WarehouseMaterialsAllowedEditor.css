@@ -268,7 +268,7 @@
   font-weight: 700;
   text-transform: uppercase;
   background: #fee2e2;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .warehouse-material-picker__item-meta {

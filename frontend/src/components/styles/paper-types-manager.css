@@ -35,7 +35,6 @@
   justify-content: center;
   z-index: 1000;
   padding: 20px;
-  backdrop-filter: blur(4px);
   animation: overlayFadeIn 0.3s ease-out;
 }
 
@@ -292,12 +291,12 @@
 }
 
 .delete-btn {
-  background-color: #dc3545 !important;
-  color: white !important;
+  background-color: #dc3545;
+  color: white;
 }
 
 .delete-btn:hover {
-  background-color: #c82333 !important;
+  background-color: #c82333;
 }
 
 .prices-list {

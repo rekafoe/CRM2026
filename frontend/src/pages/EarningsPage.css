@@ -184,8 +184,6 @@
   flex-direction: column;
   justify-content: center;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
  }
  
  .earnings-summary-title {
@@ -280,8 +278,6 @@
 .earnings-summary-card--today {
   background: rgba(209, 250, 229, 0.85);
   border-color: rgba(34, 197, 94, 0.5);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .earnings-summary-card--today .earnings-summary-value {
@@ -392,8 +388,6 @@
 /* Модалки премий и штрафов — в стиле страницы (карточка как earnings-day-group) */
 .earnings-modal-overlay {
   background-color: rgba(15, 23, 42, 0.25);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 .earnings-modal {

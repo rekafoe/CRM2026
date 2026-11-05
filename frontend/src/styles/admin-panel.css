@@ -2,9 +2,10 @@
 
 .admin-panel-page {
   min-height: 100vh;
-  background: #f8f9fa;
-  padding: 0 !important;
-  margin: 0 !important;
+  background: var(--pc-bg, #f6f5f2);
+  color: var(--pc-text, #141619);
+  padding: 0;
+  margin: 0;
   width: 100%;
   box-sizing: border-box;
 }
@@ -29,11 +30,6 @@
   padding: 0;
   max-width: none;
   margin: 0;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --bg-secondary: #f8fafc;
-  --bg-primary: #fff;
-  --border-color: #e2e8f0;
 }
 
 .admin-home .features-header {
@@ -41,15 +37,15 @@
 }
 
 .admin-home .feature-action-btn {
-  background: rgba(59, 130, 246, 0.18);
-  color: #1e3a8a;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  background: var(--pc-accent, #1d4ed8);
+  color: var(--pc-on-accent, #fff);
+  border: 1px solid var(--pc-accent, #1d4ed8);
+  border-radius: var(--pc-r-control, 8px);
+  box-shadow: none;
 }
 
 .admin-home .feature-action-btn:hover {
-  background: rgba(59, 130, 246, 0.26);
+  background: var(--pc-accent-hover, #1a45c2);
 }
 
 @media (max-width: 768px) {
@@ -78,7 +74,6 @@
   background: var(--pc-surface, #fff);
   color: var(--pc-text, #1c1b19);
   box-shadow: none;
-  backdrop-filter: none;
 }
 
 .admin-home-search {
@@ -252,7 +247,7 @@
 
 .back-btn {
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -264,8 +259,6 @@
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: all 0.2s ease;
 }
 
@@ -315,7 +308,7 @@
 
 .nav-btn {
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -327,8 +320,6 @@
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: all 0.2s ease;
 }
 
@@ -410,7 +401,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -420,8 +411,6 @@
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: all 0.2s ease;
 }
 
@@ -637,7 +626,7 @@
   flex: 1;
   max-width: 200px;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -647,8 +636,6 @@
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .quick-action-btn:hover {
@@ -782,7 +769,7 @@
 .preflight-status {
   display: inline-block;
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 13px;
   font-weight: 500;
   margin-bottom: 8px;
@@ -796,7 +783,7 @@
 .preflight-category {
   font-size: 14px;
   color: #6b7280;
-  margin-bottom: 16px !important;
+  margin-bottom: 16px;
 }
 
 .preflight-plan {

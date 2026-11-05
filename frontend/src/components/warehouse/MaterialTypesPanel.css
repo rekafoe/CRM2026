@@ -42,7 +42,7 @@
 .material-types-panel__badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
   background: var(--bg-tertiary, #eee);
   color: var(--text-secondary, #666);
@@ -211,7 +211,7 @@
 .material-types-print__count {
   flex: 0 0 auto;
   padding: 4px 9px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: var(--bg-tertiary, #e2e8f0);
   color: var(--text-secondary, #475569);
   font-size: 11px;
@@ -297,7 +297,7 @@
 
 .material-types-print__mode-badge {
   padding: 3px 7px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: var(--bg-tertiary, #e2e8f0);
   color: var(--text-secondary, #475569);
   font-size: 10px;

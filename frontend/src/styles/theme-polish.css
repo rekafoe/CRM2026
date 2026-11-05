@@ -1,0 +1,30 @@
+/* Доводка тем поверх экранов. Сцена вокруг листа макета остаётся нейтральной. */
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='powder'] {
+  color-scheme: light;
+}
+
+:root[data-theme='powder'] :is(.btn-primary, .lg-btn--primary, .pc-btn--primary, .add-order-btn),
+:root[data-theme='dark'] :is(.btn-primary, .lg-btn--primary, .pc-btn--primary, .add-order-btn) {
+  background: var(--pc-accent);
+  background-color: var(--pc-accent);
+  border-color: var(--pc-accent);
+  color: var(--pc-on-accent);
+}
+
+:root[data-theme='powder'] :is(.btn-primary, .lg-btn--primary, .pc-btn--primary, .add-order-btn):hover:not(:disabled),
+:root[data-theme='dark'] :is(.btn-primary, .lg-btn--primary, .pc-btn--primary, .add-order-btn):hover:not(:disabled) {
+  background: var(--pc-accent-hover);
+  background-color: var(--pc-accent-hover);
+  border-color: var(--pc-accent-hover);
+}
+
+:root[data-theme='powder'] .public-design-editor--admin .public-design-editor__stage,
+:root[data-theme='dark'] .public-design-editor--admin .public-design-editor__stage {
+  background: #e7e5e0;
+  color: #141619;
+}
