@@ -13,13 +13,7 @@ This handoff captures the current production state of the client/public Fabric e
 
 The website contains a vendored copy of the CRM editor at `D:\printcore-website\vendor\crm-design-editor`.
 
-Important: when changing shared editor code, update the CRM source first and mirror with:
-
-```bash
-node tools/sync-design-editor.mjs
-# or dry-run:
-node tools/sync-design-editor.mjs --dry-run
-```
+The CRM sync script was removed and is not run. The website copy is updated on the website side.
 
 **Master editor (CRM):** `/adminpanel/design-editor/:templateId` — full canvas, absolute overwrite of `design_templates`. Clients on the site receive that master as draft start.
 

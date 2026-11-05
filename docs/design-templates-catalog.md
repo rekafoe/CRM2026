@@ -16,7 +16,7 @@
 3. Указать **продукт / подтип / размер** при импорте или в карточке (выпадающие списки из конфига продукта) — для `GET /api/design-templates/public` и строки в `product_subtype_designs`.
 4. **Клиент** — проверка макета только на сайте (`printcore.by/.../order/editor?templateId=`). Кнопка «На сайте» в каталоге. Нужны привязка к продукту и `route_key`.
 
-CRM хостит **master-редактор** шаблонов: `/adminpanel/design-editor/:templateId` (из каталога — «Макет» / «Редактировать макет»). Save перезаписывает `design_templates`; клиентский UX — на сайте. Исходники `publicDesignEditor` / `designEditor` синхронизируются на `printcore-website/vendor/crm-design-editor` через `node tools/sync-design-editor.mjs`.
+CRM хостит **master-редактор** шаблонов: `/adminpanel/design-editor/:templateId` (из каталога — «Макет» / «Редактировать макет»). Save перезаписывает `design_templates`; клиентский UX — на сайте. Копия редактора в `printcore-website/vendor/crm-design-editor` живёт отдельно: скрипт синхронизации из CRM удалён и не запускается.
 
 Ручное «Добавить шаблон» без импорта — для простых фонов (PNG/JPG); поля макета — через **Импорт SVG**.
 
