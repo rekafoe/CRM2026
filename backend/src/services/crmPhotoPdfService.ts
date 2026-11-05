@@ -53,10 +53,21 @@ async function readyCrmFilenames(orderId: number): Promise<Set<string>> {
   return ready
 }
 
-async function assertOrder(orderId: number): Promise<void> {
+async function assertWebsiteOrder(orderId: number): Promise<void> {
   const db = await getDb()
-  const order = await db.get('SELECT id FROM orders WHERE id = ?', orderId) as { id: number } | undefined
+  const order = await db.get('SELECT id, source FROM orders WHERE id = ?', orderId) as {
+    id: number
+    source?: string | null
+  } | undefined
   if (!order) throw new CrmPhotoPdfError(404, 'Заказ не найден')
+  // Sibling website file routes require source=website for the shared API key.
+  // Without this check the key could plant production PDFs on CRM/mini_app orders.
+  if (String(order.source || '') !== 'website') {
+    throw new CrmPhotoPdfError(
+      403,
+      'Сборка CRM PDF по API-ключу сайта разрешена только для заказов с сайта',
+    )
+  }
 }
 
 async function registerPart(orderId: number, part: CrmStandardPdfPart, status: string, extra: Record<string, unknown> = {}) {
@@ -85,6 +96,9 @@ async function buildOrder(orderId: number, parts: CrmStandardPdfPart[]): Promise
   try {
     const ready = await readyCrmFilenames(orderId)
     const pending = parts.filter((part) => !ready.has(part.filename))
+    // Do not abort the whole batch on one part failure: startCrmPhotoPdf already
+    // registered every pending part as processing («Готовится»). Throwing here
+    // left unattempted siblings stuck in processing forever until a manual retry.
     for (const part of pending) {
       const fileId = await registerPart(orderId, part, 'processing')
       try {
@@ -115,7 +129,7 @@ async function buildOrder(orderId: number, parts: CrmStandardPdfPart[]): Promise
           fileId,
           data: { status: 'failed', metadata: { ...CRM_FILE_METADATA, error: message.slice(0, 500) } },
         }).catch(() => undefined)
-        throw error
+        logger.error('CRM photo PDF part failed', { orderId, filename: part.filename, message })
       }
     }
   } finally {
@@ -127,7 +141,7 @@ export async function startCrmPhotoPdf(
   orderId: number,
   rawOrders: unknown
 ): Promise<{ started: boolean; count: number; alreadyRunning: boolean }> {
-  await assertOrder(orderId)
+  await assertWebsiteOrder(orderId)
   const orders = asOrders(rawOrders)
   const parts = planCrmStandardPdfParts(orders)
   if (parts.length === 0) return { started: false, count: 0, alreadyRunning: false }
