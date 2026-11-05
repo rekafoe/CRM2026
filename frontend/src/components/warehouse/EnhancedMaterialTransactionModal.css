@@ -140,7 +140,7 @@
   border: 1px solid var(--border-color, #cbd5e1);
   background: var(--bg-secondary, #f8fafc);
   color: var(--text-primary, #0f172a);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;

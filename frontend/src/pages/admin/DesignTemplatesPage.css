@@ -1395,7 +1395,7 @@
 .design-usage-row__bar-track {
   height: 6px;
   background: #e2e8f0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   overflow: hidden;
 }
 
@@ -1403,7 +1403,7 @@
   height: 100%;
   width: var(--usage-bar, 0%);
   background: linear-gradient(90deg, #3b82f6, #6366f1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   transition: width 0.25s ease;
 }
 

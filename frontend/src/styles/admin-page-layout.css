@@ -3,8 +3,8 @@
 .admin-page-layout {
   min-height: 100vh;
   background: #f8f9fa;
-  padding: 0 !important;
-  margin: 0 !important;
+  padding: 0;
+  margin: 0;
   width: 100%;
 }
 
@@ -107,7 +107,7 @@
 
 .back-btn {
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -119,8 +119,6 @@
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: all 0.2s ease;
 }
 
@@ -132,8 +130,8 @@
 
 .admin-page-content {
   padding: 0;
-  max-width: 100% !important;
-  margin: 0 !important;
+  max-width: 100%;
+  margin: 0;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -201,15 +199,13 @@
   border: 1px solid rgba(209, 213, 219, 0.6);
   background: rgba(229, 231, 235, 0.88);
   color: var(--btn-tab-text, #1f2937);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
   transition: all 0.2s ease;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 .orders-list-tab:hover {
   background: rgba(229, 231, 235, 0.92);

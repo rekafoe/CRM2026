@@ -1,8 +1,8 @@
-/* Glass pill buttons — ProductManagement, OptimizedApp orders-list-tab family */
+/* Кнопки lg-btn: поверхность и акцент темы, без стекла. */
 
 .lg-btn {
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -12,20 +12,18 @@
   justify-content: center;
   gap: 6px;
   line-height: 1.3;
-  border: 1px solid rgba(209, 213, 219, 0.6);
-  background: rgba(229, 231, 235, 0.88);
-  color: #1f2937;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
+  border: 1px solid var(--pc-border-strong, #d0ccc2);
+  background: var(--pc-surface, #fff);
+  color: var(--pc-text, #141619);
+  box-shadow: none;
+  transition: background-color var(--pc-motion, 140ms ease), border-color var(--pc-motion, 140ms ease), color var(--pc-motion, 140ms ease);
   white-space: nowrap;
 }
 
 .lg-btn:hover:not(:disabled) {
-  background: rgba(229, 231, 235, 0.95);
-  border-color: rgba(255, 255, 255, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: var(--pc-surface-subtle, #efece6);
+  border-color: var(--pc-border-strong, #d0ccc2);
+  box-shadow: none;
 }
 
 .lg-btn:disabled {
@@ -34,74 +32,71 @@
 }
 
 .lg-btn--primary {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #1d4ed8;
+  background: var(--pc-accent, #1d4ed8);
+  border-color: var(--pc-accent, #1d4ed8);
+  color: var(--pc-on-accent, #fff);
 }
 
 .lg-btn--primary:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.35);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: var(--pc-accent-hover, #1a45c2);
+  border-color: var(--pc-accent-hover, #1a45c2);
 }
 
 .lg-btn--success {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #15803d;
+  background: var(--pc-success-soft, #e6f1ea);
+  border-color: var(--pc-border, #e2dfd7);
+  color: var(--pc-success-ink, #136c35);
 }
 
 .lg-btn--success:hover:not(:disabled) {
-  background: rgba(34, 197, 94, 0.3);
-  border-color: rgba(34, 197, 94, 0.5);
+  background: var(--pc-success-soft, #e6f1ea);
+  border-color: var(--pc-success-ink, #136c35);
 }
 
 .lg-btn--warning {
-  background: rgba(234, 179, 8, 0.2);
-  border-color: rgba(234, 179, 8, 0.4);
-  color: #a16207;
+  background: var(--pc-warning-soft, #f8eedf);
+  border-color: var(--pc-border, #e2dfd7);
+  color: var(--pc-warning-ink, #964406);
 }
 
 .lg-btn--warning:hover:not(:disabled) {
-  background: rgba(234, 179, 8, 0.3);
-  border-color: rgba(234, 179, 8, 0.5);
+  background: var(--pc-warning-soft, #f8eedf);
+  border-color: var(--pc-warning-ink, #964406);
 }
 
 .lg-btn--danger {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #b91c1c;
+  background: var(--pc-surface, #fff);
+  border-color: var(--pc-danger-border, #e2dfd7);
+  color: var(--pc-danger-ink, #b91c1c);
 }
 
 .lg-btn--danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.3);
-  border-color: rgba(239, 68, 68, 0.5);
+  background: var(--pc-danger-soft, #f8e6e6);
+  border-color: var(--pc-danger-ink, #b91c1c);
 }
 
-/* Button component (.btn) inside pricing admin — same glass look */
 .pricing-glass .btn,
 .admin-page-layout.pricing-page .admin-page-header__extra .btn {
-  padding: 8px 14px !important;
-  border-radius: 999px;
+  padding: 8px 14px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.02em;
   line-height: 1.3;
   gap: 6px;
-  border: 1px solid rgba(209, 213, 219, 0.6);
-  background: rgba(229, 231, 235, 0.88);
-  color: #1f2937;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transform: none !important;
+  border: 1px solid var(--pc-border-strong, #d0ccc2);
+  background: var(--pc-surface, #fff);
+  color: var(--pc-text, #141619);
+  box-shadow: none;
+  transform: none;
 }
 
 .pricing-glass .btn:hover:not(:disabled),
 .admin-page-layout.pricing-page .admin-page-header__extra .btn:hover:not(:disabled) {
-  background: rgba(229, 231, 235, 0.95);
-  border-color: rgba(255, 255, 255, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: none !important;
+  background: var(--pc-surface-subtle, #efece6);
+  border-color: var(--pc-border-strong, #d0ccc2);
+  box-shadow: none;
+  transform: none;
 }
 
 .pricing-glass .btn:disabled,
@@ -111,56 +106,56 @@
 
 .pricing-glass .btn.btn-primary,
 .admin-page-layout.pricing-page .admin-page-header__extra .btn.btn-primary {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #1d4ed8;
+  background: var(--pc-accent, #1d4ed8);
+  border-color: var(--pc-accent, #1d4ed8);
+  color: var(--pc-on-accent, #fff);
 }
 
 .pricing-glass .btn.btn-primary:hover:not(:disabled),
 .admin-page-layout.pricing-page .admin-page-header__extra .btn.btn-primary:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.35);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: var(--pc-accent-hover, #1a45c2);
+  border-color: var(--pc-accent-hover, #1a45c2);
 }
 
 .pricing-glass .btn.btn-secondary,
 .pricing-glass .btn.btn-info,
 .admin-page-layout.pricing-page .admin-page-header__extra .btn.btn-secondary {
-  background: rgba(229, 231, 235, 0.88);
-  border-color: rgba(209, 213, 219, 0.6);
-  color: #1f2937;
+  background: var(--pc-surface, #fff);
+  border-color: var(--pc-border-strong, #d0ccc2);
+  color: var(--pc-text, #141619);
 }
 
 .pricing-glass .btn.btn-success,
 .admin-page-layout.pricing-page .admin-page-header__extra .btn.btn-success {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #15803d;
+  background: var(--pc-success-soft, #e6f1ea);
+  border-color: var(--pc-border, #e2dfd7);
+  color: var(--pc-success-ink, #136c35);
 }
 
 .pricing-glass .btn.btn-success:hover:not(:disabled) {
-  background: rgba(34, 197, 94, 0.3);
-  border-color: rgba(34, 197, 94, 0.5);
+  background: var(--pc-success-soft, #e6f1ea);
+  border-color: var(--pc-success-ink, #136c35);
 }
 
 .pricing-glass .btn.btn-warning {
-  background: rgba(234, 179, 8, 0.2);
-  border-color: rgba(234, 179, 8, 0.4);
-  color: #a16207;
+  background: var(--pc-warning-soft, #f8eedf);
+  border-color: var(--pc-border, #e2dfd7);
+  color: var(--pc-warning-ink, #964406);
 }
 
 .pricing-glass .btn.btn-warning:hover:not(:disabled) {
-  background: rgba(234, 179, 8, 0.3);
-  border-color: rgba(234, 179, 8, 0.5);
+  background: var(--pc-warning-soft, #f8eedf);
+  border-color: var(--pc-warning-ink, #964406);
 }
 
 .pricing-glass .btn.btn-error,
 .admin-page-layout.pricing-page .admin-page-header__extra .btn.btn-error {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #b91c1c;
+  background: var(--pc-surface, #fff);
+  border-color: var(--pc-danger-border, #e2dfd7);
+  color: var(--pc-danger-ink, #b91c1c);
 }
 
 .pricing-glass .btn.btn-error:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.3);
-  border-color: rgba(239, 68, 68, 0.5);
+  background: var(--pc-danger-soft, #f8e6e6);
+  border-color: var(--pc-danger-ink, #b91c1c);
 }

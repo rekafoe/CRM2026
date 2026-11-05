@@ -5,8 +5,11 @@ import type { Organization } from '../../api';
 import type { InboxNotification } from '../../api';
 import { InboxNotifications } from '../notifications/InboxNotifications';
 import {
+  CRM_APPEARANCE_EVENT,
   currentAppearanceUserId,
+  readCrmAppearance,
   saveCrmAppearance,
+  type CrmTheme,
 } from '../../hooks/useCrmAppearance';
 import './TopBar.css';
 
@@ -83,8 +86,20 @@ export const TopBar: React.FC<TopBarProps> = ({
     return location.pathname === path;
   };
 
-  const keepLight = () => {
-    saveCrmAppearance(currentAppearanceUserId());
+  const [theme, setTheme] = React.useState<CrmTheme>(() => readCrmAppearance(currentAppearanceUserId()).theme);
+
+  React.useEffect(() => {
+    const sync = () => setTheme(readCrmAppearance(currentAppearanceUserId()).theme);
+    window.addEventListener(CRM_APPEARANCE_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(CRM_APPEARANCE_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const chooseTheme = (next: CrmTheme) => {
+    saveCrmAppearance(currentAppearanceUserId(), { theme: next, density: 'regular' });
   };
 
   return (
@@ -216,18 +231,18 @@ export const TopBar: React.FC<TopBarProps> = ({
             <div className="pc-profile__menu" role="menu" aria-label="Профиль">
               <div className="pc-profile__heading">Оформление</div>
               <div className="pc-profile__group" role="radiogroup" aria-label="Тема">
-                <button type="button" role="radio" aria-checked="true" className="is-selected" onClick={keepLight}>
+                <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-selected' : ''} onClick={() => chooseTheme('light')}>
                   Светлая
                 </button>
-                <button type="button" role="radio" aria-checked="false" disabled title="Пока недоступно">
+                <button type="button" role="radio" aria-checked={theme === 'powder'} className={theme === 'powder' ? 'is-selected' : ''} onClick={() => chooseTheme('powder')}>
                   Пудра
                 </button>
-                <button type="button" role="radio" aria-checked="false" disabled title="Пока недоступно">
+                <button type="button" role="radio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'is-selected' : ''} onClick={() => chooseTheme('dark')}>
                   Deep Ink
                 </button>
               </div>
               <div className="pc-profile__group" role="radiogroup" aria-label="Плотность">
-                <button type="button" role="radio" aria-checked="true" className="is-selected" onClick={keepLight}>
+                <button type="button" role="radio" aria-checked="true" className="is-selected" onClick={() => chooseTheme(theme)}>
                   Обычная
                 </button>
                 <button type="button" role="radio" aria-checked="false" disabled title="Пока недоступно">

@@ -107,7 +107,7 @@
   font-weight: 700;
   background: #f1f5f9;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   padding: 2px 8px;
 }
 
@@ -197,7 +197,7 @@
 
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .ps-strip::-webkit-scrollbar-thumb {
   background: rgba(15, 23, 42, 0.18);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .ps-scroll-btn {
@@ -325,7 +325,7 @@
   width: 10px;
   height: 10px;
   border: 1.5px solid #ffffff;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
 }
 
@@ -360,7 +360,7 @@
   padding: 0;
   font-size: 0;
   line-height: 0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .ps-strip-gap.is-active .ps-insert-btn,

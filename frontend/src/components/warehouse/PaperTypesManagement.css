@@ -39,7 +39,7 @@
   border: 1px solid var(--border-color, #e2e8f0);
   background: var(--bg-secondary, #f8fafc);
   color: var(--text-primary, #334155);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-weight: 500;
   font-size: 13px;
@@ -150,11 +150,11 @@
   width: 36px;
   height: 36px;
   min-width: 36px;
-  padding: 0 !important;
-  display: inline-flex !important;
+  padding: 0;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px !important;
+  border-radius: 8px;
 }
 
 .paper-type-card:hover {

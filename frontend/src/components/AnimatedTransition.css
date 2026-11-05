@@ -77,14 +77,14 @@
 /* Адаптивность для мобильных устройств */
 @media (max-width: 768px) {
   .animated-transition {
-    animation-duration: 200ms !important;
+    animation-duration: 200ms;
   }
 }
 
 /* Поддержка prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   .animated-transition {
-    animation: none !important;
+    animation: none;
     transition: opacity 0.1s ease;
   }
 }

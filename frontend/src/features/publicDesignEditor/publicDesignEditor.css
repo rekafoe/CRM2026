@@ -228,7 +228,7 @@
   color: #166534;
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
   font-weight: 900;
 }
@@ -303,7 +303,7 @@
   color: var(--pc-muted);
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 12px;
   font-weight: 900;
@@ -420,7 +420,7 @@
   color: var(--pc-ink);
   background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -504,7 +504,7 @@
   padding: 2px 6px;
   color: #ffffff;
   background: rgba(15, 23, 42, 0.78);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
   font-weight: 800;
 }
@@ -524,7 +524,7 @@
   color: #991b1b;
   background: #ffffff;
   border: 1px solid rgba(185, 28, 28, 0.22);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font: inherit;
   line-height: 0;
@@ -563,7 +563,7 @@
   min-height: 26px;
   padding: 4px 10px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
   font-weight: 800;
   line-height: 1.2;
@@ -608,7 +608,7 @@
   white-space: nowrap;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
@@ -637,7 +637,7 @@
   padding: 3px;
   background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor__advanced-tool-wrap {
@@ -653,7 +653,7 @@
   color: var(--pc-muted);
   background: transparent;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
 }
 
@@ -736,7 +736,7 @@
   color: #e0f2fe;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 12px;
   font-weight: 800;
 }
@@ -764,7 +764,7 @@
   justify-self: start;
   min-height: 32px;
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor__next-action span {
@@ -797,7 +797,7 @@
   color: var(--pc-muted);
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 13px;
   font-weight: 800;
@@ -816,7 +816,7 @@
   height: 20px;
   color: inherit;
   background: rgba(15, 23, 42, 0.05);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
   font-weight: 900;
 }
@@ -829,7 +829,7 @@
   padding: 0 5px;
   color: #ffffff;
   background: #ef4444;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 10px;
   line-height: 1;
 }
@@ -931,7 +931,7 @@
   height: 10px;
   margin-top: 4px;
   background: #f59e0b;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
 }
 
@@ -958,7 +958,7 @@
   color: var(--pc-ink);
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -1038,7 +1038,6 @@
   padding: 14px 20px 18px;
   background: rgba(255, 255, 255, 0.88);
   border-top: 1px solid rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(12px);
 }
 
 .public-design-editor__page-rail-title {
@@ -1135,7 +1134,7 @@
   width: 12px;
   height: 12px;
   border: 2px solid #ffffff;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
 }
 
@@ -1155,7 +1154,7 @@
   max-width: 88px;
   padding: 3px 7px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 10px;
   font-weight: 900;
   line-height: 1;
@@ -1232,7 +1231,6 @@
   place-items: center;
   padding: 18px;
   background: rgba(15, 23, 42, 0.46);
-  backdrop-filter: blur(8px);
 }
 
 .public-design-editor__checkout-card {
@@ -1284,7 +1282,7 @@
   color: var(--pc-ink);
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-weight: 800;
 }
@@ -1424,13 +1422,13 @@
 }
 
 .public-design-editor__page-count-notice-modal .modal-header h2 {
-  color: #0b1220 !important;
+  color: #0b1220;
 }
 
 .public-design-editor__page-count-notice-modal .modal-close-btn {
-  color: #334155 !important;
-  background: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
+  color: #334155;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
 }
 
 .public-design-editor__page-count-notice-body {
@@ -1451,7 +1449,7 @@
   color: var(--pc-blue);
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor__page-count-notice-message {
@@ -1526,27 +1524,27 @@
 
 @media (max-width: 760px) {
   .public-design-editor.public-design-editor--client.public-design-editor--mobile {
-    min-height: 0 !important;
+    min-height: 0;
     height: 100%;
     max-height: 100%;
   }
 
   .public-design-editor.public-design-editor--mobile {
-    min-height: 0 !important;
+    min-height: 0;
     border: 0;
     box-shadow: none;
   }
 
   .public-design-editor.public-design-editor--mobile .public-design-editor__sidepanel {
-    position: static !important;
-    max-height: none !important;
-    padding: 0 !important;
-    border-radius: 16px !important;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08) !important;
+    position: static;
+    max-height: none;
+    padding: 0;
+    border-radius: 16px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
   }
 
   .public-design-editor.public-design-editor--mobile .public-design-editor__workspace {
-    padding-bottom: 0 !important;
+    padding-bottom: 0;
   }
 
   .public-design-editor.public-design-editor--mobile .public-design-editor__inspector-tabs {
@@ -1597,9 +1595,9 @@
   }
 
   .public-design-editor__top-actions .btn-secondary {
-    color: var(--pc-ink) !important;
-    background: #f8fafc !important;
-    border-color: rgba(15, 23, 42, 0.1) !important;
+    color: var(--pc-ink);
+    background: #f8fafc;
+    border-color: rgba(15, 23, 42, 0.1);
   }
 
   .public-design-editor__workspace {

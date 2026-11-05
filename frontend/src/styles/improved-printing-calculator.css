@@ -8,7 +8,6 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -225,7 +224,6 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -386,7 +384,7 @@
 }
 
 .calculator-modal-wrapper--embedded > .calculator-subtotal-bar .form-section.result-section.compact {
-  padding: 8px 12px 10px !important;
+  padding: 8px 12px 10px;
 }
 
 .calculator-modal-wrapper--embedded > .calculator-subtotal-bar {
@@ -437,14 +435,14 @@
   overflow: hidden;
 }
 .calculator-subtotal-bar .form-section.result-section {
-  margin: 0 !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
 }
 .calculator-subtotal-bar .form-section.result-section.compact {
-  padding: 10px 16px 14px !important;
+  padding: 10px 16px 14px;
 }
 .calculator-subtotal-bar .result-section.compact h3,
 .calculator-subtotal-bar .result-total {
@@ -635,8 +633,8 @@
   padding: 0;
 }
 .improved-printing-calculator .calculator-content {
-  padding: 0 !important;
-  gap: 0 !important;
+  padding: 0;
+  gap: 0;
 }
 
 /* Основная область — скроллится, не уезжает за subtotal */
@@ -686,7 +684,7 @@
 .form-section.result-section {
   background: white;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
-  margin-bottom: 0 !important;
+  margin-bottom: 0;
 }
 
 .form-section:hover {
@@ -1144,8 +1142,8 @@
 
 /* Категория → тип материала → вариант (плотность, ширина рулона или SKU). */
 .material-type-density-row {
-  display: flex !important;
-  flex-direction: row !important;
+  display: flex;
+  flex-direction: row;
   flex-wrap: nowrap;
   gap: 12px;
   align-items: flex-end;
@@ -1333,7 +1331,7 @@
 /* Компактный результат — уменьшенные отступы, прижат к низу модалки */
 .result-section.compact {
   padding: 8px 12px 12px;
-  margin-bottom: 0 !important;
+  margin-bottom: 0;
 }
 
 .result-section.compact h3 {
@@ -1625,8 +1623,8 @@
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Адаптивность */
@@ -1661,7 +1659,7 @@
     max-height: calc(100vh - 44px);
   }
   .calculator-subtotal-bar .form-section.result-section.compact {
-    padding: 12px 16px 16px !important;
+    padding: 12px 16px 16px;
   }
   
   .calculator-header {
@@ -1723,7 +1721,6 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2089,7 +2086,6 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -2147,7 +2143,7 @@
   color: #374151;
   width: 40px;
   height: 40px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 18px;
   cursor: pointer;
   display: flex;
@@ -2222,7 +2218,7 @@
   gap: 8px;
   padding: 8px 14px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
   font-size: 14px;
@@ -2231,8 +2227,6 @@
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .category-button:hover {
@@ -2696,15 +2690,13 @@
 .action-button {
   padding: 10px 20px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .action-button.secondary {
@@ -3009,15 +3001,15 @@
 .calculator-section-unified .section-group-content .params-grid,
 .calculator-section-unified .section-group-content .materials-grid,
 .calculator-section-unified .section-group-content .advanced-grid {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
-  gap: 10px 14px !important;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px 14px;
   align-content: start;
   align-items: start;
 }
 
 .calculator-section-unified .params-grid.params-grid--multipage {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
 .calculator-section-unified .param-group--quantity {
@@ -3087,14 +3079,14 @@
 
 /* Операции (резка, ламинация, упаковка): вертикальная раскладка — контент не накладывается */
 .operations-section .operations-grid {
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  gap: 12px !important;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
   align-items: stretch;
 }
 
 .operations-section .operation-group {
-  grid-column: 1 !important;
+  grid-column: 1;
   min-width: 0;
 }
 
@@ -3164,11 +3156,11 @@
 }
 
 .calculator-section-unified .section-group-content .params-grid.compact {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .calculator-section-unified .section-group-content .params-grid.compact.params-grid--multipage {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .calculator-section-unified .params-grid--multipage .binding-variant-selector {
@@ -3261,7 +3253,7 @@
 }
 
 .calculator-section-unified .material-type-density-row {
-  display: grid !important;
+  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px 14px;
   width: 100%;
@@ -3293,7 +3285,7 @@
 }
 
 .calculator-section-unified .advanced-settings .advanced-grid.compact {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .calculator-section-unified .advanced-settings .advanced-grid.compact > .param-group:nth-child(3) {
@@ -3303,7 +3295,7 @@
 
 @media (max-width: 980px) {
   .calculator-section-unified .section-group-content .params-grid.compact.params-grid--multipage {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -3314,7 +3306,7 @@
   .calculator-section-unified .material-type-density-row,
   .calculator-section-unified .advanced-settings .advanced-grid.compact,
   .calculator-extra-row {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
 
   .calculator-section-unified .advanced-settings .advanced-grid.compact > .param-group:nth-child(3) {

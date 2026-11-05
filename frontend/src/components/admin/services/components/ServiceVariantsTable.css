@@ -152,9 +152,9 @@
 .service-variants-grid,
 .service-variants-grid .service-variants-unified-table,
 .service-variants-grid table.el-table__header {
-  width: max-content !important;
+  width: max-content;
   min-width: 100%;
-  max-width: none !important;
+  max-width: none;
   margin: 0;
   border: none;
 }
@@ -389,8 +389,8 @@
 .service-variants-grid.el-table,
 .service-variants-grid .el-table__header,
 .service-variants-grid .el-table__body {
-  width: max-content !important;
-  max-width: none !important;
+  width: max-content;
+  max-width: none;
 }
 
 .el-table th,
@@ -518,7 +518,7 @@
 .service-variants-grid .variant-actions-cell {
   position: sticky;
   z-index: 4;
-  overflow: visible !important;
+  overflow: visible;
   background: var(--bg-primary, #fff);
 }
 
@@ -842,17 +842,17 @@
 
 .service-variants-table .variant-delete-btn,
 .service-variants-grid .variant-delete-btn {
-  color: #fff !important;
-  background: var(--danger, #e11d48) !important;
-  border-color: var(--danger, #e11d48) !important;
+  color: #fff;
+  background: var(--danger, #e11d48);
+  border-color: var(--danger, #e11d48);
   font-weight: 700;
 }
 
 .service-variants-table .variant-delete-btn:hover,
 .service-variants-grid .variant-delete-btn:hover {
-  background: #be123c !important;
-  border-color: #be123c !important;
-  color: #fff !important;
+  background: #be123c;
+  border-color: #be123c;
+  color: #fff;
 }
 
 .el-button--info {

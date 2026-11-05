@@ -194,7 +194,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: rgba(59, 130, 246, 0.12);
   color: #1e3a8a;
   font-size: 11px;
@@ -307,7 +307,7 @@
 
 .expenses-cat__track {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: #e2e8f0;
   overflow: hidden;
 }

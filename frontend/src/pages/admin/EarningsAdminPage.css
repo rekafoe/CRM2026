@@ -663,7 +663,7 @@
 .earn-status-pill {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   font-size: 12px;
@@ -678,7 +678,7 @@
 }
 
 .earn-order-lines-row > td {
-  padding: 0 8px 12px !important;
+  padding: 0 8px 12px;
   background: #f8fafc;
 }
 

@@ -623,7 +623,7 @@
   color: #fca5a5;
   background: rgba(220,38,38,0.1);
   border: 1px solid rgba(220,38,38,0.22);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
@@ -697,7 +697,7 @@
   width: 42px;
   height: 42px;
   border: 1px solid currentColor;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 24px;
   font-weight: 800;
   line-height: 1;
@@ -745,7 +745,7 @@
   color: #4a5060;
   background: #1e1e1e;
   border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 14px;
   font-weight: 800;

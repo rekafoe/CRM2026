@@ -322,12 +322,12 @@
 
 /* Уникальные стили для значений статистики склада */
 .warehouse-stats .warehouse-stat-value {
-  font-size: 42px !important;
-  font-weight: 900 !important;
-  color: #2c3e50 !important;
-  margin: 0 !important;
-  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.2) !important;
-  line-height: 0.85 !important;
+  font-size: 42px;
+  font-weight: 900;
+  color: #2c3e50;
+  margin: 0;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  line-height: 0.85;
   position: relative;
   z-index: 2;
   display: flex;
@@ -1118,8 +1118,8 @@
   }
   
   .warehouse-stats .warehouse-stat-value {
-    font-size: 32px !important;
-    line-height: 0.85 !important;
+    font-size: 32px;
+    line-height: 0.85;
   }
   
   .warehouse-stats .warehouse-stat-label {

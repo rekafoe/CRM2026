@@ -101,7 +101,7 @@
   border: none;
   background: var(--btn-primary-bg, #b8a9d4);
   color: var(--btn-primary-text, #3d3551);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
