@@ -193,10 +193,49 @@ function cssFontFormat(format?: string): string {
   }
 }
 
+function normalizeFaceFamily(family: string): string {
+  return family.replace(/^['"]+|['"]+$/g, '').trim().toLowerCase();
+}
+
+/** FontFace, который мы сами добавили и дождались. */
+function hasLoadedFontFace(family: string): boolean {
+  if (typeof document === 'undefined' || !document.fonts) return false;
+  const target = normalizeFaceFamily(family);
+  if (!target) return false;
+  for (const face of document.fonts) {
+    if (face.status !== 'loaded') continue;
+    if (normalizeFaceFamily(face.family) === target) return true;
+  }
+  return false;
+}
+
+/**
+ * Системный шрифт меняет ширину строки хотя бы против одного из двух запасных.
+ * Неизвестное имя даёт ту же ширину, что и запасной.
+ */
+function fontFamilyChangesMetrics(family: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+  const sample = 'АаБбWwMmlli 0123';
+  const width = (stack: string) => {
+    ctx.font = `72px ${stack}`;
+    return ctx.measureText(sample).width;
+  };
+  const quoted = `"${family.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return width(`${quoted}, monospace`) !== width('monospace')
+    || width(`${quoted}, sans-serif`) !== width('sans-serif');
+}
+
+/**
+ * document.fonts.check() в Chrome отвечает true и для семьи, которой в документе нет.
+ * Считаем шрифт готовым, только если загружен его FontFace или это настоящий системный шрифт.
+ */
 function isFontFamilyLoaded(family: string): boolean {
+  if (hasLoadedFontFace(family)) return true;
   try {
-    const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    return document.fonts.check(`16px "${escaped}"`);
+    return fontFamilyChangesMetrics(family);
   } catch {
     return false;
   }
@@ -392,7 +431,7 @@ export async function loadDesignFontForPreview(font: {
     await loadFontFace(previewFamily, blobUrl, font.format, undefined, null, true);
     await document.fonts.load(`22px "${escapeCssString(previewFamily)}"`);
     await document.fonts.ready;
-    const ok = document.fonts.check(`22px "${escapeCssString(previewFamily)}"`);
+    const ok = hasLoadedFontFace(previewFamily);
     return { ok, previewFamily, css };
   } catch {
     return { ok: false, previewFamily, css: '' };

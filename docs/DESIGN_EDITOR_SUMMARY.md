@@ -27,7 +27,7 @@
 - **Клиентский редактор** — `features/clientEditor/` + `publicDesignEditor/` (вендор на сайт). Пишет только `editor_drafts` / заказ, **не** master.
 - Проверка клиентского UX — на сайте (`printcore.by/.../order/editor`).
 
-Sync ядра CRM → сайт: `node tools/sync-design-editor.mjs` (см. скрипт).
+Копия редактора на сайте живёт отдельно. Скрипт синхронизации из CRM удалён и не запускается.
 
 ## Импорт шаблонов
 

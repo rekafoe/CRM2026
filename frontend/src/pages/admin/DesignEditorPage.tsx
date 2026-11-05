@@ -33,6 +33,7 @@ import {
   extractUsedFontFamiliesFromPages,
   isFabricTextObjectType,
 } from './designEditor/patchFabricTextObjects';
+import { summarizeTemplateFontUsage } from './designEditor/templateFontUsage';
 import { applyDocumentTextPatch } from './designEditor/applyDocumentTextPatch';
 import { isBoldFontWeight } from './designEditor/textFormattingPresets';
 import { hasBlobUrl } from './designEditor/fabricJsonValidation';
@@ -219,6 +220,10 @@ export const DesignEditorPage: React.FC = () => {
 
   const projectUsedFonts = useMemo(
     () => extractUsedFontFamiliesFromPages(pages),
+    [pages],
+  );
+  const templateFontUsage = useMemo(
+    () => summarizeTemplateFontUsage(pages),
     [pages],
   );
 
@@ -1090,6 +1095,7 @@ export const DesignEditorPage: React.FC = () => {
               onTextChange={handleTextChange}
               onAddTextPreset={handleAddTextPreset}
               usedFonts={projectUsedFonts}
+              templateFontUsage={templateFontUsage}
               onApplyFont={handleSidebarApplyFont}
               onApplyTextColor={handleSidebarApplyTextColor}
               onApplyEffects={handleSidebarApplyEffects}
