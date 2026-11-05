@@ -5,7 +5,7 @@ import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 import {
   formatWorkDayLabel,
   getEffectiveResponsibleUserId,
-  getSourceLabel,
+  getSourceStamp,
   groupOrdersByWorkDay,
 } from './orderPoolUtils';
 import { isPoolOrderStatusId, useOrderStatuses } from '../../hooks/useOrderStatuses';
@@ -28,6 +28,14 @@ function positionLine(item: Item): string {
   const name = named || fallback;
   const qty = Number(item.quantity);
   return Number.isFinite(qty) && qty > 0 ? `${name} · ${qty} шт.` : name;
+}
+
+function orderCountLabel(count: number): string {
+  const n10 = count % 10;
+  const n100 = count % 100;
+  if (n10 === 1 && n100 !== 11) return 'заказ';
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return 'заказа';
+  return 'заказов';
 }
 
 function compositionText(order: Order): string {
@@ -94,7 +102,7 @@ const OrderRow = React.memo<{
       <td>
         <div className="pool-sheet__number">{order.number}</div>
         <div className="pool-sheet__meta">
-          {order.source ? <span>{getSourceLabel(order.source)}</span> : null}
+          {order.source ? <span>{getSourceStamp(order.source)}</span> : null}
           <time dateTime={createdAt}>{clockLabel(createdAt)}</time>
         </div>
       </td>
@@ -128,8 +136,16 @@ const OrderRow = React.memo<{
         ) : null}
       </td>
       <td className="pool-sheet__who">
-        {responsibleName}
-        {responsibleId === currentUserId ? <span className="pool-sheet__mine"> мой</span> : null}
+        {isCancelled ? (
+          '—'
+        ) : isAssigned ? (
+          <>
+            {responsibleName}
+            {responsibleId === currentUserId ? <span className="pool-sheet__mine"> мой</span> : null}
+          </>
+        ) : (
+          <span className="pool-sheet__pool">в пуле</span>
+        )}
       </td>
       <td className="pool-sheet__money"><MoneyAmount value={getOrderTotal(order)} /></td>
       <td className={debt > 0 ? 'pool-sheet__money is-due' : 'pool-sheet__money'}>
@@ -201,7 +217,7 @@ export const OrderPoolList: React.FC<OrderPoolListProps> = ({
       <table className="pool-sheet">
         <thead>
           <tr>
-            <th>Номер</th>
+            <th>Номер · время</th>
             <th>Клиент</th>
             <th>Состав</th>
             <th>Статус</th>
@@ -220,7 +236,7 @@ export const OrderPoolList: React.FC<OrderPoolListProps> = ({
                   <td colSpan={8}>
                     <span>{formatWorkDayLabel(group.key)}</span>
                     <span className="pool-sheet__day-count">
-                      {' · '}{group.orders.length}{' · '}<MoneyAmount value={dayTotal} />
+                      {' '}{group.orders.length} {orderCountLabel(group.orders.length)} на <MoneyAmount value={dayTotal} />
                     </span>
                   </td>
                 </tr>

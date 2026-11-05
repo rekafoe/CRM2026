@@ -24,6 +24,8 @@
 :root[data-density='compact'] .order-pool-page .filters-quick .quick-btn,
 :root[data-density='compact'] .order-pool-page .filters-secondary select,
 :root[data-density='compact'] .order-pool-search input,
+:root[data-density='compact'] .pool-filter-check,
+:root[data-density='compact'] .pool-heading .order-pool-department-filter select,
 :root[data-density='compact'] .admin-panel-page .nav-btn {
   box-sizing: border-box;
   height: var(--pc-h-control);

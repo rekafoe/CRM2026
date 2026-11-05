@@ -30,7 +30,6 @@ import { mergeSelectedOrderFromList } from '../utils/orderNotes';
 import { MoneyAmount } from '../components/ui';
 import { OrderContent } from '../components/optimized/OrderContent';
 import { StatusTrack } from '../components/order/StatusTrack';
-import { OrderTotal } from '../components/order/OrderTotal';
 import { FilesModal } from '../components/FilesModal';
 import { PrepaymentModal } from '../components/PrepaymentModal';
 import { PrepaymentDetailsModal } from '../components/PrepaymentDetailsModal';
@@ -802,8 +801,21 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     if (!value) return '—';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleString('ru-RU');
+    const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return time;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}.${month} ${time}`;
   }, []);
+
+  const itemCountLabel = (count: number) => {
+    const n10 = count % 10;
+    const n100 = count % 100;
+    if (n10 === 1 && n100 !== 11) return 'позиция';
+    if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return 'позиции';
+    return 'позиций';
+  };
 
   if (loading) {
     return (
@@ -818,40 +830,51 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const selectedPrepay = selectedOrder ? getOrderPrepayment(selectedOrder) : 0;
   const selectedTotal = selectedOrder ? getOrderTotal(selectedOrder) : 0;
 
+  const selectedItemCount = selectedOrder?.items?.length ?? 0;
+
   return (
     <div className="order-pool-page">
-      <header className="order-pool-topbar">
-        <button type="button" className="lg-btn" onClick={() => navigate('/')}>
-          ← Назад
-        </button>
-        <div className="order-pool-topbar__title">
-          <h1>Пул заказов</h1>
-          <p>Новые заказы, назначение и выдача</p>
-        </div>
-        <span className="order-pool-topbar__count">{filteredOrders.length}</span>
-        {departments.length > 0 ? (
-          <label className="order-pool-department-filter">
-            Точка
-            <select
-              value={poolDepartmentId === '' ? '' : String(poolDepartmentId)}
-              onChange={(e) => {
-                const v = e.target.value;
-                setPoolDepartmentId(v === '' ? '' : Number(v));
-              }}
-            >
-              <option value="">Все точки</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {myDepartmentId != null && d.id === myDepartmentId ? `${d.name} (моя)` : d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-      </header>
-
       <div className="order-pool-workspace">
       <div className="order-pool-sidebar">
+        <header className="pool-heading">
+          <p className="pool-heading__eyebrow">
+            <button type="button" className="pool-heading__back" onClick={() => navigate('/')}>
+              ← Назад
+            </button>
+            <span>02 / Входящие заказы</span>
+          </p>
+          <div className="pool-heading__top">
+            <div className="pool-heading__titles">
+              <div className="pool-heading__row">
+                <h1>Пул заказов</h1>
+                <span className="pool-heading__count">{filteredOrders.length}</span>
+              </div>
+              <p className="pool-heading__lede">
+                Заказы с сайта, Telegram и Mini App до назначения ответственного. Назначение, предоплата и выдача.
+              </p>
+            </div>
+            {departments.length > 0 ? (
+              <label className="order-pool-department-filter">
+                Точка
+                <select
+                  value={poolDepartmentId === '' ? '' : String(poolDepartmentId)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPoolDepartmentId(v === '' ? '' : Number(v));
+                  }}
+                >
+                  <option value="">Все точки</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {myDepartmentId != null && d.id === myDepartmentId ? `${d.name} (моя)` : d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
+        </header>
+
         <OrderPoolFilters
           filters={filters}
           dispatchFilters={dispatchFilters}
@@ -897,6 +920,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             <OrderPoolDetailHeader
               order={selectedOrder}
               currentUserId={currentUserId}
+              total={selectedTotal}
               prepay={selectedPrepay}
               debt={selectedDebt}
               onCopyPaymentUrl={() => {
@@ -950,6 +974,23 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 orderStatuses.find((status) => status.id === Number(selectedOrder.status))?.name
               }
             >
+              <div className="pool-passport__section">
+                Состав
+                {selectedItemCount > 0
+                  ? ` · ${selectedItemCount} ${itemCountLabel(selectedItemCount)}`
+                  : ''}
+              </div>
+              <OrderContent
+                order={selectedOrder}
+                onLoadOrders={() => {
+                  void reloadPoolList(true);
+                }}
+                readOnly
+                operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
+                assignableOnShift={assignableOnShift.length > 0 ? assignableOnShift : undefined}
+                assignableAll={assignableAll.length > 0 ? assignableAll : undefined}
+                onExecutorChange={handleExecutorChange}
+              />
               {orderStatuses.length > 0 && (
                 <details className="order-pool-collapsible">
                   <summary className="order-pool-collapsible__summary">Статусы</summary>
@@ -968,36 +1009,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   ) : null}
                 </details>
               )}
-
-              <div className="pool-passport__section">Состав</div>
-              <OrderContent
-                order={selectedOrder}
-                onLoadOrders={() => {
-                  void reloadPoolList(true);
-                }}
-                readOnly
-                operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
-                assignableOnShift={assignableOnShift.length > 0 ? assignableOnShift : undefined}
-                assignableAll={assignableAll.length > 0 ? assignableAll : undefined}
-                onExecutorChange={handleExecutorChange}
-              />
-
-              <OrderTotal
-                {...(() => {
-                  const a = getOrderAmounts(selectedOrder);
-                  return {
-                    subtotal: a.subtotal,
-                    discountAmount: a.discountAmount,
-                    total: a.total,
-                    debt: a.debt,
-                  };
-                })()}
-                taxRate={0}
-                prepaymentAmount={selectedOrder.prepaymentAmount}
-                prepaymentStatus={selectedOrder.prepaymentStatus}
-                paymentMethod={selectedOrder.paymentMethod}
-                variant="passport"
-              />
             </OrderPoolDetailHeader>
 
             <div className="order-activity-panel pool-notes">
@@ -1025,7 +1036,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </div>
 
             <details className="order-pool-collapsible" open>
-              <summary className="order-pool-collapsible__summary">История изменений</summary>
+              <summary className="order-pool-collapsible__summary">История</summary>
               <div className="order-activity-panel__timeline">
                 {activityLoading ? (
                   <div className="order-activity-panel__empty">Загрузка истории...</div>
@@ -1038,7 +1049,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                         <span className="order-activity-event__title">{event.message}</span>
                         <span className="order-activity-event__date">{formatActivityDate(event.created_at)}</span>
                       </div>
-                      <div className="order-activity-event__meta">{event.user_name || 'Система'}</div>
+                      {event.user_name && event.user_name !== 'Система' ? (
+                        <div className="order-activity-event__meta">{event.user_name}</div>
+                      ) : null}
                       {event.comment && (
                         <div className="order-activity-event__comment">{event.comment}</div>
                       )}
