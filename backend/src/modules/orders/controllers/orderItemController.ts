@@ -715,10 +715,8 @@ export class OrderItemController {
         })
         const newTotal = newAmounts.totalAmount
         const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
-        const clampedPrepayment = paymentRow
-          ? clampedPrepaymentAfterTotalDrop(paymentRow, newTotal)
-          : null
-        if (clampedPrepayment != null) {
+        const paymentMethod = paymentRow?.paymentMethod
+        if (paymentMethod === 'offline' && currentPrepayment > newTotal) {
           let hasPrepaymentUpdatedAt = false
           try {
             hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -728,11 +726,11 @@ export class OrderItemController {
           const updateSql = hasPrepaymentUpdatedAt
             ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
             : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-          await db.run(updateSql, clampedPrepayment, orderId)
+          await db.run(updateSql, newTotal, orderId)
           logger.info('[deleteItem] Предоплата пересчитана', {
             orderId,
             oldPrepayment: currentPrepayment,
-            newPrepayment: clampedPrepayment
+            newPrepayment: newTotal
           })
         }
         
