@@ -1896,13 +1896,17 @@
 }
 
 .order-pool-page .filters {
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 0;
   padding: 8px 12px;
   gap: 8px;
-  overflow-x: auto;
+  overflow: visible;
+  box-sizing: border-box;
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--pc-border, #e2dfd7);
@@ -1911,13 +1915,18 @@
 
 .order-pool-page .filters-quick,
 .order-pool-page .filters-secondary {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
 }
 
 .order-pool-page .order-pool-search {
-  flex: 1 1 220px;
-  min-width: 180px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   border-radius: var(--pc-r-control, 8px);
 }
 
@@ -1947,7 +1956,11 @@
 }
 
 .pool-sheet-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
   padding: 0 8px 12px;
+  overflow: auto;
 }
 
 .pool-sheet {
@@ -2123,4 +2136,298 @@
     flex-direction: column;
     gap: 4px;
   }
+}
+
+/* Паспорт заказа в правой колонке: без карточек, состав строками. */
+.order-pool-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  container-type: normal;
+}
+
+.pool-passport__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pool-passport__eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--pc-muted, #6f6c66);
+  font-family: var(--pc-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pool-passport__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.order-pool-detail .order-pool-detail-header__number {
+  margin: 0;
+  font-family: var(--pc-font-mono, ui-monospace, monospace);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.pool-passport__stamp {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--pc-border-strong, #d0ccc2);
+  border-radius: 5px;
+  background: var(--pc-surface, #fff);
+  color: var(--pc-text, #1c1b19);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pool-passport__stamp--muted {
+  color: var(--pc-muted, #6f6c66);
+}
+
+.pool-passport__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.order-pool-detail .pc-spec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.order-pool-detail .pc-spec-row {
+  display: grid;
+  grid-template-columns: max-content minmax(12px, 1fr) max-content;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.order-pool-detail .pc-spec-row__label {
+  color: var(--pc-muted, #6f6c66);
+}
+
+.order-pool-detail .pc-spec-row__leader {
+  border-bottom: 1px dotted var(--pc-border-strong, #d0ccc2);
+  transform: translateY(-3px);
+}
+
+.order-pool-detail .pc-spec-row__value {
+  font-family: var(--pc-font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  color: var(--pc-text, #1c1b19);
+}
+
+.order-pool-detail .order-pool-detail-header__phone-btn {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: right;
+}
+
+.order-pool-detail .order-detail-responsible {
+  align-items: center;
+}
+
+.order-pool-detail .order-detail-responsible label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--pc-muted, #6f6c66);
+  font-weight: 500;
+}
+
+.order-pool-detail .order-detail-responsible select,
+.order-pool-detail .order-detail-responsible .assignable-user-select {
+  flex: 1 1 180px;
+  min-width: 0;
+  border: 1px solid var(--pc-border, #e2dfd7);
+  border-radius: var(--pc-r-control, 8px);
+  background: var(--pc-surface, #fff);
+  color: var(--pc-text, #1c1b19);
+}
+
+.pool-passport__section {
+  margin: 4px 0 0;
+  color: var(--pc-muted, #6f6c66);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.order-pool-detail .order-positions__head {
+  display: none;
+}
+
+.order-pool-detail .order-position {
+  border-bottom: 1px solid var(--pc-border, #e2dfd7);
+  background: transparent;
+}
+
+.order-pool-detail .order-position__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name sum"
+    "essence qty"
+    "executor executor";
+  row-gap: 2px;
+  column-gap: 12px;
+  align-items: baseline;
+  min-height: 0;
+  padding: 8px 0;
+}
+
+.order-pool-detail .order-position__index {
+  display: none;
+}
+
+.order-pool-detail .order-position__name {
+  grid-area: name;
+  white-space: normal;
+}
+
+.order-pool-detail .order-position__sum {
+  grid-area: sum;
+}
+
+.order-pool-detail .order-position__essence {
+  grid-area: essence;
+  color: var(--pc-muted, #6f6c66);
+  white-space: normal;
+}
+
+.order-pool-detail .order-position__qty {
+  grid-area: qty;
+  color: var(--pc-muted, #6f6c66);
+}
+
+.order-pool-detail .order-position__executor {
+  grid-area: executor;
+  white-space: normal;
+}
+
+.order-pool-detail .pc-passport {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(100%, 320px);
+  margin: 4px 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.order-pool-detail .pc-passport__cell {
+  display: grid;
+  grid-template-columns: max-content minmax(12px, 1fr) max-content;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.order-pool-detail .pc-passport__cell--total .pc-passport__value {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.order-pool-detail .detail-body,
+.order-pool-detail .detail-body .item,
+.order-pool-detail .order-total,
+.order-pool-detail .order-activity-panel,
+.order-pool-detail .order-pool-collapsible,
+.order-pool-detail .order-activity-event {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.order-pool-detail .order-pool-collapsible {
+  overflow: visible;
+  margin: 0;
+}
+
+.order-pool-detail .order-pool-collapsible__summary {
+  padding: 6px 0;
+  color: var(--pc-muted, #6f6c66);
+  font-weight: 600;
+}
+
+.order-pool-detail .order-activity-panel {
+  padding: 4px 0 0;
+}
+
+.order-pool-detail .order-activity-panel__header h3 {
+  color: var(--pc-muted, #6f6c66);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.order-pool-detail .order-activity-panel__notes {
+  min-height: 48px;
+  padding: 4px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.order-pool-detail .order-activity-event {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--pc-border, #e2dfd7);
+}
+
+.pool-passport__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.pool-passport__take {
+  width: 100%;
+  height: 40px;
+}
+
+.order-pool-detail .order-detail-actions {
+  justify-content: flex-start;
+}
+
+.order-pool-detail .pool-passport__paylink {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.order-pool-detail .order-pool-fulfillment-banner--detail {
+  max-width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: var(--pc-warning-soft, #f8eedf);
 }

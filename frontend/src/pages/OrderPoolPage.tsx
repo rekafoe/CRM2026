@@ -946,62 +946,66 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               }
               showPermanentDelete={isAdmin && selectedOrder.is_cancelled === 1}
               issuing={issuingOrderId === selectedOrder.id}
-            />
+              statusLabel={
+                orderStatuses.find((status) => status.id === Number(selectedOrder.status))?.name
+              }
+            >
+              {orderStatuses.length > 0 && (
+                <details className="order-pool-collapsible">
+                  <summary className="order-pool-collapsible__summary">Статусы</summary>
+                  <StatusTrack
+                    statuses={orderStatuses}
+                    currentStatusId={Number(selectedOrder.status)}
+                    createdAt={selectedOrder.created_at ?? (selectedOrder as { createdAt?: string }).createdAt}
+                    readyAt={
+                      selectedOrder.actualCompletion
+                      ?? (selectedOrder as { readyAt?: string | null }).readyAt
+                      ?? null
+                    }
+                  />
+                  {(selectedOrder.items?.length ?? 0) === 0 ? (
+                    <div className="order-status-timeline__empty">Пока нет позиций</div>
+                  ) : null}
+                </details>
+              )}
 
-            {orderStatuses.length > 0 && (
-              <details className="order-pool-collapsible">
-                <summary className="order-pool-collapsible__summary">Статусы</summary>
-                <StatusTrack
-                  statuses={orderStatuses}
-                  currentStatusId={Number(selectedOrder.status)}
-                  createdAt={selectedOrder.created_at ?? (selectedOrder as { createdAt?: string }).createdAt}
-                  readyAt={
-                    selectedOrder.actualCompletion
-                    ?? (selectedOrder as { readyAt?: string | null }).readyAt
-                    ?? null
-                  }
-                />
-                {(selectedOrder.items?.length ?? 0) === 0 ? (
-                  <div className="order-status-timeline__empty">Пока нет позиций</div>
-                ) : null}
-              </details>
-            )}
+              <div className="pool-passport__section">Состав</div>
+              <OrderContent
+                order={selectedOrder}
+                onLoadOrders={() => {
+                  void reloadPoolList(true);
+                }}
+                readOnly
+                operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
+                assignableOnShift={assignableOnShift.length > 0 ? assignableOnShift : undefined}
+                assignableAll={assignableAll.length > 0 ? assignableAll : undefined}
+                onExecutorChange={handleExecutorChange}
+              />
 
-            <OrderContent
-              order={selectedOrder}
-              onLoadOrders={() => {
-                void reloadPoolList(true);
-              }}
-              readOnly
-              operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
-              assignableOnShift={assignableOnShift.length > 0 ? assignableOnShift : undefined}
-              assignableAll={assignableAll.length > 0 ? assignableAll : undefined}
-              onExecutorChange={handleExecutorChange}
-            />
+              <OrderTotal
+                {...(() => {
+                  const a = getOrderAmounts(selectedOrder);
+                  return {
+                    subtotal: a.subtotal,
+                    discountAmount: a.discountAmount,
+                    total: a.total,
+                    debt: a.debt,
+                  };
+                })()}
+                taxRate={0}
+                prepaymentAmount={selectedOrder.prepaymentAmount}
+                prepaymentStatus={selectedOrder.prepaymentStatus}
+                paymentMethod={selectedOrder.paymentMethod}
+                variant="passport"
+              />
+            </OrderPoolDetailHeader>
 
-            <OrderTotal
-              {...(() => {
-                const a = getOrderAmounts(selectedOrder);
-                return {
-                  subtotal: a.subtotal,
-                  discountAmount: a.discountAmount,
-                  total: a.total,
-                  debt: a.debt,
-                };
-              })()}
-              taxRate={0}
-              prepaymentAmount={selectedOrder.prepaymentAmount}
-              prepaymentStatus={selectedOrder.prepaymentStatus}
-              paymentMethod={selectedOrder.paymentMethod}
-              showPaymentBreakdown={false}
-            />
-
-            <div className="order-activity-panel">
+            <div className="order-activity-panel pool-notes">
               <div className="order-activity-panel__header">
                 <h3>Примечания</h3>
                 <button
                   type="button"
-                  className="lg-btn lg-btn--success"
+                  className="lg-btn"
                   onClick={() => void handleSaveNotes()}
                   disabled={notesSaving}
                 >
@@ -1018,38 +1022,38 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 placeholder="Добавьте примечание по заказу..."
                 rows={3}
               />
-
-              <details className="order-pool-collapsible order-pool-collapsible--nested">
-                <summary className="order-pool-collapsible__summary">История изменений</summary>
-                <div className="order-activity-panel__timeline">
-                  {activityLoading ? (
-                    <div className="order-activity-panel__empty">Загрузка истории...</div>
-                  ) : orderActivity.length === 0 ? (
-                    <div className="order-activity-panel__empty">История пока пустая</div>
-                  ) : (
-                    orderActivity.map((event) => (
-                      <div key={event.id} className="order-activity-event">
-                        <div className="order-activity-event__top">
-                          <span className="order-activity-event__title">{event.message}</span>
-                          <span className="order-activity-event__date">{formatActivityDate(event.created_at)}</span>
-                        </div>
-                        <div className="order-activity-event__meta">{event.user_name || 'Система'}</div>
-                        {event.comment && (
-                          <div className="order-activity-event__comment">{event.comment}</div>
-                        )}
-                        {event.old_value != null && event.new_value != null && (
-                          <div className="order-activity-event__change">
-                            <span>{event.old_value}</span>
-                            <span className="arrow">→</span>
-                            <span>{event.new_value}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </details>
             </div>
+
+            <details className="order-pool-collapsible" open>
+              <summary className="order-pool-collapsible__summary">История изменений</summary>
+              <div className="order-activity-panel__timeline">
+                {activityLoading ? (
+                  <div className="order-activity-panel__empty">Загрузка истории...</div>
+                ) : orderActivity.length === 0 ? (
+                  <div className="order-activity-panel__empty">История пока пустая</div>
+                ) : (
+                  orderActivity.map((event) => (
+                    <div key={event.id} className="order-activity-event">
+                      <div className="order-activity-event__top">
+                        <span className="order-activity-event__title">{event.message}</span>
+                        <span className="order-activity-event__date">{formatActivityDate(event.created_at)}</span>
+                      </div>
+                      <div className="order-activity-event__meta">{event.user_name || 'Система'}</div>
+                      {event.comment && (
+                        <div className="order-activity-event__comment">{event.comment}</div>
+                      )}
+                      {event.old_value != null && event.new_value != null && (
+                        <div className="order-activity-event__change">
+                          <span>{event.old_value}</span>
+                          <span className="arrow">→</span>
+                          <span>{event.new_value}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </details>
           </>
         ) : (
           <div className="order-pool-detail-empty">
