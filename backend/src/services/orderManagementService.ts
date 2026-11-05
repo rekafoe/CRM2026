@@ -6,7 +6,7 @@ import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
 import { tryEnqueueWebsiteOrderCompletedEmail } from './websiteOrderEmailService';
 import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
-import { issueCashRemainder } from '../utils/orderAmounts';
+import { issueCashRemainder, isNonCashCollectedPrepayment } from '../utils/orderAmounts';
 import { OrderService } from '../modules/orders/services/orderService';
 import { findOrderStatusId } from '../utils/orderStatusCatalog';
 
@@ -494,10 +494,18 @@ export class OrderManagementService {
           try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
           const paymentId = `ISSUE-${Date.now()}-${orderId}`;
           const completedId = await findOrderStatusId(db, 'completed', 7);
-          const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = ? WHERE id = ?`
-            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = ? WHERE id = ?`;
-          await db.run(updateSql, totalAmount, paymentId, completedId, orderId);
+          // bank / успешный BePaid: не запечатывать как offline cash-day (см. routes/orders issue).
+          if (isNonCashCollectedPrepayment(order)) {
+            await db.run(
+              `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime'), status = ? WHERE id = ?`,
+              totalAmount, completedId, orderId,
+            );
+          } else {
+            const updateSql = hasPrepaymentUpdatedAt
+              ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = ? WHERE id = ?`
+              : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = ? WHERE id = ?`;
+            await db.run(updateSql, totalAmount, paymentId, completedId, orderId);
+          }
 
           // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
           const issuer = issuerId ?? null;

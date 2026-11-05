@@ -119,6 +119,24 @@ export function issueCashRemainder(
   return round2(Math.max(0, round2(totalAmount) - collectedPrepaymentAmount(order)))
 }
 
+/**
+ * Уже полученные безналичные деньги (платёжка bank / успешный BePaid или telegram).
+ * При выдаче их нельзя переписывать в offline+paid с сегодняшней prepaymentUpdatedAt:
+ * иначе computeCashForReportDate положит безнал в кассу дня, хотя debt_closed остаток 0.
+ */
+export function isNonCashCollectedPrepayment(order: {
+  prepaymentStatus?: string | null
+  paymentMethod?: string | null
+}): boolean {
+  const status = String(order.prepaymentStatus ?? '').trim().toLowerCase()
+  const method = String(order.paymentMethod ?? '').trim().toLowerCase()
+  if (status === 'bank') return true
+  if ((status === 'paid' || status === 'successful') && (method === 'online' || method === 'telegram')) {
+    return true
+  }
+  return false
+}
+
 /** Сумма позиции после скидки заказа. База та же, что в карточке: storedTotalCost, иначе price × quantity. */
 export function discountedItemAmount(item: ItemLike, discountPercent: number): number {
   const base = computeItemLineTotal(item);

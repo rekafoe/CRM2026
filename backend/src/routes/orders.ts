@@ -10,7 +10,7 @@ import { PostalShipmentService } from '../services/postalShipmentService'
 import { buildOrderCostSheet } from '../services/orderCostSheet'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { findOrderStatusId } from '../utils/orderStatusCatalog'
-import { issueCashRemainder } from '../utils/orderAmounts'
+import { issueCashRemainder, isNonCashCollectedPrepayment } from '../utils/orderAmounts'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
@@ -1393,7 +1393,14 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const paymentId = `ISSUE-${Date.now()}-${id}`
   // prepaymentUpdatedAt = дата выдачи (today), чтобы заказ попадал в отчёты по этой дате
   const issueDateTime = `${today} 12:00:00`
-  if (hasPrepaymentUpdatedAt) {
+  // bank / успешный BePaid: не переписывать в offline+paid с сегодняшней датой — иначе безнал
+  // попадёт в кассу дня через computeCashForReportDate, даже если debt_closed остаток 0 (#76).
+  if (isNonCashCollectedPrepayment(order)) {
+    await db.run(
+      'UPDATE orders SET prepaymentAmount = ?, updated_at = ?, status = ? WHERE id = ?',
+      total, issueDateTime, completedId, id
+    )
+  } else if (hasPrepaymentUpdatedAt) {
     await db.run(
       'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = ?, updated_at = ?, status = ? WHERE id = ?',
       total, paymentId, issueDateTime, issueDateTime, completedId, id

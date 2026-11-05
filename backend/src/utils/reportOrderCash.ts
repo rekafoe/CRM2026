@@ -81,7 +81,13 @@ export function computeCashForReportDate(order: OrderCashInput, reportDate: stri
   if (hasIssue && Number.isFinite(issueAmt) && issueAmt > 0) {
     const prepayment = Number(order.prepaymentAmount ?? 0)
     const created = sliceReportDateLocal(order.created_at ?? order.createdAt)
-    if (created === rd && Number.isFinite(prepayment) && prepayment > 0) {
+    const method = String(order.paymentMethod ?? '').toLowerCase()
+    const status = String(order.prepaymentStatus ?? '').toLowerCase()
+    // Слияние «предоплата + остаток выдачи» в день оформления только для кассы.
+    // bank / online / telegram — безнал: в кассу дня идёт только issueAmt (остаток с витрины).
+    const prepaidIsCash =
+      method !== 'online' && method !== 'telegram' && status !== 'bank'
+    if (prepaidIsCash && created === rd && Number.isFinite(prepayment) && prepayment > 0) {
       if (issueAmt < prepayment) return prepayment
       if (issueAmt === 0 && prepayment > 0) return prepayment
     }

@@ -128,4 +128,53 @@ describe('computeCashForReportDate', () => {
     )
     expect(cash).toBe(40)
   })
+
+  it('does not put full invoice bank into cash after issue with zero remainder', () => {
+    // После фикса issue сохраняет bank+online; debt_closed amount=0.
+    // Старый баг: seal в offline+paid+сегодня → fallthrough считал весь итог кассой.
+    const cash = computeCashForReportDate(
+      {
+        prepaymentAmount: 250,
+        prepaymentStatus: 'bank',
+        paymentMethod: 'online',
+        payment_channel: 'invoice',
+        created_at: '2025-06-01 10:00:00',
+        prepaymentUpdatedAt: '2025-06-01 11:00:00',
+        cash_from_issue_today: 0,
+      },
+      '2025-06-05',
+    )
+    expect(cash).toBe(0)
+  })
+
+  it('same-day issue with partial bank counts only cash remainder, not bank portion', () => {
+    const cash = computeCashForReportDate(
+      {
+        prepaymentAmount: 250,
+        prepaymentStatus: 'bank',
+        paymentMethod: 'online',
+        payment_channel: 'invoice',
+        created_at: '2025-06-05 10:00:00',
+        prepaymentUpdatedAt: '2025-06-05 11:00:00',
+        cash_from_issue_today: 80,
+      },
+      '2025-06-05',
+    )
+    expect(cash).toBe(80)
+  })
+
+  it('same-day cash prepaid + issue remainder still merges to full day cash', () => {
+    const cash = computeCashForReportDate(
+      {
+        prepaymentAmount: 138,
+        prepaymentStatus: 'paid',
+        paymentMethod: 'offline',
+        created_at: '2025-06-05 10:00:00',
+        prepaymentUpdatedAt: '2025-06-05 10:30:00',
+        cash_from_issue_today: 38,
+      },
+      '2025-06-05',
+    )
+    expect(cash).toBe(138)
+  })
 })
