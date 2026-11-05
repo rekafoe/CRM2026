@@ -23,6 +23,24 @@
   border-color: var(--pc-accent-hover);
 }
 
+:root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(:disabled),
+:root[data-theme='powder'] .pc-workplace-pool:not(:disabled) {
+  border-color: #E09AB8;
+  color: var(--pc-accent);
+}
+
+:root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(:disabled):hover,
+:root[data-theme='powder'] .pc-workplace-pool:not(:disabled):hover {
+  background: var(--pc-accent-soft);
+  border-color: var(--pc-accent);
+  color: var(--pc-accent);
+}
+
+:root[data-theme='powder'] .pc-track__step.is-current .pc-track__mark,
+:root[data-theme='powder'] .pc-track__step.is-done .pc-track__mark {
+  height: 3px;
+}
+
 :root[data-theme='powder'] .public-design-editor--admin .public-design-editor__stage,
 :root[data-theme='dark'] .public-design-editor--admin .public-design-editor__stage {
   background: #e7e5e0;
