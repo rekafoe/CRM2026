@@ -122,7 +122,7 @@ export const PageModals: React.FC<PageModalsProps> = ({
                 className="close-btn"
                 onClick={onCloseCountersPage}
               >
-                ✕
+                <AppIcon name="x" size="xs" />
               </button>
             </div>
             <div className="new-order-management-content">

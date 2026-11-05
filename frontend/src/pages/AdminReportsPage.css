@@ -679,11 +679,11 @@
 }
 
 .reports-trend-positive {
-  background-color: var(--accent-primary) !important;
+  background-color: var(--accent-primary);
 }
 
 .reports-trend-negative {
-  background-color: #6c757d !important;
+  background-color: #6c757d;
 }
 
 /* Компоненты новой аналитики */

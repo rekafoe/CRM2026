@@ -58,7 +58,6 @@
     radial-gradient(circle at 0 0, rgba(0, 166, 214, 0.12), transparent 30%);
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(12px);
 }
 
 .public-design-editor__brand {
@@ -168,12 +167,12 @@
   place-items: center;
   min-width: 30px;
   min-height: 30px;
-  padding: 0 9px !important;
-  color: var(--pc-ink-soft) !important;
-  background: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.1) !important;
-  border-radius: 999px !important;
-  box-shadow: none !important;
+  padding: 0 9px;
+  color: var(--pc-ink-soft);
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
+  border-radius: var(--pc-r-control, 8px);
+  box-shadow: none;
 }
 
 .public-design-editor__view-controls {
@@ -183,7 +182,7 @@
   padding: 3px;
   background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor__view-toggle {
@@ -195,7 +194,7 @@
   color: var(--pc-muted);
   background: transparent;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 13px;
   font-weight: 900;
@@ -221,7 +220,7 @@
   color: var(--pc-muted);
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -254,7 +253,7 @@
   color: var(--pc-ink-soft);
   background: rgba(241, 245, 249, 0.86);
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
@@ -263,20 +262,20 @@
 .public-design-editor__top-actions .btn {
   min-height: 32px;
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-weight: 800;
 }
 
 .public-design-editor__top-actions .btn-primary {
-  background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue)) !important;
-  border-color: rgba(37, 99, 235, 0.7) !important;
+  background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue));
+  border-color: rgba(37, 99, 235, 0.7);
   box-shadow: 0 16px 34px rgba(37, 99, 235, 0.28);
 }
 
 .public-design-editor__top-actions .btn-secondary {
-  color: var(--pc-ink) !important;
-  background: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.1) !important;
+  color: var(--pc-ink);
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
   box-shadow: none;
 }
 
@@ -288,7 +287,7 @@
   color: var(--pc-ink-soft);
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 12px;
   font-weight: 900;
   white-space: nowrap;
@@ -342,7 +341,6 @@
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 22px;
   box-shadow: 0 22px 56px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(8px);
 }
 
 .public-design-editor__stage--with-guide {
@@ -374,7 +372,7 @@
   color: #92400e;
   background: rgba(245, 158, 11, 0.14);
   border: 1px solid rgba(245, 158, 11, 0.24);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-size: 11px;
   font-style: normal;
   font-weight: 900;

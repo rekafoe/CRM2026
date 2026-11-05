@@ -295,7 +295,7 @@
   font-size: 12px;
   line-height: 1.35;
   min-height: 26px;
-  text-align: center !important;
+  text-align: center;
   border-radius: 6px;
   border-color: #d1d5db;
   color: var(--text-primary, #374151);
@@ -533,7 +533,7 @@
   min-height: 20px;
   font-size: 11px;
   line-height: 1.35;
-  text-align: center !important;
+  text-align: center;
 }
 
 .plotter-tier-table__price-line {
@@ -560,8 +560,8 @@
   text-align: center;
   font-size: 13px;
   color: var(--text-secondary, #6b7280);
-  padding: 16px 12px !important;
-  background: var(--bg-tertiary, #f9fafb) !important;
+  padding: 16px 12px;
+  background: var(--bg-tertiary, #f9fafb);
   vertical-align: middle;
 }
 
@@ -575,7 +575,7 @@
   color: var(--text-primary, #374151);
   background: var(--bg-primary, #ffffff);
   min-height: 20px;
-  text-align: center !important;
+  text-align: center;
   width: auto;
   max-width: 100%;
 }
@@ -585,7 +585,7 @@
   width: 9ch;
   min-width: 9ch;
   max-width: 11ch;
-  text-align: center !important;
+  text-align: center;
 }
 
 .plotter-tier-table__toolbar {
@@ -698,7 +698,7 @@
 }
 
 .plotter-roll-finishing__badge {
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   border: 1px solid rgba(209, 213, 219, 0.6);
   background: rgba(229, 231, 235, 0.55);
   color: var(--text-primary, #1f2937);

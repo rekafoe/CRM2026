@@ -96,7 +96,7 @@
   gap: 6px;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: #fff;
@@ -157,7 +157,7 @@
 .status-pill {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   border: 1px solid var(--status-color, #1976d2);
   color: var(--status-color, #1976d2);
   background: #fff;
@@ -210,14 +210,12 @@
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(209, 213, 219, 0.6);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: rgba(229, 231, 235, 0.88);
   color: #1f2937;
   font-size: 18px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 .icon-btn:hover {
   background: rgba(229, 231, 235, 0.95);

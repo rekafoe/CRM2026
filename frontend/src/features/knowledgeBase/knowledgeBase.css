@@ -133,7 +133,7 @@
 .kb-image-node.is-selected .kb-image-controls { display: flex; }
 .kb-image-controls button { min-height: 30px; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: #f2f4f8; color: #42506a; font-size: 11px; cursor: pointer; }
 .kb-image-controls button:hover, .kb-image-controls button.active { color: var(--kb-primary); border-color: #c9d3f6; background: #eaf0ff; }
-.kb-image-caption-input { width: 180px !important; min-height: 30px; padding: 5px 8px !important; border-radius: 6px !important; font-size: 11px !important; }
+.kb-image-caption-input { width: 180px; min-height: 30px; padding: 5px 8px; border-radius: 6px; font-size: 11px; }
 .kb-image-resize-handle { position: absolute; right: -7px; bottom: -7px; z-index: 19; width: 18px; height: 18px; display: none; border: 2px solid #fff; border-radius: 50%; background: var(--kb-primary); box-shadow: 0 2px 7px rgba(31,50,100,.28); cursor: nwse-resize; }
 .kb-image-node.is-selected .kb-image-resize-handle { display: block; }
 .kb-prose::after { content: ""; display: block; clear: both; }
@@ -180,7 +180,7 @@
 .kb-thread > header > span:nth-child(2) { display: grid; flex: 1; }
 .kb-thread small { color: var(--kb-muted); }
 .kb-thread > p { white-space: pre-wrap; line-height: 1.55; }
-.kb-resolved { display: inline-flex !important; align-items: center; gap: 3px; color: var(--kb-success); font-size: 10px; }
+.kb-resolved { display: inline-flex; align-items: center; gap: 3px; color: var(--kb-success); font-size: 10px; }
 .kb-reply { margin: 13px 0 0 34px; padding: 13px; display: flex; align-items: flex-start; gap: 9px; background: #f7f8fb; border-radius: 9px; font-size: 12px; }
 .kb-reply p { white-space: pre-wrap; margin: 5px 0; line-height: 1.5; }
 .kb-reply-form { display: grid; gap: 8px; margin: 14px 0 0 34px; }
@@ -195,7 +195,7 @@
 .kb-editor-card, .kb-settings-card { background: #fff; border: 1px solid var(--kb-line); border-radius: 14px; box-shadow: 0 7px 25px rgba(26,43,79,.05); overflow: hidden; }
 .kb-editor-card { overflow: visible; }
 .kb-title-input { display: block; width: calc(100% - 48px); margin: 23px 24px 5px; padding: 8px 0; border: 0; border-bottom: 1px solid transparent; outline: 0; color: var(--kb-ink); font-size: clamp(25px, 3vw, 36px); font-weight: 750; letter-spacing: -.035em; }
-.kb-excerpt-input { width: calc(100% - 48px) !important; margin: 0 24px 20px; border-color: transparent !important; padding: 7px 0 !important; box-shadow: none !important; color: var(--kb-muted) !important; font-size: 14px !important; }
+.kb-excerpt-input { width: calc(100% - 48px); margin: 0 24px 20px; border-color: transparent; padding: 7px 0; box-shadow: none; color: var(--kb-muted); font-size: 14px; }
 .kb-editor-toolbar { min-height: 52px; padding: 7px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: #f8f9fc; border-top: 1px solid var(--kb-line); border-bottom: 1px solid var(--kb-line); position: sticky; top: 68px; z-index: 10; }
 .kb-editor-toolbar select { width: auto; height: 34px; padding: 5px 27px 5px 8px; font-size: 12px; }
 .kb-toolbar-group { display: inline-flex; gap: 2px; padding-left: 6px; border-left: 1px solid #dce1e9; }
@@ -223,8 +223,8 @@
 .kb-compare > section { min-width: 0; background: #fff; border: 1px solid var(--kb-line); border-radius: 14px; overflow: hidden; }
 .kb-compare > section > header { padding: 13px 18px; display: flex; align-items: center; justify-content: space-between; background: #f1f3f7; font-size: 12px; font-weight: 750; }
 .kb-compare > section > header small { color: var(--kb-muted); font-weight: 400; }
-.kb-compare-proposed { border-color: #bac8fa !important; }
-.kb-compare-proposed > header { background: #eaf0ff !important; color: var(--kb-primary); }
+.kb-compare-proposed { border-color: #bac8fa; }
+.kb-compare-proposed > header { background: #eaf0ff; color: var(--kb-primary); }
 .kb-compare-body { padding: clamp(20px, 4vw, 38px); }
 .kb-compare-body > h1 { font-size: 27px; line-height: 1.15; letter-spacing: -.035em; }
 .kb-compare-body .kb-content { padding: 18px 0; }
@@ -277,7 +277,7 @@
   .kb-editor-card { width: 100%; order: 2; }
   .kb-editor-sidebar { width: 100%; position: static; order: 1; }
   .kb-title-input { width: calc(100% - 34px); margin-inline: 17px; }
-  .kb-excerpt-input { width: calc(100% - 34px) !important; margin-inline: 17px; }
+  .kb-excerpt-input { width: calc(100% - 34px); margin-inline: 17px; }
   .kb-editor-toolbar { top: 60px; overflow-x: auto; flex-wrap: nowrap; }
   .kb-editor-content, .kb-prose--editable { min-height: 460px; }
   .kb-prose--editable { padding: 26px 20px 55px; }

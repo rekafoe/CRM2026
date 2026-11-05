@@ -315,8 +315,6 @@
   font-weight: 500;
   letter-spacing: 0;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .pc-order-actions .order-detail-action-btn:not(:disabled):hover,

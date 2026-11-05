@@ -57,8 +57,8 @@
 
 /* Обеспечиваем естественный скролл страницы */
 body {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Grid utilities */
@@ -307,30 +307,30 @@ body {
 
 /* Toolbar Styles */
 .materials-management .materials-toolbar {
-  background: var(--bg-secondary) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 6px !important;
-  padding: 12px !important;
-  margin-bottom: 12px !important;
-  box-shadow: 0 1px 3px var(--shadow) !important;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px var(--shadow);
 }
 
 .materials-management .materials-toolbar .warehouse-button {
-  padding: 8px 12px !important;
-  font-size: 13px !important;
+  padding: 8px 12px;
+  font-size: 13px;
 }
 
 /* Global warehouse button styles */
 .materials-management .warehouse-button {
-  min-height: 32px !important;
-  border-radius: 4px !important;
+  min-height: 32px;
+  border-radius: 4px;
   font-weight: 500;
 }
 
 .materials-management .warehouse-button.btn-sm {
-  min-height: 28px !important;
-  padding: 4px 8px !important;
-  font-size: 12px !important;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .warehouse-button.btn-md {
@@ -354,19 +354,19 @@ body {
 .warehouse-dashboard .materials-management .material-card,
 .materials-management-container .material-card,
 .materials-management .material-card {
-  background: var(--bg-secondary) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 6px !important;
-  padding: 16px !important;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 16px;
   transition: all 0.3s ease;
-  box-shadow: 0 1px 3px var(--shadow) !important;
+  box-shadow: 0 1px 3px var(--shadow);
   max-width: 100%;
-  height: 100% !important;
-  min-height: 450px !important;
-  overflow: hidden !important;
-  position: relative !important;
-  display: flex !important;
-  flex-direction: column !important;
+  height: 100%;
+  min-height: 450px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .warehouse-dashboard .materials-management .material-card:hover,
@@ -374,8 +374,8 @@ body {
 .warehouse-dashboard .materials-management .material-card:hover,
 .materials-management-container .material-card:hover,
 .materials-management .material-card:hover {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 4px 8px var(--shadow) !important;
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 8px var(--shadow);
 }
 
 .warehouse-dashboard .materials-management .material-card.selected,
@@ -383,8 +383,8 @@ body {
 .warehouse-dashboard .materials-management .material-card.selected,
 .materials-management-container .material-card.selected,
 .materials-management .material-card.selected {
-  border-color: var(--accent-primary) !important;
-  background-color: var(--info-light) !important;
+  border-color: var(--accent-primary);
+  background-color: var(--info-light);
 }
 
 .material-checkbox {
@@ -405,10 +405,10 @@ body {
 }
 
 .materials-management .material-details {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 6px !important;
-  margin-bottom: 10px !important;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .detail-item {
@@ -446,55 +446,55 @@ body {
 }
 
 .materials-management .material-actions {
-  display: flex !important;
-  gap: 4px !important;
-  margin-top: auto !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  flex-shrink: 0 !important;
+  display: flex;
+  gap: 4px;
+  margin-top: auto;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 /* Compact button styles - MAXIMUM SPECIFICITY */
 .warehouse-dashboard .materials-management .material-actions .warehouse-button,
 .materials-management-container .material-actions .warehouse-button,
 .materials-management .material-actions .warehouse-button {
-  padding: 3px 5px !important;
-  font-size: 10px !important;
-  min-height: auto !important;
-  flex: 1 !important;
-  max-width: 48% !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  padding: 3px 5px;
+  font-size: 10px;
+  min-height: auto;
+  flex: 1;
+  max-width: 48%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .materials-management .material-actions .warehouse-button.btn-sm {
-  padding: 4px 8px !important;
-  font-size: 11px !important;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 /* Compact card styles */
 .materials-management .material-card-header {
-  flex-shrink: 0 !important;
-  margin-bottom: 16px !important;
+  flex-shrink: 0;
+  margin-bottom: 16px;
 }
 
 .materials-management .material-card-body {
-  margin-bottom: 16px !important;
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: auto !important;
+  margin-bottom: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
 }
 
 .materials-management .material-description {
-  background: var(--bg-tertiary) !important;
-  border-radius: 4px !important;
-  padding: 6px !important;
-  margin-bottom: 8px !important;
-  font-size: 12px !important;
-  color: var(--text-secondary) !important;
-  line-height: 1.3 !important;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.3;
 }
 
 .category-info {
@@ -507,22 +507,22 @@ body {
 .warehouse-dashboard .materials-management .materials-list.grid,
 .materials-management-container .materials-list.grid,
 .materials-management .materials-list.grid {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
-  gap: 16px !important;
-  padding: 16px !important;
-  grid-auto-rows: min-content !important;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  grid-auto-rows: min-content;
 }
 
 /* Block/List Styles - MAXIMUM SPECIFICITY */
 .warehouse-dashboard .materials-management .materials-list:not(.grid),
 .materials-management-container .materials-list:not(.grid),
 .materials-management .materials-list:not(.grid) {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-  padding: 16px !important;
-  flex: 1 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  flex: 1;
 }
 
 /* Row Header Styles - заголовки для строчного режима */
@@ -662,9 +662,9 @@ body {
 }
 
 .material-row-card .action-btn {
-  padding: 4px 8px !important;
-  font-size: 11px !important;
-  min-height: 28px !important;
+  padding: 4px 8px;
+  font-size: 11px;
+  min-height: 28px;
   white-space: nowrap;
 }
 
@@ -737,9 +737,9 @@ body {
   }
   
   .material-row-card .action-btn {
-    padding: 3px 6px !important;
-    font-size: 10px !important;
-    min-height: 24px !important;
+    padding: 3px 6px;
+    font-size: 10px;
+    min-height: 24px;
   }
 }
 
@@ -769,8 +769,8 @@ body {
 /* More compact grid for larger screens */
 @media (min-width: 1200px) {
   .materials-management .materials-list.grid {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
   }
 }
 

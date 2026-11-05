@@ -455,13 +455,13 @@
 
 /* Input states */
 .input-error {
-  border-color: #d32f2f !important;
-  box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.2) !important;
+  border-color: #d32f2f;
+  box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.2);
 }
 
 .input-success {
-  border-color: #4caf50 !important;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2) !important;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 /* Form validation states */

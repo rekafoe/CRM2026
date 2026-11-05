@@ -81,7 +81,7 @@
 .pricing-chip {
   font-size: 12px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: var(--bg-secondary, #f1f5f9);
   color: var(--text-secondary);
   border: 1px solid var(--border-color, #e2e8f0);
@@ -439,7 +439,7 @@
   align-items: center;
   min-height: 24px;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   background: color-mix(in srgb, var(--warning, #d97706) 12%, #fff);
   color: var(--warning-dark, #92400e);
   font-size: 11px;
@@ -768,12 +768,12 @@
 }
 
 .simplified-table__parent-row td {
-  background-color: #f5f7fa !important;
+  background-color: #f5f7fa;
   font-weight: 500;
 }
 
 .simplified-table__parent-cell {
-  padding-left: 10px !important;
+  padding-left: 10px;
 }
 
 .simplified-table__child-row {
@@ -781,7 +781,7 @@
 }
 
 .simplified-table__child-cell {
-  padding-left: 32px !important;
+  padding-left: 32px;
   position: relative;
 }
 

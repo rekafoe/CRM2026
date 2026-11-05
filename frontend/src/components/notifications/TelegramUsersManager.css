@@ -77,7 +77,7 @@
 .loading-cell,
 .empty-cell {
   text-align: center;
-  padding: 40px !important;
+  padding: 40px;
   color: var(--text-secondary);
   font-style: italic;
 }

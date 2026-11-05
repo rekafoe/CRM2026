@@ -1,19 +1,19 @@
 import { useEffect } from 'react'
-import { applyCrmAppearance } from './useCrmAppearance'
+import { applyCrmAppearance, currentAppearanceUserId, readCrmAppearance } from './useCrmAppearance'
 
 /**
  * Системная тёмная тема больше не включается сама.
- * Оформление CRM задаёт useCrmAppearance: на этом этапе доступна только светлая тема.
+ * Оформление задаёт useCrmAppearance: Светлая, Пудра, Deep Ink.
  */
 export const useTheme = () => {
   useEffect(() => {
-    applyCrmAppearance()
+    applyCrmAppearance(readCrmAppearance(currentAppearanceUserId()))
   }, [])
 
   return {
     theme: 'light' as const,
     toggleTheme: () => {
-      applyCrmAppearance()
+      applyCrmAppearance(readCrmAppearance(currentAppearanceUserId()))
     },
     isDark: false,
     isLight: true,

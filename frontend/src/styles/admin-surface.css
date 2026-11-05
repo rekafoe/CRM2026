@@ -51,8 +51,6 @@
   background: var(--pc-surface);
   color: var(--pc-text);
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   transform: none;
 }
 
@@ -103,8 +101,6 @@
   border: 1px solid var(--pc-border);
   border-radius: var(--pc-r-card);
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .admin-panel-page .settings-page .settings-nav__btn {
@@ -113,7 +109,6 @@
   background: transparent;
   color: var(--pc-text);
   box-shadow: none;
-  backdrop-filter: none;
 }
 
 .admin-panel-page .settings-page .settings-nav__btn--active,
@@ -196,8 +191,6 @@
 .earnings-page .earnings-summary-card,
 .earnings-page button {
   border-radius: var(--pc-r-control);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .login-page .login-title {
@@ -214,17 +207,15 @@
 }
 
 .admin-panel-page .product-template-page :is(.back-btn, .template-topbar-btn, .btn) {
-  border-radius: var(--pc-r-control) !important;
-  background: var(--pc-surface) !important;
-  border-color: var(--pc-border) !important;
-  color: var(--pc-text) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  border-radius: var(--pc-r-control);
+  background: var(--pc-surface);
+  border-color: var(--pc-border);
+  color: var(--pc-text);
+  box-shadow: none;
 }
 
 .admin-panel-page .product-template-page :is(.btn-primary, .lg-btn--primary) {
-  background: var(--pc-accent) !important;
-  border-color: var(--pc-accent) !important;
-  color: var(--pc-on-accent) !important;
+  background: var(--pc-accent);
+  border-color: var(--pc-accent);
+  color: var(--pc-on-accent);
 }

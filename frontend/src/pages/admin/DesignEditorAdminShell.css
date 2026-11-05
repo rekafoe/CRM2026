@@ -6,8 +6,8 @@
 }
 
 .public-design-editor__workspace--admin {
-  display: flex !important;
-  grid-template-columns: none !important;
+  display: flex;
+  grid-template-columns: none;
   gap: 0;
   padding: 0;
   min-height: 0;
@@ -28,7 +28,7 @@
   padding: 3px;
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
 }
 
 .public-design-editor--admin .design-editor-main {
@@ -85,7 +85,7 @@
 }
 
 .public-design-editor--admin .public-design-editor__admin-action-group .btn:first-child {
-  color: #0b1220 !important;
+  color: #0b1220;
 }
 
 .public-design-editor--admin .design-editor-sidebar {
@@ -173,7 +173,7 @@
 
 .public-design-editor--admin .photo-panel__btn-primary,
 .public-design-editor--admin .design-editor-panel-add-text {
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   font-weight: 800;
 }
 
@@ -256,8 +256,6 @@
   background: var(--pc-surface, #fff);
   border-bottom: 1px solid var(--pc-border, #e2dfd7);
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .public-design-editor--admin .public-design-editor__logo-text {
@@ -365,10 +363,8 @@
 .public-design-editor--admin .design-editor-panel .photo-panel__select,
 .public-design-editor--admin .design-editor-toolbar .design-editor-font-select,
 .public-design-editor--admin .design-editor-toolbar .design-editor-font-size {
-  border-radius: var(--pc-r-control, 8px) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
+  border-radius: var(--pc-r-control, 8px);
+  box-shadow: none;
 }
 
 .public-design-editor--admin .design-editor .btn,
@@ -376,16 +372,16 @@
 .public-design-editor--admin .design-editor-panel .btn,
 .public-design-editor--admin .design-editor-toolbar-icon-btn,
 .public-design-editor--admin .design-editor-page-btn {
-  background: var(--pc-surface, #fff) !important;
-  border: 1px solid var(--pc-border-control, #d4d0c8) !important;
-  color: var(--pc-text, #141619) !important;
+  background: var(--pc-surface, #fff);
+  border: 1px solid var(--pc-border-control, #d4d0c8);
+  color: var(--pc-text, #141619);
 }
 
 .public-design-editor--admin .design-editor .btn.btn-primary,
 .public-design-editor--admin .public-design-editor__top-actions .btn.btn-primary {
-  background: var(--pc-accent, #1d4ed8) !important;
-  border-color: var(--pc-accent, #1d4ed8) !important;
-  color: var(--pc-on-accent, #fff) !important;
+  background: var(--pc-accent, #1d4ed8);
+  border-color: var(--pc-accent, #1d4ed8);
+  color: var(--pc-on-accent, #fff);
 }
 
 .public-design-editor--admin .design-editor-panel-header,
@@ -415,14 +411,14 @@
 .public-design-editor--admin .public-design-editor__view-toggle,
 .public-design-editor--admin .public-design-editor__stage-hints summary,
 .public-design-editor--admin .public-design-editor__page-caption em {
-  border-radius: var(--pc-r-control, 8px) !important;
-  box-shadow: none !important;
+  border-radius: var(--pc-r-control, 8px);
+  box-shadow: none;
 }
 
 .public-design-editor--admin .public-design-editor__top-actions .btn-primary {
-  background: var(--pc-accent, #1d4ed8) !important;
-  border-color: var(--pc-accent, #1d4ed8) !important;
-  color: var(--pc-on-accent, #fff) !important;
+  background: var(--pc-accent, #1d4ed8);
+  border-color: var(--pc-accent, #1d4ed8);
+  color: var(--pc-on-accent, #fff);
 }
 
 .public-design-editor--admin .public-design-editor__stage-toolbar {
@@ -433,6 +429,4 @@
 .public-design-editor--admin .public-design-editor__stage {
   border-radius: var(--pc-r-card, 10px);
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }

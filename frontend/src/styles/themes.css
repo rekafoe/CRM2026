@@ -86,23 +86,23 @@ body {
 }
 
 .text-primary {
-  color: var(--text-primary) !important;
+  color: var(--text-primary);
 }
 
 .text-secondary {
-  color: var(--text-secondary) !important;
+  color: var(--text-secondary);
 }
 
 .bg-primary {
-  background-color: var(--bg-primary) !important;
+  background-color: var(--bg-primary);
 }
 
 .bg-secondary {
-  background-color: var(--bg-secondary) !important;
+  background-color: var(--bg-secondary);
 }
 
 .border {
-  border-color: var(--border-color) !important;
+  border-color: var(--border-color);
 }
 
 /* Стили для форм */

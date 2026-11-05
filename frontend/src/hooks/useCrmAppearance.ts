@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 
-/** Светлая тема и обычная плотность. Пудра, Deep Ink и компактная плотность появятся позже. */
+/** Светлая, «Пудра» и Deep Ink. Плотность пока обычная. */
+export type CrmTheme = 'light' | 'powder' | 'dark';
+
 export type CrmAppearance = {
-  theme: 'light';
+  theme: CrmTheme;
   density: 'regular';
 };
 
@@ -23,18 +25,22 @@ export function currentAppearanceUserId(): string {
   return localStorage.getItem('crmUserId') || '0';
 }
 
+function isCrmTheme(value: unknown): value is CrmTheme {
+  return value === 'light' || value === 'powder' || value === 'dark';
+}
+
 export function readCrmAppearance(userId: string): CrmAppearance {
   try {
     const raw = localStorage.getItem(appearanceStorageKey(userId));
     if (!raw) return CRM_APPEARANCE_DEFAULT;
     const parsed = JSON.parse(raw) as Partial<CrmAppearance>;
-    if (parsed.theme === 'light' && parsed.density === 'regular') {
-      return CRM_APPEARANCE_DEFAULT;
-    }
+    return {
+      theme: isCrmTheme(parsed.theme) ? parsed.theme : 'light',
+      density: 'regular',
+    };
   } catch {
-    /* повреждённая запись — светлая тема */
+    return CRM_APPEARANCE_DEFAULT;
   }
-  return CRM_APPEARANCE_DEFAULT;
 }
 
 export function ensureCrmAppearance(userId = currentAppearanceUserId()): CrmAppearance {

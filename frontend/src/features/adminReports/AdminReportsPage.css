@@ -428,7 +428,7 @@
   background: var(--btn-tab-bg, #f0ecf5);
   color: var(--btn-tab-text, #5a4d72);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--pc-r-control, 8px);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
