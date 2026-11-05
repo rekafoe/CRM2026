@@ -9,6 +9,8 @@ import {
   currentAppearanceUserId,
   readCrmAppearance,
   saveCrmAppearance,
+  type CrmAppearance,
+  type CrmDensity,
   type CrmTheme,
 } from '../../hooks/useCrmAppearance';
 import './TopBar.css';
@@ -86,10 +88,10 @@ export const TopBar: React.FC<TopBarProps> = ({
     return location.pathname === path;
   };
 
-  const [theme, setTheme] = React.useState<CrmTheme>(() => readCrmAppearance(currentAppearanceUserId()).theme);
+  const [appearance, setAppearance] = React.useState<CrmAppearance>(() => readCrmAppearance(currentAppearanceUserId()));
 
   React.useEffect(() => {
-    const sync = () => setTheme(readCrmAppearance(currentAppearanceUserId()).theme);
+    const sync = () => setAppearance(readCrmAppearance(currentAppearanceUserId()));
     window.addEventListener(CRM_APPEARANCE_EVENT, sync);
     window.addEventListener('storage', sync);
     return () => {
@@ -98,9 +100,12 @@ export const TopBar: React.FC<TopBarProps> = ({
     };
   }, []);
 
-  const chooseTheme = (next: CrmTheme) => {
-    saveCrmAppearance(currentAppearanceUserId(), { theme: next, density: 'regular' });
+  const chooseAppearance = (patch: Partial<CrmAppearance>) => {
+    const current = readCrmAppearance(currentAppearanceUserId());
+    saveCrmAppearance(currentAppearanceUserId(), { ...current, ...patch });
   };
+  const theme = appearance.theme;
+  const density = appearance.density;
 
   return (
     <header className="app-topbar">
@@ -231,21 +236,21 @@ export const TopBar: React.FC<TopBarProps> = ({
             <div className="pc-profile__menu" role="menu" aria-label="Профиль">
               <div className="pc-profile__heading">Оформление</div>
               <div className="pc-profile__group" role="radiogroup" aria-label="Тема">
-                <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-selected' : ''} onClick={() => chooseTheme('light')}>
+                <button type="button" role="radio" aria-checked={theme === 'light'} className={theme === 'light' ? 'is-selected' : ''} onClick={() => chooseAppearance({ theme: 'light' })}>
                   Светлая
                 </button>
-                <button type="button" role="radio" aria-checked={theme === 'powder'} className={theme === 'powder' ? 'is-selected' : ''} onClick={() => chooseTheme('powder')}>
+                <button type="button" role="radio" aria-checked={theme === 'powder'} className={theme === 'powder' ? 'is-selected' : ''} onClick={() => chooseAppearance({ theme: 'powder' })}>
                   Пудра
                 </button>
-                <button type="button" role="radio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'is-selected' : ''} onClick={() => chooseTheme('dark')}>
+                <button type="button" role="radio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'is-selected' : ''} onClick={() => chooseAppearance({ theme: 'dark' })}>
                   Deep Ink
                 </button>
               </div>
               <div className="pc-profile__group" role="radiogroup" aria-label="Плотность">
-                <button type="button" role="radio" aria-checked="true" className="is-selected" onClick={() => chooseTheme(theme)}>
+                <button type="button" role="radio" aria-checked={density === 'regular'} className={density === 'regular' ? 'is-selected' : ''} onClick={() => chooseAppearance({ density: 'regular' satisfies CrmDensity })}>
                   Обычная
                 </button>
-                <button type="button" role="radio" aria-checked="false" disabled title="Пока недоступно">
+                <button type="button" role="radio" aria-checked={density === 'compact'} className={density === 'compact' ? 'is-selected' : ''} onClick={() => chooseAppearance({ density: 'compact' })}>
                   Компактная
                 </button>
               </div>
