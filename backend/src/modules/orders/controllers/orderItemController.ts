@@ -14,7 +14,12 @@ import { isWaitingStatusId } from '../../../utils/orderStatusCatalog'
 import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
-import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
+import {
+  clampedPrepaymentAfterTotalDrop,
+  computeItemLineTotal,
+  computeOrderAmounts,
+  parseMoneyInput,
+} from '../../../utils/orderAmounts'
 import { shouldAutoFillCashPrepayment } from '../../../utils/legalOrderPrepayment'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
@@ -954,15 +959,21 @@ export class OrderItemController {
 
         const priceOrQtyChanged = body.price != null || body.quantity != null
         let oldSubtotal = 0
-        let paymentRow: { prepaymentAmount?: number | null; paymentMethod?: string | null; discount_percent?: number | null } | null = null
+        let paymentRow: {
+          prepaymentAmount?: number | null
+          prepaymentStatus?: string | null
+          paymentMethod?: string | null
+          discount_percent?: number | null
+        } | null = null
         if (priceOrQtyChanged) {
           const itemsBefore = await OrderRepository.getItemsByOrderId(orderId)
           oldSubtotal = computeOrderAmounts({ items: itemsBefore }).subtotal
           paymentRow = await db.get<{
             prepaymentAmount?: number | null
+            prepaymentStatus?: string | null
             paymentMethod?: string | null
             discount_percent?: number | null
-          }>('SELECT prepaymentAmount, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
+          }>('SELECT prepaymentAmount, prepaymentStatus, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
         }
 
         let hasExecutorUserId = false
@@ -1089,17 +1100,24 @@ export class OrderItemController {
         }
         await db.run(updateSql, ...bindings)
 
-        if (priceOrQtyChanged && paymentRow && paymentRow.paymentMethod === 'offline') {
+        if (priceOrQtyChanged && paymentRow) {
           const pct = Number(paymentRow?.discount_percent || 0) / 100
           const oldTotal = Math.round(oldSubtotal * (1 - pct) * 100) / 100
           const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
           const eps = 0.005
-          if (Math.abs(prepaymentAmount - oldTotal) < eps) {
-            const itemsAfter = await OrderRepository.getItemsByOrderId(orderId)
-            const newTotal = computeOrderAmounts({
-              items: itemsAfter,
-              discount_percent: paymentRow?.discount_percent ?? 0,
-            }).totalAmount
+          const itemsAfter = await OrderRepository.getItemsByOrderId(orderId)
+          const newTotal = computeOrderAmounts({
+            items: itemsAfter,
+            discount_percent: paymentRow?.discount_percent ?? 0,
+          }).totalAmount
+          // Offline автопредоплата, синхронная с итогом: следует за newTotal вверх и вниз.
+          // Bank/paid: только ужимаем вниз (см. clampedPrepaymentAfterTotalDrop), иначе акт сверки копит переплату.
+          const syncOfflineFull =
+            paymentRow.paymentMethod === 'offline' && Math.abs(prepaymentAmount - oldTotal) < eps
+          const nextPrepayment = syncOfflineFull
+            ? newTotal
+            : clampedPrepaymentAfterTotalDrop(paymentRow, newTotal)
+          if (nextPrepayment != null && Math.abs(nextPrepayment - prepaymentAmount) >= eps) {
             let hasPrepaymentUpdatedAt = false
             try {
               hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -1109,7 +1127,7 @@ export class OrderItemController {
             const updateSql = hasPrepaymentUpdatedAt
               ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
               : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-            await db.run(updateSql, newTotal, orderId)
+            await db.run(updateSql, nextPrepayment, orderId)
           }
         }
 

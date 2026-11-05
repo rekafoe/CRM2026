@@ -108,15 +108,18 @@ router.post(
       return
     }
 
-    // Follow-up BePaid link после paid/bank: send-payment-link сохраняет сумму и открывает paymentUrl.
-    // Donaчислить installment; иначе SET (первая оплата / website confirm уже записал amount).
+    // Follow-up BePaid link после paid/bank: send-payment-link сохраняет сумму и открывает paymentUrl → accumulate.
+    // Без открытого checkout нельзя SET-затирать уже зачтённый bank/paid (типично: invoice /prepay
+    // обнулил paymentUrl/paymentId, а доехал delayed webhook по tracking_id=номеру заказа).
     const hasOpenCheckout = Boolean(String(order.paymentUrl || '').trim())
     const amount =
       prepaymentStatus === 'paid'
         ? amountByn > 0
           ? alreadyCollected && hasOpenCheckout
             ? Math.round((existingPrepay + amountByn) * 100) / 100
-            : amountByn
+            : alreadyCollected && !hasOpenCheckout
+              ? Math.max(existingPrepay, amountByn)
+              : amountByn
           : existingPrepay > 0
             ? existingPrepay
             : 0

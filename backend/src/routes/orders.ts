@@ -601,7 +601,11 @@ router.patch('/:id/external-files/:fileId', (req, res, next) => {
   res.json(sanitizeOrderFileForClient(file))
 }))
 
-/** Второй PDF фото. Сайт не ждёт сборку: ответ сразу, PDF пишется рядом с пометкой _crm. */
+/**
+ * Второй PDF фото. Сайт не ждёт сборку: ответ сразу, PDF пишется рядом с пометкой _crm.
+ * WEBSITE_ORDER_API_KEY only — and only for source=website (enforced in startCrmPhotoPdf),
+ * same scope as POST/PATCH external-files.
+ */
 router.post('/:id/crm-photo-pdf', requireWebsiteOrderApiKey, asyncHandler(async (req, res) => {
   const orderId = Number(req.params.id)
   if (!Number.isFinite(orderId)) {

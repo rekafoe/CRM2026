@@ -119,6 +119,30 @@ export function issueCashRemainder(
   return round2(Math.max(0, round2(totalAmount) - collectedPrepaymentAmount(order)))
 }
 
+/**
+ * После снижения итога (удаление/урезание позиций): во сколько ужать prepaid, иначе null.
+ * Offline — автопредоплата следует за итогом вниз.
+ * Bank / paid / successful — тоже: иначе акт сверки копит «переплату» без товара
+ * (у bank paymentMethod остаётся online, offline-only clamp их пропускал).
+ * Pending BePaid не трогаем: деньги ещё не получены.
+ */
+export function clampedPrepaymentAfterTotalDrop(
+  order: {
+    prepaymentAmount?: number | string | null
+    prepaymentStatus?: string | null
+    paymentMethod?: string | null
+  },
+  newTotal: number,
+): number | null {
+  const current = round2(parseNum(order.prepaymentAmount))
+  const total = round2(Math.max(0, newTotal))
+  if (current <= total) return null
+  const method = String(order.paymentMethod ?? '').trim().toLowerCase()
+  if (method === 'offline') return total
+  if (collectedPrepaymentAmount(order) > total) return total
+  return null
+}
+
 /** Сумма позиции после скидки заказа. База та же, что в карточке: storedTotalCost, иначе price × quantity. */
 export function discountedItemAmount(item: ItemLike, discountPercent: number): number {
   const base = computeItemLineTotal(item);

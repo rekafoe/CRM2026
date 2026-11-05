@@ -1,11 +1,13 @@
 import {
   attachAmountsToOrder,
+  clampedPrepaymentAfterTotalDrop,
   computeItemLineTotal,
   computeOrderAmounts,
   discountedItemAmounts,
   issueCashRemainder,
   parseMoneyInput,
 } from '../utils/orderAmounts';
+import { reconciliationSourceFromOrder } from '../services/reconciliationStatement';
 
 describe('orderAmounts', () => {
   it('computeItemLineTotal prefers storedTotalCost', () => {
@@ -120,5 +122,69 @@ describe('orderAmounts', () => {
         paymentMethod: 'online',
       }),
     ).toBe(150);
+  });
+
+  it('clamps offline and bank prepaid when total drops; leaves pending BePaid alone', () => {
+    expect(
+      clampedPrepaymentAfterTotalDrop(
+        { prepaymentAmount: 100, prepaymentStatus: 'paid', paymentMethod: 'offline' },
+        40,
+      ),
+    ).toBe(40);
+    expect(
+      clampedPrepaymentAfterTotalDrop(
+        { prepaymentAmount: 200, prepaymentStatus: 'bank', paymentMethod: 'online' },
+        75,
+      ),
+    ).toBe(75);
+    expect(
+      clampedPrepaymentAfterTotalDrop(
+        { prepaymentAmount: 90, prepaymentStatus: 'paid', paymentMethod: 'online' },
+        50,
+      ),
+    ).toBe(50);
+    expect(
+      clampedPrepaymentAfterTotalDrop(
+        { prepaymentAmount: 80, prepaymentStatus: 'pending', paymentMethod: 'online' },
+        30,
+      ),
+    ).toBeNull();
+    expect(
+      clampedPrepaymentAfterTotalDrop(
+        { prepaymentAmount: 40, prepaymentStatus: 'bank', paymentMethod: 'online' },
+        100,
+      ),
+    ).toBeNull();
+  });
+
+  it('after clamp, invoice bank no longer invents reconciliation overpayment', () => {
+    const before = reconciliationSourceFromOrder({
+      id: 21,
+      number: 'ORD-21',
+      created_at: '2026-11-04',
+      totalAmount: 40,
+      prepaymentAmount: 200,
+      prepaymentStatus: 'bank',
+      paymentMethod: 'online',
+      paymentChannel: 'invoice',
+    });
+    expect(before.collected).toBe(200);
+
+    const clamped = clampedPrepaymentAfterTotalDrop(
+      { prepaymentAmount: 200, prepaymentStatus: 'bank', paymentMethod: 'online' },
+      40,
+    );
+    expect(clamped).toBe(40);
+    const after = reconciliationSourceFromOrder({
+      id: 21,
+      number: 'ORD-21',
+      created_at: '2026-11-04',
+      totalAmount: 40,
+      prepaymentAmount: clamped,
+      prepaymentStatus: 'bank',
+      paymentMethod: 'online',
+      paymentChannel: 'invoice',
+    });
+    expect(after.collected).toBe(40);
   });
 });
