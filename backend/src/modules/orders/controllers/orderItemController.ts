@@ -14,7 +14,12 @@ import { isWaitingStatusId } from '../../../utils/orderStatusCatalog'
 import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
-import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
+import {
+  clampedPrepaymentAfterTotalDrop,
+  computeItemLineTotal,
+  computeOrderAmounts,
+  parseMoneyInput,
+} from '../../../utils/orderAmounts'
 import { shouldAutoFillCashPrepayment } from '../../../utils/legalOrderPrepayment'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
@@ -710,8 +715,10 @@ export class OrderItemController {
         })
         const newTotal = newAmounts.totalAmount
         const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
-        const paymentMethod = paymentRow?.paymentMethod
-        if (paymentMethod === 'offline' && currentPrepayment > newTotal) {
+        const clampedPrepayment = paymentRow
+          ? clampedPrepaymentAfterTotalDrop(paymentRow, newTotal)
+          : null
+        if (clampedPrepayment != null) {
           let hasPrepaymentUpdatedAt = false
           try {
             hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -721,11 +728,13 @@ export class OrderItemController {
           const updateSql = hasPrepaymentUpdatedAt
             ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime') WHERE id = ?`
             : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-          await db.run(updateSql, newTotal, orderId)
+          await db.run(updateSql, clampedPrepayment, orderId)
           logger.info('[deleteItem] Предоплата пересчитана', {
             orderId,
             oldPrepayment: currentPrepayment,
-            newPrepayment: newTotal
+            newPrepayment: clampedPrepayment,
+            paymentMethod: paymentRow?.paymentMethod,
+            prepaymentStatus: paymentRow?.prepaymentStatus,
           })
         }
         
