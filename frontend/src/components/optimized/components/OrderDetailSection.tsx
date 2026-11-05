@@ -358,6 +358,11 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             <span className="pc-order-tag">Выдали вы</span>
           )}
         </div>
+        <div className="pc-order-head__actions">
+          <button type="button" className="pc-btn" onClick={() => onOpenCalculator()}>
+            <AppIcon name="plus" size="xs" /> Добавить продукт
+          </button>
+        </div>
       </header>
       <div className="detail-header detail-header--notes-aligned">
         <div className="pc-order-actions">
@@ -631,9 +636,6 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       </div>
 
       <div className="pc-track-row">
-        <button type="button" className="pc-btn" onClick={() => onOpenCalculator()}>
-          <AppIcon name="plus" size="xs" /> Добавить продукт
-        </button>
         <StatusTrack
           currentStatusId={Number(selectedOrder.status)}
           statuses={statuses}
@@ -644,15 +646,13 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         {canIssue && onIssueOrder ? (
           <button
             type="button"
-            className="pc-btn pc-btn--primary"
+            className="pc-btn pc-btn--primary pc-track-row__issue"
             title="Выдать заказ (100% остатка, долг закрыт)"
             onClick={() => onIssueOrder(selectedOrder.id)}
           >
             <AppIcon name="check" size="xs" /> Выдать заказ
           </button>
-        ) : (
-          <span className="pc-track-row__end" aria-hidden="true" />
-        )}
+        ) : null}
       </div>
 
       <div className="detail-body">

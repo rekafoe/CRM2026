@@ -1,0 +1,33 @@
+/* Компактная плотность: строка 34px, контрол 28px. Токены уже в tokens.css. */
+
+:root[data-density='compact'] .pool-sheet th {
+  box-sizing: border-box;
+  height: var(--pc-h-row);
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+}
+
+:root[data-density='compact'] .pool-sheet td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+:root[data-density='compact'] .pc-workplace-side .order-list .order-item {
+  min-height: var(--pc-h-row);
+  padding-top: 3px;
+  padding-bottom: 3px;
+  gap: 0;
+}
+
+:root[data-density='compact'] .order-pool-page .filters .lg-btn,
+:root[data-density='compact'] .order-pool-page .filters-quick .quick-btn,
+:root[data-density='compact'] .order-pool-page .filters-secondary select,
+:root[data-density='compact'] .order-pool-search input,
+:root[data-density='compact'] .admin-panel-page .nav-btn {
+  box-sizing: border-box;
+  height: var(--pc-h-control);
+  min-height: var(--pc-h-control);
+  padding-top: 0;
+  padding-bottom: 0;
+}
