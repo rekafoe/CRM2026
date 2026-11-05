@@ -10,6 +10,7 @@ import {
 } from './orderPoolUtils';
 import { isPoolOrderStatusId, useOrderStatuses } from '../../hooks/useOrderStatuses';
 import { OrderStamp } from '../order/OrderStamp';
+import { PoolLoader } from './PoolLoader';
 
 function clockLabel(value?: string | null): string {
   if (!value) return '';
@@ -196,12 +197,7 @@ export const OrderPoolList: React.FC<OrderPoolListProps> = ({
 
   return (
     <div className={`order-list pool-sheet-wrap ${searchLoading ? 'order-list--searching' : ''}`}>
-      {searchLoading && (
-        <div className="order-pool-search-hint" role="status">
-          <span className="order-pool-search-hint__pulse" />
-          Обновляем результаты
-        </div>
-      )}
+      {searchLoading && <PoolLoader label="Обновляем список" compact />}
       <table className="pool-sheet">
         <thead>
           <tr>
