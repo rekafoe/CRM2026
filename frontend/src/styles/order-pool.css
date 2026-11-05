@@ -1871,7 +1871,7 @@
 
 .order-pool-workspace {
   display: grid;
-  grid-template-columns: minmax(280px, 30%) minmax(0, 1fr);
+  grid-template-columns: 40% 60%;
   gap: 0;
   padding: 0;
   min-height: 0;
@@ -1881,9 +1881,9 @@
 
 .order-pool-sidebar {
   flex: none;
-  width: auto;
+  width: 100%;
   min-width: 0;
-  max-width: 100%;
+  max-width: none;
   overflow: hidden;
   background: transparent;
   border: none;
@@ -1901,7 +1901,7 @@
   flex: none;
   min-width: 0;
   max-width: none;
-  width: auto;
+  width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--pc-surface, #fff);
@@ -1991,7 +1991,7 @@
 
 .pool-sheet {
   width: 100%;
-  min-width: 640px;
+  min-width: 0;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 13px;
@@ -2740,7 +2740,7 @@
 
 @media (max-width: 960px) {
   .order-pool-workspace {
-    grid-template-columns: minmax(260px, 32%) minmax(0, 1fr);
+    grid-template-columns: 40% 60%;
   }
 
   .order-pool-detail .pc-passport {
