@@ -2,6 +2,7 @@ import React from 'react';
 import type { CollageLayout, DesignAsset } from '../../../api';
 import { SIDEBAR_ITEMS } from './constants';
 import type { TextBlockPresetKind } from './constants';
+import type { TemplateFontUsage } from './templateFontUsage';
 import type { SidebarSection, SelectedObjProps, SidebarPhotoItem, TextEffectsValues } from './types';
 import { PhotoPanel } from './panels/PhotoPanel';
 import { TextPanel } from './panels/TextPanel';
@@ -34,6 +35,7 @@ interface DesignEditorPanelProps {
   onApplyFont?: (fontFamily: string) => void;
   /** Шрифты, уже встречающиеся в макете (панель «Используемые шрифты»). */
   usedFonts?: string[];
+  templateFontUsage?: TemplateFontUsage[];
   onApplyTextColor?: (fill: string) => void;
   onApplyEffects?: (v: TextEffectsValues) => void;
   // Shapes
@@ -86,6 +88,7 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
   onAddTextPreset,
   onApplyFont,
   usedFonts = [],
+  templateFontUsage = [],
   onApplyTextColor,
   onApplyEffects,
   onAddShape,
@@ -170,6 +173,7 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
       <TextPanel
         selectedObj={selectedObj ?? null}
         usedFonts={usedFonts}
+        templateFontUsage={templateFontUsage}
         onTextChange={onTextChange}
         onAddTextPreset={onAddTextPreset}
         onApplyFont={onApplyFont}

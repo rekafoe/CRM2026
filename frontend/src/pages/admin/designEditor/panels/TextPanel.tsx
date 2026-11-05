@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AppIcon } from '../../../../components/ui/AppIcon';
 import { Button } from '../../../../components/common';
 import { Modal } from '../../../../components/common/Modal';
+import { useCrmDesignFonts } from '../../../../hooks/useCrmDesignFonts';
+import { findCrmFontByFamily } from '../../../../utils/loadDesignFonts';
 import { TEXT_BLOCK_PRESETS, type TextBlockPresetKind } from '../constants';
 import { findFontCatalogEntry } from '../fontsCatalog';
+import {
+  formatTemplateFontObjectCount,
+  formatTemplateFontPages,
+  type TemplateFontUsage,
+} from '../templateFontUsage';
 import type { SelectedObjProps, TextEffectsValues } from '../types';
 import { FontLibraryView } from './FontLibraryView';
 import './TextPanel.css';
@@ -13,6 +20,8 @@ interface TextPanelProps {
   selectedObj: SelectedObjProps | null;
   /** Уникальные fontFamily по всем страницам макета (блок «Используемые шрифты»). */
   usedFonts: string[];
+  /** Сводка шрифтов макета для панели «Шрифты шаблона». Только показ. */
+  templateFontUsage?: TemplateFontUsage[];
   onTextChange: (text: string) => void;
   onAddTextPreset: (kind: TextBlockPresetKind) => void;
   onApplyFont: (fontFamily: string) => void;
@@ -31,6 +40,7 @@ export const TextPanel: React.FC<TextPanelProps> = ({
   onClose,
   selectedObj,
   usedFonts,
+  templateFontUsage = [],
   onTextChange,
   onAddTextPreset,
   onApplyFont,
@@ -51,6 +61,15 @@ export const TextPanel: React.FC<TextPanelProps> = ({
 
   const currentFontFamily =
     isText && selectedObj?.fontFamily ? selectedObj.fontFamily : undefined;
+  const { fonts: libraryFonts } = useCrmDesignFonts();
+  const templateFontRows = useMemo(
+    () => templateFontUsage.map((row) => ({
+      ...row,
+      label: findFontCatalogEntry(row.family)?.label ?? row.family,
+      inLibrary: Boolean(findCrmFontByFamily(row.family, libraryFonts)),
+    })),
+    [templateFontUsage, libraryFonts],
+  );
 
   useEffect(() => {
     if (colorOpen) {
@@ -151,6 +170,33 @@ export const TextPanel: React.FC<TextPanelProps> = ({
               })}
             </div>
           </section>
+
+          {templateFontRows.length > 0 ? (
+            <section className="text-panel-v2__section template-fonts" aria-label="Шрифты шаблона">
+              <div className="template-fonts__head">
+                <h4 className="text-panel-v2__section-title">Шрифты шаблона</h4>
+                <span className="template-fonts__count">{templateFontRows.length}</span>
+              </div>
+              <ul className="template-fonts__list">
+                {templateFontRows.map((row) => (
+                  <li key={row.family} className="template-fonts__row">
+                    <div className="template-fonts__name">{row.label}</div>
+                    <div className="template-fonts__meta">
+                      {formatTemplateFontObjectCount(row.objectCount)}
+                      {' · '}
+                      {formatTemplateFontPages(row.pages)}
+                    </div>
+                    <div className={row.inLibrary ? 'template-fonts__badge' : 'template-fonts__badge template-fonts__badge--missing'}>
+                      {row.inLibrary ? 'В библиотеке' : 'Нет в библиотеке'}
+                    </div>
+                    {row.inLibrary ? null : (
+                      <div className="template-fonts__note">будет замена</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className="text-panel-v2__section" aria-label="Правки">
             <h4 className="text-panel-v2__section-title">Шрифты проекта</h4>
