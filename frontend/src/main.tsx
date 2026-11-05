@@ -16,6 +16,7 @@ import './styles/skeleton.css';
 import { APP_CONFIG } from './types';
 import { ErrorBoundary } from './components/optimized/ErrorBoundary';
 import { ensureCrmAppearance, useCrmAppearance } from './hooks/useCrmAppearance';
+import { PoolLoader } from './components/orderPool/PoolLoader';
 
 ensureCrmAppearance();
 
@@ -88,11 +89,17 @@ function OrderPoolPageWrapper() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <LoadingFallback />;
+  if (loading) {
+    return (
+      <div className="order-pool-page order-pool-page--loading">
+        <PoolLoader label="Загружаем пул заказов" />
+      </div>
+    );
+  }
   if (!user) return <div className="error-message">Ошибка загрузки пользователя</div>;
 
   return (
-    <React.Suspense fallback={<LoadingFallback />}>
+    <React.Suspense fallback={<div className="order-pool-page order-pool-page--loading"><PoolLoader label="Загружаем пул заказов" /></div>}>
       <LazyOrderPoolPage
         currentUserId={user.id}
         currentUserName={user.name}

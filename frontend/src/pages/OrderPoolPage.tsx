@@ -42,6 +42,7 @@ import { useReasonPresets } from '../components/common/useReasonPresets';
 import {
   OrderPoolFilters,
   OrderPoolList,
+  PoolLoader,
   OrderPoolDetailHeader,
   getEffectiveResponsibleUserId,
   describeOrderPoolFilter,
@@ -804,7 +805,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     return d.toLocaleString('ru-RU');
   }, []);
 
-  if (loading) return <div className="loading-overlay">Загрузка...</div>;
+  if (loading) {
+    return (
+      <div className="order-pool-page order-pool-page--loading">
+        <PoolLoader label="Загружаем пул заказов" />
+      </div>
+    );
+  }
   if (error) return <div className="error-message">{error}</div>;
 
   const selectedDebt = selectedOrder ? getOrderDebt(selectedOrder) : 0;
@@ -882,6 +889,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       </div>
 
       <div className="order-pool-detail">
+        {selectedOrder && activityLoading ? (
+          <PoolLoader label="Открываем заказ" compact />
+        ) : null}
         {selectedOrder ? (
           <>
             <OrderPoolDetailHeader

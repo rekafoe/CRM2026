@@ -1,4 +1,5 @@
 export { OrderPoolFilters } from './OrderPoolFilters';
+export { PoolLoader } from './PoolLoader';
 export { OrderPoolList } from './OrderPoolList';
 export { OrderPoolDetailHeader } from './OrderPoolDetailHeader';
 export { OrderPoolPaymentSummary } from './OrderPoolPaymentSummary';

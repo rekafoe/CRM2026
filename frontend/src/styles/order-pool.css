@@ -253,8 +253,7 @@
 }
 
 .order-pool-search--loading::after {
-  opacity: 1;
-  animation: orderPoolGlassSweep 1.35s ease-in-out infinite;
+  opacity: 0;
 }
 
 .order-pool-search:focus-within {
