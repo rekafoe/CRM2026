@@ -4,11 +4,11 @@ import { AssignableUserSelect } from '../orders/AssignableUserSelect';
 import { OrderTransferModal } from '../orders/OrderTransferModal';
 import type { AssignableUser, Department } from '../../api';
 import {
-  formatPoolDateTimeFull,
+  formatPoolStampDate,
   getEffectiveResponsibleUserId,
   getOrderReadyLabel,
   getPoolFulfillmentChip,
-  getSourceLabel,
+  getSourceStamp,
   poolFulfillmentShowsBanner,
 } from './orderPoolUtils';
 import { OrderPoolFulfillmentBanner } from './OrderPoolFulfillmentBanner';
@@ -17,6 +17,8 @@ import { OrderDeliveryBlock } from '../orders/OrderDeliveryBlock';
 import { OrderPoolPaymentSummary } from './OrderPoolPaymentSummary';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
 import { Menu, MenuItem } from '../ui/Menu';
+import { OrderStamp } from '../order/OrderStamp';
+import { AppIcon } from '../ui/AppIcon';
 
 interface OrderPoolDetailHeaderProps {
   order: Order;
@@ -50,9 +52,25 @@ interface OrderPoolDetailHeaderProps {
   children?: React.ReactNode;
 }
 
+function channelTag(channel?: string | null): string {
+  switch (channel) {
+    case 'invoice':
+      return 'Счёт';
+    case 'internal':
+      return 'Внутренние';
+    case 'not_cashed':
+      return '';
+    default:
+      return 'Касса';
+  }
+}
+
+function invoiceLine(channel?: string | null): string {
+  return channel === 'invoice' ? 'по счёту' : 'не выставлен';
+}
+
 export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   order,
-  currentUserId,
   prepay,
   debt,
   onCopyPaymentUrl,
@@ -90,7 +108,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const readiness = getOrderReadyLabel(order);
   const needsAssign = canReassign && responsibleId == null;
   const createdAt = order.created_at ?? (order as { createdAt?: string }).createdAt;
-  const createdLabel = formatPoolDateTimeFull(createdAt);
+  const createdLabel = formatPoolStampDate(createdAt);
   const roleOnShift = assignableOnShift.length > 0 ? assignableOnShift : allUsers;
   const roleAll = assignableAll.length > 0 ? assignableAll : allUsers;
   const payment = getPoolPaymentInfo(order);
@@ -98,6 +116,13 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const showFulfillmentBanner = poolFulfillmentShowsBanner(fulfillmentChip);
   const showDeliveryDetails = Boolean(order.delivery);
   const showFulfillmentPoint = !showDeliveryDetails && Boolean(order.fulfillment_department_name);
+  const sourceStamp = order.source ? getSourceStamp(order.source) : '';
+  const channel = channelTag(order.payment_channel);
+  const customer = order.customer;
+  const isLegal = customer?.type === 'legal';
+  const legalName = customer?.legal_name || customer?.company_name || '';
+  const taxId = customer?.tax_id || '';
+  const contactName = customer?.authorized_person || '';
 
   useEffect(() => {
     if (!prepayMenuOpen) return;
@@ -115,30 +140,49 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
     };
   }, [prepayMenuOpen]);
 
-  const sourceLabel = order.source ? getSourceLabel(order.source) : '';
-
   return (
     <div className="order-pool-detail-header">
       <div className="pool-passport__identity">
         <div className="pool-passport__eyebrow">
-          {sourceLabel ? <span>{sourceLabel}</span> : <span>Заказ</span>}
+          <span>Выбран</span>
+          {sourceStamp ? <span>{sourceStamp}</span> : null}
           {createdLabel ? <span>{createdLabel}</span> : null}
         </div>
         <div className="pool-passport__title">
           <h2 className="order-pool-detail-header__number">{order.number}</h2>
-          {statusLabel ? <span className="pool-passport__stamp">{statusLabel}</span> : null}
-          {showCancelled ? <span className="pool-passport__stamp pool-passport__stamp--muted">Отменён</span> : null}
+          <OrderStamp
+            status={statusLabel ? { id: Number(order.status), name: statusLabel } : { id: Number(order.status), name: '' }}
+            onlineCancelled={showCancelled}
+          />
         </div>
         <div className="pool-passport__tags">
-          {needsAssign ? <span className="pc-order-tag">Без ответственного</span> : null}
+          {needsAssign ? <span className="pc-order-tag pc-order-tag--open">Без ответственного</span> : null}
+          {channel ? <span className="pc-order-tag">{channel}</span> : null}
           {payment.tone !== 'none' ? <span className="pc-order-tag">{payment.badge}</span> : null}
         </div>
+
+        <div className="pool-passport__section">Клиент</div>
         <div className="pc-spec-list">
-          <div className="pc-spec-row">
-            <span className="pc-spec-row__label">Клиент</span>
-            <span className="pc-spec-row__leader" />
-            <span className="pc-spec-row__value">{order.customerName || 'Не указан'}</span>
-          </div>
+          {isLegal ? (
+            <>
+              <div className="pc-spec-row">
+                <span className="pc-spec-row__label">Юрлицо</span>
+                <span className="pc-spec-row__leader" />
+                <span className="pc-spec-row__value">{legalName || order.customerName || 'Не указан'}</span>
+              </div>
+              <div className="pc-spec-row">
+                <span className="pc-spec-row__label">УНП</span>
+                <span className="pc-spec-row__leader" />
+                <span className="pc-spec-row__value">{taxId || '—'}</span>
+              </div>
+            </>
+          ) : (
+            <div className="pc-spec-row">
+              <span className="pc-spec-row__label">Клиент</span>
+              <span className="pc-spec-row__leader" />
+              <span className="pc-spec-row__value">{order.customerName || 'Не указан'}</span>
+            </div>
+          )}
           <div className="pc-spec-row">
             <span className="pc-spec-row__label">Телефон</span>
             <span className="pc-spec-row__leader" />
@@ -155,6 +199,13 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
               <span className="pc-spec-row__value">—</span>
             )}
           </div>
+          {contactName ? (
+            <div className="pc-spec-row">
+              <span className="pc-spec-row__label">Контакт</span>
+              <span className="pc-spec-row__leader" />
+              <span className="pc-spec-row__value">{contactName}</span>
+            </div>
+          ) : null}
           <div className="pc-spec-row">
             <span className="pc-spec-row__label">Готовность</span>
             <span className="pc-spec-row__leader" />
@@ -166,6 +217,11 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
                 </span>
               ) : null}
             </span>
+          </div>
+          <div className="pc-spec-row">
+            <span className="pc-spec-row__label">Счёт</span>
+            <span className="pc-spec-row__leader" />
+            <span className="pc-spec-row__value">{invoiceLine(order.payment_channel)}</span>
           </div>
         </div>
 
@@ -190,7 +246,7 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
           </div>
         ) : null}
 
-        <div className="order-detail-responsible order-detail-responsible--with-transfer">
+        <div className="order-detail-responsible">
           <label htmlFor="order-pool-responsible">
             Ответственный
             <AssignableUserSelect
@@ -215,20 +271,6 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
               }
             />
           </label>
-          <button
-            type="button"
-            className={`lg-btn${fulfillmentChip?.variant === 'pickup' ? ' lg-btn--primary' : ''}`}
-            onClick={() => setTransferOpen(true)}
-            title={
-              fulfillmentChip?.variant === 'pickup'
-                ? `Передать заказ на точку «${fulfillmentChip.pointName}»`
-                : 'Передать коллеге или в другой павильон'
-            }
-          >
-            {fulfillmentChip?.variant === 'pickup'
-              ? `Передать на ${fulfillmentChip.pointName}`
-              : 'Передать'}
-          </button>
         </div>
       </div>
 
@@ -249,13 +291,11 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             className="lg-btn lg-btn--primary pool-passport__take"
             onClick={onAssignToMe}
           >
-            Взять в работу
+            <AppIcon name="user" size="xs" />
+            Взять себе
           </button>
         )}
         <div className="order-detail-actions" role="toolbar" aria-label="Действия по заказу">
-          <button type="button" className="lg-btn" onClick={onShowFiles}>
-            Файлы
-          </button>
           <div className="pc-menu-anchor" ref={prepayMenuRef}>
             <button
               type="button"
@@ -277,13 +317,42 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
               </Menu>
             ) : null}
           </div>
-            {showIssueOrder && (
-              <button
-                type="button"
-                className="lg-btn lg-btn--success"
-                onClick={onIssueOrder}
-                disabled={issuing}
-              >
+          <button type="button" className="lg-btn" onClick={onShowFiles}>
+            <AppIcon name="folder" size="xs" />
+            Файлы
+          </button>
+          <button
+            type="button"
+            className={`lg-btn${fulfillmentChip?.variant === 'pickup' ? ' lg-btn--primary' : ''}`}
+            onClick={() => setTransferOpen(true)}
+            title={
+              fulfillmentChip?.variant === 'pickup'
+                ? `Передать заказ на точку «${fulfillmentChip.pointName}»`
+                : 'Передать коллеге или в другой павильон'
+            }
+          >
+            {fulfillmentChip?.variant === 'pickup'
+              ? `Передать на ${fulfillmentChip.pointName}`
+              : (
+                <>
+                  <span aria-hidden="true">→</span>
+                  {' '}Передать
+                </>
+              )}
+          </button>
+          {showCancelOrder && (
+            <button type="button" className="lg-btn lg-btn--danger" onClick={onCancelOrder}>
+              <AppIcon name="x" size="xs" />
+              Отменить
+            </button>
+          )}
+          {showIssueOrder && (
+            <button
+              type="button"
+              className="lg-btn"
+              onClick={onIssueOrder}
+              disabled={issuing}
+            >
               {issuing ? 'Выдача…' : 'Выдать'}
             </button>
           )}
@@ -292,11 +361,6 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
               Снять предоплату
             </button>
           )}
-            {showCancelOrder && (
-              <button type="button" className="lg-btn" onClick={onCancelOrder}>
-                Отменить
-              </button>
-            )}
           {showPermanentDelete && (
             <button type="button" className="lg-btn lg-btn--danger" onClick={onPermanentDelete}>
               Удалить из базы

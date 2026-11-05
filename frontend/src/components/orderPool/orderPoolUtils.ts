@@ -30,6 +30,22 @@ export function getSourceLabel(source?: string): string {
   }
 }
 
+/** Короткая метка источника в таблице и паспорте, как на согласованном рендере. */
+export function getSourceStamp(source?: string): string {
+  switch (source) {
+    case 'website':
+      return 'Cart';
+    case 'telegram':
+      return 'Telegram';
+    case 'mini_app':
+      return 'Mini App';
+    case 'crm':
+      return 'CRM';
+    default:
+      return '';
+  }
+}
+
 export type PoolFulfillmentChip = {
   label: string;
   title: string;
@@ -220,6 +236,17 @@ export function formatPoolDateTimeFull(value?: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/** Дата паспорта: 04.11 14:37 */
+export function formatPoolStampDate(value?: string | null): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return `${day}.${month} ${time}`;
 }
 
 /** Компактно для списка: сегодня/вчера + время, иначе дд.мм.гггг, чч:мм */
