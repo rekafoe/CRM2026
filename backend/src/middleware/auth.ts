@@ -94,6 +94,10 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/public-editor\/drafts(?:\/.*)?$/ },
   { method: 'POST', path: /^\/api\/public-editor\/drafts(?:\/.*)?$/ },
   { method: 'PATCH', path: /^\/api\/public-editor\/drafts(?:\/.*)?$/ },
+  // LK макеты / ensure customer: JWT не нужен — ключ сайта проверяет requireWebsiteOrderApiKey в роуте.
+  { method: 'GET', path: /^\/api\/public-editor\/projects\/?$/ },
+  { method: 'POST', path: /^\/api\/public-editor\/projects(?:\/.*)?$/ },
+  { method: 'POST', path: /^\/api\/public-editor\/customers\/ensure\/?$/ },
   // Telegram шлёт POST без Bearer — только сюда (опционально X-Telegram-Bot-Api-Secret-Token)
   { method: 'POST', path: /^\/api\/notifications\/telegram\/webhook\/?$/ },
   // Mini App: обмен initData → сессия (без CRM api_token)
