@@ -82,12 +82,35 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
   res.status(201).json(row);
 }));
 
-/** PUT /api/organizations/:id — обновить организацию (admin) */
+/** PUT /api/organizations/:id — обновить организацию (admin). Частичное тело не затирает остальные поля. */
 router.put('/:id', authenticate, asyncHandler(async (req, res) => {
   if (!requireAdmin(req as AuthenticatedRequest, res)) return;
   const id = Number(req.params.id);
-  const { name, unp, legal_address, phone, email, bank_details, logo_url, work_schedule, is_default, sort_order } = req.body;
   const db = await getDb();
+  const existing = await db.get<any>('SELECT * FROM organizations WHERE id = ?', id);
+  if (!existing) {
+    res.status(404).json({ message: 'Организация не найдена' });
+    return;
+  }
+  const body = (req.body && typeof req.body === 'object') ? req.body as Record<string, unknown> : {};
+  const pick = <T,>(key: string, fallback: T): T =>
+    Object.prototype.hasOwnProperty.call(body, key) ? (body[key] as T) : fallback;
+
+  const name = pick<string | null>('name', existing.name) ?? '';
+  const unp = pick<string | null>('unp', existing.unp ?? null);
+  const legal_address = pick<string | null>('legal_address', existing.legal_address ?? null);
+  const phone = pick<string | null>('phone', existing.phone ?? null);
+  const email = pick<string | null>('email', existing.email ?? null);
+  const bank_details = pick<string | null>('bank_details', existing.bank_details ?? null);
+  const logo_url = pick<string | null>('logo_url', existing.logo_url ?? null);
+  const work_schedule = pick<string | null>('work_schedule', existing.work_schedule ?? null);
+  const is_default = Object.prototype.hasOwnProperty.call(body, 'is_default')
+    ? Boolean(body.is_default)
+    : Boolean(existing.is_default);
+  const sort_order = Object.prototype.hasOwnProperty.call(body, 'sort_order')
+    ? (body.sort_order != null ? Number(body.sort_order) : 0)
+    : Number(existing.sort_order ?? 0);
+
   if (is_default) {
     await db.run('UPDATE organizations SET is_default = 0 WHERE id != ?', id);
   }
@@ -98,20 +121,19 @@ router.put('/:id', authenticate, asyncHandler(async (req, res) => {
       name = ?, unp = ?, legal_address = ?, phone = ?, email = ?, bank_details = ?, logo_url = ?${wsSet},
       is_default = ?, sort_order = ?, updated_at = datetime('now')
      WHERE id = ?`,
-    ...(hasWorkSchedule ? [name ?? '', unp ?? null, legal_address ?? null, phone ?? null, email ?? null, bank_details ?? null, logo_url ?? null, work_schedule ?? null, is_default ? 1 : 0, sort_order != null ? Number(sort_order) : 0, id] : [name ?? '', unp ?? null, legal_address ?? null, phone ?? null, email ?? null, bank_details ?? null, logo_url ?? null, is_default ? 1 : 0, sort_order != null ? Number(sort_order) : 0, id])
+    ...(hasWorkSchedule
+      ? [name, unp, legal_address, phone, email, bank_details, logo_url, work_schedule, is_default ? 1 : 0, sort_order, id]
+      : [name, unp, legal_address, phone, email, bank_details, logo_url, is_default ? 1 : 0, sort_order, id])
   );
   const hasVat = await hasColumn('organizations', 'vat_rate').catch(() => false);
-  if (hasVat) {
-    const rawVat = req.body?.vat_rate;
+  // Не трогаем vat_rate при частичном PUT (логотип из шаблона чека и т.п.)
+  if (hasVat && Object.prototype.hasOwnProperty.call(body, 'vat_rate')) {
+    const rawVat = body.vat_rate;
     const parsed = rawVat == null || rawVat === '' ? null : Number(rawVat);
     const vatRate = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
     await db.run('UPDATE organizations SET vat_rate = ? WHERE id = ?', vatRate, id);
   }
   const row = await db.get<any>('SELECT * FROM organizations WHERE id = ?', id);
-  if (!row) {
-    res.status(404).json({ message: 'Организация не найдена' });
-    return;
-  }
   res.json(row);
 }));
 
