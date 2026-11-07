@@ -280,5 +280,53 @@ describe('pricingGroupService', () => {
         1
       );
     });
+
+    it('does not pool tier volume across sizes for fixed_unit_prices products', async () => {
+      const calculatePrice = UnifiedPricingService.calculatePrice as jest.Mock;
+      const sharedMaterialConfig = {
+        material_id: 74,
+        print_technology: 'sol_m',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+      };
+      calculatePrice.mockImplementation(async (_productId: number, configuration: Record<string, unknown>, quantity: number) => {
+        expect(configuration).not.toHaveProperty('orderPricingContext');
+        return {
+          finalPrice: quantity === 1 ? 33.34 : 3000,
+          pricePerUnit: quantity === 1 ? 33.34 : 30.3,
+          sheetsNeeded: quantity,
+          tierVolumeForGrouping: quantity,
+          suppressCartTierGrouping: true,
+          productionPlan: {
+            materialId: 74,
+            technologyCode: 'sol_m',
+            usageContext: 'indoor',
+          },
+        };
+      });
+
+      const result = await quoteLines([
+        {
+          lineId: 'small',
+          productId: 137,
+          quantity: 1,
+          configuration: { ...sharedMaterialConfig, size_id: 1371101, type_id: 1371001 },
+        },
+        {
+          lineId: 'large',
+          productId: 137,
+          quantity: 99,
+          configuration: { ...sharedMaterialConfig, size_id: 1371107, type_id: 1371001 },
+        },
+      ]);
+
+      expect(result.lines.map((line) => line.groupKey)).toEqual([null, null]);
+      expect(result.cartTotal).toBeCloseTo(33.34 + 3000, 2);
+      // volume pass + price pass for each line; never a grouped override call
+      expect(calculatePrice).toHaveBeenCalledTimes(4);
+      for (const call of calculatePrice.mock.calls) {
+        expect(call[1]).not.toHaveProperty('orderPricingContext');
+      }
+    });
   });
 });

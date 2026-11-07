@@ -84,6 +84,7 @@ import {
 import { sheetLayoutPrintTierQuantity } from '../utils/sheetLayoutPrintTierQuantity';
 import { sheetQuantityRecommendation } from '../utils/sheetQuantityRecommendation';
 import { smoothedSheetPrintTotal } from '../utils/smoothedSheetPrintTotal';
+import { resolveTemplatePrintTierQuantity } from '../utils/resolveTemplatePrintTierQuantity';
 import {
   MaterialPrintResolver,
   pickMaterialDrivenPrintRow,
@@ -183,6 +184,11 @@ export interface SimplifiedPricingResult {
    * Должен быть в той же оси, что и обычный calculate для выбранного типа продукта.
    */
   tierVolumeForGrouping?: number;
+  /**
+   * Цена штуки задана ступенями размера (fixed_unit_prices): не суммировать
+   * тираж с другими позициями корзины при выборе ступени.
+   */
+  suppressCartTierGrouping?: boolean;
   
   // Детализация
   printDetails?: {
@@ -1385,29 +1391,40 @@ export class SimplifiedPricingService {
         const sheetTierQuantity = customTrimActive
           ? Math.max(1, sheetsNeeded) * Math.max(1, billingItemsPerSheet)
           : sheetLayoutPrintTierQuantity(quantity, itemsPerSheet);
-        const tierQuantity =
-          tierSheetsOverride != null
-            ? tierSheetsOverride
-            : usePagesMultiplier
-              ? multipageTierPrintUnits
-              : isRollPrint || isMaterialMeterBased
-                ? quantity
-                : sheetTierQuantity;
+        const fixedUnitPrices = simplifiedConfig.fixed_unit_prices === true;
+        // fixed_unit_prices: ступени — цена готовой штуки по размеру; не брать Σ корзины.
+        const tierQuantity = resolveTemplatePrintTierQuantity({
+          fixedUnitPrices,
+          quantity,
+          tierSheetsOverride,
+          usePagesMultiplier,
+          multipageTierPrintUnits,
+          isRollPrint,
+          isMaterialMeterBased,
+          sheetTierQuantity,
+        });
         const tier = this.findTierForQuantity(printPriceConfig.tiers, tierQuantity);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
           const pricePerSheet = priceForTier * billingItemsPerSheet;
           const discreteSheetTotal = sheetsNeeded * pricePerSheet;
+          // Холст и т.п. на sol_m: isRollPrint/isMaterialMeterBased иначе гасят сглаживание,
+          // хотя ступени шаблона — штучные (миграция canvas stretcher).
           const smoothedTotal =
             simplifiedConfig.sheet_print_smoothing !== false &&
             !usePagesMultiplier &&
-            !isRollPrint &&
-            !isMaterialMeterBased
-              ? smoothedSheetPrintTotal(sheetsNeeded, printPriceConfig.tiers, billingItemsPerSheet)
+            (fixedUnitPrices || (!isRollPrint && !isMaterialMeterBased))
+              ? smoothedSheetPrintTotal(
+                  fixedUnitPrices ? quantity : sheetsNeeded,
+                  printPriceConfig.tiers,
+                  fixedUnitPrices ? 1 : billingItemsPerSheet,
+                )
               : null;
           const basePrintPrice = usePagesMultiplier
             ? priceForTier * multipagePrintUnits
-            : (smoothedTotal ?? discreteSheetTotal);
+            : fixedUnitPrices
+              ? (smoothedTotal ?? quantity * priceForTier)
+              : (smoothedTotal ?? discreteSheetTotal);
           printPrice = basePrintPrice * billingModeMultiplier;
           printDetails = {
             tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
@@ -3165,6 +3182,9 @@ export class SimplifiedPricingService {
             : isRollWideM2Mode
               ? Math.max(0.001, Math.round(totalM2Needed * 1000) / 1000)
               : quantity,
+      ...(simplifiedConfig.fixed_unit_prices === true
+        ? { suppressCartTierGrouping: true as const }
+        : {}),
     };
   }
   

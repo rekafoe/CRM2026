@@ -160,6 +160,7 @@ async function resolveLinePricingVolumes(
   tierVolume: number;
   configuration: Record<string, unknown>;
   productionPlan?: UnifiedPricingResult['productionPlan'];
+  suppressCartTierGrouping?: boolean;
 }> {
   try {
     const result = await UnifiedPricingService.calculatePrice(
@@ -190,6 +191,7 @@ async function resolveLinePricingVolumes(
       tierVolume,
       configuration,
       ...(result.productionPlan ? { productionPlan: result.productionPlan } : {}),
+      ...(result.suppressCartTierGrouping ? { suppressCartTierGrouping: true } : {}),
     };
   } catch (error) {
     logger.warn('[PricingGroupService] не удалось получить объёмы для группировки', {
@@ -221,11 +223,16 @@ export async function quoteLines(
       tierVolume: number;
       groupKey: string | null;
       productionPlan?: UnifiedPricingResult['productionPlan'];
+      suppressCartTierGrouping?: boolean;
     }
   > = [];
   for (const line of lines) {
     const volumes = await resolveLinePricingVolumes(line);
-    const groupKey = buildGroupKey(volumes.configuration);
+    // fixed_unit_prices (холст и т.п.): общий material/tech ключ не должен
+    // объединять разные размеры/подтипы в одну тиражную ступень.
+    const groupKey = volumes.suppressCartTierGrouping
+      ? null
+      : buildGroupKey(volumes.configuration);
     enriched.push({ ...line, ...volumes, groupKey });
   }
 
