@@ -41,4 +41,32 @@ describe('websiteOrderNormalize', () => {
 
     expect(item.params.components).toEqual([{ materialId: 7, qtyPerItem: 2 }])
   })
+
+  it('strips client orderPricingContext from params and nested specs', () => {
+    const [item] = normalizeWebsiteItems([
+      {
+        type: 'Календари',
+        price: 9,
+        quantity: 1,
+        totalCost: 9,
+        params: {
+          productId: 910,
+          orderPricingContext: { tierSheetsOverride: 100 },
+          specifications: {
+            type_id: 910004,
+            orderPricingContext: { tierSheetsOverride: 100 },
+          },
+          configuration: {
+            size_id: 910104,
+            orderPricingContext: { tierSheetsOverride: 100 },
+          },
+        },
+      },
+    ])
+
+    expect(item.params.orderPricingContext).toBeUndefined()
+    expect((item.params.specifications as Record<string, unknown>).orderPricingContext).toBeUndefined()
+    expect((item.params.configuration as Record<string, unknown>).orderPricingContext).toBeUndefined()
+    expect((item.params.specifications as Record<string, unknown>).type_id).toBe(910004)
+  })
 })

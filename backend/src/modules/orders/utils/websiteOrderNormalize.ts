@@ -117,6 +117,19 @@ export function sanitizeWebsiteItemParams(params: Record<string, unknown>): Reco
     }
   }
 
+  // Клиентский tierSheetsOverride нельзя доверять: подменяет ступень тиража при reprice.
+  delete next.orderPricingContext;
+  if (next.specifications && typeof next.specifications === 'object' && !Array.isArray(next.specifications)) {
+    const specs = { ...(next.specifications as Record<string, unknown>) };
+    delete specs.orderPricingContext;
+    next.specifications = specs;
+  }
+  if (next.configuration && typeof next.configuration === 'object' && !Array.isArray(next.configuration)) {
+    const nested = { ...(next.configuration as Record<string, unknown>) };
+    delete nested.orderPricingContext;
+    next.configuration = nested;
+  }
+
   // Клиентский reservationId не доверяем: deleteItem/qty↓ отменяют по id из params.
   if (Array.isArray(next.components)) {
     next.components = stripClientReservationIds(next.components);

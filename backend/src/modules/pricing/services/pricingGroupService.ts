@@ -73,6 +73,15 @@ export function buildGroupKey(configuration: Record<string, unknown>): string | 
   return `${Number(materialId)}|${normStr(tech)}|${normStr(color)}|${normStr(sides)}`;
 }
 
+/** Клиентский orderPricingContext нельзя доверять: tierSheetsOverride подменяет ступень тиража. */
+export function withoutClientOrderPricingContext(
+  configuration: Record<string, unknown>
+): Record<string, unknown> {
+  if (!('orderPricingContext' in configuration)) return configuration;
+  const { orderPricingContext: _drop, ...rest } = configuration;
+  return rest;
+}
+
 export function configurationFromItemParams(params: Record<string, unknown>): {
   productId: number | null;
   configuration: Record<string, unknown>;
@@ -89,7 +98,7 @@ export function configurationFromItemParams(params: Record<string, unknown>): {
       ? Number(productIdRaw)
       : null;
 
-  const configuration: Record<string, unknown> = {
+  const configuration: Record<string, unknown> = withoutClientOrderPricingContext({
     ...specs,
     ...(params.priceType != null ? { priceType: params.priceType } : {}),
     ...(params.price_type != null ? { price_type: params.price_type } : {}),
@@ -98,7 +107,7 @@ export function configurationFromItemParams(params: Record<string, unknown>): {
     ...(params.type_id != null ? { type_id: params.type_id } : {}),
     ...(params.pages != null ? { pages: params.pages } : {}),
     ...(specs.pages != null ? { pages: specs.pages } : {}),
-  };
+  });
 
   const sheetsRaw =
     params.sheetsNeeded ??
@@ -162,9 +171,10 @@ async function resolveLinePricingVolumes(
   productionPlan?: UnifiedPricingResult['productionPlan'];
 }> {
   try {
+    const safeConfiguration = withoutClientOrderPricingContext(line.configuration);
     const result = await UnifiedPricingService.calculatePrice(
       line.productId,
-      line.configuration,
+      safeConfiguration,
       line.quantity
     );
     const sheets = result.sheetsNeeded ?? result.layout?.sheetsNeeded;
@@ -179,12 +189,12 @@ async function resolveLinePricingVolumes(
         : sheetsNeeded;
     const configuration = result.productionPlan
       ? {
-          ...line.configuration,
+          ...safeConfiguration,
           material_id: result.productionPlan.materialId,
           print_technology: result.productionPlan.technologyCode,
           usage_context: result.productionPlan.usageContext,
         }
-      : line.configuration;
+      : safeConfiguration;
     return {
       sheetsNeeded,
       tierVolume,
@@ -204,7 +214,7 @@ async function resolveLinePricingVolumes(
     return {
       sheetsNeeded: fallback,
       tierVolume: fallback,
-      configuration: line.configuration,
+      configuration: withoutClientOrderPricingContext(line.configuration),
     };
   }
 }
@@ -262,8 +272,9 @@ export async function quoteLines(
         : null;
 
     try {
+      // Только серверный Σ тиража группы; клиентский orderPricingContext уже снят.
       const configWithContext = {
-        ...line.configuration,
+        ...withoutClientOrderPricingContext(line.configuration),
         ...(groupTotalTierVolume != null
           ? { orderPricingContext: { tierSheetsOverride: groupTotalTierVolume } }
           : {}),

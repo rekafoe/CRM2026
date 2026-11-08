@@ -126,6 +126,22 @@ describe('pricingGroupService', () => {
       expect(configuration.material_id).toBe(12);
       expect(configuration.priceType).toBe('online');
     });
+
+    it('strips client orderPricingContext from specifications', () => {
+      const { configuration } = configurationFromItemParams({
+        productId: 910,
+        specifications: {
+          type_id: 910004,
+          size_id: 910104,
+          print_technology: 'laser_sheet',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+          orderPricingContext: { tierSheetsOverride: 100 },
+        },
+      });
+      expect(configuration.orderPricingContext).toBeUndefined();
+      expect(configuration.type_id).toBe(910004);
+    });
   });
 
   describe('quoteLines', () => {
@@ -279,6 +295,43 @@ describe('pricingGroupService', () => {
         }),
         1
       );
+    });
+
+    it('does not honor client tierSheetsOverride on non-groupable kit lines', async () => {
+      const calculatePrice = UnifiedPricingService.calculatePrice as jest.Mock;
+      calculatePrice
+        .mockResolvedValueOnce({
+          finalPrice: 9,
+          pricePerUnit: 9,
+          sheetsNeeded: 1,
+          tierVolumeForGrouping: 1,
+        })
+        .mockResolvedValueOnce({
+          finalPrice: 41.4,
+          pricePerUnit: 41.4,
+          sheetsNeeded: 1,
+        });
+
+      await quoteLines([
+        {
+          lineId: 'calendar',
+          productId: 910,
+          quantity: 1,
+          configuration: {
+            type_id: 910004,
+            size_id: 910104,
+            print_technology: 'laser_sheet',
+            print_color_mode: 'color',
+            print_sides_mode: 'single',
+            orderPricingContext: { tierSheetsOverride: 100 },
+          },
+        },
+      ]);
+
+      expect(calculatePrice).toHaveBeenCalledTimes(2);
+      expect(calculatePrice.mock.calls[0][1]).not.toHaveProperty('orderPricingContext');
+      expect(calculatePrice.mock.calls[1][1]).not.toHaveProperty('orderPricingContext');
+      expect(calculatePrice.mock.calls[1][2]).toBe(1);
     });
   });
 });

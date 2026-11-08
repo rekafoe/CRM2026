@@ -71,7 +71,12 @@ export class PricingController {
 
     try {
       // Поддерживаем оба формата: configuration (новый) и specifications (старый)
-      const config = Object.keys(configuration).length > 0 ? configuration : specifications;
+      const rawConfig = Object.keys(configuration).length > 0 ? configuration : specifications;
+      // orderPricingContext.tierSheetsOverride — только для серверного quote-cart / reprice.
+      const { orderPricingContext: _clientTierContext, ...config } =
+        rawConfig && typeof rawConfig === 'object' && !Array.isArray(rawConfig)
+          ? (rawConfig as Record<string, unknown>)
+          : {};
 
       const result = await UnifiedPricingService.calculatePrice(
         Number(productId),
@@ -750,7 +755,8 @@ export class PricingController {
       const row = rawLines[i] as Record<string, unknown>
       const productId = Number(row.productId ?? row.product_id)
       const quantity = Number(row.quantity ?? row.qty ?? 1)
-      const configuration = (row.configuration ?? row.specifications ?? {}) as Record<string, unknown>
+      const rawConfiguration = (row.configuration ?? row.specifications ?? {}) as Record<string, unknown>
+      const { orderPricingContext: _clientTierContext, ...configuration } = rawConfiguration
       const lineId = row.lineId ?? row.line_id ?? `line-${i}`
 
       if (!Number.isFinite(productId) || productId <= 0) {
