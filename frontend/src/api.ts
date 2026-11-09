@@ -1813,9 +1813,16 @@ export interface DesignTemplate {
   is_active: number;
   sort_order: number;
   author_user_id?: number | null;
+  /** Кто загрузил макет. Право правки сотрудника считается по этому полю, не по автору ЗП. */
+  uploaded_by_user_id?: number | null;
+  uploaded_by_name?: string | null;
   usage_fee?: number;
   author_percent?: number;
   author_name?: string | null;
+  delete_request_id?: number | null;
+  delete_requested_by_user_id?: number | null;
+  delete_requested_by_name?: string | null;
+  delete_requested_at?: string | null;
   subtype_link_count?: number;
   /** Доступные size_id для семьи design_code в рамках подтипа */
   available_size_ids?: string[];
@@ -2048,6 +2055,28 @@ export const createDesignTemplate = (data: DesignTemplateInput) =>
 export const updateDesignTemplate = (id: number, data: DesignTemplateInput) =>
   api.put<DesignTemplate>(`/design-templates/${id}`, data);
 export const deleteDesignTemplate = (id: number) => api.delete(`/design-templates/${id}`);
+
+export interface DesignTemplateDeleteRequest {
+  id: number;
+  design_template_id: number;
+  design_code: string | null;
+  template_name: string | null;
+  requested_by_user_id: number;
+  requested_by_name: string | null;
+  requested_at: string;
+  status: 'pending' | 'rejected' | 'confirmed';
+  resolved_by_user_id?: number | null;
+  resolved_at?: string | null;
+}
+
+export const requestDesignTemplateDeletion = (id: number) =>
+  api.post<DesignTemplateDeleteRequest>(`/design-templates/${id}/delete-request`);
+export const getDesignTemplateDeleteRequests = (status: 'pending' | 'rejected' = 'pending') =>
+  api.get<{ requests: DesignTemplateDeleteRequest[] }>('/design-templates/delete-requests', { params: { status } });
+export const confirmDesignTemplateDeletion = (requestId: number) =>
+  api.post<{ ok: true }>(`/design-templates/delete-requests/${requestId}/confirm`);
+export const rejectDesignTemplateDeletion = (requestId: number) =>
+  api.post<DesignTemplateDeleteRequest>(`/design-templates/delete-requests/${requestId}/reject`);
 export const uploadDesignTemplatePreview = (file: File) => {
   const formData = new FormData();
   formData.append('preview', file);
@@ -2269,6 +2298,7 @@ export interface SubtypeDesignLink {
   name: string;
   preview_url: string | null;
   site_preview_url?: string | null;
+  uploaded_by_user_id?: number | null;
   category: string | null;
   is_active: number;
 }

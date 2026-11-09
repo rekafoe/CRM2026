@@ -16,6 +16,7 @@ export interface SubtypeDesignRow {
   site_preview_url: string | null
   spec: string | null
   is_active: number
+  uploaded_by_user_id?: number | null
 }
 
 function normalizeSizeId(sizeId?: string | null): string {
@@ -56,7 +57,8 @@ export async function getSubtypeDesigns(
     return db.all<SubtypeDesignRow[]>(
       `SELECT
          psd.id, psd.product_id, psd.type_id, psd.size_id, psd.design_template_id, psd.sort_order, psd.created_at,
-         dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active
+         dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active,
+         dt.uploaded_by_user_id
        FROM product_subtype_designs psd
        JOIN design_templates dt ON dt.id = psd.design_template_id
        WHERE psd.product_id = ? AND psd.type_id = ? AND psd.size_id = ?
@@ -69,7 +71,8 @@ export async function getSubtypeDesigns(
   return db.all<SubtypeDesignRow[]>(
     `SELECT
        psd.id, psd.product_id, psd.type_id, psd.size_id, psd.design_template_id, psd.sort_order, psd.created_at,
-       dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active
+       dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active,
+       dt.uploaded_by_user_id
      FROM product_subtype_designs psd
      JOIN design_templates dt ON dt.id = psd.design_template_id
      WHERE psd.product_id = ? AND psd.type_id = ?
@@ -115,7 +118,8 @@ export async function addSubtypeDesign(
   const row = await db.get<SubtypeDesignRow>(
     `SELECT
        psd.id, psd.product_id, psd.type_id, psd.size_id, psd.design_template_id, psd.sort_order, psd.created_at,
-       dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active
+       dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active,
+       dt.uploaded_by_user_id
      FROM product_subtype_designs psd
      JOIN design_templates dt ON dt.id = psd.design_template_id
      WHERE psd.id = ?`,
@@ -153,6 +157,16 @@ export async function reorderSubtypeDesigns(
       normalizedSize,
     )
   }
+}
+
+export async function getSubtypeDesignTemplateId(productId: number, linkId: number): Promise<number | null> {
+  const db = await getDb()
+  const row = await db.get<{ design_template_id: number }>(
+    `SELECT design_template_id FROM product_subtype_designs WHERE id = ? AND product_id = ?`,
+    linkId,
+    productId,
+  )
+  return row?.design_template_id != null ? Number(row.design_template_id) : null
 }
 
 /** Размеры подтипа без ни одного привязанного дизайна */

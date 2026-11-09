@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { BynSymbol } from '../../components/ui/BynSymbol';
@@ -11,6 +11,9 @@ import {
   createDesignTemplate,
   updateDesignTemplate,
   deleteDesignTemplate,
+  requestDesignTemplateDeletion,
+  confirmDesignTemplateDeletion,
+  rejectDesignTemplateDeletion,
   uploadDesignTemplatePreview,
   importDesignTemplateFile,
   getUsers,
@@ -53,6 +56,13 @@ import { DesignTemplateReimportModal } from './designTemplates/DesignTemplateRei
 import { DesignTemplateUsagePanel } from './designTemplates/DesignTemplateUsagePanel';
 import { buildCategorySections, UNCATEGORIZED_KEY } from './designTemplates/designTemplateCategoryUtils';
 import { useDesignTemplateBindingLabels } from './designTemplates/useDesignTemplateBindingLabels';
+import {
+  canEditDesign,
+  designsCatalogPath,
+  isDesignCatalogAdmin,
+  ownsDesignFamily,
+  readStoredCatalogUser,
+} from './designTemplates/designTemplateAccess';
 import '../../styles/admin-page-layout.css';
 import '../../components/admin/ProductManagement.css';
 import './DesignTemplatesPage.css';
@@ -127,8 +137,23 @@ function mergeSpecOnSave(
   return base;
 }
 
+function formatRequestedAt(value?: string | null): string {
+  if (!value) return '';
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export const DesignTemplatesPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useCurrentUser();
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
@@ -147,6 +172,7 @@ export const DesignTemplatesPage: React.FC = () => {
   const [users, setUsers] = useState<UserRef[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [infoTemplate, setInfoTemplate] = useState<DesignTemplate | null>(null);
@@ -292,7 +318,7 @@ export const DesignTemplatesPage: React.FC = () => {
       list = list.filter((t) => (t.subtype_link_count ?? 0) === 0);
     }
     if (authorFilter === 'mine' && currentUser?.id) {
-      list = list.filter((t) => t.author_user_id === currentUser.id);
+      list = list.filter((t) => t.uploaded_by_user_id === currentUser.id);
     } else if (authorFilter !== 'all') {
       const aid = Number(authorFilter);
       if (Number.isFinite(aid)) {
@@ -677,31 +703,84 @@ export const DesignTemplatesPage: React.FC = () => {
     }
   }, [importForm, loadTemplates, currentUser?.id]);
 
+  const catalogUser = currentUser ?? readStoredCatalogUser();
+  const userIsAdmin = isDesignCatalogAdmin(catalogUser?.role);
+  const catalogPath = designsCatalogPath(location.pathname);
+  const openMasterEditor = useCallback((templateId: number) => {
+    navigate(`/adminpanel/design-editor/${templateId}`, { state: { catalogPath } });
+  }, [catalogPath, navigate]);
+  const pendingDeletes = useMemo(
+    () => templates.filter((template) => template.delete_request_id != null),
+    [templates],
+  );
+  const authorChoices = useMemo(() => {
+    if (currentUser && !users.some((user) => user.id === currentUser.id)) {
+      return [{ id: currentUser.id, name: currentUser.name }, ...users];
+    }
+    return users;
+  }, [currentUser, users]);
+
   const handleDelete = useCallback(async (id: number, label?: string) => {
     const title = label?.trim() ? ` «${label.trim()}»` : '';
-    if (!confirm(`Удалить макет${title} (#${id})? Это действие необратимо.`)) return;
-    try {
-      await deleteDesignTemplate(id);
-      await loadTemplates();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Ошибка удаления');
+    const template = templates.find((item) => item.id === id);
+    const direct = isDesignCatalogAdmin(catalogUser?.role);
+    if (!direct && template?.delete_request_id) {
+      setNotice('Запрос на удаление уже ожидает подтверждения администратора.');
+      return;
     }
-  }, [loadTemplates]);
-
-  const handleDeleteFamily = useCallback(async (family: DesignTemplateFamily) => {
-    const code = family.design_code ?? formatDesignCodeLabel(family.primary);
-    const n = family.variants.length;
-    if (!confirm(
-      `Удалить всю семью «${code}» (${n} размер${n === 1 ? '' : n < 5 ? 'а' : 'ов'})? Это действие необратимо.`,
-    )) return;
+    const question = direct
+      ? `Удалить макет${title} (#${id})? Это действие необратимо.`
+      : `Запросить удаление макета${title} (#${id})? С сайта он исчезнет после подтверждения администратором.`;
+    if (!confirm(question)) return;
     try {
-      for (const variant of family.variants) {
-        await deleteDesignTemplate(variant.id);
+      setError(null);
+      if (direct) {
+        await deleteDesignTemplate(id);
+        setNotice(null);
+      } else {
+        await requestDesignTemplateDeletion(id);
+        setNotice('Запрос отправлен. Дизайн останется в каталоге и на сайте, пока администратор не подтвердит удаление.');
       }
       await loadTemplates();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ошибка удаления');
+    }
+  }, [catalogUser?.role, loadTemplates, templates]);
+
+  const handleDeleteFamily = useCallback(async (family: DesignTemplateFamily) => {
+    const code = family.design_code ?? formatDesignCodeLabel(family.primary);
+    const n = family.variants.length;
+    const direct = isDesignCatalogAdmin(catalogUser?.role);
+    const question = direct
+      ? `Удалить всю семью «${code}» (${n} размер${n === 1 ? '' : n < 5 ? 'а' : 'ов'})? Это действие необратимо.`
+      : `Запросить удаление семьи «${code}» (${n} размер${n === 1 ? '' : n < 5 ? 'а' : 'ов'})? Администратор подтвердит каждый размер.`;
+    if (!confirm(question)) return;
+    try {
+      setError(null);
+      for (const variant of family.variants) {
+        if (direct) {
+          await deleteDesignTemplate(variant.id);
+        } else if (!variant.delete_request_id) {
+          await requestDesignTemplateDeletion(variant.id);
+        }
+      }
+      setNotice(direct ? null : 'Запросы на удаление отправлены администратору.');
       await loadTemplates();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления');
+      await loadTemplates();
+    }
+  }, [catalogUser?.role, loadTemplates]);
+
+  const resolveDeleteRequest = useCallback(async (requestId: number, action: 'confirm' | 'reject') => {
+    try {
+      setError(null);
+      if (action === 'confirm') await confirmDesignTemplateDeletion(requestId);
+      else await rejectDesignTemplateDeletion(requestId);
+      setNotice(action === 'confirm' ? 'Дизайн удалён из каталога и с сайта.' : 'Запрос на удаление отклонён.');
+      await loadTemplates();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Не удалось обработать запрос');
     }
   }, [loadTemplates]);
 
@@ -721,6 +800,12 @@ export const DesignTemplatesPage: React.FC = () => {
       return p.hasDesignState && !p.fontsResolved;
     });
     const unlinkedCount = family.variants.filter((v) => (v.subtype_link_count ?? 0) === 0).length;
+    const canEditFamily = ownsDesignFamily(catalogUser, family.variants);
+    const canEditPrimary = canEditDesign(catalogUser, t);
+    const uploaders = Array.from(new Set(
+      family.variants.map((variant) => variant.uploaded_by_name).filter((name): name is string => Boolean(name)),
+    ));
+    const pendingInFamily = family.variants.filter((variant) => variant.delete_request_id != null).length;
 
     return (
       <div key={family.key} className={`design-template-card design-template-card--family design-template-card--${status}`}>
@@ -763,6 +848,16 @@ export const DesignTemplatesPage: React.FC = () => {
                 </span>
               )}
             </div>
+            {uploaders.length > 0 && (
+              <span className="design-template-author">
+                Загрузил: {uploaders.join(', ')}
+              </span>
+            )}
+            {pendingInFamily > 0 && (
+              <span className="design-template-pending-badge">
+                Ожидает удаления{pendingInFamily > 1 ? `: ${pendingInFamily}` : ''}
+              </span>
+            )}
             {(t.author_name || t.author_user_id) && (
               <span className="design-template-author">
                 <AppIcon name="user" size="xs" />
@@ -778,7 +873,7 @@ export const DesignTemplatesPage: React.FC = () => {
             )}
             <div className="design-template-actions design-template-actions--family-top">
               <div className="design-template-actions__primary">
-                {family.design_code && (
+                {canEditFamily && family.design_code && (
                   <button
                     type="button"
                     className="lg-btn"
@@ -788,33 +883,39 @@ export const DesignTemplatesPage: React.FC = () => {
                     <AppIcon name="plus" size="xs" /> Добавить размер
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="lg-btn lg-btn--icon"
-                  onClick={() =>openEdit(t)}
-                  title="Карточка семьи (автор, плата Y, % Z)"
-                  aria-label="Карточка"
-                >
-                  <AppIcon name="edit" size="xs" />
-                </button>
+                {canEditFamily && (
+                  <button
+                    type="button"
+                    className="lg-btn lg-btn--icon"
+                    onClick={() =>openEdit(t)}
+                    title="Карточка семьи (автор, плата Y, % Z)"
+                    aria-label="Карточка"
+                  >
+                    <AppIcon name="edit" size="xs" />
+                  </button>
+                )}
                 <button type="button" className="lg-btn lg-btn--icon" onClick={() =>setInfoTemplate(t)} title="Импорт и метаданные" aria-label="Инфо">
                   <AppIcon name="info" size="xs" />
                 </button>
-                <button type="button" className="lg-btn lg-btn--icon" onClick={() =>setReimportTemplate(t)} title="Обновить из SVG (первый вариант)" aria-label="Обновить SVG">
-                  <AppIcon name="download" size="xs" />
-                </button>
+                {canEditPrimary && (
+                  <button type="button" className="lg-btn lg-btn--icon" onClick={() =>setReimportTemplate(t)} title="Обновить из SVG (первый вариант)" aria-label="Обновить SVG">
+                    <AppIcon name="download" size="xs" />
+                  </button>
+                )}
                 <button type="button" className="lg-btn lg-btn--icon" onClick={() =>void handleDuplicate(t)} title="Копия с новым кодом семьи" aria-label="Копия">
                   <AppIcon name="copy" size="xs" />
                 </button>
-                <button
-                  type="button"
-                  className="lg-btn lg-btn--icon lg-btn--danger"
-                  onClick={() =>void handleDeleteFamily(family)}
-                  title="Удалить всю семью"
-                  aria-label="Удалить семью"
-                >
-                  <AppIcon name="trash" size="xs" />
-                </button>
+                {canEditFamily && (
+                  <button
+                    type="button"
+                    className="lg-btn lg-btn--icon lg-btn--danger"
+                    onClick={() =>void handleDeleteFamily(family)}
+                    title={userIsAdmin ? 'Удалить всю семью' : 'Запросить удаление семьи'}
+                    aria-label={userIsAdmin ? 'Удалить семью' : 'Запросить удаление семьи'}
+                  >
+                    <AppIcon name="trash" size="xs" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -829,6 +930,7 @@ export const DesignTemplatesPage: React.FC = () => {
       </div>
     );
   }, [
+    catalogUser,
     formatBinding,
     handleDelete,
     handleDeleteFamily,
@@ -836,17 +938,59 @@ export const DesignTemplatesPage: React.FC = () => {
     loadTemplates,
     openEdit,
     openImportIntoFamily,
+    userIsAdmin,
   ]);
 
   return (
     <AdminPageLayout
       className="design-templates-layout"
-      title="Шаблоны дизайна"
-      description="Семьи макетов, размеры и привязка к продуктам."
+      title="Дизайны"
+      description="Каталог макетов для сайта. Свой дизайн можно добавить и править, чужой — только смотреть. Удаление сотрудника подтверждает администратор."
       icon={<AppIcon name="image" size="lg" />}
-      onBack={() => navigate('/adminpanel')}
+      onBack={() => navigate(location.pathname.startsWith('/designs') ? '/' : '/adminpanel')}
+      backLabel={location.pathname.startsWith('/designs') ? '← В рабочее место' : '← Назад'}
     >
       {error && <Alert type="error">{error}</Alert>}
+      {notice && <Alert type="success" onClose={() => setNotice(null)}>{notice}</Alert>}
+      {userIsAdmin && pendingDeletes.length > 0 && (
+        <section className="design-delete-requests" aria-label="Запросы на удаление">
+          <h2 className="design-delete-requests__title">
+            Запросы на удаление
+            <span className="design-templates-tab__count">{pendingDeletes.length}</span>
+          </h2>
+          <ul className="design-delete-requests__list">
+            {pendingDeletes.map((template) => (
+              <li key={template.delete_request_id} className="design-delete-requests__item">
+                <div className="design-delete-requests__meta">
+                  <strong>
+                    {template.design_code || formatDesignCodeLabel(template)} · #{template.id}
+                  </strong>
+                  <span>
+                    {template.delete_requested_by_name || `пользователь #${template.delete_requested_by_user_id}`}
+                    {template.delete_requested_at ? ` · ${formatRequestedAt(template.delete_requested_at)}` : ''}
+                  </span>
+                </div>
+                <div className="design-delete-requests__actions">
+                  <button
+                    type="button"
+                    className="lg-btn lg-btn--danger"
+                    onClick={() => void resolveDeleteRequest(template.delete_request_id!, 'confirm')}
+                  >
+                    Подтвердить удаление
+                  </button>
+                  <button
+                    type="button"
+                    className="lg-btn"
+                    onClick={() => void resolveDeleteRequest(template.delete_request_id!, 'reject')}
+                  >
+                    Отклонить
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="design-templates-page product-management">
         <div className="design-templates-tabs" role="tablist">
@@ -900,7 +1044,8 @@ export const DesignTemplatesPage: React.FC = () => {
           {helpOpen && (
             <p className="design-templates-help__body">
               Master-шаблоны для сайта. Карточка = семья с кодом <code>000001</code>;
-              размеры (мм) — варианты внутри. Основной вход — <strong>Импорт SVG</strong> (
+              размеры (мм) — варианты внутри. Сотрудник добавляет дизайн тем же импортом и правит только свои макеты.
+              Удаление без прав администратора уходит в запрос. Основной вход — <strong>Импорт SVG</strong> (
               <code>docs/design-template-importer.md</code>). В ZIP папки вида <code>204x204/</code> создают
               варианты одной семьи. Клиентский редактор — на сайте (кнопка «На сайте»). Плата автора (Y) и % (Z) задаются один раз на семью.
             </p>
@@ -918,12 +1063,16 @@ export const DesignTemplatesPage: React.FC = () => {
           <button type="button" className="lg-btn" onClick={() =>setCategoriesModalOpen(true)}>
             <AppIcon name="folder" size="xs" /> Категории
           </button>
-          <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-fonts')}>
-            <AppIcon name="document" size="xs" /> Шрифты
-          </button>
-          <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-assets')}>
-            <AppIcon name="puzzle" size="xs" /> Клипарты
-          </button>
+          {userIsAdmin && (
+            <>
+              <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-fonts')}>
+                <AppIcon name="document" size="xs" /> Шрифты
+              </button>
+              <button type="button" className="lg-btn" onClick={() =>navigate('/adminpanel/design-assets')}>
+                <AppIcon name="puzzle" size="xs" /> Клипарты
+              </button>
+            </>
+          )}
           <div className="design-templates-view" role="group" aria-label="Вид каталога">
             <button
               type="button"
@@ -981,7 +1130,7 @@ export const DesignTemplatesPage: React.FC = () => {
             <select value={authorFilter} onChange={(e) => setAuthorFilter(e.target.value)}>
               <option value="all">Все</option>
               {currentUser?.id != null && (
-                <option value="mine">Мои макеты</option>
+                <option value="mine">Мои загрузки</option>
               )}
               {users.map((u) => (
                 <option key={u.id} value={String(u.id)}>{u.name}</option>
@@ -1085,9 +1234,11 @@ export const DesignTemplatesPage: React.FC = () => {
                                   <td>{stampLabel}</td>
                                   <td>{variant.author_name ?? family.primary.author_name ?? '—'}</td>
                                   <td className="design-templates-table__actions">
-                                    <button type="button" className="lg-btn lg-btn--sm lg-btn--primary" onClick={() => navigate(`/adminpanel/design-editor/${variant.id}`)}>
-                                      Макет
-                                    </button>
+                                    {canEditDesign(catalogUser, variant) && (
+                                      <button type="button" className="lg-btn lg-btn--sm lg-btn--primary" onClick={() => openMasterEditor(variant.id)}>
+                                        Макет
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       className="lg-btn lg-btn--sm"
@@ -1267,7 +1418,7 @@ export const DesignTemplatesPage: React.FC = () => {
                     onChange={(e) => setForm((p) => ({ ...p, author_user_id: e.target.value }))}
                   >
                     <option value="">—</option>
-                    {users.map((u) => (
+                    {authorChoices.map((u) => (
                       <option key={u.id} value={String(u.id)}>{u.name}</option>
                     ))}
                   </select>
@@ -1416,7 +1567,7 @@ export const DesignTemplatesPage: React.FC = () => {
                 onChange={(e) => setImportForm((p) => ({ ...p, author_user_id: e.target.value }))}
               >
                 <option value="">Текущий пользователь</option>
-                {users.map((u) => (
+                {authorChoices.map((u) => (
                   <option key={u.id} value={String(u.id)}>{u.name}</option>
                 ))}
               </select>
@@ -1573,6 +1724,7 @@ export const DesignTemplatesPage: React.FC = () => {
         isOpen={categoriesModalOpen}
         onClose={() => setCategoriesModalOpen(false)}
         onChanged={() => void reloadCatalog()}
+        canManageStructure={userIsAdmin}
       />
 
       <DesignTemplateReimportModal

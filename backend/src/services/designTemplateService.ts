@@ -19,6 +19,8 @@ export interface DesignTemplateRow {
   is_active: number
   sort_order: number
   author_user_id: number | null
+  /** Кто загрузил макет в каталог. Не путать с author_user_id (автор для ЗП). */
+  uploaded_by_user_id?: number | null
   usage_fee: number
   author_percent: number
   created_at: string
@@ -31,6 +33,11 @@ export interface DesignTemplateRow {
 
 export type DesignTemplateListRow = DesignTemplateRow & {
   author_name?: string | null
+  uploaded_by_name?: string | null
+  delete_request_id?: number | null
+  delete_requested_by_user_id?: number | null
+  delete_requested_by_name?: string | null
+  delete_requested_at?: string | null
   /** Число строк в product_subtype_designs для этого шаблона */
   subtype_link_count?: number
 }
@@ -60,6 +67,8 @@ export interface DesignTemplateInput {
   is_active?: boolean
   sort_order?: number
   author_user_id?: number | null
+  /** Ставит только сервер из текущего пользователя. Клиентское поле игнорируется. */
+  uploaded_by_user_id?: number | null
   usage_fee?: number
   author_percent?: number
 }
@@ -217,15 +226,41 @@ function mapListRow(row: Record<string, unknown>): DesignTemplateListRow {
     is_active: Number(row.is_active) ? 1 : 0,
     sort_order: Number(row.sort_order) || 0,
     author_user_id: row.author_user_id != null ? Number(row.author_user_id) : null,
+    uploaded_by_user_id: row.uploaded_by_user_id != null ? Number(row.uploaded_by_user_id) : null,
     usage_fee: normalizeUsageFee(row.usage_fee),
     author_percent: normalizeAuthorPercent(row.author_percent),
     created_at: String(row.created_at ?? ''),
     updated_at: String(row.updated_at ?? ''),
     author_name: row.author_name != null ? String(row.author_name) : null,
+    uploaded_by_name: row.uploaded_by_name != null ? String(row.uploaded_by_name) : null,
+    delete_request_id: row.delete_request_id != null ? Number(row.delete_request_id) : null,
+    delete_requested_by_user_id: row.delete_requested_by_user_id != null
+      ? Number(row.delete_requested_by_user_id)
+      : null,
+    delete_requested_by_name: row.delete_requested_by_name != null
+      ? String(row.delete_requested_by_name)
+      : null,
+    delete_requested_at: row.delete_requested_at != null ? String(row.delete_requested_at) : null,
     subtype_link_count:
       row.subtype_link_count != null ? Number(row.subtype_link_count) || 0 : undefined,
   }
 }
+
+const CATALOG_ACTOR_JOINS = `
+  LEFT JOIN users u ON u.id = dt.author_user_id
+  LEFT JOIN users uploader ON uploader.id = dt.uploaded_by_user_id
+  LEFT JOIN design_template_delete_requests dr
+    ON dr.design_template_id = dt.id AND dr.status = 'pending'
+  LEFT JOIN users requester ON requester.id = dr.requested_by_user_id
+`.trim()
+
+const CATALOG_ACTOR_COLUMNS = `
+  uploader.name AS uploaded_by_name,
+  dr.id AS delete_request_id,
+  dr.requested_by_user_id AS delete_requested_by_user_id,
+  requester.name AS delete_requested_by_name,
+  dr.requested_at AS delete_requested_at
+`.trim()
 
 function parseSpecMm(spec: string | null | undefined): { width_mm: number; height_mm: number } | null {
   if (!spec) return null
@@ -415,12 +450,12 @@ async function ensureFamilySitePreviewBackfill(): Promise<void> {
 export async function getAllDesignTemplates(): Promise<DesignTemplateListRow[]> {
   const db = await getDb()
   const rows = await db.all(
-    `SELECT dt.*, u.name AS author_name,
+    `SELECT dt.*, u.name AS author_name, ${CATALOG_ACTOR_COLUMNS},
       COALESCE(c.name, dt.category) AS category,
       (SELECT COUNT(*) FROM product_subtype_designs psd WHERE psd.design_template_id = dt.id) AS subtype_link_count
      FROM design_templates dt
      LEFT JOIN design_template_categories c ON c.id = dt.category_id
-     LEFT JOIN users u ON u.id = dt.author_user_id
+     ${CATALOG_ACTOR_JOINS}
      ORDER BY dt.sort_order ASC, dt.name ASC`,
   ) as Record<string, unknown>[]
   return rows.map(mapListRow)
@@ -451,10 +486,10 @@ export async function getDesignTemplatesByCategory(category: string): Promise<De
 export async function getDesignTemplate(id: number): Promise<DesignTemplateListRow | null> {
   const db = await getDb()
   const row = await db.get(
-    `SELECT dt.*, u.name AS author_name, COALESCE(c.name, dt.category) AS category
+    `SELECT dt.*, u.name AS author_name, ${CATALOG_ACTOR_COLUMNS}, COALESCE(c.name, dt.category) AS category
      FROM design_templates dt
      LEFT JOIN design_template_categories c ON c.id = dt.category_id
-     LEFT JOIN users u ON u.id = dt.author_user_id
+     ${CATALOG_ACTOR_JOINS}
      WHERE dt.id = ?`,
     [id],
   ) as Record<string, unknown> | undefined
@@ -642,8 +677,8 @@ export async function createDesignTemplate(input: DesignTemplateInput): Promise<
   const result = await db.run(
     `INSERT INTO design_templates (
       design_code, name, description, category_id, category, preview_url, site_preview_url, spec, is_active, sort_order,
-      author_user_id, usage_fee, author_percent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      author_user_id, usage_fee, author_percent, uploaded_by_user_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       designCode,
       name,
@@ -658,6 +693,7 @@ export async function createDesignTemplate(input: DesignTemplateInput): Promise<
       input.author_user_id ?? null,
       normalizeUsageFee(input.usage_fee),
       normalizeAuthorPercent(input.author_percent),
+      input.uploaded_by_user_id ?? null,
     ],
   )
   const id = (result as { lastID: number }).lastID
@@ -796,6 +832,7 @@ export async function deleteDesignTemplate(id: number): Promise<boolean> {
   if (!existing) return false
 
   const db = await getDb()
+  await db.run('DELETE FROM design_template_delete_requests WHERE design_template_id = ?', [id])
   await db.run('DELETE FROM design_templates WHERE id = ?', [id])
   return true
 }

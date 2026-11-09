@@ -24,6 +24,8 @@ import {
   sizeMatchesTrimFormat,
 } from '../../../features/productTemplate/utils/designTemplateSpec';
 import { resolveTemplatePreviewUrl } from './designTemplateCatalogUtils';
+import { canEditDesign, isDesignCatalogAdmin, readStoredCatalogUser } from './designTemplateAccess';
+import { useCurrentUser } from '../../../hooks/useCurrentUser';
 import { API_BASE_URL } from '../../../config/constants';
 import '../../../features/productTemplate/components/SimplifiedTemplateSection.css';
 import './DesignTemplateBindingsPanel.css';
@@ -47,6 +49,9 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
   highlightTemplateId,
 }) => {
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
+  const catalogUser = currentUser ?? readStoredCatalogUser();
+  const userIsAdmin = isDesignCatalogAdmin(catalogUser?.role);
   const [searchParams, setSearchParams] = useSearchParams();
   const products = useProductDirectoryStore((s) => s.products);
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
@@ -192,13 +197,13 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
     setLoadingTemplates(true);
     try {
       const res = await getDesignTemplates();
-      setAllTemplates(res.data.filter((t) => t.is_active === 1));
+      setAllTemplates(res.data.filter((t) => t.is_active === 1 && canEditDesign(catalogUser, t)));
     } catch {
       setAllTemplates([]);
     } finally {
       setLoadingTemplates(false);
     }
-  }, []);
+  }, [catalogUser]);
 
   const handleAdd = useCallback(
     async (templateId: number, sizeId: string) => {
@@ -370,14 +375,16 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
                           )}
                         </div>
                         <div className="subtype-designs-item__name">{link.name}</div>
-                        <button
-                          type="button"
-                          className="subtype-designs-item__remove"
-                          onClick={() =>void handleRemove(link.id)}
-                          title="Отвязать"
-                        >
-                          <AppIcon name="x" size="xs" />
-                        </button>
+                        {canEditDesign(catalogUser, link) && (
+                          <button
+                            type="button"
+                            className="subtype-designs-item__remove"
+                            onClick={() =>void handleRemove(link.id)}
+                            title="Отвязать"
+                          >
+                            <AppIcon name="x" size="xs" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -409,7 +416,9 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
             {loadingTemplates ? (
               <p className="subtype-designs-modal__hint">Загрузка…</p>
             ) : modalTemplates.length === 0 ? (
-              <p className="subtype-designs-modal__hint">Нет шаблонов.</p>
+              <p className="subtype-designs-modal__hint">
+                {userIsAdmin ? 'Нет шаблонов.' : 'Нет ваших активных дизайнов. Сначала добавьте дизайн в каталоге.'}
+              </p>
             ) : (
               <div className="subtype-designs-modal-grid">
                 {modalTemplates.map((t) => {

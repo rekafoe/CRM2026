@@ -30,11 +30,19 @@ type Props = {
 
   onChanged: () => void;
 
+  /** Переименование, порядок и удаление категорий — только администратор. */
+  canManageStructure?: boolean;
+
 };
 
 
 
-export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose, onChanged }) => {
+export const DesignTemplateCategoriesModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  onChanged,
+  canManageStructure = true,
+}) => {
 
   const [list, setList] = useState<DesignTemplateCategory[]>([]);
 
@@ -248,7 +256,9 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
       <p className="design-categories-modal-lead">
 
-        Категории группируют каталог. Переименование обновит категорию у всех шаблонов.
+        {canManageStructure
+          ? 'Категории группируют каталог. Переименование обновит категорию у всех шаблонов.'
+          : 'Можно добавить категорию для нового дизайна. Переименование и удаление делает администратор.'}
 
       </p>
 
@@ -344,7 +354,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
               <span className="design-categories-list__count">{cat.template_count ?? 0} шабл.</span>
 
-              <div className="design-categories-list__actions">
+              {canManageStructure && <div className="design-categories-list__actions">
 
                 {editingId !== cat.id && (
 
@@ -426,7 +436,7 @@ export const DesignTemplateCategoriesModal: React.FC<Props> = ({ isOpen, onClose
 
                 </button>
 
-              </div>
+              </div>}
 
             </li>
 

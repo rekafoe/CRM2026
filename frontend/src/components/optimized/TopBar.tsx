@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AppIcon } from '../ui/AppIcon';
 import type { Organization } from '../../api';
 import type { InboxNotification } from '../../api';
+import { getDesignTemplateDeleteRequests } from '../../api';
 import { InboxNotifications } from '../notifications/InboxNotifications';
 import {
   CRM_APPEARANCE_EVENT,
@@ -85,6 +86,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       return location.pathname.startsWith('/adminpanel') && !location.pathname.startsWith('/adminpanel/reports');
     }
     if (path === '/knowledge') return location.pathname.startsWith('/knowledge');
+    if (path === '/designs') return location.pathname === '/designs' || location.pathname.startsWith('/designs/');
     return location.pathname === path;
   };
 
@@ -106,6 +108,30 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
   const theme = appearance.theme;
   const density = appearance.density;
+  const [pendingDesignDeletes, setPendingDesignDeletes] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isAdmin) {
+      setPendingDesignDeletes(0);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      getDesignTemplateDeleteRequests('pending')
+        .then((res) => {
+          if (!cancelled) setPendingDesignDeletes(res.data.requests?.length ?? 0);
+        })
+        .catch(() => {
+          if (!cancelled) setPendingDesignDeletes(0);
+        });
+    };
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', load);
+    };
+  }, [isAdmin]);
 
   return (
     <header className="app-topbar">
@@ -201,6 +227,20 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <AppIcon name="document" size="sm" />
           <span>База знаний</span>
+        </button>
+        <button
+          type="button"
+          className={navClass(sectionActive('/designs'))}
+          onClick={() => navigate('/designs')}
+          title="Дизайны для сайта"
+          aria-label={pendingDesignDeletes > 0 ? `Дизайны, запросов на удаление: ${pendingDesignDeletes}` : 'Дизайны'}
+          aria-current={sectionActive('/designs') ? 'page' : undefined}
+        >
+          <AppIcon name="image" size="sm" />
+          <span>Дизайны</span>
+          {isAdmin && pendingDesignDeletes > 0 ? (
+            <span className="pc-count-stamp">{pendingDesignDeletes > 99 ? '99+' : pendingDesignDeletes}</span>
+          ) : null}
         </button>
         {isAdmin ? (
           <>

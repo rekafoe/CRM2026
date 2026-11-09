@@ -49,6 +49,8 @@ export interface ImportDesignTemplateInput {
   sizeId?: string
   sortOrder?: number
   authorUserId?: number
+  /** Кто загрузил макет. Ставит маршрут из сессии, не из тела запроса. */
+  uploadedByUserId?: number
   usageFee?: number
   authorPercent?: number
   trace?: boolean
@@ -423,6 +425,7 @@ async function createTemplateFromVariant(
     is_active: true,
     sort_order: input.sortOrder ?? 0,
     author_user_id: input.authorUserId ?? null,
+    uploaded_by_user_id: input.uploadedByUserId ?? null,
     usage_fee: input.usageFee,
     author_percent: input.authorPercent,
     spec: await finalizeImportedSpec(importSpec),
@@ -509,6 +512,7 @@ export async function importDesignTemplateFromFile(
       is_active: false,
       sort_order: input.sortOrder ?? 0,
       author_user_id: input.authorUserId ?? null,
+      uploaded_by_user_id: input.uploadedByUserId ?? null,
       usage_fee: input.usageFee,
       author_percent: input.authorPercent,
       spec: {
