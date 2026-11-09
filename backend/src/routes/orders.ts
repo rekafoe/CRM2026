@@ -10,7 +10,7 @@ import { PostalShipmentService } from '../services/postalShipmentService'
 import { buildOrderCostSheet } from '../services/orderCostSheet'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { findOrderStatusId } from '../utils/orderStatusCatalog'
-import { issueCashRemainder } from '../utils/orderAmounts'
+import { issueCashRemainder, shouldSkipOfflineIssueSeal } from '../utils/orderAmounts'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
@@ -1363,7 +1363,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const issuerId = authUser?.id ?? null
   const db = await getDb()
   const order = await db.get<any>(
-    'SELECT id, status, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
+    'SELECT id, status, source, prepaymentAmount, prepaymentStatus, paymentMethod, payment_channel, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
     id,
   )
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
@@ -1379,7 +1379,9 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   }
   const amounts = await OrderService.getOrderAmountsById(id)
   const total = amounts.totalAmount
-  const remainder = issueCashRemainder(total, order)
+  // invoice без order prepaid: не выдумывать offline в кассу — безнал уже в legal_payments / bank.
+  const skipOfflineSeal = shouldSkipOfflineIssueSeal(order)
+  const remainder = skipOfflineSeal ? 0 : issueCashRemainder(total, order)
 
   // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
   const bodyDate = (req.body as any)?.issued_on
@@ -1393,7 +1395,12 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const paymentId = `ISSUE-${Date.now()}-${id}`
   // prepaymentUpdatedAt = дата выдачи (today), чтобы заказ попадал в отчёты по этой дате
   const issueDateTime = `${today} 12:00:00`
-  if (hasPrepaymentUpdatedAt) {
+  if (skipOfflineSeal) {
+    await db.run(
+      'UPDATE orders SET updated_at = ?, status = ? WHERE id = ?',
+      issueDateTime, completedId, id
+    )
+  } else if (hasPrepaymentUpdatedAt) {
     await db.run(
       'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = ?, updated_at = ?, status = ? WHERE id = ?',
       total, paymentId, issueDateTime, issueDateTime, completedId, id

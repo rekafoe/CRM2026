@@ -5,6 +5,7 @@ import {
   discountedItemAmounts,
   issueCashRemainder,
   parseMoneyInput,
+  shouldSkipOfflineIssueSeal,
 } from '../utils/orderAmounts';
 
 describe('orderAmounts', () => {
@@ -121,4 +122,45 @@ describe('orderAmounts', () => {
       }),
     ).toBe(150);
   });
+
+  it('skips offline issue seal for unpaid invoice (legal_payments / bank live off order prepaid)', () => {
+    expect(
+      shouldSkipOfflineIssueSeal({
+        payment_channel: 'invoice',
+        prepaymentAmount: null,
+        prepaymentStatus: null,
+        paymentMethod: null,
+      }),
+    ).toBe(true)
+    expect(
+      shouldSkipOfflineIssueSeal({
+        payment_channel: 'invoice',
+        prepaymentAmount: 0,
+        prepaymentStatus: null,
+      }),
+    ).toBe(true)
+    expect(
+      shouldSkipOfflineIssueSeal({
+        payment_channel: 'invoice',
+        prepaymentAmount: 100,
+        prepaymentStatus: 'pending',
+        paymentMethod: 'online',
+      }),
+    ).toBe(true)
+    expect(
+      shouldSkipOfflineIssueSeal({
+        payment_channel: 'invoice',
+        prepaymentAmount: 100,
+        prepaymentStatus: 'bank',
+        paymentMethod: 'online',
+      }),
+    ).toBe(false)
+    expect(
+      shouldSkipOfflineIssueSeal({
+        payment_channel: 'cash',
+        prepaymentAmount: null,
+        prepaymentStatus: null,
+      }),
+    ).toBe(false)
+  })
 });

@@ -119,6 +119,23 @@ export function issueCashRemainder(
   return round2(Math.max(0, round2(totalAmount) - collectedPrepaymentAmount(order)))
 }
 
+/**
+ * Заказ по счёту без order-level prepaid: выдача не должна выдумывать offline+paid=total.
+ * Безнал юрлица живёт в customer_legal_payments или в /prepay со статусом bank;
+ * иначе касса дня получает ложный нал, а акт сверки — двойной кредит (поступление + «оплата по заказу»).
+ */
+export function shouldSkipOfflineIssueSeal(order: {
+  payment_channel?: string | null
+  paymentChannel?: string | null
+  prepaymentAmount?: number | string | null
+  prepaymentStatus?: string | null
+  paymentMethod?: string | null
+}): boolean {
+  const channel = String(order.payment_channel ?? order.paymentChannel ?? '').trim().toLowerCase()
+  if (channel !== 'invoice') return false
+  return collectedPrepaymentAmount(order) <= 0
+}
+
 /** Сумма позиции после скидки заказа. База та же, что в карточке: storedTotalCost, иначе price × quantity. */
 export function discountedItemAmount(item: ItemLike, discountPercent: number): number {
   const base = computeItemLineTotal(item);

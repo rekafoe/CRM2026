@@ -174,4 +174,58 @@ describe('акт сверки', () => {
     expect(statement.openingBalance).toBe(-15)
     expect(statement.closingBalance).toBe(-15)
   })
+
+  it('invoice + legal payment остаётся 0 после выдачи без выдуманного order prepaid', () => {
+    // Баг: Issue на unpaid invoice ставил offline prepaid=total → кредит заказа + поступление = переплата.
+    const beforeIssue = buildReconciliationStatement(
+      [
+        {
+          id: 20,
+          number: 'ORD-20',
+          orderDate: '2026-11-01',
+          total: 100,
+          collected: 0,
+          paymentDate: null,
+        },
+      ],
+      {},
+      [{ id: 9, date: '2026-11-02', amount: 100, document: 'Поступление: платёжка' }],
+    )
+    expect(beforeIssue.closingBalance).toBe(0)
+
+    const afterBadSeal = reconciliationSourceFromOrder({
+      id: 20,
+      number: 'ORD-20',
+      created_at: '2026-11-01',
+      totalAmount: 100,
+      prepaymentAmount: 100,
+      prepaymentStatus: 'paid',
+      paymentMethod: 'offline',
+      paymentChannel: 'invoice',
+      prepaymentUpdatedAt: '2026-11-03 12:00:00',
+    })
+    const corrupted = buildReconciliationStatement(
+      [afterBadSeal],
+      {},
+      [{ id: 9, date: '2026-11-02', amount: 100, document: 'Поступление: платёжка' }],
+    )
+    expect(corrupted.closingBalance).toBe(-100)
+
+    const afterFixedIssue = reconciliationSourceFromOrder({
+      id: 20,
+      number: 'ORD-20',
+      created_at: '2026-11-01',
+      totalAmount: 100,
+      prepaymentAmount: null,
+      prepaymentStatus: null,
+      paymentMethod: null,
+      paymentChannel: 'invoice',
+    })
+    const fixed = buildReconciliationStatement(
+      [afterFixedIssue],
+      {},
+      [{ id: 9, date: '2026-11-02', amount: 100, document: 'Поступление: платёжка' }],
+    )
+    expect(fixed.closingBalance).toBe(0)
+  })
 })

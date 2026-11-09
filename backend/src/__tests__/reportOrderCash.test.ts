@@ -2,6 +2,7 @@ import {
   computeCashForReportDate,
   countsAsPaidForCashReport,
   isOrderExcludedFromCashRegister,
+  shouldIncludeOrderInCashRegister,
 } from '../utils/reportOrderCash'
 
 describe('computeCashForReportDate', () => {
@@ -127,5 +128,49 @@ describe('computeCashForReportDate', () => {
       '2025-06-03',
     )
     expect(cash).toBe(40)
+  })
+
+  it('unpaid invoice issue without offline seal stays out of cash register', () => {
+    // Баг: Issue на invoice без prepaid писал debt_closed=total + offline → касса +итог.
+    const badCash = computeCashForReportDate(
+      {
+        prepaymentAmount: 100,
+        prepaymentStatus: 'paid',
+        paymentMethod: 'offline',
+        payment_channel: 'invoice',
+        created_at: '2026-11-01 10:00:00',
+        prepaymentUpdatedAt: '2026-11-03 12:00:00',
+        cash_from_issue_today: 100,
+      },
+      '2026-11-03',
+    )
+    expect(badCash).toBe(100)
+    expect(
+      shouldIncludeOrderInCashRegister(
+        { payment_channel: 'invoice', prepaymentAmount: 100, paymentMethod: 'offline' },
+        '2026-11-03',
+        badCash,
+      ),
+    ).toBe(true)
+
+    const fixedCash = computeCashForReportDate(
+      {
+        prepaymentAmount: null,
+        prepaymentStatus: null,
+        paymentMethod: null,
+        payment_channel: 'invoice',
+        created_at: '2026-11-01 10:00:00',
+        cash_from_issue_today: 0,
+      },
+      '2026-11-03',
+    )
+    expect(fixedCash).toBe(0)
+    expect(
+      shouldIncludeOrderInCashRegister(
+        { payment_channel: 'invoice', prepaymentAmount: null },
+        '2026-11-03',
+        fixedCash,
+      ),
+    ).toBe(false)
   })
 })
