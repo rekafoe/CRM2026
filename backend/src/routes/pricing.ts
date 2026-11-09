@@ -27,8 +27,9 @@ import {
 } from '../modules/pricing/services/rollWideM2PricingService'
 import {
   itemsPerSheetForDerive,
-  resolveCentralSheetTiers,
+  mergeCentralSheetTierLists,
   toProductQtyTiers,
+  type CentralSheetTier,
 } from '../modules/pricing/utils/deriveSheetPrintTiers'
 
 console.log('Loading pricing routes...')
@@ -219,21 +220,58 @@ async function upsertPrintPriceRollM2Tiers(
   }
 }
 
-/** Сохранить диапазоны цен печати (по листам) */
-async function upsertPrintPriceTiers(db: any, printPriceId: number, tiers: Array<{ price_mode: string; min_sheets: number; max_sheets?: number; price_per_sheet: number }> | undefined) {
+/** Сохранить диапазоны цен печати (по листам). Повтор порога не обрывает остальные ставки: остаётся положительная цена. */
+async function upsertPrintPriceTiers(db: any, printPriceId: number, tiers: Array<{ price_mode: string; min_sheets: number; max_sheets?: number | null; price_per_sheet: number }> | undefined) {
   if (!Array.isArray(tiers)) return
+  const byKey = new Map<string, { price_mode: string; min_sheets: number; max_sheets: number | null; price_per_sheet: number }>()
+  for (const tier of tiers) {
+    const mode = String(tier?.price_mode || '').trim()
+    const min = Math.floor(Number(tier?.min_sheets))
+    if (!mode || !Number.isFinite(min) || min <= 0) continue
+    const price = Number(tier?.price_per_sheet)
+    const nextPrice = Number.isFinite(price) && price > 0 ? price : 0
+    const key = `${mode}:${min}`
+    const prev = byKey.get(key)
+    if (prev && prev.price_per_sheet > 0 && nextPrice <= 0) continue
+    const maxRaw = tier?.max_sheets
+    const max = maxRaw == null || maxRaw === undefined || (maxRaw as unknown) === ''
+      ? null
+      : Number(maxRaw)
+    byKey.set(key, {
+      price_mode: mode,
+      min_sheets: min,
+      max_sheets: max != null && Number.isFinite(max) ? max : null,
+      price_per_sheet: nextPrice > 0 ? nextPrice : (prev?.price_per_sheet ?? 0),
+    })
+  }
   try {
-    await db.run('DELETE FROM print_price_tiers WHERE print_price_id = ?', [printPriceId])
-    for (const t of tiers) {
-      if (!t.price_mode || t.min_sheets == null) continue
-      await db.run(`
-        INSERT INTO print_price_tiers (print_price_id, price_mode, min_sheets, max_sheets, price_per_sheet)
-        VALUES (?, ?, ?, ?, ?)
-      `, [printPriceId, t.price_mode, t.min_sheets, t.max_sheets ?? null, t.price_per_sheet ?? 0])
+    await db.run('SAVEPOINT print_price_tiers_save')
+    try {
+      await db.run('DELETE FROM print_price_tiers WHERE print_price_id = ?', [printPriceId])
+      for (const tier of byKey.values()) {
+        await db.run(`
+          INSERT INTO print_price_tiers (print_price_id, price_mode, min_sheets, max_sheets, price_per_sheet)
+          VALUES (?, ?, ?, ?, ?)
+        `, [printPriceId, tier.price_mode, tier.min_sheets, tier.max_sheets, tier.price_per_sheet])
+      }
+      await db.run('RELEASE print_price_tiers_save')
+    } catch (error) {
+      try { await db.run('ROLLBACK TO print_price_tiers_save') } catch { /* savepoint уже снят */ }
+      try { await db.run('RELEASE print_price_tiers_save') } catch { /* ignore */ }
+      throw error
     }
   } catch (e) {
     console.warn('print_price_tiers not available:', e)
   }
+}
+
+function sheetFlatRate(incoming: unknown, existing: unknown): number {
+  if (incoming === undefined) {
+    const prev = Number(existing)
+    return Number.isFinite(prev) ? prev : 0
+  }
+  const next = Number(incoming)
+  return Number.isFinite(next) ? next : 0
 }
 
 /**
@@ -754,19 +792,55 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       cutGapMm,
       itemsPerSheetOverride: itemsOverride,
     })
-    const tierRows = await db.all<any>(`
-      SELECT min_sheets, max_sheets, price_per_sheet FROM print_price_tiers
-      WHERE print_price_id = ? AND price_mode = ?
-      ORDER BY min_sheets
-    `, [pp.id, priceMode])
-    const storedTiers = Array.isArray(tierRows) ? tierRows : []
-    const flatByMode: Record<string, number | null | undefined> = {
-      color_single: pp.price_color_single,
-      color_duplex: pp.price_color_duplex,
-      bw_single: pp.price_bw_single,
-      bw_duplex: pp.price_bw_duplex,
+    const sheetRows = await db.all<any>(`
+      SELECT id, price_bw_single, price_bw_duplex, price_color_single, price_color_duplex
+      FROM print_prices
+      WHERE LOWER(technology_code) = LOWER(?) AND is_active = 1 AND counter_unit = 'sheets'
+      ORDER BY id DESC
+    `, [technology_code])
+    const sheetIds = (Array.isArray(sheetRows) ? sheetRows : [])
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+    const tierRows = sheetIds.length > 0
+      ? await db.all<any>(`
+        SELECT print_price_id, min_sheets, max_sheets, price_per_sheet
+        FROM print_price_tiers
+        WHERE price_mode = ? AND print_price_id IN (${sheetIds.map(() => '?').join(',')})
+        ORDER BY min_sheets
+      `, [priceMode, ...sheetIds])
+      : []
+    const tiersByPriceId = new Map<number, CentralSheetTier[]>()
+    for (const id of sheetIds) tiersByPriceId.set(id, [])
+    for (const tier of Array.isArray(tierRows) ? tierRows : []) {
+      const id = Number(tier.print_price_id)
+      const bucket = tiersByPriceId.get(id)
+      if (!bucket) continue
+      bucket.push({
+        min_sheets: Number(tier.min_sheets),
+        max_sheets: tier.max_sheets,
+        price_per_sheet: Number(tier.price_per_sheet) || 0,
+      })
     }
-    const resolved = resolveCentralSheetTiers(storedTiers, flatByMode[priceMode])
+    const flatFieldByMode: Record<string, string> = {
+      color_single: 'price_color_single',
+      color_duplex: 'price_color_duplex',
+      bw_single: 'price_bw_single',
+      bw_duplex: 'price_bw_duplex',
+    }
+    const flatField = flatFieldByMode[priceMode]
+    const rows = Array.isArray(sheetRows) ? sheetRows : []
+    const flatOf = (row: any) => Number(flatField ? row?.[flatField] : 0)
+    // Только односторонний цвет: со второго диапазона в базе часто 0,
+    // хотя ставка есть на более старой записи или в плоской цене принтера.
+    // Остальные режимы читаем как раньше — с самой новой записи, нули не подменяем.
+    const fillZeroSlots = priceMode === 'color_single'
+    const tierLists = fillZeroSlots
+      ? sheetIds.map((id) => tiersByPriceId.get(id) ?? [])
+      : [tiersByPriceId.get(sheetIds[0]) ?? []]
+    const flatPrice = fillZeroSlots
+      ? rows.map(flatOf).find((price) => Number.isFinite(price) && price > 0) ?? 0
+      : flatOf(rows[0])
+    const resolved = mergeCentralSheetTierLists(tierLists, flatPrice, { fillZeroSlots })
     if (resolved.tiers.length === 0) {
       res.json({
         items_per_sheet: itemsPerSheet,
@@ -780,7 +854,7 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       items_per_sheet: itemsPerSheet,
       sheet_size: { width_mm: sheetW, height_mm: sheetH },
       tiers: derivedTiers,
-      ...(resolved.usedFlat
+      ...(resolved.usedFlat && resolved.tiers.every((tier) => tier.min_sheets === 1 && tier.max_sheets == null)
         ? { note: 'Взята плоская ставка за лист: положительных диапазонов тиража нет.' }
         : {}),
     })
@@ -2374,6 +2448,19 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       resolvedCounterUnit === 'm2' && resolvedM2PricingKind === 'uv_flatbed'
         ? optionalNonNegative(cost_varnish_per_m2)
         : null
+    const existingFlat = await db.get<{
+      price_bw_single: number | null
+      price_bw_duplex: number | null
+      price_color_single: number | null
+      price_color_duplex: number | null
+    }>(`
+      SELECT price_bw_single, price_bw_duplex, price_color_single, price_color_duplex
+      FROM print_prices WHERE id = ?
+    `, [id])
+    const priceBwSingleForSave = sheetFlatRate(price_bw_single, existingFlat?.price_bw_single)
+    const priceBwDuplexForSave = sheetFlatRate(price_bw_duplex, existingFlat?.price_bw_duplex)
+    const priceColorSingleForSave = sheetFlatRate(price_color_single, existingFlat?.price_color_single)
+    const priceColorDuplexForSave = sheetFlatRate(price_color_duplex, existingFlat?.price_color_duplex)
     await db.run(`
       UPDATE print_prices SET
         technology_code = ?,
@@ -2407,10 +2494,10 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       resolvedCounterUnit || 'sheets',
       sw,
       sh,
-      price_bw_single || 0,
-      price_bw_duplex || 0,
-      price_color_single || 0,
-      price_color_duplex || 0,
+      priceBwSingleForSave,
+      priceBwDuplexForSave,
+      priceColorSingleForSave,
+      priceColorDuplexForSave,
       price_bw_per_meter || null,
       price_color_per_meter || null,
       m2KindForSave,
@@ -2453,10 +2540,10 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       m2_pricing_kind: m2KindForSave,
       sheet_width_mm: sw,
       sheet_height_mm: sh,
-      price_bw_single: price_bw_single || 0,
-      price_bw_duplex: price_bw_duplex || 0,
-      price_color_single: price_color_single || 0,
-      price_color_duplex: price_color_duplex || 0,
+      price_bw_single: priceBwSingleForSave,
+      price_bw_duplex: priceBwDuplexForSave,
+      price_color_single: priceColorSingleForSave,
+      price_color_duplex: priceColorDuplexForSave,
       price_bw_per_meter: price_bw_per_meter || null,
       price_color_per_meter: price_color_per_meter || null,
       price_color_per_m2: colorPerM2ForSave,

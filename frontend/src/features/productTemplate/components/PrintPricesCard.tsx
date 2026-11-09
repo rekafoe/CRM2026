@@ -6,7 +6,7 @@ import type { SimplifiedSizeConfig } from '../hooks/useProductTemplate'
 import { PriceCell } from './PriceCell'
 import { type Tier, defaultTiers, addRangeBoundary, editRangeBoundary, removeRange, normalizeTiers } from '../utils/tierManagement'
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../hooks/useTierRangeFloating'
-import { deriveSizePrintPricesFromCentral } from '../utils/derivePrintPricesFromCentral'
+import { deriveSizePrintPricesFromCentral, unitPriceForTierColumn } from '../utils/derivePrintPricesFromCentral'
 
 type PrintTechRow = {
   code: string
@@ -474,20 +474,19 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                   </div>
                 </td>
                 {commonRanges.map((t, ti) => {
-                  const priceTier = row.tiers.find((rt) => Number(rt.min_qty) === Number(t.min_qty))
                   return (
                     <td key={ti}>
                       <PriceCell
                         className="form-input form-input--compact-table"
-                        value={priceTier ? Number(priceTier.unit_price ?? 0) : 0}
+                        value={unitPriceForTierColumn(row.tiers, t.min_qty)}
                         onChange={(v) => {
                           const next = selected.print_prices.map((r, i) => {
                             if (i !== actualIdx) return r
-                            const updatedTiers = commonRanges.map((rt, rti) => {
-                              const existingTier = r.tiers.find((tier) => Number(tier.min_qty) === Number(rt.min_qty))
-                              if (rti === ti) return { ...(existingTier ?? rt), unit_price: v }
-                              return existingTier ?? { ...rt, unit_price: 0 }
-                            })
+                            const updatedTiers = commonRanges.map((rt, rti) => ({
+                              min_qty: rt.min_qty,
+                              max_qty: rt.max_qty,
+                              unit_price: rti === ti ? v : unitPriceForTierColumn(r.tiers, rt.min_qty),
+                            }))
                             return { ...r, tiers: updatedTiers }
                           })
                           updateSize(selected.id, { print_prices: next })
