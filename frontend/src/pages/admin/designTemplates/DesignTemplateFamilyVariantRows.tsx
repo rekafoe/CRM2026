@@ -10,7 +10,9 @@ import {
   type DesignTemplateFamily,
 } from './designTemplateCatalogUtils';
 import { openSiteSandboxForDesignTemplate } from '../../../features/designTemplates/openSiteSandboxForDesignTemplate';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useCurrentUser } from '../../../hooks/useCurrentUser';
+import { canEditDesign, designsCatalogPath, isDesignCatalogAdmin, readStoredCatalogUser } from './designTemplateAccess';
 import './DesignTemplateFamilyVariantRows.css';
 
 function mergeProductBindIntoSpec(
@@ -69,6 +71,12 @@ function VariantRow({
   onDelete: Props['onDelete'];
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentUser = useCurrentUser();
+  const catalogUser = currentUser ?? readStoredCatalogUser();
+  const canEdit = canEditDesign(catalogUser, variant);
+  const userIsAdmin = isDesignCatalogAdmin(catalogUser?.role);
+  const deletePending = variant.delete_request_id != null;
   const parsed = useMemo(() => parseTemplateSpec(variant), [variant]);
   const sizeStr = formatTemplateSize(parsed) ?? 'без размера в SVG';
   const status = getTemplateCatalogStatus(variant);
@@ -82,8 +90,10 @@ function VariantRow({
   const [sandboxBusy, setSandboxBusy] = useState(false);
 
   const openMasterEditor = useCallback(() => {
-    navigate(`/adminpanel/design-editor/${variant.id}`);
-  }, [navigate, variant.id]);
+    navigate(`/adminpanel/design-editor/${variant.id}`, {
+      state: { catalogPath: designsCatalogPath(location.pathname) },
+    });
+  }, [location.pathname, navigate, variant.id]);
 
   const openClientSandbox = useCallback(async () => {
     try {
@@ -158,16 +168,23 @@ function VariantRow({
           <span className={`design-family-variant-row__status design-family-variant-row__status--${status}`}>
             {STATUS_LABELS[status]}
           </span>
+          {deletePending && (
+            <span className="design-template-pending-badge" title={variant.delete_requested_by_name || undefined}>
+              Ожидает удаления
+            </span>
+          )}
         </div>
         <div className="design-family-variant-row__maket-actions">
-          <button
-            type="button"
-            className="lg-btn lg-btn--sm lg-btn--primary"
-            onClick={openMasterEditor}
-            title="Master-редактор CRM: абсолютная правка шаблона (текст, фотополя, надписи)"
-          >
-            <AppIcon name="edit" size="xs" /> Макет
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              className="lg-btn lg-btn--sm lg-btn--primary"
+              onClick={openMasterEditor}
+              title="Master-редактор CRM: абсолютная правка шаблона (текст, фотополя, надписи)"
+            >
+              <AppIcon name="edit" size="xs" /> Макет
+            </button>
+          )}
           <button
             type="button"
             className="lg-btn lg-btn--sm"
@@ -181,15 +198,19 @@ function VariantRow({
           >
             <AppIcon name="image" size="xs" /> {sandboxBusy ? '…' : 'На сайте'}
           </button>
-          <button
-            type="button"
-            className="lg-btn lg-btn--sm lg-btn--icon lg-btn--danger"
-            onClick={() =>void onDelete(variant.id, sizeStr)}
-            title="Удалить этот размер"
-            aria-label="Удалить"
-          >
-            <AppIcon name="trash" size="xs" />
-          </button>
+          {canEdit && (deletePending && !userIsAdmin ? (
+            <span className="design-template-pending-badge">Запрос отправлен</span>
+          ) : (
+            <button
+              type="button"
+              className="lg-btn lg-btn--sm lg-btn--icon lg-btn--danger"
+              onClick={() =>void onDelete(variant.id, sizeStr)}
+              title={userIsAdmin ? 'Удалить этот размер' : 'Запросить удаление этого размера'}
+              aria-label={userIsAdmin ? 'Удалить' : 'Запросить удаление'}
+            >
+              <AppIcon name="trash" size="xs" />
+            </button>
+          ))}
         </div>
       </div>
 
@@ -204,22 +225,26 @@ function VariantRow({
             <span className="design-family-variant-row__bind-warn">не привязан</span>
           )}
         </div>
-        <div className="design-family-variant-row__bind-controls">
-          <DesignTemplateProductBindField
-            value={bind}
-            onChange={setBind}
-            requiredSize
-            compact
-          />
-          <button
-            type="button"
-            className="lg-btn lg-btn--primary lg-btn--sm design-family-variant-row__bind-btn"
-            disabled={!canBind || saving}
-            onClick={() =>void handleBind()}
-          >
-            {saving ? '…' : linked ? 'Обновить привязку' : 'Привязать'}
-          </button>
-        </div>
+        {canEdit ? (
+          <div className="design-family-variant-row__bind-controls">
+            <DesignTemplateProductBindField
+              value={bind}
+              onChange={setBind}
+              requiredSize
+              compact
+            />
+            <button
+              type="button"
+              className="lg-btn lg-btn--primary lg-btn--sm design-family-variant-row__bind-btn"
+              disabled={!canBind || saving}
+              onClick={() =>void handleBind()}
+            >
+              {saving ? '…' : linked ? 'Обновить привязку' : 'Привязать'}
+            </button>
+          </div>
+        ) : (
+          <p className="design-family-variant-row__readonly">Чужой дизайн: привязку меняет тот, кто его загрузил, или администратор.</p>
+        )}
         {rowError && <p className="design-family-variant-row__error">{rowError}</p>}
         {rowOk && !rowError && <p className="design-family-variant-row__ok">{rowOk}</p>}
       </div>

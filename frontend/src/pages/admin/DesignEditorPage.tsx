@@ -40,6 +40,7 @@ import { hasBlobUrl } from './designEditor/fabricJsonValidation';
 import { TextPatchScopeDialog } from './designEditor/TextPatchScopeDialog';
 import { useDesignTemplateAssetUpload } from './designEditor/useDesignTemplateAssetUpload';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { canEditDesign, readStoredCatalogUser, resolveDesignCatalogReturn } from './designTemplates/designTemplateAccess';
 import { openSiteSandboxForDesignTemplate } from '../../features/designTemplates/openSiteSandboxForDesignTemplate';
 import { useTextPatchScopeDialog } from './designEditor/useTextPatchScopeDialog';
 import type {
@@ -119,8 +120,8 @@ export const DesignEditorPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { templateId } = useParams<{ templateId: string }>();
-  const isMainAppRoute = location.pathname.startsWith('/design-editor/');
-  const catalogPath = isMainAppRoute ? '/design-templates' : '/adminpanel/design-templates';
+  const currentUser = useCurrentUser();
+  const catalogPath = resolveDesignCatalogReturn(location.state, currentUser?.role);
 
   // ── Template ────────────────────────────────────────────────────────────────
   const [templateState, setTemplateState] = useState<{
@@ -337,7 +338,6 @@ export const DesignEditorPage: React.FC = () => {
 
   const [exportingPdf, setExportingPdf] = useState(false);
   const [siteBusy, setSiteBusy] = useState(false);
-  const currentUser = useCurrentUser();
   const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null);
 
   /** Ошибки в рабочем режиме (загрузка по URL, сохранение и т.д.) */
@@ -825,6 +825,10 @@ export const DesignEditorPage: React.FC = () => {
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
+    if (!canEditDesign(currentUser ?? readStoredCatalogUser(), template)) {
+      setEditorError('Этот дизайн загрузил другой сотрудник. Править его может он или администратор.');
+      return;
+    }
     if (!canvasHandleRef.current) return;
 
     const rawSaved = await canvasHandleRef.current.saveCurrentPage();
@@ -893,6 +897,7 @@ export const DesignEditorPage: React.FC = () => {
     leftPageIdx,
     rightPageIdx,
     numericTemplateId,
+    currentUser,
   ]);
 
   // ── PDF export ────────────────────────────────────────────────────────────────
@@ -976,6 +981,7 @@ export const DesignEditorPage: React.FC = () => {
     );
   }
 
+  const canEditTemplate = canEditDesign(currentUser ?? readStoredCatalogUser(), template);
   const adminFragmentLabel = currentStripItem?.label ?? `Страница ${currentPage + 1}`;
   const adminFragmentDetail = isSpreadView
     ? 'Редактирование разворота шаблона'
@@ -995,9 +1001,12 @@ export const DesignEditorPage: React.FC = () => {
       className="design-editor-fullbleed design-editor-single-bar"
     >
       <div className="public-design-editor public-design-editor--admin">
+        {!canEditTemplate && (
+          <Alert type="info">Этот дизайн загрузил другой сотрудник. Макет открыт только для просмотра.</Alert>
+        )}
         <EditorTopBar
           templateName={template.name}
-          documentLabel="Админский шаблон"
+          documentLabel={canEditTemplate ? 'Админский шаблон' : 'Только просмотр'}
           saving={saving}
           saveState={
             saving
@@ -1010,7 +1019,7 @@ export const DesignEditorPage: React.FC = () => {
           }
           leading={(
             <button type="button" className="de-admin-back" onClick={() => navigate(catalogPath)}>
-              <AppIcon name="arrow-left" size="xs" /> Шаблоны
+              <AppIcon name="arrow-left" size="xs" /> Дизайны
             </button>
           )}
           tags={(
@@ -1022,7 +1031,7 @@ export const DesignEditorPage: React.FC = () => {
           )}
           orderLabel="Сохранить шаблон"
           savingLabel="Сохраняем..."
-          onPrimaryAction={() => void handleSave()}
+          onPrimaryAction={canEditTemplate ? () => void handleSave() : undefined}
           actionBar={(
             <>
               <Button

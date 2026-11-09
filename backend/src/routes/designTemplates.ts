@@ -20,8 +20,23 @@ import {
   createDesignTemplate,
   updateDesignTemplate,
   deleteDesignTemplate,
+  getDesignTemplatesByCode,
+  isValidDesignCode,
   type DesignTemplateInput,
 } from '../services/designTemplateService'
+import {
+  canEditDesign,
+  canEditDesignFamily,
+  canUseDesignCatalog,
+  isDesignCatalogAdmin,
+  type DesignActor,
+} from '../services/designTemplateAccess'
+import {
+  confirmDesignTemplateDeletion,
+  listDesignTemplateDeleteRequests,
+  rejectDesignTemplateDeletion,
+  requestDesignTemplateDeletion,
+} from '../services/designTemplateDeleteRequestService'
 import {
   importDesignTemplateFromFile,
   reimportDesignTemplateFromFile,
@@ -280,6 +295,89 @@ router.get('/public/:id', asyncHandler(async (req: Request, res: Response) => {
 
 router.use(authenticate)
 
+router.use((req: Request, res: Response, next) => {
+  const user = (req as AuthenticatedRequest).user
+  if (!user?.id || !canUseDesignCatalog(user.role)) {
+    res.status(403).json({ message: 'Раздел дизайнов доступен сотрудникам CRM' })
+    return
+  }
+  next()
+})
+
+function actorOf(req: Request): DesignActor {
+  const user = (req as AuthenticatedRequest).user!
+  return { id: user.id, role: user.role }
+}
+
+function bodyTouchesDesignFamily(body: Record<string, unknown>): boolean {
+  return ['author_user_id', 'usage_fee', 'author_percent', 'site_preview_url'].some((key) =>
+    Object.prototype.hasOwnProperty.call(body, key),
+  )
+}
+
+/** true, если ответ уже отправлен: чужая семья. */
+async function deniedForeignFamily(req: Request, res: Response, designCode: string | undefined): Promise<boolean> {
+  const code = String(designCode || '').trim()
+  if (!code || !isValidDesignCode(code)) return false
+  const family = await getDesignTemplatesByCode(code)
+  if (family.length === 0 || canEditDesignFamily(actorOf(req), family)) return false
+  res.status(403).json({
+    message: 'Добавить размер можно только в свою семью дизайна',
+    errors: ['Добавить размер можно только в свою семью дизайна'],
+    warnings: [],
+  })
+  return true
+}
+
+/** Запросы на удаление. Админ видит все, сотрудник — только свои. */
+router.get('/delete-requests', asyncHandler(async (req: Request, res: Response) => {
+  const actor = actorOf(req)
+  const status = req.query.status === 'rejected' ? 'rejected' : 'pending'
+  const requests = await listDesignTemplateDeleteRequests({
+    status,
+    requestedByUserId: isDesignCatalogAdmin(actor.role) ? undefined : actor.id,
+  })
+  res.json({ requests })
+}))
+
+router.post('/delete-requests/:requestId/confirm', asyncHandler(async (req: Request, res: Response) => {
+  const actor = actorOf(req)
+  if (!isDesignCatalogAdmin(actor.role)) {
+    res.status(403).json({ message: 'Подтвердить удаление может только администратор' })
+    return
+  }
+  const requestId = parseInt(req.params.requestId, 10)
+  if (!Number.isFinite(requestId)) {
+    res.status(400).json({ message: 'Неверный ID запроса' })
+    return
+  }
+  const deleted = await confirmDesignTemplateDeletion(requestId)
+  if (!deleted) {
+    res.status(404).json({ message: 'Запрос на удаление не найден' })
+    return
+  }
+  res.json({ ok: true })
+}))
+
+router.post('/delete-requests/:requestId/reject', asyncHandler(async (req: Request, res: Response) => {
+  const actor = actorOf(req)
+  if (!isDesignCatalogAdmin(actor.role)) {
+    res.status(403).json({ message: 'Отклонить удаление может только администратор' })
+    return
+  }
+  const requestId = parseInt(req.params.requestId, 10)
+  if (!Number.isFinite(requestId)) {
+    res.status(400).json({ message: 'Неверный ID запроса' })
+    return
+  }
+  const rejected = await rejectDesignTemplateDeletion(requestId, actor.id)
+  if (!rejected) {
+    res.status(404).json({ message: 'Запрос на удаление не найден' })
+    return
+  }
+  res.json(rejected)
+}))
+
 /** GET /api/design-templates/analytics/usage — популярность шаблонов в заказах */
 router.get('/analytics/usage', asyncHandler(async (req: Request, res: Response) => {
   const analytics = await getDesignTemplateUsageAnalytics(req.query as Record<string, string>)
@@ -305,6 +403,12 @@ router.get('/categories', asyncHandler(async (_req: Request, res: Response) => {
   res.json(categories)
 }))
 
+function requireDesignAdmin(req: Request, res: Response): boolean {
+  if (isDesignCatalogAdmin(actorOf(req).role)) return true
+  res.status(403).json({ message: 'Это действие доступно только администратору' })
+  return false
+}
+
 /** POST /api/design-templates/categories */
 router.post('/categories', asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>
@@ -321,6 +425,7 @@ router.post('/categories', asyncHandler(async (req: Request, res: Response) => {
 
 /** PUT /api/design-templates/categories/:id */
 router.put('/categories/:id', asyncHandler(async (req: Request, res: Response) => {
+  if (!requireDesignAdmin(req, res)) return
   const id = parseInt(req.params.id)
   if (isNaN(id)) {
     res.status(400).json({ message: 'Неверный ID' })
@@ -345,6 +450,7 @@ router.put('/categories/:id', asyncHandler(async (req: Request, res: Response) =
 
 /** DELETE /api/design-templates/categories/:id */
 router.delete('/categories/:id', asyncHandler(async (req: Request, res: Response) => {
+  if (!requireDesignAdmin(req, res)) return
   const id = parseInt(req.params.id)
   if (isNaN(id)) {
     res.status(400).json({ message: 'Неверный ID' })
@@ -362,6 +468,31 @@ router.delete('/categories/:id', asyncHandler(async (req: Request, res: Response
   }
 }))
 
+/** POST /api/design-templates/:id/delete-request — сотрудник просит удалить свой дизайн */
+router.post('/:id/delete-request', asyncHandler(async (req: Request, res: Response) => {
+  const actor = actorOf(req)
+  if (isDesignCatalogAdmin(actor.role)) {
+    res.status(400).json({ message: 'Администратор удаляет дизайн сразу, без запроса' })
+    return
+  }
+  const id = parseInt(req.params.id, 10)
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  const template = await getDesignTemplate(id)
+  if (!template) {
+    res.status(404).json({ message: 'Шаблон не найден' })
+    return
+  }
+  if (!canEditDesign(actor, template)) {
+    res.status(403).json({ message: 'Запросить удаление можно только для своего дизайна' })
+    return
+  }
+  const request = await requestDesignTemplateDeletion(id, actor.id)
+  res.status(202).json(request)
+}))
+
 /** POST /api/design-templates/:id/reimport — обновить существующий шаблон из SVG/ZIP */
 router.post('/:id/reimport', uploadOrderFilesMemory.fields([
   { name: 'file', maxCount: 1 },
@@ -370,6 +501,19 @@ router.post('/:id/reimport', uploadOrderFilesMemory.fields([
   const id = parseInt(req.params.id)
   if (isNaN(id)) {
     res.status(400).json({ message: 'Неверный ID', errors: ['Неверный ID'], warnings: [] })
+    return
+  }
+  const existing = await getDesignTemplate(id)
+  if (!existing) {
+    res.status(404).json({ message: 'Шаблон не найден', errors: ['Шаблон не найден'], warnings: [] })
+    return
+  }
+  if (!canEditDesign(actorOf(req), existing)) {
+    res.status(403).json({
+      message: 'Обновить из SVG можно только свой дизайн',
+      errors: ['Обновить из SVG можно только свой дизайн'],
+      warnings: [],
+    })
     return
   }
   try {
@@ -405,6 +549,15 @@ router.post('/:id/assets', uploadOrderFilesMemory.single('file'), asyncHandler(a
   const templateId = parseInt(req.params.id)
   if (!Number.isFinite(templateId) || templateId <= 0) {
     res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  const existing = await getDesignTemplate(templateId)
+  if (!existing) {
+    res.status(404).json({ message: 'Шаблон не найден' })
+    return
+  }
+  if (!canEditDesign(actorOf(req), existing)) {
+    res.status(403).json({ message: 'Загрузить файл можно только в свой дизайн' })
     return
   }
   const file = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
@@ -480,9 +633,11 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     is_active: body.is_active !== false,
     sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
     author_user_id: royalty.author_user_id ?? authUser?.id ?? null,
+    uploaded_by_user_id: authUser?.id ?? null,
     usage_fee: royalty.usage_fee,
     author_percent: royalty.author_percent,
   }
+  if (await deniedForeignFamily(req, res, input.design_code)) return
   const template = await createDesignTemplate(input)
   res.status(201).json(template)
 }))
@@ -526,6 +681,7 @@ router.post('/import', uploadOrderFilesMemory.fields([
       })
       return
     }
+    if (await deniedForeignFamily(req, res, body.design_code != null ? String(body.design_code) : undefined)) return
     const result = await importDesignTemplateFromFile({
       file: files?.file?.[0],
       sourceFile: files?.sourceFile?.[0],
@@ -540,6 +696,7 @@ router.post('/import', uploadOrderFilesMemory.fields([
       sizeId: body.sizeId != null && body.sizeId !== '' ? String(body.sizeId) : undefined,
       sortOrder: body.sortOrder != null ? Number(body.sortOrder) : undefined,
       authorUserId: royalty.author_user_id ?? authUser?.id,
+      uploadedByUserId: authUser?.id,
       usageFee: royalty.usage_fee,
       authorPercent: royalty.author_percent,
       trace: body.trace === true || body.trace === 'true' || body.trace === '1',
@@ -566,7 +723,24 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     res.status(400).json({ message: 'Неверный ID' })
     return
   }
+  const existing = await getDesignTemplate(id)
+  if (!existing) {
+    res.status(404).json({ message: 'Шаблон не найден' })
+    return
+  }
+  const actor = actorOf(req)
+  if (!canEditDesign(actor, existing)) {
+    res.status(403).json({ message: 'Редактировать можно только свой дизайн' })
+    return
+  }
   const body = req.body as Record<string, unknown>
+  if (bodyTouchesDesignFamily(body)) {
+    const family = existing.design_code ? await getDesignTemplatesByCode(existing.design_code) : [existing]
+    if (!canEditDesignFamily(actor, family)) {
+      res.status(403).json({ message: 'Плату, автора и превью сайта можно менять, только если вся семья ваша' })
+      return
+    }
+  }
   const input: Partial<DesignTemplateInput> = {}
   if (body.name != null) input.name = String(body.name).trim()
   if (body.description != null) input.description = String(body.description)
@@ -609,8 +783,12 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   res.json(template)
 }))
 
-/** DELETE /api/design-templates/:id — удалить шаблон */
+/** DELETE /api/design-templates/:id — удалить шаблон (только администратор) */
 router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+  if (!isDesignCatalogAdmin(actorOf(req).role)) {
+    res.status(403).json({ message: 'Удалить дизайн сразу может только администратор. Отправьте запрос на удаление.' })
+    return
+  }
   const id = parseInt(req.params.id)
   if (isNaN(id)) {
     res.status(400).json({ message: 'Неверный ID' })

@@ -64,6 +64,9 @@ const LazyKnowledgeEditorPage = React.lazy(() =>
 const LazyKnowledgeProposalPage = React.lazy(() =>
   import('./features/knowledgeBase').then((m) => ({ default: m.KnowledgeProposalPage }))
 );
+const LazyDesignTemplatesPage = React.lazy(() =>
+  import('./pages/admin/DesignTemplatesPage').then((m) => ({ default: m.DesignTemplatesPage }))
+);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(APP_CONFIG.storage.token) : null;
@@ -192,8 +195,18 @@ root.render(
             }
           />
           <Route
+            path="/designs"
+            element={(
+              <RequireAuth>
+                <React.Suspense fallback={<LoadingFallback />}>
+                  <LazyDesignTemplatesPage />
+                </React.Suspense>
+              </RequireAuth>
+            )}
+          />
+          <Route
             path="/design-templates"
-            element={<Navigate to="/adminpanel/design-templates" replace />}
+            element={<Navigate to="/designs" replace />}
           />
           <Route
             path="/design-editor/:templateId"

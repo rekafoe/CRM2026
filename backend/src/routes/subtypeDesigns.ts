@@ -1,11 +1,38 @@
 import { Router, Request, Response } from 'express'
-import { asyncHandler, authenticate } from '../middleware'
+import { asyncHandler, authenticate, type AuthenticatedRequest } from '../middleware'
+import { canEditDesign, canUseDesignCatalog, type DesignActor } from '../services/designTemplateAccess'
+import { getDesignTemplate } from '../services/designTemplateService'
 import {
   getSubtypeDesigns,
+  getSubtypeDesignTemplateId,
   addSubtypeDesign,
   removeSubtypeDesign,
   reorderSubtypeDesigns,
 } from '../services/subtypeDesignService'
+
+function catalogActor(req: Request): DesignActor | null {
+  const user = (req as AuthenticatedRequest).user
+  if (!user?.id || !canUseDesignCatalog(user.role)) return null
+  return { id: user.id, role: user.role }
+}
+
+async function assertCanPublishTemplate(req: Request, res: Response, templateId: number): Promise<boolean> {
+  const actor = catalogActor(req)
+  if (!actor) {
+    res.status(403).json({ error: 'Привязка дизайнов доступна сотрудникам CRM' })
+    return false
+  }
+  const template = await getDesignTemplate(templateId)
+  if (!template) {
+    res.status(404).json({ error: 'Шаблон не найден' })
+    return false
+  }
+  if (!canEditDesign(actor, template)) {
+    res.status(403).json({ error: 'Привязать или отвязать можно только свой дизайн' })
+    return false
+  }
+  return true
+}
 
 const router = Router({ mergeParams: true })
 router.use(authenticate)
@@ -45,6 +72,7 @@ router.post(
       res.status(400).json({ error: 'productId, typeId и designTemplateId обязательны' })
       return
     }
+    if (!(await assertCanPublishTemplate(req, res, Number(designTemplateId)))) return
     try {
       const row = await addSubtypeDesign(productId, typeId, designTemplateId, sizeId)
       res.status(201).json(row)
@@ -69,6 +97,12 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const productId = parseInt(req.params.productId, 10)
     const linkId = parseInt(req.params.linkId, 10)
+    const templateId = await getSubtypeDesignTemplateId(productId, linkId)
+    if (!templateId) {
+      res.status(404).json({ error: 'Привязка не найдена' })
+      return
+    }
+    if (!(await assertCanPublishTemplate(req, res, templateId))) return
     await removeSubtypeDesign(productId, linkId)
     res.status(204).send()
   }),
@@ -87,6 +121,14 @@ router.put(
     if (!productId || !typeId || !Array.isArray(orderedLinkIds)) {
       res.status(400).json({ error: 'productId, typeId и orderedLinkIds обязательны' })
       return
+    }
+    for (const linkId of orderedLinkIds) {
+      const templateId = await getSubtypeDesignTemplateId(productId, Number(linkId))
+      if (!templateId) {
+        res.status(404).json({ error: 'Привязка не найдена' })
+        return
+      }
+      if (!(await assertCanPublishTemplate(req, res, templateId))) return
     }
     await reorderSubtypeDesigns(productId, typeId, sizeId, orderedLinkIds)
     res.json({ ok: true })
