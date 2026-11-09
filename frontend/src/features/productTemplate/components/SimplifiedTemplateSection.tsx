@@ -730,10 +730,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       if (onlyTechnology && String(pp.technology_code || '').trim().toLowerCase() !== onlyTechnology) {
         return pp
       }
-      const priceMap = new Map(pp.tiers.map(t => [t.min_qty, t.unit_price]))
+      const priceMap = new Map<number, number>()
+      for (const tier of pp.tiers) {
+        const min = Number(tier.min_qty)
+        if (!Number.isFinite(min)) continue
+        const price = Number(tier.unit_price) || 0
+        const prev = priceMap.get(min)
+        if (prev == null || prev <= 0 || price > 0) priceMap.set(min, price > 0 ? price : (prev ?? 0))
+      }
       const newTiers = newRanges.map(r => ({
         ...r,
-        unit_price: priceMap.get(r.min_qty) ?? 0
+        unit_price: priceMap.get(Number(r.min_qty)) ?? 0
       }))
       return { ...pp, tiers: newTiers }
     })

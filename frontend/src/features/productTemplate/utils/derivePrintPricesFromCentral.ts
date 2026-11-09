@@ -22,18 +22,83 @@ export function samePrintTechnology(a?: string, b?: string): boolean {
   return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
 }
 
-/** Колонки таблицы печати — ступени выбранной технологии, а не первой строки размера. */
+export type PrintQtyTier = { min_qty: number; max_qty?: number; unit_price: number }
+
+/** Цена колонки: точное совпадение порога, при нескольких ставках — ненулевая. Иначе действующая ступень. */
+export function unitPriceForTierColumn(
+  tiers: PrintQtyTier[] | null | undefined,
+  columnMinQty: number,
+): number {
+  const column = Number(columnMinQty)
+  if (!Number.isFinite(column)) return 0
+  const list = Array.isArray(tiers) ? tiers : []
+  const exact = list.filter((tier) => Number(tier.min_qty) === column)
+  const exactPositive = exact.find((tier) => Number(tier.unit_price) > 0)
+  if (exactPositive) return Number(exactPositive.unit_price)
+  if (exact.length > 0) return Number(exact[0].unit_price) || 0
+
+  let coverMin = Number.NEGATIVE_INFINITY
+  let coverPrice = 0
+  for (const tier of list) {
+    const min = Number(tier.min_qty)
+    const price = Number(tier.unit_price) || 0
+    if (!Number.isFinite(min) || min > column || price <= 0) continue
+    const max = tier.max_qty == null ? null : Number(tier.max_qty)
+    if (max != null && Number.isFinite(max) && column > max) continue
+    if (min >= coverMin) {
+      coverMin = min
+      coverPrice = price
+    }
+  }
+  return coverPrice
+}
+
+/** Колонки таблицы печати — все пороги технологии, где есть цена, а не первая строка. */
 export function printTierColumnsForTechnology(
   size: SimplifiedSizeConfig,
   technologyCode: string,
-): Array<{ min_qty: number; max_qty?: number; unit_price: number }> | null {
+): PrintQtyTier[] | null {
   const rows = (size.print_prices || []).filter((row) =>
     samePrintTechnology(row.technology_code, technologyCode),
   )
   const withTiers = rows.filter((row) => Array.isArray(row.tiers) && row.tiers.length > 0)
   if (withTiers.length === 0) return null
-  const priced = withTiers.find((row) => row.tiers.some((tier) => Number(tier.unit_price) > 0))
-  return (priced ?? withTiers[0]).tiers
+  const byMin = new Map<number, PrintQtyTier>()
+  for (const row of withTiers) {
+    for (const tier of row.tiers) {
+      const min = Number(tier.min_qty)
+      if (!Number.isFinite(min)) continue
+      const price = Number(tier.unit_price) || 0
+      const prev = byMin.get(min)
+      if (!prev || (prev.unit_price <= 0 && price > 0)) {
+        byMin.set(min, {
+          min_qty: min,
+          max_qty: tier.max_qty == null ? undefined : Number(tier.max_qty),
+          unit_price: price > 0 ? price : (prev?.unit_price ?? 0),
+        })
+      }
+    }
+  }
+  return [...byMin.values()].sort((a, b) => a.min_qty - b.min_qty)
+}
+
+function collapseDerivedQtyTiers(
+  tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }>,
+): PrintQtyTier[] {
+  const byMin = new Map<number, PrintQtyTier>()
+  for (const tier of tiers) {
+    const min = Number(tier.min_qty)
+    if (!Number.isFinite(min)) continue
+    const price = Number(tier.unit_price) || 0
+    const prev = byMin.get(min)
+    if (prev && prev.unit_price > 0 && price <= 0) continue
+    byMin.set(min, {
+      min_qty: min,
+      max_qty: tier.max_qty == null ? undefined : Number(tier.max_qty),
+      unit_price: price > 0 ? price : (prev?.unit_price ?? 0),
+    })
+  }
+  return [...byMin.values()].sort((a, b) => a.min_qty - b.min_qty)
 }
 
 export function printVariantKey(
@@ -223,11 +288,11 @@ export async function deriveSizePrintPricesFromCentral(options: {
             technology_code: tech,
             color_mode: mode.color_mode,
             sides_mode: mode.sides_mode,
-            tiers: tiers.map((t) => ({
+            tiers: collapseDerivedQtyTiers(tiers.map((t) => ({
               min_qty: Number(t.min_qty),
               max_qty: t.max_qty == null ? undefined : Number(t.max_qty),
               unit_price: Number(t.unit_price) || 0,
-            })),
+            }))),
           })
         } else {
           const hint = data?.message || data?.error || 'Нет диапазонов тиража для этой комбинации в центральных ценах печати.'

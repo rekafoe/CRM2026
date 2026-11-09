@@ -49,6 +49,17 @@ const PRICE_MODES = [
 ] as const;
 const PRICE_MODES_COLOR_ONLY = PRICE_MODES.filter((mode) => !mode.key.startsWith('bw_'));
 
+function sheetTierPrice(
+  tiers: Array<{ price_mode: string; min_sheets: number; price_per_sheet: number }>,
+  priceMode: string,
+  minSheets: number,
+): number {
+  const min = Number(minSheets)
+  const matches = tiers.filter((tier) => tier.price_mode === priceMode && Number(tier.min_sheets) === min)
+  const priced = matches.find((tier) => Number(tier.price_per_sheet) > 0)
+  return Number((priced ?? matches[0])?.price_per_sheet) || 0
+}
+
 const DEFAULT_TIER_BOUNDARIES = [1, 5, 10, 50, 100, 500, 1000];
 const DEFAULT_ROLL_M2_BOUNDARIES = [1, 5, 10, 25, 50, 100];
 const M2_RANGE_STEP = 0.001;
@@ -422,12 +433,13 @@ export const PrintPriceEditPage: React.FC = () => {
 
   const updateTierPrice = useCallback((priceMode: string, minSheets: number, price: number) => {
     setForm((prev) => {
-      const existing = prev.tiers.find((t) => t.price_mode === priceMode && t.min_sheets === minSheets)
+      const min = Number(minSheets)
+      const existing = prev.tiers.find((t) => t.price_mode === priceMode && Number(t.min_sheets) === min)
       if (existing) {
         return {
           ...prev,
           tiers: prev.tiers.map((t) =>
-            t.price_mode === priceMode && t.min_sheets === minSheets ? { ...t, price_per_sheet: price } : t
+            t.price_mode === priceMode && Number(t.min_sheets) === min ? { ...t, min_sheets: min, price_per_sheet: price } : t
           ),
         }
       }
@@ -573,7 +585,11 @@ export const PrintPriceEditPage: React.FC = () => {
   }, [rollTierModal.isOpen]);
 
   const getCommonRanges = useCallback((): SheetTier[] => {
-    const allMinSheets = [...new Set(form.tiers.map((t) => t.min_sheets))].sort((a, b) => a - b)
+    const allMinSheets = [...new Set(
+      form.tiers
+        .map((t) => Number(t.min_sheets))
+        .filter((min) => Number.isFinite(min) && min > 0),
+    )].sort((a, b) => a - b)
     if (allMinSheets.length === 0) {
       return DEFAULT_TIER_BOUNDARIES.map((min, i) => ({
         min_sheets: min,
@@ -592,7 +608,12 @@ export const PrintPriceEditPage: React.FC = () => {
     setForm((prev) => {
       const priceMap = new Map<string, number>()
       for (const t of prev.tiers) {
-        priceMap.set(`${t.price_mode}:${t.min_sheets}`, t.price_per_sheet)
+        const key = `${t.price_mode}:${Number(t.min_sheets)}`
+        const price = Number(t.price_per_sheet) || 0
+        const prevPrice = priceMap.get(key)
+        if (prevPrice == null || prevPrice <= 0 || price > 0) {
+          priceMap.set(key, price > 0 ? price : (prevPrice ?? 0))
+        }
       }
       const newTiers: PrintPriceTier[] = []
       for (const mode of activeSheetModes) {
@@ -1134,18 +1155,15 @@ export const PrintPriceEditPage: React.FC = () => {
                           <td className="simplified-table__child-cell">
                             <PrintPriceModeLabel child>односторонняя</PrintPriceModeLabel>
                           </td>
-                          {commonRanges.map((t, ti) => {
-                            const priceTier = form.tiers.find((rt) => rt.price_mode === 'color_single' && rt.min_sheets === t.min_sheets)
-                            return (
+                          {commonRanges.map((t, ti) => (
                               <td key={ti}>
                                 <PriceCell
                                   className="form-input form-input--compact-table"
-                                  value={priceTier?.price_per_sheet ?? 0}
+                                  value={sheetTierPrice(form.tiers, 'color_single', t.min_sheets)}
                                   onChange={(v) => updateTierPrice('color_single', t.min_sheets, v)}
                                 />
                               </td>
-                            )
-                          })}
+                          ))}
                           <td></td>
                         </tr>
                         {/* Цвет, двусторонняя */}
@@ -1153,18 +1171,15 @@ export const PrintPriceEditPage: React.FC = () => {
                           <td className="simplified-table__child-cell">
                             <PrintPriceModeLabel child>двухсторонняя</PrintPriceModeLabel>
                           </td>
-                          {commonRanges.map((t, ti) => {
-                            const priceTier = form.tiers.find((rt) => rt.price_mode === 'color_duplex' && rt.min_sheets === t.min_sheets)
-                            return (
+                          {commonRanges.map((t, ti) => (
                               <td key={ti}>
                                 <PriceCell
                                   className="form-input form-input--compact-table"
-                                  value={priceTier?.price_per_sheet ?? 0}
+                                  value={sheetTierPrice(form.tiers, 'color_duplex', t.min_sheets)}
                                   onChange={(v) => updateTierPrice('color_duplex', t.min_sheets, v)}
                                 />
                               </td>
-                            )
-                          })}
+                          ))}
                           <td></td>
                         </tr>
                         {technologySupportsBw && (
@@ -1184,18 +1199,15 @@ export const PrintPriceEditPage: React.FC = () => {
                               <td className="simplified-table__child-cell">
                                 <PrintPriceModeLabel child>односторонняя</PrintPriceModeLabel>
                               </td>
-                              {commonRanges.map((t, ti) => {
-                                const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_single' && rt.min_sheets === t.min_sheets)
-                                return (
+                              {commonRanges.map((t, ti) => (
                                   <td key={ti}>
                                     <PriceCell
                                       className="form-input form-input--compact-table"
-                                      value={priceTier?.price_per_sheet ?? 0}
+                                      value={sheetTierPrice(form.tiers, 'bw_single', t.min_sheets)}
                                       onChange={(v) => updateTierPrice('bw_single', t.min_sheets, v)}
                                     />
                                   </td>
-                                )
-                              })}
+                              ))}
                               <td></td>
                             </tr>
                             {/* ЧБ, двусторонняя */}
@@ -1203,18 +1215,15 @@ export const PrintPriceEditPage: React.FC = () => {
                               <td className="simplified-table__child-cell">
                                 <PrintPriceModeLabel child>двухсторонняя</PrintPriceModeLabel>
                               </td>
-                              {commonRanges.map((t, ti) => {
-                                const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_duplex' && rt.min_sheets === t.min_sheets)
-                                return (
+                              {commonRanges.map((t, ti) => (
                                   <td key={ti}>
                                     <PriceCell
                                       className="form-input form-input--compact-table"
-                                      value={priceTier?.price_per_sheet ?? 0}
+                                      value={sheetTierPrice(form.tiers, 'bw_duplex', t.min_sheets)}
                                       onChange={(v) => updateTierPrice('bw_duplex', t.min_sheets, v)}
                                     />
                                   </td>
-                                )
-                              })}
+                              ))}
                               <td></td>
                             </tr>
                           </>
