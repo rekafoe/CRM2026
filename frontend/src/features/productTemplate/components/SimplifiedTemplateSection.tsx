@@ -14,7 +14,7 @@ import { FinishingCard } from './FinishingCard'
 import { SubtypeDesignsCard } from './SubtypeDesignsCard'
 import { AddSizeModal, CopySizesModal } from './SizeModals'
 import { type Tier, defaultTiers, normalizeTiers } from '../utils/tierManagement'
-import { printTierColumnsForTechnology } from '../utils/derivePrintPricesFromCentral'
+import { printTierColumnsForTechnology, unitPriceForTierColumn } from '../utils/derivePrintPricesFromCentral'
 import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
 import { computeItemsPerSheet } from './PrintSheetSection'
 import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
@@ -730,17 +730,12 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       if (onlyTechnology && String(pp.technology_code || '').trim().toLowerCase() !== onlyTechnology) {
         return pp
       }
-      const priceMap = new Map<number, number>()
-      for (const tier of pp.tiers) {
-        const min = Number(tier.min_qty)
-        if (!Number.isFinite(min)) continue
-        const price = Number(tier.unit_price) || 0
-        const prev = priceMap.get(min)
-        if (prev == null || prev <= 0 || price > 0) priceMap.set(min, price > 0 ? price : (prev ?? 0))
-      }
+      // Общие колонки технологии могут быть шире, чем ступени этой цветности.
+      // Берём действующую цену порога (cover), а не 0 — иначе duplex/чб на новых
+      // min_qty из color_single сохраняются бесплатными.
       const newTiers = newRanges.map(r => ({
         ...r,
-        unit_price: priceMap.get(Number(r.min_qty)) ?? 0
+        unit_price: unitPriceForTierColumn(pp.tiers, Number(r.min_qty)),
       }))
       return { ...pp, tiers: newTiers }
     })
