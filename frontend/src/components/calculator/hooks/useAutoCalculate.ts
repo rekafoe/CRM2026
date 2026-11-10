@@ -21,6 +21,7 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     priceType: specs.priceType,
     pages: specs.pages ?? null,
     material_id: specs.material_id, //  ID материала тоже важен
+    print_without_material: specs.print_without_material === true,
     base_material_id: specs.base_material_id ?? null,
     usage_context: specs.usage_context, // помещение/улица выбирает технологию
     cover_material_id: specs.cover_material_id,

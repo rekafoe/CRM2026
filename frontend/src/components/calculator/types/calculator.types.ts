@@ -47,6 +47,8 @@ export interface ProductSpecs {
   name?: string;
   size_id?: number | string; //  Для упрощённых продуктов (number для новых, string для обратной совместимости)
   material_id?: number; //  ID материала (для упрощённых и обычных продуктов)
+  /** УФ-планшет: явная печать без листа/носителя. Другие типы печати не используют. */
+  print_without_material?: boolean;
   /** Условия использования для material-driven printing. */
   usage_context?: 'indoor' | 'outdoor';
   /** Бумага обложки (multiPageStructure.cover.mode = separate) */

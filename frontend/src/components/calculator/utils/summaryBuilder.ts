@@ -78,6 +78,7 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
     key: 'paperType',
     label: 'Материал',
     formatter: (value, { options, specs }) => {
+      if (specs.print_without_material === true) return null;
       if (!value) return null;
       
       //  Для упрощённых продуктов: если есть materialType, используем его вместо paperType
@@ -99,7 +100,8 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
   {
     key: 'paperDensity',
     label: 'Плотность бумаги',
-    formatter: (value) => {
+    formatter: (value, { specs }) => {
+      if (specs.print_without_material === true) return null;
       if (value == null) return null;
       const num = Number(value);
       if (!Number.isFinite(num) || num <= 0) return null;
@@ -173,9 +175,15 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
     formatter: (value) => (value ? 'Да' : null),
   },
   {
+    key: 'print_without_material',
+    label: 'Носитель',
+    formatter: (value) => (value === true ? 'Печать без материала' : null),
+  },
+  {
     key: 'materialType',
     label: 'Тип материала',
-    formatter: (value, { options }) => {
+    formatter: (value, { options, specs }) => {
+      if (specs.print_without_material === true) return null;
       if (!value) return null;
       //  Используем display_name из типов бумаги со склада для транслирования
       // Это позволяет оператору видеть понятное название типа бумаги (например, "Глянцевая" вместо "glossy")
