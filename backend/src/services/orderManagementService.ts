@@ -6,7 +6,7 @@ import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
 import { tryEnqueueWebsiteOrderCompletedEmail } from './websiteOrderEmailService';
 import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
-import { issueCashRemainder } from '../utils/orderAmounts';
+import { issueCashRemainder, shouldSkipOfflineIssueSeal } from '../utils/orderAmounts';
 import { OrderService } from '../modules/orders/services/orderService';
 import { findOrderStatusId } from '../utils/orderStatusCatalog';
 
@@ -472,7 +472,7 @@ export class OrderManagementService {
         } else {
           const order = await db.get<any>(
             `
-            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled
+            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, payment_channel, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled
             FROM orders WHERE id = ?
           `,
             [orderId],
@@ -488,16 +488,25 @@ export class OrderManagementService {
 
           const amounts = await OrderService.getOrderAmountsById(orderId);
           const totalAmount = amounts.totalAmount;
-          const remainder = issueCashRemainder(totalAmount, order);
+          // invoice без order prepaid: не выдумывать offline в кассу — безнал уже в legal_payments / bank.
+          const skipOfflineSeal = shouldSkipOfflineIssueSeal(order);
+          const remainder = skipOfflineSeal ? 0 : issueCashRemainder(totalAmount, order);
 
           let hasPrepaymentUpdatedAt = false;
           try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
           const paymentId = `ISSUE-${Date.now()}-${orderId}`;
           const completedId = await findOrderStatusId(db, 'completed', 7);
-          const updateSql = hasPrepaymentUpdatedAt
-            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = ? WHERE id = ?`
-            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = ? WHERE id = ?`;
-          await db.run(updateSql, totalAmount, paymentId, completedId, orderId);
+          if (skipOfflineSeal) {
+            await db.run(
+              `UPDATE orders SET updated_at = datetime('now','localtime'), status = ? WHERE id = ?`,
+              completedId, orderId,
+            );
+          } else {
+            const updateSql = hasPrepaymentUpdatedAt
+              ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = ? WHERE id = ?`
+              : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = ? WHERE id = ?`;
+            await db.run(updateSql, totalAmount, paymentId, completedId, orderId);
+          }
 
           // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
           const issuer = issuerId ?? null;
