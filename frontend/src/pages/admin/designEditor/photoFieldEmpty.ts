@@ -6,6 +6,7 @@ import { Circle, Group, Path, Point, Rect, Text, type Canvas, type FabricObject 
 import {
   photoFieldFrameRadii,
   readPhotoFieldClip,
+  readPhotoFieldFillRule,
   readPhotoFieldShape,
   type PhotoFieldShape,
 } from './photoFieldShape';
@@ -164,6 +165,7 @@ function makePhotoFieldPath(
   boxW: number,
   boxH: number,
   visible: boolean,
+  fillRule?: 'nonzero' | 'evenodd',
 ): FabricObject | null {
   try {
     return new Path(d, {
@@ -173,6 +175,7 @@ function makePhotoFieldPath(
       top: -frameH / 2,
       scaleX: frameW / Math.max(1, boxW),
       scaleY: frameH / Math.max(1, boxH),
+      fillRule: fillRule === 'evenodd' ? 'evenodd' : 'nonzero',
       fill: visible ? EMPTY_PHOTO_FIELD_FILL : 'transparent',
       stroke: visible ? EMPTY_PHOTO_FIELD_STROKE : undefined,
       strokeWidth: visible ? EMPTY_PHOTO_FIELD_STROKE_WIDTH : 0,
@@ -193,16 +196,18 @@ function attachPhotoFieldOutline(
   clip: { d: string; boxW: number; boxH: number } | null,
   frameW: number,
   frameH: number,
+  fillRule?: 'nonzero' | 'evenodd',
 ): void {
   const o = ax(group);
   if (shape === 'rect') return;
   o.photoFieldShape = shape;
+  if (fillRule) o.photoFieldFillRule = fillRule;
   if (shape !== 'path' || !clip) return;
   o.photoFieldClipPath = clip.d;
   o.photoFieldClipBoxW = clip.boxW;
   o.photoFieldClipBoxH = clip.boxH;
-  const outline = makePhotoFieldPath(clip.d, frameW, frameH, clip.boxW, clip.boxH, true);
-  const mask = makePhotoFieldPath(clip.d, frameW, frameH, clip.boxW, clip.boxH, false);
+  const outline = makePhotoFieldPath(clip.d, frameW, frameH, clip.boxW, clip.boxH, true, fillRule);
+  const mask = makePhotoFieldPath(clip.d, frameW, frameH, clip.boxW, clip.boxH, false, fillRule);
   if (outline) {
     ax(outline).photoFieldRole = 'clip-shape';
     group.add(outline);
@@ -274,6 +279,7 @@ export function upgradePlainEmptyPhotoField(field: FabricObject): FabricObject |
     clipPath: clip?.d,
     clipBoxW: clip?.boxW,
     clipBoxH: clip?.boxH,
+    fillRule: readPhotoFieldFillRule(o),
   });
   copyImportStackMetadata(field, upgraded);
   return upgraded;
@@ -314,6 +320,7 @@ export function createEmptyPhotoField(opts: {
   clipPath?: string;
   clipBoxW?: number;
   clipBoxH?: number;
+  fillRule?: 'nonzero' | 'evenodd';
 }): FabricObject {
   const { id, left, top } = opts;
   const frameW = Math.max(32, Math.round(opts.width));
@@ -352,6 +359,7 @@ export function createEmptyPhotoField(opts: {
       : null,
     frameW,
     frameH,
+    opts.fillRule,
   );
   o.id = id;
   if (opts.clientAdded) o.photoFieldClientAdded = true;
@@ -525,6 +533,8 @@ export function dehydrateEmptyPhotoFieldJsonObject(
     rect.photoFieldClipBoxW = clip.boxW;
     rect.photoFieldClipBoxH = clip.boxH;
   }
+  const fillRule = readPhotoFieldFillRule(obj);
+  if (fillRule) rect.photoFieldFillRule = fillRule;
   if (obj.importStackIndex != null) rect.importStackIndex = obj.importStackIndex;
   if (obj.isDecorElement != null) rect.isDecorElement = obj.isDecorElement;
   if (obj.decorLayerName != null) rect.decorLayerName = obj.decorLayerName;

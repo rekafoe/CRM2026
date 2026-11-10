@@ -12,7 +12,7 @@ import { createEmptyPhotoField, finalizeEmptyPhotoFieldPlacement } from '../phot
 import { resolvePhotoFieldSizeForPage } from '../photoFieldClientSizing';
 import { syncFilledPhotoFieldSceneAnchor } from '../photoFieldGeometry';
 import { isClientAddedPhotoField } from '../designFields';
-import { readPhotoFieldClip, readPhotoFieldShape } from '../photoFieldShape';
+import { readPhotoFieldClip, readPhotoFieldFillRule, readPhotoFieldShape } from '../photoFieldShape';
 import { copyImportStackMetadata } from '../designFields/importStackOrder';
 import { detachFabricObject } from './canvasObjectDetach';
 import {
@@ -79,6 +79,7 @@ async function applyImageToPhotoField(
     clipPath: clip?.d,
     clipBoxW: clip?.boxW,
     clipBoxH: clip?.boxH,
+    fillRule: readPhotoFieldFillRule(f),
   });
   copyImportStackMetadata(field, group);
   const groupMeta = asAny(group);

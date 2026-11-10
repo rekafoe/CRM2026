@@ -48,10 +48,12 @@ export type SvgRect = {
   height: number
   svg: GeometryRect
   scene: GeometryRect
-  /** Форма фотополя. Прямоугольник, если слой пришёл из <rect>. */
+  /** Форма фотополя. Прямоугольник, если слой пришёл из острого осевого <rect>. */
   shape?: PhotoFieldShape
   /** Контур в пикселях сцены, начало в левом верхнем углу рамки. Только для shape=path. */
   clipPath?: string
+  /** evenodd нужен составному контуру с дыркой. nonzero — обычная заливка. */
+  fillRule?: 'nonzero' | 'evenodd'
 }
 
 export type SvgTextStyleSegment = {
@@ -430,6 +432,171 @@ function polygonPointsAbsolutePath(points: Array<{ x: number; y: number }>): str
   const head = points[0]!
   const tail = points.slice(1).map((p) => `L ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`).join(' ')
   return `M ${formatSvgPathNumber(head.x)} ${formatSvgPathNumber(head.y)} ${tail} Z`
+}
+
+/** Четыре кубические дуги Безье достаточно близки к эллипсу для клипа. */
+const ELLIPSE_BEZIER = 0.5522847498307936
+
+function isAxisAlignedTransform(t: SvgTransform): boolean {
+  return Math.abs(t.b) < 1e-4 && Math.abs(t.c) < 1e-4
+}
+
+function ellipseCurvePath(cx: number, cy: number, rx: number, ry: number): string {
+  const kx = rx * ELLIPSE_BEZIER
+  const ky = ry * ELLIPSE_BEZIER
+  const n = formatSvgPathNumber
+  return [
+    `M ${n(cx + rx)} ${n(cy)}`,
+    `C ${n(cx + rx)} ${n(cy + ky)} ${n(cx + kx)} ${n(cy + ry)} ${n(cx)} ${n(cy + ry)}`,
+    `C ${n(cx - kx)} ${n(cy + ry)} ${n(cx - rx)} ${n(cy + ky)} ${n(cx - rx)} ${n(cy)}`,
+    `C ${n(cx - rx)} ${n(cy - ky)} ${n(cx - kx)} ${n(cy - ry)} ${n(cx)} ${n(cy - ry)}`,
+    `C ${n(cx + kx)} ${n(cy - ry)} ${n(cx + rx)} ${n(cy - ky)} ${n(cx + rx)} ${n(cy)}`,
+    'Z',
+  ].join(' ')
+}
+
+function roundedRectCurvePath(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  rx: number,
+  ry: number,
+): string {
+  const rrx = Math.min(Math.max(0, rx), width / 2)
+  const rry = Math.min(Math.max(0, ry), height / 2)
+  const n = formatSvgPathNumber
+  if (rrx <= 1e-6 && rry <= 1e-6) {
+    return `M ${n(x)} ${n(y)} H ${n(x + width)} V ${n(y + height)} H ${n(x)} Z`
+  }
+  const kx = rrx * ELLIPSE_BEZIER
+  const ky = rry * ELLIPSE_BEZIER
+  const right = x + width
+  const bottom = y + height
+  return [
+    `M ${n(x + rrx)} ${n(y)}`,
+    `L ${n(right - rrx)} ${n(y)}`,
+    `C ${n(right - rrx + kx)} ${n(y)} ${n(right)} ${n(y + rry - ky)} ${n(right)} ${n(y + rry)}`,
+    `L ${n(right)} ${n(bottom - rry)}`,
+    `C ${n(right)} ${n(bottom - rry + ky)} ${n(right - rrx + kx)} ${n(bottom)} ${n(right - rrx)} ${n(bottom)}`,
+    `L ${n(x + rrx)} ${n(bottom)}`,
+    `C ${n(x + rrx - kx)} ${n(bottom)} ${n(x)} ${n(bottom - rry + ky)} ${n(x)} ${n(bottom - rry)}`,
+    `L ${n(x)} ${n(y + rry)}`,
+    `C ${n(x)} ${n(y + rry - ky)} ${n(x + rrx - kx)} ${n(y)} ${n(x + rrx)} ${n(y)}`,
+    'Z',
+  ].join(' ')
+}
+
+function clipPathReferenceId(value: string | undefined): string | null {
+  if (!value) return null
+  const match = value.trim().match(/url\(\s*#([^)]+?)\s*\)/i)
+  if (!match?.[1]) return null
+  return match[1].trim().replace(/["']/g, '')
+}
+
+function resolveShapeFillRule(
+  attrs: Record<string, string>,
+  inheritedStyle: Record<string, string>,
+): 'nonzero' | 'evenodd' | undefined {
+  const style = { ...inheritedStyle, ...parseStyle(attrs.style) }
+  return normalizeSvgFillRule(attrs['fill-rule'])
+    ?? normalizeSvgFillRule(attrs['clip-rule'])
+    ?? normalizeSvgFillRule(style['fill-rule'])
+    ?? normalizeSvgFillRule(style['clip-rule'])
+}
+
+function primitiveToAbsolutePath(tagLc: string, attrs: Record<string, string>): string | null {
+  if (tagLc === 'path') return attrs.d?.trim() || null
+  if (tagLc === 'rect') {
+    const x = parseNumber(attrs.x) ?? 0
+    const y = parseNumber(attrs.y) ?? 0
+    const width = parseNumber(attrs.width)
+    const height = parseNumber(attrs.height)
+    if (width == null || height == null || width <= 0 || height <= 0) return null
+    const rx = parseNumber(attrs.rx) ?? 0
+    const ry = parseNumber(attrs.ry) ?? rx
+    return roundedRectCurvePath(x, y, width, height, rx, ry)
+  }
+  if (tagLc === 'circle' || tagLc === 'ellipse') {
+    const cx = parseNumber(attrs.cx) ?? 0
+    const cy = parseNumber(attrs.cy) ?? 0
+    const rx = tagLc === 'circle' ? parseNumber(attrs.r) : (parseNumber(attrs.rx) ?? parseNumber(attrs.r))
+    const ry = tagLc === 'circle' ? rx : (parseNumber(attrs.ry) ?? parseNumber(attrs.r) ?? rx)
+    if (rx == null || ry == null || rx <= 0 || ry <= 0) return null
+    return ellipseCurvePath(cx, cy, rx, ry)
+  }
+  if (tagLc === 'polygon' || tagLc === 'polyline') {
+    return polygonPointsAbsolutePath(parsePolygonPointPairs(attrs.points))
+  }
+  return null
+}
+
+function collectFragmentPaths(fragment: string, inherited: SvgTransform): string[] {
+  const paths: string[] = []
+  const transformStack = [inherited]
+  let cursor = 0
+  while (cursor < fragment.length) {
+    const lt = fragment.indexOf('<', cursor)
+    if (lt === -1) break
+    const gt = indexOfClosingTagBracket(fragment, lt)
+    if (gt <= lt + 1) {
+      cursor = lt + 1
+      continue
+    }
+    const trimmed = fragment.slice(lt + 1, gt).trim()
+    const closing = trimmed.startsWith('/')
+    let inner = closing ? trimmed.slice(1).trim() : trimmed
+    const selfClosing = !closing && inner.endsWith('/')
+    if (selfClosing) inner = inner.slice(0, -1).trim()
+    const nameMatch = inner.match(/^([\w:-]+)(?:\s|$)/)
+    const tagLc = nameMatch ? nameMatch[1].toLowerCase() : ''
+    const attrPart = nameMatch ? inner.slice(nameMatch[1].length).trim() : inner
+    if (tagLc === 'g') {
+      if (closing) {
+        if (transformStack.length > 1) transformStack.pop()
+      } else if (!selfClosing) {
+        const attrs = parseAttributes(attrPart)
+        const parent = transformStack[transformStack.length - 1] ?? IDENTITY_TRANSFORM
+        transformStack.push(multiplyTransform(parent, parseSvgTransform(attrs.transform)))
+      }
+      cursor = gt + 1
+      continue
+    }
+    if (!closing && tagLc) {
+      const attrs = parseAttributes(attrPart)
+      const local = primitiveToAbsolutePath(tagLc, attrs)
+      if (local) {
+        const parent = transformStack[transformStack.length - 1] ?? IDENTITY_TRANSFORM
+        const withOwn = multiplyTransform(parent, parseSvgTransform(attrs.transform))
+        paths.push(transformSvgPathData(local, withOwn))
+      }
+    }
+    cursor = gt + 1
+  }
+  return paths
+}
+
+type ClipPathDef = {
+  units: 'userSpaceOnUse' | 'objectBoundingBox'
+  pathData: string
+}
+
+function extractClipPathLibrary(svg: string): Map<string, ClipPathDef> {
+  const library = new Map<string, ClipPathDef>()
+  const re = /<clipPath\b([^>]*)>([\s\S]*?)<\/clipPath>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(svg))) {
+    const attrs = parseAttributes(match[1] ?? '')
+    const id = (attrs.id || '').trim()
+    if (!id) continue
+    const unitsAttr = (attrs.clipPathUnits || attrs.clippathunits || '').toLowerCase()
+    const units = unitsAttr === 'objectboundingbox' ? 'objectBoundingBox' : 'userSpaceOnUse'
+    const parts = collectFragmentPaths(match[2] ?? '', parseSvgTransform(attrs.transform))
+    const pathData = parts.join(' ').trim()
+    if (!pathData) continue
+    library.set(id, { units, pathData })
+  }
+  return library
 }
 
 function transformScale(t: SvgTransform): number {
@@ -2431,6 +2598,10 @@ export function parseImportedSvgLayers(
     }
   }
 
+  const clipPathLibrary = extractClipPathLibrary(svg)
+  let clipPathDepth = 0
+  const clipRefStack: Array<string | null> = [null]
+
   const rootPresentationStyle: Record<string, string> = {
     ...styleFromClassNames(dims.svgAttrs.class, cssClassStyles),
     ...parseStyle(dims.svgAttrs.style),
@@ -2466,6 +2637,7 @@ export function parseImportedSvgLayers(
     removalEnd: number
     shape: PhotoFieldShape
     pathData?: string
+    fillRule?: 'nonzero' | 'evenodd'
   }): void {
     if (!(input.tr.width > 0) || !(input.tr.height > 0)) return
     const mmRect = geometry.svgRectToMm(input.tr)
@@ -2483,6 +2655,7 @@ export function parseImportedSvgLayers(
       scene,
       shape: input.shape,
       ...(clipPath ? { clipPath } : {}),
+      ...(input.fillRule ? { fillRule: input.fillRule } : {}),
     }
     photoRects.push(photoEntry)
     interactiveLayers.push({ kind: 'photo', data: photoEntry })
@@ -2495,6 +2668,65 @@ export function parseImportedSvgLayers(
       bboxScene: scene,
     })
     removalRanges.push({ start: input.removalStart, end: input.removalEnd })
+  }
+
+  function currentPhotoFillRule(attrs: Record<string, string>): 'nonzero' | 'evenodd' | undefined {
+    return resolveShapeFillRule(attrs, groupStyleStack[groupStyleStack.length - 1] ?? {})
+  }
+
+  function tryCommitPhotoClip(input: {
+    sourceName: string
+    attrs: Record<string, string>
+    inheritedTransform: SvgTransform
+    objectTransform: SvgTransform
+    localBounds: GeometryRect | null
+    removalStart: number
+    removalEnd: number
+  }): boolean {
+    const style = {
+      ...(groupStyleStack[groupStyleStack.length - 1] ?? {}),
+      ...parseStyle(input.attrs.style),
+    }
+    const ownRef = clipPathReferenceId(input.attrs['clip-path'] || style['clip-path'])
+    const ref = ownRef ?? clipRefStack[clipRefStack.length - 1] ?? null
+    if (!ref) return false
+    const def = clipPathLibrary.get(ref)
+    if (!def) {
+      warnWithCode(
+        warnings,
+        'CLIP_PATH_UNRESOLVED',
+        `Слой ${input.sourceName}: clip-path #${ref} не найден, оставлена геометрия самой фигуры.`,
+      )
+      return false
+    }
+    let pathData = def.pathData
+    if (def.units === 'objectBoundingBox') {
+      if (!input.localBounds || !(input.localBounds.width > 0) || !(input.localBounds.height > 0)) return false
+      const box = input.localBounds
+      pathData = transformSvgPathData(def.pathData, {
+        a: box.width,
+        b: 0,
+        c: 0,
+        d: box.height,
+        e: box.x,
+        f: box.y,
+      })
+      pathData = transformSvgPathData(pathData, input.objectTransform)
+    } else {
+      pathData = transformSvgPathData(def.pathData, input.inheritedTransform)
+    }
+    const tr = parseSvgPathApproxBounds(pathData)
+    if (!tr || !(tr.width > 0) || !(tr.height > 0)) return false
+    commitPhotoShape({
+      sourceName: input.sourceName,
+      tr,
+      removalStart: input.removalStart,
+      removalEnd: input.removalEnd,
+      shape: 'path',
+      pathData,
+      fillRule: currentPhotoFillRule(input.attrs),
+    })
+    return true
   }
 
   const scanStart = performance.now()
@@ -2539,6 +2771,7 @@ export function parseImportedSvgLayers(
       if (groupStack.length > 1) groupStack.pop()
       if (transformStack.length > 1) transformStack.pop()
       if (groupStyleStack.length > 1) groupStyleStack.pop()
+      if (clipRefStack.length > 1) clipRefStack.pop()
       if (framed) {
         const ln = framed.layerName
         const removableInteractive = !!ln && (
@@ -2569,6 +2802,11 @@ export function parseImportedSvgLayers(
       }
       if (ln) warnUnhandledLayerName('группа', ln, warnings, warnedNames)
       groupStack.push(stackName)
+      clipRefStack.push(
+        clipPathReferenceId(attrs['clip-path'] || parseStyle(attrs.style)['clip-path'])
+        ?? clipRefStack[clipRefStack.length - 1]
+        ?? null,
+      )
       if (groupStack.length > MAX_SVG_GROUP_DEPTH) {
         throw new Error(`[SVG_GROUP_DEPTH_LIMIT_EXCEEDED] Превышена глубина групп SVG: ${groupStack.length} > ${MAX_SVG_GROUP_DEPTH}.`)
       }
@@ -2580,6 +2818,18 @@ export function parseImportedSvgLayers(
       )
       groupStyleStack.push(mergeGroupPresentationStyle(attrs))
       groupFrameStack.push({ openLt: lt, removable: groupRemovable(stackName), layerName: stackName })
+      i = gt + 1
+      continue
+    }
+
+    if (tagLc === 'clippath') {
+      if (closing) clipPathDepth = Math.max(0, clipPathDepth - 1)
+      else if (!selfClosing) clipPathDepth += 1
+      i = gt + 1
+      continue
+    }
+
+    if (clipPathDepth > 0) {
       i = gt + 1
       continue
     }
@@ -2643,14 +2893,45 @@ export function parseImportedSvgLayers(
       }
 
       if (ef?.startsWith('photo_') && width != null && height != null && width > 0 && height > 0) {
-        const tr = transformedRect(x, y, width, height, objectTransform)
-        commitPhotoShape({
+        const clipped = tryCommitPhotoClip({
           sourceName: ef,
-          tr,
+          attrs,
+          inheritedTransform,
+          objectTransform,
+          localBounds: { x, y, width, height },
           removalStart: lt,
           removalEnd: gt + 1,
-          shape: 'rect',
         })
+        if (!clipped) {
+          const cornerRx = parseNumber(attrs.rx) ?? 0
+          const cornerRy = parseNumber(attrs.ry) ?? cornerRx
+          const roundedOrRotated = cornerRx > 0 || cornerRy > 0 || !isAxisAlignedTransform(objectTransform)
+          if (roundedOrRotated) {
+            const pathData = transformSvgPathData(
+              roundedRectCurvePath(x, y, width, height, cornerRx, cornerRy),
+              objectTransform,
+            )
+            const tr = parseSvgPathApproxBounds(pathData)
+              ?? transformedRect(x, y, width, height, objectTransform)
+            commitPhotoShape({
+              sourceName: ef,
+              tr,
+              removalStart: lt,
+              removalEnd: gt + 1,
+              shape: 'path',
+              pathData,
+              fillRule: currentPhotoFillRule(attrs),
+            })
+          } else {
+            commitPhotoShape({
+              sourceName: ef,
+              tr: transformedRect(x, y, width, height, objectTransform),
+              removalStart: lt,
+              removalEnd: gt + 1,
+              shape: 'rect',
+            })
+          }
+        }
       } else {
         const explicitName = getLayerName(attrs)
         const decorName = resolveDecorLayerName(explicitName, inheritedDecor, 'rect', autoDecorSeq)
@@ -2698,13 +2979,38 @@ export function parseImportedSvgLayers(
         parseSvgTransform(attrs.transform, unsupportedFeatures),
       )
       if (ef?.startsWith('photo_') && rx > 0 && ry > 0) {
-        commitPhotoShape({
+        const localBounds = { x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2 }
+        const clipped = tryCommitPhotoClip({
           sourceName: ef,
-          tr: transformedRect(cx - rx, cy - ry, rx * 2, ry * 2, objectTransform),
+          attrs,
+          inheritedTransform,
+          objectTransform,
+          localBounds,
           removalStart: lt,
           removalEnd: gt + 1,
-          shape: 'ellipse',
         })
+        if (!clipped && !isAxisAlignedTransform(objectTransform)) {
+          const pathData = transformSvgPathData(ellipseCurvePath(cx, cy, rx, ry), objectTransform)
+          const tr = parseSvgPathApproxBounds(pathData)
+            ?? transformedRect(localBounds.x, localBounds.y, localBounds.width, localBounds.height, objectTransform)
+          commitPhotoShape({
+            sourceName: ef,
+            tr,
+            removalStart: lt,
+            removalEnd: gt + 1,
+            shape: 'path',
+            pathData,
+            fillRule: currentPhotoFillRule(attrs),
+          })
+        } else if (!clipped) {
+          commitPhotoShape({
+            sourceName: ef,
+            tr: transformedRect(localBounds.x, localBounds.y, localBounds.width, localBounds.height, objectTransform),
+            removalStart: lt,
+            removalEnd: gt + 1,
+            shape: 'ellipse',
+          })
+        }
         i = gt + 1
         continue
       }
@@ -2751,13 +3057,38 @@ export function parseImportedSvgLayers(
         parseSvgTransform(attrs.transform, unsupportedFeatures),
       )
       if (ef?.startsWith('photo_') && r != null && r > 0) {
-        commitPhotoShape({
+        const localBounds = { x: cx - r, y: cy - r, width: r * 2, height: r * 2 }
+        const clipped = tryCommitPhotoClip({
           sourceName: ef,
-          tr: transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform),
+          attrs,
+          inheritedTransform,
+          objectTransform,
+          localBounds,
           removalStart: lt,
           removalEnd: gt + 1,
-          shape: 'ellipse',
         })
+        if (!clipped && !isAxisAlignedTransform(objectTransform)) {
+          const pathData = transformSvgPathData(ellipseCurvePath(cx, cy, r, r), objectTransform)
+          const tr = parseSvgPathApproxBounds(pathData)
+            ?? transformedRect(localBounds.x, localBounds.y, localBounds.width, localBounds.height, objectTransform)
+          commitPhotoShape({
+            sourceName: ef,
+            tr,
+            removalStart: lt,
+            removalEnd: gt + 1,
+            shape: 'path',
+            pathData,
+            fillRule: currentPhotoFillRule(attrs),
+          })
+        } else if (!clipped) {
+          commitPhotoShape({
+            sourceName: ef,
+            tr: transformedRect(localBounds.x, localBounds.y, localBounds.width, localBounds.height, objectTransform),
+            removalStart: lt,
+            removalEnd: gt + 1,
+            shape: 'ellipse',
+          })
+        }
         i = gt + 1
         continue
       }
@@ -2804,22 +3135,34 @@ export function parseImportedSvgLayers(
           inheritedTransform,
           parseSvgTransform(attrs.transform, unsupportedFeatures),
         )
-        const pathData = transformSvgPathData(d, objectTransform)
-        const tr = parseSvgPathApproxBounds(pathData) ?? transformedRect(
-          baseBounds.x,
-          baseBounds.y,
-          baseBounds.width,
-          baseBounds.height,
-          objectTransform,
-        )
-        commitPhotoShape({
+        const clipped = tryCommitPhotoClip({
           sourceName: ef,
-          tr,
+          attrs,
+          inheritedTransform,
+          objectTransform,
+          localBounds: baseBounds,
           removalStart: lt,
           removalEnd: gt + 1,
-          shape: 'path',
-          pathData,
         })
+        if (!clipped) {
+          const pathData = transformSvgPathData(d, objectTransform)
+          const tr = parseSvgPathApproxBounds(pathData) ?? transformedRect(
+            baseBounds.x,
+            baseBounds.y,
+            baseBounds.width,
+            baseBounds.height,
+            objectTransform,
+          )
+          commitPhotoShape({
+            sourceName: ef,
+            tr,
+            removalStart: lt,
+            removalEnd: gt + 1,
+            shape: 'path',
+            pathData,
+            fillRule: currentPhotoFillRule(attrs),
+          })
+        }
         i = gt + 1
         continue
       }
@@ -2879,24 +3222,36 @@ export function parseImportedSvgLayers(
           inheritedTransform,
           parseSvgTransform(attrs.transform, unsupportedFeatures),
         )
-        const transformedPts = pts.map((p) => applyTransform(objectTransform, p.x, p.y))
-        const tr = boundsFromPointPairs(transformedPts) ?? transformedRect(
-          baseBounds.x,
-          baseBounds.y,
-          baseBounds.width,
-          baseBounds.height,
-          objectTransform,
-        )
-        const axisRect = isAxisAlignedRectPoints(transformedPts)
-        const pathData = axisRect ? undefined : polygonPointsAbsolutePath(transformedPts) ?? undefined
-        commitPhotoShape({
+        const clipped = tryCommitPhotoClip({
           sourceName: ef,
-          tr,
+          attrs,
+          inheritedTransform,
+          objectTransform,
+          localBounds: baseBounds,
           removalStart: lt,
           removalEnd: gt + 1,
-          shape: axisRect || !pathData ? 'rect' : 'path',
-          pathData,
         })
+        if (!clipped) {
+          const transformedPts = pts.map((p) => applyTransform(objectTransform, p.x, p.y))
+          const tr = boundsFromPointPairs(transformedPts) ?? transformedRect(
+            baseBounds.x,
+            baseBounds.y,
+            baseBounds.width,
+            baseBounds.height,
+            objectTransform,
+          )
+          const axisRect = isAxisAlignedRectPoints(transformedPts)
+          const pathData = axisRect ? undefined : polygonPointsAbsolutePath(transformedPts) ?? undefined
+          commitPhotoShape({
+            sourceName: ef,
+            tr,
+            removalStart: lt,
+            removalEnd: gt + 1,
+            shape: axisRect || !pathData ? 'rect' : 'path',
+            pathData,
+            fillRule: pathData ? currentPhotoFillRule(attrs) : undefined,
+          })
+        }
         i = gt + 1
         continue
       }

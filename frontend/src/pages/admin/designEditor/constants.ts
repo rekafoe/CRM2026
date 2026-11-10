@@ -71,6 +71,7 @@ export const FABRIC_CUSTOM_PROPS = [
   'photoFieldClipPath',
   'photoFieldClipBoxW',
   'photoFieldClipBoxH',
+  'photoFieldFillRule',
   'photoFieldPanX',
   'photoFieldPanY',
   'photoFieldZoom',

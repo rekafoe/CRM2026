@@ -13,7 +13,7 @@ export function photoFieldFrameRadii(
   frameH: number,
 ): { rx: number; ry: number } {
   if (shape === 'ellipse') return { rx: frameW / 2, ry: frameH / 2 }
-  return { rx: 6, ry: 6 }
+  return { rx: 0, ry: 0 }
 }
 
 export function readPhotoFieldClip(source: object | null | undefined): {
@@ -37,4 +37,12 @@ export function readPhotoFieldClip(source: object | null | undefined): {
     boxW: Number.isFinite(boxW) && boxW > 0 ? boxW : 1,
     boxH: Number.isFinite(boxH) && boxH > 0 ? boxH : 1,
   }
+}
+
+export function readPhotoFieldFillRule(
+  source: object | null | undefined,
+): 'nonzero' | 'evenodd' | undefined {
+  const value = (source as { photoFieldFillRule?: unknown } | null | undefined)?.photoFieldFillRule
+  if (value === 'evenodd' || value === 'nonzero') return value
+  return undefined
 }
