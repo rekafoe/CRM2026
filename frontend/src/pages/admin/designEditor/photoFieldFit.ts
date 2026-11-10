@@ -178,6 +178,7 @@ export function buildFilledPhotoFieldGroup(opts: {
   clipPath?: string;
   clipBoxW?: number;
   clipBoxH?: number;
+  fillRule?: 'nonzero' | 'evenodd';
 }): Group {
   const { left, top, frameW, frameH, image, id } = opts;
   const iw = opts.intrinsicW;
@@ -236,6 +237,7 @@ export function buildFilledPhotoFieldGroup(opts: {
         top: oy,
         scaleX: frameW / clipBoxW,
         scaleY: frameH / clipBoxH,
+        fillRule: opts.fillRule === 'evenodd' ? 'evenodd' : 'nonzero',
         objectCaching: false,
       });
     } catch {
@@ -267,6 +269,7 @@ export function buildFilledPhotoFieldGroup(opts: {
     g.photoFieldClipBoxW = clipBoxW;
     g.photoFieldClipBoxH = clipBoxH;
   }
+  if (opts.fillRule) g.photoFieldFillRule = opts.fillRule;
   g.photoFieldFitMode = fitMode;
   g.photoFieldPanX = panX;
   g.photoFieldPanY = panY;

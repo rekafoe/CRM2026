@@ -72,6 +72,44 @@ describe('editorProductionRenderService internals', () => {
     expect(html).toContain('height:120px')
   })
 
+  it('prints a bezier photo clip instead of a rectangular mask', () => {
+    const fabricJSON = {
+      objects: [
+        {
+          type: 'group',
+          left: 0,
+          top: 0,
+          width: 80,
+          height: 40,
+          isPhotoField: true,
+          photoFieldFilled: true,
+          photoFieldFw: 80,
+          photoFieldFh: 40,
+          photoFieldShape: 'path',
+          photoFieldFillRule: 'evenodd',
+          photoFieldClipPath: 'M 0 0 C 20 10 40 0 80 8 L 80 40 L 0 40 Z',
+          objects: [
+            { type: 'rect', left: -40, top: -20, width: 80, height: 40 },
+            {
+              type: 'image',
+              left: 0,
+              top: 0,
+              originX: 'center',
+              originY: 'center',
+              width: 80,
+              height: 40,
+              scaleX: 1,
+              scaleY: 1,
+              src: transparentPng,
+            },
+          ],
+        },
+      ],
+    }
+    const { html } = __editorProductionRenderInternals.buildPageHtml(fabricJSON, new Map(), 90, 50, 0)
+    expect(html).toContain("clip-path:path(evenodd, 'M 0 0 C 20 10 40 0 80 8 L 80 40 L 0 40 Z')")
+  })
+
   it('resolves /api/uploads image URLs from the uploads folder pattern', () => {
     const diagnostics = __editorProductionRenderInternals.collectProductionPageDiagnostics({
       objects: [{ type: 'image', src: 'data:image/png;base64,abc' }],

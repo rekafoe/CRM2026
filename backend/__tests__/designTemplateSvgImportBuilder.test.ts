@@ -139,6 +139,30 @@ describe('fabricTextFromSvgText', () => {
     expect(objects.some((obj) => String(obj.id).startsWith('decor_'))).toBe(false)
   })
 
+  it('кладёт кривую photo_* в clip и не скругляет острый прямоугольник', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50" style="fill-rule:evenodd">
+  <rect id="photo_sharp" x="0" y="0" width="20" height="10"/>
+  <path id="photo_wave" fill-rule="evenodd" d="M 10 10 C 20 0 30 20 40 10 L 40 30 L 10 30 Z"/>
+</svg>`
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(svg, 'utf8'),
+      originalname: 'photo-curve.svg',
+      mimetype: 'image/svg+xml',
+    }, 'photo-curve', [])
+    const objects = doc.pages[0]!.designPage.fabricJSON.objects
+    const sharp = objects.find((obj) => obj.id === 'photo_sharp') as Record<string, unknown>
+    const wave = objects.find((obj) => obj.id === 'photo_wave') as Record<string, unknown>
+    expect(sharp.photoFieldShape).toBe('rect')
+    expect(sharp.photoFieldClipPath).toBeUndefined()
+    expect(sharp.rx).toBe(0)
+    expect(sharp.ry).toBe(0)
+    expect(wave.photoFieldShape).toBe('path')
+    expect(String(wave.photoFieldClipPath)).toMatch(/C /)
+    expect(wave.photoFieldFillRule).toBe('evenodd')
+    expect(wave.type).toBe('rect')
+  })
+
   it('конвертирует decor_* и безымянные фигуры в fabric-объекты', () => {
     const warnings: string[] = []
     const svg = `

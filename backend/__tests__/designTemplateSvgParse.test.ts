@@ -888,4 +888,40 @@ describe('parseImportedSvgLayers', () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm">${open}<rect id="photo_1" x="1" y="1" width="4" height="4"/>${close}</svg>`
     expect(() => parseImportedSvgLayers(svg)).toThrow('SVG_GROUP_DEPTH_LIMIT_EXCEEDED')
   })
+
+  it('сохраняет кривую photo_*, скругление, поворот, дырку и clip-path', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="80mm" viewBox="0 0 100 80" style="fill-rule:evenodd">
+  <defs>
+    <clipPath id="wave">
+      <path d="M 5 5 C 15 0 25 20 35 5 L 35 25 L 5 25 Z"/>
+    </clipPath>
+  </defs>
+  <rect id="photo_sharp" x="0" y="0" width="10" height="8"/>
+  <rect id="photo_round" x="10" y="10" width="40" height="20" rx="4"/>
+  <ellipse id="photo_tilt" cx="40" cy="50" rx="12" ry="6" transform="rotate(40 40 50)"/>
+  <path id="photo_wave" d="M 10 60 C 20 50 30 70 40 60 Q 50 50 60 60 A 8 8 0 0 1 76 60 Z"/>
+  <path id="photo_ring" fill-rule="evenodd" d="M10 10 h20 v20 h-20 z M14 14 h12 v12 h-12 z"/>
+  <rect id="photo_cut" x="0" y="40" width="40" height="30" clip-path="url(#wave)"/>
+  <polyline id="photo_line" points="0,0 10,0"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const byName = Object.fromEntries(r.photoRects.map((item) => [item.layerName ?? item.name, item]))
+    expect(byName.photo_sharp?.shape).toBe('rect')
+    expect(byName.photo_sharp?.clipPath).toBeUndefined()
+    expect(byName.photo_round?.shape).toBe('path')
+    expect(byName.photo_round?.clipPath).toMatch(/C /)
+    expect(byName.photo_tilt?.shape).toBe('path')
+    expect(byName.photo_tilt?.clipPath).toMatch(/C /)
+    expect(byName.photo_wave?.shape).toBe('path')
+    expect(byName.photo_wave?.clipPath).toMatch(/C /)
+    expect(byName.photo_wave?.clipPath).toMatch(/Q /)
+    expect(byName.photo_wave?.clipPath).toMatch(/A /)
+    expect(byName.photo_ring?.fillRule).toBe('evenodd')
+    expect(byName.photo_ring?.clipPath).toMatch(/M /)
+    expect(byName.photo_cut?.shape).toBe('path')
+    expect(byName.photo_cut?.clipPath).toMatch(/C /)
+    expect(byName.photo_line).toBeUndefined()
+    expect(r.warnings.some((w) => w.includes('photo_line') && w.includes('PHOTO_NO_VALID_RECT'))).toBe(true)
+  })
 })

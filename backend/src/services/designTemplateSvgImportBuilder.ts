@@ -154,8 +154,8 @@ function toFabricRect(rect: SvgRect) {
     stroke: '#1e3a8a',
     strokeWidth: 2.5,
     strokeDashArray: [8, 4],
-    rx: elliptical ? rect.scene.width / 2 : 6,
-    ry: elliptical ? rect.scene.height / 2 : 6,
+    rx: elliptical ? rect.scene.width / 2 : 0,
+    ry: elliptical ? rect.scene.height / 2 : 0,
     id: rect.name,
     ...(rect.stackIndex != null ? { importStackIndex: rect.stackIndex } : {}),
     isPhotoField: true,
@@ -163,6 +163,7 @@ function toFabricRect(rect: SvgRect) {
     photoFieldFw: rect.scene.width,
     photoFieldFh: rect.scene.height,
     photoFieldShape: shape,
+    ...(rect.fillRule ? { photoFieldFillRule: rect.fillRule } : {}),
     ...(rect.clipPath
       ? {
         photoFieldClipPath: rect.clipPath,
