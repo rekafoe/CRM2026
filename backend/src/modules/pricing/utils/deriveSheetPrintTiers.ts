@@ -44,8 +44,12 @@ function normalizedMaxSheets(value: unknown): number | null {
 
 /**
  * Склеивает списки диапазонов одной цветности.
- * Списки идут от новой записи к старой: положительная ставка новой записи
- * важнее, ноль не затирает уже заданную цену того же порога.
+ * Списки идут от новой записи к старой.
+ * Структура порогов — только с самой новой непустой книги: чужие min_sheets
+ * из более старых записей не подмешиваем (иначе findTierForQuantity уходит
+ * на дешёвый «хвост» старой книги и занижает тираж).
+ * На уже взятых порогах положительная ставка новой записи важнее, ноль не
+ * затирает цену того же порога из более старой записи.
  * fillZeroSlots — подставить плоскую цену в нулевые пороги, не трогая ненулевые.
  * Без флага ноль остаётся нулём, пока в списке есть хотя бы одна живая ставка
  * (так двусторонняя и ч/б не меняются).
@@ -56,19 +60,24 @@ export function mergeCentralSheetTierLists(
   options?: { fillZeroSlots?: boolean },
 ): { tiers: CentralSheetTier[]; usedFlat: boolean } {
   const byMin = new Map<number, MergedSheetTier>()
+  let structureLocked = false
   for (const list of tierListsNewestFirst) {
     if (!Array.isArray(list)) continue
+    let listAddedSlot = false
     for (const tier of list) {
       const min = normalizedMinSheets(tier?.min_sheets)
       if (min == null) continue
       const price = positiveSheetPrice(tier?.price_per_sheet)
       const prev = byMin.get(min)
       if (!prev) {
+        // Пороги задаёт первая непустая (самая новая) книга; дальше только fill.
+        if (structureLocked) continue
         byMin.set(min, {
           min_sheets: min,
           max_sheets: normalizedMaxSheets(tier?.max_sheets),
           price_per_sheet: price,
         })
+        listAddedSlot = true
         continue
       }
       if (prev.price_per_sheet <= 0 && price > 0) {
@@ -79,6 +88,7 @@ export function mergeCentralSheetTierLists(
         })
       }
     }
+    if (listAddedSlot || byMin.size > 0) structureLocked = true
   }
 
   const flat = positiveSheetPrice(flatPricePerSheet)

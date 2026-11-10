@@ -77,6 +77,38 @@ describe('deriveSheetPrintTiers', () => {
     expect(merged.tiers.map((tier) => tier.price_per_sheet)).toEqual([2, 1.5])
   })
 
+  it('does not import cheaper foreign breakpoints from an older print_prices book', () => {
+    const merged = mergeCentralSheetTierLists(
+      [
+        [{ min_sheets: 1, max_sheets: null, price_per_sheet: 2 }],
+        [
+          { min_sheets: 1, max_sheets: 4, price_per_sheet: 3 },
+          { min_sheets: 5, max_sheets: null, price_per_sheet: 0.5 },
+        ],
+      ],
+      0,
+      { fillZeroSlots: true },
+    )
+    expect(merged.tiers).toEqual([
+      { min_sheets: 1, max_sheets: null, price_per_sheet: 2 },
+    ])
+  })
+
+  it('falls back to an older book structure only when the newest book has no tiers', () => {
+    const merged = mergeCentralSheetTierLists(
+      [
+        [],
+        [
+          { min_sheets: 1, max_sheets: 4, price_per_sheet: 3 },
+          { min_sheets: 5, max_sheets: null, price_per_sheet: 1.5 },
+        ],
+      ],
+      0,
+      { fillZeroSlots: true },
+    )
+    expect(merged.tiers.map((tier) => tier.price_per_sheet)).toEqual([3, 1.5])
+  })
+
   it('collapses duplicate quantity breaks and keeps the positive unit price', () => {
     const tiers = toProductQtyTiers(
       [
