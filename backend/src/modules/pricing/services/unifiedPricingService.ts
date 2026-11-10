@@ -21,6 +21,8 @@ export interface UnifiedPricingResult {
   sheetsNeeded?: number; //  Количество листов для печати
   /** Объём для tier при группировке в той же оси, что и обычный calculate */
   tierVolumeForGrouping?: number;
+  /** fixed_unit_prices: не суммировать тираж с другими позициями корзины */
+  suppressCartTierGrouping?: boolean;
   metersNeeded?: number; //  Погонные метры для рулонной печати
   itemsPerSheet?: number; //  Укладка: сколько изделий на лист
   cutsPerSheet?: number; //  Количество резов на лист
@@ -293,6 +295,7 @@ export class UnifiedPricingService {
       } : {},
       sheetsNeeded: result.layout?.sheetsNeeded,
       tierVolumeForGrouping: result.tierVolumeForGrouping,
+      ...(result.suppressCartTierGrouping ? { suppressCartTierGrouping: true as const } : {}),
       metersNeeded: result.layout?.metersNeeded,
       itemsPerSheet: result.layout?.itemsPerSheet,
       cutsPerSheet: result.layout?.cutsPerSheet,

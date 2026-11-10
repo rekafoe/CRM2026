@@ -374,18 +374,34 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     );
     const orderRows: OrderRow[] = Array.isArray(rawOrderRows) ? rawOrderRows : [];
     const orderMap = new Map<number, OrderRow>(orderRows.map((r) => [r.id, r]));
-    const orders: OrderRow[] = orderIds.map((id) => orderMap.get(id)).filter((o): o is OrderRow => Boolean(o));
-    if (orders.length === 0) {
-      res.status(404).json({ message: 'Заказы не найдены' });
+    const missingIds = orderIds.filter((id) => !orderMap.has(id));
+    if (missingIds.length > 0) {
+      res.status(400).json({
+        message: `Заказы не найдены: ${missingIds.join(', ')}`,
+        missingIds,
+      });
       return;
     }
+    const orders: OrderRow[] = orderIds.map((id) => orderMap.get(id)!);
     const customerIds = [...new Set(orders.map((order) => Number(order.customer_id)).filter((id) => id > 0))];
     if (customerIds.length > 1) {
       res.status(400).json({ message: 'В один документ можно включить заказы только одного клиента' });
       return;
     }
 
-    const organizationId = orders.find((order) => Number(order.organization_id) > 0)?.organization_id ?? null;
+    const orgIds = [...new Set(
+      orders
+        .map((order) => Number(order.organization_id))
+        .filter((oid) => Number.isFinite(oid) && oid > 0),
+    )];
+    if (orgIds.length > 1) {
+      res.status(400).json({
+        message: 'В один документ можно включить заказы только одной организации-продавца',
+        organizationIds: orgIds,
+      });
+      return;
+    }
+    const organizationId = orgIds[0] ?? null;
     const vatCol = (await hasColumn('organizations', 'vat_rate').catch(() => false)) ? ', vat_rate' : '';
     const seller = await db.get<any>(
       organizationId

@@ -26,15 +26,20 @@ export async function ensureWebsiteCustomer(input: {
   const db = await getDb()
   if (phone) {
     const phoneDigits = digitsOnlyPhone(phone)
+    // Exact digit match in SQL — LIMIT 500 по id DESC пропускал старых клиентов с тем же телефоном
+    // и создавал дубликаты при website checkout / editor ensure.
     if (phoneDigits.length >= 7) {
-      const rows = (await db.all(
-        `SELECT id, phone FROM customers
+      const phoneDigitsSql =
+        `replace(replace(replace(replace(replace(replace(COALESCE(phone, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', '')`
+      const matched = await db.get<{ id: number }>(
+        `SELECT id FROM customers
          WHERE phone IS NOT NULL AND TRIM(phone) != ''
+           AND ${phoneDigitsSql} = ?
          ORDER BY id DESC
-         LIMIT 500`,
-      )) as Array<{ id: number; phone: string | null }>
-      const matched = rows.find((row) => digitsOnlyPhone(String(row.phone ?? '')) === phoneDigits)
-      if (matched) return { id: matched.id }
+         LIMIT 1`,
+        [phoneDigits],
+      )
+      if (matched?.id) return { id: matched.id }
     }
   }
 
