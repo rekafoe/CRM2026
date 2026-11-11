@@ -1073,8 +1073,10 @@ export class OrderService {
     ) as Order
   }
 
-  /** Допустимые значения скидки: 0, 5, 10, 15, 20, 25 (%) */
-  private static readonly ALLOWED_DISCOUNT_PERCENTS = new Set([0, 5, 10, 15, 20, 25]);
+  /** Скидка: 0, 5, 10, 15, 20, 25. Наценка хранится отрицательным процентом: −5…−30. */
+  private static readonly ALLOWED_DISCOUNT_PERCENTS = new Set([
+    0, 5, 10, 15, 20, 25, -5, -10, -15, -20, -25, -30,
+  ]);
 
   /** Допустимые значения payment_channel (internal хранится в is_internal) */
   private static readonly ALLOWED_PAYMENT_CHANNELS = new Set(['cash', 'invoice', 'not_cashed', 'internal']);
@@ -1635,7 +1637,7 @@ export class OrderService {
     }
     const p = Number(discountPercent)
     if (!Number.isFinite(p) || !OrderService.ALLOWED_DISCOUNT_PERCENTS.has(p)) {
-      throw new Error('Скидка должна быть 0, 5, 10, 15, 20 или 25%')
+      throw new Error('Скидка: 0, 5, 10, 15, 20 или 25%. Наценка: 5, 10, 15, 20, 25 или 30%')
     }
 
     await db.run(

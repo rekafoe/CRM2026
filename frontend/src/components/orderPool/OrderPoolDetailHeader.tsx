@@ -146,8 +146,8 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             }
           >
             {fulfillmentChip?.variant === 'pickup'
-              ? `Передать на ${fulfillmentChip.pointName}`
-              : 'Передать'}
+              ? `Передать заказ на ${fulfillmentChip.pointName}`
+              : 'Передать заказ'}
           </button>
         </div>
         <div className="pool-passport__tags">

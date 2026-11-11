@@ -223,7 +223,7 @@ export const OrderTransferModal: React.FC<OrderTransferModalProps> = ({
             disabled={!canSubmit || submitting}
             loading={submitting}
           >
-            Передать
+            Передать заказ
           </Button>
         </div>
       </div>

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getOrderCostSheet, type OrderCostSheet } from '../../api';
 import { AppIcon } from '../ui/AppIcon';
 import { MoneyAmount } from '../ui/MoneyAmount';
@@ -33,9 +34,31 @@ function RoleCell({
   );
 }
 
+type PopoverBox = { top: number; left: number; maxHeight: number };
+
+function placeCostSheet(anchor: HTMLElement, panel: HTMLElement | null): PopoverBox {
+  const rect = anchor.getBoundingClientRect();
+  const margin = 8;
+  const width = Math.min(720, window.innerWidth * 0.92);
+  const left = Math.max(margin, Math.min(rect.right - width, window.innerWidth - width - margin));
+  const spaceBelow = window.innerHeight - rect.bottom - margin;
+  const spaceAbove = rect.top - margin;
+  const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
+  const available = Math.max(160, openAbove ? spaceAbove - 4 : spaceBelow - 4);
+  const maxHeight = Math.min(560, available);
+  const height = panel ? Math.min(panel.offsetHeight, maxHeight) : maxHeight;
+  const top = openAbove
+    ? Math.max(margin, rect.top - 4 - height)
+    : Math.min(rect.bottom + 4, window.innerHeight - margin - height);
+  return { top, left, maxHeight };
+}
+
 export const OrderCostSheetPanel: React.FC<Props> = ({ orderId }) => {
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [box, setBox] = useState<PopoverBox | null>(null);
   const [sheet, setSheet] = useState<OrderCostSheet | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -49,13 +72,32 @@ export const OrderCostSheetPanel: React.FC<Props> = ({ orderId }) => {
   useEffect(() => {
     if (!open) return;
     const onOutside = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('click', onOutside, true);
     return () => document.removeEventListener('click', onOutside, true);
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setBox(null);
+      return;
+    }
+    const place = () => {
+      const button = buttonRef.current;
+      if (!button) return;
+      setBox(placeCostSheet(button, popoverRef.current));
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, loading, sheet, error]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,6 +122,7 @@ export const OrderCostSheetPanel: React.FC<Props> = ({ orderId }) => {
   return (
     <div className="order-cost-sheet" ref={rootRef}>
       <button
+        ref={buttonRef}
         type="button"
         className={`order-detail-action-btn order-detail-action-btn--neutral pc-btn--quiet${open ? ' order-cost-sheet__toggle--open' : ''}`}
         title="Закупка, печать и проценты по строкам"
@@ -91,8 +134,14 @@ export const OrderCostSheetPanel: React.FC<Props> = ({ orderId }) => {
         <AppIcon name="money" size="xs" />
         Расходы ▼
       </button>
-      {open ? (
-        <div className="order-cost-sheet__popover" role="dialog" aria-label="Расходы заказа">
+      {open ? createPortal(
+        <div
+          ref={popoverRef}
+          className="order-cost-sheet__popover order-cost-sheet__popover--portal"
+          role="dialog"
+          aria-label="Расходы заказа"
+          style={box ? { top: box.top, left: box.left, maxHeight: box.maxHeight } : { visibility: 'hidden' }}
+        >
           <h3>Расходы и проценты</h3>
           <p className="order-cost-sheet__note">
             Из отпускной цены строки вычитается закупка материала, себестоимость печати и плата за макет.
@@ -182,7 +231,8 @@ export const OrderCostSheetPanel: React.FC<Props> = ({ orderId }) => {
               </table>
             </>
           ) : null}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

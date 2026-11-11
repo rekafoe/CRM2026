@@ -45,6 +45,8 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
   prepaymentUpdatedAt,
 }) => {
   const disc = discountAmount;
+  const isMarkup = discountPercent < 0;
+  const adjustment = Math.abs(disc);
   const rate = Number(taxRate) || 0;
   const tax = rate > 0 ? (subtotal - disc) * rate : 0;
   const prepayment = Number(prepaymentAmount) || 0;
@@ -69,8 +71,10 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
           <span className="pc-passport__value"><BynValue>{subtotal}</BynValue></span>
         </div>
         <div className="pc-passport__cell">
-          <span className="pc-passport__label">{discountPercent > 0 ? `Скидка ${discountPercent}%` : 'Скидка'}</span>
-          <span className="pc-passport__value"><BynValue>{disc}</BynValue></span>
+          <span className="pc-passport__label">
+            {isMarkup ? `Наценка ${Math.abs(discountPercent)}%` : discountPercent > 0 ? `Скидка ${discountPercent}%` : 'Скидка'}
+          </span>
+          <span className="pc-passport__value"><BynValue>{isMarkup ? adjustment : disc}</BynValue></span>
         </div>
         <div className="pc-passport__cell">
           <span className="pc-passport__label">Предоплата</span>
@@ -100,6 +104,10 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
           {disc > 0 ? (
             <span className="order-total-bar__note">
               скидка <BynValue>{disc}</BynValue>
+            </span>
+          ) : isMarkup ? (
+            <span className="order-total-bar__note">
+              наценка <BynValue>{adjustment}</BynValue>
             </span>
           ) : null}
         </div>
@@ -132,6 +140,14 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
           <span>Скидка:</span>
           <span>
             -<BynValue>{disc}</BynValue>
+          </span>
+        </div>
+      )}
+      {isMarkup && (
+        <div className="order-total__line">
+          <span>Наценка:</span>
+          <span>
+            +<BynValue>{adjustment}</BynValue>
           </span>
         </div>
       )}

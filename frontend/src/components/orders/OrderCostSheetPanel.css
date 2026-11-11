@@ -24,6 +24,13 @@
   text-align: left;
 }
 
+.order-cost-sheet__popover.order-cost-sheet__popover--portal {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 5000;
+}
+
 .order-cost-sheet__popover h3 {
   margin: 0 0 4px;
   font-size: 15px;

@@ -258,6 +258,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   }, [addToast, openPdfInNewTab]);
 
   const DISCOUNT_OPTIONS = [0, 5, 10, 15, 20, 25] as const;
+  const MARKUP_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
   const handleSetDiscount = useCallback(async (percent: number) => {
     try {
       setDiscountMenuOpen(false);
@@ -266,10 +267,19 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       addToast({
         type: 'success',
         title: 'Успешно',
-        message: percent === 0 ? 'Скидка снята' : `Скидка ${percent}% применена`,
+        message:
+          percent === 0
+            ? 'Скидка снята'
+            : percent < 0
+              ? `Наценка ${-percent}% применена`
+              : `Скидка ${percent}% применена`,
       });
     } catch (error: any) {
-      addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось применить скидку' });
+      addToast({
+        type: 'error',
+        title: 'Ошибка',
+        message: error.message || (percent < 0 ? 'Не удалось применить наценку' : 'Не удалось применить скидку'),
+      });
     }
   }, [selectedOrder.id, onLoadOrders, addToast]);
 
@@ -367,7 +377,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               onClick={() => setTransferOpen(true)}
               title="Передать коллеге или в другой павильон"
             >
-              Передать
+              Передать заказ
             </button>
           ) : null}
           <button type="button" className="pc-btn pc-btn--primary pc-btn--lg" onClick={() => onOpenCalculator()}>
@@ -478,12 +488,12 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     setDiscountMenuOpen((v) => !v);
                   }}
                   className="pc-btn pc-btn--quiet"
-                  title="Скидка на итог заказа"
+                  title="Скидка или наценка на итог заказа"
                 >
-                  <AppIcon name="tag" size="xs" /> {discountPercent > 0 ? `Скидка ${discountPercent}%` : 'Скидка'}
+                  <AppIcon name="tag" size="xs" /> {discountPercent > 0 ? `Скидка ${discountPercent}%` : discountPercent < 0 ? `Наценка ${-discountPercent}%` : 'Скидка'}
                 </button>
                 {discountMenuOpen && (
-                  <Menu label="Скидка">
+                  <Menu label="Скидка и наценка">
                     {DISCOUNT_OPTIONS.map((percent) => (
                       <MenuItem
                         key={percent}
@@ -491,6 +501,15 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                         onClick={() => handleSetDiscount(percent)}
                       >
                         {percent === 0 ? 'Без скидки' : `${percent}%`}
+                      </MenuItem>
+                    ))}
+                    {MARKUP_OPTIONS.map((percent) => (
+                      <MenuItem
+                        key={`markup-${percent}`}
+                        selected={discountPercent === -percent}
+                        onClick={() => handleSetDiscount(-percent)}
+                      >
+                        Наценка {percent}%
                       </MenuItem>
                     ))}
                   </Menu>

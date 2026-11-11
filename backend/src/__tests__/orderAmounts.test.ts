@@ -78,6 +78,24 @@ describe('orderAmounts', () => {
     expect(amounts.debt).toBe(130);
   });
 
+  it('computeOrderAmounts applies markup as a negative discount percent', () => {
+    const amounts = computeOrderAmounts({
+      items: [{ price: 100, quantity: 2, params: { storedTotalCost: 200 } }],
+      discount_percent: -10,
+      prepaymentAmount: 50,
+    });
+    expect(amounts.subtotal).toBe(200);
+    expect(amounts.discountAmount).toBe(-20);
+    expect(amounts.totalAmount).toBe(220);
+    expect(amounts.debt).toBe(170);
+    expect(
+      discountedItemAmounts(
+        [{ price: 100, quantity: 2, params: { storedTotalCost: 200 } }],
+        -10,
+      ),
+    ).toEqual([220]);
+  });
+
   it('attachAmountsToOrder sets lineTotal on items', () => {
     const order = attachAmountsToOrder({
       id: 1,
