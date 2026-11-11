@@ -80,7 +80,7 @@ export const EarningsAdminPage: React.FC = () => {
       const params: { month?: string; department_id?: number } = { month };
       if (departmentId !== '' && Number.isFinite(departmentId)) params.department_id = departmentId;
       const res = await getAdminEarnings(params);
-      if (gen !== requestGen.current || yearStatusRef.current === 'ready') return;
+      if (gen !== requestGen.current) return;
       setRows(Array.isArray(res.data?.users) ? res.data.users : []);
     } catch (e: any) {
       if (gen !== requestGen.current) return;
