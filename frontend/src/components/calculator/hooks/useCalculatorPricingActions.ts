@@ -483,7 +483,15 @@ export function useCalculatorPricingActions({
           ),
         };
 
-        if (materialDrivenPrinting) {
+        const uvPrintWithoutMaterial = uvFlatbed && specs.print_without_material === true;
+        if (uvPrintWithoutMaterial) {
+          delete (configuration as { material_id?: number }).material_id;
+          (configuration as { print_without_material?: boolean }).print_without_material = true;
+        } else {
+          delete (configuration as { print_without_material?: boolean }).print_without_material;
+        }
+
+        if (materialDrivenPrinting && !uvPrintWithoutMaterial) {
           delete (configuration as Record<string, unknown>).print_technology;
           delete (configuration as Record<string, unknown>).printTechnology;
           (configuration as Record<string, unknown>).usage_context =
@@ -1059,8 +1067,9 @@ export function useCalculatorPricingActions({
           }
         }
         
-        //  Для упрощённых продуктов, если материалов нет в результате, но material_id есть в specs - добавляем
-        if (normalizedMaterials.length === 0 && specs.material_id && specs.size_id) {
+        //  Для упрощённых продуктов, если материалов нет в результате, но material_id есть в specs - добавляем.
+        // УФ без носителя не дописывает лист: иначе заказ получит материал, которого не было в цене.
+        if (normalizedMaterials.length === 0 && specs.material_id && specs.size_id && !uvPrintWithoutMaterial) {
           logger.info('Добавляем материал из specs для упрощённого продукта', {
             material_id: specs.material_id,
             size_id: specs.size_id
@@ -1160,23 +1169,47 @@ export function useCalculatorPricingActions({
             : (backendResult.pricePerUnit as number);
 
 
+        const uvPrintWithoutMaterialForResult =
+          uvFlatbed && specSnapshot.print_without_material === true;
+        const materialsForResult = uvPrintWithoutMaterialForResult
+          ? normalizedMaterials.filter((m) => {
+              if (m.isConsumableOnly) return true;
+              return (
+                specs.base_material_id != null &&
+                sameMaterialId(m.materialId, specs.base_material_id)
+              );
+            })
+          : normalizedMaterials;
+
         const calculationResult: CalculationResult = {
-          productName: `${selectedProduct.name} ${formatInfo || specSnapshot.format} (${specSnapshot.paperType} ${specSnapshot.paperDensity}г/м², ${
-            specSnapshot.sides === 2 ? 'двусторонние' : 'односторонние'
-          })`,
+          productName: uvPrintWithoutMaterialForResult
+            ? `${selectedProduct.name} ${formatInfo || specSnapshot.format}`.trim()
+            : `${selectedProduct.name} ${formatInfo || specSnapshot.format} (${specSnapshot.paperType} ${specSnapshot.paperDensity}г/м², ${
+                specSnapshot.sides === 2 ? 'двусторонние' : 'односторонние'
+              })`,
           specifications: {
             ...specSnapshot,
-            ...(backendResult.productionPlan?.materialId
-              ? { material_id: Number(backendResult.productionPlan.materialId) }
-              : {}),
-            ...(backendResult.productionPlan?.technologyCode
+            ...(uvPrintWithoutMaterialForResult
               ? {
-                  print_technology: String(backendResult.productionPlan.technologyCode),
-                  printTechnology: String(backendResult.productionPlan.technologyCode),
+                  print_without_material: true,
+                  material_id: undefined,
+                  materialType: undefined,
+                  print_technology: 'uv',
+                  printTechnology: 'uv',
                 }
-              : {}),
+              : {
+                  ...(backendResult.productionPlan?.materialId
+                    ? { material_id: Number(backendResult.productionPlan.materialId) }
+                    : {}),
+                  ...(backendResult.productionPlan?.technologyCode
+                    ? {
+                        print_technology: String(backendResult.productionPlan.technologyCode),
+                        printTechnology: String(backendResult.productionPlan.technologyCode),
+                      }
+                    : {}),
+                }),
           },
-          materials: normalizedMaterials,
+          materials: materialsForResult,
           services: normalizedServices,
           productionPlan: backendResult.productionPlan,
           totalCost: finalTotalCost,

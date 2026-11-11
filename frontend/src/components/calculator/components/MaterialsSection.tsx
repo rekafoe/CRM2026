@@ -118,6 +118,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     simplifiedSizesSource && simplifiedSizesSource.length > 0,
   );
   const isMaterialDriven = schema?.template?.simplified?.material_driven_printing === true;
+  const printWithoutMaterial = uvFlatbed && specs.print_without_material === true;
 
   useEffect(() => {
     if (!isMaterialDriven || specs.usage_context === 'indoor' || specs.usage_context === 'outdoor') {
@@ -571,7 +572,14 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   // Единственная синхронизация внешнего material_id с локальным путём выбора.
   // Если сохранённый материал больше не разрешён, выбираем первый доступный SKU.
+  // УФ «печать без материала» этот автовыбор отключает — иначе лист подставится молча.
   useEffect(() => {
+    if (printWithoutMaterial) {
+      if (specs.material_id != null || specs.materialType) {
+        updateSpecs({ material_id: undefined, materialType: undefined }, true);
+      }
+      return;
+    }
     if (!isSimplifiedProduct || !sizeIdForMaterials || materialSelectionTree.length === 0) return;
     const path = findMaterialSelectionPath(materialSelectionTree, specs.material_id);
     if (path) {
@@ -603,6 +611,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     applyWarehouseMaterial,
     isSimplifiedProduct,
     materialSelectionTree,
+    printWithoutMaterial,
     resolveSpecsMaterialType,
     sizeIdForMaterials,
     specs.material_id,
@@ -674,8 +683,45 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   // Упрощённые продукты: категория склада → тип материала → конкретный вариант.
   // Для рулона вариантом является ширина, для бумаги — плотность.
-  const materialBlock = isSimplifiedProduct && sizeIdForMaterials ? (
+  const materialBlock = isSimplifiedProduct && (sizeIdForMaterials || uvFlatbed) ? (
     <>
+      {uvFlatbed && (
+        <div className="param-group param-group--narrow">
+          <label>
+            Носитель <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
+          </label>
+          <select
+            value={printWithoutMaterial ? 'none' : 'with'}
+            onChange={(e) => {
+              if (e.target.value === 'none') {
+                updateSpecs({
+                  print_without_material: true,
+                  material_id: undefined,
+                  materialType: undefined,
+                }, true);
+                return;
+              }
+              const firstMaterial = materialSelectionTree[0]?.types[0]?.materials[0];
+              if (firstMaterial) {
+                updateSpecs({ print_without_material: false }, true);
+                applyWarehouseMaterial(firstMaterial);
+                return;
+              }
+              updateSpecs({ print_without_material: false }, true);
+            }}
+            className="form-control"
+          >
+            <option value="with">Материал со склада</option>
+            <option value="none">Печать без материала</option>
+          </select>
+          {printWithoutMaterial && (
+            <small className="text-muted">
+              Лист и носитель не требуются. В цену и в заказ войдёт печать, без подстановки материала.
+            </small>
+          )}
+        </div>
+      )}
+      {!printWithoutMaterial && sizeIdForMaterials && (
       <div className="material-type-density-row">
       <div className="param-group param-group--narrow">
         <label>Категория материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
@@ -758,6 +804,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       </div>
       {baseMaterialBlock}
       </div>
+      )}
+      {printWithoutMaterial ? baseMaterialBlock : null}
     </>
   ) : null;
 

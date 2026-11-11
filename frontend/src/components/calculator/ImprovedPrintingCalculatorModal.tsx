@@ -420,6 +420,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         } else {
           delete (next as { uv_print?: unknown }).uv_print;
           delete (next as { uv_use_custom_dimensions?: unknown }).uv_use_custom_dimensions;
+          delete (next as { print_without_material?: unknown }).print_without_material;
         }
       }
 
@@ -760,6 +761,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       if (next.material_id) {
         delete next.material_id;
       }
+      delete next.print_without_material;
       //  Сбрасываем выбранные операции при смене продукта
       next.selectedOperations = [];
       // Для обычных продуктов сбрасываем paperType, чтобы MaterialsSection
@@ -831,6 +833,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       const key = `uv:${JSON.stringify({
         productId: selectedProduct.id,
         materialId: specs.material_id,
+        printWithoutMaterial: (specs as { print_without_material?: boolean }).print_without_material === true,
         typeId: specs.typeId,
         uv_print: uvPrint,
         size_id: specs.size_id,

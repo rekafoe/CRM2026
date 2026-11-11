@@ -265,6 +265,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             lamination: specs.lamination, 
             quantity: specs.quantity,
             material_id: (specs as any).material_id,
+            materialType: (specs as any).materialType,
+            print_without_material: (specs as any).print_without_material === true,
             size_id: (specs as any).size_id,
             usage_context: (specs as any).usage_context,
           }}

@@ -113,8 +113,30 @@ export function buildOrderPayload({
     ...(materialTypeFromSelected ? { materialType: materialTypeFromSelected, paperType: materialTypeFromSelected } : {}),
   };
 
-  const cleanMaterials = result.materials
-    ? result.materials.map((m: any) => ({
+  const printWithoutMaterial =
+    result.specifications.print_without_material === true &&
+    result.specifications.uv_print != null &&
+    typeof result.specifications.uv_print === 'object';
+  const specificationsRecord = specificationsPayload as Record<string, unknown>;
+  if (printWithoutMaterial) {
+    delete specificationsRecord.material_id;
+    delete specificationsRecord.materialType;
+    delete specificationsRecord.paperType;
+    delete specificationsRecord.paperDensity;
+    specificationsRecord.print_without_material = true;
+  } else {
+    delete specificationsRecord.print_without_material;
+  }
+
+  const materialsSource = (Array.isArray(result.materials) ? result.materials : []).filter((m: any) => {
+    if (!printWithoutMaterial) return true;
+    if (m?.isConsumableOnly === true) return true;
+    const id = Number(m?.materialId ?? m?.material_id);
+    const baseId = Number(result.specifications.base_material_id);
+    return Number.isFinite(baseId) && baseId > 0 && id === baseId;
+  });
+
+  const cleanMaterials = materialsSource.map((m: any) => ({
         materialId: m.materialId,
         materialName: m.materialName ?? m.material,
         material: m.material ?? m.materialName,
@@ -124,8 +146,7 @@ export function buildOrderPayload({
         totalCost: m.totalCost ?? m.total,
         density: m.density,
         paper_type_name: m.paper_type_name,
-      }))
-    : [];
+      }));
 
   // Операции (печать, резка, ламинация и т.д.) — только из ответа расчёта. В заказ сохраняем как есть; чек и отчёты читают из item.params.services.
   const cleanServices = result.services
@@ -209,7 +230,7 @@ export function buildOrderPayload({
   };
 
   const components =
-    result.materials
+    materialsSource
       .filter((m) => m.materialId)
       .map((m) => ({
         materialId: m.materialId as number,
