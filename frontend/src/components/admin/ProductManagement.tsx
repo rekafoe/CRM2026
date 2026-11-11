@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Product,
   deleteProduct,
@@ -17,6 +17,8 @@ import { ProductDuplicateModal, productCanBeDuplicated } from './ProductDuplicat
 import { ProductSetupStatus } from './ProductSetupStatus';
 import { Modal } from '../common/Modal';
 import { useProductManagementState } from './hooks/useProductManagementState';
+import { useProductListFilters } from './hooks/useProductListFilters';
+import { filterAndSortProducts, productListBackTarget } from '../../utils/productListFilters';
 import { CategoryManagementModal } from './CategoryManagementModal';
 import { PlotterCalculatorMaterialsModal } from './PlotterCalculatorMaterialsModal';
 import { getAxiosErrorMessage } from '../../utils/errorUtils';
@@ -24,6 +26,7 @@ import './ProductManagement.css';
 
 const ProductManagement: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showCategoryModal, setShowCategoryModal] = React.useState(false);
   const [showPlotterMaterialsModal, setShowPlotterMaterialsModal] = React.useState(false);
   const [duplicateSource, setDuplicateSource] = useState<Product | null>(null);
@@ -46,10 +49,6 @@ const ProductManagement: React.FC = () => {
   // Используем хук для управления состоянием
   const {
     state,
-    setQuery,
-    setShowOnlyActive,
-    setSelectedCategoryId,
-    toggleSort,
     toggleProductSelection,
     setSelectedProducts,
     clearSelectedProducts,
@@ -60,6 +59,11 @@ const ProductManagement: React.FC = () => {
     setProductForm,
     resetProductForm,
   } = useProductManagementState();
+  const { filters, updateFilters, toggleSort } = useProductListFilters();
+
+  const openProductPage = (path: string) => {
+    navigate(path, { state: { backTo: productListBackTarget(location.search) } });
+  };
 
   useEffect(() => {
     void initializeDirectory();
@@ -208,49 +212,22 @@ const ProductManagement: React.FC = () => {
     await fetchProducts(true);
     handleWizardClose();
     showToast('Продукт создан', 'success');
-    navigate(`/adminpanel/products/${productId}/template`);
+    openProductPage(`/adminpanel/products/${productId}/template`);
   };
 
   const handleDuplicateCreated = async (productId: number) => {
     await fetchProducts(true);
     setDuplicateSource(null);
     showToast('Копия продукта создана', 'success');
-    navigate(`/adminpanel/products/${productId}/template`);
+    openProductPage(`/adminpanel/products/${productId}/template`);
   };
 
-  const filteredProducts = useMemo(() => {
-    const search = state.query.trim().toLowerCase();
-    let filtered = products
-      .filter(
-        (p) =>
-          !search ||
-          p.name.toLowerCase().includes(search) ||
-          (p.description || '').toLowerCase().includes(search),
-      )
-      .filter((p) => (!state.showOnlyActive ? true : p.is_active))
-      .filter((p) => (!state.selectedCategoryId ? true : p.category_id === state.selectedCategoryId));
-
-    // Сортировка
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      
-      if (state.sortField === 'name') {
-        comparison = a.name.localeCompare(b.name);
-      } else if (state.sortField === 'category') {
-        const catA = getCategoryById(a.category_id)?.name || '';
-        const catB = getCategoryById(b.category_id)?.name || '';
-        comparison = catA.localeCompare(catB);
-      } else if (state.sortField === 'updated') {
-        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-        comparison = dateA - dateB;
-      }
-      
-      return state.sortDirection === 'asc' ? comparison : -comparison;
-    });
-
-    return filtered;
-  }, [products, state.query, state.showOnlyActive, state.selectedCategoryId, state.sortField, state.sortDirection, getCategoryById]);
+  const filteredProducts = useMemo(
+    () => filterAndSortProducts(products, filters, (categoryId) => (
+      categoryId != null ? getCategoryById(categoryId)?.name || '' : ''
+    )),
+    [products, filters, getCategoryById],
+  );
 
   const isDirectoryLoading =
     directoryLoading.initialize ||
@@ -309,15 +286,15 @@ const ProductManagement: React.FC = () => {
               <input
                 className="product-controls__search-input"
                 placeholder="Поиск по названию или описанию..."
-                value={state.query}
-                onChange={(e) => setQuery(e.target.value)}
+                value={filters.query}
+                onChange={(e) => updateFilters({ query: e.target.value })}
               />
             </div>
 
             <select
               className="product-controls__select"
-              value={state.selectedCategoryId || ''}
-              onChange={(e) => setSelectedCategoryId(e.target.value ? Number(e.target.value) : null)}
+              value={filters.selectedCategoryId || ''}
+              onChange={(e) => updateFilters({ selectedCategoryId: e.target.value ? Number(e.target.value) : null })}
             >
               <option value="">Все категории ({products.length})</option>
               {categories.map((cat) => (
@@ -328,19 +305,52 @@ const ProductManagement: React.FC = () => {
             </select>
 
             <button
-              className={`product-controls__toggle ${state.showOnlyActive ? 'product-controls__toggle--active' : ''}`}
-              onClick={() =>setShowOnlyActive(!state.showOnlyActive)}
+              type="button"
+              className={`product-controls__toggle ${filters.showOnlyActive ? 'product-controls__toggle--active' : ''}`}
+              onClick={() => updateFilters({ showOnlyActive: !filters.showOnlyActive })}
             >
-              <AppIcon name={state.showOnlyActive ? 'check' : 'ban'} size="xs" />
+              <AppIcon name={filters.showOnlyActive ? 'check' : 'ban'} size="xs" />
               <span>Только активные</span>
             </button>
+
+            <div className="product-site-filter">
+              <span className="product-site-filter__label" id="product-site-filter-label">Сайт</span>
+              <div className="product-site-filter__options" role="group" aria-labelledby="product-site-filter-label">
+                <button
+                  type="button"
+                  className={`product-site-filter__btn ${filters.site === 'all' ? 'product-site-filter__btn--active' : ''}`}
+                  aria-pressed={filters.site === 'all'}
+                  onClick={() => updateFilters({ site: 'all' })}
+                >
+                  Все
+                </button>
+                <button
+                  type="button"
+                  className={`product-site-filter__btn ${filters.site === 'on' ? 'product-site-filter__btn--active' : ''}`}
+                  aria-pressed={filters.site === 'on'}
+                  title="В каталоге сайта: продукт включён и отмечен «На сайте»"
+                  onClick={() => updateFilters({ site: 'on' })}
+                >
+                  На сайте
+                </button>
+                <button
+                  type="button"
+                  className={`product-site-filter__btn ${filters.site === 'off' ? 'product-site-filter__btn--active' : ''}`}
+                  aria-pressed={filters.site === 'off'}
+                  title="Не в каталоге сайта: выключен или без отметки «На сайте»"
+                  onClick={() => updateFilters({ site: 'off' })}
+                >
+                  Не на сайте
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="product-quick-filters">
           <button
-            className={`product-filter-chip ${!state.selectedCategoryId ? 'product-filter-chip--active' : ''}`}
-            onClick={() =>setSelectedCategoryId(null)}
+            className={`product-filter-chip ${!filters.selectedCategoryId ? 'product-filter-chip--active' : ''}`}
+            onClick={() => updateFilters({ selectedCategoryId: null })}
           >
             <AppIcon name="package" size="xs" />
             <span>Все</span>
@@ -352,8 +362,8 @@ const ProductManagement: React.FC = () => {
             return (
               <button
                 key={cat.id}
-                className={`product-filter-chip ${state.selectedCategoryId === cat.id ? 'product-filter-chip--active' : ''}`}
-                onClick={() =>setSelectedCategoryId(cat.id)}
+                className={`product-filter-chip ${filters.selectedCategoryId === cat.id ? 'product-filter-chip--active' : ''}`}
+                onClick={() => updateFilters({ selectedCategoryId: cat.id })}
               >
                 <AppIcon name="folder" size="xs" />
                 <span>{cat.name}</span>
@@ -400,10 +410,10 @@ const ProductManagement: React.FC = () => {
                   </th>
                   <th></th>
                   <th className="sortable-header" onClick={() =>toggleSort('name')}>
-                    Название {state.sortField === 'name' && (state.sortDirection === 'asc' ? '↑' : '↓')}
+                    Название {filters.sortField === 'name' && (filters.sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="sortable-header" onClick={() =>toggleSort('category')}>
-                    Категория {state.sortField === 'category' && (state.sortDirection === 'asc' ? '↑' : '↓')}
+                    Категория {filters.sortField === 'category' && (filters.sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th>Статус</th>
                   <th title="Показывать в каталоге на сайте">На сайте</th>
@@ -474,7 +484,7 @@ const ProductManagement: React.FC = () => {
                             <AppIcon name="copy" size="xs" /> Копировать
                           </button>
                         )}
-                        <button type="button" className="lg-btn" onClick={() =>navigate(`/adminpanel/products/${product.id}/edit`)}>
+                        <button type="button" className="lg-btn" onClick={() => openProductPage(`/adminpanel/products/${product.id}/edit`)}>
                           <AppIcon name="clipboard" size="xs" /> Инфо
                         </button>
                         <button
@@ -487,10 +497,10 @@ const ProductManagement: React.FC = () => {
                           <AppIcon name="camera" size="xs" />
                           {uploadingImageProductId === product.id ? 'Загрузка…' : 'Фото'}
                         </button>
-                        <button type="button" className="lg-btn" onClick={() =>navigate(`/adminpanel/products/${product.id}/template`)}>
+                        <button type="button" className="lg-btn" onClick={() => openProductPage(`/adminpanel/products/${product.id}/template`)}>
                           <AppIcon name="edit" size="xs" /> Шаблон
                         </button>
-                        <button type="button" className="lg-btn" onClick={() =>navigate(`/adminpanel/products/${product.id}/tech-process`)}>
+                        <button type="button" className="lg-btn" onClick={() => openProductPage(`/adminpanel/products/${product.id}/tech-process`)}>
                           <AppIcon name="cog" size="xs" /> Процесс
                         </button>
                         <button

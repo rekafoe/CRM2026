@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useAdminBack } from '../../hooks/useAdminBack';
 import { Button, Alert, StatusBadge } from '../../components/common';
 import './product-edit/ProductEditPage.css';
 import { updateProduct } from '../../services/products';
@@ -32,6 +33,8 @@ interface ProductDto {
 const ProductEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const goBackToProducts = useAdminBack();
   const productId = useMemo(() => Number(id), [id]);
 
   const categories = useProductDirectoryStore((s) => s.categories);
@@ -187,7 +190,7 @@ const ProductEditPage: React.FC = () => {
       <div className="product-edit">
         <div className="product-edit__header">
           <div className="product-edit__header-left">
-            <Button variant="secondary" size="sm" onClick={() => navigate('/adminpanel/products')}>
+            <Button variant="secondary" size="sm" onClick={goBackToProducts}>
               ← К списку продуктов
             </Button>
             <div className="product-edit__title">
@@ -208,7 +211,7 @@ const ProductEditPage: React.FC = () => {
     <div className="product-edit">
       <div className="product-edit__header">
         <div className="product-edit__header-left">
-          <Button variant="secondary" size="sm" className="product-edit__back" onClick={() => navigate('/adminpanel/products')}>
+          <Button variant="secondary" size="sm" className="product-edit__back" onClick={goBackToProducts}>
             ← К списку продуктов
           </Button>
           <div className="product-edit__title">
@@ -330,7 +333,7 @@ const ProductEditPage: React.FC = () => {
         onDuplicated={async (newId) => {
           await fetchProducts(true);
           showToast('Копия продукта создана', 'success');
-          navigate(`/adminpanel/products/${newId}/template`);
+          navigate(`/adminpanel/products/${newId}/template`, { state: location.state });
         }}
       />
     </div>

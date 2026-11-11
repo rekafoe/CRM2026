@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button, Alert, Modal } from '../../components/common';
 import TrimSizeSection from './components/TrimSizeSection';
 import PriceRulesSection from './components/PriceRulesSection';
@@ -36,6 +36,7 @@ import { useUIStore } from '../../stores/uiStore';
 
 const ProductTemplatePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const parsedProductId = id ? Number(id) : NaN;
   const productId = Number.isFinite(parsedProductId) ? parsedProductId : undefined;
   const navigate = useNavigate();
@@ -205,7 +206,6 @@ const ProductTemplatePage: React.FC = () => {
     <AdminPageLayout
       title={pageTitle}
       icon={pageIcon}
-      onBack={() => navigate('/adminpanel/products')}
       className="product-template-page"
       headerExtra={(
         <TemplateHeaderExtra
@@ -673,7 +673,7 @@ const ProductTemplatePage: React.FC = () => {
         onDuplicated={async (newId) => {
           await fetchProducts(true);
           showToast('Копия продукта создана', 'success');
-          navigate(`/adminpanel/products/${newId}/template`);
+          navigate(`/adminpanel/products/${newId}/template`, { state: location.state });
         }}
       />
     </div>
