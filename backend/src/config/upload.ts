@@ -71,16 +71,52 @@ export const storage = multer.diskStorage({
   }
 })
 
+const extAllowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.tif', '.tiff', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
+
 function defaultFileFilter(_req: any, file: any, cb: (error: Error | null, acceptFile: boolean) => void): void {
   const mime = String(file?.mimetype || '').toLowerCase()
   const ext = path.extname(String(file?.originalname || '')).toLowerCase()
-  const extAllowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.tif', '.tiff', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
   const accepted = allowedUploadMimes.has(mime) && extAllowed.includes(ext)
   if (!accepted) {
     cb(new Error('Unsupported file type'), false)
     return
   }
   cb(null, true)
+}
+
+const RTF_MIME_TYPES = new Set([
+  'application/rtf',
+  'text/rtf',
+  'application/x-rtf',
+  'text/richtext',
+])
+
+/**
+ * Подтверждение поступления юрлица. Файл только хранится, платёжка из RTF не разбирается.
+ * Банк-клиент и браузеры подписывают .rtf разным MIME (application/rtf, text/rtf, octet-stream, msword),
+ * поэтому для расширения .rtf MIME не сужаем. Остальной allowlist совпадает с общим upload.
+ */
+export function isLegalPaymentConfirmationFile(originalName: unknown, mimetype: unknown): boolean {
+  const rawName = String(originalName || '')
+  const ext = path.extname(rawName).toLowerCase()
+  const trimmedExt = path.extname(rawName.trim()).toLowerCase()
+  const mime = String(mimetype || '').toLowerCase()
+  if (trimmedExt === '.rtf') return true
+  const bareMime = mime.split(';')[0].trim()
+  if (!ext && RTF_MIME_TYPES.has(bareMime)) return true
+  return allowedUploadMimes.has(mime) && extAllowed.includes(ext)
+}
+
+function legalPaymentFileFilter(_req: any, file: any, cb: (error: Error | null, acceptFile: boolean) => void): void {
+  if (isLegalPaymentConfirmationFile(file?.originalname, file?.mimetype)) {
+    cb(null, true)
+    return
+  }
+  const error: any = new Error('Подтверждение оплаты: разрешены PDF, изображения, Word, Excel и RTF')
+  error.name = 'ValidationError'
+  error.status = 400
+  error.code = 'UNSUPPORTED_FILE_TYPE'
+  cb(error, false)
 }
 
 const multerCommonOptions = {
@@ -96,6 +132,13 @@ export const upload = multer({ storage, ...multerCommonOptions })
 
 /** Multer в памяти — тело не пишется на диск до явной записи. Исправляет случай, когда файлы сохранялись 0 КБ (stream уже прочитан до multer). */
 export const uploadMemory = multer({ storage: multer.memoryStorage(), ...multerCommonOptions })
+
+/** Поступление юрлица: те же лимиты, что у uploadMemory, плюс RTF-платёжка. Чужой тип — 400, не 500. */
+export const uploadLegalPaymentFiles = multer({
+  storage: multer.memoryStorage(),
+  limits: multerCommonOptions.limits,
+  fileFilter: legalPaymentFileFilter,
+})
 
 const knowledgeBaseImageMimes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 const knowledgeBaseImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])

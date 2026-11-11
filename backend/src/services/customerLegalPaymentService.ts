@@ -1,4 +1,5 @@
 import fs from 'fs'
+import path from 'path'
 import { getDb } from '../config/database'
 import {
   legalPaymentsDir,
@@ -55,6 +56,16 @@ function displayFileName(name: string | undefined): string {
   if (!/[\u0080-\u00ff]/.test(raw)) return raw
   const decoded = Buffer.from(raw, 'latin1').toString('utf8')
   return decoded.includes('\uFFFD') ? raw : decoded
+}
+
+const RTF_BARE_MIMES = new Set(['application/rtf', 'text/rtf', 'application/x-rtf', 'text/richtext'])
+
+function confirmationFileName(name: string | undefined, mimetype: string | undefined): string {
+  const display = displayFileName(name)
+  if (path.extname(display.trim())) return display
+  const mime = String(mimetype || '').toLowerCase().split(';')[0].trim()
+  if (RTF_BARE_MIMES.has(mime)) return `${display}.rtf`
+  return display
 }
 
 export function parseLegalPaymentAmount(raw: unknown): number {
@@ -176,7 +187,7 @@ export async function createLegalPayment(input: {
   if (incoming.length === 0) throw new Error('Приложите подтверждающий документ')
 
   const stored = incoming.map((file) => {
-    const originalName = displayFileName(file.originalname)
+    const originalName = confirmationFileName(file.originalname, file.mimetype)
     const saved = saveBufferToLegalPayments(file.buffer, originalName)
     if (!saved) throw new Error('Не удалось сохранить подтверждающий документ')
     return {
