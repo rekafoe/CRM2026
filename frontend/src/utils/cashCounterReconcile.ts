@@ -7,6 +7,14 @@
  * - отклонение принтера — факт сегодня минус расчётный счётчик;
  * - ожидаемое по кассе — факт терминала за вчера (или 0) + `cash_in_today`;
  * - разница кассы — факт терминала сегодня минус это ожидаемое.
+ *
+ * Итог месяца на /adminpanel/counters не складывает уровни счётчиков:
+ * - ожидаемое по принтерам — сумма `expected_clicks`;
+ * - фактическое по принтерам — сумма (сегодня − предыдущий), если сняты оба;
+ * - ожидаемое по кассе — сумма `cash_in_today`;
+ * - фактическое по кассе — сумма (факт терминала сегодня − вчера), если введены оба;
+ * - разница — фактическое минус ожидаемое там, где факт известен.
+ * Расчётный уровень кассы и сам остаток терминала остаются на карточке дня.
  */
 
 export type PrinterReading = {
@@ -79,6 +87,203 @@ export function cashFactGap(
   const fact = Number(actual);
   if (!Number.isFinite(fact)) return null;
   return fact - expected;
+}
+
+/** Меньше копейки считаем совпадением, как на экране оператора. */
+export const CASH_GAP_EPSILON = 0.009;
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Фактические отпечатки: сегодняшний счётчик минус предыдущий.
+ * Нет одного из показаний — null, не ноль и не сам остаток счётчика.
+ */
+export function printerActualClicks(printer: PrinterReading): number | null {
+  if (printer.value == null || printer.prev_value == null) return null;
+  const current = Number(printer.value);
+  const previous = Number(printer.prev_value);
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+  return current - previous;
+}
+
+/**
+ * Фактический прирост терминала. Нет факта сегодня или вчера — null:
+ * остаток терминала не подменяет выручку дня.
+ */
+export function cashActualMove(
+  actual: number | null | undefined,
+  previous: number | null | undefined,
+): number | null {
+  if (actual == null || previous == null) return null;
+  const fact = Number(actual);
+  const prev = Number(previous);
+  if (!Number.isFinite(fact) || !Number.isFinite(prev)) return null;
+  return roundMoney(fact - prev);
+}
+
+export type MonthDayInput = {
+  printers: PrinterReading[];
+  /** `cash_in_today`. null — источник месяца его не отдал. */
+  cashInToday?: number | null;
+  cashActual?: number | null;
+  previousCashActual?: number | null;
+  departmentSelected: boolean;
+};
+
+export type MonthDayReconcile = {
+  expectedClicks: number;
+  /** Сумма (сегодня − предыдущий) по принтерам с парой показаний. Нет ни одной пары — null. */
+  actualClicks: number | null;
+  /** Клики CRM только у принтеров, которые вошли в actualClicks. */
+  printerComparedExpected: number;
+  printerGap: GapSplit;
+  cashInToday: number | null;
+  /** Прирост терминала. Нет пары фактов — null. */
+  cashActualMove: number | null;
+  /** «В кассу» только за дни, где прирост известен. */
+  cashComparedExpected: number;
+  cashGap: GapSplit;
+  /** Остаток терминала за день. В итог месяца не входит. */
+  cashActualLevel: number | null;
+  /** Вчерашний факт (или 0) + в кассу. В итог месяца не входит. */
+  expectedCashLevel: number | null;
+  /** Факт за день есть, вчерашнего нет: прирост не считаем. */
+  cashLevelWithoutMove: boolean;
+};
+
+const ZERO_GAP: GapSplit = { net: null, more: 0, less: 0, known: 0, missing: 0 };
+
+function emptyGap(epsilon = 0): GapSplit {
+  return splitSignedGaps([null], epsilon);
+}
+
+/** Один день месяца: те же клики и та же касса, что дневной экран, плюс сопоставимый факт. */
+export function reconcileMonthDay(input: MonthDayInput): MonthDayReconcile {
+  let actualClicks = 0;
+  let actualKnown = 0;
+  let printerComparedExpected = 0;
+  const printerDeltas: Array<number | null> = [];
+  for (const printer of input.printers) {
+    const clicks = expectedPrinterClicks(printer);
+    const fact = printerActualClicks(printer);
+    if (fact == null) {
+      printerDeltas.push(null);
+      continue;
+    }
+    actualKnown += 1;
+    actualClicks += fact;
+    printerComparedExpected += clicks;
+    printerDeltas.push(fact - clicks);
+  }
+
+  const cashInToday = input.cashInToday == null || !Number.isFinite(Number(input.cashInToday))
+    ? null
+    : roundMoney(Number(input.cashInToday));
+  const cashActualLevel = input.departmentSelected && input.cashActual != null
+    && Number.isFinite(Number(input.cashActual))
+    ? roundMoney(Number(input.cashActual))
+    : null;
+  const previousLevel = input.departmentSelected && input.previousCashActual != null
+    && Number.isFinite(Number(input.previousCashActual))
+    ? roundMoney(Number(input.previousCashActual))
+    : null;
+  const actualMove = input.departmentSelected
+    ? cashActualMove(cashActualLevel, previousLevel)
+    : null;
+  const cashComparedExpected = actualMove != null && cashInToday != null ? cashInToday : 0;
+  const cashGap = actualMove == null || cashInToday == null
+    ? emptyGap(CASH_GAP_EPSILON)
+    : splitSignedGaps([roundMoney(actualMove - cashInToday)], CASH_GAP_EPSILON);
+
+  return {
+    expectedClicks: sumExpectedPrinterClicks(input.printers),
+    actualClicks: actualKnown > 0 ? actualClicks : null,
+    printerComparedExpected,
+    printerGap: splitSignedGaps(printerDeltas),
+    cashInToday,
+    cashActualMove: actualMove,
+    cashComparedExpected,
+    cashGap,
+    cashActualLevel,
+    expectedCashLevel: input.departmentSelected && cashInToday != null
+      ? cashExpectedCounter(previousLevel, cashInToday)
+      : null,
+    cashLevelWithoutMove: input.departmentSelected && cashActualLevel != null && previousLevel == null,
+  };
+}
+
+export type MonthReconcileSum = {
+  expectedClicks: number;
+  actualClicks: number | null;
+  printerComparedExpected: number;
+  printerGap: GapSplit;
+  cashInToday: number | null;
+  cashActualMove: number | null;
+  cashComparedExpected: number;
+  cashGap: GapSplit;
+  cashLevelWithoutMove: number;
+};
+
+function addGap(base: GapSplit, extra: GapSplit): GapSplit {
+  const netKnown = base.net != null || extra.net != null;
+  return {
+    net: netKnown ? (base.net ?? 0) + (extra.net ?? 0) : null,
+    more: base.more + extra.more,
+    less: base.less + extra.less,
+    known: base.known + extra.known,
+    missing: base.missing + extra.missing,
+  };
+}
+
+/** Складывает клики, отпечатки, «в кассу» и прирост терминала. Уровни счётчиков не суммирует. */
+export function sumMonthReconcile(days: MonthDayReconcile[]): MonthReconcileSum {
+  let expectedClicks = 0;
+  let actualClicks = 0;
+  let sawActualClicks = false;
+  let printerComparedExpected = 0;
+  let printerGap = ZERO_GAP;
+  let cashInToday = 0;
+  let sawCashIn = false;
+  let cashActualMove = 0;
+  let sawCashMove = false;
+  let cashComparedExpected = 0;
+  let cashGap = ZERO_GAP;
+  let cashLevelWithoutMove = 0;
+
+  for (const day of days) {
+    expectedClicks += day.expectedClicks;
+    printerComparedExpected += day.printerComparedExpected;
+    if (day.actualClicks != null) {
+      actualClicks += day.actualClicks;
+      sawActualClicks = true;
+    }
+    printerGap = addGap(printerGap, day.printerGap);
+    if (day.cashInToday != null) {
+      cashInToday += day.cashInToday;
+      sawCashIn = true;
+    }
+    if (day.cashActualMove != null) {
+      cashActualMove += day.cashActualMove;
+      sawCashMove = true;
+    }
+    cashComparedExpected += day.cashComparedExpected;
+    cashGap = addGap(cashGap, day.cashGap);
+    if (day.cashLevelWithoutMove) cashLevelWithoutMove += 1;
+  }
+
+  return {
+    expectedClicks,
+    actualClicks: sawActualClicks ? actualClicks : null,
+    printerComparedExpected,
+    printerGap,
+    cashInToday: sawCashIn ? roundMoney(cashInToday) : null,
+    cashActualMove: sawCashMove ? roundMoney(cashActualMove) : null,
+    cashComparedExpected: roundMoney(cashComparedExpected),
+    cashGap,
+    cashLevelWithoutMove,
+  };
 }
 
 export function gapDirection(delta: number, epsilon = 0): GapDirection {

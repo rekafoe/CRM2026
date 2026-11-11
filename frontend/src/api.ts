@@ -1357,9 +1357,9 @@ export const submitPrinterCounter = (printerId: number, data: { counter_date: st
 export const getPrinterCountersByDate = (date: string, params?: { department_id?: number }) =>
   api.get(`/printers/counters`, { params: { date, ...params } });
 export const getPrinterCountersByMonth = (month: string, params?: { department_id?: number }) =>
-  api.get(`/printers/counters`, { params: { month, ...params } });
+  api.get(`/printers/counters`, { params: { month, ...params }, timeout: 120000 });
 export const getDailyCashByMonth = (month: string, params?: { department_id?: number }) =>
-  api.get(`/reports/daily-cash-by-month`, { params: { month, ...params } });
+  api.get(`/reports/daily-cash-by-month`, { params: { month, ...params }, timeout: 120000 });
 export const getDailySummary = (date: string) => api.get(`/reports/daily/${date}/summary`);
 
 export type CashRegisterDayPayload = {
