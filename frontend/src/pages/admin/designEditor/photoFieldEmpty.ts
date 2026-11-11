@@ -16,6 +16,7 @@ import {
 } from './photoFieldFit';
 import { copyImportStackMetadata } from './designFields/importStackOrder';
 import {
+  placePhotoFieldPathClip,
   resolvePhotoFieldFrameSceneTL,
   relayoutEmptyPhotoFieldChrome,
   resolvePhotoFieldFrameSize,
@@ -213,6 +214,8 @@ function attachPhotoFieldOutline(
     group.add(outline);
   }
   if (mask) group.clipPath = mask;
+  // group.add переводит path в координаты холста — возвращаем контур в рамку.
+  placePhotoFieldPathClip(group, frameW, frameH);
 }
 
 function resolveFieldAnchorTL(field: FabricObject): { x: number; y: number } {
