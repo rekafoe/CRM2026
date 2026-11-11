@@ -129,7 +129,7 @@ export const CustomerLegalPaymentsSection: React.FC<{ customerId: number }> = ({
       <div className="customers-legal-docs__head">
         <h5>Оплаты — кредит</h5>
         <p className="customers-legal-docs__hint">
-          Зачислите перевод юрлица и приложите платёжку или скан. Сумма уменьшает долг и попадает в акт сверки.
+          Зачислите перевод юрлица и приложите платёжку или скан (PDF, фото, Word, Excel или RTF). Сумма уменьшает долг и попадает в акт сверки.
         </p>
       </div>
       {ledger && (
@@ -218,7 +218,7 @@ export const CustomerLegalPaymentsSection: React.FC<{ customerId: number }> = ({
             key={fileKey}
             type="file"
             multiple
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.rtf,application/rtf,text/rtf"
             onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
           />
         </label>
