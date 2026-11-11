@@ -155,23 +155,24 @@
 }
 
 .pc-workplace-side .order-list .order-item.is-completed {
-  background: color-mix(in srgb, var(--pc-success) 24%, var(--pc-surface));
+  background: var(--pc-row-completed);
   color: var(--pc-text);
-  box-shadow: inset 4px 0 0 var(--pc-success);
+  box-shadow: inset 4px 0 0 var(--pc-row-completed-mark);
 }
 
 .pc-workplace-side .order-list .order-item.is-completed .order-item__number,
 .pc-workplace-side .order-list .order-item.is-completed .order-item__amount,
 .pc-workplace-side .order-list .order-item.is-completed .order-item__customer,
-.pc-workplace-side .order-list .order-item.is-completed .order-item__ready {
+.pc-workplace-side .order-list .order-item.is-completed .order-item__ready,
+.pc-workplace-side .order-list .order-item.is-completed .order-item__issued-by-me {
   color: var(--pc-text);
 }
 
 .pc-workplace-side .order-list .order-item.is-completed.active,
 .pc-workplace-side .order-list .order-list__item.is-completed.active {
-  background: color-mix(in srgb, var(--pc-success) 28%, var(--pc-row-selected));
+  background: var(--pc-row-completed-active);
   color: var(--pc-text);
-  box-shadow: inset 4px 0 0 var(--pc-success);
+  box-shadow: inset 4px 0 0 var(--pc-row-completed-mark);
 }
 
 .pc-workplace-side .order-item__amount {

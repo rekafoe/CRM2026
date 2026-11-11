@@ -11,7 +11,7 @@
 }
 
 .pp-modal {
-  background: #fff;
+  background: var(--pc-surface);
   padding: 24px;
   border-radius: 16px;
   min-width: 400px;
@@ -32,14 +32,14 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--pc-text);
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 .pp-title-icon {
-  color: #4a6a94;
+  color: var(--pc-accent-ink);
 }
 
 .pp-close {
@@ -53,7 +53,7 @@
   border-radius: var(--pc-r-control, 8px);
   font-size: 18px;
   cursor: pointer;
-  color: #4b5563;
+  color: var(--pc-muted);
   transition: all 0.2s ease;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
@@ -61,7 +61,7 @@
 .pp-close:hover {
   background: rgba(229, 231, 235, 0.95);
   border-color: rgba(255, 255, 255, 0.5);
-  color: #1f2937;
+  color: var(--pc-text);
 }
 
 .pp-field {
@@ -73,7 +73,7 @@
   margin-bottom: 8px;
   font-weight: 500;
   font-size: 14px;
-  color: #374151;
+  color: var(--pc-text);
 }
 
 .pp-input {
@@ -83,15 +83,15 @@
   border-radius: 12px;
   font-size: 15px;
   background: rgba(249, 250, 251, 0.9);
-  color: #1f2937;
+  color: var(--pc-text);
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
 
 .pp-input:focus {
   outline: none;
-  border-color: rgba(108, 142, 184, 0.6);
-  background: #fff;
+  border-color: var(--pc-accent);
+  background: var(--pc-surface);
   box-shadow: 0 0 0 3px rgba(108, 142, 184, 0.15);
 }
 
@@ -114,7 +114,7 @@
   border-radius: var(--pc-r-control, 8px);
   border: 1px solid rgba(209, 213, 219, 0.6);
   background: rgba(229, 231, 235, 0.88);
-  color: #1f2937;
+  color: var(--pc-text);
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -133,9 +133,9 @@
 }
 
 .pp-radio-option.pp-radio-selected {
-  background: rgba(184, 201, 224, 0.8);
-  border-color: rgba(255, 255, 255, 0.5);
-  color: #1f2937;
+  background: var(--pc-accent-soft);
+  border-color: var(--pc-accent);
+  color: var(--pc-accent-ink);
 }
 
 .pp-hint-offline {
@@ -161,14 +161,14 @@
 
 .pp-order-total__label {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--pc-muted);
   font-weight: 500;
 }
 
 .pp-order-total__value {
   font-size: 18px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--pc-text);
 }
 
 .pp-quick-percents {
@@ -185,7 +185,7 @@
   background: rgba(249, 250, 251, 0.95);
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--pc-text);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -196,9 +196,9 @@
 }
 
 .pp-quick-percent--active {
-  background: rgba(184, 201, 224, 0.85);
-  border-color: rgba(74, 106, 148, 0.5);
-  color: #1e3a5f;
+  background: var(--pc-accent-soft);
+  border-color: var(--pc-accent);
+  color: var(--pc-accent-ink);
 }
 
 .pp-calc-summary {
@@ -207,11 +207,11 @@
   gap: 6px;
   margin: -4px 0 16px;
   padding: 12px 16px;
-  background: rgba(236, 253, 245, 0.75);
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: var(--pc-accent-soft);
+  border: 1px solid var(--pc-border);
   border-radius: 12px;
   font-size: 14px;
-  color: #14532d;
+  color: var(--pc-accent-ink);
 }
 
 .pp-calc-summary__pct {
@@ -220,7 +220,7 @@
 
 .pp-calc-summary__debt {
   font-size: 13px;
-  color: #166534;
+  color: var(--pc-text);
 }
 
 .pp-calc-summary__muted {
@@ -250,13 +250,13 @@
 .pp-checkbox-wrap input {
   width: 18px;
   height: 18px;
-  accent-color: #4a6a94;
+  accent-color: var(--pc-accent);
   cursor: pointer;
 }
 
 .pp-checkbox-wrap span {
   font-size: 14px;
-  color: #374151;
+  color: var(--pc-text);
 }
 
 .pp-actions {
@@ -284,7 +284,7 @@
 .pp-btn-secondary {
   background: rgba(229, 231, 235, 0.88);
   border: 1px solid rgba(209, 213, 219, 0.6);
-  color: #1f2937;
+  color: var(--pc-text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
@@ -295,14 +295,14 @@
 }
 
 .pp-btn-primary {
-  background: rgba(108, 142, 184, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: #fff;
+  background: var(--pc-accent);
+  border: 1px solid var(--pc-accent);
+  color: var(--pc-on-accent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .pp-btn-primary:hover:not(:disabled) {
-  background: rgba(74, 106, 148, 0.9);
+  background: var(--pc-accent-hover);
   border-color: rgba(255, 255, 255, 0.45);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -322,17 +322,17 @@
   border: 1px solid rgba(209, 213, 219, 0.5);
   border-radius: 12px;
   font-size: 13px;
-  color: #4b5563;
+  color: var(--pc-muted);
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 
 .pp-info-icon {
-  color: #4a6a94;
+  color: var(--pc-accent-ink);
   flex-shrink: 0;
 }
 
 .pp-info strong {
-  color: #374151;
+  color: var(--pc-text);
 }

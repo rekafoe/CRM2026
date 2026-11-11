@@ -73,10 +73,14 @@
   background: var(--pc-success);
 }
 
+.pc-stamp--completed .pc-stamp__mark {
+  background: var(--pc-row-completed-mark);
+}
+
 .pc-stamp--completed {
-  background: var(--pc-success-soft);
-  border-color: color-mix(in srgb, var(--pc-success) 50%, var(--pc-border));
-  color: var(--pc-success-ink);
+  background: var(--pc-row-completed);
+  border-color: var(--pc-row-completed-mark);
+  color: var(--pc-text);
   font-weight: 700;
 }
 

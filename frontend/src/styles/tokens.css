@@ -46,6 +46,9 @@
 
   --pc-row-hover: #FAF9F6;
   --pc-row-selected: #F1F4FC;
+  --pc-row-completed: color-mix(in srgb, var(--pc-accent) 16%, var(--pc-surface));
+  --pc-row-completed-mark: var(--pc-accent);
+  --pc-row-completed-active: color-mix(in srgb, var(--pc-accent) 24%, var(--pc-row-selected));
 
   --pc-info: var(--pc-accent);
   --pc-info-ink: var(--pc-accent-ink);
@@ -129,6 +132,9 @@
 
   --pc-row-hover: #FBD4E6;
   --pc-row-selected: #F4B3D0;
+  --pc-row-completed: #FFC0CB;
+  --pc-row-completed-mark: #B5186A;
+  --pc-row-completed-active: #FF8FA2;
 
   --pc-info: #4A6890;
   --pc-info-ink: #3E5A84;
@@ -190,6 +196,9 @@
 
   --pc-row-hover: #1C2027;
   --pc-row-selected: rgba(59, 130, 246, 0.10);
+  --pc-row-completed: color-mix(in srgb, var(--pc-accent) 28%, var(--pc-surface));
+  --pc-row-completed-mark: var(--pc-accent-ink);
+  --pc-row-completed-active: color-mix(in srgb, var(--pc-accent) 40%, var(--pc-surface));
 
   --pc-overlay: rgba(0, 0, 0, 0.6);
   --pc-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
