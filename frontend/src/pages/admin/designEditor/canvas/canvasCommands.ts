@@ -10,7 +10,7 @@ import {
 } from '../photoFieldFit';
 import { createEmptyPhotoField, finalizeEmptyPhotoFieldPlacement } from '../photoFieldEmpty';
 import { resolvePhotoFieldSizeForPage } from '../photoFieldClientSizing';
-import { syncFilledPhotoFieldSceneAnchor } from '../photoFieldGeometry';
+import { realignFilledPhotoFieldToClip, syncFilledPhotoFieldSceneAnchor } from '../photoFieldGeometry';
 import { isClientAddedPhotoField } from '../designFields';
 import { readPhotoFieldClip, readPhotoFieldFillRule, readPhotoFieldShape } from '../photoFieldShape';
 import { copyImportStackMetadata } from '../designFields/importStackOrder';
@@ -137,6 +137,9 @@ async function applyImageToPhotoField(
     group.setCoords();
     syncFilledPhotoFieldSceneAnchor(group, anchorSceneTL);
     applyPhotoFieldPanToGroup(group, panX, panY, zoom);
+    // После parent.add / setXY клип и фото снова в рамке, и aCoords не протухают
+    // (иначе skipOffscreen не рисует группу — файл уже загружен, в контуре пусто).
+    realignFilledPhotoFieldToClip(group);
     parent?.setCoords();
     canvas.requestRenderAll();
   };

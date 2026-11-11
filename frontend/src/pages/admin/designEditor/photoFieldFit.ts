@@ -90,6 +90,8 @@ export {
 import {
   measureFilledPhotoFieldFrameSize,
   pickEmptyPhotoFieldFrameRect,
+  placePhotoFieldPathClip,
+  realignFilledPhotoFieldToClip,
   relayoutEmptyPhotoFieldChrome,
   resolvePhotoFieldFrameSize,
   syncEmptyPhotoFieldSceneAnchor,
@@ -280,6 +282,8 @@ export function buildFilledPhotoFieldGroup(opts: {
   if (id) g.id = id;
   if (opts.clientAdded) g.photoFieldClientAdded = true;
 
+  realignFilledPhotoFieldToClip(group);
+
   return group;
 }
 
@@ -354,6 +358,8 @@ function relayoutFilledPhotoFieldFrame(
       scaleY: 1,
       ...(shape === 'ellipse' ? { rx: frameW / 2, ry: frameH / 2 } : {}),
     });
+  } else if (clip && shape === 'path') {
+    placePhotoFieldPathClip(group, frameW, frameH);
   } else if (clip) {
     const boxW = Math.max(1, Number(o.photoFieldClipBoxW) || frameW);
     const boxH = Math.max(1, Number(o.photoFieldClipBoxH) || frameH);
@@ -584,7 +590,7 @@ export function refreshFilledPhotoFieldLayout(group: Group): void {
     Number(o.photoFieldPanY ?? 0),
     Number(o.photoFieldZoom ?? 1),
   );
-  group.setCoords();
+  realignFilledPhotoFieldToClip(group);
 }
 
 /** После loadFromJSON: пересчитать cover/contain и рамку заполненных полей. */
@@ -624,7 +630,10 @@ export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: numb
   const fitMode = resolvePhotoFieldFitMode(g);
   const innerList = group.getObjects('image');
   const inner = innerList[0] as FabricImage | undefined;
-  if (!inner) return;
+  if (!inner) {
+    realignFilledPhotoFieldToClip(group);
+    return;
+  }
   const { iw, ih } = getFabricImageIntrinsicSize(inner, g);
   const nextZoom = normalizePhotoFieldZoom(zoom ?? g.photoFieldZoom ?? 1);
   const layout = zoomPhotoFieldLayout(computePhotoFieldLayout(fitMode, fw, fh, iw, ih), nextZoom);
@@ -633,8 +642,8 @@ export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: numb
   g.photoFieldPanY = clamped.panY;
   g.photoFieldZoom = nextZoom;
   placeFitImageInPhotoFieldFrame(inner, layout, clamped.panX, clamped.panY);
-  inner.setCoords();
-  group.setCoords();
+  // group.add / parent.add могли увести bitmap и path-clip из рамки — сажаем обратно в pan.
+  realignFilledPhotoFieldToClip(group);
 }
 
 export function getFilledPhotoCropContext(field: FabricObject): {
