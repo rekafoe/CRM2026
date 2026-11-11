@@ -68,6 +68,7 @@ describe('editorProductionRenderService internals', () => {
     expect(diagnostics.unresolvedImages).toEqual([])
     expect(html).toContain('overflow:hidden')
     expect(html).toContain(`src="${transparentPng}"`)
+    expect(html).not.toContain('<svg')
     expect(html).toContain('width:200px')
     expect(html).toContain('height:120px')
   })
@@ -107,7 +108,10 @@ describe('editorProductionRenderService internals', () => {
       ],
     }
     const { html } = __editorProductionRenderInternals.buildPageHtml(fabricJSON, new Map(), 90, 50, 0)
-    expect(html).toContain("clip-path:path(evenodd, 'M 0 0 C 20 10 40 0 80 8 L 80 40 L 0 40 Z')")
+    expect(html).toContain('clip-rule="evenodd"')
+    expect(html).toContain('M 0 0 C 20 10 40 0 80 8 L 80 40 L 0 40 Z')
+    expect(html).toContain(`href="${transparentPng}"`)
+    expect(html).not.toContain('clip-path:path(')
   })
 
   it('resolves /api/uploads image URLs from the uploads folder pattern', () => {

@@ -55,6 +55,18 @@ class PhotoFieldNoopLayoutManager extends LayoutManager {
   performLayout(): void {
     // координаты и размеры детей задаём вручную (createEmptyPhotoField / legacy group / bake*InPlace)
   }
+
+  /**
+   * Конструктор LayoutManager ставит FitContentLayout, а Group.toObject
+   * не пишет strategy fit-content. После loadFromJSON modified раздувает
+   * короткую рамку букв до высоты cover — клип уезжает из видимого кадра.
+   */
+  toObject() {
+    return {
+      type: PhotoFieldNoopLayoutManager.type,
+      strategy: PhotoFieldFilledLayoutStrategy.type,
+    };
+  }
 }
 
 classRegistry.setClass(PhotoFieldFilledLayoutStrategy);
@@ -75,6 +87,8 @@ export function createPhotoFieldStaticLayoutManager(): LayoutManager {
 /** FitContentLayout Fabric 7 ломает детей при scale/resize группы — фиксируем noop-layout. */
 export function ensurePhotoFieldStaticLayout(group: Group): void {
   if (isPhotoFieldNoopLayoutManager(group)) return;
+  // Подписки fit-content висят на детях и не смотрят на group.layoutManager.
+  group.layoutManager?.dispose();
   group.layoutManager = createPhotoFieldStaticLayoutManager();
 }
 
