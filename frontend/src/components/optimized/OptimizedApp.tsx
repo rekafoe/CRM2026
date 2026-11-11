@@ -642,6 +642,12 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         initialProductId={calculatorContext.initialProductId}
         editContext={calculatorEditContext}
         onSubmitExisting={calculatorContext.mode === 'edit' ? orderHandlers.handleReplaceOrderItem : undefined}
+        orderId={calculatorEditContext?.orderId ?? selectedId}
+        orderItems={
+          (calculatorEditContext?.orderId
+            ? orders.find((order) => order.id === calculatorEditContext.orderId)?.items
+            : selectedOrder?.items)
+        }
       />
 
       {/* Настройки калькулятора - теперь это страница, а не модальное окно */}
