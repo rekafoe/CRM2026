@@ -3559,3 +3559,94 @@
     grid-column: auto;
   }
 }
+
+/* Пудра и Deep Ink: поверхности и кнопки модалки продукта с токенов темы.
+   На #FFC0CB текст тёмный (--pc-on-accent). Deep Ink остаётся своим синим, не розовым. */
+:root[data-theme='powder'] :is(
+  .improved-printing-calculator,
+  .calculator-subtotal-bar,
+  .product-selection-content,
+  .dynamic-product-selector,
+  .presets-modal,
+  .form-section,
+  .calculator-section-group,
+  .product-card,
+  .product-selection-card,
+  .material-cost-info
+),
+:root[data-theme='dark'] :is(
+  .improved-printing-calculator,
+  .calculator-subtotal-bar,
+  .product-selection-content,
+  .dynamic-product-selector,
+  .presets-modal,
+  .form-section,
+  .calculator-section-group,
+  .product-card,
+  .product-selection-card,
+  .material-cost-info
+) {
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  border-color: var(--pc-border);
+}
+
+:root[data-theme='powder'] :is(.calculator-header, .presets-header, .selector-header, .section-group-header),
+:root[data-theme='dark'] :is(.calculator-header, .presets-header, .selector-header, .section-group-header) {
+  background: var(--pc-surface-subtle);
+  color: var(--pc-text);
+  border-color: var(--pc-border);
+}
+
+:root[data-theme='powder'] :is(.calculator-header h2, .presets-header h3, .selector-header h2, .section-group-header h3, .param-group label, .selected-product-card .product-name, .filter-section h3, .products-header h3),
+:root[data-theme='dark'] :is(.calculator-header h2, .presets-header h3, .selector-header h2, .section-group-header h3, .param-group label, .selected-product-card .product-name, .filter-section h3, .products-header h3) {
+  color: var(--pc-text);
+  text-shadow: none;
+}
+
+:root[data-theme='powder'] :is(.close-btn, .calculator-close-button),
+:root[data-theme='dark'] :is(.close-btn, .calculator-close-button) {
+  background: var(--pc-surface-subtle);
+  color: var(--pc-text);
+}
+
+:root[data-theme='powder'] :is(.form-control, .search-input, .quantity-input),
+:root[data-theme='dark'] :is(.form-control, .search-input, .quantity-input) {
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  border-color: var(--pc-border);
+}
+
+:root[data-theme='powder'] :is(.quantity-btn, .material-usage-context__options button.is-active, .category-button.active, .action-button.primary, .calculator-product-types__tab--active),
+:root[data-theme='dark'] :is(.quantity-btn, .material-usage-context__options button.is-active, .category-button.active, .action-button.primary, .calculator-product-types__tab--active) {
+  background: var(--pc-accent);
+  background-image: none;
+  color: var(--pc-on-accent);
+  border-color: var(--pc-accent);
+}
+
+:root[data-theme='powder'] .quantity-btn:hover,
+:root[data-theme='dark'] .quantity-btn:hover,
+:root[data-theme='powder'] .category-button.active:hover,
+:root[data-theme='dark'] .category-button.active:hover,
+:root[data-theme='powder'] .action-button.primary:hover,
+:root[data-theme='dark'] .action-button.primary:hover {
+  background: var(--pc-accent-hover);
+  color: var(--pc-on-accent);
+}
+
+:root[data-theme='powder'] .product-card.selected,
+:root[data-theme='dark'] .product-card.selected,
+:root[data-theme='powder'] .selected-product-card,
+:root[data-theme='dark'] .selected-product-card {
+  background: var(--pc-accent-soft);
+  border-color: var(--pc-accent);
+  color: var(--pc-text);
+}
+
+:root[data-theme='powder'] .btn-outline:hover,
+:root[data-theme='dark'] .btn-outline:hover {
+  background: var(--pc-accent);
+  color: var(--pc-on-accent);
+  border-color: var(--pc-accent);
+}

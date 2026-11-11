@@ -18,8 +18,8 @@
   height: min(88vh, 820px);
   max-height: 88vh;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border, #e2e8f0);
   border-radius: 16px;
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
 }
@@ -54,8 +54,8 @@
   height: 34px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--pc-surface-subtle);
+  color: var(--pc-text);
   cursor: pointer;
 }
 
@@ -114,8 +114,8 @@
   padding: 6px 28px 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #fff;
-  color: #0f172a;
+  background: var(--pc-surface);
+  color: var(--pc-text);
   font-size: 13px;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -144,19 +144,19 @@
 }
 
 .fm-btn--primary {
-  color: #fff;
-  background: #2563eb;
-  border-color: #1d4ed8;
+  color: var(--pc-on-accent);
+  background: var(--pc-accent);
+  border-color: var(--pc-accent);
 }
 
 .fm-btn--secondary {
-  color: #fff;
-  background: #64748b;
-  border-color: #475569;
+  color: var(--pc-text);
+  background: var(--pc-surface-subtle);
+  border-color: var(--pc-border);
 }
 
 .fm-btn--ghost {
-  color: #1d4ed8;
+  color: var(--pc-accent-ink);
   background: #eff6ff;
   border-color: #bfdbfe;
 }
@@ -306,12 +306,12 @@
   padding: 10px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  background: #fff;
+  background: var(--pc-surface);
 }
 
 .fm-file--approved {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+  border-color: var(--pc-border-strong);
+  background: var(--pc-accent-soft);
 }
 
 .fm-file__main {
@@ -325,7 +325,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #0f172a;
+  color: var(--pc-text);
   font: inherit;
   font-size: 14px;
   font-weight: 600;
@@ -427,7 +427,7 @@
 
 .fm-icon-btn:hover:not(:disabled) {
   background: #e2e8f0;
-  color: #0f172a;
+  color: var(--pc-text);
 }
 
 .fm-icon-btn:disabled {
@@ -460,7 +460,7 @@
 }
 
 .fm-empty strong {
-  color: #0f172a;
+  color: var(--pc-text);
   font-size: 15px;
 }
 

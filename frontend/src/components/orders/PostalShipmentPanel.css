@@ -64,11 +64,12 @@
 .postal-shipment__form input,
 .postal-shipment__form select,
 .postal-shipment__row-actions input {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--pc-border);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 13px;
-  background: #fff;
+  background: var(--pc-surface);
+  color: var(--pc-text);
 }
 
 .postal-shipment__form > button,
@@ -76,8 +77,8 @@
   border: 0;
   border-radius: 6px;
   padding: 8px 10px;
-  background: #1e293b;
-  color: #fff;
+  background: var(--pc-accent);
+  color: var(--pc-on-accent);
   cursor: pointer;
   font-size: 13px;
 }

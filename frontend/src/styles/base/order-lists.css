@@ -170,8 +170,8 @@
 }
 
 .order-status.completed {
-  background: #e8f5e8;
-  color: #2e7d32;
+  background: var(--pc-row-completed);
+  color: var(--pc-text);
 }
 
 .order-status.cancelled {

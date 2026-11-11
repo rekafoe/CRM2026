@@ -156,9 +156,9 @@
   letter-spacing: 0.02em;
   height: 44px;
   border-radius: var(--pc-r-control, 8px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: #4a6a94;
-  color: #fff;
+  border: 1px solid var(--pc-accent);
+  background: var(--pc-accent);
+  color: var(--pc-on-accent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   display: flex;

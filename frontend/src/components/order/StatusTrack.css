@@ -56,11 +56,11 @@
 
 .pc-track__step.is-completed.is-current .pc-track__mark,
 .pc-track__step.is-completed.is-done .pc-track__mark {
-  background: var(--pc-success);
+  background: var(--pc-row-completed-mark);
 }
 
 .pc-track__step.is-completed.is-current .pc-track__name {
-  color: var(--pc-success-ink);
+  color: var(--pc-accent-ink);
   font-weight: 700;
 }
 

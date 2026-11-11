@@ -101,9 +101,9 @@
 }
 
 .filter-btn.active {
-  background: var(--accent-color);
-  color: white;
-  border-color: var(--accent-color);
+  background: var(--pc-accent);
+  color: var(--pc-on-accent);
+  border-color: var(--pc-accent);
 }
 
 /* Content */

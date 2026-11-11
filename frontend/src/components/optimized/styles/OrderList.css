@@ -40,9 +40,9 @@
 }
 
 .order-list .order-item.is-completed {
-  background: color-mix(in srgb, var(--pc-success, #15803d) 22%, var(--pc-surface, #fff));
+  background: var(--pc-row-completed);
   color: var(--pc-text, #141619);
-  box-shadow: inset 4px 0 0 var(--pc-success, #15803d);
+  box-shadow: inset 4px 0 0 var(--pc-row-completed-mark);
 }
 
 .order-list .order-item.is-completed .order-item__number,
@@ -52,8 +52,8 @@
 }
 
 .order-list .order-item.is-completed.active {
-  background: color-mix(in srgb, var(--pc-success, #15803d) 20%, var(--pc-row-selected, #f0f7ff));
-  border-color: var(--pc-success, #15803d);
+  background: var(--pc-row-completed-active);
+  border-color: var(--pc-row-completed-mark);
   color: var(--pc-text, #141619);
 }
 
@@ -84,7 +84,7 @@
 
 .order-item__amount {
   font-weight: 600;
-  color: #2e7d32;
+  color: var(--pc-text, #141619);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -162,7 +162,7 @@
 
 .order-item__issued-by-me {
   font-size: 11px;
-  color: #2e7d32;
+  color: var(--pc-muted, #5c626c);
   margin-top: 2px;
 }
 
