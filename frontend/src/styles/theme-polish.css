@@ -26,14 +26,14 @@
 :root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(.pc-btn--quiet):not(.pc-btn--soft):not(.pc-btn--attention):not(:disabled),
 :root[data-theme='powder'] .pc-workplace-pool:not(:disabled) {
   border-color: #E09AB8;
-  color: var(--pc-accent);
+  color: var(--pc-accent-ink);
 }
 
 :root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(.pc-btn--quiet):not(.pc-btn--soft):not(.pc-btn--attention):not(:disabled):hover,
 :root[data-theme='powder'] .pc-workplace-pool:not(:disabled):hover {
   background: var(--pc-accent-soft);
   border-color: var(--pc-accent);
-  color: var(--pc-accent);
+  color: var(--pc-accent-ink);
 }
 
 :root[data-theme='powder'] .pc-btn--quiet:not(:disabled),

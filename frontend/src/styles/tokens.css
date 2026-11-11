@@ -104,11 +104,11 @@
   --pc-border-strong: #E0B3C6;
   --pc-border-control: #8F7F86;
 
-  --pc-accent: #B5186A;
-  --pc-accent-hover: #9C1459;
+  --pc-accent: #FFC0CB;
+  --pc-accent-hover: #FF8FA2;
   --pc-accent-soft: #F8C8DE;
   --pc-accent-ink: #B5186A;
-  --pc-on-accent: #FFFFFF;
+  --pc-on-accent: #1E191B;
   --pc-accent-alt: #C24A78;
 
   --pc-accent-warm: #7A3718;
@@ -137,15 +137,15 @@
   --pc-row-expanded: #F6C0D8;
   --pc-list-selected: #F4B3D0;
   --pc-nav-active: #B5186A;
-  --pc-counter-bg: #B5186A;
-  --pc-on-counter: #FFFFFF;
+  --pc-counter-bg: #FFC0CB;
+  --pc-on-counter: #1E191B;
   --pc-badge-quiet-bg: #F8C8DE;
   --pc-badge-quiet-ink: #B5186A;
-  --pc-dot: #B5186A;
+  --pc-dot: #FFC0CB;
   --pc-control-checked: #B5186A;
   --pc-control-checked-soft: #F8C8DE;
   --pc-focus-ring: #B5186A;
-  --pc-mark: #B5186A;
+  --pc-mark: #FFC0CB;
   --pc-mark-ink: #B5186A;
   --pc-divider-accent: #E7A9C4;
   --pc-danger-border: #B98A73;
