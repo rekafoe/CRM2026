@@ -1573,7 +1573,9 @@ router.post('/:id/send-payment-link', asyncHandler(async (req, res) => {
     recreate?: boolean
   }
   const channel = body.channel ?? 'none'
-  const total = Number(order.totalAmount ?? 0)
+  // В таблице orders нет колонки totalAmount — итог только через позиции и discount_percent.
+  // SELECT * даёт total=0 → remainder=0 → любая доплата по bank/paid ложно «превышает остаток».
+  const total = (await OrderService.getOrderAmountsById(id)).totalAmount
   const existingPrepay = Number(order.prepaymentAmount ?? 0)
   const statusLower = String(order.prepaymentStatus ?? '').toLowerCase()
   // paid/successful — уже получено; bank — подтверждённая платёжка по счёту (не BePaid).
