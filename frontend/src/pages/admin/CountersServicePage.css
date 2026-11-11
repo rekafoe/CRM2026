@@ -564,6 +564,19 @@
   color: var(--pc-muted);
 }
 
+.cnt-page--cash .cnt-month-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.cnt-page--cash .cnt-day-card__value {
+  color: var(--pc-text);
+  text-align: right;
+}
+
+.cnt-page--cash .cnt-day-card .cnt-reconcile__sides {
+  margin-top: 4px;
+}
+
 .cnt-page--cash .cnt-stat-card,
 .cnt-page--cash .cnt-card,
 .cnt-page--cash .cnt-day-card,

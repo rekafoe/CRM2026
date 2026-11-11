@@ -92,6 +92,104 @@ export const GAP_DIRECTION_LABEL: Record<GapDirection, string> = {
   even: 'совпадает',
 };
 
+/** Меньше копейки считаем совпадением, как на экране оператора. */
+export const CASH_GAP_EPSILON = 0.009;
+
+export type MonthDayInput = {
+  printers: PrinterReading[];
+  cashInToday?: number | null;
+  cashActual?: number | null;
+  previousCashActual?: number | null;
+  departmentSelected: boolean;
+};
+
+export type MonthDayReconcile = {
+  expectedClicks: number;
+  /** Деньги в кассу из CRM за этот день (`cash_in_today`). */
+  cashInToday: number;
+  /** Расчётный счётчик: факт вчера (или 0) + cashInToday. По точке. Без точки равен cashInToday. */
+  expectedCash: number;
+  printerGap: GapSplit;
+  cashGap: GapSplit;
+};
+
+/** Один день месяца теми же формулами, что дневной экран. */
+export function reconcileMonthDay(input: MonthDayInput): MonthDayReconcile {
+  const cashInToday = finiteOr(input.cashInToday, 0);
+  const expectedClicks = sumExpectedPrinterClicks(input.printers);
+  const printerGap = splitSignedGaps(input.printers.map((printer) => printerFactGap(printer)));
+  const expectedCash = input.departmentSelected
+    ? cashExpectedCounter(input.previousCashActual, cashInToday)
+    : cashInToday;
+  const cashGap = input.departmentSelected
+    ? splitSignedGaps([cashFactGap(input.cashActual, expectedCash)], CASH_GAP_EPSILON)
+    : splitSignedGaps([null], CASH_GAP_EPSILON);
+  return { expectedClicks, cashInToday, expectedCash, printerGap, cashGap };
+}
+
+/** Складывает дневные клики, в кассу из CRM и отклонения. Расчётные счётчики кассы не суммирует. */
+export function sumMonthReconcile(days: MonthDayReconcile[]): {
+  expectedClicks: number;
+  cashInToday: number;
+  printerGap: GapSplit;
+  cashGap: GapSplit;
+} {
+  let expectedClicks = 0;
+  let cashInToday = 0;
+  let printerNet = 0;
+  let printerMore = 0;
+  let printerLess = 0;
+  let printerKnown = 0;
+  let printerMissing = 0;
+  let printerAny = false;
+  let cashNet = 0;
+  let cashMore = 0;
+  let cashLess = 0;
+  let cashKnown = 0;
+  let cashMissing = 0;
+  let cashAny = false;
+
+  for (const day of days) {
+    expectedClicks += day.expectedClicks;
+    cashInToday += day.cashInToday;
+    printerMissing += day.printerGap.missing;
+    printerKnown += day.printerGap.known;
+    printerMore += day.printerGap.more;
+    printerLess += day.printerGap.less;
+    if (day.printerGap.net != null) {
+      printerNet += day.printerGap.net;
+      printerAny = true;
+    }
+    cashMissing += day.cashGap.missing;
+    cashKnown += day.cashGap.known;
+    cashMore += day.cashGap.more;
+    cashLess += day.cashGap.less;
+    if (day.cashGap.net != null) {
+      cashNet += day.cashGap.net;
+      cashAny = true;
+    }
+  }
+
+  return {
+    expectedClicks,
+    cashInToday,
+    printerGap: {
+      net: printerAny ? printerNet : null,
+      more: printerMore,
+      less: printerLess,
+      known: printerKnown,
+      missing: printerMissing,
+    },
+    cashGap: {
+      net: cashAny ? cashNet : null,
+      more: cashMore,
+      less: cashLess,
+      known: cashKnown,
+      missing: cashMissing,
+    },
+  };
+}
+
 /** Раскладывает отклонения на «в большую» и «в меньшую», не подменяя пустой факт нулём. */
 export function splitSignedGaps(deltas: Array<number | null>, epsilon = 0): GapSplit {
   let net = 0;

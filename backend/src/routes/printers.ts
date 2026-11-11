@@ -385,9 +385,19 @@ router.get('/counters', asyncHandler(async (req, res) => {
         dateStr,
         ...deptParams
       )
+      const clickDepartmentId =
+        departmentId === 'empty' || departmentId == null ? undefined : Number(departmentId)
+      const expectedClicks =
+        departmentId === 'empty'
+          ? {}
+          : await loadPrinterExpectedClicksForDay(
+              dateStr,
+              Number.isFinite(clickDepartmentId) ? clickDepartmentId : undefined,
+            )
       byDate[dateStr] = rows.map((r: any) => ({
         ...r,
         difference: r.value != null && r.prev_value != null ? r.value - r.prev_value : null,
+        expected_clicks: Number(expectedClicks[Number(r.id)] ?? 0),
       }))
     }
     res.json({ month, dates: Object.keys(byDate).sort(), byDate })

@@ -6,15 +6,19 @@ import { getPrinterCountersByDate, getPrinterCountersByMonth, getDailyCashByMont
 import { addCalendarDaysLocal, todayCalendarLocal } from '../../utils/numberInput';
 import {
   GAP_DIRECTION_LABEL,
+  CASH_GAP_EPSILON,
   cashExpectedCounter,
   cashFactGap,
   expectedPrinterClicks,
   gapDirection,
   parseCashActual,
   printerFactGap,
+  reconcileMonthDay,
   splitSignedGaps,
   sumExpectedPrinterClicks,
+  sumMonthReconcile,
   type GapSplit,
+  type MonthDayReconcile,
 } from '../../utils/cashCounterReconcile';
 import './CountersServicePage.css';
 
@@ -30,8 +34,6 @@ interface PrinterCounter {
   expected_clicks?: number | null;
 }
 
-const CASH_GAP_EPSILON = 0.009;
-
 interface CashContribution {
   user_id: number;
   user_name?: string;
@@ -40,8 +42,7 @@ interface CashContribution {
 
 interface DayCardData {
   date: string;
-  printerDiff: number;
-  cash: number;
+  reconcile: MonthDayReconcile;
 }
 
 function formatClickCount(value: number, signed = false): string {
@@ -66,6 +67,98 @@ function GapChip({
       {children}
       <span className="cnt-gap__word">{GAP_DIRECTION_LABEL[direction]}</span>
     </span>
+  );
+}
+
+function ReconcileSection({
+  loading,
+  ariaLabel,
+  expectedClicks,
+  clicksHint,
+  expectedCash,
+  cashHint,
+  cashMeta,
+  printerGap,
+  printerHint,
+  cashGap,
+  cashGapHint,
+}: {
+  loading: boolean;
+  ariaLabel: string;
+  expectedClicks: number;
+  clicksHint: string;
+  expectedCash: number;
+  cashHint: string;
+  cashMeta?: React.ReactNode;
+  printerGap: GapSplit;
+  printerHint: string;
+  cashGap: GapSplit;
+  cashGapHint: string;
+}) {
+  return (
+    <section className="cnt-reconcile" aria-label={ariaLabel}>
+      <article className="cnt-reconcile__card">
+        <div className="cnt-reconcile__label">Ожидаемое по принтерам</div>
+        <div className="cnt-reconcile__value">
+          {loading ? '—' : (
+            <>
+              {formatClickCount(expectedClicks)}
+              <span className="cnt-reconcile__unit"> клик.</span>
+            </>
+          )}
+        </div>
+        <p className="cnt-reconcile__hint">{clicksHint}</p>
+      </article>
+      <article className="cnt-reconcile__card">
+        <div className="cnt-reconcile__label">Ожидаемое по кассе</div>
+        <div className="cnt-reconcile__value">
+          {loading ? '—' : <MoneyAmount value={expectedCash} />}
+        </div>
+        <p className="cnt-reconcile__hint">{cashHint}</p>
+        {!loading && cashMeta ? <div className="cnt-reconcile__meta">{cashMeta}</div> : null}
+      </article>
+      <article className="cnt-reconcile__card">
+        <div className="cnt-reconcile__label">Разница, факт − ожидаемое</div>
+        {loading ? (
+          <div className="cnt-reconcile__value">—</div>
+        ) : (
+          <>
+            <div className="cnt-reconcile__block">
+              <div className="cnt-reconcile__line">
+                <span className="cnt-reconcile__line-name">Принтеры</span>
+                {printerGap.net == null ? (
+                  <span className="cnt-reconcile__missing">{printerHint}</span>
+                ) : (
+                  <GapChip delta={printerGap.net} epsilon={0}>
+                    {formatClickCount(printerGap.net, true)}
+                  </GapChip>
+                )}
+              </div>
+              <GapSides split={printerGap} epsilon={0} render={(value) => formatClickCount(value)} />
+              {printerGap.net != null && <p className="cnt-reconcile__hint">{printerHint}</p>}
+            </div>
+            <div className="cnt-reconcile__block">
+              <div className="cnt-reconcile__line">
+                <span className="cnt-reconcile__line-name">Касса</span>
+                {cashGap.net == null ? (
+                  <span className="cnt-reconcile__missing">{cashGapHint}</span>
+                ) : (
+                  <GapChip delta={cashGap.net} epsilon={CASH_GAP_EPSILON}>
+                    <MoneyAmount value={cashGap.net} signed />
+                  </GapChip>
+                )}
+              </div>
+              <GapSides
+                split={cashGap}
+                epsilon={CASH_GAP_EPSILON}
+                render={(value) => <MoneyAmount value={value} />}
+              />
+              {cashGap.net != null && <p className="cnt-reconcile__hint">{cashGapHint}</p>}
+            </div>
+          </>
+        )}
+      </article>
+    </section>
   );
 }
 
@@ -185,17 +278,33 @@ export const CountersServicePage: React.FC = () => {
       ]);
 
       const countersData = countersRes.data as { month?: string; dates?: string[]; byDate?: Record<string, any[]> };
-      const cashData = cashRes.data as { month?: string; byDate?: Record<string, { total: number }> };
+      const cashData = cashRes.data as {
+        cash_in_today_by_date?: Record<string, number>;
+        cash_actual_by_date?: Record<string, number | null>;
+      };
+      const cashInByDate = cashData?.cash_in_today_by_date;
+      if (!cashInByDate || typeof cashInByDate !== 'object') {
+        throw new Error('Нет дневных сумм кассы из CRM за месяц');
+      }
+      const actualByDate = cashData?.cash_actual_by_date ?? {};
+      const departmentSelected = selectedDepartmentId != null;
 
       const dates = countersData?.dates ?? [];
       const byDate = countersData?.byDate ?? {};
-      const cashByDate = cashData?.byDate ?? {};
 
       const cards: DayCardData[] = dates.map((date) => {
-        const printers = byDate[date] ?? [];
-        const printerDiff = printers.reduce((s: number, p: any) => s + (p.difference ?? 0), 0);
-        const cash = cashByDate[date]?.total ?? 0;
-        return { date, printerDiff, cash };
+        const printers = Array.isArray(byDate[date]) ? byDate[date] : [];
+        const previousDate = addCalendarDaysLocal(date, -1);
+        return {
+          date,
+          reconcile: reconcileMonthDay({
+            printers,
+            cashInToday: cashInByDate[date],
+            cashActual: departmentSelected ? parseCashActual(actualByDate[date]) : null,
+            previousCashActual: departmentSelected ? parseCashActual(actualByDate[previousDate]) : null,
+            departmentSelected,
+          }),
+        };
       });
 
       setMonthData(cards);
@@ -255,6 +364,29 @@ export const CountersServicePage: React.FC = () => {
     : cashActual == null
       ? 'Факт терминала не введён'
       : 'Факт терминала минус ожидаемое по кассе';
+
+  const monthSummary = useMemo(
+    () => sumMonthReconcile(monthData.map((card) => card.reconcile)),
+    [monthData],
+  );
+
+  const monthPrinterHint = monthSummary.printerGap.net == null
+    ? 'Факт счётчика не снят ни в один день'
+    : monthSummary.printerGap.missing > 0
+      ? `Сумма дней со снятым счётчиком. Без факта: ${monthSummary.printerGap.missing}`
+      : 'Сумма дневных отклонений: факт сегодня − (вчера или 0 + клики CRM)';
+
+  const monthCashGapHint = selectedDepartmentId == null
+    ? 'Выберите точку: факт терминала хранится по точке'
+    : monthSummary.cashGap.net == null
+      ? 'Факт терминала не введён ни в один день'
+      : monthSummary.cashGap.missing > 0
+        ? `Сумма дней с фактом терминала. Без факта: ${monthSummary.cashGap.missing}`
+        : 'Сумма дневных разниц: факт терминала − расчётный счётчик';
+
+  const monthCashHint = selectedDepartmentId == null
+    ? 'Сумма «в кассу за день» из CRM по всем точкам. Расчётный счётчик на карточке дня считается только у выбранной точки.'
+    : 'Сумма «в кассу за день» из CRM. Расчётный счётчик (факт вчера + этот день) на карточке дня за месяц не складывается.';
 
   const expectedCashHint = selectedDepartmentId == null
     ? 'В кассу за день из CRM по всем точкам. Факт вчера считается только у выбранной точки.'
@@ -331,29 +463,75 @@ export const CountersServicePage: React.FC = () => {
         <div className="cnt-month-section">
           <h3 className="cnt-month-section__title">Счётчики по дням месяца</h3>
           <p className="cnt-month-section__note">
-            Ожидаемое из CRM и разница с фактом — в режиме «День». За месяц здесь только факт принтеров и сумма в кассу.
+            Итог — сумма тех же дневных расчётов. Расчётный счётчик кассы на карточке дня за месяц не складывается.
           </p>
+          {!error && <ReconcileSection
+            loading={loading}
+            ariaLabel="Сверка факта с ожидаемым из CRM за месяц"
+            expectedClicks={monthSummary.expectedClicks}
+            clicksHint="Сумма кликов заказов CRM по дням месяца, без статуса «Ожидает»"
+            expectedCash={monthSummary.cashInToday}
+            cashHint={monthCashHint}
+            cashMeta="На карточках дней «Ожид. касса» — расчётный счётчик (факт вчера + в кассу). В этот итог входит только «В кассу CRM»."
+            printerGap={monthSummary.printerGap}
+            printerHint={monthPrinterHint}
+            cashGap={monthSummary.cashGap}
+            cashGapHint={monthCashGapHint}
+          />}
           {loading ? (
             <div className="cnt-month-loading">Загрузка...</div>
           ) : (
             <div className="cnt-month-grid">
-              {monthData.map((card) => (
-                <div key={card.date} className="cnt-day-card">
-                  <div className="cnt-day-card__date">{card.date}</div>
-                  <div className="cnt-day-card__row">
-                    <span className="cnt-day-card__label">Принтеры</span>
-                    <span className="cnt-day-card__value cnt-day-card__value--print">
-                      {card.printerDiff > 0 ? `+${card.printerDiff}` : card.printerDiff}
-                    </span>
+              {monthData.map((card) => {
+                const day = card.reconcile;
+                return (
+                  <div key={card.date} className="cnt-day-card">
+                    <div className="cnt-day-card__date">{card.date}</div>
+                    <div className="cnt-day-card__row">
+                      <span className="cnt-day-card__label">Ожид. принтеры</span>
+                      <span className="cnt-day-card__value">{formatClickCount(day.expectedClicks)}</span>
+                    </div>
+                    <div className="cnt-day-card__row">
+                      <span className="cnt-day-card__label">В кассу CRM</span>
+                      <span className="cnt-day-card__value"><MoneyAmount value={day.cashInToday} /></span>
+                    </div>
+                    <div className="cnt-day-card__row">
+                      <span className="cnt-day-card__label">Ожид. касса</span>
+                      <span className="cnt-day-card__value"><MoneyAmount value={day.expectedCash} /></span>
+                    </div>
+                    <div className="cnt-day-card__row">
+                      <span className="cnt-day-card__label">Разница принт.</span>
+                      {day.printerGap.net == null ? (
+                        <span className="cnt-day-card__value">—</span>
+                      ) : (
+                        <GapChip delta={day.printerGap.net} epsilon={0}>
+                          {formatClickCount(day.printerGap.net, true)}
+                        </GapChip>
+                      )}
+                    </div>
+                    {day.printerGap.net != null && (
+                      <GapSides split={day.printerGap} epsilon={0} render={(value) => formatClickCount(value)} />
+                    )}
+                    <div className="cnt-day-card__row">
+                      <span className="cnt-day-card__label">Разница касса</span>
+                      {day.cashGap.net == null ? (
+                        <span className="cnt-day-card__value">—</span>
+                      ) : (
+                        <GapChip delta={day.cashGap.net} epsilon={CASH_GAP_EPSILON}>
+                          <MoneyAmount value={day.cashGap.net} signed />
+                        </GapChip>
+                      )}
+                    </div>
+                    {day.cashGap.net != null && (
+                      <GapSides
+                        split={day.cashGap}
+                        epsilon={CASH_GAP_EPSILON}
+                        render={(value) => <MoneyAmount value={value} />}
+                      />
+                    )}
                   </div>
-                  <div className="cnt-day-card__row">
-                    <span className="cnt-day-card__label">Касса</span>
-                    <span className="cnt-day-card__value cnt-day-card__value--cash">
-                      <MoneyAmount value={card.cash} decimals={0} />
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -397,83 +575,29 @@ export const CountersServicePage: React.FC = () => {
         </div>
       </div>
 
-      <section className="cnt-reconcile" aria-label="Сверка факта с ожидаемым из CRM">
-        <article className="cnt-reconcile__card">
-          <div className="cnt-reconcile__label">Ожидаемое по принтерам</div>
-          <div className="cnt-reconcile__value">
-            {loading ? '—' : (
+      <ReconcileSection
+        loading={loading}
+        ariaLabel="Сверка факта с ожидаемым из CRM"
+        expectedClicks={expectedPrinterClicksTotal}
+        clicksHint="Клики заказов CRM за день, без статуса «Ожидает»"
+        expectedCash={expectedCash}
+        cashHint={expectedCashHint}
+        cashMeta={(
+          <>
+            В кассу из CRM: <MoneyAmount value={cashTotal} />
+            {selectedDepartmentId != null && (
               <>
-                {formatClickCount(expectedPrinterClicksTotal)}
-                <span className="cnt-reconcile__unit"> клик.</span>
+                {' '}· факт вчера:{' '}
+                {previousCashActual == null ? 'не введён' : <MoneyAmount value={previousCashActual} />}
               </>
             )}
-          </div>
-          <p className="cnt-reconcile__hint">Клики заказов CRM за день, без статуса «Ожидает»</p>
-        </article>
-        <article className="cnt-reconcile__card">
-          <div className="cnt-reconcile__label">Ожидаемое по кассе</div>
-          <div className="cnt-reconcile__value">
-            {loading ? '—' : <MoneyAmount value={expectedCash} />}
-          </div>
-          <p className="cnt-reconcile__hint">{expectedCashHint}</p>
-          {!loading && (
-            <p className="cnt-reconcile__meta">
-              В кассу из CRM: <MoneyAmount value={cashTotal} />
-              {selectedDepartmentId != null && (
-                <>
-                  {' '}· факт вчера:{' '}
-                  {previousCashActual == null ? 'не введён' : <MoneyAmount value={previousCashActual} />}
-                </>
-              )}
-            </p>
-          )}
-        </article>
-        <article className="cnt-reconcile__card">
-          <div className="cnt-reconcile__label">Разница, факт − ожидаемое</div>
-          {loading ? (
-            <div className="cnt-reconcile__value">—</div>
-          ) : (
-            <>
-              <div className="cnt-reconcile__block">
-                <div className="cnt-reconcile__line">
-                  <span className="cnt-reconcile__line-name">Принтеры</span>
-                  {printerGap.net == null ? (
-                    <span className="cnt-reconcile__missing">{printerGapHint}</span>
-                  ) : (
-                    <GapChip delta={printerGap.net} epsilon={0}>
-                      {formatClickCount(printerGap.net, true)}
-                    </GapChip>
-                  )}
-                </div>
-                <GapSides split={printerGap} epsilon={0} render={(value) => formatClickCount(value)} />
-                {printerGap.net != null && (
-                  <p className="cnt-reconcile__hint">{printerGapHint}</p>
-                )}
-              </div>
-              <div className="cnt-reconcile__block">
-                <div className="cnt-reconcile__line">
-                  <span className="cnt-reconcile__line-name">Касса</span>
-                  {cashGap.net == null ? (
-                    <span className="cnt-reconcile__missing">{cashGapHint}</span>
-                  ) : (
-                    <GapChip delta={cashGap.net} epsilon={CASH_GAP_EPSILON}>
-                      <MoneyAmount value={cashGap.net} signed />
-                    </GapChip>
-                  )}
-                </div>
-                <GapSides
-                  split={cashGap}
-                  epsilon={CASH_GAP_EPSILON}
-                  render={(value) => <MoneyAmount value={value} />}
-                />
-                {cashGap.net != null && (
-                  <p className="cnt-reconcile__hint">{cashGapHint}</p>
-                )}
-              </div>
-            </>
-          )}
-        </article>
-      </section>
+          </>
+        )}
+        printerGap={printerGap}
+        printerHint={printerGapHint}
+        cashGap={cashGap}
+        cashGapHint={cashGapHint}
+      />
 
       {/* Content */}
       <div className="cnt-page__grid">

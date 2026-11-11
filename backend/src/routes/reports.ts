@@ -18,6 +18,8 @@ import {
   upsertDepartmentCashActual,
 } from '../services/departmentCashActualService'
 import { computeCashForReportDate } from '../utils/reportOrderCash'
+import { loadMonthCashCounterDaily } from '../services/cashCounterMonthService'
+import { datesInMonth } from '../utils/calendarMonth'
 import {
   hasFulfillmentDepartmentColumn,
   parseFulfillmentDepartmentId,
@@ -379,7 +381,15 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
   }
   const departmentId = await resolveCashDepartmentId(req as AuthenticatedRequest)
   if (departmentId === 'empty') {
-    res.json({ month, byDate: {} })
+    const cash_in_today_by_date: Record<string, number> = {}
+    for (const date of datesInMonth(month)) cash_in_today_by_date[date] = 0
+    res.json({
+      month,
+      byDate: {},
+      cash_in_today_by_date,
+      cash_actual_by_date: {},
+      previous_cash_actual: null,
+    })
     return
   }
   const db = await getDb()
@@ -466,7 +476,11 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
       addCash(day, uid, cash)
     }
   }
-  res.json({ month, department_id: departmentId ?? null, byDate })
+  const daily = await loadMonthCashCounterDaily(
+    month,
+    typeof departmentId === 'number' ? departmentId : undefined,
+  )
+  res.json({ month, department_id: departmentId ?? null, byDate, ...daily })
 }))
 
 // GET /api/reports/analytics/products/popularity — популярность продуктов
