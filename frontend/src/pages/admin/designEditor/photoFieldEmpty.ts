@@ -16,6 +16,7 @@ import {
 } from './photoFieldFit';
 import { copyImportStackMetadata } from './designFields/importStackOrder';
 import {
+  addObjectInPhotoFieldSpace,
   placePhotoFieldPathClip,
   resolvePhotoFieldFrameSceneTL,
   relayoutEmptyPhotoFieldChrome,
@@ -211,10 +212,10 @@ function attachPhotoFieldOutline(
   const mask = makePhotoFieldPath(clip.d, frameW, frameH, clip.boxW, clip.boxH, false, fillRule);
   if (outline) {
     ax(outline).photoFieldRole = 'clip-shape';
-    group.add(outline);
+    // group.add вычитает центр группы из уже локального path — контур уезжает из рамки.
+    addObjectInPhotoFieldSpace(group, outline);
   }
   if (mask) group.clipPath = mask;
-  // group.add переводит path в координаты холста — возвращаем контур в рамку.
   placePhotoFieldPathClip(group, frameW, frameH);
 }
 

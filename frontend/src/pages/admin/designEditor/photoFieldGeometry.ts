@@ -140,10 +140,28 @@ export function resolvePhotoFieldFrameSize(field: FabricObject): { fw: number; f
   return { fw: mw, fh: mh };
 }
 
+type GroupLocalHost = Group & {
+  _objects: FabricObject[];
+  enterGroup: (object: FabricObject, removeParentTransform?: boolean) => void;
+};
+
+/**
+ * Дети рамки уже в координатах группы (0,0 — центр).
+ * Публичный group.add считает left/top координатами холста и вычитает центр группы:
+ * path и фото уезжают из контура. enterGroup(..., false) оставляет локальные координаты.
+ */
+export function addObjectInPhotoFieldSpace(group: Group, object: FabricObject): void {
+  const host = group as GroupLocalHost;
+  if (!host._objects.includes(object)) host._objects.push(object);
+  host.enterGroup(object, false);
+  group.set({ dirty: true });
+}
+
 /**
  * Контур букв живёт в координатах рамки (0,0 — центр группы).
  * Fabric group.add считает объект координатами холста и уводит path на половину кадра
  * плюс left/top поля — дырки П/А и само фото тогда не совпадают с рамкой.
+ * Сбрасываем и угол: qrDecompose после add может оставить skew/flip.
  */
 export function placePhotoFieldPathClip(group: Group, frameW: number, frameH: number): void {
   if (readPhotoFieldShape(group) !== 'path') return;
@@ -156,12 +174,52 @@ export function placePhotoFieldPathClip(group: Group, frameW: number, frameH: nu
     originY: 'top' as const,
     scaleX: frameW / boxW,
     scaleY: frameH / boxH,
+    angle: 0,
+    skewX: 0,
+    skewY: 0,
+    flipX: false,
+    flipY: false,
+    objectCaching: false,
+    dirty: true,
   };
   for (const kid of group.getObjects()) {
     if (ax(kid).photoFieldRole !== 'clip-shape') continue;
     kid.set(patch);
+    kid.setCoords();
   }
-  if (group.clipPath) group.clipPath.set(patch);
+  if (group.clipPath) {
+    group.clipPath.set(patch);
+    group.clipPath.setCoords();
+  }
+}
+
+/**
+ * Фото в заполненном поле: центр bitmap в (panX, panY), clip path — в левом верхнем углу рамки.
+ * Вызывать после того, как группа уже на холсте: group.add/parent.add к этому моменту уже
+ * могли сдвинуть локальные left/top, а setCoords без этого оставляет объект за skipOffscreen.
+ * Прямоугольник и эллипс не трогают clip — у них нет shape path.
+ */
+export function realignFilledPhotoFieldToClip(group: Group): void {
+  const meta = ax(group);
+  if (meta.isPhotoField !== true || meta.photoFieldFilled !== true) return;
+  const frameW = Math.max(1, Number(meta.photoFieldFw) || Number(group.width) || 1);
+  const frameH = Math.max(1, Number(meta.photoFieldFh) || Number(group.height) || 1);
+  placePhotoFieldPathClip(group, frameW, frameH);
+  const panX = Number(meta.photoFieldPanX ?? 0);
+  const panY = Number(meta.photoFieldPanY ?? 0);
+  for (const kid of group.getObjects()) {
+    if (String(kid.type).toLowerCase() !== 'image') continue;
+    kid.set({
+      originX: 'center',
+      originY: 'center',
+      left: Number.isFinite(panX) ? panX : 0,
+      top: Number.isFinite(panY) ? panY : 0,
+      dirty: true,
+    });
+    kid.setCoords();
+  }
+  group.set({ dirty: true, objectCaching: false });
+  group.setCoords();
 }
 
 /**

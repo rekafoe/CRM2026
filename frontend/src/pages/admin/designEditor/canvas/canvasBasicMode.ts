@@ -8,6 +8,7 @@ import {
 import { applyDesignEditorDeleteControl } from '../designEditorDeleteControl';
 import { ensurePhotoFieldStaticLayout } from '../photoFieldFit';
 import { createEmptyPhotoField, isClientAddedPhotoField } from '../designFields';
+import { readPhotoFieldClip, readPhotoFieldFillRule, readPhotoFieldShape } from '../photoFieldShape';
 import { finalizeEmptyPhotoFieldPlacement } from '../photoFieldEmpty';
 import { detachFabricObject } from './canvasObjectDetach';
 import { resolvePhotoFieldFrameSceneTL } from './canvasPhotoFieldFrame';
@@ -135,6 +136,8 @@ export function clearFilledPhotoField(canvas: Canvas, field: FabricObject): bool
   const fh = Math.max(1, Number(o.photoFieldFh ?? field.height ?? 1));
   const anchor = resolvePhotoFieldFrameSceneTL(field);
   const clientAdded = isClientAddedPhotoField(o);
+  const shape = readPhotoFieldShape(o);
+  const clip = readPhotoFieldClip(o);
   const parent = field.group;
   const stackIndex = parent != null ? parent.getObjects().indexOf(field) : -1;
 
@@ -147,6 +150,11 @@ export function clearFilledPhotoField(canvas: Canvas, field: FabricObject): bool
     width: fw,
     height: fh,
     clientAdded,
+    shape,
+    clipPath: clip?.d,
+    clipBoxW: clip?.boxW,
+    clipBoxH: clip?.boxH,
+    fillRule: readPhotoFieldFillRule(o),
   });
 
   if (parent != null && stackIndex >= 0) {
