@@ -201,6 +201,156 @@ describe('UV flatbed material quantity', () => {
   });
 });
 
+describe('UV arbitrary trim on the selected sheet', () => {
+  const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>;
+  const materialId = 42;
+  const sheetPrice = 55;
+
+  const config = (extra?: { override?: number; dimensionsMode?: 'custom_only' | 'presets_and_custom' }) => ({
+    simplified: {
+      use_layout: false,
+      include_material_cost: true,
+      uv_print: {
+        mode: 'flatbed_m2' as const,
+        layers: ['color'],
+        default_passes: { color: 1 },
+        dimensions_mode: extra?.dimensionsMode ?? 'custom_only',
+      },
+      sizes: [
+        {
+          id: 'anchor',
+          label: '—',
+          width_mm: 100,
+          height_mm: 100,
+          ...(extra?.override != null ? { items_per_sheet_override: extra.override } : {}),
+          print_prices: [],
+          allowed_material_ids: [materialId],
+          material_prices: [],
+          finishing: [],
+        },
+      ],
+    },
+  });
+
+  const mockDb = (template: unknown, sheet: { width: number; height: number } | null) => {
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return { id: 1, name: 'УФ', calculator_type: 'simplified', product_type: 'universal' };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(template) };
+        }
+        if (query.includes('sheet_width, sheet_height FROM materials')) {
+          return sheet ? { sheet_width: sheet.width, sheet_height: sheet.height } : { sheet_width: null, sheet_height: null };
+        }
+        if (query.includes('sheet_price_single FROM materials')) {
+          return { sheet_price_single: sheetPrice };
+        }
+        if (query.includes('FROM materials m') && query.includes('paper_type')) {
+          return { name: 'SRA3', density: null, paper_type_id: null };
+        }
+        if (query.includes('FROM print_prices') && query.includes('technology_code')) {
+          return { id: 9, counter_unit: 'm2', technology_code: 'uv' };
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+  };
+
+  const calc = (trim: { width: number; height: number }, quantity: number, material = materialId) =>
+    SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'anchor',
+        ...(material ? { material_id: material } : {}),
+        print_technology: 'uv',
+        trim_size: trim,
+        uv_print: { color: { enabled: true, passes: 1 } },
+      },
+      quantity,
+    );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('40×30 на SRA3 больше 1 шт/лист, печать остаётся по площади', async () => {
+    mockDb(config(), { width: 320, height: 450 });
+
+    const result = await calc({ width: 40, height: 30 }, 4);
+
+    expect(result.layout?.itemsPerSheet).toBeGreaterThan(1);
+    expect(result.layout?.sheetsNeeded).toBe(1);
+    expect(result.materialPrice).toBe(sheetPrice);
+    expect(result.finalPrice).toBe(100 + sheetPrice);
+  });
+
+  it('300×400 на SRA3 остаётся 1 шт/лист', async () => {
+    mockDb(config(), { width: 320, height: 450 });
+
+    const result = await calc({ width: 300, height: 400 }, 2);
+
+    expect(result.layout?.itemsPerSheet).toBe(1);
+    expect(result.layout?.sheetsNeeded).toBe(2);
+    expect(result.materialPrice).toBe(2 * sheetPrice);
+  });
+
+  it('ручная норма якоря не замораживает произвольный обрез', async () => {
+    mockDb(config({ override: 1 }), { width: 320, height: 450 });
+
+    const result = await calc({ width: 40, height: 30 }, 4);
+
+    expect(result.layout?.itemsPerSheet).toBeGreaterThan(1);
+  });
+
+  it('пресет при use_layout false остаётся 1 изделием на лист', async () => {
+    mockDb(config({ dimensionsMode: 'presets_and_custom' }), { width: 320, height: 450 });
+
+    const preset = await calc({ width: 100, height: 100 }, 3);
+    expect(preset.layout?.itemsPerSheet).toBe(1);
+    expect(preset.layout?.sheetsNeeded).toBe(3);
+
+    const custom = await calc({ width: 40, height: 30 }, 4);
+    expect(custom.layout?.itemsPerSheet).toBeGreaterThan(1);
+  });
+
+  it('без листа склада произвольный размер не подменяет SRA3 и не берёт материал', async () => {
+    mockDb(config(), null);
+
+    const result = await calc({ width: 40, height: 30 }, 4, 0);
+
+    expect(result.layout?.itemsPerSheet).toBe(1);
+    expect(result.layout?.sheetsNeeded).toBe(4);
+    expect(result.materialPrice).toBe(0);
+    expect(result.finalPrice).toBe(100);
+  });
+
+  it('печать без материала не раскладывает произвольный размер на лист', async () => {
+    mockDb(config(), { width: 320, height: 450 });
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'anchor',
+        material_id: materialId,
+        print_technology: 'uv',
+        trim_size: { width: 40, height: 30 },
+        uv_print: { color: { enabled: true, passes: 1 } },
+        print_without_material: true,
+      },
+      4,
+    );
+
+    expect(result.layout?.itemsPerSheet).toBe(1);
+    expect(result.layout?.sheetsNeeded).toBe(4);
+    expect(result.materialPrice).toBe(0);
+    expect(result.finalPrice).toBe(100);
+  });
+});
+
 describe('UV print without material', () => {
   const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>;
   const materialId = 42;

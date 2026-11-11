@@ -888,9 +888,22 @@ export class SimplifiedPricingService {
     }
 
     // Учёт раскладки: use_layout=false → 1 изделие на лист (без оптимизации, для крупноформатных и т.п.)
+    // Произвольный размер УФ на выбранном листе — исключение: вместимость по той же формуле,
+    // даже если шаблон flatbed_m2 когда-то записал use_layout: false.
+    const trimDiffersFromAnchor =
+      trimInput != null &&
+      Number.isFinite(anchorWidthMm) &&
+      Number.isFinite(anchorHeightMm) &&
+      (Math.abs(trimInput.width - anchorWidthMm) > 1 || Math.abs(trimInput.height - anchorHeightMm) > 1);
+    const uvArbitraryTrim =
+      isUvFlatbedMode &&
+      trimInput != null &&
+      (uvTemplateConfig?.dimensions_mode === 'custom_only' || trimDiffersFromAnchor);
     const useLayout = simplifiedConfig.use_layout !== false;
+    const uvArbitraryOnKnownSheet =
+      uvArbitraryTrim && (materialSheetMm?.width ?? 0) > 0 && (materialSheetMm?.height ?? 0) > 0;
     let layoutCheck: { fitsOnSheet: boolean; itemsPerSheet: number; wastePercentage: number; recommendedSheetSize: { width: number; height: number }; layout: { rows: number; cols: number; actualItemsPerSheet: number }; cutsPerSheet: number };
-    if (itemsPerSheetOverride != null && itemsPerSheetOverride > 0) {
+    if (itemsPerSheetOverride != null && itemsPerSheetOverride > 0 && !uvArbitraryTrim) {
       // Ручная норма вместимости — обходим расчёт раскладки
       layoutCheck = {
         fitsOnSheet: true,
@@ -901,7 +914,7 @@ export class SimplifiedPricingService {
         cutsPerSheet: itemsPerSheetOverride + 1,
       };
       logger.info('Раскладка: использована ручная норма вместимости', { productId, itemsPerSheetOverride });
-    } else if (!useLayout) {
+    } else if (!useLayout && !uvArbitraryOnKnownSheet) {
       layoutCheck = {
         fitsOnSheet: true,
         itemsPerSheet: 1,
@@ -1094,7 +1107,9 @@ export class SimplifiedPricingService {
         ? 1
         : (selectedSize.min_qty ?? 1)
       : selectedSize.min_qty ?? (
-          isOfficePrint || isRollPrint || isRollWideM2Mode || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
+          isOfficePrint || isRollPrint || isRollWideM2Mode || plotterRollMode || hasManualItemsPerSheet || isUvFlatbedMode
+            ? 1
+            : itemsPerSheet
         );
     const maxQtyLimit = selectedSize.max_qty;
     const qtySizeLabel =
