@@ -553,3 +553,244 @@
     font-size: 24px;
   }
 }
+
+/* Сверка факта с CRM. Только экран счётчиков (cnt-page--cash):
+   страница услуг делит базовые классы и эти правила не наследует.
+   Цвета — токены Пудры и Deep Ink, чтобы цифры читались на светлом и тёмном фоне. */
+.cnt-page--cash .cnt-month-section__note {
+  margin: -8px 0 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--pc-muted);
+}
+
+.cnt-page--cash .cnt-stat-card,
+.cnt-page--cash .cnt-card,
+.cnt-page--cash .cnt-day-card,
+.cnt-page--cash .cnt-reconcile__card {
+  background: var(--pc-surface);
+  border-color: var(--pc-border);
+  color: var(--pc-text);
+  box-shadow: none;
+}
+
+.cnt-page--cash .cnt-stat-card__value,
+.cnt-page--cash .cnt-cell-name,
+.cnt-page--cash .cnt-card__header h3,
+.cnt-page--cash .cnt-day-card__value--cash,
+.cnt-page--cash .cnt-cash-item__name,
+.cnt-page--cash .cnt-month-section__title,
+.cnt-page--cash .cnt-day-card__date,
+.cnt-page--cash .cnt-reconcile__value,
+.cnt-page--cash .cnt-reconcile__line-name,
+.cnt-page--cash .cnt-cash-expect__value {
+  color: var(--pc-text);
+}
+
+.cnt-page--cash .cnt-stat-card__label,
+.cnt-page--cash .cnt-stat-card__trend--neutral,
+.cnt-page--cash .cnt-day-card__label,
+.cnt-page--cash .cnt-card__empty,
+.cnt-page--cash .cnt-card__loading,
+.cnt-page--cash .cnt-month-loading,
+.cnt-page--cash .cnt-diff,
+.cnt-page--cash .cnt-reconcile__label,
+.cnt-page--cash .cnt-reconcile__hint,
+.cnt-page--cash .cnt-reconcile__meta,
+.cnt-page--cash .cnt-reconcile__missing,
+.cnt-page--cash .cnt-cash-expect__label {
+  color: var(--pc-muted);
+}
+
+.cnt-page--cash .cnt-stat-card__trend,
+.cnt-page--cash .cnt-day-card__value--print,
+.cnt-page--cash .cnt-cash-item__amount {
+  color: var(--pc-success-ink);
+}
+
+.cnt-page--cash .cnt-stat-card__icon-box,
+.cnt-page--cash .cnt-cash-item__avatar,
+.cnt-page--cash .cnt-card__badge {
+  background: var(--pc-surface-subtle);
+  color: var(--pc-text);
+}
+
+.cnt-page--cash .cnt-card__badge--green,
+.cnt-page--cash .cnt-diff--positive {
+  background: var(--pc-success-soft);
+  color: var(--pc-success-ink);
+}
+
+.cnt-page--cash .cnt-diff--negative {
+  background: var(--pc-danger-soft);
+  color: var(--pc-danger-ink);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cnt-page--cash .cnt-card__header,
+.cnt-page--cash .cnt-day-card__date,
+.cnt-page--cash .cnt-cash-item,
+.cnt-page--cash .cnt-cash-expect {
+  border-color: var(--pc-border);
+}
+
+.cnt-page--cash .cnt-table tbody td {
+  color: var(--pc-text);
+  border-bottom-color: var(--pc-border);
+}
+
+.cnt-page--cash .cnt-table tbody tr:hover,
+.cnt-page--cash .cnt-cash-item:hover {
+  background: var(--pc-row-hover);
+}
+
+.cnt-page--cash .cnt-table__empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--pc-muted);
+}
+
+.cnt-page--cash .cnt-mode-tab {
+  background: var(--pc-surface);
+  color: var(--pc-muted);
+}
+
+.cnt-page--cash .cnt-mode-tab--active,
+.cnt-page--cash .cnt-mode-tab--active:hover {
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-ink);
+}
+
+.cnt-page--cash .cnt-reconcile {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cnt-page--cash .cnt-reconcile__card {
+  border: 1px solid var(--pc-border);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 0;
+}
+
+.cnt-page--cash .cnt-reconcile__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.cnt-page--cash .cnt-reconcile__value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+
+.cnt-page--cash .cnt-reconcile__unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pc-muted);
+}
+
+.cnt-page--cash .cnt-reconcile__hint,
+.cnt-page--cash .cnt-reconcile__meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.cnt-page--cash .cnt-reconcile__block + .cnt-reconcile__block {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pc-border);
+}
+
+.cnt-page--cash .cnt-reconcile__line,
+.cnt-page--cash .cnt-cash-expect__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cnt-page--cash .cnt-reconcile__line-name,
+.cnt-page--cash .cnt-cash-expect__label,
+.cnt-page--cash .cnt-cash-expect__value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cnt-page--cash .cnt-reconcile__missing {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.cnt-page--cash .cnt-reconcile__sides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cnt-page--cash .cnt-gap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--pc-text);
+  background: var(--pc-surface-subtle);
+}
+
+.cnt-page--cash .cnt-gap--more {
+  color: var(--pc-success-ink);
+  background: var(--pc-success-soft);
+}
+
+.cnt-page--cash .cnt-gap--less {
+  color: var(--pc-danger-ink);
+  background: var(--pc-danger-soft);
+}
+
+.cnt-page--cash .cnt-gap--even {
+  color: var(--pc-text);
+  background: var(--pc-surface-subtle);
+}
+
+.cnt-page--cash .cnt-gap__word {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cnt-page--cash .cnt-cash-expect {
+  padding: 4px 24px 8px;
+  border-bottom: 1px solid var(--pc-border);
+}
+
+.cnt-page--cash .cnt-cash-expect__row {
+  padding: 8px 0;
+}
+
+@media (max-width: 1100px) {
+  .cnt-page--cash .cnt-reconcile {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .cnt-page--cash .cnt-reconcile__value {
+    font-size: 24px;
+  }
+}
