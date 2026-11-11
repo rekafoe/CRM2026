@@ -282,7 +282,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     (next: SimplifiedUvPrintConfig | undefined) => {
       const withLayoutFlag = (rest: SimplifiedConfig): SimplifiedConfig => {
         if (next?.mode === 'flatbed_m2') {
-          return { ...rest, uv_print: next, roll_m2: undefined, use_layout: false }
+          return { ...rest, uv_print: next, roll_m2: undefined }
         }
         return next ? { ...rest, uv_print: next, roll_m2: undefined } : rest
       }
