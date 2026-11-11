@@ -140,7 +140,8 @@ export function shouldSkipOfflineIssueSeal(order: {
 export function discountedItemAmount(item: ItemLike, discountPercent: number): number {
   const base = computeItemLineTotal(item);
   const pct = parseNum(discountPercent);
-  if (pct <= 0) return base;
+  if (pct === 0) return base;
+  // Отрицательный процент — наценка: множитель больше 1, сумма строки растёт.
   return round2(base * (1 - pct / 100));
 }
 
