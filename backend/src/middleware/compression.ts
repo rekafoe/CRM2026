@@ -19,17 +19,26 @@ function isDesignFontContentPath(req: Request): boolean {
   return re.test(path) || re.test(base)
 }
 
-function isBinaryFileResponsePath(req: Request): boolean {
+function matchesPath(req: Request, re: RegExp): boolean {
   const path = req.path || ''
   const base = (req.originalUrl || '').split('?')[0] || path
-  // sendFile для content/thumb: нельзя заранее ставить Content-Encoding —
-  // иначе клиент (fetch/Next BFF) пытается gunzip сырой JPEG → 500 / битый preview.
+  return re.test(path) || re.test(base)
+}
+
+function isBinaryFileResponsePath(req: Request): boolean {
+  // sendFile не идёт через res.send. Content-Encoding на таком ответе
+  // заставляет браузер gunzip-ить сырой JPEG/PNG → ERR_CONTENT_DECODING_FAILED.
   const draftFileBinaryRe =
-    /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/(content|thumb)\/?$/
+    /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/(?:content|thumb)\/?$/
+  const templateAssetBinaryRe =
+    /\/api\/design-templates\/(?:public\/)?[0-9]+\/assets\/[0-9]+\/(?:content|thumb)\/?$/
+  const designAssetBinaryRe =
+    /\/api\/design-assets\/(?:public\/)?[0-9]+\/(?:content|thumb)\/?$/
   return (
     isDesignFontContentPath(req) ||
-    draftFileBinaryRe.test(path) ||
-    draftFileBinaryRe.test(base)
+    matchesPath(req, draftFileBinaryRe) ||
+    matchesPath(req, templateAssetBinaryRe) ||
+    matchesPath(req, designAssetBinaryRe)
   )
 }
 
@@ -42,7 +51,7 @@ export function compressionMiddleware(req: Request, res: Response, next: NextFun
   if (isUploadsOrStaticPath(req)) {
     return next()
   }
-  // Draft-файлы редактора отдаются через sendFile; нельзя заранее ставить Content-Encoding.
+  // Бинарники через sendFile (черновики, картинки шаблона, клипарт): без Content-Encoding.
   if (isBinaryFileResponsePath(req)) {
     return next()
   }
@@ -62,9 +71,10 @@ export function compressionMiddleware(req: Request, res: Response, next: NextFun
   // Определяем метод сжатия
   const useGzip = acceptEncoding.includes('gzip')
   const compressionMethod = useGzip ? gzip : deflate
+  const encoding = useGzip ? 'gzip' : 'deflate'
 
-  // Устанавливаем заголовки
-  res.setHeader('Content-Encoding', useGzip ? 'gzip' : 'deflate')
+  // Vary можно ставить заранее. Content-Encoding — только вместе со сжатым телом:
+  // sendFile этот send не вызывает и иначе отдаёт сырой файл с gzip-заголовком.
   res.setHeader('Vary', 'Accept-Encoding')
 
   // Переопределяем метод send для сжатия ответа
@@ -76,18 +86,21 @@ export function compressionMiddleware(req: Request, res: Response, next: NextFun
     // Сжимаем только JSON и текстовые данные
     if (typeof data === 'string' || Buffer.isBuffer(data)) {
       compressionMethod(data, (err, compressed) => {
-        if (err) {
-          console.error('Ошибка сжатия:', err)
+        if (err || res.headersSent) {
+          if (err) console.error('Ошибка сжатия:', err)
+          if (!res.headersSent) res.removeHeader('Content-Encoding')
           originalSend.call(this, data)
-        } else {
-          res.setHeader('Content-Length', compressed.length)
-          originalSend.call(this, compressed)
+          return
         }
+        res.setHeader('Content-Encoding', encoding)
+        res.setHeader('Content-Length', compressed.length)
+        originalSend.call(this, compressed)
       })
       return res
-    } else {
-      return originalSend.call(this, data)
     }
+
+    res.removeHeader('Content-Encoding')
+    return originalSend.call(this, data)
   }
 
   next()
