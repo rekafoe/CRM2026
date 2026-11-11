@@ -70,6 +70,7 @@ export const StatusTrack: React.FC<StatusTrackProps> = ({
           'pc-track__step',
           isCurrent ? 'is-current' : '',
           isDone ? 'is-done' : '',
+          step.code === 'completed' && (isCurrent || isDone) ? 'is-completed' : '',
         ].filter(Boolean).join(' ');
 
         return (

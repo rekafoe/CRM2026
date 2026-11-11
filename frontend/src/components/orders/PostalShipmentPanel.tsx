@@ -287,7 +287,7 @@ export const PostalShipmentPanel: React.FC<Props> = ({ order, onNotify }) => {
     <div className="postal-shipment" ref={rootRef}>
       <button
         type="button"
-        className={`order-detail-action-btn order-detail-action-btn--neutral${open ? ' postal-shipment__toggle--open' : ''}`}
+        className={`order-detail-action-btn order-detail-action-btn--neutral pc-btn--quiet${open ? ' postal-shipment__toggle--open' : ''}`}
         title="Трек и бланк приходят от Белпочты или Европочты"
         onClick={(event) =>{
           event.stopPropagation();

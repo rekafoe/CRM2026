@@ -81,7 +81,7 @@ export const OrderCostSheetPanel: React.FC<Props> = ({ orderId }) => {
     <div className="order-cost-sheet" ref={rootRef}>
       <button
         type="button"
-        className={`order-detail-action-btn order-detail-action-btn--neutral${open ? ' order-cost-sheet__toggle--open' : ''}`}
+        className={`order-detail-action-btn order-detail-action-btn--neutral pc-btn--quiet${open ? ' order-cost-sheet__toggle--open' : ''}`}
         title="Закупка, печать и проценты по строкам"
         onClick={(event) => {
           event.stopPropagation();

@@ -38,15 +38,30 @@
 
 .pc-track__mark {
   display: block;
-  width: calc(100% - 8px);
-  height: 2px;
-  border-radius: 1px;
-  background: var(--pc-border);
+  width: calc(100% - 4px);
+  height: 7px;
+  border-radius: 4px;
+  background: var(--pc-border-control);
 }
 
 .pc-track__step.is-done .pc-track__mark,
 .pc-track__step.is-current .pc-track__mark {
+  height: 8px;
   background: var(--pc-accent);
+}
+
+.pc-track__step.is-current .pc-track__mark {
+  height: 10px;
+}
+
+.pc-track__step.is-completed.is-current .pc-track__mark,
+.pc-track__step.is-completed.is-done .pc-track__mark {
+  background: var(--pc-success);
+}
+
+.pc-track__step.is-completed.is-current .pc-track__name {
+  color: var(--pc-success-ink);
+  font-weight: 700;
 }
 
 .pc-track__name {

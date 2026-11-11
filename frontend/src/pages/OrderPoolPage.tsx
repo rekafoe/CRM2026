@@ -851,7 +851,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 <span className="pool-heading__count">{filteredOrders.length}</span>
               </div>
               <p className="pool-heading__lede">
-                Заказы с сайта, Telegram и Mini App до назначения ответственного. Назначение, предоплата и выдача.
+                Все заказы пула, включая уже назначенные. Назначение, предоплата и выдача.
               </p>
             </div>
             {departments.length > 0 ? (
@@ -975,8 +975,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               }
             >
               {orderStatuses.length > 0 && (
-                <details className="order-pool-collapsible">
-                  <summary className="order-pool-collapsible__summary">Статусы</summary>
+                <div className="order-pool-status">
+                  <div className="order-pool-status__label">Статус заказа</div>
                   <StatusTrack
                     statuses={orderStatuses}
                     currentStatusId={Number(selectedOrder.status)}
@@ -990,7 +990,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   {(selectedOrder.items?.length ?? 0) === 0 ? (
                     <div className="order-status-timeline__empty">Пока нет позиций</div>
                   ) : null}
-                </details>
+                </div>
               )}
 
               <div className="pool-passport__section">

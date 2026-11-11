@@ -78,7 +78,7 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
           {prepayNote ? <span className="pc-passport__note">{prepayNote}</span> : null}
         </div>
         <div className={`pc-passport__cell${debt > 0 ? ' pc-passport__cell--debt' : ''}`}>
-          <span className="pc-passport__label">Остаток к выдаче</span>
+          <span className="pc-passport__label">Долг</span>
           <span className="pc-passport__value"><BynValue>{debt}</BynValue></span>
         </div>
         <div className="pc-passport__cell pc-passport__cell--total">

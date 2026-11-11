@@ -303,7 +303,7 @@ export type FilterAction =
 export const initialOrderPoolFilters: FilterState = {
   source: 'website',
   cancelled: 'not_cancelled',
-  assigned: 'not_assigned',
+  assigned: 'all',
   searchInput: '',
   searchTerm: '',
   quickFilter: null,

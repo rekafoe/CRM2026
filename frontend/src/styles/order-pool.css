@@ -2001,11 +2001,19 @@
 }
 
 .pool-sheet {
-  width: max-content;
-  min-width: 960px;
+  width: 100%;
+  min-width: 0;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
   font-size: 13px;
+}
+
+.pool-sheet__col-money {
+  width: 8.5rem;
+}
+
+.pool-sheet__col-action {
+  width: 5rem;
 }
 
 .pool-sheet th {
@@ -2023,12 +2031,18 @@
   border-bottom: 1px solid var(--pc-border, #e2dfd7);
 }
 
+.pool-sheet th:nth-child(5),
 .pool-sheet th:nth-child(6),
-.pool-sheet th:nth-child(7),
+.pool-sheet td:nth-child(5),
+.pool-sheet td:nth-child(6),
 .pool-sheet__money {
+  width: 8.5rem;
+  min-width: 8.5rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .pool-sheet td {
@@ -2051,6 +2065,28 @@
 .pool-sheet__row.is-selected td,
 .pool-sheet__row.is-selected:hover td {
   background: var(--pc-row-selected, #e8eef6);
+}
+
+.pool-sheet__row.is-completed td {
+  background: color-mix(in srgb, var(--pc-success, #15803d) 24%, var(--pc-surface, #fff));
+  color: var(--pc-text, #141619);
+}
+
+.pool-sheet__row.is-completed td:first-child {
+  box-shadow: inset 4px 0 0 var(--pc-success, #15803d);
+}
+
+.pool-sheet__row.is-completed .pool-sheet__number,
+.pool-sheet__row.is-completed .pool-sheet__client,
+.pool-sheet__row.is-completed .pool-sheet__ready-when {
+  color: var(--pc-text, #141619);
+}
+
+.pool-sheet__row.is-completed.is-selected td,
+.pool-sheet__row.is-completed:hover td,
+.pool-sheet__row.is-completed.is-selected:hover td {
+  background: color-mix(in srgb, var(--pc-success, #15803d) 30%, var(--pc-row-selected, #f1f4fc));
+  color: var(--pc-text, #141619);
 }
 
 .pool-sheet__row.is-cancelled {
@@ -2104,10 +2140,22 @@
   cursor: pointer;
 }
 
-.pool-sheet__composition {
-  max-width: none;
-  overflow: visible;
+.pool-sheet__ready {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.pool-sheet__ready-when {
+  color: var(--pc-text, #141619);
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
+}
+
+.pool-sheet__ready-when.is-hour-sla {
+  color: var(--pc-warning-ink, #964406);
 }
 
 .pool-sheet__money.is-due {
@@ -2660,21 +2708,21 @@
 }
 
 .pool-sheet th:nth-child(1),
-.pool-sheet td:nth-child(1) { min-width: 128px; }
+.pool-sheet td:nth-child(1) { width: 18%; }
 .pool-sheet th:nth-child(2),
-.pool-sheet td:nth-child(2) { min-width: 156px; }
+.pool-sheet td:nth-child(2) { width: 22%; }
 .pool-sheet th:nth-child(3),
-.pool-sheet td:nth-child(3) { min-width: 200px; }
+.pool-sheet td:nth-child(3) { width: 20%; }
 .pool-sheet th:nth-child(4),
-.pool-sheet td:nth-child(4) { min-width: 118px; }
-.pool-sheet th:nth-child(5),
-.pool-sheet td:nth-child(5) { min-width: 124px; }
-.pool-sheet th:nth-child(6),
-.pool-sheet td:nth-child(6),
+.pool-sheet td:nth-child(4) { width: 16%; }
 .pool-sheet th:nth-child(7),
-.pool-sheet td:nth-child(7) { min-width: 88px; }
-.pool-sheet th:nth-child(8),
-.pool-sheet td:nth-child(8) { min-width: 76px; }
+.pool-sheet td:nth-child(7) { width: 5rem; }
+.pool-sheet td:nth-child(2),
+.pool-sheet td:nth-child(3),
+.pool-sheet td:nth-child(4) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .pool-sheet .pc-stamp,
 .pool-sheet .pc-stamp__label {
@@ -2694,10 +2742,16 @@
   font-weight: 500;
 }
 
-.pool-sheet__composition {
-  max-width: none;
-  overflow: visible;
-  white-space: nowrap;
+.pool-passport__title .pool-passport__transfer {
+  margin-left: auto;
+}
+
+.order-pool-status__label {
+  color: var(--pc-muted, #6f6c66);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .pool-sheet__take {
@@ -2747,13 +2801,15 @@
 
 .order-pool-detail .order-activity-event__top {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 14px;
   align-items: baseline;
 }
 
 .order-pool-detail .order-activity-event__date {
   order: -1;
+  min-width: max-content;
+  white-space: nowrap;
   color: var(--pc-muted, #6f6c66);
   font-family: var(--pc-font-mono, ui-monospace, monospace);
   font-size: 12px;
@@ -2761,6 +2817,8 @@
 }
 
 .order-pool-detail .order-activity-event__title {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--pc-text, #1c1b19);
   font-size: 13px;
 }
