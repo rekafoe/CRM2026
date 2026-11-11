@@ -221,6 +221,61 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.product-site-filter {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  border-radius: var(--pc-r-control, 8px);
+  background: rgba(229, 231, 235, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.product-site-filter__label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #64748b;
+  border-right: 1px solid rgba(209, 213, 219, 0.7);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.product-site-filter__options {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.product-site-filter__btn {
+  border: 0;
+  background: transparent;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.product-site-filter__btn + .product-site-filter__btn {
+  border-left: 1px solid rgba(209, 213, 219, 0.55);
+}
+
+.product-site-filter__btn:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.product-site-filter__btn--active {
+  background: rgba(71, 85, 105, 0.35);
+  color: #1e293b;
+}
+
+.product-site-filter__btn--active:hover {
+  background: rgba(71, 85, 105, 0.45);
+}
+
 /* Быстрые фильтры (чипы) */
 .product-quick-filters {
   display: flex;
@@ -652,6 +707,18 @@
   .product-controls__actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .product-site-filter {
+    width: 100%;
+  }
+
+  .product-site-filter__options {
+    flex: 1;
+  }
+
+  .product-site-filter__btn {
+    flex: 1;
   }
 
   .products-table thead th,

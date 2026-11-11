@@ -1,34 +1,20 @@
 /**
- * Хук для управления состоянием ProductManagement
- * Рефакторинг: использование useReducer вместо множества useState
+ * Хук для управления состоянием ProductManagement.
+ * Фильтры и сортировка живут в query (useProductListFilters), здесь — выбор и модалки.
  */
 
 import { useReducer, useCallback } from 'react';
 
-// Типы состояния
 interface ProductManagementState {
-  // Фильтры и поиск
-  query: string;
-  showOnlyActive: boolean;
-  selectedCategoryId: number | null;
-  
-  // Сортировка
-  sortField: 'name' | 'category' | 'updated';
-  sortDirection: 'asc' | 'desc';
-  
-  // Выбор продуктов
   selectedProducts: Set<number>;
-  
-  // Модалка создания продукта
+
   wizard: {
     show: boolean;
   };
-  
-  // Модальные окна
+
   setupStatusModal: number | null;
   deletingProductId: number | null;
-  
-  // Формы
+
   categoryForm: {
     name: string;
     icon: string;
@@ -36,7 +22,7 @@ interface ProductManagementState {
     description: string;
     sort_order: number;
   };
-  
+
   productForm: {
     category_id: number;
     name: string;
@@ -45,14 +31,7 @@ interface ProductManagementState {
   };
 }
 
-// Типы действий
 type ProductManagementAction =
-  | { type: 'SET_QUERY'; payload: string }
-  | { type: 'SET_SHOW_ONLY_ACTIVE'; payload: boolean }
-  | { type: 'SET_SELECTED_CATEGORY_ID'; payload: number | null }
-  | { type: 'SET_SORT_FIELD'; payload: 'name' | 'category' | 'updated' }
-  | { type: 'SET_SORT_DIRECTION'; payload: 'asc' | 'desc' }
-  | { type: 'TOGGLE_SORT'; payload: 'name' | 'category' | 'updated' }
   | { type: 'TOGGLE_PRODUCT_SELECTION'; payload: number }
   | { type: 'SET_SELECTED_PRODUCTS'; payload: Set<number> }
   | { type: 'CLEAR_SELECTED_PRODUCTS' }
@@ -65,13 +44,7 @@ type ProductManagementAction =
   | { type: 'SET_PRODUCT_FORM'; payload: Partial<ProductManagementState['productForm']> }
   | { type: 'RESET_PRODUCT_FORM' };
 
-// Начальное состояние
 const initialState: ProductManagementState = {
-  query: '',
-  showOnlyActive: false,
-  selectedCategoryId: null,
-  sortField: 'name',
-  sortDirection: 'asc',
   selectedProducts: new Set(),
   wizard: {
     show: false,
@@ -93,40 +66,11 @@ const initialState: ProductManagementState = {
   },
 };
 
-// Reducer
 function productManagementReducer(
   state: ProductManagementState,
   action: ProductManagementAction
 ): ProductManagementState {
   switch (action.type) {
-    case 'SET_QUERY':
-      return { ...state, query: action.payload };
-    
-    case 'SET_SHOW_ONLY_ACTIVE':
-      return { ...state, showOnlyActive: action.payload };
-    
-    case 'SET_SELECTED_CATEGORY_ID':
-      return { ...state, selectedCategoryId: action.payload };
-    
-    case 'SET_SORT_FIELD':
-      return { ...state, sortField: action.payload };
-    
-    case 'SET_SORT_DIRECTION':
-      return { ...state, sortDirection: action.payload };
-    
-    case 'TOGGLE_SORT':
-      if (state.sortField === action.payload) {
-        return {
-          ...state,
-          sortDirection: state.sortDirection === 'asc' ? 'desc' : 'asc',
-        };
-      }
-      return {
-        ...state,
-        sortField: action.payload,
-        sortDirection: 'asc',
-      };
-    
     case 'TOGGLE_PRODUCT_SELECTION': {
       const next = new Set(state.selectedProducts);
       if (next.has(action.payload)) {
@@ -136,13 +80,13 @@ function productManagementReducer(
       }
       return { ...state, selectedProducts: next };
     }
-    
+
     case 'SET_SELECTED_PRODUCTS':
       return { ...state, selectedProducts: action.payload };
-    
+
     case 'CLEAR_SELECTED_PRODUCTS':
       return { ...state, selectedProducts: new Set() };
-    
+
     case 'OPEN_CREATE_WIZARD':
       return {
         ...state,
@@ -154,56 +98,38 @@ function productManagementReducer(
         ...state,
         wizard: { ...initialState.wizard },
       };
-    
+
     case 'SET_SETUP_STATUS_MODAL':
       return { ...state, setupStatusModal: action.payload };
-    
+
     case 'SET_DELETING_PRODUCT_ID':
       return { ...state, deletingProductId: action.payload };
-    
+
     case 'SET_CATEGORY_FORM':
       return {
         ...state,
         categoryForm: { ...state.categoryForm, ...action.payload },
       };
-    
+
     case 'RESET_CATEGORY_FORM':
       return { ...state, categoryForm: initialState.categoryForm };
-    
+
     case 'SET_PRODUCT_FORM':
       return {
         ...state,
         productForm: { ...state.productForm, ...action.payload },
       };
-    
+
     case 'RESET_PRODUCT_FORM':
       return { ...state, productForm: initialState.productForm };
-    
+
     default:
       return state;
   }
 }
 
-// Хук
 export function useProductManagementState() {
   const [state, dispatch] = useReducer(productManagementReducer, initialState);
-
-  // Действия
-  const setQuery = useCallback((query: string) => {
-    dispatch({ type: 'SET_QUERY', payload: query });
-  }, []);
-
-  const setShowOnlyActive = useCallback((show: boolean) => {
-    dispatch({ type: 'SET_SHOW_ONLY_ACTIVE', payload: show });
-  }, []);
-
-  const setSelectedCategoryId = useCallback((id: number | null) => {
-    dispatch({ type: 'SET_SELECTED_CATEGORY_ID', payload: id });
-  }, []);
-
-  const toggleSort = useCallback((field: 'name' | 'category' | 'updated') => {
-    dispatch({ type: 'TOGGLE_SORT', payload: field });
-  }, []);
 
   const toggleProductSelection = useCallback((productId: number) => {
     dispatch({ type: 'TOGGLE_PRODUCT_SELECTION', payload: productId });
@@ -250,14 +176,7 @@ export function useProductManagementState() {
   }, []);
 
   return {
-    // Состояние
     state,
-    
-    // Действия
-    setQuery,
-    setShowOnlyActive,
-    setSelectedCategoryId,
-    toggleSort,
     toggleProductSelection,
     setSelectedProducts,
     clearSelectedProducts,
@@ -271,4 +190,3 @@ export function useProductManagementState() {
     resetProductForm,
   };
 }
-

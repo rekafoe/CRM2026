@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { useAdminBack } from '../../hooks/useAdminBack';
 import '../../components/admin/ProductManagement.css';
 import { getProductDetails, updateProduct, ProductWithDetails } from '../../services/products';
 import { apiClient } from '../../api/client';
@@ -26,7 +27,8 @@ interface ProductOperationLink {
 const ProductTechProcessPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const productId = Number(id);
-  const navigate = useNavigate();
+  const location = useLocation();
+  const goBackToProducts = useAdminBack();
 
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<ProductWithDetails | null>(null);
@@ -125,7 +127,7 @@ const ProductTechProcessPage: React.FC = () => {
     <div className="product-management">
       <div className="management-header">
         <div className="header-content">
-          <button onClick={() =>navigate('/adminpanel/products')} className="btn-quick-action" style={{ marginRight: 12 }}>
+          <button type="button" onClick={goBackToProducts} className="btn-quick-action" style={{ marginRight: 12 }}>
             ← Назад к списку
           </button>
           <h2>Технологический процесс</h2>
@@ -271,7 +273,7 @@ const ProductTechProcessPage: React.FC = () => {
               </div>
 
               <div className="list-section">
-                <p>Совет: После добавления операций вернитесь к <Link to={`/adminpanel/products/${productId}/template`}>редактору шаблона</Link> и проверьте расчет цены.</p>
+                <p>Совет: После добавления операций вернитесь к <Link to={`/adminpanel/products/${productId}/template`} state={location.state}>редактору шаблона</Link> и проверьте расчет цены.</p>
               </div>
             </>
           )}
