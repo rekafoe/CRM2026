@@ -9,10 +9,10 @@ import {
 import { normalizeCustomCalculatorPercent } from '../services/earningsOperatorPercent'
 import { getRoleOrderPercents, setRoleOrderPercents } from '../services/earningsRoleRateSettings'
 import { getWasteSharesForMonths } from '../services/earningsWasteService'
+import { salesManagerBonusFromTurnover } from '../services/salesManagerBonus'
 import {
   loadSalesManagerOutput,
-  salesBonusAmountMap,
-  type SalesManagerOutput,
+  loadSalesMonthFigures,
 } from '../services/salesManagerOutputService'
 
 const router = Router()
@@ -351,6 +351,8 @@ router.get('/admin', asyncHandler(async (req, res) => {
   const historyMonths = Math.max(1, Math.min(6, Number((req.query as any)?.history_months) || 3))
   const prevMonth = getPreviousMonthKey(month)
   const departmentId = (req.query as any)?.department_id != null ? parseInt(String((req.query as any).department_id), 10) : undefined
+  // График «к выплате» за год просит year_payout=1. Сводка без него не пересчитывает брак и юрлица за все месяцы.
+  const yearPayout = String((req.query as any)?.year_payout || '') === '1'
 
   const db = await getDb()
   let users = await db.all<any>(
@@ -362,151 +364,90 @@ router.get('/admin', asyncHandler(async (req, res) => {
     users = users.filter((u: any) => u.department_id === departmentId)
   }
 
-  const totalsCurrent = await db.all<any>(
-    `
-    SELECT user_id, SUM(amount) as total
-    FROM order_item_earnings
-    WHERE substr(earned_date, 1, 7) = ?
-    GROUP BY user_id
-    `,
-    [month]
-  )
-  const totalsPrev = await db.all<any>(
-    `
-    SELECT user_id, SUM(amount) as total
-    FROM order_item_earnings
-    WHERE substr(earned_date, 1, 7) = ?
-    GROUP BY user_id
-    `,
-    [prevMonth]
-  )
-  const shifts = await db.all<any>(
-    `
-    SELECT user_id, SUM(hours) as hours, COUNT(*) as shifts
-    FROM user_shifts
-    WHERE substr(work_date, 1, 7) = ?
-    GROUP BY user_id
-    `,
-    [month]
-  )
-
-  const totalsCurrentMap = new Map(totalsCurrent.map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
-  const totalsPrevMap = new Map(totalsPrev.map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
-  const shiftsMap = new Map<number, { hours: number; shifts: number }>()
-  shifts.forEach((r: any) => {
-    shiftsMap.set(Number(r.user_id), {
-      hours: Number(r.hours) || 0,
-      shifts: Number(r.shifts) || 0,
-    })
-  })
-  const shiftsPrev = await db.all<any>(
-    `
-    SELECT user_id, SUM(hours) as hours
-    FROM user_shifts
-    WHERE substr(work_date, 1, 7) = ?
-    GROUP BY user_id
-    `,
-    [prevMonth]
-  ).catch(() => [])
-  const shiftsPrevMap = new Map<number, number>()
-  ;(shiftsPrev || []).forEach((r: any) => {
-    shiftsPrevMap.set(Number(r.user_id), Number(r.hours) || 0)
-  })
-
-  const penaltiesRows = await db.all<any>(
-    `SELECT user_id, SUM(amount) as total FROM user_penalties
-     WHERE substr(penalty_date, 1, 7) = ?
-     GROUP BY user_id`,
-    [month]
-  ).catch(() => [])
-  const penaltiesMap = new Map(penaltiesRows.map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
-  const bonusesRows = await db.all<any>(
-    `SELECT user_id, SUM(amount) as total FROM user_bonuses
-     WHERE substr(bonus_date, 1, 7) = ?
-     GROUP BY user_id`,
-    [month]
-  ).catch(() => [])
-  const bonusesMap = new Map(bonusesRows.map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
-  const penaltiesPrevRows = await db.all<any>(
-    `SELECT user_id, SUM(amount) as total FROM user_penalties
-     WHERE substr(penalty_date, 1, 7) = ?
-     GROUP BY user_id`,
-    [prevMonth]
-  ).catch(() => [])
-  const penaltiesPrevMap = new Map((penaltiesPrevRows || []).map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
-  const bonusesPrevRows = await db.all<any>(
-    `SELECT user_id, SUM(amount) as total FROM user_bonuses
-     WHERE substr(bonus_date, 1, 7) = ?
-     GROUP BY user_id`,
-    [prevMonth]
-  ).catch(() => [])
-  const bonusesPrevMap = new Map((bonusesPrevRows || []).map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
-
   const historyKeys = buildMonthKeys(historyMonths, month)
   const yearKeys = calendarYearKeys(month)
   const seriesKeys = Array.from(new Set([...yearKeys, ...historyKeys]))
-  const historyRows = await db.all<any>(
-    `
-    SELECT user_id, substr(earned_date, 1, 7) as month_key, SUM(amount) as total
-    FROM order_item_earnings
-    WHERE substr(earned_date, 1, 7) IN (${seriesKeys.map(() => '?').join(',')})
-    GROUP BY user_id, month_key
-    `,
-    seriesKeys
-  )
-  const historyMap = new Map<string, number>()
-  historyRows.forEach((row: any) => {
-    historyMap.set(`${row.user_id}_${row.month_key}`, Number(row.total) || 0)
-  })
-  const historyPlaceholders = seriesKeys.map(() => '?').join(',')
+  const sortedSeries = [...seriesKeys].sort()
+  const rangeFrom = `${sortedSeries[0]}-01`
+  const lastKey = sortedSeries[sortedSeries.length - 1]
+  const lastYear = Number(lastKey.slice(0, 4))
+  const lastMonth = Number(lastKey.slice(5, 7))
+  const rangeTo = lastMonth === 12
+    ? `${lastYear + 1}-01-01`
+    : `${lastYear}-${String(lastMonth + 1).padStart(2, '0')}-01`
+  const heavyMonths = yearPayout
+    ? Array.from(new Set([...seriesKeys, month, prevMonth]))
+    : Array.from(new Set([month, prevMonth]))
+  const heavy = new Set(heavyMonths)
+
   const toMonthMap = (rows: any[]) => {
     const map = new Map<string, number>()
-    rows.forEach((row) => {
+    ;(rows || []).forEach((row) => {
       map.set(`${row.user_id}_${row.month_key}`, Number(row.total) || 0)
     })
     return map
   }
-  const historyHoursMap = toMonthMap(await db.all<any>(
-    `
-    SELECT user_id, substr(work_date, 1, 7) as month_key, SUM(hours) as total
-    FROM user_shifts
-    WHERE substr(work_date, 1, 7) IN (${historyPlaceholders})
-    GROUP BY user_id, month_key
-    `,
-    seriesKeys,
-  ).catch(() => []))
-  const historyBonusMap = toMonthMap(await db.all<any>(
-    `
-    SELECT user_id, substr(bonus_date, 1, 7) as month_key, SUM(amount) as total
-    FROM user_bonuses
-    WHERE substr(bonus_date, 1, 7) IN (${historyPlaceholders})
-    GROUP BY user_id, month_key
-    `,
-    seriesKeys,
-  ).catch(() => []))
-  const historyPenaltyMap = toMonthMap(await db.all<any>(
-    `
-    SELECT user_id, substr(penalty_date, 1, 7) as month_key, SUM(amount) as total
-    FROM user_penalties
-    WHERE substr(penalty_date, 1, 7) IN (${historyPlaceholders})
-    GROUP BY user_id, month_key
-    `,
-    seriesKeys,
-  ).catch(() => []))
+  const monthRangeClause = (column: string) =>
+    `${column} >= ? AND ${column} < ?`
 
-  const wasteMonths = Array.from(new Set([...seriesKeys, month, prevMonth]))
-  const wasteByMonth = await getWasteSharesForMonths(db, wasteMonths).catch(() => new Map())
+  const [earningRows, shiftRows, bonusRows, penaltyRows, wasteByMonth, salesFigures] = await Promise.all([
+    db.all<any>(
+      `
+      SELECT user_id, substr(earned_date, 1, 7) as month_key, SUM(amount) as total
+      FROM order_item_earnings
+      WHERE ${monthRangeClause('earned_date')}
+      GROUP BY user_id, month_key
+      `,
+      [rangeFrom, rangeTo],
+    ),
+    db.all<any>(
+      `
+      SELECT user_id, substr(work_date, 1, 7) as month_key, SUM(hours) as total, COUNT(*) as shifts
+      FROM user_shifts
+      WHERE ${monthRangeClause('work_date')}
+      GROUP BY user_id, month_key
+      `,
+      [rangeFrom, rangeTo],
+    ).catch(() => []),
+    db.all<any>(
+      `
+      SELECT user_id, substr(bonus_date, 1, 7) as month_key, SUM(amount) as total
+      FROM user_bonuses
+      WHERE ${monthRangeClause('bonus_date')}
+      GROUP BY user_id, month_key
+      `,
+      [rangeFrom, rangeTo],
+    ).catch(() => []),
+    db.all<any>(
+      `
+      SELECT user_id, substr(penalty_date, 1, 7) as month_key, SUM(amount) as total
+      FROM user_penalties
+      WHERE ${monthRangeClause('penalty_date')}
+      GROUP BY user_id, month_key
+      `,
+      [rangeFrom, rangeTo],
+    ).catch(() => []),
+    getWasteSharesForMonths(db, heavyMonths).catch(() => new Map()),
+    loadSalesMonthFigures(db, heavyMonths).catch(() => ({
+      clients: new Map<number, number>(),
+      turnover: new Map<string, number>(),
+    })),
+  ])
+
+  const historyMap = toMonthMap(earningRows)
+  const historyHoursMap = toMonthMap(shiftRows)
+  const historyBonusMap = toMonthMap(bonusRows)
+  const historyPenaltyMap = toMonthMap(penaltyRows)
+  const shiftsCountMap = new Map<string, number>()
+  ;(shiftRows || []).forEach((row: any) => {
+    shiftsCountMap.set(`${row.user_id}_${row.month_key}`, Number(row.shifts) || 0)
+  })
+
   const wasteShareOf = (userId: number, key: string) => wasteByMonth.get(key)?.shares.get(userId) || 0
-  const salesBonusOfMonth = await salesBonusAmountMap(db, wasteMonths).catch(() => new Map<string, number>())
-  const salesBonusOf = (userId: number, key: string) => salesBonusOfMonth.get(`${userId}_${key}`) || 0
-  const salesCurrent: SalesManagerOutput[] = await loadSalesManagerOutput(db, month).catch(() => [])
-  const salesPrev: SalesManagerOutput[] = await loadSalesManagerOutput(db, prevMonth).catch(() => [])
-  const salesCurrentMap = new Map<number, SalesManagerOutput>(
-    salesCurrent.map((row) => [row.userId, row] as const),
-  )
-  const salesPrevMap = new Map<number, SalesManagerOutput>(
-    salesPrev.map((row) => [row.userId, row] as const),
-  )
+  const salesBonusOf = (userId: number, key: string) => {
+    if (!heavy.has(key)) return 0
+    return salesManagerBonusFromTurnover(salesFigures.turnover.get(`${userId}_${key}`) || 0).bonus
+  }
 
   const monthPayout = (userId: number, key: string, hourlyRate: number) => {
     const percent = historyMap.get(`${userId}_${key}`) || 0
@@ -514,35 +455,39 @@ router.get('/admin', asyncHandler(async (req, res) => {
     const hourlyPart = Math.round(hours * hourlyRate * 100) / 100
     const bonuses = historyBonusMap.get(`${userId}_${key}`) || 0
     const penalties = historyPenaltyMap.get(`${userId}_${key}`) || 0
+    const point: { month: string; total: number; net?: number } = { month: key, total: percent }
+    if (!heavy.has(key)) return point
     const waste = wasteShareOf(userId, key)
     const salesBonus = salesBonusOf(userId, key)
-    return {
-      month: key,
-      total: percent,
-      net: Math.max(0, percent + bonuses + salesBonus + hourlyPart - penalties - waste),
-    }
+    point.net = Math.max(0, percent + bonuses + salesBonus + hourlyPart - penalties - waste)
+    return point
   }
 
   const result = users.map((u: any) => {
-    const shift = shiftsMap.get(u.id) || { hours: 0, shifts: 0 }
-    const earnings = totalsCurrentMap.get(u.id) || 0
-    const totalPenalties = penaltiesMap.get(u.id) || 0
-    const totalBonuses = bonusesMap.get(u.id) || 0
+    const hours = historyHoursMap.get(`${u.id}_${month}`) || 0
+    const shifts = shiftsCountMap.get(`${u.id}_${month}`) || 0
+    const earnings = historyMap.get(`${u.id}_${month}`) || 0
+    const totalPenalties = historyPenaltyMap.get(`${u.id}_${month}`) || 0
+    const totalBonuses = historyBonusMap.get(`${u.id}_${month}`) || 0
     const hourlyRate = Number(u.hourly_rate) || 0
-    const hourlyPay = Math.round(shift.hours * hourlyRate * 100) / 100
+    const hourlyPay = Math.round(hours * hourlyRate * 100) / 100
     const totalWaste = wasteShareOf(u.id, month)
-    const sales = salesCurrentMap.get(u.id)
+    const salesTurnoverRaw = salesFigures.turnover.get(`${u.id}_${month}`) || 0
+    const salesClients = salesFigures.clients.get(Number(u.id)) || 0
+    const sales = salesClients > 0 || salesTurnoverRaw > 0
+      ? salesManagerBonusFromTurnover(salesTurnoverRaw)
+      : null
     const salesBonus = sales?.bonus || 0
     const totalNet = Math.max(
       0,
       Number(earnings) + Number(totalBonuses) + salesBonus + hourlyPay - Number(totalPenalties) - totalWaste,
     )
-    const previousPercent = totalsPrevMap.get(u.id) || 0
-    const previousHourlyPay = Math.round((shiftsPrevMap.get(u.id) || 0) * hourlyRate * 100) / 100
-    const previousBonuses = bonusesPrevMap.get(u.id) || 0
-    const previousPenalties = penaltiesPrevMap.get(u.id) || 0
+    const previousPercent = historyMap.get(`${u.id}_${prevMonth}`) || 0
+    const previousHourlyPay = Math.round((historyHoursMap.get(`${u.id}_${prevMonth}`) || 0) * hourlyRate * 100) / 100
+    const previousBonuses = historyBonusMap.get(`${u.id}_${prevMonth}`) || 0
+    const previousPenalties = historyPenaltyMap.get(`${u.id}_${prevMonth}`) || 0
     const previousWaste = wasteShareOf(u.id, prevMonth)
-    const previousSalesBonus = salesPrevMap.get(u.id)?.bonus || 0
+    const previousSalesBonus = salesBonusOf(u.id, prevMonth)
     const totalPreviousNet = Math.max(
       0,
       Number(previousPercent) + Number(previousBonuses) + previousSalesBonus + previousHourlyPay - Number(previousPenalties) - previousWaste,
@@ -559,7 +504,7 @@ router.get('/admin', asyncHandler(async (req, res) => {
       totalPreviousNet,
       totalPenalties,
       totalBonuses,
-      salesClients: sales?.clients || 0,
+      salesClients,
       salesTurnover: sales?.turnover || 0,
       salesBonus,
       salesRemainder: sales?.remainder || 0,
@@ -568,14 +513,20 @@ router.get('/admin', asyncHandler(async (req, res) => {
       hourlyRate,
       hourlyPay,
       totalNet,
-      hours: shift.hours,
-      shifts: shift.shifts,
+      hours,
+      shifts,
       history,
       yearHistory,
     }
   })
 
-  res.json({ month, previousMonth: prevMonth, historyMonths, users: result })
+  res.json({
+    month,
+    previousMonth: prevMonth,
+    historyMonths,
+    yearPayoutReady: yearPayout,
+    users: result,
+  })
 }))
 
 /**

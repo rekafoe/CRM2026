@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, FormField, Modal } from '../../components/common';
 import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
@@ -24,6 +24,10 @@ export const EarningsAdminPage: React.FC = () => {
   const navigate = useNavigate();
   const [month, setMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
+  const [yearStatus, setYearStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const yearStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const summaryLoadingRef = useRef(false);
+  const requestGen = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [departmentId, setDepartmentId] = useState<number | ''>('');
@@ -66,17 +70,26 @@ export const EarningsAdminPage: React.FC = () => {
   const [rolePercentSaving, setRolePercentSaving] = useState(false);
 
   const loadData = useCallback(async () => {
+    const gen = ++requestGen.current;
+    yearStatusRef.current = 'idle';
+    summaryLoadingRef.current = true;
+    setYearStatus('idle');
     try {
       setLoading(true);
       setError(null);
       const params: { month?: string; department_id?: number } = { month };
       if (departmentId !== '' && Number.isFinite(departmentId)) params.department_id = departmentId;
       const res = await getAdminEarnings(params);
+      if (gen !== requestGen.current) return;
       setRows(Array.isArray(res.data?.users) ? res.data.users : []);
     } catch (e: any) {
+      if (gen !== requestGen.current) return;
       setError(e?.response?.data?.message || 'Не удалось загрузить проценты сотрудников');
     } finally {
-      setLoading(false);
+      if (gen === requestGen.current) {
+        summaryLoadingRef.current = false;
+        setLoading(false);
+      }
     }
   }, [month, departmentId]);
 
@@ -144,6 +157,36 @@ export const EarningsAdminPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (activeTab !== 'analytics' || loading || summaryLoadingRef.current) return;
+    if (yearStatusRef.current !== 'idle') return;
+    let cancelled = false;
+    const gen = requestGen.current;
+    yearStatusRef.current = 'loading';
+    setYearStatus('loading');
+    const params: { month?: string; department_id?: number; year_payout: 1 } = { month, year_payout: 1 };
+    if (departmentId !== '' && Number.isFinite(departmentId)) params.department_id = departmentId;
+    getAdminEarnings(params)
+      .then((res) => {
+        if (cancelled || gen !== requestGen.current) return;
+        setRows(Array.isArray(res.data?.users) ? res.data.users : []);
+        yearStatusRef.current = 'ready';
+        setYearStatus('ready');
+      })
+      .catch(() => {
+        if (cancelled || gen !== requestGen.current) return;
+        yearStatusRef.current = 'error';
+        setYearStatus('error');
+      });
+    return () => {
+      cancelled = true;
+      if (yearStatusRef.current === 'loading') {
+        yearStatusRef.current = 'idle';
+        setYearStatus('idle');
+      }
+    };
+  }, [activeTab, loading, month, departmentId]);
 
   const openMonthOrders = useCallback(async (user: AdminUserRow, monthKey: string) => {
     setOrdersDetailLoading(true);
@@ -655,7 +698,7 @@ export const EarningsAdminPage: React.FC = () => {
 
       {/* Analytics tab */}
       {activeTab === 'analytics' && (
-        <EarningsAnalyticsPanel rows={rows} month={month} />
+        <EarningsAnalyticsPanel rows={rows} month={month} yearStatus={yearStatus} />
       )}
 
       {/* Employee tab */}
@@ -752,7 +795,7 @@ export const EarningsAdminPage: React.FC = () => {
       )}
 
       {/* Detail modal — история месяцев */}
-      <Modal isOpen={!!detailUser} onClose={() => setDetailUser(null)} title="Динамика начислений" size="md">
+      <Modal className="earn-modal" isOpen={!!detailUser} onClose={() => setDetailUser(null)} title="Динамика начислений" size="md">
         {detailUser && (
           <div className="earn-table-wrapper">
             <p className="earn-detail-hint">
@@ -793,6 +836,7 @@ export const EarningsAdminPage: React.FC = () => {
 
       {/* Orders by month modal */}
       <Modal
+        className="earn-modal"
         isOpen={!!ordersDetail}
         onClose={() => {
           setOrdersDetail(null);
@@ -900,7 +944,7 @@ export const EarningsAdminPage: React.FC = () => {
       </Modal>
 
       {/* Shift modal */}
-      <Modal isOpen={!!shiftUser} onClose={() => setShiftUser(null)} title="Рабочие часы" size="lg">
+      <Modal className="earn-modal" isOpen={!!shiftUser} onClose={() => setShiftUser(null)} title="Рабочие часы" size="lg">
         {shiftUser && (
           <>
             <div className="earn-shift-form">
@@ -963,7 +1007,7 @@ export const EarningsAdminPage: React.FC = () => {
       </Modal>
 
       {/* Penalty modal — выписка штрафов */}
-      <Modal isOpen={!!penaltyUser} onClose={() => setPenaltyUser(null)} title={penaltyUser ? `Штрафы: ${penaltyUser.name}` : 'Штрафы'} size="lg">
+      <Modal className="earn-modal" isOpen={!!penaltyUser} onClose={() => setPenaltyUser(null)} title={penaltyUser ? `Штрафы: ${penaltyUser.name}` : 'Штрафы'} size="lg">
         {penaltyUser && (
           <>
             <div className="earn-shift-form earn-penalty-form">
@@ -1022,7 +1066,7 @@ export const EarningsAdminPage: React.FC = () => {
       </Modal>
 
       {/* Bonus modal — начисление премий */}
-      <Modal isOpen={!!bonusUser} onClose={() => setBonusUser(null)} title={bonusUser ? `Премии: ${bonusUser.name}` : 'Премии'} size="lg">
+      <Modal className="earn-modal" isOpen={!!bonusUser} onClose={() => setBonusUser(null)} title={bonusUser ? `Премии: ${bonusUser.name}` : 'Премии'} size="lg">
         {bonusUser && (
           <>
             <div className="earn-shift-form earn-penalty-form">

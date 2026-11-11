@@ -900,8 +900,12 @@ export const updateRoleOrderPercents = (payload: { contactPercent: number; respo
   api.put<{ contactPercent: number; responsiblePercent: number }>('/earnings/role-order-percents', payload);
 export const getMyEarnings = (params?: { month?: string }) =>
   api.get('/earnings/me', { params });
-export const getAdminEarnings = (params?: { month?: string; history_months?: number; department_id?: number }) =>
-  api.get('/earnings/admin', { params });
+export const getAdminEarnings = (params?: {
+  month?: string;
+  history_months?: number;
+  department_id?: number;
+  year_payout?: 0 | 1;
+}) => api.get('/earnings/admin', { params });
 export type AdminEarningsOrderLine = {
   itemId: number;
   itemType: string;

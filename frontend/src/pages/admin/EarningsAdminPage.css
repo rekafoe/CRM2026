@@ -1,23 +1,13 @@
-/* =============================================
-   Проценты сотрудников — EarningsAdminPage
-   Стиль согласован с ProductManagement / ProductEditPage
-   ============================================= */
+/* Проценты сотрудников. Цвета только из токенов: Пудра и Deep Ink. */
 
 .earn-admin {
   max-width: 1440px;
   margin: 0 auto;
   padding: 24px 24px 48px;
-  animation: earnFadeIn 0.3s ease-out;
+  background: var(--pc-bg);
+  color: var(--pc-text);
 }
 
-@keyframes earnFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* =================================
-   Header
-   ================================= */
 .earn-admin__header {
   display: flex;
   justify-content: space-between;
@@ -25,10 +15,9 @@
   gap: 16px;
   margin-bottom: 24px;
   padding: 16px 24px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-r-card);
 }
 
 .earn-admin__header-left {
@@ -44,31 +33,18 @@
   gap: 12px;
 }
 
-.earn-admin__icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  background: #f1f5f9;
-  border-radius: 12px;
-  flex-shrink: 0;
-  border: 2px solid #e2e8f0;
-}
-
 .earn-admin__title {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--pc-text);
   line-height: 1.2;
 }
 
 .earn-admin__subtitle {
   margin: 2px 0 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--pc-muted);
 }
 
 .earn-admin__header-actions {
@@ -78,9 +54,12 @@
   flex-shrink: 0;
 }
 
-/* =================================
-   Stats
-   ================================= */
+.earn-admin .app-icon--circle {
+  background: var(--pc-accent);
+  border-color: var(--pc-accent);
+  color: var(--pc-on-accent);
+}
+
 .earn-admin__stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -89,33 +68,11 @@
 }
 
 .earn-stat-card {
-  background: #fff;
+  background: var(--pc-surface);
+  color: var(--pc-text);
   padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #e2e8f0;
-  position: relative;
-  overflow: hidden;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-.earn-stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: #475569;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.earn-stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-}
-
-.earn-stat-card:hover::before {
-  opacity: 1;
+  border-radius: var(--pc-r-card);
+  border: 1px solid var(--pc-border);
 }
 
 .earn-stat-card__header {
@@ -127,7 +84,7 @@
 
 .earn-stat-card__label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--pc-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -139,38 +96,42 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  background: #f1f5f9;
-  border-radius: 10px;
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-ink);
+  border-radius: var(--pc-r-control);
+}
+
+.earn-admin .earn-stat-card__icon .app-icon {
+  color: var(--pc-accent-ink);
 }
 
 .earn-stat-card__value {
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--pc-text);
   margin-bottom: 4px;
   line-height: 1;
 }
 
-.earn-stat-card__trend {
+.earn-stat-card__trend,
+.earn-stat-card__trend--neutral {
   font-size: 12px;
-  color: #22c55e;
+  color: var(--pc-muted);
   font-weight: 500;
 }
 
-.earn-stat-card__trend--neutral {
-  color: #64748b;
+.earn-admin__filters,
+.earn-admin__custom-percent,
+.earn-admin__tabs,
+.earn-admin__card {
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-r-card);
 }
 
-/* =================================
-   Filters
-   ================================= */
 .earn-admin__filters {
-  background: #fff;
   padding: 20px 24px;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #e2e8f0;
   margin-bottom: 24px;
 }
 
@@ -181,21 +142,32 @@
   flex-wrap: wrap;
 }
 
-.earn-filter-input {
+.earn-admin .form-label,
+.modal-content.earn-modal .form-label {
+  color: var(--pc-text);
+}
+
+.earn-filter-input,
+.earn-filter-select {
   padding: 10px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid var(--pc-border-control);
+  border-radius: var(--pc-r-input);
   font-size: 13px;
-  background: #f8fafc;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  background: var(--pc-surface);
+  color: var(--pc-text);
   min-width: 160px;
 }
 
-.earn-filter-input:focus {
+.earn-filter-select {
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.earn-filter-input:focus,
+.earn-filter-select:focus {
   outline: none;
-  border-color: #64748b;
-  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
-  background: #fff;
+  border-color: var(--pc-focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc-focus-ring) 18%, transparent);
 }
 
 .earn-filter-input--compact {
@@ -204,81 +176,84 @@
   min-width: 80px;
 }
 
-.earn-filter-select {
-  padding: 10px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 13px;
-  background: #f8fafc;
-  cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  min-width: 180px;
-}
-
-.earn-filter-select:focus {
-  outline: none;
-  border-color: #64748b;
-  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
-}
-
-.earn-sales-note {
+.earn-sales-note,
+.earn-chart-caption,
+.earn-detail-hint {
   margin: 0 0 12px;
-  color: #64748b;
+  color: var(--pc-muted);
   font-size: 13px;
   line-height: 1.45;
 }
 
-/* =================================
-   Tabs
-   ================================= */
+.earn-chart-caption {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.earn-admin__custom-percent {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+}
+
+.earn-admin__custom-percent h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--pc-text);
+}
+
+.earn-admin__custom-percent p {
+  margin: 0;
+  max-width: 640px;
+  color: var(--pc-muted);
+  font-size: 14px;
+}
+
+.earn-admin__custom-percent-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.earn-admin__custom-percent-form .earn-filter-input {
+  width: 120px;
+}
+
 .earn-admin__tabs {
   display: flex;
   gap: 4px;
   margin-bottom: 24px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
   padding: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .earn-tab {
   flex: 1;
   padding: 10px 20px;
-  border: none;
-  border-radius: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--pc-r-control);
   background: transparent;
   font-size: 13px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--pc-muted);
   cursor: pointer;
-  transition: all 0.2s;
 }
 
 .earn-tab:hover {
-  color: #334155;
-  background: #f8fafc;
+  color: var(--pc-text);
+  background: var(--pc-row-hover);
 }
 
-.earn-tab--active {
-  background: #475569;
-  color: white;
-  box-shadow: 0 2px 8px rgba(71, 85, 105, 0.15);
+.earn-admin .earn-tab--active,
+.earn-admin .earn-tab--active:hover {
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-ink);
+  border-color: var(--pc-accent);
 }
 
-.earn-tab--active:hover {
-  background: #334155;
-  color: white;
-}
-
-/* =================================
-   Card
-   ================================= */
 .earn-admin__card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   margin-bottom: 24px;
 }
@@ -288,35 +263,25 @@
   align-items: center;
   gap: 10px;
   padding: 16px 24px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--pc-border);
 }
 
 .earn-admin__card-header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--pc-text);
 }
 
 .earn-admin__card-badge {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--pc-badge-quiet-bg);
+  color: var(--pc-badge-quiet-ink);
   font-size: 12px;
   font-weight: 600;
   padding: 2px 10px;
-  border-radius: 10px;
+  border-radius: var(--pc-r-stamp);
 }
 
-.earn-chart-caption {
-  margin: 0 0 12px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-/* =================================
-   Table
-   ================================= */
 .earn-table-wrapper {
   overflow-x: auto;
 }
@@ -325,10 +290,14 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  color: var(--pc-text);
 }
 
-.earn-table thead {
-  background: #475569;
+.earn-table thead,
+.earn-admin .earn-table thead th,
+.modal-content.earn-modal .earn-table thead th {
+  background: var(--pc-surface-sunken);
+  color: var(--pc-muted);
 }
 
 .earn-table thead th {
@@ -338,68 +307,48 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: white;
-  position: relative;
+  background: var(--pc-surface-sunken);
+  color: var(--pc-muted);
   white-space: nowrap;
 }
 
-.earn-table thead th::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 25%;
-  bottom: 25%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.earn-table thead th:last-child::after {
-  display: none;
-}
-
-.earn-table tbody tr {
-  transition: background 0.15s;
-}
-
-.earn-table tbody tr:hover {
-  background: #f8fafc;
+.earn-table tbody tr:hover,
+.earn-order-row:hover {
+  background: var(--pc-row-hover);
 }
 
 .earn-table tbody td {
   padding: 12px 18px;
   font-size: 13px;
-  color: #334155;
+  color: var(--pc-text);
   vertical-align: middle;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--pc-border);
 }
 
 .earn-cell-name {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--pc-text);
 }
 
-.earn-cell-money {
-  font-weight: 600;
-  color: #059669;
-}
-
+.earn-cell-money,
 .earn-cell-money--bonus {
-  color: #059669;
+  font-weight: 600;
+  color: var(--pc-success-ink);
 }
 
 .earn-cell-money--penalty {
-  color: #dc2626;
+  color: var(--pc-danger-ink);
 }
 
 .earn-cell-money--net {
-  color: #0f172a;
+  color: var(--pc-text);
   font-weight: 700;
 }
 
 .earn-cell-hint {
   margin-top: 2px;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--pc-muted);
   font-weight: 500;
 }
 
@@ -408,9 +357,22 @@
   gap: 6px;
 }
 
-/* =================================
-   Analytics
-   ================================= */
+.earn-month-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--pc-accent-ink);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.earn-month-link:hover {
+  color: var(--pc-accent);
+}
+
 .earn-analytics {
   padding: 20px 24px;
 }
@@ -424,11 +386,12 @@
 }
 
 .earn-trend-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  background: var(--pc-surface-sunken);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-r-card);
   padding: 14px 18px;
   min-width: 220px;
+  color: var(--pc-text);
 }
 
 .earn-trend-badge {
@@ -436,85 +399,43 @@
   font-size: 12px;
   font-weight: 600;
   padding: 2px 10px;
-  border-radius: 8px;
+  border-radius: var(--pc-r-stamp);
   margin-bottom: 6px;
+  background: var(--pc-neutral-soft);
+  color: var(--pc-muted);
 }
 
 .earn-trend-badge--up {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--pc-success-soft);
+  color: var(--pc-success-ink);
 }
 
 .earn-trend-badge--down {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.earn-trend-badge--neutral {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--pc-danger-soft);
+  color: var(--pc-danger-ink);
 }
 
 .earn-trend-value {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--pc-text);
+}
+
+.earn-trend-pct,
+.earn-trend-period {
+  font-size: 12px;
+  color: var(--pc-muted);
+  font-weight: 500;
 }
 
 .earn-trend-pct {
   margin-left: 6px;
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 500;
 }
 
 .earn-trend-period {
-  font-size: 12px;
-  color: #94a3b8;
   margin-top: 4px;
 }
 
-/* =================================
-   Chart
-   ================================= */
-.earn-chart {
-  padding: 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #fafbfc;
-  margin-bottom: 16px;
-}
-
-.earn-chart__svg {
-  width: 100%;
-  height: 140px;
-}
-
-.earn-chart__line {
-  fill: none;
-  stroke: #475569;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.earn-chart__dot {
-  fill: #475569;
-  stroke: #fff;
-  stroke-width: 1;
-}
-
-.earn-chart__labels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-/* =================================
-   Shift form (modal)
-   ================================= */
 .earn-shift-form {
   display: flex;
   gap: 12px;
@@ -525,30 +446,97 @@
 
 .earn-penalty-form {
   padding-bottom: 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--pc-border);
   margin-bottom: 16px;
 }
 
-.earn-penalty-summary {
+.earn-penalty-summary,
+.earn-bonus-summary {
   font-size: 13px;
-  color: #475569;
+  color: var(--pc-muted);
   margin-bottom: 16px;
 }
 
 .earn-penalty-summary strong,
 .earn-bonus-summary strong {
-  color: #0f172a;
+  color: var(--pc-text);
 }
 
-.earn-bonus-summary {
-  font-size: 13px;
-  color: #475569;
-  margin-bottom: 16px;
+.earn-orders-detail__summary {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: var(--pc-text);
 }
 
-/* =================================
-   Responsive
-   ================================= */
+.earn-orders-detail__loading,
+.earn-orders-detail__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--pc-muted);
+}
+
+.earn-order-row {
+  cursor: pointer;
+}
+
+.earn-status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--pc-r-stamp);
+  background: var(--pc-neutral-soft);
+  border: 1px solid var(--pc-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pc-text);
+}
+
+.earn-table--nested,
+.earn-order-lines-row > td {
+  background: var(--pc-surface-sunken);
+}
+
+.earn-table--nested {
+  margin: 8px 0 8px 12px;
+  width: calc(100% - 12px);
+}
+
+.earn-order-lines-row > td {
+  padding: 0 8px 12px;
+}
+
+.earn-admin .btn-primary,
+.modal-content.earn-modal .btn-primary {
+  background: var(--pc-accent);
+  border-color: var(--pc-accent);
+  color: var(--pc-on-accent);
+}
+
+.earn-admin .btn-secondary,
+.modal-content.earn-modal .btn-secondary {
+  background: var(--pc-surface);
+  border-color: var(--pc-border-strong);
+  color: var(--pc-text);
+}
+
+.modal-content.earn-modal {
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  border: 1px solid var(--pc-border);
+}
+
+.modal-content.earn-modal .modal-header {
+  background: var(--pc-surface);
+  border-bottom-color: var(--pc-border);
+}
+
+.modal-content.earn-modal .modal-header h2,
+.modal-content.earn-modal .text-primary {
+  color: var(--pc-text);
+}
+
 @media (max-width: 1100px) {
   .earn-admin__stats {
     grid-template-columns: repeat(2, 1fr);
@@ -600,6 +588,13 @@
   }
 }
 
+@media (max-width: 720px) {
+  .earn-admin__custom-percent {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 @media (max-width: 480px) {
   .earn-admin__title {
     font-size: 18px;
@@ -611,114 +606,5 @@
 
   .earn-admin__tabs {
     flex-direction: column;
-  }
-}
-
-.earn-month-link {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  color: #2563eb;
-  font: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.earn-month-link:hover {
-  color: #1d4ed8;
-}
-
-.earn-detail-hint {
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.earn-orders-detail__summary {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-  font-size: 14px;
-  color: #475569;
-}
-
-.earn-orders-detail__loading,
-.earn-orders-detail__empty {
-  padding: 24px;
-  text-align: center;
-  color: #94a3b8;
-}
-
-.earn-order-row {
-  cursor: pointer;
-}
-
-.earn-order-row:hover {
-  background: #f8fafc;
-}
-
-.earn-status-pill {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: var(--pc-r-control, 8px);
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #334155;
-}
-
-.earn-table--nested {
-  margin: 8px 0 8px 12px;
-  width: calc(100% - 12px);
-  background: #f8fafc;
-}
-
-.earn-order-lines-row > td {
-  padding: 0 8px 12px;
-  background: #f8fafc;
-}
-
-.earn-admin__custom-percent {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
-  margin-bottom: 24px;
-  padding: 16px 24px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-}
-
-.earn-admin__custom-percent h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-}
-
-.earn-admin__custom-percent p {
-  margin: 0;
-  max-width: 640px;
-  color: #64748b;
-  font-size: 14px;
-}
-
-.earn-admin__custom-percent-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.earn-admin__custom-percent-form .earn-filter-input {
-  width: 120px;
-}
-
-@media (max-width: 720px) {
-  .earn-admin__custom-percent {
-    flex-direction: column;
-    align-items: stretch;
   }
 }

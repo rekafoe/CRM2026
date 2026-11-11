@@ -8,6 +8,7 @@ import './EarningsAnalyticsPanel.css';
 type EarningsAnalyticsPanelProps = {
   rows: AdminUserRow[];
   month: string;
+  yearStatus: 'idle' | 'loading' | 'ready' | 'error';
 };
 
 const toNumber = (value: unknown) => {
@@ -22,7 +23,7 @@ const formatPercent = (value: number | null) => {
 
 const formatCompactNumber = (value: number) => value.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
 
-export const EarningsAnalyticsPanel: React.FC<EarningsAnalyticsPanelProps> = ({ rows, month }) => {
+export const EarningsAnalyticsPanel: React.FC<EarningsAnalyticsPanelProps> = ({ rows, month, yearStatus }) => {
   const analytics = useMemo(() => buildEarningsAnalytics(rows, month), [rows, month]);
 
   return (
@@ -72,7 +73,13 @@ export const EarningsAnalyticsPanel: React.FC<EarningsAnalyticsPanelProps> = ({ 
             <span className="earn-admin__card-badge">{month.slice(0, 4)}</span>
           </div>
           <div className="earn-analytics-card__body">
-            {analytics.historyTotals.length > 0 ? (
+            {yearStatus !== 'ready' ? (
+              <div className="earn-empty-state">
+                {yearStatus === 'error'
+                  ? 'Не удалось посчитать динамику года'
+                  : 'Считаем динамику года…'}
+              </div>
+            ) : analytics.historyTotals.length > 0 ? (
               <>
                 <p className="earn-chart-caption">Календарный год. К выплате: проценты, часы, премии и штрафы. Высота столбца считается от нуля.</p>
                 <EarningsBarChart items={analytics.historyTotals} highlightMonth={month} />
