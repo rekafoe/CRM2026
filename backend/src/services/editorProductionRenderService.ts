@@ -482,6 +482,36 @@ function childLocalTop(parent: FabricObj, child: FabricObj, childH: number): num
   return parentH / 2 + cssNumber(child.top) - originOffset(child.originY, childH)
 }
 
+let photoFieldClipSerial = 0
+
+function buildPhotoFieldSvgClip(opts: {
+  src: string
+  frameW: number
+  frameH: number
+  boxW: number
+  boxH: number
+  clipD: string
+  evenodd: boolean
+  imageLeft: number
+  imageTop: number
+  imageW: number
+  imageH: number
+  angle: number
+}): string {
+  photoFieldClipSerial += 1
+  const id = `pc-photo-clip-${photoFieldClipSerial}`
+  const sx = opts.frameW / Math.max(1, opts.boxW)
+  const sy = opts.frameH / Math.max(1, opts.boxH)
+  const scaled = Math.abs(sx - 1) > 0.0001 || Math.abs(sy - 1) > 0.0001
+  const pathTransform = scaled ? ` transform="scale(${sx} ${sy})"` : ''
+  const rule = opts.evenodd ? 'evenodd' : 'nonzero'
+  const imageRotate = opts.angle
+    ? ` transform="rotate(${opts.angle} ${opts.imageLeft + opts.imageW / 2} ${opts.imageTop + opts.imageH / 2})"`
+    : ''
+  const href = escapeHtml(opts.src)
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${opts.frameW}" height="${opts.frameH}" viewBox="0 0 ${opts.frameW} ${opts.frameH}" style="position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden"><defs><clipPath id="${id}" clipPathUnits="userSpaceOnUse"><g${pathTransform}><path d="${escapeHtml(opts.clipD)}" clip-rule="${rule}" fill-rule="${rule}"/></g></clipPath></defs><image href="${href}" xlink:href="${href}" x="${opts.imageLeft}" y="${opts.imageTop}" width="${opts.imageW}" height="${opts.imageH}" preserveAspectRatio="none" clip-path="url(#${id})"${imageRotate}/></svg>`
+}
+
 function buildFilledPhotoFieldHtml(
   group: FabricObj,
   fileNameByUrl: Map<string, string>,
@@ -496,17 +526,31 @@ function buildFilledPhotoFieldHtml(
   const shape = String(group.photoFieldShape ?? 'rect')
   const clipD = typeof group.photoFieldClipPath === 'string' ? group.photoFieldClipPath.trim() : ''
   const evenodd = group.photoFieldFillRule === 'evenodd'
-  const clipCss = shape === 'ellipse'
-    ? 'border-radius:50%'
-    : shape === 'path' && clipD
-      ? `clip-path:path(${evenodd ? 'evenodd, ' : ''}'${clipD.replace(/'/g, '')}')`
-      : ''
+  const clipCss = shape === 'ellipse' ? 'border-radius:50%' : ''
   const outer = buildBoxStyle(group, { width: frameW, height: frameH, overflow: 'hidden' })
     + (clipCss ? `;${clipCss}` : '')
   const imageW = Math.max(1, cssNumber(image.width, 1) * cssNumber(image.scaleX, 1))
   const imageH = Math.max(1, cssNumber(image.height, 1) * cssNumber(image.scaleY, 1))
   const imageLeft = frameW / 2 + cssNumber(image.left) - originOffset(image.originX, imageW)
   const imageTop = frameH / 2 + cssNumber(image.top) - originOffset(image.originY, imageH)
+  if (shape === 'path' && clipD) {
+    const boxW = Math.max(1, cssNumber(group.photoFieldClipBoxW, frameW))
+    const boxH = Math.max(1, cssNumber(group.photoFieldClipBoxH, frameH))
+    return `<div style="${outer}">${buildPhotoFieldSvgClip({
+      src,
+      frameW,
+      frameH,
+      boxW,
+      boxH,
+      clipD,
+      evenodd,
+      imageLeft,
+      imageTop,
+      imageW,
+      imageH,
+      angle: cssNumber(image.angle, 0),
+    })}</div>`
+  }
   const imageStyle = [
     'position:absolute',
     `left:${imageLeft}px`,
