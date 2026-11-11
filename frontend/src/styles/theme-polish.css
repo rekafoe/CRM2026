@@ -23,22 +23,31 @@
   border-color: var(--pc-accent-hover);
 }
 
-:root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(:disabled),
+:root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(.pc-btn--quiet):not(.pc-btn--soft):not(.pc-btn--attention):not(:disabled),
 :root[data-theme='powder'] .pc-workplace-pool:not(:disabled) {
   border-color: #E09AB8;
   color: var(--pc-accent);
 }
 
-:root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(:disabled):hover,
+:root[data-theme='powder'] .pc-btn:not(.pc-btn--primary):not(.pc-btn--quiet):not(.pc-btn--soft):not(.pc-btn--attention):not(:disabled):hover,
 :root[data-theme='powder'] .pc-workplace-pool:not(:disabled):hover {
   background: var(--pc-accent-soft);
   border-color: var(--pc-accent);
   color: var(--pc-accent);
 }
 
-:root[data-theme='powder'] .pc-track__step.is-current .pc-track__mark,
-:root[data-theme='powder'] .pc-track__step.is-done .pc-track__mark {
-  height: 3px;
+:root[data-theme='powder'] .pc-btn--quiet:not(:disabled),
+:root[data-theme='dark'] .pc-btn--quiet:not(:disabled) {
+  border-color: var(--pc-border);
+  background: transparent;
+  color: var(--pc-muted);
+}
+
+:root[data-theme='powder'] .pc-btn--quiet:not(:disabled):hover,
+:root[data-theme='dark'] .pc-btn--quiet:not(:disabled):hover {
+  background: var(--pc-surface-subtle);
+  border-color: var(--pc-border-strong);
+  color: var(--pc-text);
 }
 
 :root[data-theme='powder'] .public-design-editor--admin .public-design-editor__stage,

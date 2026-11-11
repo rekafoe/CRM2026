@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Order } from '../../types';
 import { AssignableUserSelect } from '../orders/AssignableUserSelect';
 import { OrderTransferModal } from '../orders/OrderTransferModal';
@@ -16,7 +16,6 @@ import { isPoolOrderStatusId } from '../../hooks/useOrderStatuses';
 import { OrderDeliveryBlock } from '../orders/OrderDeliveryBlock';
 import { OrderPoolPaymentSummary } from './OrderPoolPaymentSummary';
 import { getPoolPaymentInfo } from '../../utils/poolPaymentStatus';
-import { Menu, MenuItem } from '../ui/Menu';
 import { OrderStamp } from '../order/OrderStamp';
 import { AppIcon } from '../ui/AppIcon';
 
@@ -100,8 +99,6 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   children,
 }) => {
   const [transferOpen, setTransferOpen] = useState(false);
-  const [prepayMenuOpen, setPrepayMenuOpen] = useState(false);
-  const prepayMenuRef = useRef<HTMLDivElement>(null);
   const responsibleId = getEffectiveResponsibleUserId(order);
   const canReassign = isPoolOrderStatusId(Number(order.status));
   const showCancelled = order.is_cancelled === 1;
@@ -124,22 +121,6 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
   const taxId = customer?.tax_id || '';
   const contactName = customer?.authorized_person || '';
 
-  useEffect(() => {
-    if (!prepayMenuOpen) return;
-    const onPointer = (event: MouseEvent) => {
-      if (!prepayMenuRef.current?.contains(event.target as Node)) setPrepayMenuOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPrepayMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onPointer);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [prepayMenuOpen]);
-
   return (
     <div className="order-pool-detail-header">
       <div className="pool-passport__identity">
@@ -154,6 +135,20 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
             status={statusLabel ? { id: Number(order.status), name: statusLabel } : { id: Number(order.status), name: '' }}
             onlineCancelled={showCancelled}
           />
+          <button
+            type="button"
+            className="lg-btn lg-btn--attention pool-passport__transfer"
+            onClick={() => setTransferOpen(true)}
+            title={
+              fulfillmentChip?.variant === 'pickup'
+                ? `Передать заказ на точку «${fulfillmentChip.pointName}»`
+                : 'Передать коллеге или в другой павильон'
+            }
+          >
+            {fulfillmentChip?.variant === 'pickup'
+              ? `Передать на ${fulfillmentChip.pointName}`
+              : 'Передать'}
+          </button>
         </div>
         <div className="pool-passport__tags">
           {needsAssign ? <span className="pc-order-tag pc-order-tag--open">Без ответственного</span> : null}
@@ -296,49 +291,16 @@ export const OrderPoolDetailHeader: React.FC<OrderPoolDetailHeaderProps> = ({
           </button>
         )}
         <div className="order-detail-actions" role="toolbar" aria-label="Действия по заказу">
-          <div className="pc-menu-anchor" ref={prepayMenuRef}>
-            <button
-              type="button"
-              className="lg-btn"
-              aria-expanded={prepayMenuOpen}
-              aria-haspopup="menu"
-              onClick={() => setPrepayMenuOpen((open) => !open)}
-            >
-              Предоплата ▾
-            </button>
-            {prepayMenuOpen ? (
-              <Menu label="Предоплата">
-                <MenuItem onClick={() => { setPrepayMenuOpen(false); onShowPrepayment(); }}>
-                  Внести предоплату
-                </MenuItem>
-                <MenuItem onClick={() => { setPrepayMenuOpen(false); onSendPaymentLink(); }}>
-                  Ссылка на оплату · BePaid
-                </MenuItem>
-              </Menu>
-            ) : null}
-          </div>
-          <button type="button" className="lg-btn" onClick={onShowFiles}>
+          <button type="button" className="lg-btn lg-btn--primary lg-btn--lg" onClick={onShowFiles}>
             <AppIcon name="folder" size="xs" />
             Файлы
           </button>
-          <button
-            type="button"
-            className={`lg-btn${fulfillmentChip?.variant === 'pickup' ? ' lg-btn--primary' : ''}`}
-            onClick={() => setTransferOpen(true)}
-            title={
-              fulfillmentChip?.variant === 'pickup'
-                ? `Передать заказ на точку «${fulfillmentChip.pointName}»`
-                : 'Передать коллеге или в другой павильон'
-            }
-          >
-            {fulfillmentChip?.variant === 'pickup'
-              ? `Передать на ${fulfillmentChip.pointName}`
-              : (
-                <>
-                  <span aria-hidden="true">→</span>
-                  {' '}Передать
-                </>
-              )}
+          <button type="button" className="lg-btn lg-btn--primary lg-btn--lg" onClick={onShowPrepayment}>
+            <AppIcon name="card" size="xs" />
+            Внести предоплату
+          </button>
+          <button type="button" className="lg-btn lg-btn--quiet" onClick={onSendPaymentLink}>
+            Ссылка на оплату
           </button>
           {showCancelOrder && (
             <button type="button" className="lg-btn lg-btn--danger" onClick={onCancelOrder}>

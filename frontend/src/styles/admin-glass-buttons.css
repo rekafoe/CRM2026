@@ -42,6 +42,55 @@
   border-color: var(--pc-accent-hover, #1a45c2);
 }
 
+.lg-btn--lg {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.lg-btn--soft {
+  border-color: color-mix(in srgb, var(--pc-accent, #1d4ed8) 42%, var(--pc-border, #e2dfd7));
+  background: var(--pc-accent-soft, #e9eefb);
+  color: var(--pc-accent-ink, #1d4ed8);
+  font-weight: 600;
+}
+
+.lg-btn--soft:hover:not(:disabled) {
+  border-color: var(--pc-accent, #1d4ed8);
+  background: var(--pc-accent-soft, #e9eefb);
+  color: var(--pc-accent-ink, #1d4ed8);
+}
+
+.lg-btn--quiet {
+  border-color: var(--pc-border, #e2dfd7);
+  background: transparent;
+  color: var(--pc-muted, #5c626c);
+  font-weight: 500;
+}
+
+.lg-btn--quiet:hover:not(:disabled) {
+  background: var(--pc-surface-subtle, #efece6);
+  border-color: var(--pc-border-strong, #d0ccc2);
+  color: var(--pc-text, #141619);
+}
+
+.lg-btn--attention {
+  min-height: 40px;
+  padding: 0 14px;
+  border-color: var(--pc-accent, #1d4ed8);
+  background: var(--pc-surface, #fff);
+  color: var(--pc-accent-ink, #1d4ed8);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--pc-accent, #1d4ed8);
+}
+
+.lg-btn--attention:hover:not(:disabled) {
+  background: var(--pc-accent, #1d4ed8);
+  border-color: var(--pc-accent, #1d4ed8);
+  color: var(--pc-on-accent, #fff);
+}
+
 .lg-btn--success {
   background: var(--pc-success-soft, #e6f1ea);
   border-color: var(--pc-border, #e2dfd7);

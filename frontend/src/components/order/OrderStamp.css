@@ -54,26 +54,30 @@
 }
 
 .pc-stamp--at_pickup {
-  background: transparent;
-  border-color: var(--pc-border-strong);
-  color: var(--pc-text);
+  background: var(--pc-info-soft);
+  border-color: transparent;
+  color: var(--pc-info-ink);
 }
 
 .pc-stamp--picked_up {
-  background: transparent;
-  border-color: var(--pc-border-strong);
-  color: var(--pc-text);
+  background: var(--pc-success-soft);
+  border-color: transparent;
+  color: var(--pc-success-ink);
 }
 
 .pc-stamp--picked_up .pc-stamp__mark,
 .pc-stamp--completed .pc-stamp__mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
   background: var(--pc-success);
 }
 
 .pc-stamp--completed {
-  background: transparent;
-  border-color: var(--pc-border);
-  color: var(--pc-muted);
+  background: var(--pc-success-soft);
+  border-color: color-mix(in srgb, var(--pc-success) 50%, var(--pc-border));
+  color: var(--pc-success-ink);
+  font-weight: 700;
 }
 
 .pc-stamp--cancelled {

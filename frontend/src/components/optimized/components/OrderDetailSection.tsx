@@ -102,6 +102,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   });
   const roleOnShift = assignableOnShift.length > 0 ? assignableOnShift : operatorsToday;
   const roleAll = assignableAll.length > 0 ? assignableAll : (allUsers.length > 0 ? allUsers : operatorsToday);
+  const canTransfer = (roleOnShift.length > 0 || roleAll.length > 0) && Boolean(onAssigneesChange);
 
   useEffect(() => {
     getDepartments()
@@ -359,18 +360,27 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
           )}
         </div>
         <div className="pc-order-head__actions">
-          <button type="button" className="pc-btn" onClick={() => onOpenCalculator()}>
+          {canTransfer ? (
+            <button
+              type="button"
+              className="pc-btn pc-btn--attention"
+              onClick={() => setTransferOpen(true)}
+              title="Передать коллеге или в другой павильон"
+            >
+              Передать
+            </button>
+          ) : null}
+          <button type="button" className="pc-btn pc-btn--primary pc-btn--lg" onClick={() => onOpenCalculator()}>
             <AppIcon name="plus" size="xs" /> Добавить продукт
           </button>
         </div>
       </header>
       <div className="detail-header detail-header--notes-aligned">
         <div className="pc-order-actions">
-              <div className="pc-btn-group">
               <button
                 type="button"
                 onClick={onShowFilesModal}
-                className="pc-btn"
+                className="pc-btn pc-btn--primary pc-btn--lg"
                 title="Файлы макетов"
               >
                 <AppIcon name="folder" size="xs" /> Файлы
@@ -378,12 +388,11 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               <button
                 type="button"
                 onClick={onShowPrepaymentModal}
-                className="pc-btn"
+                className="pc-btn pc-btn--primary pc-btn--lg"
                 title="Внести предоплату"
               >
                 <AppIcon name="card" size="xs" /> Внести предоплату
               </button>
-              </div>
               {orderAmounts.prepayment > 0 && onRemovePrepayment && (
                 <button
                   type="button"
@@ -398,7 +407,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                 type="button"
                 onClick={handleGenerateBlank}
                 disabled={isGeneratingPdf}
-                className="pc-btn"
+                className="pc-btn pc-btn--soft"
                 title="Создать PDF бланк заказа"
               >
                 {isGeneratingPdf ? <><AppIcon name="refresh" size="xs" /> Генерация...</> : <><AppIcon name="document" size="xs" /> Бланк</>}
@@ -424,7 +433,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                       if (!generatingKind) setDocsMenuOpen((v) => !v);
                     }}
                     disabled={Boolean(generatingKind)}
-                    className="pc-btn"
+                    className="pc-btn pc-btn--soft"
                     title="Договор, акт, счёт и товарная накладная по этому заказу"
                   >
                     {generatingKind
@@ -449,7 +458,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     if (!isGeneratingReceipt) setReceiptMenuOpen((v) => !v);
                   }}
                   disabled={isGeneratingReceipt}
-                  className="pc-btn"
+                  className="pc-btn pc-btn--soft"
                   title="Товарный чек: по заказу или бланк"
                 >
                   {isGeneratingReceipt ? <><AppIcon name="refresh" size="xs" /> Генерация...</> : <><AppIcon name="receipt" size="xs" /> Товарный чек</>}
@@ -468,7 +477,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     e.stopPropagation();
                     setDiscountMenuOpen((v) => !v);
                   }}
-                  className="pc-btn"
+                  className="pc-btn pc-btn--quiet"
                   title="Скидка на итог заказа"
                 >
                   <AppIcon name="tag" size="xs" /> {discountPercent > 0 ? `Скидка ${discountPercent}%` : 'Скидка'}
@@ -494,7 +503,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     e.stopPropagation();
                     setPaymentChannelMenuOpen((v) => !v);
                   }}
-                  className="pc-btn"
+                  className="pc-btn pc-btn--quiet"
                   title="Канал оплаты"
                 >
                   Канал: {channelLabel}
@@ -514,16 +523,6 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   </Menu>
                 )}
               </div>
-              {((roleOnShift.length > 0 || roleAll.length > 0) && onAssigneesChange) ? (
-                <button
-                  type="button"
-                  className="pc-btn"
-                  onClick={() => setTransferOpen(true)}
-                  title="Передать коллеге или в другой павильон"
-                >
-                  Передать
-                </button>
-              ) : null}
             </div>
         <div className="detail-header__main pc-order-data">
         <div className="detail-header__col-left">

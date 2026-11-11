@@ -6,6 +6,7 @@ import { MoneyAmount } from '../ui';
 import { readMaterialShortage } from '../order/materialShortage';
 import type { OrdersListTab } from './hooks/useOptimizedAppData';
 import { OrderStamp } from '../order/OrderStamp';
+import { getOrderReadyLabel } from '../orderPool/orderPoolUtils';
 import './styles/OrderList.css';
 
 interface StatusInfo {
@@ -62,6 +63,15 @@ const OrderItem = memo<{
 
   const isAssignedAsExecutor =
     order.assigned_as_executor === true || order.assigned_as_executor === 1;
+  const isCompleted =
+    statusInfo?.code === 'completed' ||
+    statusInfo?.name === 'Завершён' ||
+    statusValue === 7;
+  const readiness = getOrderReadyLabel(order);
+  const readyText = [
+    readiness.readyAtLabel !== '—' ? readiness.readyAtLabel : '',
+    readiness.label,
+  ].filter(Boolean).join(' · ');
   const hasMaterialShortage = (order.items || []).some(
     (item) => readMaterialShortage(item.params).length > 0,
   );
@@ -98,7 +108,7 @@ const OrderItem = memo<{
 
   return (
     <li
-      className={`order-item order-list__item ${isActive ? 'active' : ''} ${isAssignedAsExecutor ? 'order-item--executor' : ''}`}
+      className={`order-item order-list__item ${isActive ? 'active' : ''} ${isAssignedAsExecutor ? 'order-item--executor' : ''} ${isCompleted ? 'is-completed' : ''}`}
       onClick={handleClick}
     >
       <div className="order-item__header">
@@ -110,6 +120,12 @@ const OrderItem = memo<{
           {customerLabel}
         </div>
       )}
+      {readyText ? (
+        <div className={`order-item__ready${readiness.isHourSla ? ' is-hour-sla' : ''}`}>
+          <span className="order-item__ready-label">Готовность</span>
+          {readyText}
+        </div>
+      ) : null}
       {isAssignedAsExecutor && (
         <div className="order-item__executor-badge">
           Исполнитель по позиции
