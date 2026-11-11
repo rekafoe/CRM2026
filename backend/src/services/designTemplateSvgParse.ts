@@ -336,17 +336,19 @@ function transformSvgPathData(d: string, t: SvgTransform): string {
     }
     if (lower === 'h') {
       for (const x of nums) {
-        const p = absPt(x, 0, rel)
+        const nx = rel ? currentX + x : x
+        const p = applyTransform(t, nx, currentY)
         parts.push(`L ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`)
-        currentX = rel ? currentX + x : x
+        currentX = nx
       }
       continue
     }
     if (lower === 'v') {
       for (const y of nums) {
-        const p = absPt(0, y, rel)
+        const ny = rel ? currentY + y : y
+        const p = applyTransform(t, currentX, ny)
         parts.push(`L ${formatSvgPathNumber(p.x)} ${formatSvgPathNumber(p.y)}`)
-        currentY = rel ? currentY + y : y
+        currentY = ny
       }
       continue
     }
@@ -795,11 +797,17 @@ function parseSvgPathApproxBounds(d: string): GeometryRect | null {
       continue
     }
     if (lower === 'h') {
-      for (const x of nums) step(x, 0)
+      for (const x of nums) {
+        currentX = rel ? currentX + x : x
+        mark(currentX, currentY)
+      }
       continue
     }
     if (lower === 'v') {
-      for (const y of nums) step(0, y)
+      for (const y of nums) {
+        currentY = rel ? currentY + y : y
+        mark(currentX, currentY)
+      }
       continue
     }
     if (lower === 'c') {
@@ -855,6 +863,29 @@ function parseSvgPathApproxBounds(d: string): GeometryRect | null {
     width: Math.max(0, maxX - minX),
     height: Math.max(0, maxY - minY),
   }
+}
+
+/** Дырка буквы — отдельный подконтур, чей bbox лежит строго внутри другого. */
+function pathHasContainedSubpath(d: string): boolean {
+  const chunks = d.split(/(?=[Mm])/).map((part) => part.trim()).filter(Boolean)
+  if (chunks.length < 2) return false
+  const boxes = chunks
+    .map((part) => parseSvgPathApproxBounds(part))
+    .filter((box): box is GeometryRect => !!box && box.width > 0 && box.height > 0)
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = 0; j < boxes.length; j++) {
+      if (i === j) continue
+      const inner = boxes[i]!
+      const outer = boxes[j]!
+      if (
+        inner.x > outer.x
+        && inner.y > outer.y
+        && inner.x + inner.width < outer.x + outer.width
+        && inner.y + inner.height < outer.y + outer.height
+      ) return true
+    }
+  }
+  return false
 }
 
 /** Среднее внешнее поле между outer и inner (мм). */
@@ -2612,6 +2643,8 @@ export function parseImportedSvgLayers(
   const transformStack: SvgTransform[] = [IDENTITY_TRANSFORM]
   const groupStyleStack: Array<Record<string, string>> = [rootPresentationStyle]
   const groupFrameStack: Array<{ openLt: number; removable: boolean; layerName: string | null }> = []
+  type PendingPhotoContour = { pathData: string; fillRule?: 'nonzero' | 'evenodd' }
+  const photoContourStack: Array<PendingPhotoContour[] | null> = [null]
 
   function mergeGroupPresentationStyle(attrs: Record<string, string>): Record<string, string> {
     const parent = groupStyleStack[groupStyleStack.length - 1] ?? {}
@@ -2646,6 +2679,8 @@ export function parseImportedSvgLayers(
     const clipPath = input.shape === 'path' && input.pathData
       ? localizeSvgPathToFrameScene(input.pathData, input.tr, scene)
       : undefined
+    const fillRule = input.fillRule
+      ?? (input.pathData && pathHasContainedSubpath(input.pathData) ? 'evenodd' : undefined)
     const photoEntry: SvgRect = {
       name: fabricId,
       layerName,
@@ -2655,7 +2690,7 @@ export function parseImportedSvgLayers(
       scene,
       shape: input.shape,
       ...(clipPath ? { clipPath } : {}),
-      ...(input.fillRule ? { fillRule: input.fillRule } : {}),
+      ...(fillRule ? { fillRule } : {}),
     }
     photoRects.push(photoEntry)
     interactiveLayers.push({ kind: 'photo', data: photoEntry })
@@ -2667,11 +2702,34 @@ export function parseImportedSvgLayers(
       bboxSvg: input.tr,
       bboxScene: scene,
     })
-    removalRanges.push({ start: input.removalStart, end: input.removalEnd })
+    if (input.removalStart >= 0 && input.removalEnd > input.removalStart) {
+      removalRanges.push({ start: input.removalStart, end: input.removalEnd })
+    }
   }
 
   function currentPhotoFillRule(attrs: Record<string, string>): 'nonzero' | 'evenodd' | undefined {
-    return resolveShapeFillRule(attrs, groupStyleStack[groupStyleStack.length - 1] ?? {})
+    const inherited = groupStyleStack[groupStyleStack.length - 1] ?? {}
+    const fromClass = styleFromClassNames(attrs.class, cssClassStyles)
+    return resolveShapeFillRule(attrs, { ...inherited, ...fromClass })
+  }
+
+  function flushPhotoContours(layerName: string, contours: PendingPhotoContour[]): void {
+    if (contours.length === 0) return
+    const pathData = contours.map((item) => item.pathData).filter(Boolean).join(' ')
+    const tr = parseSvgPathApproxBounds(pathData)
+    if (!tr || !(tr.width > 0) || !(tr.height > 0)) return
+    const fillRule = contours.some((item) => item.fillRule === 'evenodd')
+      ? 'evenodd'
+      : contours.find((item) => item.fillRule)?.fillRule
+    commitPhotoShape({
+      sourceName: layerName,
+      tr,
+      removalStart: -1,
+      removalEnd: -1,
+      shape: 'path',
+      pathData,
+      fillRule,
+    })
   }
 
   function tryCommitPhotoClip(input: {
@@ -2768,6 +2826,15 @@ export function parseImportedSvgLayers(
 
     if (closing && tagLc === 'g') {
       const framed = groupFrameStack.pop()
+      const contours = photoContourStack.pop()
+      const parentContours = photoContourStack[photoContourStack.length - 1] ?? null
+      if (
+        framed?.layerName?.startsWith('photo_')
+        && contours
+        && contours !== parentContours
+      ) {
+        flushPhotoContours(framed.layerName, contours)
+      }
       if (groupStack.length > 1) groupStack.pop()
       if (transformStack.length > 1) transformStack.pop()
       if (groupStyleStack.length > 1) groupStyleStack.pop()
@@ -2818,6 +2885,11 @@ export function parseImportedSvgLayers(
       )
       groupStyleStack.push(mergeGroupPresentationStyle(attrs))
       groupFrameStack.push({ openLt: lt, removable: groupRemovable(stackName), layerName: stackName })
+      photoContourStack.push(
+        ln?.startsWith('photo_')
+          ? []
+          : (photoContourStack[photoContourStack.length - 1] ?? null),
+      )
       i = gt + 1
       continue
     }
@@ -3153,15 +3225,20 @@ export function parseImportedSvgLayers(
             baseBounds.height,
             objectTransform,
           )
-          commitPhotoShape({
-            sourceName: ef,
-            tr,
-            removalStart: lt,
-            removalEnd: gt + 1,
-            shape: 'path',
-            pathData,
-            fillRule: currentPhotoFillRule(attrs),
-          })
+          const pending = photoContourStack[photoContourStack.length - 1]
+          if (pending && !explicitName) {
+            pending.push({ pathData, fillRule: currentPhotoFillRule(attrs) })
+          } else {
+            commitPhotoShape({
+              sourceName: ef,
+              tr,
+              removalStart: lt,
+              removalEnd: gt + 1,
+              shape: 'path',
+              pathData,
+              fillRule: currentPhotoFillRule(attrs),
+            })
+          }
         }
         i = gt + 1
         continue
@@ -3242,15 +3319,20 @@ export function parseImportedSvgLayers(
           )
           const axisRect = isAxisAlignedRectPoints(transformedPts)
           const pathData = axisRect ? undefined : polygonPointsAbsolutePath(transformedPts) ?? undefined
-          commitPhotoShape({
-            sourceName: ef,
-            tr,
-            removalStart: lt,
-            removalEnd: gt + 1,
-            shape: axisRect || !pathData ? 'rect' : 'path',
-            pathData,
-            fillRule: pathData ? currentPhotoFillRule(attrs) : undefined,
-          })
+          const pending = photoContourStack[photoContourStack.length - 1]
+          if (pending && !explicitName && pathData) {
+            pending.push({ pathData, fillRule: currentPhotoFillRule(attrs) })
+          } else {
+            commitPhotoShape({
+              sourceName: ef,
+              tr,
+              removalStart: lt,
+              removalEnd: gt + 1,
+              shape: axisRect || !pathData ? 'rect' : 'path',
+              pathData,
+              fillRule: pathData ? currentPhotoFillRule(attrs) : undefined,
+            })
+          }
         }
         i = gt + 1
         continue

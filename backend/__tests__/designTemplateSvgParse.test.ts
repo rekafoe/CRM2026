@@ -924,4 +924,65 @@ describe('parseImportedSvgLayers', () => {
     expect(byName.photo_line).toBeUndefined()
     expect(r.warnings.some((w) => w.includes('photo_line') && w.includes('PHOTO_NO_VALID_RECT'))).toBe(true)
   })
+
+  it('держит абсолютные H/V и дырку буквы в одном photo_ path', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="40mm" viewBox="0 0 80 40" style="fill-rule:evenodd; clip-rule:evenodd">
+  <defs>
+    <style type="text/css"><![CDATA[
+      .fil0 {fill:#2B2A29;fill-rule:nonzero}
+    ]]></style>
+  </defs>
+  <path id="photo_" class="fil0" d="M10 30 H40 V10 H10 Z M16 24 H28 V16 H16 Z"/>
+  <rect id="photo_box" x="50" y="8" width="20" height="12"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const letter = r.photoRects.find((item) => item.layerName === 'photo_')
+    const box = r.photoRects.find((item) => item.name === 'photo_box')
+    expect(r.photoRects).toHaveLength(2)
+    expect(letter?.shape).toBe('path')
+    expect(letter?.fillRule).toBe('nonzero')
+    expect(box?.shape).toBe('rect')
+    expect(box?.clipPath).toBeUndefined()
+    const d = String(letter?.clipPath ?? '')
+    const moves = d.match(/\bM\s+[-0-9.]+\s+[-0-9.]+/g) ?? []
+    expect(moves).toHaveLength(2)
+    const pairs = [...d.matchAll(/\b[ML]\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)/g)].map((m) => [Number(m[1]), Number(m[2])])
+    expect(pairs.length).toBeGreaterThanOrEqual(4)
+    expect(pairs[0]?.[1]).toBeCloseTo(pairs[1]?.[1] ?? NaN, 3)
+    const scene = letter?.scene
+    expect(scene).toBeTruthy()
+    for (const [x, y] of pairs) {
+      expect(x).toBeGreaterThanOrEqual(-0.02)
+      expect(y).toBeGreaterThanOrEqual(-0.02)
+      expect(x).toBeLessThanOrEqual((scene?.width ?? 0) + 0.02)
+      expect(y).toBeLessThanOrEqual((scene?.height ?? 0) + 0.02)
+    }
+    const hole = pairs.slice(4, 8)
+    const outerMaxX = Math.max(...pairs.slice(0, 4).map((p) => p[0]!))
+    const outerMaxY = Math.max(...pairs.slice(0, 4).map((p) => p[1]!))
+    for (const [x, y] of hole) {
+      expect(x).toBeGreaterThan(0.5)
+      expect(y).toBeGreaterThan(0.5)
+      expect(x).toBeLessThan(outerMaxX - 0.5)
+      expect(y).toBeLessThan(outerMaxY - 0.5)
+    }
+  })
+
+  it('собирает внешний контур и дырку группы photo_ в один path', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="60mm" height="40mm" viewBox="0 0 60 40">
+  <g id="photo_letter">
+    <path d="M0 0 H40 V40 H0 Z"/>
+    <path d="M10 10 H22 V30 H10 Z"/>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.photoRects).toHaveLength(1)
+    const field = r.photoRects[0]!
+    expect(field.shape).toBe('path')
+    expect(field.fillRule).toBe('evenodd')
+    expect(String(field.clipPath).match(/\bM\s+/g)?.length).toBe(2)
+    expect(r.strippedSvg.includes('photo_letter')).toBe(false)
+  })
 })

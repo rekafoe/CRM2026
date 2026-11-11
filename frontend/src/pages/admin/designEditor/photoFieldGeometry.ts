@@ -141,6 +141,30 @@ export function resolvePhotoFieldFrameSize(field: FabricObject): { fw: number; f
 }
 
 /**
+ * Контур букв живёт в координатах рамки (0,0 — центр группы).
+ * Fabric group.add считает объект координатами холста и уводит path на половину кадра
+ * плюс left/top поля — дырки П/А и само фото тогда не совпадают с рамкой.
+ */
+export function placePhotoFieldPathClip(group: Group, frameW: number, frameH: number): void {
+  if (readPhotoFieldShape(group) !== 'path') return;
+  const boxW = Math.max(1, Number(ax(group).photoFieldClipBoxW) || frameW);
+  const boxH = Math.max(1, Number(ax(group).photoFieldClipBoxH) || frameH);
+  const patch = {
+    left: -frameW / 2,
+    top: -frameH / 2,
+    originX: 'left' as const,
+    originY: 'top' as const,
+    scaleX: frameW / boxW,
+    scaleY: frameH / boxH,
+  };
+  for (const kid of group.getObjects()) {
+    if (ax(kid).photoFieldRole !== 'clip-shape') continue;
+    kid.set(patch);
+  }
+  if (group.clipPath) group.clipPath.set(patch);
+}
+
+/**
  * После setXY группа может сместиться по union-bbox (cover шире рамки).
  * Совмещаем фактический TL прозрачной рамки с точкой плейсхолдера.
  */
@@ -164,34 +188,7 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       ...(shape === 'ellipse' ? { rx: frameW / 2, ry: frameH / 2 } : {}),
     });
   }
-  if (shape === 'path') {
-    const boxW = Math.max(1, Number(ax(group).photoFieldClipBoxW) || frameW);
-    const boxH = Math.max(1, Number(ax(group).photoFieldClipBoxH) || frameH);
-    const scaleX = frameW / boxW;
-    const scaleY = frameH / boxH;
-    for (const kid of group.getObjects()) {
-      if (ax(kid).photoFieldRole !== 'clip-shape') continue;
-      kid.set({
-        left: ox,
-        top: oy,
-        originX: 'left',
-        originY: 'top',
-        scaleX,
-        scaleY,
-      });
-    }
-    const clip = group.clipPath;
-    if (clip) {
-      clip.set({
-        left: ox,
-        top: oy,
-        originX: 'left',
-        originY: 'top',
-        scaleX,
-        scaleY,
-      });
-    }
-  }
+  placePhotoFieldPathClip(group, frameW, frameH);
 
   const minSide = Math.min(frameW, frameH);
   const badgeR = Math.max(7, Math.min(42, Math.round(minSide * 0.16)));
