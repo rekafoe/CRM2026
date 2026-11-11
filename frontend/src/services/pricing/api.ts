@@ -400,6 +400,17 @@ export async function deletePriceType(id: number): Promise<void> {
 }
 
 // --- Категории послепечатных услуг ---
+export async function getRecentPostprintServiceIds(orderId?: number | null): Promise<number[]> {
+  const response = await api.get('/pricing/postprint/recent', {
+    params: orderId != null && orderId > 0 ? { orderId } : undefined,
+  });
+  const payload: any = (response.data as any)?.data ?? response.data ?? {};
+  const ids = Array.isArray(payload?.serviceIds) ? payload.serviceIds : Array.isArray(payload) ? payload : [];
+  return ids
+    .map((id: unknown) => Number(id))
+    .filter((id: number) => Number.isInteger(id) && id > 0);
+}
+
 export async function getServiceCategories(): Promise<ServiceCategory[]> {
   const response = await api.get('/pricing/service-categories');
   const payload: any = (response.data as any)?.data ?? response.data ?? [];

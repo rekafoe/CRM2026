@@ -79,6 +79,8 @@ interface ImprovedPrintingCalculatorModalProps {
   initialProductId?: number | null;
   editContext?: EditContextPayload;
   onSubmitExisting?: (payload: { orderId: number; itemId: number; item: any }) => Promise<void>;
+  orderId?: number | null;
+  orderItems?: Array<{ id: number; params?: unknown }>;
   embedded?: boolean;
   readOnlyTestMode?: boolean;
   initialTestConfig?: {
@@ -100,6 +102,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   initialProductId,
   editContext,
   onSubmitExisting,
+  orderId = null,
+  orderItems,
   embedded = false,
   readOnlyTestMode = false,
   initialTestConfig,
@@ -201,16 +205,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     logger,
     toast,
   });
-  const postprintByCategory = useMemo(() => {
-    const groups = new Map<string, typeof postprintServices>();
-    for (const s of postprintServices) {
-      const cat = s.categoryName ?? 'Без категории';
-      if (!groups.has(cat)) groups.set(cat, []);
-      groups.get(cat)!.push(s);
-    }
-    return Array.from(groups.entries()).map(([categoryName, services]) => ({ categoryName, services }));
-  }, [postprintServices]);
-  
   // Схема и типы — вынесено в хук
 
   const { backendProductSchema, currentConfig, availableFormats, getDefaultFormat } = useCalculatorSchema({
@@ -1314,10 +1308,11 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 postprintLoading={postprintLoading}
                 postprintError={postprintError}
                 postprintServices={postprintServices}
-                postprintByCategory={postprintByCategory}
                 postprintSelections={postprintSelections}
                 setPostprintSelections={setPostprintSelections}
                 getOperationUnitPrice={getOperationUnitPrice}
+                orderId={orderId}
+                orderItems={orderItems}
               />
             ) : (
               <CalculatorSections
