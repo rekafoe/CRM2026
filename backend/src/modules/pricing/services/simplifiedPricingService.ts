@@ -16,6 +16,7 @@ import {
   type UvFlatbedPricingResult,
   type UvPrintConfiguration,
 } from './uvFlatbedPricingService';
+import { isExplicitUvPrintWithoutMaterial } from '../uvPrintWithoutMaterial';
 import {
   RollWideM2PricingService,
   type RollWideM2PricingResult,
@@ -504,6 +505,8 @@ export class SimplifiedPricingService {
       plotter_weeding?: boolean;
       plotter_mounting?: boolean;
       uv_print?: UvPrintConfiguration;
+      /** УФ-планшет: печать без листа/носителя. Для остальных технологий игнорируется. */
+      print_without_material?: boolean | number | string;
     },
     quantity: number
   ): Promise<SimplifiedPricingResult> {
@@ -592,6 +595,16 @@ export class SimplifiedPricingService {
     if ('orderPricingContext' in normalizedConfig) {
       delete (normalizedConfig as { orderPricingContext?: unknown }).orderPricingContext;
     }
+
+    // УФ-планшет: явный отказ от листа. Не ищем материал по бумаге и не подставляем SKU.
+    const uvPrintWithoutMaterial = isExplicitUvPrintWithoutMaterial(isUvFlatbedMode, normalizedConfig);
+    if (uvPrintWithoutMaterial) {
+      delete normalizedConfig.material_id;
+      normalizedConfig.print_without_material = true;
+      if (!normalizedConfig.print_technology) {
+        normalizedConfig.print_technology = 'uv';
+      }
+    }
     
     // Преобразуем sides (1 или 2) в print_sides_mode
     if (!normalizedConfig.print_sides_mode && (configuration as any).sides) {
@@ -607,8 +620,14 @@ export class SimplifiedPricingService {
       });
     }
     
-    // Находим material_id по paperType и paperDensity, если material_id не указан
-    if (!normalizedConfig.material_id && (configuration as any).paperType && (configuration as any).paperDensity) {
+    // Находим material_id по paperType и paperDensity, если material_id не указан.
+    // Для явной УФ-печати без носителя бумагу не резолвим — иначе подставится чужой лист.
+    if (
+      !uvPrintWithoutMaterial &&
+      !normalizedConfig.material_id &&
+      (configuration as any).paperType &&
+      (configuration as any).paperDensity
+    ) {
       try {
         const paperTypeName = String((configuration as any).paperType); // paperType - это name (строка), не ID
         const paperDensity = Number((configuration as any).paperDensity);
@@ -745,7 +764,7 @@ export class SimplifiedPricingService {
       ? getEffectiveAllowedMaterialIds(typeConfig, selectedSize)
       : (selectedSize.allowed_material_ids ?? []);
     let resolvedMaterialPrint: MaterialPrintResolution | undefined;
-    if (simplifiedConfig.material_driven_printing === true) {
+    if (simplifiedConfig.material_driven_printing === true && !uvPrintWithoutMaterial) {
       if (!normalizedConfig.material_id) {
         const err: any = new Error('Выберите материал для автоматического определения технологии печати.');
         err.status = 400;

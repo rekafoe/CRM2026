@@ -33,6 +33,7 @@ import { shouldClearDefaultPrepaymentForLegal } from '../../../utils/legalOrderP
 import { buildDefaultReadyDateIso, extractRawPriceType, normalizePriceTypeKey } from '../../../utils/orderReadySla'
 import { contactToKeep, resolveColleagueContactUserId, shouldTransferContact } from '../orderTransferContact'
 import { calendarDay, freezeOpenedOn } from '../orderReportVisibility'
+import { orderParamsDeclareUvPrintWithoutMaterial } from '../../pricing/uvPrintWithoutMaterial'
 
 export class OrderService {
   private static isMeterUnit(unitRaw: unknown): boolean {
@@ -2067,6 +2068,10 @@ export class OrderService {
     for (const item of items) {
       const paramsObj = JSON.parse(item.params || '{}') as { description?: string }
       let composition: Array<{ materialId: number; qtyPerItem: number; unit?: string | null }> = []
+      // УФ без носителя не имеет пресета листа: не возвращаем на склад чужой материал по описанию.
+      if (orderParamsDeclareUvPrintWithoutMaterial(paramsObj)) {
+        continue
+      }
       if (hasRulesTable) {
         composition = (await db.all<{
           materialId: number

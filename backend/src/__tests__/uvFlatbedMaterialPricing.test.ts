@@ -1,4 +1,8 @@
 import { SimplifiedPricingService } from '../modules/pricing/services/simplifiedPricingService';
+import {
+  isExplicitUvPrintWithoutMaterial,
+  orderParamsDeclareUvPrintWithoutMaterial,
+} from '../modules/pricing/uvPrintWithoutMaterial';
 import { LayoutCalculationService } from '../modules/pricing/services/layoutCalculationService';
 import { getDb } from '../db';
 
@@ -322,6 +326,208 @@ describe('UV arbitrary trim on the selected sheet', () => {
     expect(result.layout?.sheetsNeeded).toBe(4);
     expect(result.materialPrice).toBe(0);
     expect(result.finalPrice).toBe(100);
+  });
+
+  it('печать без материала не раскладывает произвольный размер на лист', async () => {
+    mockDb(config(), { width: 320, height: 450 });
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'anchor',
+        material_id: materialId,
+        print_technology: 'uv',
+        trim_size: { width: 40, height: 30 },
+        uv_print: { color: { enabled: true, passes: 1 } },
+        print_without_material: true,
+      },
+      4,
+    );
+
+    expect(result.layout?.itemsPerSheet).toBe(1);
+    expect(result.layout?.sheetsNeeded).toBe(4);
+    expect(result.materialPrice).toBe(0);
+    expect(result.finalPrice).toBe(100);
+  });
+});
+
+describe('UV print without material', () => {
+  const mockedGetDb = getDb as jest.MockedFunction<typeof getDb>;
+  const materialId = 42;
+  const sheetPrice = 55;
+
+  const templateConfigData = {
+    simplified: {
+      use_layout: false,
+      include_material_cost: true,
+      material_driven_printing: true,
+      uv_print: {
+        mode: 'flatbed_m2' as const,
+        layers: ['color'],
+        default_passes: { color: 1 },
+        dimensions_mode: 'custom_only' as const,
+      },
+      sizes: [
+        {
+          id: 'anchor',
+          label: '—',
+          width_mm: 85,
+          height_mm: 55,
+          print_prices: [],
+          allowed_material_ids: [materialId],
+          material_prices: [],
+          finishing: [],
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string) => {
+        if (query.includes('FROM products WHERE id = ?')) {
+          return { id: 1, name: 'УФ ПВХ', calculator_type: 'simplified', product_type: 'universal' };
+        }
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM paper_types')) {
+          return { id: 7, name: 'pvc' };
+        }
+        if (query.includes('paper_type_id = ? AND density')) {
+          return { id: 99, name: 'ПВХ подставленный', density: 300 };
+        }
+        if (query.includes('sheet_price_single FROM materials')) {
+          return { sheet_price_single: sheetPrice };
+        }
+        if (query.includes('sheet_width, sheet_height FROM materials')) {
+          return { sheet_width: 85, sheet_height: 55 };
+        }
+        if (query.includes('FROM materials m') && query.includes('paper_type')) {
+          return { name: 'ПВХ подставленный', density: 300, paper_type_id: 7 };
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+  });
+
+  it('игнорирует присланный material_id и не падает на material-driven', async () => {
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'anchor',
+        material_id: materialId,
+        paperType: 'pvc',
+        paperDensity: 300,
+        print_technology: 'uv',
+        trim_size: { width: 85, height: 55 },
+        uv_print: { color: { enabled: true, passes: 1 } },
+        print_without_material: true,
+      } as any,
+      85,
+    );
+
+    expect(result.materialPrice).toBe(0);
+    expect(result.selectedMaterial).toBeUndefined();
+    expect(result.printPrice).toBe(100);
+    expect(result.finalPrice).toBe(100);
+  });
+
+  it('не подставляет материал по paperType, пока флаг включён', async () => {
+    templateConfigData.simplified.material_driven_printing = false;
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'anchor',
+        paperType: 'pvc',
+        paperDensity: 300,
+        print_technology: 'uv',
+        trim_size: { width: 85, height: 55 },
+        uv_print: { color: { enabled: true, passes: 1 } },
+        print_without_material: true,
+      } as any,
+      2,
+    );
+
+    expect(result.selectedMaterial).toBeUndefined();
+    expect(result.materialPrice).toBe(0);
+    expect(result.finalPrice).toBe(100);
+  });
+
+  it('без флага по-прежнему берёт материал по paperType', async () => {
+    templateConfigData.simplified.material_driven_printing = false;
+    templateConfigData.simplified.sizes[0].allowed_material_ids = [materialId, 99];
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'anchor',
+        paperType: 'pvc',
+        paperDensity: 300,
+        print_technology: 'uv',
+        trim_size: { width: 85, height: 55 },
+        uv_print: { color: { enabled: true, passes: 1 } },
+      } as any,
+      2,
+    );
+
+    expect(result.selectedMaterial?.material_id).toBe(99);
+    expect(result.materialPrice).toBe(2 * sheetPrice);
+  });
+
+  it('флаг не снимает материал, если шаблон не УФ-планшет', async () => {
+    const saved = templateConfigData.simplified.uv_print;
+    templateConfigData.simplified.uv_print = undefined as any;
+    templateConfigData.simplified.material_driven_printing = false;
+    try {
+      const result = await SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'anchor',
+          material_id: materialId,
+          print_without_material: true,
+          trim_size: { width: 85, height: 55 },
+        },
+        10,
+      );
+      expect(result.selectedMaterial?.material_id).toBe(materialId);
+      expect(result.materialPrice).toBe(10 * sheetPrice);
+    } finally {
+      templateConfigData.simplified.uv_print = saved;
+    }
+  });
+});
+
+describe('isExplicitUvPrintWithoutMaterial', () => {
+  it('только flatbed и явный флаг', () => {
+    expect(isExplicitUvPrintWithoutMaterial(true, { print_without_material: true })).toBe(true);
+    expect(isExplicitUvPrintWithoutMaterial(true, { print_without_material: '1' })).toBe(true);
+    expect(isExplicitUvPrintWithoutMaterial(true, { print_without_material: false })).toBe(false);
+    expect(isExplicitUvPrintWithoutMaterial(false, { print_without_material: true })).toBe(false);
+  });
+
+  it('позиция заказа требует и флаг, и uv_print', () => {
+    expect(
+      orderParamsDeclareUvPrintWithoutMaterial({
+        specifications: {
+          print_without_material: true,
+          uv_print: { color: { enabled: true, passes: 1 } },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      orderParamsDeclareUvPrintWithoutMaterial({
+        specifications: { print_without_material: true },
+      }),
+    ).toBe(false);
+    expect(
+      orderParamsDeclareUvPrintWithoutMaterial({
+        print_without_material: true,
+        specifications: { print_technology: 'digital' },
+      }),
+    ).toBe(false);
   });
 });
 

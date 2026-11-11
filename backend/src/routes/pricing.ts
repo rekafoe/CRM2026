@@ -1,5 +1,6 @@
 import { Router } from 'express'
-import { asyncHandler } from '../middleware'
+import { asyncHandler, type AuthenticatedRequest } from '../middleware'
+import { listRecentPostprintServiceIds } from '../modules/pricing/services/recentPostprintServices'
 import { getDb } from '../config/database'
 import { isRollWideM2Enabled } from '../config/app'
 import { hasColumn, invalidateTableSchemaCache } from '../utils/tableSchemaCache'
@@ -1283,6 +1284,19 @@ router.post('/bindings/quote', asyncHandler(async (req, res) => {
     unitsPerItem: req.body?.unitsPerItem ?? req.body?.units_per_item,
   })
   res.json(result)
+}))
+
+router.get('/postprint/recent', asyncHandler(async (req, res) => {
+  const authUser = (req as AuthenticatedRequest).user
+  if (!authUser?.id) {
+    res.status(401).json({ error: 'Unauthorized' })
+    return
+  }
+  const raw = Array.isArray(req.query.orderId) ? req.query.orderId[0] : req.query.orderId
+  const parsed = raw == null || raw === '' ? null : Number(raw)
+  const orderId = parsed != null && Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  const serviceIds = await listRecentPostprintServiceIds({ userId: authUser.id, orderId })
+  res.json({ serviceIds })
 }))
 
 // --- Категории послепечатных услуг (для группировки в services-management и выборе продукта) ---

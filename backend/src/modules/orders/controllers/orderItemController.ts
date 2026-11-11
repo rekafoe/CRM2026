@@ -18,6 +18,7 @@ import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../.
 import { shouldAutoFillCashPrepayment } from '../../../utils/legalOrderPrepayment'
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
+import { orderParamsDeclareUvPrintWithoutMaterial } from '../../pricing/uvPrintWithoutMaterial'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -175,7 +176,8 @@ export class OrderItemController {
       const skipPresetLookup =
         paramsObjForTotal?.customProduct === true ||
         paramsObjForTotal?.postprintProduct === true ||
-        paramsObjForTotal?.plotterBareProduct === true
+        paramsObjForTotal?.plotterBareProduct === true ||
+        orderParamsDeclareUvPrintWithoutMaterial(paramsObjForTotal)
       let needed = [] as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null; unit?: string | null }>
       if (Array.isArray(components) && components.length > 0) {
         const ids = components.map(c => Number(c.materialId)).filter(Boolean)
@@ -658,7 +660,8 @@ export class OrderItemController {
         const skipPresetLookup =
           (paramsObj as any).customProduct === true ||
           (paramsObj as any).postprintProduct === true ||
-          (paramsObj as any).plotterBareProduct === true
+          (paramsObj as any).plotterBareProduct === true ||
+          orderParamsDeclareUvPrintWithoutMaterial(paramsObj)
         if (reservationIds.length > 0) {
           await UnifiedWarehouseService.cancelReservations(reservationIds, { orderId })
         } else if (!skipPresetLookup && (paramsObj as any).description) {
@@ -893,7 +896,8 @@ export class OrderItemController {
           } else if (
             (paramsObj as any).customProduct !== true &&
             (paramsObj as any).postprintProduct !== true &&
-            (paramsObj as any).plotterBareProduct !== true
+            (paramsObj as any).plotterBareProduct !== true &&
+            !orderParamsDeclareUvPrintWithoutMaterial(paramsObj)
           ) {
             // Старые записи без компонентов/резервов — fallback к прежней логике движений склада
             const composition = (await db.all<{

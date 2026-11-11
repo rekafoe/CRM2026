@@ -96,7 +96,11 @@ function computeErrors(params: {
       ? sizes.find((s: any) => s.id === specs.size_id)
       : undefined;
     const allowed = selectedSize?.allowed_material_ids;
-    if (Array.isArray(allowed) && allowed.length > 0) {
+    const uvWithoutMaterial =
+      specs.print_without_material === true &&
+      (isUvFlatbedProduct(backendProductSchema, specs.typeId) ||
+        (specs.uv_print != null && typeof specs.uv_print === 'object'));
+    if (Array.isArray(allowed) && allowed.length > 0 && !uvWithoutMaterial) {
       const mid = specs.material_id;
       if (mid == null || mid === '' || Number.isNaN(Number(mid))) {
         errors.material_id = 'Выберите материал';
