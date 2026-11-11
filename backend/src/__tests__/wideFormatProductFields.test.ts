@@ -147,7 +147,7 @@ describe('patchWideFormatProductConfig', () => {
     expect(config.simplified.typeConfigs['9'].common_allowed_material_ids).toEqual([71]);
     expect(config.simplified.material_driven_printing).toBe(true);
     expect(config.simplified.typeConfigs['9'].initial.print_technology).toBe('sol_m');
-    expect(config.simplified.types[0].fullDescription).toContain('Сольвентная широкоформатная печать');
+    expect(config.simplified.types[0].fullDescription).toContain('выбрать носитель под место');
     expect(config.trim_size).toEqual({ width: 10 });
   });
 
@@ -198,11 +198,11 @@ describe('patchWideFormatProductConfig', () => {
       'Трос металлический',
       'Семь готовых размеров',
     ]);
-    expect(type.fullDescription).toContain('подрамник');
+    expect(type.fullDescription).toContain('сразу вешать');
     expect(type.advantages).toEqual([
-      'Холст натянут на подрамник',
-      'Крепление — металлический трос',
-      'Готовые размеры в калькуляторе',
+      'Не нужно отдельно заказывать натяжку и раму',
+      'Подрамник держит холст, трос рассчитан на подвес',
+      'Готовый предмет для стены, а не рулон в багетную мастерскую',
     ]);
     const sizes = config.simplified.typeConfigs['1371001'].sizes;
     expect(sizes[0].print_prices[0].tiers).toEqual(tiers);
