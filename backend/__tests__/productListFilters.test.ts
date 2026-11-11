@@ -7,7 +7,7 @@ import {
   productListBackTarget,
   serializeProductListSearch,
   type ProductListRow,
-} from '../../../frontend/src/utils/productListFilters';
+} from '../../frontend/src/utils/productListFilters';
 
 const wideFormat = 7;
 
