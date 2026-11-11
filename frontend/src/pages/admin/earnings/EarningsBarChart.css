@@ -3,6 +3,7 @@
   align-items: stretch;
   gap: 10px;
   min-height: 240px;
+  color: var(--pc-text);
 }
 
 .earn-bars__col {
@@ -15,7 +16,7 @@
 
 .earn-bars__value {
   margin-bottom: 6px;
-  color: #0f172a;
+  color: var(--pc-text);
   font-size: 12px;
   font-weight: 700;
   text-align: center;
@@ -28,29 +29,29 @@
   max-width: 84px;
   display: flex;
   align-items: flex-end;
-  background: #f1f5f9;
+  background: var(--pc-surface-subtle);
   border-radius: 10px 10px 4px 4px;
 }
 
 .earn-bars__bar {
   width: 100%;
   min-height: 2px;
-  background: #94a3b8;
+  background: var(--pc-border-strong);
   border-radius: 10px 10px 2px 2px;
 }
 
 .earn-bars__col--current .earn-bars__bar {
-  background: #0f172a;
+  background: var(--pc-accent);
 }
 
 .earn-bars__col--current .earn-bars__label {
-  color: #0f172a;
+  color: var(--pc-text);
   font-weight: 700;
 }
 
 .earn-bars__label {
   margin-top: 8px;
-  color: #64748b;
+  color: var(--pc-muted);
   font-size: 12px;
   font-weight: 600;
   text-align: center;

@@ -1,7 +1,7 @@
 import type { Database } from 'sqlite'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { notWaitingStatusSql } from '../utils/orderFulfillmentScope'
-import { sqlOrderTotalAfterDiscount } from '../utils/orderAmountsSql'
+import { SQL_ITEM_LINE_TOTAL_EXPR, sqlOrderTotalAfterDiscount } from '../utils/orderAmountsSql'
 import {
   salesBonusPayrollDate,
   salesManagerBonusFromTurnover,
@@ -139,6 +139,77 @@ export async function loadSalesManagerOutput(
       }
     })
     .sort((a, b) => b.turnover - a.turnover || a.name.localeCompare(b.name, 'ru'))
+}
+
+export type SalesMonthFigures = {
+  /** userId → сколько юрлиц закреплено сейчас. */
+  clients: Map<number, number>
+  /** userId_YYYY-MM → оборот заказов. Ноль и просчёт не входят, как в loadOrders. */
+  turnover: Map<string, number>
+}
+
+async function columnSet(db: Database, table: string): Promise<Set<string>> {
+  const rows = await db.all<Array<{ name: string }>>(`PRAGMA table_info(${table})`)
+  return new Set((rows || []).map((row) => row.name))
+}
+
+/**
+ * Оборот и число юрлиц за месяцы одним проходом.
+ * Итог заказа считается тем же выражением, что sqlOrderTotalAfterDiscount,
+ * но позиции соединяются один раз, без подзапроса на каждый заказ.
+ */
+export async function loadSalesMonthFigures(
+  db: Database,
+  months: string[],
+): Promise<SalesMonthFigures> {
+  const clients = new Map<number, number>()
+  const turnover = new Map<string, number>()
+  const keys = [...new Set(months.map((month) => String(month).slice(0, 7)).filter((month) => /^\d{4}-\d{2}$/.test(month)))]
+  if (!(await tableExists(db, 'customers'))) return { clients, turnover }
+  const customerCols = await columnSet(db, 'customers')
+  if (!customerCols.has('manager_user_id')) return { clients, turnover }
+
+  const clientRows = await db.all<Array<{ user_id: number; clients: number }>>(
+    `SELECT manager_user_id AS user_id, COUNT(*) AS clients
+       FROM customers
+      WHERE type = 'legal' AND manager_user_id IS NOT NULL
+      GROUP BY manager_user_id`,
+  )
+  for (const row of clientRows || []) clients.set(Number(row.user_id), Number(row.clients) || 0)
+  if (keys.length === 0 || !(await tableExists(db, 'orders')) || !(await tableExists(db, 'items'))) {
+    return { clients, turnover }
+  }
+
+  const orderCols = await columnSet(db, 'orders')
+  const hasCancelled = orderCols.has('is_cancelled')
+  const hasChannel = orderCols.has('payment_channel')
+  const hasDiscount = orderCols.has('discount_percent')
+  const discountExpr = hasDiscount ? 'COALESCE(o.discount_percent, 0)' : '0'
+  const rows = await db.all<Array<{ user_id: number; month_key: string; total: number }>>(
+    `SELECT user_id, month_key, SUM(total) AS total
+       FROM (
+         SELECT c.manager_user_id AS user_id,
+                substr(o.created_at, 1, 7) AS month_key,
+                ROUND(COALESCE(SUM(${SQL_ITEM_LINE_TOTAL_EXPR}), 0) * (1.0 - ${discountExpr} / 100.0), 2) AS total
+           FROM orders o
+           JOIN customers c ON c.id = o.customer_id
+           LEFT JOIN items i ON i.orderId = o.id
+          WHERE c.type = 'legal'
+            AND c.manager_user_id IS NOT NULL
+            ${hasCancelled ? 'AND COALESCE(o.is_cancelled, 0) = 0' : ''}
+            AND ${notWaitingStatusSql('o.status')}
+            ${hasChannel ? "AND LOWER(COALESCE(o.payment_channel, '')) != 'internal'" : ''}
+            AND substr(o.created_at, 1, 7) IN (${keys.map(() => '?').join(',')})
+          GROUP BY o.id
+       )
+      WHERE total > 0
+      GROUP BY user_id, month_key`,
+    keys,
+  )
+  for (const row of rows || []) {
+    turnover.set(`${Number(row.user_id)}_${row.month_key}`, Number(row.total) || 0)
+  }
+  return { clients, turnover }
 }
 
 /** Ключ userId_YYYY-MM → сумма премии. Нужен сводке зарплаты за несколько месяцев. */

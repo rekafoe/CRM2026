@@ -3,7 +3,8 @@
  * Отдельный файл, чтобы не дублировать в raw-запросах.
  */
 
-const SQL_ITEM_LINE_TOTAL_INNER = `
+/** Сумма строки позиции. Алиас таблицы — `i`. Тот же фрагмент, что в подзапросе итога заказа. */
+export const SQL_ITEM_LINE_TOTAL_EXPR = `
   CASE
     WHEN json_valid(i.params) = 1
       AND json_type(json_extract(i.params, '$.storedTotalCost')) IN ('integer', 'real')
@@ -11,6 +12,8 @@ const SQL_ITEM_LINE_TOTAL_INNER = `
     ELSE CAST(i.price AS REAL) * CAST(MAX(1, COALESCE(i.quantity, 1)) AS REAL)
   END
 `;
+
+const SQL_ITEM_LINE_TOTAL_INNER = SQL_ITEM_LINE_TOTAL_EXPR;
 
 /** Подытог заказа: `orderIdSqlRef` — например `o.id` или `orders.id`. */
 export function sqlOrderSubtotalSubquery(orderIdSqlRef: string): string {
