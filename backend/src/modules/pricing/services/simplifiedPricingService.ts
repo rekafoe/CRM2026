@@ -40,6 +40,7 @@ import {
   finishingFinKey,
   loadFinishingRollWidthMmMap,
   quotePerM2Finishing,
+  resolvePerMeterFeedFixedWarehouseMeters,
   resolveWarehouseFeedMeters,
 } from './finishingPerM2';
 import { finishingServiceDisplayName } from './finishingServiceCaption';
@@ -2728,7 +2729,8 @@ export class SimplifiedPricingService {
             pricingWarnings.push(feed.warning);
           }
         } else if (detailPriceUnit === 'per_meter' && effectiveMeterBasis === 'feed') {
-          baseUnitsForConsumption = Math.max(rawUnits, materialMetersNeeded);
+          // rawUnits уже = подача по ширине плёнки отделки; не раздувать до метров печати.
+          baseUnitsForConsumption = resolvePerMeterFeedFixedWarehouseMeters(rawUnits);
         }
 
         const totalQty = qtyPerItem * baseUnitsForConsumption;
