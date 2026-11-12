@@ -87,7 +87,9 @@ export class AutoMaterialDeductionService {
       // Добавляем предупреждения
       result.warnings = availabilityCheck.warnings
 
-      // Выполняем списание материалов
+      // Выполняем списание материалов. Ошибка на любом материале — failure:
+      // иначе callers (createOrderWithAutoDeduction / miniapp checkout) видят
+      // success=true и коммитят заказ с частичным write-off.
       for (const requirement of groupedRequirements) {
         try {
           const material = await db.get(
@@ -118,6 +120,7 @@ export class AutoMaterialDeductionService {
           logger.error('Ошибка списания материала', error)
           result.success = false
           result.errors.push(`Ошибка списания материала ID ${requirement.materialId}: ${error.message}`)
+          break
         }
       }
 
