@@ -725,12 +725,11 @@ export class SimplifiedPricingService {
         ? trimInput
         : { width: selectedSize.width_mm, height: selectedSize.height_mm };
 
+    // Дозаливка только из шаблона продукта. Клиентский bleed_mm (public calculate /
+    // website specs / reprice) раньше мог обнулить раскладку → больше шт/лист → undercharge.
     const prepressBleed = simplifiedConfig.prepress?.bleedMm;
     let resolvedBleedMm = 0;
-    const bleedFromReq = (normalizedConfig as any).bleed_mm;
-    if (bleedFromReq != null && Number.isFinite(Number(bleedFromReq))) {
-      resolvedBleedMm = Math.max(0, Number(bleedFromReq));
-    } else if (simplifiedConfig.default_bleed_mm != null && Number.isFinite(Number(simplifiedConfig.default_bleed_mm))) {
+    if (simplifiedConfig.default_bleed_mm != null && Number.isFinite(Number(simplifiedConfig.default_bleed_mm))) {
       resolvedBleedMm = Math.max(0, Number(simplifiedConfig.default_bleed_mm));
     } else if (prepressBleed != null && Number.isFinite(Number(prepressBleed))) {
       resolvedBleedMm = Math.max(0, Number(prepressBleed));
