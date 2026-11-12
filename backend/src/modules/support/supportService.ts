@@ -468,6 +468,16 @@ async function rememberOrder(db: Database, row: ConversationRow): Promise<Conver
   }
 }
 
+/** Newest 500 messages in chronological order. ASC+LIMIT would drop the latest ops traffic. */
+async function loadRecentMessages(db: Database, conversationId: number): Promise<MessageRow[]> {
+  const rows = await db.all<MessageRow[]>(
+    `SELECT id, direction, body, operator_name, operator_user_id, created_at
+     FROM support_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 500`,
+    conversationId,
+  )
+  return rows.reverse()
+}
+
 async function notifyCustomerWrote(row: ConversationRow, text: string, opened: boolean) {
   try {
     const db = await getDb()
@@ -577,11 +587,7 @@ export class SupportService {
     const db = await getDb()
     const row = await requireRow(db, publicIdValue, customer.id)
     await db.run('UPDATE support_conversations SET customer_unread = 0 WHERE id = ?', row.id)
-    const messages = await db.all<MessageRow[]>(
-      `SELECT id, direction, body, operator_name, created_at
-       FROM support_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 500`,
-      row.id,
-    )
+    const messages = await loadRecentMessages(db, row.id)
     return { messages: messages.map((message) => presentMessage(message, row.public_id)) }
   }
 
@@ -749,11 +755,7 @@ export class SupportService {
         staff_low_unread: loaded.staff_low_id === staff.id ? 0 : loaded.staff_low_unread,
         staff_high_unread: loaded.staff_high_id === staff.id ? 0 : loaded.staff_high_unread,
       }
-      const messages = await db.all<MessageRow[]>(
-        `SELECT id, direction, body, operator_name, operator_user_id, created_at
-         FROM support_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 500`,
-        loaded.id,
-      )
+      const messages = await loadRecentMessages(db, loaded.id)
       return {
         conversation: presentStaff(cleared, staff.id),
         messages: messages.map((message) => ({
@@ -767,11 +769,7 @@ export class SupportService {
     }
     const row = await rememberOrder(db, loaded)
     await db.run('UPDATE support_conversations SET operator_unread = 0 WHERE id = ?', row.id)
-    const messages = await db.all<MessageRow[]>(
-      `SELECT id, direction, body, operator_name, operator_user_id, created_at
-       FROM support_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 500`,
-      row.id,
-    )
+    const messages = await loadRecentMessages(db, row.id)
     return {
       conversation: presentOperator({ ...row, operator_unread: 0 }, staff.id),
       messages: messages.map((message) => ({
