@@ -1,5 +1,6 @@
 import path from 'path'
 import { getDb } from '../config/database'
+import { assertPublicHttpUrl } from '../utils/assertPublicHttpUrl'
 
 type ExternalOrderFileInput = {
   orderItemId?: number | string | null
@@ -103,6 +104,16 @@ async function findExistingExternalFile(db: any, orderId: number, externalKey: s
   return undefined
 }
 
+/** Не сохраняем URL, с которых CRM потом сделает server-side fetch во внутреннюю сеть. */
+async function sanitizeExternalUrl(raw: string | null): Promise<string | null> {
+  if (!raw) return null
+  try {
+    return await assertPublicHttpUrl(raw)
+  } catch (e) {
+    throw Object.assign(new Error((e as Error)?.message || 'Недопустимый URL внешнего файла'), { status: 400 })
+  }
+}
+
 export async function registerExternalOrderFiles(input: RegisterExternalFilesInput): Promise<any[]> {
   const db = await getDb()
   await assertOrderAccess(db, input.orderId, input.requireWebsiteSource)
@@ -110,7 +121,7 @@ export async function registerExternalOrderFiles(input: RegisterExternalFilesInp
   const insertedIds: number[] = []
   for (const file of input.files) {
     const externalKey = nullableText(file.key)
-    const externalUrl = nullableText(file.url)
+    const externalUrl = await sanitizeExternalUrl(nullableText(file.url))
     if (!externalKey && !externalUrl) {
       throw Object.assign(new Error('Для внешнего файла нужен key или url'), { status: 400 })
     }
@@ -195,7 +206,9 @@ export async function updateExternalOrderFile(input: UpdateExternalFileInput): P
 
   const file = input.data
   const externalKey = nullableText(file.key)
-  const externalUrl = nullableText(file.url)
+  const externalUrl = file.url !== undefined && file.url !== null
+    ? await sanitizeExternalUrl(nullableText(file.url))
+    : null
   const orderItemId = await resolveOrderItemId(db, input.orderId, file.orderItemId)
   const filename = filenameFromInput(file)
   const originalName = nullableText(file.originalName ?? file.filename) ?? filename
