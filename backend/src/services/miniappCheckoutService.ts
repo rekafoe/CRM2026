@@ -17,6 +17,8 @@ import {
 import {
   MINIAPP_CHECKOUT_STATE_DRAFT,
   MINIAPP_CHECKOUT_STATE_FINALIZED,
+  claimMiniappDraftFinalizeInTx,
+  isClaimableMiniappCheckoutState,
 } from '../utils/miniappCheckoutState';
 
 export type MiniappCustomerBody =
@@ -357,10 +359,7 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
     (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_FOUND';
     throw err;
   }
-  if (
-    draftOrder.miniapp_checkout_state &&
-    String(draftOrder.miniapp_checkout_state) !== MINIAPP_CHECKOUT_STATE_DRAFT
-  ) {
+  if (!isClaimableMiniappCheckoutState(draftOrder.miniapp_checkout_state)) {
     const err = new Error('Этот заказ уже оформлен');
     (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_DRAFT';
     throw err;
@@ -388,18 +387,23 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
     }
   }
 
+  // Claim автокоммитом до BEGIN: на одном SQLite-connection параллельный
+  // BEGIN ломается, а атомарный UPDATE WHERE draft пропускает только первого.
+  const claimed = await claimMiniappDraftFinalizeInTx(db, orderId, telegramChatId);
+  if (!claimed) {
+    const err = new Error('Этот заказ уже оформлен');
+    (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_DRAFT';
+    throw err;
+  }
+
   try {
     await db.run('BEGIN');
     const deductionResult = await OrderService.deductMaterialsForExistingOrder(orderId, undefined);
-    if (!deductionResult.success) {
+    if (!deductionResult.success || (deductionResult.errors?.length ?? 0) > 0) {
       const err = new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);
       (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
       throw err;
     }
-    await db.run(
-      'UPDATE orders SET miniapp_checkout_state = ? WHERE id = ?',
-      [MINIAPP_CHECKOUT_STATE_FINALIZED, orderId]
-    );
     const nextNotes = designHelpRequested
       ? String(draftOrder.notes || '').trim() || null
       : clearMiniappLayoutsPendingNote(draftOrder.notes ?? null) || null;
@@ -436,7 +440,27 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
       deductionResult,
     };
   } catch (error) {
-    await db.run('ROLLBACK');
+    try {
+      await db.run('ROLLBACK');
+    } catch {
+      /* ignore */
+    }
+    // Вернуть draft, чтобы можно было повторить finalize после сбоя списания.
+    try {
+      await db.run(
+        `UPDATE orders
+            SET miniapp_checkout_state = ?
+          WHERE id = ?
+            AND telegram_chat_id = ?
+            AND miniapp_checkout_state = ?`,
+        MINIAPP_CHECKOUT_STATE_DRAFT,
+        orderId,
+        telegramChatId,
+        MINIAPP_CHECKOUT_STATE_FINALIZED,
+      );
+    } catch {
+      /* ignore */
+    }
     throw error;
   }
 }
