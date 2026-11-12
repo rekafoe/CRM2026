@@ -3,6 +3,7 @@ import {
   flatFinishingUnits,
   getEffectiveFinishing,
   isTemplateFinishingRequired,
+  resolveCountableFinishingUnits,
 } from '../modules/pricing/services/finishingQuantity';
 
 describe('finishing quantity', () => {
@@ -51,6 +52,31 @@ describe('finishing quantity', () => {
     expect(
       enforceRequiredFinishing([], [{ service_id: -910003, is_required: true, units_per_item: 5 }]),
     ).toEqual([]);
+  });
+
+  it('без quantity_scope считает per_item на тираж, а per_cut и fixed один раз', () => {
+    expect(resolveCountableFinishingUnits('per_item', 100, 2, undefined)).toBe(200);
+    expect(resolveCountableFinishingUnits('per_cut', 100, 3, undefined)).toBe(3);
+    expect(resolveCountableFinishingUnits('fixed', 100, 1, undefined)).toBe(1);
+    expect(resolveCountableFinishingUnits('per_order', 50, 0, undefined)).toBe(0);
+    expect(resolveCountableFinishingUnits('per_hour', 4, 5 / 60, undefined)).toBeCloseTo(5 / 60);
+  });
+
+  it('quantity_scope=item умножает норму на тираж, run оставляет её один раз', () => {
+    expect(resolveCountableFinishingUnits('per_cut', 100, 3, 'item')).toBe(300);
+    expect(resolveCountableFinishingUnits('fixed', 100, 1, 'item')).toBe(100);
+    expect(resolveCountableFinishingUnits('per_hour', 10, 0.5, 'item')).toBe(5);
+    expect(resolveCountableFinishingUnits('per_item', 100, 2, 'run')).toBe(2);
+    expect(resolveCountableFinishingUnits('per_item', 10, 0, 'item')).toBe(0);
+  });
+
+  it('переносит quantity_scope обязательной услуги', () => {
+    expect(
+      enforceRequiredFinishing(
+        [{ service_id: 9, units_per_item: 1 }],
+        [{ service_id: 9, is_required: true, units_per_item: 2, quantity_scope: 'item' }],
+      ),
+    ).toEqual([{ service_id: 9, units_per_item: 2, quantity_scope: 'item' }]);
   });
 
   it('берёт общие услуги типа, пока у размера нет своего списка', () => {

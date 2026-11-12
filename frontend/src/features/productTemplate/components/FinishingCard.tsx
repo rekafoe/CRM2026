@@ -278,8 +278,8 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
         )}
         <p className="text-muted text-sm simplified-finishing-lead">
           {hasCommonFinishingFeature && !useOwnFinishing
-            ? 'Эти услуги общие для всех размеров типа. Обязательная считается всегда и с заданным количеством. Остальные в калькуляторе включаются отдельно.'
-            : 'Подключите услуги этого размера. Обязательная считается всегда и с заданным количеством. Остальные в калькуляторе включаются отдельно.'}
+            ? 'Эти услуги общие для всех размеров типа. Обязательная считается всегда и с заданным количеством. Остальные в калькуляторе включаются отдельно. Норму можно считать на весь тираж или на каждое изделие.'
+            : 'Подключите услуги этого размера. Обязательная считается всегда и с заданным количеством. Остальные в калькуляторе включаются отдельно. Норму можно считать на весь тираж или на каждое изделие.'}
         </p>
         {loadingLists ? (
           <div className="text-muted">Загрузка услуг...</div>
@@ -319,6 +319,18 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
                 const units = Number.isFinite(storedUnits) && storedUnits >= 0 ? storedUnits : 1
                 const minutes = meta.mode === 'minutes' ? hoursToMinutes(units) : 0
                 const normValue = normDraft[Number(row.service_id)] ?? String(meta.mode === 'minutes' ? minutes : units)
+                const implicitScope = meta.mode === 'item' ? 'item' : 'run'
+                const scope = row.quantity_scope === 'run' || row.quantity_scope === 'item' ? row.quantity_scope : implicitScope
+                const scopeHint =
+                  meta.mode === 'layout'
+                    ? meta.hint
+                    : scope === 'item'
+                      ? meta.mode === 'minutes'
+                        ? 'Минуты на каждое изделие. Умножаются на тираж.'
+                        : 'Норма на каждое изделие. Умножается на тираж.'
+                      : meta.mode === 'minutes'
+                        ? 'Минуты на весь тираж. Количество изделий их не умножает. В тарифе услуги цена за час.'
+                        : 'Норма на весь тираж. Количество изделий её не умножает.'
                 const category = (service?.categoryName ?? service?.category_name ?? '').trim()
                 return (
                   <div key={row.service_id} className="simplified-finishing-item">
@@ -397,6 +409,22 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
                       )}
                       {meta.mode !== 'layout' && (
                         <label className="simplified-finishing-field">
+                          <span>Как считать</span>
+                          <select
+                            value={scope}
+                            aria-label="Как считать услугу"
+                            onChange={(event) => {
+                              const next = event.target.value === 'item' ? 'item' : 'run'
+                              patchRow(Number(row.service_id), { quantity_scope: next })
+                            }}
+                          >
+                            <option value="run">На весь тираж</option>
+                            <option value="item">На каждое изделие</option>
+                          </select>
+                        </label>
+                      )}
+                      {meta.mode !== 'layout' && (
+                        <label className="simplified-finishing-field">
                           <span>{meta.label}</span>
                           <input
                             type="number"
@@ -440,7 +468,7 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
                         <span>Обязательная</span>
                       </label>
                     </div>
-                    <p className="simplified-finishing-item__hint">{meta.hint}</p>
+                    <p className="simplified-finishing-item__hint">{scopeHint}</p>
                   </div>
                 )
               })}

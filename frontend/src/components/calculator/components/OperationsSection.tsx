@@ -6,6 +6,7 @@ import { formatServiceVariantDisplayLabel } from '../../../utils/serviceVariantL
 import {
   getEffectiveSimplifiedConfig,
   requiredOperationsFromSizeFinishing,
+  templateQuantityScopeForOperation,
   templateUnitsForOperation,
 } from '../utils/simplifiedConfig';
 
@@ -54,7 +55,7 @@ function formatQtyHint(n: number): string {
   return String(Math.round(n * 100000) / 100000).replace('.', ',');
 }
 
-function quantityFieldMeta(operation: Operation): {
+function quantityFieldMeta(operation: Operation, scope?: 'run' | 'item'): {
   label: string;
   step: number;
   min: number;
@@ -85,25 +86,33 @@ function quantityFieldMeta(operation: Operation): {
       min: 1,
     };
   }
-  if (priceUnit === 'per_hour') {
-    return {
-      label: 'Часов на заказ:',
-      step: 0.01,
-      min: 0.01,
-      hint: 'Фиксированное время, без умножения на тираж.',
-    };
-  }
-  if (priceUnit === 'fixed' || priceUnit === 'per_order' || priceUnit === 'per_cut') {
-    return {
-      label: 'Норма:',
-      step: 1,
-      min: 0,
-    };
-  }
+  const base =
+    priceUnit === 'per_hour'
+      ? {
+          label: 'Часов на заказ:',
+          step: 0.01,
+          min: 0.01,
+          hint: 'Фиксированное время, без умножения на тираж.',
+        }
+      : priceUnit === 'fixed' || priceUnit === 'per_order' || priceUnit === 'per_cut'
+        ? {
+            label: 'Норма:',
+            step: 1,
+            min: 0,
+          }
+        : {
+            label: 'Количество:',
+            step: 1,
+            min: 1,
+          };
+  if (scope !== 'run' && scope !== 'item') return base;
   return {
-    label: 'Количество:',
-    step: 1,
-    min: 1,
+    ...base,
+    label: scope === 'item' && priceUnit === 'per_hour' ? 'Часов на изделие:' : base.label,
+    hint:
+      scope === 'item'
+        ? 'На каждое изделие: норма умножается на тираж.'
+        : 'На весь тираж: норма один раз, без умножения на количество изделий.',
   };
 }
 
@@ -724,7 +733,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
 
                       {/* Поле количества */}
                       {(() => {
-                        const qtyMeta = quantityFieldMeta(operation);
+                        const qtyMeta = quantityFieldMeta(
+                          operation,
+                          templateQuantityScopeForOperation(
+                            backendProductSchema?.template?.simplified,
+                            specs.typeId,
+                            specs.size_id,
+                            operationId,
+                          ),
+                        );
                         const step = qtyMeta.step;
                         const fieldMin = Math.min(qtyMeta.min, limits?.min ?? qtyMeta.min);
                         const billedM2 = selectedData?.billedM2;
@@ -814,7 +831,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
 
                     {/* Поле количества */}
                     {(() => {
-                      const qtyMeta = quantityFieldMeta(operation);
+                      const qtyMeta = quantityFieldMeta(
+                          operation,
+                          templateQuantityScopeForOperation(
+                            backendProductSchema?.template?.simplified,
+                            specs.typeId,
+                            specs.size_id,
+                            operationId,
+                          ),
+                        );
                       const step = qtyMeta.step;
                       const fieldMin = Math.min(qtyMeta.min, limits?.min ?? qtyMeta.min);
                       const billedM2 = selectedData?.billedM2;

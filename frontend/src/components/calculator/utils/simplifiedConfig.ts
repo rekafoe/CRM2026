@@ -327,3 +327,24 @@ export function templateUnitsForOperation(
   );
   return positiveUnits(row?.units_per_item);
 }
+
+/** Явный охват нормы из шаблона продукта. Пусто — считать по единице услуги. */
+export function templateQuantityScopeForOperation(
+  simplified: { sizes?: any[]; typeConfigs?: Record<string, { sizes?: any[]; common_finishing?: any[] }> } | null | undefined,
+  typeId: number | string | null | undefined,
+  sizeId: number | string | null | undefined,
+  operationId: number,
+): 'run' | 'item' | undefined {
+  const typeConfig =
+    typeId != null && simplified?.typeConfigs ? simplified.typeConfigs[String(typeId)] : undefined;
+  const sizes = typeConfig ? typeConfig.sizes : simplified?.sizes;
+  const sizeList = Array.isArray(sizes) ? sizes : [];
+  const size =
+    sizeList.find((row) => String(row?.id) === String(sizeId)) ??
+    (sizeId == null || sizeId === '' ? sizeList[0] : undefined);
+  const row = getEffectiveFinishing(typeConfig, size).find(
+    (item) => Number(item?.service_id ?? item?.operation_id) === Number(operationId),
+  );
+  const scope = row?.quantity_scope;
+  return scope === 'run' || scope === 'item' ? scope : undefined;
+}

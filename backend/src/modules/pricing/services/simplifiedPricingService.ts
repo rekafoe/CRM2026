@@ -48,6 +48,9 @@ import {
   flatFinishingUnits,
   getEffectiveFinishing,
   isTemplateFinishingRequired,
+  readFinishingQuantityScope,
+  resolveCountableFinishingUnits,
+  type FinishingQuantityScope,
 } from './finishingQuantity';
 import {
   buildPlotterTiersFromDto,
@@ -328,6 +331,11 @@ interface SimplifiedSizeConfig {
     service_id: number;
     price_unit: 'per_cut' | 'per_item' | 'per_sheet' | 'fixed' | 'per_order' | 'per_meter' | 'per_m2' | 'per_hour';
     units_per_item: number;
+    /**
+     * run — норма один раз на тираж; item — норма × тираж («за изделие»).
+     * Пусто — как у price_unit услуги, без смены раскладки.
+     */
+    quantity_scope?: FinishingQuantityScope;
     variant_id?: number; //  ID варианта для услуг с вариантами (например, ламинация)
     is_required?: boolean | number | string;
     //  tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
@@ -497,6 +505,7 @@ export class SimplifiedPricingService {
         service_id: number;
         price_unit?: 'per_cut' | 'per_item';
         units_per_item?: number;
+        quantity_scope?: FinishingQuantityScope;
       }>;
       /** Дозаливка мм (с каждой стороны) — переопределяет дефолт из шаблона */
       bleed_mm?: number;
@@ -1640,7 +1649,13 @@ export class SimplifiedPricingService {
 
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
     // При fallback берём услуги с is_required в шаблоне размера и связи «обязательная / по умолчанию».
-    let finishingToUse: Array<{ service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number }>;
+    let finishingToUse: Array<{
+      service_id: number;
+      variant_id?: number;
+      price_unit?: string;
+      units_per_item?: number;
+      quantity_scope?: FinishingQuantityScope;
+    }>;
     const hasExplicitFinishing = Array.isArray(normalizedConfig.finishing);
     if (hasExplicitFinishing) {
       finishingToUse = normalizedConfig.finishing;
@@ -1680,14 +1695,14 @@ export class SimplifiedPricingService {
       Array.isArray(selectedSize.finishing) &&
       selectedSize.finishing.length > 0
     ) {
-      const tmplByKey = new Map<string, { units_per_item?: number }>();
+      const tmplByKey = new Map<string, { units_per_item?: number; quantity_scope?: unknown }>();
       for (const t of selectedSize.finishing) {
         const sid = Number((t as any).service_id);
         if (!Number.isFinite(sid)) continue;
         const rawVid = (t as any).variant_id;
         const vid =
           rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
-        const row = t as { units_per_item?: number };
+        const row = t as { units_per_item?: number; quantity_scope?: unknown };
         if (vid != null) tmplByKey.set(`${sid}:${vid}`, row);
         if (!tmplByKey.has(String(sid))) tmplByKey.set(String(sid), row);
       }
@@ -1698,7 +1713,13 @@ export class SimplifiedPricingService {
           rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
         const k = vid != null ? `${sid}:${vid}` : String(sid);
         const tmpl = tmplByKey.get(k) ?? tmplByKey.get(String(sid));
-        let next: { service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number } = {
+        let next: {
+          service_id: number;
+          variant_id?: number;
+          price_unit?: string;
+          units_per_item?: number;
+          quantity_scope?: FinishingQuantityScope;
+        } = {
           ...f,
         };
         const raw = f.units_per_item;
@@ -1708,6 +1729,8 @@ export class SimplifiedPricingService {
           const u = Number(tmpl.units_per_item);
           if (Number.isFinite(u) && u > 0) next.units_per_item = u;
         }
+        const quantityScope = readFinishingQuantityScope(tmpl?.quantity_scope);
+        if (quantityScope) next.quantity_scope = quantityScope;
         // price_unit не подмешиваем из шаблона: источник истины — карточка услуги (БД), иначе старый per_item в шаблоне ломает per_sheet.
         return next;
       });
@@ -2337,8 +2360,10 @@ export class SimplifiedPricingService {
 
           const priceUnit = priceUnitFromDb;
           const unitsPerItem = finConfig.units_per_item ?? 1;
+          const quantityScope = readFinishingQuantityScope(finConfig.quantity_scope);
           const flatUnits = flatFinishingUnits(priceUnit, unitsPerItem);
           // per_cut (обычная резка): тупо сколько внёс резов — столько и считаем. Цена × кол-во внесённых. Раскладку не подставляем.
+          // quantity_scope=item возвращает старый режим «за изделие»: норма × тираж.
           const totalCutsForOrder = Math.max(unitsPerItem, 0);
           const billedPerSheetForTier =
             isPerSheetOp && limits ? Math.max(perSheetUnits, limits.min ?? 1) : perSheetUnits;
@@ -2350,7 +2375,7 @@ export class SimplifiedPricingService {
             ? billedPerSheetForTier
             : isPerMeterOp
               ? billedMeterForTier
-              : priceUnit === 'per_cut'
+              : priceUnit === 'per_cut' && quantityScope !== 'item'
                 ? billedCutsForTier
                 : quantity;
           const sidNum = Number(finConfig.service_id);
@@ -2394,6 +2419,7 @@ export class SimplifiedPricingService {
           const serviceMinQty = limits?.min ?? 0;
           // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на заказ;
           // fixed / per_order / per_hour: units_per_item один раз; иначе — тираж × units_per_item (per_item).
+          // quantity_scope на услуге продукта: run — один раз на тираж, item — × тираж. Раскладку не трогает.
 
           let servicePrice = 0;
           let totalUnits: number;
@@ -2406,7 +2432,7 @@ export class SimplifiedPricingService {
             rawUnits = meterUnits;
             totalUnits = Math.max(meterUnits, serviceMinQty);
             servicePrice = effectivePriceForTier * totalUnits;
-          } else if (priceUnit === 'per_cut') {
+          } else if (priceUnit === 'per_cut' && quantityScope !== 'item') {
             rawUnits = totalCutsForOrder;
             totalUnits = totalCutsForOrder === 0 ? 0 : Math.max(totalCutsForOrder, serviceMinQty);
             servicePrice = effectivePriceForTier * totalUnits;
@@ -2469,12 +2495,12 @@ export class SimplifiedPricingService {
               servicePrice,
             });
             continue;
-          } else if (flatUnits != null) {
+          } else if (quantityScope !== 'item' && flatUnits != null) {
             rawUnits = flatUnits;
             totalUnits = flatUnits;
             servicePrice = effectivePriceForTier * totalUnits;
           } else {
-            rawUnits = quantity * (unitsPerItem ?? 1);
+            rawUnits = resolveCountableFinishingUnits(priceUnit, quantity, unitsPerItem ?? 1, quantityScope);
             totalUnits = rawUnits;
             servicePrice = effectivePriceForTier * totalUnits;
           }
@@ -3230,7 +3256,13 @@ export class SimplifiedPricingService {
     baseMaterialPricePerItem: number;
     serviceTiersMap: Map<string, SimplifiedQtyTier[]>;
     serviceLimitsMap?: Map<number, { min?: number; max?: number }>;
-    finishingConfig: Array<{ service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number }>;
+    finishingConfig: Array<{
+      service_id: number;
+      variant_id?: number;
+      price_unit?: string;
+      units_per_item?: number;
+      quantity_scope?: FinishingQuantityScope;
+    }>;
     selectedSize: SimplifiedSizeConfig;
     layoutCheck: any;
     itemsPerSheet: number;
@@ -3444,6 +3476,7 @@ export class SimplifiedPricingService {
         const meterUnits = rawMeterUnits;
         const perSheetUnits = isPerSheetOp ? (ctx.isRollMeterage ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
+        const quantityScope = readFinishingQuantityScope(finConfig.quantity_scope);
         const totalCutsForOrder = Math.max(unitsPerItem, 0);
         let m2Units = 0;
         if (isPerM2Op) {
@@ -3470,7 +3503,7 @@ export class SimplifiedPricingService {
           ? billedPerSheetTier
           : isPerMeterOp
             ? billedMeterTier
-            : priceUnitFromDb === 'per_cut'
+            : priceUnitFromDb === 'per_cut' && quantityScope !== 'item'
               ? billedCutsTier
               : isPerM2Op
                 ? billedM2Tier
@@ -3512,14 +3545,15 @@ export class SimplifiedPricingService {
           finishingPrice += effectiveTierPrice * Math.max(perSheetUnits, serviceMinQty);
         } else if (priceUnit === 'per_meter') {
           finishingPrice += effectiveTierPrice * Math.max(meterUnits, serviceMinQty);
-        } else if (priceUnit === 'per_cut') {
+        } else if (priceUnit === 'per_cut' && quantityScope !== 'item') {
           const cuts = totalCutsForOrder === 0 ? 0 : Math.max(totalCutsForOrder, serviceMinQty);
           finishingPrice += effectiveTierPrice * cuts;
         } else if (priceUnit === 'per_m2') {
           finishingPrice += effectiveTierPrice * Math.max(m2Units, serviceMinQty);
         } else {
-          const flatUnits = flatFinishingUnits(priceUnit, unitsPerItem);
-          finishingPrice += effectiveTierPrice * (flatUnits ?? (q * (unitsPerItem ?? 1)));
+          finishingPrice +=
+            effectiveTierPrice *
+            resolveCountableFinishingUnits(priceUnit, q, unitsPerItem ?? 1, quantityScope);
         }
       }
 
