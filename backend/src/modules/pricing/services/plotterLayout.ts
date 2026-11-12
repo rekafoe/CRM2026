@@ -35,6 +35,33 @@ export function resolvePlotterMargins(
   return { edgeMm, gapMm };
 }
 
+/**
+ * Поля раскладки для отделки и складского списания в калькуляторе продукта.
+ * Если у подтипа включён плоттер — те же дефолты (рулон 25/2, лист 15/4), что у резки и плёнки.
+ * Иначе — только явное cut_margin_mm / cut_gap_mm размера (без плоттерных дефолтов).
+ */
+export function resolveProductNestMargins(
+  plotterEnabled: boolean,
+  plotterMode: PlotterMode | 'auto' | string | null | undefined,
+  cutMarginMm?: number | null,
+  cutGapMm?: number | null
+): PlotterMargins {
+  if (plotterEnabled) {
+    const mode: PlotterMode = plotterMode === 'sheet' ? 'sheet' : 'roll';
+    return resolvePlotterMargins(mode, cutMarginMm, cutGapMm);
+  }
+  return {
+    edgeMm:
+      cutMarginMm != null && Number.isFinite(Number(cutMarginMm)) && Number(cutMarginMm) > 0
+        ? Number(cutMarginMm)
+        : 0,
+    gapMm:
+      cutGapMm != null && Number.isFinite(Number(cutGapMm)) && Number(cutGapMm) >= 0
+        ? Number(cutGapMm)
+        : 0,
+  };
+}
+
 export type KnifePathRollInput = {
   rollWidthMm: number;
   trimMm: { width: number; height: number };

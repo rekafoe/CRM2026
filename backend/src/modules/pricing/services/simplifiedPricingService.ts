@@ -32,6 +32,7 @@ import {
   computeOptimizedRollFeedMeters,
   productPlotterRollFeedMeters,
   resolvePlotterMargins,
+  resolveProductNestMargins,
   SHEET_PLOTTER_SRA3_MM,
 } from './plotterLayout';
 import {
@@ -873,6 +874,13 @@ export class SimplifiedPricingService {
             }
           : undefined
         : configuredPlotter;
+    // Отделка (ламинация per_m2 / roll_feed) должна садиться в ту же сетку полей, что плёнка плоттера.
+    const finishingLayoutMargins = resolveProductNestMargins(
+      effectivePlotterConfig?.enabled === true,
+      effectivePlotterConfig?.mode,
+      customMarginMm,
+      customGapMm,
+    );
 
     let materialSheetMm: { width: number; height: number } | null = null;
     if (normalizedConfig.material_id) {
@@ -2227,16 +2235,7 @@ export class SimplifiedPricingService {
                     trimMm: layoutTrim,
                     bleedMm: resolvedBleedMm,
                     quantity,
-                    margins: {
-                      edgeMm:
-                        customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
-                          ? Number(customMarginMm)
-                          : 0,
-                      gapMm:
-                        customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
-                          ? Number(customGapMm)
-                          : 0,
-                    },
+                    margins: finishingLayoutMargins,
                   },
                   fallbackMeters: materialMetersNeeded,
                   materialId: undefined,
@@ -2253,16 +2252,7 @@ export class SimplifiedPricingService {
                   trimMm: layoutTrim,
                   bleedMm: resolvedBleedMm,
                   quantity,
-                  margins: {
-                    edgeMm:
-                      customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
-                        ? Number(customMarginMm)
-                        : 0,
-                    gapMm:
-                      customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
-                        ? Number(customGapMm)
-                        : 0,
-                  },
+                  margins: finishingLayoutMargins,
                 },
                 fallbackMeters: materialMetersNeeded,
                 materialId: undefined,
@@ -2418,16 +2408,7 @@ export class SimplifiedPricingService {
                 trimMm: layoutTrim,
                 bleedMm: resolvedBleedMm,
                 quantity,
-                margins: {
-                  edgeMm:
-                    customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
-                      ? Number(customMarginMm)
-                      : 0,
-                  gapMm:
-                    customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
-                      ? Number(customGapMm)
-                      : 0,
-                },
+                margins: finishingLayoutMargins,
               },
               rate: effectivePriceForTier,
               serviceMinQty,
@@ -2708,16 +2689,7 @@ export class SimplifiedPricingService {
               trimMm: layoutTrim,
               bleedMm: resolvedBleedMm,
               quantity,
-              margins: {
-                edgeMm:
-                  customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
-                    ? Number(customMarginMm)
-                    : 0,
-                gapMm:
-                  customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
-                    ? Number(customGapMm)
-                    : 0,
-              },
+              margins: finishingLayoutMargins,
             },
             fallbackMeters: Math.max(materialMetersNeeded, rawUnits),
             materialId: src.material_id,
@@ -2917,16 +2889,7 @@ export class SimplifiedPricingService {
       rollConsumedAreaCtx: {
         trimMm: layoutTrim,
         bleedMm: resolvedBleedMm,
-        margins: {
-          edgeMm:
-            customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
-              ? Number(customMarginMm)
-              : 0,
-          gapMm:
-            customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
-              ? Number(customGapMm)
-              : 0,
-        },
+        margins: finishingLayoutMargins,
         rollWidthByFinKey: finishingRollWidthMmMap,
       },
     });
