@@ -45,12 +45,22 @@ describe('service variant leaf pricing', () => {
     expect(collectLeafVariantIds(rows)).toEqual([3, 4, 5]);
   });
 
-  it('uses the earliest root candidate for legacy groups without an explicit root', () => {
+  it('keeps prices on all flat typed peers without an explicit root', () => {
     const rows = [
       row(10, 'Скоба', { type: 'Обычная' }),
       row(11, 'Скоба', { type: 'Премиум' }),
     ];
-    expect([...collectNonLeafVariantIds(rows)]).toEqual([10]);
-    expect(collectLeafVariantIds(rows)).toEqual([11]);
+    expect([...collectNonLeafVariantIds(rows)]).toEqual([]);
+    expect(collectLeafVariantIds(rows)).toEqual([10, 11]);
+  });
+
+  it('keeps prices on flat density peers without an explicit root', () => {
+    const rows = [
+      row(20, 'Бумага', { density: '80' }),
+      row(21, 'Бумага', { density: '120' }),
+      row(22, 'Бумага', { density: '160' }),
+    ];
+    expect([...collectNonLeafVariantIds(rows)]).toEqual([]);
+    expect(collectLeafVariantIds(rows)).toEqual([20, 21, 22]);
   });
 });

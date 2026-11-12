@@ -22,17 +22,16 @@ function hasNonEmptyTypeOrDensity(v: VariantWithTiers): boolean {
 }
 
 /**
- * Один корень на группу (variantName): сначала варианты без parent и без type/density,
- * иначе — самый ранний по id среди вариантов без parent (чтобы не пропадала таблица).
+ * Один корень на группу (variantName): только явный заголовок без parent и без type/density.
+ * Плоские peers с type/density без заголовка не получают синтетический корень —
+ * иначе backend/clearNonLeaf стирает цены у первого варианта группы.
  */
 function pickRootForGroup(group: VariantWithTiers[]): VariantWithTiers | undefined {
   const noParent = group.filter((v) => !hasParentVariantId(v));
   if (noParent.length === 0) return undefined;
   const explicitRoots = noParent.filter((v) => !hasNonEmptyTypeOrDensity(v));
-  const pickMinId = (list: VariantWithTiers[]) =>
-    [...list].sort((a, b) => Number(a.id) - Number(b.id))[0];
-  if (explicitRoots.length > 0) return pickMinId(explicitRoots);
-  return pickMinId(noParent);
+  if (explicitRoots.length === 0) return undefined;
+  return [...explicitRoots].sort((a, b) => Number(a.id) - Number(b.id))[0];
 }
 
 /**
@@ -61,6 +60,19 @@ export function groupVariantsByType(variants: VariantWithTiers[]): VariantsByTyp
         .sort((a, b) => Number(a.id) - Number(b.id));
       if (siblings.length > 0) {
         level1.set(pkRoot, siblings);
+      }
+    } else {
+      // Legacy flat peers: каждый вариант — лист. Рендерим через level0+level1,
+      // чтобы ServiceVariantsGrid (требует level0[0]) не скрыл группу.
+      const peers = group
+        .filter((v) => !hasParentVariantId(v))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      if (peers.length > 0) {
+        level0.push(peers[0]);
+        const rest = peers.slice(1);
+        if (rest.length > 0) {
+          level1.set(variantParentMapKey(peers[0].id), rest);
+        }
       }
     }
 
@@ -94,6 +106,9 @@ export function collectPricingLeafVariantIds(variants: VariantWithTiers[]): Set<
     const totalVariants = group.level0.length + level1Variants.length + level2Variants.length;
 
     if (level0 && totalVariants === 1) {
+      leafIds.add(Number(level0.id));
+    } else if (level0 && hasNonEmptyTypeOrDensity(level0) && level2Variants.length === 0) {
+      // Синтетический «корень» среди flat typed peers — тоже лист с ценой.
       leafIds.add(Number(level0.id));
     }
     for (const variant of level1Variants) {
