@@ -4,6 +4,7 @@ import type { PageSaveSnapshot } from './mergePagesSnapshot';
 import { mergePagesWithSavedSnapshot } from './mergePagesSnapshot';
 import { reconcileSavedSnapshotLoss } from './fabricSnapshotReconcile';
 import { inferSceneScaleFromPageExtents } from './designFields/sceneScale';
+import { MM_TO_PX } from './constants';
 
 export type DesignTemplateSpec = {
   width_mm?: number;
@@ -67,10 +68,18 @@ export function resolveDesignSceneScale(
 /**
  * Для preview/production-like render явный scale не должен побеждать координаты сцены:
  * это та же политика разрешения mismatch, которую применяет backend production PDF.
+ *
+ * Legacy souvenir_3d без fabricCoordSpace='css_px' писал 1px=1mm — компенсируем 1/MM_TO_PX.
  */
 export function resolveDesignRenderSceneScale(
-  designState: Pick<DesignState, 'sceneScale' | 'pages' | 'pageWidth' | 'pageHeight'> | null | undefined,
+  designState: Pick<DesignState, 'sceneScale' | 'pages' | 'pageWidth' | 'pageHeight' | 'editorKind' | 'fabricCoordSpace'> | null | undefined,
 ): number {
+  if (
+    designState?.editorKind === 'souvenir_3d'
+    && designState.fabricCoordSpace !== 'css_px'
+  ) {
+    return 1 / MM_TO_PX;
+  }
   const explicit = Number(designState?.sceneScale);
   const validExplicit = Number.isFinite(explicit) && explicit > 0 ? explicit : null;
   const inferred = inferSceneScaleFromPageExtents(designState);

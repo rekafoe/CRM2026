@@ -1,4 +1,9 @@
 import type { DesignPage, DesignState } from '../../pages/admin/designEditor/types';
+import {
+  normalizeSouvenirFabricJsonToCssPx,
+  resolveSouvenirFabricCoordSpace,
+  type SouvenirFabricCoordSpace,
+} from './souvenirFabricCoords';
 import type { PrintAreaConfig } from './types';
 
 const EMPTY_FABRIC_JSON: Record<string, unknown> = { version: '7.2.0', objects: [] };
@@ -33,6 +38,7 @@ export function getUsedPrintAreaIds(
 export function normalizeSouvenirPages(
   rawPages: unknown,
   areas: PrintAreaConfig[],
+  coordSpace: SouvenirFabricCoordSpace = 'css_px',
 ): DesignPage[] {
   const source = Array.isArray(rawPages)
     ? rawPages.map((page) => asRecord(page)).filter(Boolean) as Record<string, unknown>[]
@@ -44,7 +50,12 @@ export function normalizeSouvenirPages(
       ?? (original && Array.isArray(original.objects) ? original : null)
       ?? EMPTY_FABRIC_JSON;
     return {
-      fabricJSON: { ...fabricJSON },
+      fabricJSON: normalizeSouvenirFabricJsonToCssPx(
+        { ...fabricJSON },
+        area.widthMm,
+        area.heightMm,
+        coordSpace,
+      ),
       printAreaId: area.id,
       printAreaLabel: area.label,
       widthMm: area.widthMm,
@@ -71,10 +82,13 @@ export function buildSouvenirDesignState(input: {
     spread_mode: false,
     cover_pages: 0,
     editorKind: 'souvenir_3d',
+    fabricCoordSpace: 'css_px',
     activePrintAreaId: input.activePrintAreaId,
     usedPrintAreaIds,
   };
 }
+
+export { resolveSouvenirFabricCoordSpace };
 
 export function filterUsedSouvenirPages(
   state: DesignState,

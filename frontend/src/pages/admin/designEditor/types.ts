@@ -96,4 +96,9 @@ export interface DesignState {
   editorKind?: 'flat' | 'souvenir_3d';
   activePrintAreaId?: string;
   usedPrintAreaIds?: string[];
+  /**
+   * Координаты Fabric: css_px = MM_TO_PX (как production), mm_px = legacy 1px=1mm.
+   * Для souvenir_3d без маркера считаем mm_px.
+   */
+  fabricCoordSpace?: 'css_px' | 'mm_px';
 }
