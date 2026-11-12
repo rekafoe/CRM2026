@@ -69,6 +69,9 @@ export async function ensureWebsiteCustomer(input: {
 /**
  * Найти или создать юрлицо сайта строго по УНП.
  * Телефон и email намеренно не участвуют в поиске, чтобы не связать юрлицо с физлицом.
+ * Существующую legal-карточку не обновляем: website checkout не должен перезаписывать
+ * bank_details / контакты / уполномоченное лицо (иначе любой corporate-заказ по УНП
+ * портит карточку клиента в CRM).
  */
 export async function ensureWebsiteLegalCustomer(
   input: WebsiteLegalCustomerInput,
@@ -87,8 +90,12 @@ export async function ensureWebsiteLegalCustomer(
     [taxId],
   )
 
-  const customerData = {
-    type: 'legal' as const,
+  if (existing?.id) {
+    return { id: existing.id }
+  }
+
+  const created = await CustomerService.createCustomer({
+    type: 'legal',
     company_name: input.company_name.trim(),
     legal_name: input.legal_name.trim(),
     tax_id: taxId,
@@ -104,15 +111,6 @@ export async function ensureWebsiteLegalCustomer(
     ...(input.authority_basis ? { authority_basis: input.authority_basis.trim() } : {}),
     phone: input.phone.trim(),
     email: input.email.trim().toLowerCase(),
-  }
-
-  if (existing?.id) {
-    const updated = await CustomerService.updateCustomer(existing.id, customerData)
-    return { id: updated.id }
-  }
-
-  const created = await CustomerService.createCustomer({
-    ...customerData,
     source: 'website',
   })
   return { id: created.id }
