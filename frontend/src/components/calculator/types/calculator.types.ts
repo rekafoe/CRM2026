@@ -55,7 +55,10 @@ export interface ProductSpecs {
   cover_material_id?: number;
   /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
   base_material_id?: number;
-  /** Дозаливка мм (с каждой стороны) — переопределяет шаблон; иначе см. resolveBleedMmForCalculateRequest */
+  /**
+   * Дозаливка мм (с каждой стороны). На бэкенде для биллинга берётся только
+   * шаблон (default_bleed_mm / prepress.bleedMm); клиентский bleed_mm игнорируется.
+   */
   bleed_mm?: number;
   /** ID типа продукта (вариант внутри продукта: односторонние, с ламинацией и т.д.) */
   typeId?: number;
