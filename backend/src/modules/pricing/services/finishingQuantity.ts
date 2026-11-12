@@ -2,10 +2,17 @@
  * Количество услуги в упрощённом калькуляторе.
  * per_item умножается на тираж.
  * fixed / per_order / per_hour и per_cut — фиксированное количество на заказ.
+ * quantity_scope на строке услуги продукта переключает это явно:
+ * item — норма × тираж (как раньше price_unit=per_item, «за изделие»);
+ * run — норма один раз на весь тираж.
+ * Без поля формула остаётся прежней, раскладка per_sheet / per_meter / per_m2 не меняется.
  * Обязательная строка шаблона всегда входит в расчёт со своим units_per_item.
  */
 
 const FLAT_FINISHING_UNITS = new Set(['fixed', 'per_order', 'per_hour']);
+
+/** Как считать норму услуги внутри продукта: на весь тираж или на каждое изделие. */
+export type FinishingQuantityScope = 'run' | 'item';
 
 export function isTemplateFinishingRequired(row: { is_required?: unknown } | null | undefined): boolean {
   const value = row?.is_required;
@@ -25,11 +32,47 @@ export function flatFinishingUnits(priceUnit: string | null | undefined, unitsPe
   return units;
 }
 
+export function readFinishingQuantityScope(raw: unknown): FinishingQuantityScope | undefined {
+  const value = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (value === 'run' || value === 'item') return value;
+  return undefined;
+}
+
+/**
+ * Единицы, на которые умножается ставка услуги.
+ * per_sheet / per_meter / per_m2 сюда не передавать.
+ * Без quantity_scope: per_cut и fixed/per_order/per_hour — один раз, per_item — × тираж.
+ */
+export function resolveCountableFinishingUnits(
+  priceUnit: string | null | undefined,
+  quantity: number,
+  unitsPerItem: number,
+  quantityScope: unknown,
+): number {
+  const unit = String(priceUnit ?? '').trim().toLowerCase();
+  const scope = readFinishingQuantityScope(quantityScope);
+  const once = (): number => {
+    if (isFlatFinishingPriceUnit(unit)) return flatFinishingUnits(unit, unitsPerItem) ?? 1;
+    const units = Number(unitsPerItem);
+    if (!Number.isFinite(units)) return 1;
+    return Math.max(units, 0);
+  };
+  if (scope === 'run') return once();
+  if (scope === 'item') {
+    const units = Number(unitsPerItem);
+    return quantity * (Number.isFinite(units) ? units : 1);
+  }
+  if (unit === 'per_cut' || isFlatFinishingPriceUnit(unit)) return once();
+  const units = Number(unitsPerItem);
+  return quantity * (Number.isFinite(units) ? units : 1);
+}
+
 type FinishingRow = {
   service_id: number;
   variant_id?: number;
   price_unit?: string;
   units_per_item?: number;
+  quantity_scope?: unknown;
   is_required?: unknown;
 };
 
@@ -78,6 +121,7 @@ export function enforceRequiredFinishing<T extends FinishingRow>(
     if (!Number.isFinite(serviceId) || serviceId <= 0) continue;
     const variantId = variantIdOf(row.variant_id);
     const units = templateUnits(row.units_per_item);
+    const quantityScope = readFinishingQuantityScope(row.quantity_scope);
     const index = next.findIndex((item) => Number(item.service_id) === serviceId);
     if (index === -1) {
       next.push({
@@ -85,6 +129,7 @@ export function enforceRequiredFinishing<T extends FinishingRow>(
         ...(variantId != null ? { variant_id: variantId } : {}),
         ...(row.price_unit ? { price_unit: row.price_unit } : {}),
         ...(units != null ? { units_per_item: units } : {}),
+        ...(quantityScope ? { quantity_scope: quantityScope } : {}),
       } as T);
       continue;
     }
@@ -93,6 +138,7 @@ export function enforceRequiredFinishing<T extends FinishingRow>(
       ...prev,
       ...(variantId != null ? { variant_id: variantId } : {}),
       ...(units != null ? { units_per_item: units } : {}),
+      ...(quantityScope ? { quantity_scope: quantityScope } : {}),
     };
   }
 

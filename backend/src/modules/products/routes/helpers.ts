@@ -293,16 +293,18 @@ function compactPrintPrice(pp: any) {
   };
 }
 
-/** Компактный finishing: service_id, price_unit, units_per_item, variant_id, обязательность — без tiers. */
+/** Компактный finishing: service_id, price_unit, units_per_item, variant_id, обязательность, охват нормы — без tiers. */
 function compactFinishingItem(f: any) {
   if (!f || typeof f.service_id !== 'number') return null;
   const required = f.is_required === true || f.is_required === 1 || f.is_required === '1';
+  const quantityScope = f.quantity_scope === 'run' || f.quantity_scope === 'item' ? f.quantity_scope : undefined;
   return {
     service_id: f.service_id,
     price_unit: f.price_unit ?? 'per_item',
     units_per_item: f.units_per_item ?? 1,
     ...(f.variant_id != null ? { variant_id: f.variant_id } : {}),
     ...(required ? { is_required: true } : {}),
+    ...(quantityScope ? { quantity_scope: quantityScope } : {}),
   };
 }
 

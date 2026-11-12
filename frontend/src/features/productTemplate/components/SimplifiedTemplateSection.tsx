@@ -103,6 +103,7 @@ function finishingListKey(rows: SimplifiedSizeConfig['finishing'] | undefined): 
         row.units_per_item ?? '',
         row.is_required ? 1 : 0,
         row.price_unit ?? '',
+        row.quantity_scope ?? '',
       ].join(':'),
     )
     .sort()

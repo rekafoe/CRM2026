@@ -20,6 +20,12 @@ export type SimplifiedFinishingPrice = {
    * per_sheet / per_meter / per_m2 считает раскладка.
    */
   units_per_item: number;
+  /**
+   * Как применять норму. Раньше это был price_unit шаблона: per_item = «за изделие».
+   * run — один раз на весь тираж; item — на каждое изделие (тираж × норма).
+   * Пусто — как у price_unit услуги, без смены раскладки.
+   */
+  quantity_scope?: 'run' | 'item';
   /** Всегда входит в расчёт с количеством из шаблона. */
   is_required?: boolean;
   //  tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг

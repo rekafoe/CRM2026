@@ -133,6 +133,30 @@ describe('compact material-driven schema', () => {
     ])
   })
 
+  it('отдаёт охват нормы услуги, только если он задан', () => {
+    const compact = compactSimplifiedForSite({
+      sizes: [
+        {
+          id: 1,
+          label: 'A6',
+          width_mm: 105,
+          height_mm: 148,
+          finishing: [
+            { service_id: 4, price_unit: 'per_cut', units_per_item: 2, quantity_scope: 'item' },
+            { service_id: 5, price_unit: 'per_item', units_per_item: 1, quantity_scope: 'run' },
+            { service_id: 6, price_unit: 'per_sheet', units_per_item: 1, quantity_scope: 'later' },
+          ],
+        },
+      ],
+    })
+
+    expect(compact.sizes[0].finishing).toEqual([
+      { service_id: 4, price_unit: 'per_cut', units_per_item: 2, quantity_scope: 'item' },
+      { service_id: 5, price_unit: 'per_item', units_per_item: 1, quantity_scope: 'run' },
+      { service_id: 6, price_unit: 'per_sheet', units_per_item: 1 },
+    ])
+  })
+
   it('отдаёт общие услуги типа и флаг своих услуг размера', () => {
     const compact = compactSimplifiedForSite({
       types: [{ id: 1, name: 'Квадратные', default: true }],
