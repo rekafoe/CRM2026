@@ -53,11 +53,30 @@ type ServiceRow = {
   category_name?: string | null;
 }
 
+export type BindingServiceVariant = {
+  id: number;
+  variantName?: string;
+  variant_name?: string;
+  parentVariantId?: number | string | null;
+  parent_variant_id?: number | string | null;
+  isActive?: boolean;
+  is_active?: boolean | number;
+  parameters?: unknown;
+  material_id?: number | null;
+};
+
 export type BindingServiceRow = {
   id: number;
   name: string;
-  variants?: Array<{ id: number; variantName?: string; variant_name?: string }>;
-}
+  price_unit?: string | null;
+  priceUnit?: string | null;
+  min_quantity?: number | null;
+  max_quantity?: number | null;
+  minQuantity?: number | null;
+  maxQuantity?: number | null;
+  material_id?: number | null;
+  variants?: BindingServiceVariant[];
+};
 
 export type SimplifiedEditorTab =
   | 'pages'

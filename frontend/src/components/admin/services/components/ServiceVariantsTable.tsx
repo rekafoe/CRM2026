@@ -101,6 +101,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         onSaveNow={handleToolbarSaveNow}
         onCancelDraft={handleToolbarCancel}
         onAddRangeClick={(e) => tierModal.openAddModal(e.currentTarget)}
+        quantityLabel={isBindService ? 'Тираж заказа' : 'Тираж'}
       />
 
       {variants.length === 0 ? (

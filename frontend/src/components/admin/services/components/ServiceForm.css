@@ -27,3 +27,70 @@
 .service-form__full .form-group {
   min-width: 0;
 }
+
+.service-form-operation {
+  margin: -0.35rem 0 0;
+  font-size: 13px;
+  color: #334155;
+}
+
+.service-form-unit-fixed {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.service-form-unit-warn {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #78350f;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.service-form-unit-warn p {
+  margin: 0 0 8px;
+}
+
+.service-form-unit-warn__button {
+  border: 1px solid #d97706;
+  background: #fff;
+  color: #92400e;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.service-form-input--invalid {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 1px #dc2626;
+}
+
+.service-form-quantity-hint {
+  margin: -0.35rem 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.service-form-quantity-hint--invalid {
+  color: #dc2626;
+}
+
+.service-form-writeoff__title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.service-form-roll-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}

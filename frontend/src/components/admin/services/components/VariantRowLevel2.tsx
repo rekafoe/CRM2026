@@ -66,7 +66,7 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
                   <input
                     type="text"
                     className="el-input__inner"
-                    placeholder="Подтип"
+                    placeholder={isBindService ? 'Лист, например: 8 мм' : 'Подтип'}
                     value={editingParamsValue.subType || ''}
                     onChange={(e) => onParamsChange('subType', e.target.value)}
                     style={{ flex: 1 }}
@@ -82,19 +82,29 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
                 <input
                   type="text"
                   className="el-input__inner"
-                  value={variant.parameters?.subType || 'Подвариант'}
+                  placeholder={isBindService ? 'Лист, например: 8 мм' : undefined}
+                  value={
+                    isBindService
+                      ? (['Новый тип', 'Вариант', 'Подвариант'].includes(String(variant.parameters?.subType || ''))
+                        ? ''
+                        : (variant.parameters?.subType || ''))
+                      : (variant.parameters?.subType || 'Подвариант')
+                  }
                   onClick={handleParamsEditStart}
                   readOnly
                   style={{ cursor: 'pointer' }}
                 />
               )}
             </div>
-            {onUpdateMaterial && materials.length > 0 && (
+            {isBindService && <span className="variant-kind">лист</span>}
+            {isBindService && variant.isActive === false && <span className="variant-kind variant-kind--off">выключен</span>}
+            {onUpdateMaterial && (materials.length > 0 || isBindService) && (
               <VariantMaterialSelect
                 variant={variant}
                 materials={materials}
                 priceUnit={priceUnit}
                 onUpdate={onUpdateMaterial}
+                bindingLeaf={Boolean(isBindService)}
               />
             )}
             {isBindService && onUpdateBindingPages && (
@@ -103,7 +113,7 @@ const VariantRowLevel2Inner: React.FC<VariantRowLevel2Props> = ({
           </div>
         </div>
       </td>
-      <VariantRowActions layout="leaf" onAddSibling={handleCreateSibling} onDelete={handleDelete} />
+      <VariantRowActions layout="leaf" bindingLabels={Boolean(isBindService)} onAddSibling={handleCreateSibling} onDelete={handleDelete} />
       <PriceRangeCells
         tiers={variant.tiers}
         commonRanges={commonRangesAsPriceRanges}

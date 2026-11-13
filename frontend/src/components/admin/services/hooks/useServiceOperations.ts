@@ -6,6 +6,7 @@ import {
 import {
   createPricingService,
   createBindingService,
+  updateBindingService,
   updatePricingService,
   deletePricingService,
   createServiceVariant,
@@ -43,7 +44,7 @@ export function useServiceOperations({
       hasVariants?: boolean;
       operationType?: string;
       minQuantity?: number;
-      maxQuantity?: number;
+      maxQuantity?: number | null;
       operator_percent?: number;
       categoryId?: number | null;
       material_id?: number | null;
@@ -128,7 +129,7 @@ export function useServiceOperations({
       isActive: boolean;
       hasVariants?: boolean;
       minQuantity?: number;
-      maxQuantity?: number;
+      maxQuantity?: number | null;
       operator_percent?: number;
       categoryId?: number | null;
       material_id?: number | null;
@@ -190,6 +191,24 @@ export function useServiceOperations({
     []
   );
 
+  const updateBinding = useCallback(
+    async (id: number, payload: UpdatePricingServicePayload) => {
+      try {
+        await updateBindingService(id, {
+          ...payload,
+          operationType: 'bind',
+          type: 'bind',
+          consumption_mode: payload.consumption_mode !== undefined ? 'fixed' : payload.consumption_mode,
+        });
+        callbacksRef.current.onSuccess?.('Переплёт обновлён');
+        await callbacksRef.current.onReload?.();
+      } catch (err) {
+        callbacksRef.current.onError?.('Ошибка обновления переплёта');
+      }
+    },
+    []
+  );
+
   const deleteService = useCallback(
     async (id: number, serviceName: string) => {
       if (
@@ -215,6 +234,7 @@ export function useServiceOperations({
     createService,
     createBinding,
     updateService,
+    updateBinding,
     deleteService,
   };
 }

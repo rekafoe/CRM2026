@@ -855,6 +855,7 @@ export class PricingServiceRepository {
       type: 'bind',
       operationType: 'bind',
       categoryId: payload.categoryId ?? categoryId,
+      consumption_mode: 'fixed',
     });
   }
 
@@ -983,6 +984,7 @@ export class PricingServiceRepository {
       type: 'bind',
       operationType: 'bind',
       categoryId: payload.categoryId ?? existing.category_id ?? categoryId,
+      ...(payload.consumption_mode !== undefined ? { consumption_mode: 'fixed' as const } : {}),
     });
   }
 

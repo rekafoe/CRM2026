@@ -1,14 +1,64 @@
 import React, { useMemo } from 'react'
 import { FormField } from '../../../components/common'
 import { CoverMaterialsAllowedEditor } from '../../../components/multipage/CoverMaterialsAllowedEditor'
+import {
+  listBindingLeafPaths,
+  type BindingVariantOption,
+} from '../../../components/calculator/components/BindingVariantSelector'
+import { readBindingPagesLimits } from '../../../utils/multipageBinding'
+import {
+  bindingUnitNote,
+  bindingUnitShortLabel,
+  isBindingPerItemUnit,
+} from '../../../components/admin/services/utils/bindingCopy'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type {
   MultiPageStructureConfig,
   SimplifiedSizeConfig,
 } from '../hooks/useProductTemplate'
-import type { BindingServiceRow } from './SimplifiedTemplateSection'
+import type { BindingServiceRow, BindingServiceVariant } from './SimplifiedTemplateSection'
 
 type PrintTechRow = { code: string; name: string; supports_duplex?: number | boolean }
+
+function bindingVariantActive(variant: BindingServiceVariant): boolean {
+  if (variant.isActive === false) return false
+  if (variant.is_active === false || variant.is_active === 0) return false
+  return true
+}
+
+function toBindingOptions(variants: BindingServiceVariant[] | undefined): BindingVariantOption[] {
+  return (variants ?? []).map((variant) => ({
+    id: Number(variant.id),
+    variantName: variant.variantName || variant.variant_name,
+    parentVariantId: variant.parentVariantId ?? variant.parent_variant_id ?? null,
+    isActive: bindingVariantActive(variant),
+    parameters: variant.parameters,
+  }))
+}
+
+function bindingTemplatePagesLine(parameters: unknown): string {
+  const { minPages, maxPages } = readBindingPagesLimits(parameters)
+  if (minPages != null && maxPages != null) {
+    return `Страницы изделия: от ${minPages} до ${maxPages}, с обложкой`
+  }
+  if (minPages != null) return `Страницы изделия: от ${minPages}, с обложкой`
+  if (maxPages != null) return `Страницы изделия: до ${maxPages}, с обложкой`
+  return 'лимит страниц не задан'
+}
+
+function bindingTemplateUnitLine(unit: string | null | undefined): string {
+  if (isBindingPerItemUnit(unit)) return 'Единица: за изделие'
+  const note = bindingUnitNote(unit)
+  const label = bindingUnitShortLabel(unit)
+  return note ? `единица ${label}, ${note}` : `единица ${label}`
+}
+
+function bindingTemplateRunLine(minRaw: unknown, maxRaw: unknown): string | null {
+  const min = minRaw != null && minRaw !== '' && Number.isFinite(Number(minRaw)) ? Number(minRaw) : 1
+  const max = maxRaw != null && maxRaw !== '' && Number.isFinite(Number(maxRaw)) ? Number(maxRaw) : null
+  if (min <= 1 && max == null) return null
+  return max != null ? `тираж заказа ${min}–${max}` : `тираж заказа от ${min}`
+}
 
 type Props = {
   structure: MultiPageStructureConfig
@@ -102,6 +152,37 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   }
 
   const bindingService = bindingServices.find((b) => b.id === binding.service_id)
+  const bindingOptions = toBindingOptions(bindingService?.variants)
+  const bindingLeafChoices = listBindingLeafPaths(bindingOptions)
+  const selectedLeaf = bindingLeafChoices.find((leaf) => leaf.id === binding.variant_id)
+  const savedBindingVariant = bindingOptions.find((variant) => variant.id === binding.variant_id)
+  const bindingLeafMessage = (() => {
+    if (!binding.service_id || bindingLeafChoices.length === 0) return null
+    if (selectedLeaf) return null
+    if (savedBindingVariant && savedBindingVariant.isActive === false) return 'Лист выключен'
+    if (savedBindingVariant) {
+      const name = savedBindingVariant.variantName || 'группа'
+      return `Сейчас выбрана группа „${name}“. Нужен лист.`
+    }
+    return 'Выберите лист'
+  })()
+  const bindingLeafInvalid = bindingLeafMessage != null
+  const selectedLeafVariant = selectedLeaf
+    ? bindingService?.variants?.find((variant) => Number(variant.id) === selectedLeaf.id)
+    : undefined
+  const bindingLeafSummary = selectedLeafVariant
+    ? [
+        bindingTemplatePagesLine(selectedLeafVariant.parameters),
+        selectedLeafVariant.material_id != null
+          ? `Материал: ${allMaterials.find((material) => material.id === Number(selectedLeafVariant.material_id))?.name || 'материал'}`
+          : 'материал услуги',
+        bindingTemplateUnitLine(bindingService?.price_unit ?? bindingService?.priceUnit),
+        bindingTemplateRunLine(
+          bindingService?.min_quantity ?? bindingService?.minQuantity,
+          bindingService?.max_quantity ?? bindingService?.maxQuantity,
+        ),
+      ].filter(Boolean).join(' · ')
+    : ''
 
   return (
     <div className="multipage-structure">
@@ -315,32 +396,37 @@ export const MultiPageStructureCard: React.FC<Props> = ({
               </select>
             </FormField>
 
-            {binding.service_id != null && (
-              <FormField
-                label="Вариант"
-                help="Лимиты страниц задаются в карточке услуги → таблица вариантов."
-              >
+            {binding.service_id != null && bindingLeafChoices.length > 0 && (
+              <FormField label="Лист">
                 <select
-                  className="form-select"
-                  value={binding.variant_id ?? ''}
+                  className={`form-select${bindingLeafInvalid ? ' multipage-structure__binding-select--invalid' : ''}`}
+                  value={selectedLeaf ? binding.variant_id ?? '' : ''}
+                  aria-invalid={bindingLeafInvalid || undefined}
                   onChange={(e) =>
                     patchBinding({
                       variant_id: e.target.value ? Number(e.target.value) : undefined,
                     })
                   }
                 >
-                  <option value="">— По умолчанию (без варианта) —</option>
-                  {(bindingService?.variants || []).map((variant) => {
-                    const label =
-                      variant.variantName || variant.variant_name || `Вариант #${variant.id}`
-                    return (
-                      <option key={variant.id} value={variant.id}>
-                        {label}
-                      </option>
-                    )
-                  })}
+                  <option value="">— Лист —</option>
+                  {bindingLeafChoices.map((leaf) => (
+                    <option key={leaf.id} value={leaf.id}>
+                      {leaf.path}
+                    </option>
+                  ))}
                 </select>
+                {bindingLeafMessage && (
+                  <p className="multipage-structure__binding-error">{bindingLeafMessage}</p>
+                )}
               </FormField>
+            )}
+            {binding.service_id != null && bindingLeafChoices.length === 0 && (
+              <p className="multipage-structure__binding-note">
+                У услуги нет дерева, считается её базовая цена.
+              </p>
+            )}
+            {selectedLeaf && (
+              <p className="multipage-structure__binding-summary">{bindingLeafSummary}</p>
             )}
 
           </div>

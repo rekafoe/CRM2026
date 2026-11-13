@@ -2,6 +2,11 @@ import React from 'react';
 import { FormField } from '../../../common';
 import { BynSymbol } from '../../../ui';
 import { PricingServiceType, ServiceConsumptionMode, ServiceMeterBasis } from '../../../../types/pricing';
+import {
+  bindingQuantityRangeInvalid,
+  bindingUnitWarning,
+  isBindingPerItemUnit,
+} from '../utils/bindingCopy';
 import './ServiceForm.css';
 
 export interface ServiceFormState {
@@ -111,20 +116,14 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
 
   const isBinding = variant === 'binding';
   const isWideFormat = variant === 'wideformat';
-  const showMaterialConsumption = materials.length > 0 && value.materialId !== '';
+  const showMaterialConsumption = !isBinding && materials.length > 0 && value.materialId !== '';
   const showMeterBasis = value.consumptionMode === 'roll_feed' || value.unit === 'per_meter';
+  const rangeInvalid = isBinding && bindingQuantityRangeInvalid(value.minQuantity, value.maxQuantity);
+  const unitWarning = isBinding ? bindingUnitWarning(value.unit) : null;
+  const quantityClass = rangeInvalid ? `${inputClass} service-form-input--invalid` : inputClass;
 
   return (
     <div className="service-form-grid">
-      {isBinding && (
-        <div className="service-form-binding-hint service-form__full" role="status">
-          <strong>Переплёт</strong>
-          <span className="service-form-binding-hint__muted">
-            Тип услуги postprint и операция bind задаются при сохранении. Категорию при необходимости укажите в
-            редактировании услуги.
-          </span>
-        </div>
-      )}
       {isWideFormat && (
         <div className="service-form-binding-hint service-form__full" role="status">
           <strong>ШФП послепечатка</strong>
@@ -132,25 +131,6 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
             Ламинация: тариф за пог. м подачи рулона (per_meter). После создания добавьте варианты по ширинам и
             привяжите рулоны со склада — в селекте материала видна ширина в мм. Печать считается отдельно в м².
           </span>
-        </div>
-      )}
-      {!isBinding && categories.length > 0 && (
-        <div className="service-form__full">
-          <FormField label="Категория" help="Группировка в выборе продукта и калькуляторе">
-            <select
-              className={inputClass}
-              value={value.categoryId === '' ? '' : value.categoryId}
-              disabled={disabled}
-              onChange={(e) => updateField('categoryId', e.target.value === '' ? '' : Number(e.target.value))}
-            >
-              <option value="">— Без категории</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
         </div>
       )}
       <div className="service-form__full">
@@ -172,6 +152,45 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           />
         </FormField>
       </div>
+      {isBinding && <p className="service-form-operation">Операция: переплёт</p>}
+      {(isBinding || categories.length > 0) && !isWideFormat && (
+        <div className="service-form__full">
+          <FormField label="Категория" help={isBinding ? 'Группировка списка, не операция' : 'Группировка в выборе продукта и калькуляторе'}>
+            <select
+              className={inputClass}
+              value={value.categoryId === '' ? '' : value.categoryId}
+              disabled={disabled}
+              onChange={(e) => updateField('categoryId', e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <option value="">— Без категории</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      )}
+      {!isBinding && categories.length > 0 && isWideFormat && (
+        <div className="service-form__full">
+          <FormField label="Категория" help="Группировка в выборе продукта и калькуляторе">
+            <select
+              className={inputClass}
+              value={value.categoryId === '' ? '' : value.categoryId}
+              disabled={disabled}
+              onChange={(e) => updateField('categoryId', e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <option value="">— Без категории</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      )}
       {!isBinding && (
         <div className="service-form__row">
           <FormField label="Тип" help="print — печать, postprint — послепечатные, other — прочее">
@@ -205,42 +224,78 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         </div>
       )}
       <div className="service-form__full">
-        <FormField label="Тип услуги" help="Простая — без вариантов, сложная — с вариантами (ламинация, плотность и т.п.)">
-          <select
-            className={inputClass}
-            value={value.hasVariants ? 'complex' : 'simple'}
-            disabled={disabled}
-            onChange={(e) => updateField('hasVariants', e.target.value === 'complex')}
+        {isBinding ? (
+          <FormField
+            label="Варианты"
+            help="Одна цена — без дерева. В дереве цена, материал и страницы только на листе, не на группе."
           >
-            <option value="simple">Простая</option>
-            <option value="complex">Сложная</option>
-          </select>
-        </FormField>
+            <select
+              className={inputClass}
+              value={value.hasVariants ? 'complex' : 'simple'}
+              disabled={disabled}
+              onChange={(e) => updateField('hasVariants', e.target.value === 'complex')}
+            >
+              <option value="simple">Одна цена</option>
+              <option value="complex">Дерево: вид → тип → лист</option>
+            </select>
+          </FormField>
+        ) : (
+          <FormField label="Тип услуги" help="Простая — без вариантов, сложная — с вариантами (ламинация, плотность и т.п.)">
+            <select
+              className={inputClass}
+              value={value.hasVariants ? 'complex' : 'simple'}
+              disabled={disabled}
+              onChange={(e) => updateField('hasVariants', e.target.value === 'complex')}
+            >
+              <option value="simple">Простая</option>
+              <option value="complex">Сложная</option>
+            </select>
+          </FormField>
+        )}
       </div>
       <div className="service-form__row">
-        <FormField
-          label="Единица"
-          help={
-            isBinding
-              ? 'Часто: per_item или fixed'
-              : isWideFormat
+        {isBinding ? (
+          <FormField label="Единица цены">
+            {unitWarning && (
+              <div className="service-form-unit-warn" role="status">
+                <p>{unitWarning}</p>
+                <button
+                  type="button"
+                  className="service-form-unit-warn__button"
+                  disabled={disabled}
+                  onClick={() => updateField('unit', 'per_item')}
+                >
+                  Считать за изделие
+                </button>
+              </div>
+            )}
+            {isBindingPerItemUnit(value.unit) && (
+              <p className="service-form-unit-fixed">За изделие. Сумма = ставка × тираж × норма.</p>
+            )}
+          </FormField>
+        ) : (
+          <FormField
+            label="Единица"
+            help={
+              isWideFormat
                 ? 'Для ШФП-ламинации: per_meter — за пог. м подачи; печать — отдельно в м²'
                 : 'per_item, per_sheet, per_cut, fixed…'
-          }
-        >
-          <select
-            className={inputClass}
-            value={value.unit}
-            disabled={disabled}
-            onChange={(e) => updateField('unit', e.target.value)}
+            }
           >
-            {unitOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </FormField>
+            <select
+              className={inputClass}
+              value={value.unit}
+              disabled={disabled}
+              onChange={(e) => updateField('unit', e.target.value)}
+            >
+              {unitOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        )}
         <FormField label={<>Цена (<BynSymbol />) *</>} required>
           <input
             type="number"
@@ -255,31 +310,47 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         </FormField>
       </div>
       <div className="service-form__row">
-        <FormField label="Мин. тираж">
+        <FormField label={isBinding ? 'Тираж заказа, от' : 'Мин. тираж'}>
           <input
             type="number"
             min="1"
-            className={inputClass}
+            className={quantityClass}
             value={value.minQuantity}
             disabled={disabled}
+            aria-invalid={rangeInvalid || undefined}
             onChange={(e) => updateField('minQuantity', e.target.value)}
             placeholder="1"
           />
         </FormField>
-        <FormField label="Макс. тираж">
+        <FormField label={isBinding ? 'Тираж заказа, до' : 'Макс. тираж'}>
           <input
             type="number"
             min="1"
-            className={inputClass}
+            className={quantityClass}
             value={value.maxQuantity}
             disabled={disabled}
+            aria-invalid={rangeInvalid || undefined}
             onChange={(e) => updateField('maxQuantity', e.target.value)}
-            placeholder="без ограничений"
+            placeholder={isBinding ? 'без потолка' : 'без ограничений'}
           />
         </FormField>
       </div>
+      {isBinding && (
+        <p className={`service-form-quantity-hint${rangeInvalid ? ' service-form-quantity-hint--invalid' : ''}`}>
+          {rangeInvalid
+            ? '„от“ больше „до“'
+            : 'Штук в заказе. Пустое „до“ — без потолка. Это не страницы брошюры.'}
+        </p>
+      )}
       <div className="service-form__full">
-        <FormField label="Процент оператора (%)" help="Доля в ЗП оператора от суммы позиции">
+        <FormField
+          label="Процент оператора (%)"
+          help={
+            isBinding
+              ? 'Доля в ЗП оператора, в цену переплёта не входит'
+              : 'Доля в ЗП оператора от суммы позиции'
+          }
+        >
           <input
             type="number"
             step="0.1"
@@ -293,17 +364,18 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           />
         </FormField>
       </div>
-      {materials.length > 0 && (
-        <>
+      {isBinding ? (
+        <div className="service-form__full service-form-writeoff">
+          <p className="service-form-writeoff__title">Списание</p>
           <div className="service-form__row">
-            <FormField label="Материал для списания" help="Со склада при выполнении операции">
+            <FormField label="Материал">
               <select
                 className={inputClass}
                 value={value.materialId === '' ? '' : value.materialId}
                 disabled={disabled}
                 onChange={(e) => updateField('materialId', e.target.value === '' ? '' : Number(e.target.value))}
               >
-                <option value="">— Без списания</option>
+                <option value="">Без списания</option>
                 {materials.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
@@ -311,7 +383,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
                 ))}
               </select>
             </FormField>
-            <FormField label="Расход на ед." help="Норма на одну единицу операции">
+            <FormField label="Норма на изделие">
               <input
                 type="number"
                 step="0.01"
@@ -324,45 +396,84 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
               />
             </FormField>
           </div>
-          {showMaterialConsumption && (
+          {value.consumptionMode === 'roll_feed' && (
+            <p className="service-form-roll-note">
+              Сохранён режим рулона. Для переплёта он не используется, расход — норма на изделие.
+            </p>
+          )}
+        </div>
+      ) : (
+        materials.length > 0 && (
+          <>
             <div className="service-form__row">
-              <FormField
-                label="Режим расхода"
-                help="fixed — по units операции; roll_feed — по подаче рулона"
-              >
+              <FormField label="Материал для списания" help="Со склада при выполнении операции">
                 <select
                   className={inputClass}
-                  value={value.consumptionMode}
+                  value={value.materialId === '' ? '' : value.materialId}
                   disabled={disabled}
-                  onChange={(e) => updateField('consumptionMode', e.target.value as ServiceConsumptionMode)}
+                  onChange={(e) => updateField('materialId', e.target.value === '' ? '' : Number(e.target.value))}
                 >
-                  {consumptionModeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  <option value="">— Без списания</option>
+                  {materials.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
                     </option>
                   ))}
                 </select>
               </FormField>
-              <FormField
-                label="База metering"
-                help="Для per_meter и roll_feed: обычно feed для рулонной ламинации"
-              >
-                <select
+              <FormField label="Расход на ед." help="Норма на одну единицу операции">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
                   className={inputClass}
-                  value={value.meterBasis}
-                  disabled={disabled || !showMeterBasis}
-                  onChange={(e) => updateField('meterBasis', e.target.value as ServiceMeterBasis)}
-                >
-                  {meterBasisOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  value={value.qtyPerItem}
+                  disabled={disabled}
+                  onChange={(e) => updateField('qtyPerItem', e.target.value)}
+                  placeholder="1"
+                />
               </FormField>
             </div>
-          )}
-        </>
+            {showMaterialConsumption && (
+              <div className="service-form__row">
+                <FormField
+                  label="Режим расхода"
+                  help="fixed — по units операции; roll_feed — по подаче рулона"
+                >
+                  <select
+                    className={inputClass}
+                    value={value.consumptionMode}
+                    disabled={disabled}
+                    onChange={(e) => updateField('consumptionMode', e.target.value as ServiceConsumptionMode)}
+                  >
+                    {consumptionModeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                <FormField
+                  label="База metering"
+                  help="Для per_meter и roll_feed: обычно feed для рулонной ламинации"
+                >
+                  <select
+                    className={inputClass}
+                    value={value.meterBasis}
+                    disabled={disabled || !showMeterBasis}
+                    onChange={(e) => updateField('meterBasis', e.target.value as ServiceMeterBasis)}
+                  >
+                    {meterBasisOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+            )}
+          </>
+        )
       )}
       <label className="service-form__full inline-flex items-center gap-2 text-sm text-gray-600">
         <input
@@ -378,5 +489,3 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
 };
 
 export default ServiceForm;
-
-

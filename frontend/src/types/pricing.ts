@@ -102,7 +102,7 @@ export interface CreatePricingServicePayload {
   isActive?: boolean;
   operationType?: string;
   minQuantity?: number;
-  maxQuantity?: number;
+  maxQuantity?: number | null;
   operator_percent?: number;
   categoryId?: number | null;
   material_id?: number | null;

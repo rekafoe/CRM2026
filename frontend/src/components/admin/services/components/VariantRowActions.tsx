@@ -7,6 +7,8 @@ export interface VariantRowActionsProps {
   onAddChild?: () => void;
   onAddSibling?: () => void;
   onDelete: () => void;
+  /** Подписи кнопок дерева переплёта */
+  bindingLabels?: boolean;
 }
 
 /** Пустая ячейка той же ширины, что и кнопка — столбцы действий ровные по строкам */
@@ -23,10 +25,11 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
   onAddChild,
   onAddSibling,
   onDelete,
+  bindingLabels = false,
 }) => (
   <td className="variant-actions-cell">
     <div className="cell">
-      <div className="variant-actions-row" role="group" aria-label="Действия со строкой">
+      <div className={bindingLabels ? 'variant-actions-row variant-actions-row--binding' : 'variant-actions-row'} role="group" aria-label="Действия со строкой">
         {layout === 'root' && (
           <>
             <Slot>
@@ -36,7 +39,7 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 onClick={onAddChild}
                 title="Добавить дочернюю строку"
               >
-                <span style={{ fontSize: '14px' }}></span>
+                <span style={{ fontSize: '14px' }}>{bindingLabels ? '+ лист' : ''}</span>
               </button>
             </Slot>
             <Slot>
@@ -44,9 +47,9 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 type="button"
                 className="el-button el-button--success el-button--small"
                 onClick={onAddSibling}
-                title="Добавить тип на том же уровне"
+                title={bindingLabels ? 'Добавить соседнюю строку' : 'Добавить тип на том же уровне'}
               >
-                <span style={{ fontSize: '14px' }}>↓</span>
+                <span style={{ fontSize: '14px' }}>{bindingLabels ? '+ сосед' : '↓'}</span>
               </button>
             </Slot>
             <Slot>
@@ -71,7 +74,7 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 onClick={onAddChild}
                 title="Добавить дочернюю строку (уровень 2)"
               >
-                <span style={{ fontSize: '14px' }}></span>
+                <span style={{ fontSize: '14px' }}>{bindingLabels ? '+ лист' : ''}</span>
               </button>
             </Slot>
             <Slot>
@@ -79,9 +82,9 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 type="button"
                 className="el-button el-button--success el-button--small"
                 onClick={onAddSibling}
-                title="Добавить строку на том же уровне"
+                title={bindingLabels ? 'Добавить соседнюю строку' : 'Добавить строку на том же уровне'}
               >
-                <span style={{ fontSize: '14px' }}>↓</span>
+                <span style={{ fontSize: '14px' }}>{bindingLabels ? '+ сосед' : '↓'}</span>
               </button>
             </Slot>
             <Slot>
@@ -105,9 +108,9 @@ export const VariantRowActions: React.FC<VariantRowActionsProps> = ({
                 type="button"
                 className="el-button el-button--success el-button--small"
                 onClick={onAddSibling}
-                title="Добавить строку на том же уровне"
+                title={bindingLabels ? 'Добавить соседнюю строку' : 'Добавить строку на том же уровне'}
               >
-                <span style={{ fontSize: '14px' }}>↓</span>
+                <span style={{ fontSize: '14px' }}>{bindingLabels ? '+ сосед' : '↓'}</span>
               </button>
             </Slot>
             <Slot>

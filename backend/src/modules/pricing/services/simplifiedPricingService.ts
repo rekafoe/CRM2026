@@ -1757,18 +1757,31 @@ export class SimplifiedPricingService {
     let hasConfiguredBinding = configuredBindingServiceId > 0;
 
     if (hasConfiguredBinding) {
-      const bindService = await db.get<{ id: number; operation_type?: string | null }>(
-        `SELECT id, operation_type FROM post_processing_services WHERE id = ? AND is_active = 1`,
+      const bindService = await db.get<{
+        id: number;
+        operation_type?: string | null;
+        is_active?: number | null;
+      }>(
+        `SELECT id, operation_type, is_active FROM post_processing_services WHERE id = ?`,
         [configuredBindingServiceId],
       );
-      if (!bindService || String(bindService.operation_type || '').toLowerCase() !== 'bind') {
+      if (!bindService) {
+        const err: any = new Error('Переплёт не найден');
+        err.status = 400;
+        throw err;
+      }
+      if (String(bindService.operation_type || '').toLowerCase() !== 'bind') {
         logger.warn('binding_service_id проигнорирован: услуга не является переплётом', {
           productId,
           serviceId: configuredBindingServiceId,
-          operation_type: bindService?.operation_type ?? null,
+          operation_type: bindService.operation_type ?? null,
         });
         configuredBindingServiceId = 0;
         hasConfiguredBinding = false;
+      } else if (Number(bindService.is_active) === 0) {
+        const err: any = new Error('Переплёт выключен');
+        err.status = 400;
+        throw err;
       }
     }
 
@@ -2607,6 +2620,56 @@ export class SimplifiedPricingService {
       }
     }
 
+    // После d5a5e602 продукт не считает накатку (PLOTTER_FIN_MOUNTING отфильтрован выше).
+    // Нельзя оставлять списание mounting_film_material_id по устаревшему plotter_mounting:
+    // калькулятор/редактирование старых specs и публичный /pricing/calculate иначе кладут
+    // плёнку в operationMaterials → components без строки накатки в цене.
+
+    let coverPrice = 0;
+    if (usePagesMultiplier && pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
+      coverPrice = await this.calculateMultiPageCoverCost({
+        db,
+        quantity,
+        selectedSize,
+        includeMaterialCost,
+        configuration: normalizedConfig as any,
+        multiPageStructure,
+        selectedTypeConfig: typeConfig ?? undefined,
+        coverPages: pageSplit.coverPages,
+        itemsPerSheet,
+        sidesMode: normalizedConfig.print_sides_mode || 'single',
+        tierPrintUnits: tierSheetsOverride ?? multipageTierPrintUnits,
+      });
+    }
+
+    let configuredBindingQuote: BindingQuoteResult | null = null;
+    const bindAlreadyInFinishing = finishingDetails
+      .filter((d) => String(d.operation_type || '').toLowerCase() === 'bind')
+      .reduce((sum, d) => sum + Number(d.priceForQuantity || 0), 0);
+    if (usePagesMultiplier && hasConfiguredBinding) {
+      configuredBindingQuote = await BindingPricingService.quoteBinding({
+        serviceId: configuredBindingServiceId,
+        variantId: configuredBindingVariantId,
+        quantity,
+        unitsPerItem: configuredBindingUnits,
+      });
+      if (configuredBindingQuote) {
+        const bindName = configuredBindingQuote.variantName
+          ? `${configuredBindingQuote.serviceName} — ${configuredBindingQuote.variantName}`
+          : configuredBindingQuote.serviceName;
+        finishingDetails.push({
+          service_id: configuredBindingQuote.serviceId,
+          variant_id: configuredBindingQuote.variantId,
+          service_name: bindName,
+          tier: { min_qty: 1, max_qty: undefined, price: configuredBindingQuote.unitPrice },
+          units_needed: configuredBindingQuote.units,
+          priceForQuantity: configuredBindingQuote.total,
+          price_unit: configuredBindingQuote.priceUnit,
+          operation_type: 'bind',
+        });
+      }
+    }
+
     // Сбор материалов по операциям отделки (для списания со склада)
     const operationMaterials: Array<{ material_id: number; material_name: string; quantity: number }> = [];
     if (finishingDetails.length > 0) {
@@ -2722,8 +2785,10 @@ export class SimplifiedPricingService {
         );
 
         let baseUnitsForConsumption = rawUnits;
+        const isBindDetail = String(d.operation_type || '').toLowerCase() === 'bind';
         const useRollFeedUnits =
-          effectiveConsumptionMode === 'roll_feed' || detailPriceUnit === 'per_m2';
+          !isBindDetail &&
+          (effectiveConsumptionMode === 'roll_feed' || detailPriceUnit === 'per_m2');
         if (useRollFeedUnits) {
           const matInfo = materialInfoMap.get(src.material_id);
           const rollWidthMm = Number(matInfo?.sheet_width ?? matInfo?.printable_width ?? 0);
@@ -2752,7 +2817,7 @@ export class SimplifiedPricingService {
             warnedRollFeedMaterials.add(src.material_id);
             pricingWarnings.push(feed.warning);
           }
-        } else if (detailPriceUnit === 'per_meter' && effectiveMeterBasis === 'feed') {
+        } else if (!isBindDetail && detailPriceUnit === 'per_meter' && effectiveMeterBasis === 'feed') {
           baseUnitsForConsumption = Math.max(rawUnits, materialMetersNeeded);
         }
 
@@ -2765,70 +2830,8 @@ export class SimplifiedPricingService {
       }
     }
 
-    // После d5a5e602 продукт не считает накатку (PLOTTER_FIN_MOUNTING отфильтрован выше).
-    // Нельзя оставлять списание mounting_film_material_id по устаревшему plotter_mounting:
-    // калькулятор/редактирование старых specs и публичный /pricing/calculate иначе кладут
-    // плёнку в operationMaterials → components без строки накатки в цене.
-
-    let coverPrice = 0;
-    if (usePagesMultiplier && pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
-      coverPrice = await this.calculateMultiPageCoverCost({
-        db,
-        quantity,
-        selectedSize,
-        includeMaterialCost,
-        configuration: normalizedConfig as any,
-        multiPageStructure,
-        selectedTypeConfig: typeConfig ?? undefined,
-        coverPages: pageSplit.coverPages,
-        itemsPerSheet,
-        sidesMode: normalizedConfig.print_sides_mode || 'single',
-        tierPrintUnits: tierSheetsOverride ?? multipageTierPrintUnits,
-      });
-    }
-
-    let configuredBindingQuote: BindingQuoteResult | null = null;
-    if (usePagesMultiplier && hasConfiguredBinding) {
-      try {
-        configuredBindingQuote = await BindingPricingService.quoteBinding({
-          serviceId: configuredBindingServiceId,
-          variantId: configuredBindingVariantId,
-          quantity,
-          unitsPerItem: configuredBindingUnits,
-        });
-      } catch (error) {
-        logger.warn('Не удалось рассчитать configured binding через BindingPricingService', {
-          productId,
-          serviceId: configuredBindingServiceId,
-          variantId: configuredBindingVariantId,
-          error: (error as Error).message,
-        });
-      }
-      if (configuredBindingQuote) {
-        const bindName = configuredBindingQuote.variantName
-          ? `${configuredBindingQuote.serviceName} — ${configuredBindingQuote.variantName}`
-          : configuredBindingQuote.serviceName;
-        finishingDetails.push({
-          service_id: configuredBindingQuote.serviceId,
-          variant_id: configuredBindingQuote.variantId,
-          service_name: bindName,
-          tier: { min_qty: 1, max_qty: undefined, price: configuredBindingQuote.unitPrice },
-          units_needed: configuredBindingQuote.units,
-          priceForQuantity: configuredBindingQuote.total,
-          price_unit: configuredBindingQuote.priceUnit,
-          operation_type: 'bind',
-        });
-      }
-    }
-
-    const bindFromFinishing = finishingDetails
-      .filter((d) => String(d.operation_type || '').toLowerCase() === 'bind')
-      .reduce((sum, d) => sum + Number(d.priceForQuantity || 0), 0);
-    let bindingPrice = configuredBindingQuote ? configuredBindingQuote.total : bindFromFinishing;
-    let otherFinishingPrice = Math.max(
-      0,
-      finishingPrice - bindFromFinishing
-    );
+    let bindingPrice = configuredBindingQuote ? configuredBindingQuote.total : bindAlreadyInFinishing;
+    let otherFinishingPrice = Math.max(0, finishingPrice - bindAlreadyInFinishing);
 
     // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
     let subtotal = printPrice + materialPrice + otherFinishingPrice + bindingPrice + coverPrice;
@@ -2992,17 +2995,13 @@ export class SimplifiedPricingService {
 
         let tierBindingPrice = 0;
         if (hasConfiguredBinding) {
-          try {
-            const tierBindingQuote = await BindingPricingService.quoteBinding({
-              serviceId: configuredBindingServiceId,
-              variantId: configuredBindingVariantId,
-              quantity: qtyForTier,
-              unitsPerItem: configuredBindingUnits,
-            });
-            tierBindingPrice = tierBindingQuote.total;
-          } catch {
-            tierBindingPrice = 0;
-          }
+          const tierBindingQuote = await BindingPricingService.quoteBinding({
+            serviceId: configuredBindingServiceId,
+            variantId: configuredBindingVariantId,
+            quantity: qtyForTier,
+            unitsPerItem: configuredBindingUnits,
+          });
+          tierBindingPrice = tierBindingQuote.total;
         }
         tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice) * 100) / 100;
         tierRow.unit_price = qtyForTier > 0 ? Math.round((tierRow.total_price / qtyForTier) * 10000) / 10000 : tierRow.unit_price;
@@ -3178,22 +3177,12 @@ export class SimplifiedPricingService {
         material_id: normalizedConfig.base_material_id,
         material_name: selectedBaseMaterialName,
       } : undefined,
-      selectedFinishing: [
-        ...finishingDetails.map(d => ({
-          service_id: d.service_id,
-          service_name: d.service_name,
-          price_unit: d.price_unit || 'per_item',
-          units_per_item: quantity > 0 ? d.units_needed / quantity : 0,
-        })),
-        ...(configuredBindingQuote
-          ? [{
-              service_id: configuredBindingQuote.serviceId,
-              service_name: configuredBindingQuote.serviceName,
-              price_unit: configuredBindingQuote.priceUnit,
-              units_per_item: configuredBindingUnits,
-            }]
-          : []),
-      ],
+      selectedFinishing: finishingDetails.map(d => ({
+        service_id: d.service_id,
+        service_name: d.service_name,
+        price_unit: d.price_unit || 'per_item',
+        units_per_item: quantity > 0 ? d.units_needed / quantity : 0,
+      })),
       printPrice,
       materialPrice,
       finishingPrice: otherFinishingPrice + bindingPrice,

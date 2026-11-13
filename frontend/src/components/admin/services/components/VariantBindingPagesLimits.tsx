@@ -37,9 +37,14 @@ export const VariantBindingPagesLimits: React.FC<VariantBindingPagesLimitsProps>
     setMaxPages(inputValue(limits.maxPages));
   }, [limits.minPages, limits.maxPages]);
 
+  const minValue = positiveInteger(minPages);
+  const maxValue = positiveInteger(maxPages);
+  const rangeInvalid = minValue != null && maxValue != null && minValue > maxValue;
+
   const commit = useCallback(() => {
     const min = positiveInteger(minPages);
     const max = positiveInteger(maxPages);
+    if (min != null && max != null && min > max) return;
     const nextParams: Record<string, unknown> = { ...(variant.parameters || {}) };
     delete nextParams.minPages;
     delete nextParams.maxPages;
@@ -58,8 +63,8 @@ export const VariantBindingPagesLimits: React.FC<VariantBindingPagesLimitsProps>
   }, []);
 
   return (
-    <div className="variant-binding-pages">
-      <span className="variant-binding-pages__label">Страницы</span>
+    <div className={`variant-binding-pages${rangeInvalid ? ' variant-binding-pages--invalid' : ''}`}>
+      <span className="variant-binding-pages__label">Страницы изделия</span>
       <div className="variant-binding-pages__controls">
         <label>
           <span>от</span>
@@ -68,12 +73,14 @@ export const VariantBindingPagesLimits: React.FC<VariantBindingPagesLimitsProps>
             min={1}
             inputMode="numeric"
             value={minPages}
-            placeholder="мин."
-            aria-label="Минимум страниц для этого варианта переплёта"
+            placeholder="от"
+            aria-invalid={rangeInvalid || undefined}
+            aria-label="Страницы изделия, от"
             onChange={(event) => setMinPages(event.target.value)}
             onBlur={commit}
             onKeyDown={handleEnter}
           />
+          <span className="variant-binding-pages__suffix">стр.</span>
         </label>
         <label>
           <span>до</span>
@@ -82,14 +89,21 @@ export const VariantBindingPagesLimits: React.FC<VariantBindingPagesLimitsProps>
             min={1}
             inputMode="numeric"
             value={maxPages}
-            placeholder="макс."
-            aria-label="Максимум страниц для этого варианта переплёта"
+            placeholder="до"
+            aria-invalid={rangeInvalid || undefined}
+            aria-label="Страницы изделия, до"
             onChange={(event) => setMaxPages(event.target.value)}
             onBlur={commit}
             onKeyDown={handleEnter}
           />
+          <span className="variant-binding-pages__suffix">стр.</span>
         </label>
       </div>
+      <p className="variant-binding-pages__hint">
+        {rangeInvalid
+          ? '„от“ больше „до“'
+          : 'Общее число страниц изделия, вместе с обложкой. Не число печатных листов. Пусто — без лимита.'}
+      </p>
     </div>
   );
 };

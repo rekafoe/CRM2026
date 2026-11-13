@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { AppIcon } from '../../ui/AppIcon';
-import { formatBindingPagesHint, readBindingPagesLimits } from '../../../utils/multipageBinding';
+import { readBindingPagesLimits } from '../../../utils/multipageBinding';
 import {
   isMultipageLikeProduct,
   resolveCalculatorPagesBounds,
   resolveMultipageMinQty,
 } from '../../../utils/multipageProduct';
-import { BindingVariantSelector } from './BindingVariantSelector';
+import {
+  BindingVariantSelector,
+  bindingCalculatorIssue,
+  formatBindingProductPagesHint,
+} from './BindingVariantSelector';
 import { CustomPagesField } from './CustomPagesField';
 
 export interface ParamsSectionSpecs {
@@ -87,9 +91,15 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
     bindingVariantId != null
       ? bindingVariants.find((v) => v.id === bindingVariantId)
       : undefined;
-  const bindingPagesHint = selectedBindingVariant
-    ? formatBindingPagesHint(readBindingPagesLimits(selectedBindingVariant.parameters))
-    : null;
+  const bindingIssue = bindingCalculatorIssue({
+    variants: bindingVariants,
+    variantId: bindingVariantId,
+    locked: bindingVariantLocked,
+  });
+  const bindingPagesHint =
+    bindingIssue.kind === 'ok' && selectedBindingVariant && selectedBindingVariant.isActive !== false
+      ? formatBindingProductPagesHint(readBindingPagesLimits(selectedBindingVariant.parameters))
+      : null;
 
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getEnum = (name: string): any[] => schema?.fields?.find(f => f.name === name)?.enum || [];

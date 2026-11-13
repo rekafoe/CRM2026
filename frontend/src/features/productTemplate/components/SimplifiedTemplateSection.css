@@ -2384,6 +2384,25 @@
   margin-bottom: 8px;
 }
 
+.multipage-structure__binding-note,
+.multipage-structure__binding-summary {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.multipage-structure__binding-error {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #dc2626;
+}
+
+.multipage-structure__binding-select--invalid {
+  border-color: #dc2626;
+}
+
 .simplified-template__multipage-panel {
   margin-top: 4px;
 }
