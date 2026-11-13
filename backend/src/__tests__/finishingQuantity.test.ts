@@ -1,4 +1,5 @@
 import {
+  applyTemplateFinishingQuantityScope,
   enforceRequiredFinishing,
   flatFinishingUnits,
   getEffectiveFinishing,
@@ -77,6 +78,24 @@ describe('finishing quantity', () => {
         [{ service_id: 9, is_required: true, units_per_item: 2, quantity_scope: 'item' }],
       ),
     ).toEqual([{ service_id: 9, units_per_item: 2, quantity_scope: 'item' }]);
+  });
+
+  it('отбрасывает клиентский quantity_scope и берёт только шаблонный', () => {
+    expect(
+      applyTemplateFinishingQuantityScope(
+        [
+          { service_id: 9, units_per_item: 1, quantity_scope: 'run' },
+          { service_id: 4, units_per_item: 2, quantity_scope: 'run' },
+        ],
+        [
+          { service_id: 9, units_per_item: 1, quantity_scope: 'item' },
+          { service_id: 4, units_per_item: 2 },
+        ],
+      ),
+    ).toEqual([
+      { service_id: 9, units_per_item: 1, quantity_scope: 'item' },
+      { service_id: 4, units_per_item: 2 },
+    ]);
   });
 
   it('берёт общие услуги типа, пока у размера нет своего списка', () => {
