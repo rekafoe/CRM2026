@@ -9,6 +9,11 @@ import {
   isSeparateCoverMode,
 } from '../../../utils/multipageCoverMaterials';
 import { hasEnabledUvLayer, isUvFlatbedProduct } from '../utils/uvPrintConfig';
+import {
+  bindingCalculatorIssue,
+  bindingCalculatorIssueText,
+  type BindingVariantOption,
+} from '../components/BindingVariantSelector';
 
 export interface CalculatorValidationResult {
   errors: Record<string, string>;
@@ -38,7 +43,9 @@ interface UseCalculatorValidationParams {
   isMultiPageProduct?: boolean;
   bindingPagesLimits?: BindingPagesLimits | null;
   bindingLabel?: string;
-  bindingVariantIsLeaf?: boolean;
+  bindingVariants?: BindingVariantOption[];
+  bindingVariantId?: number;
+  bindingVariantLocked?: boolean;
 }
 
 function computeErrors(params: {
@@ -58,7 +65,9 @@ function computeErrors(params: {
   isMultiPageProduct?: boolean;
   bindingPagesLimits?: BindingPagesLimits | null;
   bindingLabel?: string;
-  bindingVariantIsLeaf?: boolean;
+  bindingVariants?: BindingVariantOption[];
+  bindingVariantId?: number;
+  bindingVariantLocked?: boolean;
 }): Record<string, string> {
   const {
     specs,
@@ -76,7 +85,9 @@ function computeErrors(params: {
     isMultiPageProduct,
     bindingPagesLimits,
     bindingLabel,
-    bindingVariantIsLeaf,
+    bindingVariants,
+    bindingVariantId,
+    bindingVariantLocked,
   } = params;
   const errors: Record<string, string> = {};
 
@@ -167,14 +178,20 @@ function computeErrors(params: {
     }
   }
 
-  if (bindingPagesLimits && Number.isFinite(p) && p >= 1) {
+  const bindingIssue = bindingVariants
+    ? bindingCalculatorIssueText(bindingCalculatorIssue({
+      variants: bindingVariants,
+      variantId: bindingVariantId,
+      locked: bindingVariantLocked,
+    }))
+    : null;
+  if (bindingIssue) {
+    errors.binding = bindingIssue;
+  } else if (bindingPagesLimits && Number.isFinite(p) && p >= 1) {
     const bindErr = validateBindingPagesForCalculator(p, bindingPagesLimits, bindingLabel);
     if (bindErr) {
       errors.binding = bindErr;
     }
-  }
-  if (bindingVariantIsLeaf === false) {
-    errors.binding = 'Выберите последний уровень варианта переплёта';
   }
 
   if (sizeLimits || operationLimits) {
@@ -230,7 +247,9 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     isMultiPageProduct,
     bindingPagesLimits,
     bindingLabel,
-    bindingVariantIsLeaf,
+    bindingVariants,
+    bindingVariantId,
+    bindingVariantLocked,
   } = params;
 
   const schemaPagesEnum = useMemo(() => {
@@ -300,7 +319,9 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
         isMultiPageProduct,
         bindingPagesLimits,
         bindingLabel,
-        bindingVariantIsLeaf,
+        bindingVariants,
+        bindingVariantId,
+        bindingVariantLocked,
       });
       return { errors, isValid: Object.keys(errors).length === 0 };
     },
@@ -319,7 +340,9 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
       isMultiPageProduct,
       bindingPagesLimits,
       bindingLabel,
-      bindingVariantIsLeaf,
+      bindingVariants,
+      bindingVariantId,
+      bindingVariantLocked,
     ],
   );
 

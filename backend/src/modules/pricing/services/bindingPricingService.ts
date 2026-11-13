@@ -1,4 +1,20 @@
 import { PricingServiceRepository } from '../repositories/serviceRepository';
+import { flatFinishingUnits, isFlatFinishingPriceUnit } from './finishingQuantity';
+
+const LAYOUT_BINDING_UNITS = new Set(['per_sheet', 'per_meter', 'per_m2', 'per_cut']);
+
+function statusError(message: string, status: number): Error {
+  const err: any = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function isLeafVariant(
+  variants: Array<{ id: number; parentVariantId?: number | null }>,
+  variantId: number,
+): boolean {
+  return !variants.some((variant) => Number(variant.parentVariantId) === Number(variantId));
+}
 
 export interface BindingQuoteRequest {
   serviceId: number;
@@ -139,25 +155,58 @@ export class BindingPricingService {
 
     const service = await PricingServiceRepository.getServiceById(serviceId);
     if (!service || String(service.operationType || '').toLowerCase() !== 'bind') {
-      const err: any = new Error('Переплёт не найден');
-      err.status = 404;
-      throw err;
+      throw statusError('Переплёт не найден', 404);
+    }
+    if (service.isActive === false) {
+      throw statusError('Переплёт выключен', 400);
     }
 
+    const priceUnit = String(service.priceUnit || 'per_item').trim().toLowerCase();
+    if (LAYOUT_BINDING_UNITS.has(priceUnit)) {
+      throw statusError(`Единица «${priceUnit}» для переплёта не считается`, 400);
+    }
+
+    const variants = await PricingServiceRepository.listServiceVariants(serviceId);
+    const activeLeaves = variants.filter(
+      (variant) => variant.isActive !== false && isLeafVariant(variants, Number(variant.id)),
+    );
     let variantName: string | undefined;
-    if (variantId != null) {
-      const variants = await PricingServiceRepository.listServiceVariants(serviceId);
+    if (variantId == null) {
+      if (activeLeaves.length > 0) {
+        throw statusError('Выберите лист переплёта', 400);
+      }
+    } else {
       const variant = variants.find((v) => Number(v.id) === variantId);
       if (!variant) {
-        const err: any = new Error('Вариант переплёта не найден');
-        err.status = 404;
-        throw err;
+        throw statusError('Вариант переплёта не найден', 404);
+      }
+      if (variant.isActive === false) {
+        throw statusError('Вариант переплёта выключен', 400);
       }
       await PricingServiceRepository.assertVariantPricingLeaf(serviceId, variantId);
       variantName = variant.variantName;
     }
 
-    const billableUnits = quantity * unitsPerItem;
+    const flatUnits = flatFinishingUnits(priceUnit, unitsPerItem);
+    const perItem = !isFlatFinishingPriceUnit(priceUnit);
+    if (perItem) {
+      const minQuantity = Number(service.minQuantity ?? 1);
+      const maxQuantity = service.maxQuantity != null ? Number(service.maxQuantity) : null;
+      if (maxQuantity != null && Number.isFinite(maxQuantity) && quantity > maxQuantity) {
+        throw statusError(
+          `Тираж для операции "${service.name}" должен быть от ${minQuantity} до ${maxQuantity} шт`,
+          400,
+        );
+      }
+      if (Number.isFinite(minQuantity) && quantity < minQuantity) {
+        throw statusError(
+          `Тираж для операции "${service.name}" должен быть не меньше ${minQuantity} шт`,
+          400,
+        );
+      }
+    }
+
+    const billableUnits = flatUnits != null ? flatUnits : quantity * unitsPerItem;
     let tiers = await PricingServiceRepository.listServiceTiers(serviceId, variantId);
     if ((!tiers || tiers.length === 0) && variantId != null) {
       tiers = await PricingServiceRepository.listServiceTiers(serviceId);
@@ -165,7 +214,7 @@ export class BindingPricingService {
 
     const tierPrice = resolveTierPrice(
       tiers.map((t) => ({ minQuantity: t.minQuantity, rate: t.rate })),
-      billableUnits
+      quantity
     );
     const unitPrice = tierPrice != null ? tierPrice : Number(service.rate ?? 0);
     const total = unitPrice * billableUnits;

@@ -16,6 +16,8 @@ export interface VariantMaterialSelectProps {
   materials: Array<{ id: number; name: string; sheet_width?: number | null }>;
   priceUnit?: string;
   onUpdate: (variantId: number, patch: VariantMaterialPatch) => void;
+  /** Лист переплёта: имя склада без ширины, норма рядом, без режима рулона */
+  bindingLeaf?: boolean;
 }
 
 function formatMaterialOption(m: { id: number; name: string; sheet_width?: number | null }): string {
@@ -31,6 +33,7 @@ export const VariantMaterialSelect: React.FC<VariantMaterialSelectProps> = ({
   materials,
   priceUnit,
   onUpdate,
+  bindingLeaf = false,
 }) => {
   const pu = String(priceUnit || '').toLowerCase();
 
@@ -42,41 +45,68 @@ export const VariantMaterialSelect: React.FC<VariantMaterialSelectProps> = ({
         mat?.sheet_width != null &&
         Number.isFinite(Number(mat.sheet_width)) &&
         Number(mat.sheet_width) > 0;
-      const nextMode: 'fixed' | 'roll_feed' =
-        val != null && (pu === 'per_m2' || pu === 'per_meter' || hasRollWidth)
+      const nextMode: 'fixed' | 'roll_feed' = bindingLeaf
+        ? 'fixed'
+        : val != null && (pu === 'per_m2' || pu === 'per_meter' || hasRollWidth)
           ? 'roll_feed'
           : ((variant.consumption_mode ?? 'fixed') as 'fixed' | 'roll_feed');
       onUpdate(variant.id, {
         material_id: val,
         qty_per_item: variant.qty_per_item ?? 1,
         consumption_mode: nextMode,
-        meter_basis: (variant.meter_basis ?? 'feed') as 'knife_path' | 'feed',
+        ...(bindingLeaf ? {} : { meter_basis: (variant.meter_basis ?? 'feed') as 'knife_path' | 'feed' }),
       });
     },
-    [materials, onUpdate, pu, variant]
+    [bindingLeaf, materials, onUpdate, pu, variant]
   );
 
-  if (materials.length === 0) return null;
+  if (materials.length === 0 && !bindingLeaf) return null;
+
+  const commitQty = (raw: string) => {
+    const parsed = Number(raw);
+    onUpdate(variant.id, {
+      material_id: variant.material_id ?? null,
+      qty_per_item: Number.isFinite(parsed) && parsed >= 0 ? parsed : 1,
+      consumption_mode: 'fixed',
+    });
+  };
 
   return (
-    <div className="variant-material-select">
+    <div className={bindingLeaf ? 'variant-material-select variant-material-select--binding' : 'variant-material-select'}>
       <label className="variant-material-select__label" htmlFor={`variant-mat-${variant.id}`}>
-        Материал
+        {bindingLeaf ? 'Материал листа' : 'Материал'}
       </label>
       <select
         id={`variant-mat-${variant.id}`}
         className="variant-material-select__control"
         value={variant.material_id ?? ''}
         onChange={handleChange}
-        title="Материал для списания и ширины рулона (раскладка подачи)"
+        title={bindingLeaf ? 'Пусто — берётся материал услуги' : 'Материал для списания и ширины рулона (раскладка подачи)'}
       >
-        <option value="">— Без списания</option>
+        <option value="">{bindingLeaf ? 'Как у услуги' : '— Без списания'}</option>
         {materials.map((m) => (
           <option key={m.id} value={m.id}>
-            {formatMaterialOption(m)}
+            {bindingLeaf ? m.name : formatMaterialOption(m)}
           </option>
         ))}
       </select>
+      {bindingLeaf && (
+        <>
+          <p className="variant-material-select__hint">Пусто — берётся материал услуги. Если выбран — в заказе этот.</p>
+          <label className="variant-material-select__norm" htmlFor={`variant-qty-${variant.id}`}>
+            <span>Норма</span>
+            <input
+              id={`variant-qty-${variant.id}`}
+              type="number"
+              min={0}
+              step="0.01"
+              defaultValue={variant.qty_per_item ?? 1}
+              key={`${variant.id}:${variant.qty_per_item ?? 1}`}
+              onBlur={(event) => commitQty(event.target.value)}
+            />
+          </label>
+        </>
+      )}
     </div>
   );
 };

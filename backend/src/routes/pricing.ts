@@ -104,6 +104,13 @@ function optionalNonNegative(raw: unknown): number | null {
   return parseNonNegativeNumber(raw)
 }
 
+function readOptionalQuantityLimit(raw: unknown): number | null | undefined {
+  if (raw === undefined) return undefined
+  if (raw === null || raw === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : undefined
+}
+
 function normalizeServiceConsumptionMode(raw: unknown): 'fixed' | 'roll_feed' | undefined {
   if (raw === undefined) return undefined
   if (raw === null || raw === '') return undefined
@@ -1213,7 +1220,7 @@ router.post('/bindings', asyncHandler(async (req, res) => {
     currency,
     isActive: is_active !== undefined ? !!is_active : isActive,
     minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
-    maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
+    maxQuantity: readOptionalQuantityLimit(max_quantity),
     operator_percent: operator_percent !== undefined && operator_percent !== '' ? Number(operator_percent) : undefined,
     categoryId: category_id ?? categoryId,
     material_id: material_id != null && material_id !== '' ? Number(material_id) : undefined,
@@ -1253,7 +1260,7 @@ router.put('/bindings/:id', asyncHandler(async (req, res) => {
     rate: rate !== undefined ? Number(rate) : undefined,
     isActive: is_active !== undefined ? !!is_active : isActive,
     minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
-    maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
+    maxQuantity: readOptionalQuantityLimit(max_quantity),
     operator_percent: operator_percent !== undefined ? (operator_percent === '' || operator_percent === null ? undefined : Number(operator_percent)) : undefined,
     categoryId: category_id !== undefined ? category_id : categoryId,
     material_id: material_id !== undefined ? (material_id != null && material_id !== '' ? Number(material_id) : null) : undefined,

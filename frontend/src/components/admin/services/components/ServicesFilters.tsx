@@ -15,6 +15,7 @@ interface ServicesFiltersProps {
   onSortChange: (field: 'name' | 'price' | 'type', order: 'asc' | 'desc') => void;
   onCreateService: () => void;
   createLabel?: string;
+  showTypeFilters?: boolean;
 }
 
 /**
@@ -31,6 +32,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
   onSortChange,
   onCreateService,
   createLabel = '+ Добавить услугу',
+  showTypeFilters = true,
 }) => {
   const availableTypes = [...new Set(services.map((s) => s.type))];
 
@@ -43,13 +45,13 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
             <span className="services-controls__search-icon"><AppIcon name="search" size="xs" /></span>
             <input
               className="services-controls__search-input"
-              placeholder="Поиск по названию или типу..."
+              placeholder={showTypeFilters ? 'Поиск по названию или типу...' : 'Поиск по названию...'}
               value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
 
-          {/* Фильтр по типу */}
+          {showTypeFilters && (
           <select
             className="services-controls__filter-select"
             value={typeFilter}
@@ -63,6 +65,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
               </option>
             ))}
           </select>
+          )}
 
           {/* Сортировка */}
           <select
@@ -91,7 +94,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
         </div>
       </div>
 
-      {/* Быстрые фильтры */}
+      {showTypeFilters && (
       <div className="services-quick-filters">
         <button
           className={`quick-filter-chip ${
@@ -118,6 +121,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 };

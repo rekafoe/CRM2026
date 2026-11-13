@@ -9,7 +9,7 @@ import { AppIcon } from '../../ui/AppIcon';
 import { PricingService } from '../../../types/pricing';
 import { ServiceFormState } from './components/ServiceForm';
 import usePricingServices from '../../../hooks/pricing/usePricingServices';
-import { createServiceCategory, getServiceCategories, getServiceVariants } from '../../../services/pricing';
+import { addRangeBoundary, createServiceCategory, createServiceVariant, getServiceCategories, getServiceVariants } from '../../../services/pricing';
 import { ServiceCategory } from '../../../types/pricing';
 import { getMaterials } from '../../../api';
 import { ServiceCategoriesBlock } from './components/ServiceCategoriesBlock';
@@ -18,6 +18,7 @@ import { useServiceOperations } from './hooks/useServiceOperations';
 import { useTierOperations } from './hooks/useTierOperations';
 import { filterAndSortServices } from './utils/serviceFilters';
 import { getServiceIcon, getServiceTypeLabel, getUnitLabel } from './utils/serviceFormatters';
+import { bindingQuantityRangeInvalid } from './utils/bindingCopy';
 import {
   findWideFormatCategory,
   isBindingService,
@@ -25,6 +26,7 @@ import {
   WIDE_FORMAT_CATEGORY_NAME,
 } from './utils/wideFormatServices';
 import ServiceForm from './components/ServiceForm';
+import ServicesTable from './components/ServicesTable';
 import ServiceVolumeTiersPanel from './components/ServiceVolumeTiersPanel';
 import { AutoCuttingPriceSidebar } from './components/AutoCuttingPriceSidebar';
 import { ServiceVariantsTable } from './components/ServiceVariantsTable';
@@ -251,40 +253,69 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   // Обработчики
   const openEditService = useCallback((service: PricingService) => {
     setEditingService(service);
-    setEditingServiceForm(serviceToFormState(service));
-  }, [setEditingService, setEditingServiceForm]);
+    setEditingServiceForm({
+      ...serviceToFormState(service),
+      hasVariants: servicesWithVariants.has(service.id),
+    });
+  }, [servicesWithVariants, setEditingService, setEditingServiceForm]);
 
   const saveEditService = useCallback(async () => {
     if (!state.editingService || !state.editingServiceForm) return;
+    const editingIsBinding = isBindingService(state.editingService);
+    if (editingIsBinding && bindingQuantityRangeInvalid(state.editingServiceForm.minQuantity, state.editingServiceForm.maxQuantity)) {
+      return;
+    }
     const payload = {
       name: state.editingServiceForm.name.trim(),
-      type: state.editingServiceForm.type,
-      unit: state.editingServiceForm.unit,
+      type: editingIsBinding ? 'bind' : state.editingServiceForm.type,
+      unit: editingIsBinding ? (state.editingServiceForm.unit || 'per_item') : state.editingServiceForm.unit,
       rate: Number(state.editingServiceForm.rate || 0),
       isActive: state.editingServiceForm.isActive,
-      operationType: state.editingServiceForm.operationType || 'other', // 
+      operationType: editingIsBinding ? 'bind' : (state.editingServiceForm.operationType || 'other'),
       minQuantity: state.editingServiceForm.minQuantity
         ? Number(state.editingServiceForm.minQuantity)
         : undefined,
       maxQuantity: state.editingServiceForm.maxQuantity
         ? Number(state.editingServiceForm.maxQuantity)
-        : undefined,
+        : null,
       operator_percent: state.editingServiceForm.operatorPercent !== ''
         ? Number(state.editingServiceForm.operatorPercent) || 0
         : undefined,
       categoryId: state.editingServiceForm.categoryId !== '' ? state.editingServiceForm.categoryId : null,
       material_id: state.editingServiceForm.materialId !== '' ? state.editingServiceForm.materialId : null,
       qty_per_item: state.editingServiceForm.qtyPerItem !== '' && Number(state.editingServiceForm.qtyPerItem) > 0 ? Number(state.editingServiceForm.qtyPerItem) : undefined,
-      consumption_mode: state.editingServiceForm.materialId !== '' ? state.editingServiceForm.consumptionMode : undefined,
-      meter_basis:
-        state.editingServiceForm.materialId !== '' &&
-        (state.editingServiceForm.consumptionMode === 'roll_feed' || state.editingServiceForm.unit === 'per_meter')
+      consumption_mode: editingIsBinding
+        ? 'fixed'
+        : state.editingServiceForm.materialId !== ''
+          ? state.editingServiceForm.consumptionMode
+          : undefined,
+      meter_basis: editingIsBinding
+        ? undefined
+        : state.editingServiceForm.materialId !== '' &&
+          (state.editingServiceForm.consumptionMode === 'roll_feed' || state.editingServiceForm.unit === 'per_meter')
           ? state.editingServiceForm.meterBasis
           : undefined,
     };
-    await serviceOperationsRef.current.updateService(state.editingService.id, payload);
+    if (editingIsBinding) {
+      await serviceOperationsRef.current.updateBinding(state.editingService.id, payload);
+      if (state.editingServiceForm.hasVariants && !servicesWithVariants.has(state.editingService.id)) {
+        try {
+          await createServiceVariant(state.editingService.id, {
+            variantName: 'Новый тип',
+            parameters: {},
+            sortOrder: 0,
+            isActive: true,
+          });
+          await addRangeBoundary(state.editingService.id, payload.minQuantity ?? 1);
+        } catch {
+          // диапазон мог уже существовать
+        }
+      }
+    } else {
+      await serviceOperationsRef.current.updateService(state.editingService.id, payload);
+    }
     resetEditingService();
-  }, [state.editingService, state.editingServiceForm, resetEditingService]); // serviceOperations через ref
+  }, [servicesWithVariants, state.editingService, state.editingServiceForm, resetEditingService]);
 
   const createFormValid = useMemo(() => {
     const f = state.newServiceForm;
@@ -292,8 +323,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     const unitOk = (f.unit || '').trim().length > 0;
     const rateNum = Number(f.rate);
     const rateOk = f.rate !== '' && Number.isFinite(rateNum) && rateNum >= 0;
-    return nameOk && unitOk && rateOk;
-  }, [state.newServiceForm]);
+    const rangeOk = createMode !== 'binding' || !bindingQuantityRangeInvalid(f.minQuantity, f.maxQuantity);
+    return nameOk && unitOk && rateOk && rangeOk;
+  }, [createMode, state.newServiceForm]);
 
   const ensureWideFormatCategoryId = useCallback(async (): Promise<number | ''> => {
     const existing = findWideFormatCategory(categories);
@@ -311,7 +343,13 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     async (mode: CreateMode) => {
       setCreateMode(mode);
       if (mode === 'binding') {
-        resetNewServiceForm(bindingServiceForm);
+        const bindingsCategory = categories.find((category) => category.name.trim().toLowerCase() === 'переплёты');
+        resetNewServiceForm({
+          ...bindingServiceForm,
+          unit: 'per_item',
+          consumptionMode: 'fixed',
+          categoryId: bindingsCategory?.id ?? '',
+        });
       } else if (mode === 'wideformat') {
         const categoryId = await ensureWideFormatCategoryId();
         resetNewServiceForm(wideFormatServiceForm(categoryId));
@@ -320,7 +358,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       }
       setShowCreateService(true);
     },
-    [ensureWideFormatCategoryId, resetNewServiceForm, setShowCreateService]
+    [categories, ensureWideFormatCategoryId, resetNewServiceForm, setShowCreateService]
   );
 
   const handleServiceCreate = useCallback(async () => {
@@ -334,7 +372,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         categoryId = ensured === '' ? undefined : ensured;
       }
       const unit =
-        createMode === 'wideformat'
+        createMode === 'binding'
+          ? 'per_item'
+          : createMode === 'wideformat'
           ? state.newServiceForm.unit || 'per_meter'
           : state.newServiceForm.unit || 'item';
       const payload = {
@@ -353,7 +393,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           : undefined,
         maxQuantity: state.newServiceForm.maxQuantity
           ? Number(state.newServiceForm.maxQuantity)
-          : undefined,
+          : createMode === 'binding'
+            ? null
+            : undefined,
         operator_percent: state.newServiceForm.operatorPercent !== ''
           ? Number(state.newServiceForm.operatorPercent) || 0
           : undefined,
@@ -361,13 +403,17 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         material_id: state.newServiceForm.materialId !== '' ? state.newServiceForm.materialId : undefined,
         qty_per_item: state.newServiceForm.qtyPerItem !== '' && Number(state.newServiceForm.qtyPerItem) > 0 ? Number(state.newServiceForm.qtyPerItem) : undefined,
         consumption_mode:
-          createMode === 'wideformat'
+          createMode === 'binding'
+            ? 'fixed'
+            : createMode === 'wideformat'
             ? state.newServiceForm.consumptionMode || 'roll_feed'
             : state.newServiceForm.materialId !== ''
               ? state.newServiceForm.consumptionMode
               : undefined,
         meter_basis:
-          createMode === 'wideformat' ||
+          createMode === 'binding'
+            ? undefined
+            : createMode === 'wideformat' ||
           (state.newServiceForm.materialId !== '' &&
             (state.newServiceForm.consumptionMode === 'roll_feed' ||
               state.newServiceForm.unit === 'per_meter' ||
@@ -478,12 +524,12 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     if (workspaceTab === 'bindings') {
       return {
         title: 'Переплёты',
-        lead: 'Услуги переплёта (bind). Варианты и диапазоны цен — в строке услуги.',
+        lead: 'Цена, материал и лимит страниц задаются на листе дерева. Группа — только имя.',
         createLabel: '+ Добавить переплёт',
         createMode: 'binding' as CreateMode,
         emptyTitle: 'Нет переплётов',
         emptyHint: 'Добавьте первый переплёт',
-        hint: 'Переплёты попадают в отдельный блок привязки к продуктам.',
+        hint: 'Эту услугу выбирает блок «Переплёт» в шаблоне многостраничного продукта.',
       };
     }
     if (workspaceTab === 'wideformat') {
@@ -518,7 +564,14 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         variant="secondary"
         size="sm"
         title={service.isActive ? 'Сделать услугу неактивной' : 'Сделать услугу активной'}
-        onClick={() => serviceOperationsRef.current.updateService(service.id, { isActive: !service.isActive })}
+        onClick={() => {
+          const payload = { isActive: !service.isActive };
+          if (isBindingService(service)) {
+            void serviceOperationsRef.current.updateBinding(service.id, payload);
+          } else {
+            void serviceOperationsRef.current.updateService(service.id, payload);
+          }
+        }}
       >
         {service.isActive ? <><AppIcon name="ban" size="xs" /> Деактивировать</> : <><AppIcon name="check" size="xs" /> Активировать</>}
       </Button>
@@ -598,7 +651,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       ) : (
         <section className="sm-list-panel" aria-label="Справочник услуг">
           <header className="sm-list-panel__head">
-            <h2 className="sm-list-panel__title">Услуги</h2>
+            <h2 className="sm-list-panel__title">{workspaceTab === 'bindings' ? 'Переплёты' : 'Услуги'}</h2>
             <p className="sm-list-panel__lead">{workspaceMeta.lead}</p>
           </header>
 
@@ -618,7 +671,10 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               role="tab"
               aria-selected={workspaceTab === 'bindings'}
               className={`sm-workspace-tabs__tab${workspaceTab === 'bindings' ? ' is-active' : ''}`}
-              onClick={() =>setWorkspaceTab('bindings')}
+              onClick={() => {
+                setTypeFilter('all');
+                setWorkspaceTab('bindings');
+              }}
             >
               Переплёты
               <span className="sm-workspace-tabs__count">{workspaceCounts.bindings}</span>
@@ -652,6 +708,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               setSortOrder(order);
             }}
             createLabel={workspaceMeta.createLabel}
+            showTypeFilters={workspaceTab !== 'bindings'}
             onCreateService={() => {
               void openCreateModal(workspaceMeta.createMode);
             }}
@@ -663,19 +720,14 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             <>
               <div className="services-table-container sm-table-wrap">
                 {workspaceTab === 'bindings' ? (
-                  <ServiceCategoryTableSection
-                    sectionKey={SVC_SECTION_BINDINGS}
-                    label="Переплёты"
-                    count={filteredServices.length}
-                    isOpen={openServiceCategorySections.has(SVC_SECTION_BINDINGS)}
-                    onToggle={toggleServiceCategorySection}
-                    panelIdFor={panelIdForServiceSection}
+                  <ServicesTable
                     services={filteredServices}
+                    layout="binding"
+                    materialNameOf={(service) =>
+                      materials.find((material) => material.id === service.material_id)?.name ?? null
+                    }
                     expandedServiceId={state.expandedServiceId}
                     renderExpandedRow={renderExpandedRow}
-                    getServiceIcon={getServiceIcon}
-                    getServiceTypeLabel={getServiceTypeLabel}
-                    getUnitLabel={getUnitLabel}
                     renderActions={renderActions}
                   />
                 ) : workspaceTab === 'wideformat' ? (
@@ -762,7 +814,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       {state.showCreateService && (
         <Modal
           isOpen={true}
-          title="Создание записи"
+          title={createMode === 'binding' ? 'Новый переплёт' : 'Создание записи'}
           size="md"
           className="services-create-modal sm-ui-modal"
           onClose={() => {
@@ -772,6 +824,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             resetNewServiceForm(emptyServiceForm);
           }}
         >
+          {createMode !== 'binding' && (
           <div className="services-create-modal__tabs" role="tablist" aria-label="Тип записи">
             <button
               type="button"
@@ -787,8 +840,8 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             <button
               type="button"
               role="tab"
-              aria-selected={createMode === 'binding'}
-              className={`services-create-modal__tab${createMode === 'binding' ? ' is-active' : ''}`}
+              aria-selected={false}
+              className="services-create-modal__tab"
               onClick={() =>{
                 void openCreateModal('binding');
               }}
@@ -807,13 +860,14 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               ШФП
             </button>
           </div>
+          )}
+          {createMode !== 'binding' && (
           <p className="services-create-modal__lead">
-            {createMode === 'binding'
-              ? 'Переплёт попадает во вкладку «Переплёты», операция на бэкенде — bind. Варианты настраиваются после создания.'
-              : createMode === 'wideformat'
+            {createMode === 'wideformat'
                 ? 'Услуга ШФП: ламинация — per_meter (пог. м подачи), расход roll_feed. После создания добавьте варианты по ширинам и привяжите рулоны.'
                 : 'Укажите название, единицу и цену. После создания привяжите услугу к продукту в карточке продукта.'}
           </p>
+          )}
           <form
             className="services-create-modal__form"
             onSubmit={(e) => {
@@ -835,13 +889,13 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               }
               autoFocusName
             />
+            {createMode !== 'binding' && (
             <Alert type="info" className="mt-4">
-              {createMode === 'binding'
-                ? 'Тип postprint и операция bind подставляются автоматически. Категорию при необходимости задайте в «Редактировать».'
-                : createMode === 'wideformat'
+              {createMode === 'wideformat'
                   ? 'Категория «ШФП послепечатка» создаётся автоматически. Цену за м² и рулоны настройте в вариантах услуги.'
                   : 'Категория нужна для удобной группировки в списке услуг при настройке продукта.'}
             </Alert>
+            )}
             <div className="services-create-modal__footer">
               <Button
                 variant="secondary"
@@ -872,17 +926,36 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       {state.editingService && state.editingServiceForm && (
         <Modal
           isOpen={true}
-          title="Редактирование услуги"
+          title={
+            isBindingService(state.editingService)
+              ? `Переплёт: ${state.editingService.name}`
+              : 'Редактирование услуги'
+          }
           size="md"
           className="services-edit-modal sm-ui-modal"
           onClose={resetEditingService}
         >
-          <ServiceForm value={state.editingServiceForm} onChange={setEditingServiceForm} categories={categories} materials={materials} />
+          <ServiceForm
+            value={state.editingServiceForm}
+            onChange={setEditingServiceForm}
+            categories={categories}
+            materials={materials}
+            variant={isBindingService(state.editingService) ? 'binding' : 'default'}
+          />
           <div className="flex justify-end gap-2 w-full mt-4 pt-4 border-t">
             <Button variant="secondary" onClick={resetEditingService}>
               Отмена
             </Button>
-            <Button variant="primary" onClick={saveEditService}>Сохранить</Button>
+            <Button
+              variant="primary"
+              disabled={
+                isBindingService(state.editingService) &&
+                bindingQuantityRangeInvalid(state.editingServiceForm.minQuantity, state.editingServiceForm.maxQuantity)
+              }
+              onClick={saveEditService}
+            >
+              Сохранить
+            </Button>
           </div>
         </Modal>
       )}

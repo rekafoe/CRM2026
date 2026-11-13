@@ -854,6 +854,20 @@
   color: #0f172a;
 }
 
+.services-table__service-sub,
+.services-table__unit-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.services-table__unit-note {
+  color: #92400e;
+}
+
 .services-table__type-badge {
   display: inline-flex;
   align-items: center;

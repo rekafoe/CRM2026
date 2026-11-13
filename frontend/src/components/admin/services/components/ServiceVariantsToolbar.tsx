@@ -13,6 +13,7 @@ export interface ServiceVariantsToolbarProps {
   onSaveNow: () => void | Promise<void>;
   onCancelDraft: () => void;
   onAddRangeClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  quantityLabel?: string;
 }
 
 export const ServiceVariantsToolbar: React.FC<ServiceVariantsToolbarProps> = ({
@@ -25,6 +26,7 @@ export const ServiceVariantsToolbar: React.FC<ServiceVariantsToolbarProps> = ({
   onSaveNow,
   onCancelDraft,
   onAddRangeClick,
+  quantityLabel = 'Тираж',
 }) => (
   <div className="service-variants-toolbar">
     <div className="service-variants-toolbar__left">
@@ -32,7 +34,7 @@ export const ServiceVariantsToolbar: React.FC<ServiceVariantsToolbarProps> = ({
         <h3 className="service-variants-title">Варианты услуги: {serviceName}</h3>
         {(serviceMinQuantity !== undefined || serviceMaxQuantity !== undefined) && (
           <div className="service-variants-subtitle">
-            Тираж: от {serviceMinQuantity ?? 1}
+            {quantityLabel}: от {serviceMinQuantity ?? 1}
             {serviceMaxQuantity !== undefined ? ` до ${serviceMaxQuantity}` : ' (без максимума)'}
           </div>
         )}

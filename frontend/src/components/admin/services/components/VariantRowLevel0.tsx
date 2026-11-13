@@ -37,10 +37,7 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
 
   // Только сам корень — лист, цены вводим здесь; иначе цены у дочерних строк
   const isLeaf = (allTypeVariants?.length ?? 1) <= 1;
-
-  const handleNameEditStart = useCallback(() => {
-    onNameEditStart(variant.id, typeName);
-  }, [variant.id, typeName, onNameEditStart]);
+  const shownName = isBindService && (typeName === 'Новый тип' || !typeName.trim()) ? '' : typeName;
 
   const handleNameSave = useCallback(() => {
     onNameSave(variant.id);
@@ -67,11 +64,13 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
         <div className="cell">
           <div className="variant-name-stack">
             <div className="variant-name-row">
+              {isBindService && <span className="variant-kind">{isLeaf ? 'лист' : 'группа'}</span>}
               <div className="el-input el-input--small" style={{ flex: 1, marginRight: '8px', minWidth: 0 }}>
                 {isEditingName ? (
                   <input
                     type="text"
                     className="el-input__inner"
+                    placeholder={isBindService ? 'Вид, например: пружина' : undefined}
                     value={editingNameValue}
                     onChange={(e) => onNameChange(e.target.value)}
                     onBlur={handleNameSave}
@@ -89,20 +88,24 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
                   <input
                     type="text"
                     className="el-input__inner"
-                    value={typeName}
-                    onClick={handleNameEditStart}
+                    placeholder={isBindService ? 'Вид, например: пружина' : undefined}
+                    value={shownName}
+                    onClick={() => onNameEditStart(variant.id, shownName)}
                     readOnly
                     style={{ cursor: 'pointer' }}
                   />
                 )}
               </div>
+              {isBindService && variant.isActive === false && <span className="variant-kind variant-kind--off">выключен</span>}
             </div>
-            {isLeaf && onUpdateMaterial && materials.length > 0 && (
+            {isBindService && !isLeaf && <p className="variant-group-note">Материал и страницы — на листе.</p>}
+            {isLeaf && onUpdateMaterial && (materials.length > 0 || isBindService) && (
               <VariantMaterialSelect
                 variant={variant}
                 materials={materials}
                 priceUnit={priceUnit}
                 onUpdate={onUpdateMaterial}
+                bindingLeaf={Boolean(isBindService)}
               />
             )}
             {isLeaf && isBindService && onUpdateBindingPages && (
@@ -113,16 +116,25 @@ const VariantRowLevel0Inner: React.FC<VariantRowLevel0Props> = ({
       </td>
       <VariantRowActions
         layout="root"
+        bindingLabels={Boolean(isBindService)}
         onAddChild={handleCreateChild}
         onAddSibling={onCreateSibling}
         onDelete={handleDelete}
       />
+      {isBindService && !isLeaf ? (
+        commonRangesAsPriceRanges.map((range) => (
+          <td key={range.minQty} style={{ padding: '8px', textAlign: 'center' }}>
+            <span className="variant-price-on-leaf">на листе</span>
+          </td>
+        ))
+      ) : (
       <PriceRangeCells
         tiers={isLeaf ? variant.tiers : []}
         commonRanges={commonRangesAsPriceRanges}
         onPriceChange={isLeaf && onPriceChange ? handlePriceChange : NOOP_PRICE}
         editable={isLeaf && Boolean(onPriceChange)}
       />
+      )}
     </tr>
   );
 };

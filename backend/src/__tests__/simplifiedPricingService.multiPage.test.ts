@@ -2,6 +2,8 @@ import { SimplifiedPricingService } from '../modules/pricing/services/simplified
 import { LayoutCalculationService } from '../modules/pricing/services/layoutCalculationService';
 import { getDb } from '../db';
 import { BindingPricingService } from '../modules/pricing/services/bindingPricingService';
+import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository';
+import { getTableColumns } from '../utils/tableSchemaCache';
 
 jest.mock('../db', () => ({
   getDb: jest.fn(),
@@ -21,6 +23,19 @@ jest.mock('../modules/pricing/services/layoutCalculationService', () => ({
   LayoutCalculationService: {
     calculateLayout: jest.fn(() => layoutMock(1)),
     findOptimalSheetSize: jest.fn(() => layoutMock(1)),
+  },
+}));
+
+jest.mock('../utils/tableSchemaCache', () => ({
+  getTableColumns: jest.fn(async () => new Set<string>()),
+  hasColumn: jest.fn(async () => false),
+  invalidateTableSchemaCache: jest.fn(),
+}));
+
+jest.mock('../modules/pricing/repositories/serviceRepository', () => ({
+  PricingServiceRepository: {
+    listServiceTiers: jest.fn(async () => []),
+    getServiceById: jest.fn(async () => null),
   },
 }));
 
@@ -362,6 +377,215 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
         10,
       ),
     ).rejects.toThrow(/Не более/);
+  });
+
+  it('кладёт переплёт поверх ненулевой отделки', async () => {
+    templateConfigData.simplified.sizes[0].finishing = [{ service_id: 55 }];
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      binding: { service_id: 77, units_per_item: 1 },
+    };
+    (PricingServiceRepository.listServiceTiers as jest.Mock).mockImplementation(async (serviceId: number) => {
+      if (serviceId === 55) {
+        return [{ id: 1, serviceId: 55, minQuantity: 1, rate: 1, isActive: true }];
+      }
+      return [];
+    });
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services') && query.includes('operation_type')) {
+          const id = Number(params?.[0]);
+          if (id === 77) return { id: 77, operation_type: 'bind', is_active: 1 };
+          return { id, operation_type: 'laminate', is_active: 1 };
+        }
+        return null;
+      }),
+      all: jest.fn(async (query: string) => {
+        if (String(query).includes('FROM post_processing_services') && String(query).includes('id IN')) {
+          return [{
+            id: 55,
+            name: 'Ламинация',
+            operation_type: 'laminate',
+            price_unit: 'per_item',
+            min_quantity: 1,
+            max_quantity: null,
+          }];
+        }
+        return [];
+      }),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 4 as any,
+      } as any,
+      100,
+    );
+
+    expect(result.finalPrice).toBe(950);
+    expect(result.breakdown?.otherFinishingPrice).toBe(100);
+    expect(result.breakdown?.bindingPrice).toBe(50);
+    expect(result.selectedFinishing?.filter((row) => row.service_id === 77)).toHaveLength(1);
+  });
+
+  it('не возвращает цену, если цитата переплёта упала', async () => {
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      binding: { service_id: 77, units_per_item: 1 },
+    };
+    mockedQuoteBinding.mockRejectedValue(Object.assign(new Error('не лист'), { status: 400 }));
+
+    await expect(
+      SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'a4',
+          print_technology: 'laser_prof',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+          pages: 8 as any,
+        } as any,
+        10,
+      ),
+    ).rejects.toThrow(/не лист/);
+  });
+
+  it('не подставляет ноль в таблицу тиражей, если цитата диапазона упала', async () => {
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      binding: { service_id: 77, units_per_item: 1 },
+    };
+    mockedQuoteBinding
+      .mockResolvedValueOnce({
+        serviceId: 77,
+        serviceName: 'Пружина',
+        priceUnit: 'per_item',
+        unitPrice: 0.5,
+        units: 10,
+        total: 5,
+      })
+      .mockRejectedValueOnce(Object.assign(new Error('диапазон'), { status: 400 }));
+
+    await expect(
+      SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'a4',
+          print_technology: 'laser_prof',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+          pages: 8 as any,
+        } as any,
+        10,
+      ),
+    ).rejects.toThrow(/диапазон/);
+  });
+
+  it('отвечает ошибкой, если переплёт шаблона выключен', async () => {
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      binding: { service_id: 77, units_per_item: 1 },
+    };
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services') && query.includes('operation_type')) {
+          return { id: Number(params?.[0]), operation_type: 'bind', is_active: 0 };
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    await expect(
+      SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'a4',
+          print_technology: 'laser_prof',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+          pages: 8 as any,
+        } as any,
+        10,
+      ),
+    ).rejects.toThrow(/выключен/);
+    expect(mockedQuoteBinding).not.toHaveBeenCalled();
+  });
+
+  it('списывает материал переплёта по норме и единицам цитаты, без подачи рулона', async () => {
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      binding: { service_id: 77, units_per_item: 1 },
+    };
+    mockedQuoteBinding.mockResolvedValue({
+      serviceId: 77,
+      serviceName: 'Пружина',
+      variantId: 5,
+      priceUnit: 'per_item',
+      unitPrice: 0.5,
+      units: 100,
+      total: 50,
+    });
+    (getTableColumns as jest.Mock).mockImplementation(async (table: string) => {
+      if (table === 'service_variants' || table === 'post_processing_services') {
+        return new Set(['material_id', 'qty_per_item', 'consumption_mode', 'meter_basis']);
+      }
+      return new Set();
+    });
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services') && query.includes('operation_type')) {
+          return { id: Number(params?.[0]), operation_type: 'bind', is_active: 1 };
+        }
+        return null;
+      }),
+      all: jest.fn(async (query: string) => {
+        const sql = String(query);
+        if (sql.includes('FROM service_variants') && sql.includes('material_id')) {
+          return [{ id: 5, material_id: 9, qty_per_item: 2, consumption_mode: 'roll_feed', meter_basis: 'feed' }];
+        }
+        if (sql.includes('FROM materials')) {
+          return [{ id: 9, name: 'Пружина', sheet_width: 320, printable_width: null }];
+        }
+        return [];
+      }),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 4 as any,
+      } as any,
+      100,
+    );
+
+    expect(result.operationMaterials).toEqual([
+      { material_id: 9, material_name: 'Пружина', quantity: 200 },
+    ]);
   });
 });
 

@@ -35,10 +35,14 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
 
   const hasChildren = level2Variants.length > 0;
   const isLeaf = !hasChildren;
+  const rawType = variant.parameters?.type || '';
+  const shownType = isBindService && (rawType === 'Новый тип' || rawType === 'Вариант' || !rawType.trim())
+    ? ''
+    : (rawType || (isBindService ? '' : 'Вариант'));
 
   const handleParamsEditStart = useCallback(() => {
-    onParamsEditStart(variant.id, variant.parameters?.type || '');
-  }, [variant.id, variant.parameters?.type, onParamsEditStart]);
+    onParamsEditStart(variant.id, isBindService ? shownType : (variant.parameters?.type || ''));
+  }, [isBindService, onParamsEditStart, shownType, variant.id, variant.parameters?.type]);
 
   const handleParamsSave = useCallback(() => {
     onParamsSave(variant.id);
@@ -87,7 +91,7 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
                   <input
                     type="text"
                     className="el-input__inner"
-                    placeholder="Тип (например: глянец, мат)"
+                    placeholder={isBindService ? 'Тип, например: металл' : 'Тип (например: глянец, мат)'}
                     value={editingParamsValue.type || ''}
                     onChange={(e) => onParamsChange('type', e.target.value)}
                     style={{ flex: 1 }}
@@ -103,19 +107,24 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
                 <input
                   type="text"
                   className="el-input__inner"
-                  value={variant.parameters?.type || 'Вариант'}
+                  placeholder={isBindService ? 'Тип, например: металл' : undefined}
+                  value={isBindService ? shownType : (variant.parameters?.type || 'Вариант')}
                   onClick={handleParamsEditStart}
                   readOnly
                   style={{ cursor: 'pointer' }}
                 />
               )}
             </div>
-            {isLeaf && onUpdateMaterial && materials.length > 0 && (
+            {isBindService && <span className="variant-kind">{isLeaf ? 'лист' : 'группа'}</span>}
+            {isBindService && variant.isActive === false && <span className="variant-kind variant-kind--off">выключен</span>}
+            {isBindService && !isLeaf && <p className="variant-group-note">Материал и страницы — на листе.</p>}
+            {isLeaf && onUpdateMaterial && (materials.length > 0 || isBindService) && (
               <VariantMaterialSelect
                 variant={variant}
                 materials={materials}
                 priceUnit={priceUnit}
                 onUpdate={onUpdateMaterial}
+                bindingLeaf={Boolean(isBindService)}
               />
             )}
             {isLeaf && isBindService && onUpdateBindingPages && (
@@ -126,11 +135,18 @@ const VariantRowLevel1Inner: React.FC<VariantRowLevel1Props> = ({
       </td>
       <VariantRowActions
         layout="branch"
+        bindingLabels={Boolean(isBindService)}
         onAddChild={handleCreateChild}
         onAddSibling={handleCreateSibling}
         onDelete={handleDelete}
       />
-      {isLeaf ? (
+      {isBindService && !isLeaf ? (
+        commonRangesAsPriceRanges.map((range) => (
+          <td key={range.minQty} style={{ padding: '8px', textAlign: 'center' }}>
+            <span className="variant-price-on-leaf">на листе</span>
+          </td>
+        ))
+      ) : isLeaf ? (
         <PriceRangeCells
           tiers={variant.tiers}
           commonRanges={commonRangesAsPriceRanges}

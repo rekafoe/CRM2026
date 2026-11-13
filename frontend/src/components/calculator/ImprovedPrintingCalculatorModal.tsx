@@ -32,7 +32,6 @@ import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
 import { isMultipageLikeProduct, resolveCalculatorPagesBounds } from '../../utils/multipageProduct';
 import { CalculatorSections } from './components/CalculatorSections';
-import { isBindingVariantPricingLeaf } from './components/BindingVariantSelector';
 import { CustomProductForm } from './components/CustomProductForm';
 import { PostprintServicesForm } from './components/PostprintServicesForm';
 import { PlotterCuttingCalculatorForm } from './components/PlotterCuttingCalculatorForm';
@@ -573,11 +572,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     const variant = bindingVariants.find((v) => v.id === activeBindingVariantId);
     return variant?.variantName ?? variant?.variant_name;
   }, [activeBindingVariantId, bindingVariants]);
-  const activeBindingVariantIsLeaf = useMemo(
-    () => isBindingVariantPricingLeaf(bindingVariants, activeBindingVariantId),
-    [activeBindingVariantId, bindingVariants],
-  );
-
   const pagesAllowCustom = isMultiPageProduct || effectivePagesConfig?.allowCustom !== false;
   const calculatorPagesBounds = useMemo(
     () =>
@@ -608,7 +602,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     isMultiPageProduct,
     bindingPagesLimits: activeBindingLimits,
     bindingLabel: activeBindingLabel,
-    bindingVariantIsLeaf: activeBindingVariantIsLeaf,
+    bindingVariants: bindingTemplate?.service_id != null ? bindingVariants : undefined,
+    bindingVariantId: activeBindingVariantId,
+    bindingVariantLocked,
   });
 
   const getProductionTime = useCallback(() => {

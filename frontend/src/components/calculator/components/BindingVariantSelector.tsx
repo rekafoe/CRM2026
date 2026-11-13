@@ -173,6 +173,86 @@ export function isBindingVariantPricingLeaf(
   return false;
 }
 
+function activeBindingVariants(variants: BindingVariantOption[]): BindingVariantOption[] {
+  return variants.filter((variant) => variant.isActive !== false);
+}
+
+export function bindingServiceHasSelectableLeaves(variants: BindingVariantOption[]): boolean {
+  const active = activeBindingVariants(variants);
+  return active.some((variant) => isBindingVariantPricingLeaf(active, variant.id));
+}
+
+export type BindingLeafChoice = { id: number; path: string };
+
+export function listBindingLeafPaths(variants: BindingVariantOption[]): BindingLeafChoice[] {
+  const tree = buildBindingTree(activeBindingVariants(variants));
+  const choices: BindingLeafChoice[] = [];
+  for (const root of tree) {
+    if (root.branches.length === 0 && root.leafVariantId != null) {
+      choices.push({ id: root.leafVariantId, path: root.label });
+      continue;
+    }
+    for (const branch of root.branches) {
+      if (branch.leaves.length === 0) {
+        choices.push({ id: branch.variantId, path: `${root.label} — ${branch.label}` });
+        continue;
+      }
+      for (const leaf of branch.leaves) {
+        choices.push({ id: leaf.id, path: `${root.label} — ${branch.label} — ${leaf.label}` });
+      }
+    }
+  }
+  return choices;
+}
+
+export type BindingCalculatorIssue =
+  | { kind: 'ok' }
+  | { kind: 'inactive' }
+  | { kind: 'need-leaf' }
+  | { kind: 'template-group'; name: string };
+
+export function bindingCalculatorIssue(opts: {
+  variants: BindingVariantOption[];
+  variantId?: number;
+  locked?: boolean;
+}): BindingCalculatorIssue {
+  const selected = opts.variantId != null
+    ? opts.variants.find((variant) => variant.id === opts.variantId)
+    : undefined;
+  if (selected && selected.isActive === false) return { kind: 'inactive' };
+  if (opts.variantId == null || !Number.isFinite(opts.variantId)) {
+    return bindingServiceHasSelectableLeaves(opts.variants) ? { kind: 'need-leaf' } : { kind: 'ok' };
+  }
+  const active = activeBindingVariants(opts.variants);
+  if (!isBindingVariantPricingLeaf(active, opts.variantId)) {
+    const name = text(selected?.variantName ?? selected?.variant_name) || 'группа';
+    return opts.locked ? { kind: 'template-group', name } : { kind: 'need-leaf' };
+  }
+  return { kind: 'ok' };
+}
+
+export function bindingCalculatorIssueText(issue: BindingCalculatorIssue): string | null {
+  if (issue.kind === 'inactive') return 'Лист выключен';
+  if (issue.kind === 'need-leaf') return 'Выберите лист.';
+  if (issue.kind === 'template-group') {
+    return `В шаблоне выбрана группа „${issue.name}“, нужен лист. Исправьте блок „Переплёт“ в шаблоне.`;
+  }
+  return null;
+}
+
+export function formatBindingProductPagesHint(limits: {
+  minPages: number | null;
+  maxPages: number | null;
+}): string {
+  const { minPages, maxPages } = limits;
+  if (minPages != null && maxPages != null) {
+    return `Переплёт: от ${minPages} до ${maxPages} стр. изделия, вместе с обложкой.`;
+  }
+  if (minPages != null) return `Переплёт: от ${minPages} стр. изделия, вместе с обложкой.`;
+  if (maxPages != null) return `Переплёт: до ${maxPages} стр. изделия, вместе с обложкой.`;
+  return 'Переплёт: лимит страниц не задан.';
+}
+
 export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
   variants,
   value,
@@ -181,7 +261,8 @@ export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
   pagesHint,
   error,
 }) => {
-  const tree = useMemo(() => buildBindingTree(variants), [variants]);
+  const inactiveSelected = variants.some((variant) => variant.id === value && variant.isActive === false);
+  const tree = useMemo(() => buildBindingTree(activeBindingVariants(variants)), [variants]);
   const selection = useMemo(() => findSelection(tree, value), [tree, value]);
   const [rootKey, setRootKey] = useState('');
   const [branchKey, setBranchKey] = useState('');
@@ -216,21 +297,19 @@ export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
   const selectedLeafValue = selectedBranch?.leaves.some((leaf) => leaf.id === value)
     ? String(value)
     : '';
-  const structuralSelection = Boolean(
-    value != null
-    && (
-      (selectedRoot?.variantId === value && selectedRoot.branches.length > 0)
-      || (selectedBranch?.variantId === value && selectedBranch.leaves.length > 0)
-    ),
-  );
-  const effectiveError = structuralSelection
-    ? 'Выберите последний уровень варианта переплёта'
-    : error;
+  const effectiveError = error;
+  if (inactiveSelected) {
+    return (
+      <div className="binding-variant-selector">
+        <p className="param-error">{effectiveError || 'Лист выключен'}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="binding-variant-selector">
       <div className="param-group param-group--binding">
-        <label>Переплёт</label>
+        <label>Вид</label>
         <select
           className="form-control"
           disabled={disabled}
@@ -243,7 +322,7 @@ export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
             onChange(nextRoot?.leafVariantId);
           }}
         >
-          <option value="">— Выберите вид переплёта —</option>
+          <option value="">— Вид —</option>
           {tree.map((root) => (
             <option key={root.key} value={root.key}>{root.label}</option>
           ))}
@@ -252,7 +331,7 @@ export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
 
       {selectedRoot && selectedRoot.branches.length > 0 && (
         <div className="param-group param-group--binding">
-          <label>Тип переплёта</label>
+          <label>Тип</label>
           <select
             className="form-control"
             disabled={disabled}
@@ -264,7 +343,7 @@ export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
               onChange(nextBranch && nextBranch.leaves.length === 0 ? nextBranch.variantId : undefined);
             }}
           >
-            <option value="">— Выберите тип —</option>
+            <option value="">— Тип —</option>
             {selectedRoot.branches.map((branch) => (
               <option key={branch.key} value={branch.key}>{branch.label}</option>
             ))}
@@ -274,14 +353,14 @@ export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
 
       {selectedBranch && selectedBranch.leaves.length > 0 && (
         <div className="param-group param-group--binding">
-          <label>Вариант переплёта</label>
+          <label>Лист</label>
           <select
             className="form-control"
             disabled={disabled}
             value={selectedLeafValue}
             onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)}
           >
-            <option value="">— Выберите вариант —</option>
+            <option value="">— Лист —</option>
             {selectedBranch.leaves.map((leaf) => (
               <option key={leaf.id} value={leaf.id}>{leaf.label}</option>
             ))}
@@ -289,8 +368,11 @@ export const BindingVariantSelector: React.FC<BindingVariantSelectorProps> = ({
         </div>
       )}
 
-      {(pagesHint || effectiveError) && (
+      {(pagesHint || effectiveError || (disabled && !effectiveError && value != null)) && (
         <div className="binding-variant-selector__messages">
+          {disabled && !effectiveError && value != null && (
+            <p className="param-hint param-hint--binding">Задан в шаблоне продукта.</p>
+          )}
           {pagesHint && <p className="param-hint param-hint--binding">{pagesHint}</p>}
           {effectiveError && <p className="param-error">{effectiveError}</p>}
         </div>
