@@ -45,6 +45,7 @@ import {
 import { finishingServiceDisplayName } from './finishingServiceCaption';
 import {
   enforceRequiredFinishing,
+  applyTemplateFinishingQuantityScope,
   flatFinishingUnits,
   getEffectiveFinishing,
   isTemplateFinishingRequired,
@@ -1695,14 +1696,14 @@ export class SimplifiedPricingService {
       Array.isArray(selectedSize.finishing) &&
       selectedSize.finishing.length > 0
     ) {
-      const tmplByKey = new Map<string, { units_per_item?: number; quantity_scope?: unknown }>();
+      const tmplByKey = new Map<string, { units_per_item?: number }>();
       for (const t of selectedSize.finishing) {
         const sid = Number((t as any).service_id);
         if (!Number.isFinite(sid)) continue;
         const rawVid = (t as any).variant_id;
         const vid =
           rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
-        const row = t as { units_per_item?: number; quantity_scope?: unknown };
+        const row = t as { units_per_item?: number };
         if (vid != null) tmplByKey.set(`${sid}:${vid}`, row);
         if (!tmplByKey.has(String(sid))) tmplByKey.set(String(sid), row);
       }
@@ -1729,15 +1730,19 @@ export class SimplifiedPricingService {
           const u = Number(tmpl.units_per_item);
           if (Number.isFinite(u) && u > 0) next.units_per_item = u;
         }
-        const quantityScope = readFinishingQuantityScope(tmpl?.quantity_scope);
-        if (quantityScope) next.quantity_scope = quantityScope;
         // price_unit не подмешиваем из шаблона: источник истины — карточка услуги (БД), иначе старый per_item в шаблоне ломает per_sheet.
+        // quantity_scope — только из шаблона (applyTemplateFinishingQuantityScope ниже).
         return next;
       });
     }
 
     // Обязательная услуга размера всегда в расчёте, с количеством из шаблона, даже если клиент её снял или прислал другое число.
     finishingToUse = enforceRequiredFinishing(
+      finishingToUse,
+      Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
+    );
+    // Клиентский quantity_scope (public calculate / website) не доверяем — только шаблон продукта.
+    finishingToUse = applyTemplateFinishingQuantityScope(
       finishingToUse,
       Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
     );
