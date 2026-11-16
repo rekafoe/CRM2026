@@ -10,7 +10,7 @@ import { PostalShipmentService } from '../services/postalShipmentService'
 import { buildOrderCostSheet } from '../services/orderCostSheet'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { findOrderStatusId } from '../utils/orderStatusCatalog'
-import { issueCashRemainder, shouldSkipOfflineIssueSeal } from '../utils/orderAmounts'
+import { resolveInvoiceIssueSettlement } from '../utils/invoiceIssueCash'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
@@ -1363,7 +1363,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const issuerId = authUser?.id ?? null
   const db = await getDb()
   const order = await db.get<any>(
-    'SELECT id, status, source, prepaymentAmount, prepaymentStatus, paymentMethod, payment_channel, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
+    'SELECT id, status, source, customer_id, prepaymentAmount, prepaymentStatus, paymentMethod, payment_channel, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled FROM orders WHERE id = ?',
     id,
   )
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
@@ -1379,9 +1379,8 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   }
   const amounts = await OrderService.getOrderAmountsById(id)
   const total = amounts.totalAmount
-  // invoice без order prepaid: не выдумывать offline в кассу — безнал уже в legal_payments / bank.
-  const skipOfflineSeal = shouldSkipOfflineIssueSeal(order)
-  const remainder = skipOfflineSeal ? 0 : issueCashRemainder(total, order)
+  // invoice: без prepaid или баланс юрлица уже 0 (partial bank + legal_payments) — не выдумывать offline/cash.
+  const { skipOfflineSeal, remainder } = await resolveInvoiceIssueSettlement(order, total)
 
   // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
   const bodyDate = (req.body as any)?.issued_on
