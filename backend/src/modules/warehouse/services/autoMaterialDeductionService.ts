@@ -1,5 +1,6 @@
 import { getDb } from '../../../config/database'
 import { logger } from '../../../utils/logger'
+import { orderParamsDeclareUvPrintWithoutMaterial } from '../../pricing/uvPrintWithoutMaterial'
 import { configurationFromItemParams } from '../../pricing/services/pricingGroupService'
 import { UnifiedPricingService } from '../../pricing/services/unifiedPricingService'
 import { WarehouseTransactionService } from './warehouseTransactionService'
@@ -155,6 +156,12 @@ export class AutoMaterialDeductionService {
       params && typeof params === 'object' && !Array.isArray(params)
         ? (params as Record<string, unknown>)
         : {}
+
+    // Как CRM reserve/delete: УФ без носителя не имеет листа — не падать на product_materials BOM,
+    // иначе website/miniapp auto-deduct списывает чужой SKU при пустом materials[] из pricing.
+    if (orderParamsDeclareUvPrintWithoutMaterial(paramsObj)) {
+      return []
+    }
 
     const nestedConfig =
       paramsObj.configuration &&
