@@ -4,6 +4,7 @@ import { ProductConfiguration } from '../../../types/products';
 import { rateLimiter } from '../../../middleware/rateLimiter';
 import { logger } from '../../../utils/logger';
 import { UnifiedPricingService } from '../../pricing/services/unifiedPricingService';
+import { stripClientPrintWithoutMaterial } from '../../pricing/uvPrintWithoutMaterial';
 
 const router = Router();
 
@@ -94,7 +95,10 @@ const validateRateLimit = rateLimiter.middleware({
 router.post('/:productId/calculate', calculateRateLimit, async (req, res) => {
   try {
     const { productId } = req.params;
-    const configuration: ProductConfiguration = req.body;
+    // Публичный calculate: клиентский print_without_material обнулял носитель УФ.
+    const configuration = stripClientPrintWithoutMaterial(
+      (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>,
+    ) as ProductConfiguration;
 
     logger.debug('Calculating price for product', { productId, configuration });
 

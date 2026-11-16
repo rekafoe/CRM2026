@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { asyncHandler } from '../../../middleware/asyncHandler'
+import type { AuthenticatedRequest } from '../../../middleware/auth'
 import { UnifiedPricingService } from '../services/unifiedPricingService'
 import { ServiceManagementService } from '../services/serviceManagementService'
 import { MarkupSettingsService } from '../services/markupSettingsService'
@@ -11,6 +12,7 @@ import { CompatibilityService } from '../../../services/compatibilityService'
 import { logger } from '../../../utils/logger'
 import { PrintPriceService } from '../services/printPriceService'
 import { quoteLines, type PricingLineInput } from '../services/pricingGroupService'
+import { stripClientPrintWithoutMaterial } from '../uvPrintWithoutMaterial'
 
 const toServiceResponse = (service: PricingServiceDTO) => ({
   id: service.id,
@@ -71,7 +73,17 @@ export class PricingController {
 
     try {
       // Поддерживаем оба формата: configuration (новый) и specifications (старый)
-      const config = Object.keys(configuration).length > 0 ? configuration : specifications;
+      const rawConfig = Object.keys(configuration).length > 0 ? configuration : specifications;
+      // print_without_material: только CRM с JWT. Анонимный/сайт иначе обнуляет носитель УФ.
+      const staffUser = (req as AuthenticatedRequest).user;
+      const config =
+        staffUser?.id != null && Number(staffUser.id) > 0
+          ? rawConfig
+          : stripClientPrintWithoutMaterial(
+              rawConfig && typeof rawConfig === 'object' && !Array.isArray(rawConfig)
+                ? (rawConfig as Record<string, unknown>)
+                : {},
+            );
 
       const result = await UnifiedPricingService.calculatePrice(
         Number(productId),
@@ -750,7 +762,9 @@ export class PricingController {
       const row = rawLines[i] as Record<string, unknown>
       const productId = Number(row.productId ?? row.product_id)
       const quantity = Number(row.quantity ?? row.qty ?? 1)
-      const configuration = (row.configuration ?? row.specifications ?? {}) as Record<string, unknown>
+      const rawConfiguration = (row.configuration ?? row.specifications ?? {}) as Record<string, unknown>
+      // quote-cart — сайт: клиентский print_without_material не доверяем.
+      const configuration = stripClientPrintWithoutMaterial(rawConfiguration)
       const lineId = row.lineId ?? row.line_id ?? `line-${i}`
 
       if (!Number.isFinite(productId) || productId <= 0) {
