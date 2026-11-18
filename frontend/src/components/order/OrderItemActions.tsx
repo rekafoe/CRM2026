@@ -12,11 +12,12 @@ interface OrderItemActionsProps {
   onDelete: () => void;
   /** Компактная шапка: как кнопки шапки заказа — иконки карандаш / корзина */
   variant?: 'default' | 'compact';
+  showDelete?: boolean;
 }
 
 /** Кнопки позиции: сохранение при редактировании или Редактировать / Удалить (компактно — как на странице заказа). */
 export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(
-  ({ editing, onEditParameters, orderId, item, onSave, onCancel, onDelete, variant = 'default' }) => {
+  ({ editing, onEditParameters, orderId, item, onSave, onCancel, onDelete, variant = 'default', showDelete = true }) => {
     const compact = variant === 'compact';
 
     if (editing) {
@@ -54,7 +55,7 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(
               Редактировать
             </button>
           ))}
-        {compact ? (
+        {showDelete && (compact ? (
           <button
             type="button"
             className="order-item-toolbar-btn order-item-toolbar-btn--danger"
@@ -68,7 +69,7 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(
           <button type="button" className="order-item-btn order-item-btn--danger" onClick={onDelete}>
             Удалить
           </button>
-        )}
+        ))}
       </div>
     );
   }

@@ -19,6 +19,7 @@ import { shouldAutoFillCashPrepayment } from '../../../utils/legalOrderPrepaymen
 import { UserInboxNotificationService } from '../../../services/userInboxNotificationService'
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
 import { orderParamsDeclareUvPrintWithoutMaterial } from '../../pricing/uvPrintWithoutMaterial'
+import { websiteWaitingItemDeleteBlock } from '../services/websiteWaitingItemDelete'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -605,6 +606,12 @@ export class OrderItemController {
       const itemId = Number(req.params.itemId)
       const authUser = (req as AuthenticatedRequest).user as { id: number } | undefined
       const db = await getDb()
+
+      const deleteBlock = await websiteWaitingItemDeleteBlock(db, orderId)
+      if (deleteBlock) {
+        res.status(409).json({ error: deleteBlock })
+        return
+      }
 
       // Находим позицию и её состав материалов
       const it = await db.get<{

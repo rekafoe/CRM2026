@@ -128,8 +128,13 @@ interface OrderItemProps {
   } | null;
   onUpdate: () => void;
   onEditParameters?: (orderId: number, item: Item) => void;
-  /** Режим пула заказов: только информация, без принтера/редактирования/удаления */
+  /** Режим пула заказов: только информация, без принтера и правки параметров */
   readOnly?: boolean;
+  /**
+   * Удаление строки. В пуле readOnly остаётся, а для сайта в «Ожидает» без оплаты
+   * сюда передают true. false явно прячет корзину, даже если карточку можно редактировать.
+   */
+  allowDelete?: boolean;
   /** Операторы за сегодня (для выбора исполнителя) */
   operatorsToday?: Array<{ id: number; name: string }>;
   /** Списки «В смене» / «Все» для селекта исполнителя */
@@ -152,6 +157,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   onUpdate,
   onEditParameters,
   readOnly,
+  allowDelete,
   operatorsToday = [],
   assignableOnShift,
   assignableAll,
@@ -435,8 +441,13 @@ export const OrderItem: React.FC<OrderItemProps> = ({
       await deleteOrderItem(orderId, item.id);
       onUpdate();
       addToast({ type: 'success', title: 'Успешно', message: 'Позиция удалена' });
-    } catch (error) {
-      addToast({ type: 'error', title: 'Ошибка', message: 'Ошибка при удалении позиции' });
+    } catch (error: unknown) {
+      const response = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      addToast({
+        type: 'error',
+        title: 'Ошибка',
+        message: response || 'Ошибка при удалении позиции',
+      });
     }
   };
 
@@ -489,6 +500,8 @@ export const OrderItem: React.FC<OrderItemProps> = ({
   const executorAll = assignableAll ?? operatorsToday;
   const hasExecutorOptions = executorOnShift.length > 0 || executorAll.length > 0;
   const canShowAssign = (hasExecutorOptions && onExecutorChange) || !readOnly;
+  const canDeleteItem = allowDelete ?? !readOnly;
+  const showLineActions = !readOnly || canDeleteItem;
   const assignFields = canShowAssign ? (
     <>
       {hasExecutorOptions && onExecutorChange && (
@@ -688,16 +701,17 @@ export const OrderItem: React.FC<OrderItemProps> = ({
                   }
                   assignBar={useBreakdownChrome && assignFields ? assignFields : undefined}
                   tableActions={
-                    useBreakdownChrome && !readOnly ? (
+                    useBreakdownChrome && showLineActions ? (
                       <OrderItemActions
                         variant="compact"
                         editing={editing}
-                        onEditParameters={onEditParameters}
+                        onEditParameters={readOnly ? undefined : onEditParameters}
                         orderId={orderId}
                         item={item}
                         onSave={handleSave}
                         onCancel={() => setEditing(false)}
                         onDelete={() => setShowDeleteConfirm(true)}
+                        showDelete={canDeleteItem}
                       />
                     ) : undefined
                   }
@@ -712,20 +726,21 @@ export const OrderItem: React.FC<OrderItemProps> = ({
             </>
           );
         })()}
-        {canShowAssign && !useBreakdownChrome && (
+        {(canShowAssign || (showLineActions && readOnly)) && !useBreakdownChrome && (
           <div className="order-item-meta-panel order-item-meta-panel--grid">
             <div className="order-item-meta-panel__col order-item-meta-panel__col--assign">{assignFields}</div>
-            {!readOnly && (
+            {showLineActions && (
               <div className="order-item-meta-panel__col order-item-meta-panel__col--actions">
                 <OrderItemActions
                   variant="compact"
                   editing={editing}
-                  onEditParameters={onEditParameters}
+                  onEditParameters={readOnly ? undefined : onEditParameters}
                   orderId={orderId}
                   item={item}
                   onSave={handleSave}
                   onCancel={() => setEditing(false)}
                   onDelete={() => setShowDeleteConfirm(true)}
+                  showDelete={canDeleteItem}
                 />
               </div>
             )}
@@ -796,7 +811,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({
           </div>
         </aside>
       ) : null}
-      {!readOnly && (
+      {canDeleteItem && (
         <ConfirmDialog
           isOpen={showDeleteConfirm}
           onClose={() => setShowDeleteConfirm(false)}

@@ -24,6 +24,7 @@ import { OrderTransferModal } from '../../orders/OrderTransferModal';
 import { useAssignableUsers } from '../../../hooks/useAssignableUsers';
 import { useOrderLegalDocuments } from '../hooks/useOrderLegalDocuments';
 import { useFreshOrderItem } from '../../order/useFreshOrderItem';
+import { websiteWaitingLineAccess } from '../../../utils/websiteWaitingLineAccess';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -111,6 +112,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   }, []);
 
   const items = selectedOrder.items ?? [];
+  const lineAccess = websiteWaitingLineAccess(selectedOrder, statuses);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const freshItemId = useFreshOrderItem(
     selectedOrder.id,
@@ -704,6 +706,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                 assignableOnShift={roleOnShift}
                 assignableAll={roleAll}
                 onExecutorChange={onExecutorChange}
+                allowDelete={lineAccess.kind === 'blocked' ? false : undefined}
                 layout="table"
                 rowIndex={index + 1}
                 expanded={expandedItemId === it.id}

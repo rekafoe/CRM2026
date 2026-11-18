@@ -15,6 +15,7 @@ import {
   issueOrder,
   getOperatorsToday,
   updateOrderItem,
+  addOrderItem,
   getOrderActivity,
   updateOrderNotes,
   getAssignableUsers,
@@ -26,6 +27,8 @@ import { completedOrderStatusId, isCompletedOrderStatusId, isPoolOrderStatusId, 
 import { collectedPrepaymentAmount, parseNumberFlexible } from '../utils/numberInput';
 import { isAwaitingOnlinePayment } from '../utils/poolPaymentStatus';
 import { getOrderAmounts } from '../utils/orderTotal';
+import { websiteWaitingLineAccess } from '../utils/websiteWaitingLineAccess';
+import { FeatureFlaggedCalculator } from '../components/calculator/FeatureFlaggedCalculator';
 import { mergeSelectedOrderFromList } from '../utils/orderNotes';
 import { MoneyAmount } from '../components/ui';
 import { OrderContent } from '../components/optimized/OrderContent';
@@ -78,6 +81,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [showPrepaymentDetailsModal, setShowPrepaymentDetailsModal] = useState(false);
   const [showSendPaymentLinkModal, setShowSendPaymentLinkModal] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
@@ -810,6 +814,27 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     return `${day}.${month} ${time}`;
   }, []);
 
+  useEffect(() => {
+    setShowCalculator(false);
+  }, [selectedOrder?.id]);
+
+  const handleAddPoolItem = useCallback(
+    async (item: Parameters<typeof addOrderItem>[1]) => {
+      if (!selectedOrder) return;
+      try {
+        await addOrderItem(selectedOrder.id, item);
+        toast.success('Позиция добавлена', 'Новая строка записана в заказ');
+        setShowCalculator(false);
+        await reloadPoolList(true);
+      } catch (err: unknown) {
+        const response = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        const message = response || (err instanceof Error ? err.message : 'Не удалось добавить позицию');
+        toast.error('Ошибка', message);
+      }
+    },
+    [reloadPoolList, selectedOrder, toast],
+  );
+
   const itemCountLabel = (count: number) => {
     const n10 = count % 10;
     const n100 = count % 100;
@@ -832,6 +857,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const selectedTotal = selectedOrder ? getOrderTotal(selectedOrder) : 0;
 
   const selectedItemCount = selectedOrder?.items?.length ?? 0;
+  const lineAccess = selectedOrder
+    ? websiteWaitingLineAccess(selectedOrder, orderStatuses)
+    : { kind: 'other' as const };
 
   return (
     <div className="order-pool-page">
@@ -993,18 +1021,33 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 </div>
               )}
 
-              <div className="pool-passport__section">
-                Состав
-                {selectedItemCount > 0
-                  ? ` · ${selectedItemCount} ${itemCountLabel(selectedItemCount)}`
-                  : ''}
+              <div className="pool-passport__section-row">
+                <div className="pool-passport__section">
+                  Состав
+                  {selectedItemCount > 0
+                    ? ` · ${selectedItemCount} ${itemCountLabel(selectedItemCount)}`
+                    : ''}
+                </div>
+                {lineAccess.kind === 'open' ? (
+                  <button
+                    type="button"
+                    className="lg-btn"
+                    onClick={() => setShowCalculator(true)}
+                  >
+                    Добавить продукт
+                  </button>
+                ) : null}
               </div>
+              {lineAccess.kind === 'blocked' ? (
+                <p className="pool-line-lock">{lineAccess.reason}</p>
+              ) : null}
               <OrderContent
                 order={selectedOrder}
                 onLoadOrders={() => {
                   void reloadPoolList(true);
                 }}
                 readOnly
+                allowDelete={lineAccess.kind === 'open'}
                 operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
                 assignableOnShift={assignableOnShift.length > 0 ? assignableOnShift : undefined}
                 assignableAll={assignableAll.length > 0 ? assignableAll : undefined}
@@ -1158,6 +1201,17 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           }}
         />
       )}
+      {showCalculator && selectedOrder && lineAccess.kind === 'open' ? (
+        <FeatureFlaggedCalculator
+          isOpen
+          onClose={() => setShowCalculator(false)}
+          onAddToOrder={(item) => {
+            void handleAddPoolItem(item);
+          }}
+          orderId={selectedOrder.id}
+          orderItems={selectedOrder.items}
+        />
+      ) : null}
       {ReasonPromptModalElement}
     </div>
   );

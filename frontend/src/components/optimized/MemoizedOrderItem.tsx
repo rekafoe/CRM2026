@@ -17,6 +17,7 @@ interface MemoizedOrderItemProps {
   onUpdate: () => void;
   onEditParameters?: (orderId: number, item: any) => void;
   readOnly?: boolean;
+  allowDelete?: boolean;
   operatorsToday?: Array<{ id: number; name: string }>;
   assignableOnShift?: Array<{ id: number; name: string; department_id?: number | null }>;
   assignableAll?: Array<{ id: number; name: string; department_id?: number | null }>;
@@ -35,6 +36,7 @@ export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({
   onUpdate,
   onEditParameters,
   readOnly,
+  allowDelete,
   operatorsToday = [],
   assignableOnShift,
   assignableAll,
@@ -58,6 +60,7 @@ export const MemoizedOrderItem = memo<MemoizedOrderItemProps>(({
       onUpdate={handleUpdate} 
       onEditParameters={onEditParameters}
       readOnly={readOnly}
+      allowDelete={allowDelete}
       operatorsToday={operatorsToday}
       assignableOnShift={assignableOnShift}
       assignableAll={assignableAll}
