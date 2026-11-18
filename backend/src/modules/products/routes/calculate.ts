@@ -98,7 +98,7 @@ router.post('/:productId/calculate', calculateRateLimit, async (req, res) => {
     // Публичный calculate: клиентский print_without_material обнулял носитель УФ.
     const configuration = stripClientPrintWithoutMaterial(
       (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>,
-    ) as ProductConfiguration;
+    ) as unknown as ProductConfiguration;
 
     logger.debug('Calculating price for product', { productId, configuration });
 
