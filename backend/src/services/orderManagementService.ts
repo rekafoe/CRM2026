@@ -6,7 +6,7 @@ import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
 import { tryEnqueueWebsiteOrderCompletedEmail } from './websiteOrderEmailService';
 import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
-import { issueCashRemainder, shouldSkipOfflineIssueSeal } from '../utils/orderAmounts';
+import { resolveInvoiceIssueSettlement } from '../utils/invoiceIssueCash';
 import { OrderService } from '../modules/orders/services/orderService';
 import { findOrderStatusId } from '../utils/orderStatusCatalog';
 
@@ -472,7 +472,7 @@ export class OrderManagementService {
         } else {
           const order = await db.get<any>(
             `
-            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, payment_channel, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled
+            SELECT id, source, customer_id, prepaymentAmount, prepaymentStatus, paymentMethod, payment_channel, discount_percent, COALESCE(is_cancelled, 0) as is_cancelled
             FROM orders WHERE id = ?
           `,
             [orderId],
@@ -488,9 +488,8 @@ export class OrderManagementService {
 
           const amounts = await OrderService.getOrderAmountsById(orderId);
           const totalAmount = amounts.totalAmount;
-          // invoice без order prepaid: не выдумывать offline в кассу — безнал уже в legal_payments / bank.
-          const skipOfflineSeal = shouldSkipOfflineIssueSeal(order);
-          const remainder = skipOfflineSeal ? 0 : issueCashRemainder(totalAmount, order);
+          // invoice: без prepaid или баланс юрлица уже 0 (partial bank + legal_payments) — не выдумывать offline/cash.
+          const { skipOfflineSeal, remainder } = await resolveInvoiceIssueSettlement(order, totalAmount);
 
           let hasPrepaymentUpdatedAt = false;
           try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }

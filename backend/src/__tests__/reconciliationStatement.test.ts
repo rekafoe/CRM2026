@@ -228,4 +228,60 @@ describe('акт сверки', () => {
     )
     expect(fixed.closingBalance).toBe(0)
   })
+
+  it('partial bank + legal_payments остаётся 0 если Issue не раздувает prepaid до итога', () => {
+    // Баг: partial /prepay bank 40 + поступление 60 → баланс 0; Issue seal prepaid=100 offline
+    // → кредит 100 + 60 = переплата −60 и ложный cash remainder 60.
+    const beforeIssue = buildReconciliationStatement(
+      [
+        {
+          id: 21,
+          number: 'ORD-21',
+          orderDate: '2026-11-01',
+          total: 100,
+          collected: 40,
+          paymentDate: '2026-11-01',
+        },
+      ],
+      {},
+      [{ id: 10, date: '2026-11-02', amount: 60, document: 'Поступление: остаток' }],
+    )
+    expect(beforeIssue.closingBalance).toBe(0)
+
+    const afterBadSeal = reconciliationSourceFromOrder({
+      id: 21,
+      number: 'ORD-21',
+      created_at: '2026-11-01',
+      totalAmount: 100,
+      prepaymentAmount: 100,
+      prepaymentStatus: 'paid',
+      paymentMethod: 'offline',
+      paymentChannel: 'invoice',
+      prepaymentUpdatedAt: '2026-11-03 12:00:00',
+    })
+    const corrupted = buildReconciliationStatement(
+      [afterBadSeal],
+      {},
+      [{ id: 10, date: '2026-11-02', amount: 60, document: 'Поступление: остаток' }],
+    )
+    expect(corrupted.closingBalance).toBe(-60)
+
+    const afterFixedIssue = reconciliationSourceFromOrder({
+      id: 21,
+      number: 'ORD-21',
+      created_at: '2026-11-01',
+      totalAmount: 100,
+      prepaymentAmount: 40,
+      prepaymentStatus: 'bank',
+      paymentMethod: 'online',
+      paymentChannel: 'invoice',
+      prepaymentUpdatedAt: '2026-11-01 12:00:00',
+    })
+    const fixed = buildReconciliationStatement(
+      [afterFixedIssue],
+      {},
+      [{ id: 10, date: '2026-11-02', amount: 60, document: 'Поступление: остаток' }],
+    )
+    expect(fixed.closingBalance).toBe(0)
+  })
 })
