@@ -86,6 +86,8 @@ interface MaterialsSectionProps {
   materialSelectionResetKey?: string;
   /** УФ-планшет: размер изделия задаётся в UvPrintSection, материалы берём по первому размеру шаблона */
   uvFlatbed?: boolean;
+  /** Блокнот: две складские бумаги вместо дерева типов. */
+  blockPaperChoice?: { whiteId: number; gridId: number } | null;
 }
 
 export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
@@ -101,6 +103,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   effectiveSizes: effectiveSizesProp,
   materialSelectionResetKey,
   uvFlatbed = false,
+  blockPaperChoice = null,
 }) => {
   const simplifiedSizesSource = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
     ? effectiveSizesProp
@@ -653,8 +656,33 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     updateSpecs,
   ]);
 
+  useEffect(() => {
+    if (!blockPaperChoice) return
+    const current = Number(specs.material_id)
+    if (current === blockPaperChoice.whiteId || current === blockPaperChoice.gridId) return
+    updateSpecs({ material_id: blockPaperChoice.whiteId }, true)
+  }, [blockPaperChoice, specs.material_id, updateSpecs])
+
   // Продукт без материалов (нет paperType в схеме и не упрощённый с размерами/материалами) — не показываем секцию
   const usesMaterials = hasField('paperType') || isSimplifiedProduct;
+  if (blockPaperChoice && isSimplifiedProduct) {
+    const selected = Number(specs.material_id) === blockPaperChoice.gridId
+      ? blockPaperChoice.gridId
+      : blockPaperChoice.whiteId
+    return (
+      <div className="param-group param-group--narrow">
+        <label>Бумага блока <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
+        <select
+          className="form-control"
+          value={String(selected)}
+          onChange={(e) => updateSpecs({ material_id: Number(e.target.value) }, true)}
+        >
+          <option value={String(blockPaperChoice.whiteId)}>Белая</option>
+          <option value={String(blockPaperChoice.gridId)}>В клетку</option>
+        </select>
+      </div>
+    )
+  }
   if (!usesMaterials) {
     return null;
   }

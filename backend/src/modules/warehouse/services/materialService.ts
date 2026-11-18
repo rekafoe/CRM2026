@@ -37,6 +37,16 @@ function buildBadRequest(message: string): Error & { status: number } {
   return err
 }
 
+function thicknessColumnSelect(cols: Set<string>): string {
+  const column = (name: string) => (cols.has(name) ? `m.${name}` : `NULL as ${name}`)
+  return [
+    column('sheet_thickness_mm'),
+    column('spine_thickness_mm'),
+    column('channel_min_mm'),
+    column('channel_max_mm'),
+  ].join(',\n        ')
+}
+
 export class MaterialService {
   private static inferMaterialKind(material: Record<string, any>): MaterialKind {
     const explicit = normalizeMaterialKind(material.material_kind)
@@ -108,6 +118,20 @@ export class MaterialService {
     }
     if (payload.density != null && payload.density !== '') {
       payload.density = Number(payload.density)
+    }
+    for (const key of ['sheet_thickness_mm', 'spine_thickness_mm', 'channel_min_mm', 'channel_max_mm'] as const) {
+      const parsed = toNullableNumber(material[key])
+      if (parsed != null && parsed < 0) {
+        throw buildBadRequest('Толщина в мм не может быть отрицательной')
+      }
+      payload[key] = parsed
+    }
+    if (
+      payload.channel_min_mm != null &&
+      payload.channel_max_mm != null &&
+      payload.channel_min_mm > payload.channel_max_mm
+    ) {
+      throw buildBadRequest('Диапазон канала: «от» больше «до»')
     }
 
     if (payload.material_type_id != null) {
@@ -186,6 +210,7 @@ export class MaterialService {
     const purchasePriceSelect = cols.has('purchase_price')
       ? 'm.purchase_price'
       : 'NULL as purchase_price'
+    const thicknessSelect = thicknessColumnSelect(cols)
 
     const allMats = await db.all<Material & { sheet_price_single: number | null; purchase_price: number | null }>(
       `SELECT 
@@ -208,6 +233,7 @@ export class MaterialService {
         m.paper_type_id,
         pt.display_name as paper_type_name,
         m.density,
+        ${thicknessSelect},
         m.is_active,
         m.sheet_width,
         m.sheet_height,
@@ -266,6 +292,7 @@ export class MaterialService {
     const purchasePriceSelect = cols.has('purchase_price')
       ? 'm.purchase_price'
       : 'NULL as purchase_price'
+    const thicknessSelect = thicknessColumnSelect(cols)
 
     const material = await db.get<Material & { sheet_price_single: number | null; purchase_price: number | null }>(
       `SELECT 
@@ -288,6 +315,7 @@ export class MaterialService {
         m.paper_type_id,
         pt.display_name as paper_type_name,
         m.density,
+        ${thicknessSelect},
         m.is_active,
         m.sheet_width,
         m.sheet_height,
@@ -392,6 +420,16 @@ export class MaterialService {
       if (cols.has('sheet_height')) assignableColumns.push({ name: 'sheet_height', value: normalized.sheet_height ?? null })
       if (cols.has('material_type_id')) assignableColumns.push({ name: 'material_type_id', value: normalized.material_type_id ?? null })
       if (cols.has('material_kind')) assignableColumns.push({ name: 'material_kind', value: normalized.material_kind })
+      const sent = (key: string) => Object.prototype.hasOwnProperty.call(material, key)
+      const writeThickness = (column: 'sheet_thickness_mm' | 'spine_thickness_mm' | 'channel_min_mm' | 'channel_max_mm') => {
+        if (!cols.has(column)) return
+        if (normalized.id && !sent(column)) return
+        assignableColumns.push({ name: column, value: normalized[column] ?? null })
+      }
+      writeThickness('sheet_thickness_mm')
+      writeThickness('spine_thickness_mm')
+      writeThickness('channel_min_mm')
+      writeThickness('channel_max_mm')
 
       if (normalized.id) {
         const setSql = assignableColumns.map((column) => `${column.name} = ?`).join(', ')

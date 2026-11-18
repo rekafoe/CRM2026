@@ -17,6 +17,8 @@ import {
   isUvFlatbedProduct,
   type UvPrintState,
 } from '../utils/uvPrintConfig';
+import { describeOperatorView, type BoundStructure } from '../../../utils/boundProductPreset';
+import { ReadyLidSection } from './ReadyLidSection';
 
 interface CalculatorSectionsProps {
   specs: ProductSpecs;
@@ -108,6 +110,36 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   bindingVariantLocked = false,
 }) => {
   const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
+  const boundStructure = (
+    backendProductSchema?.template?.simplified as { multiPageStructure?: BoundStructure } | undefined
+  )?.multiPageStructure;
+  const operatorView = describeOperatorView(boundStructure);
+  const materialColumn = hasEffectiveSizes && (specs as any).size_id
+    ? (
+        <MaterialsSection
+          specs={{
+            paperType: specs.paperType,
+            paperDensity: specs.paperDensity,
+            lamination: specs.lamination,
+            quantity: specs.quantity,
+            material_id: (specs as any).material_id,
+            size_id: (specs as any).size_id,
+            usage_context: (specs as any).usage_context,
+          }}
+          warehousePaperTypes={warehousePaperTypes}
+          availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}
+          loadingPaperTypes={loadingPaperTypes}
+          getDefaultPaperDensity={getDefaultPaperDensity}
+          updateSpecs={updateSpecs}
+          schema={backendProductSchema}
+          result={result}
+          renderMaterialOnly
+          effectiveSizes={effectiveSizes}
+          materialSelectionResetKey={materialSelectionResetKey}
+          blockPaperChoice={operatorView.paperChoice}
+        />
+      )
+    : undefined;
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
   const typeIdForPlotterFields = showTypeSelector ? selectedTypeId ?? specs.typeId ?? null : specs.typeId ?? null;
   const plotterRollFinHiddenFields = getHiddenPlotterRollFinFieldNamesForCalculator();
@@ -160,6 +192,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
               sides: specs.sides,
               size_id: (specs as any).size_id,
               pages: (specs as any).pages,
+              notebook_sheets: (specs as any).notebook_sheets,
+              cover_print: (specs as any).cover_print,
             } satisfies ParamsSectionSpecs
           }
           availableFormats={availableFormats}
@@ -180,6 +214,9 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           bindingVariantId={bindingVariantId}
           bindingVariantLocked={bindingVariantLocked}
           onBindingVariantChange={onBindingVariantChange}
+          hidePages={operatorView.hidePages}
+          showBlockSheets={operatorView.showSheets}
+          showCoverPrint={operatorView.showCoverPrint}
         />
 
         {uvFlatbed ? (
@@ -215,7 +252,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
         ) : null}
 
         <div className={`unified-params-row${uvFlatbed ? ' unified-params-row--uv-materials' : ''}`}>
-          {!uvFlatbed && (
+          {!uvFlatbed && !operatorView.hidePrint && (
           <PrintingSettingsSection
             printTechnology={printTechnology}
             printColorMode={printColorMode}
@@ -228,36 +265,10 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             effectiveSizes={effectiveSizes}
             selectedSizeId={(specs as any).size_id}
             selectedTypeId={selectedTypeId}
-            materialInFirstColumn={
-              hasEffectiveSizes && (specs as any).size_id
-                ? (
-                    <MaterialsSection
-                      specs={{
-                        paperType: specs.paperType,
-                        paperDensity: specs.paperDensity,
-                        lamination: specs.lamination,
-                        quantity: specs.quantity,
-                        material_id: (specs as any).material_id,
-                        size_id: (specs as any).size_id,
-                        usage_context: (specs as any).usage_context,
-                      }}
-                      warehousePaperTypes={warehousePaperTypes}
-                      availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}
-                      loadingPaperTypes={loadingPaperTypes}
-                      getDefaultPaperDensity={getDefaultPaperDensity}
-                      updateSpecs={updateSpecs}
-                      schema={backendProductSchema}
-                      result={result}
-                      renderMaterialOnly
-                      effectiveSizes={effectiveSizes}
-                      materialSelectionResetKey={materialSelectionResetKey}
-                    />
-                  )
-                : undefined
-            }
+            materialInFirstColumn={materialColumn}
           />
           )}
-          {!hasEffectiveSizes || uvFlatbed ? (
+          {operatorView.hidePrint || !hasEffectiveSizes || uvFlatbed ? (
           <MaterialsSection
           specs={{ 
             paperType: specs.paperType, 
@@ -281,9 +292,23 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           materialSelectionResetKey={materialSelectionResetKey}
           renderMaterialOnly={uvFlatbed}
           uvFlatbed={uvFlatbed}
+          blockPaperChoice={operatorView.paperChoice}
         />
           ) : null}
         </div>
+
+        {operatorView.showReadyLid && (
+          <ReadyLidSection
+            coverIds={(boundStructure?.readyLid?.cover_material_ids ?? []).map(Number)}
+            channelIds={(boundStructure?.readyLid?.channel_material_ids ?? []).map(Number)}
+            lidMaterialId={(specs as { lid_material_id?: number }).lid_material_id}
+            blockMaterialId={(specs as { material_id?: number }).material_id}
+            pages={(specs as { pages?: number }).pages}
+            pagesPerSheet={boundStructure?.innerBlock?.print?.sides_mode === 'single' ? 1 : 2}
+            validationError={validationErrors.lid_material_id}
+            onLidChange={(id) => updateSpecs({ lid_material_id: id } as Partial<ProductSpecs>)}
+          />
+        )}
 
         <DynamicFieldsSection
           schema={backendProductSchema}
@@ -293,7 +318,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
         />
 
         <div className={isMultiPageProduct ? 'calculator-extra-row' : undefined}>
-          {isMultiPageProduct && (
+          {isMultiPageProduct && !operatorView.hideCover && (
             <CoverMaterialsSection
               coverConfig={
                 (backendProductSchema?.template?.simplified as { multiPageStructure?: { cover?: unknown } } | undefined)
@@ -312,6 +337,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             specs={specs as any}
             updateSpecs={updateSpecs as any}
             allowedOperationIds={allowedOperationIds}
+            hideLamination={operatorView.hideLamination}
           />
         </div>
 

@@ -12,6 +12,11 @@ import {
   formatBindingProductPagesHint,
 } from './BindingVariantSelector';
 import { CustomPagesField } from './CustomPagesField';
+import {
+  coverPrintChoiceToSides,
+  springTotalPages,
+  type CoverPrintChoice,
+} from '../../../utils/boundProductPreset';
 
 export interface ParamsSectionSpecs {
   productType: string;
@@ -20,6 +25,8 @@ export interface ParamsSectionSpecs {
   sides: 1 | 2;
   size_id?: number | string;
   pages?: number | null;
+  notebook_sheets?: number | null;
+  cover_print?: CoverPrintChoice | null;
 }
 
 interface ParamsSectionProps {
@@ -64,6 +71,12 @@ interface ParamsSectionProps {
   bindingVariantId?: number;
   onBindingVariantChange?: (variantId: number | undefined) => void;
   hideSimplifiedSizeSelect?: boolean;
+  /** Готовая крышка или блокнот: сырое поле «Страницы» не показываем. */
+  hidePages?: boolean;
+  /** Блокнот на пружине: листы блока вместо 102 страниц. */
+  showBlockSheets?: boolean;
+  /** Блокнот: «только снаружи» / «с двух сторон». */
+  showCoverPrint?: boolean;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -86,6 +99,9 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   bindingVariantId,
   onBindingVariantChange,
   hideSimplifiedSizeSelect = false,
+  hidePages = false,
+  showBlockSheets = false,
+  showCoverPrint = false,
 }) => {
   const selectedBindingVariant =
     bindingVariantId != null
@@ -450,8 +466,49 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           </div>
         ) : null}
 
+        {showBlockSheets && (
+          <div className="param-group param-group--pages">
+            <label>Листы блока</label>
+            <input
+              type="number"
+              min={1}
+              className="form-control"
+              value={specs.notebook_sheets ?? ''}
+              onChange={(e) => {
+                const sheets = Math.max(1, Math.floor(Number(e.target.value)) || 1)
+                updateSpecs({
+                  notebook_sheets: sheets,
+                  pages: springTotalPages(sheets),
+                  sides: 2,
+                }, true)
+              }}
+            />
+            <p className="param-hint">Печать блока с двух сторон. Два картона обложки сюда не входят.</p>
+          </div>
+        )}
+
+        {showCoverPrint && (
+          <div className="param-group">
+            <label>Печать обложки</label>
+            <select
+              className="form-control"
+              value={specs.cover_print ?? 'outside'}
+              onChange={(e) => {
+                const choice = e.target.value === 'both' ? 'both' : 'outside'
+                updateSpecs({
+                  cover_print: choice,
+                  cover_print_sides_mode: coverPrintChoiceToSides(choice),
+                }, true)
+              }}
+            >
+              <option value="outside">Только снаружи</option>
+              <option value="both">С двух сторон</option>
+            </select>
+          </div>
+        )}
+
         {/* Стороны печати */}
-        {hasField('sides') && (
+        {hasField('sides') && !showCoverPrint && !hidePages && (
         <div className="param-group">
           <label>
             {getLabel('sides', 'Стороны')}
@@ -471,7 +528,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         )}
 
         {/* Страницы: пресеты из шаблона + произвольное число (если разрешено) */}
-        {(() => {
+        {!hidePages && (() => {
           const fromTemplate = Array.isArray(effectivePagesProp?.options)
             ? effectivePagesProp!.options!.map((n) => Number(n)).filter((n) => Number.isFinite(n))
             : [];

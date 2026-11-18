@@ -163,6 +163,13 @@ export interface Material {
   supplier_contact?: string;
   finish?: string;
   density?: number;
+  /** Эталонная толщина одного листа этой плотности, мм. */
+  sheet_thickness_mm?: number | null;
+  /** Часть крышки под сшивку, мм. В канал идёт она, не толщина лица. */
+  spine_thickness_mm?: number | null;
+  /** Канал подходит, если толщина блока в мм попадает в диапазон. */
+  channel_min_mm?: number | null;
+  channel_max_mm?: number | null;
   sheet_width?: number;
   sheet_height?: number;
   printable_width?: number;

@@ -916,7 +916,21 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
 
       {isMultipageEditorTab && (
         <div className="simplified-template__multipage-panel">
-          {editorTab === 'pages' && (
+          {editorTab === 'pages' && multiPageStructure.notebook?.use_sheets === true && multiPageStructure.coverChoice !== 'ready' && (
+            <div className="simplified-card">
+              <div className="simplified-card__header">
+                <h4 className="simplified-card__title-inline">Листы блока</h4>
+              </div>
+              <div className="simplified-card__content">
+                <p className="param-hint">
+                  Число листов задаётся в «Сборке». Сейчас {multiPageStructure.notebook?.sheets ?? 50} листов:
+                  блок печатается с двух сторон, обложка — 2 картона. Оператор в калькуляторе выбирает листы,
+                  а не вводит 102 страницы.
+                </p>
+              </div>
+            </div>
+          )}
+          {editorTab === 'pages' && !(multiPageStructure.notebook?.use_sheets === true && multiPageStructure.coverChoice !== 'ready') && (
             <MultiPagePagesTab pagesConfig={pagesConfig} onChange={updatePagesConfig} />
           )}
           {editorTab === 'assembly' && (
@@ -941,6 +955,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   bindingServices={bindingServices}
                   services={services}
                   selectedSize={selected ?? null}
+                  onPagesPreset={updatePagesConfig}
                 />
               </div>
             </div>

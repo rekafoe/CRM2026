@@ -118,7 +118,17 @@ function computeErrors(params: {
       }
     }
     const coverCfg = simplified?.multiPageStructure?.cover;
-    if (isSeparateCoverMode(coverCfg)) {
+    const readyLid = simplified?.multiPageStructure?.coverChoice === 'ready';
+    if (readyLid) {
+      const coverIds = (simplified?.multiPageStructure?.readyLid?.cover_material_ids ?? [])
+        .map((id: number) => Number(id))
+        .filter((id: number) => Number.isFinite(id) && id > 0);
+      const lidId = Number((specs as { lid_material_id?: number }).lid_material_id);
+      if (coverIds.length > 0 && !coverIds.includes(lidId)) {
+        errors.lid_material_id = 'Выберите крышку';
+      }
+    }
+    if (!readyLid && isSeparateCoverMode(coverCfg)) {
       const coverAllowed = getCoverAllowedMaterialIds(coverCfg);
       if (coverAllowed.length > 0) {
         const cid = (specs as { cover_material_id?: number | string }).cover_material_id;

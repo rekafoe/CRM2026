@@ -43,6 +43,13 @@ import { buildOrderPayload } from './utils/orderPayloadBuilder';
 import { getServiceVariants } from '../../services/pricing/api';
 import { readBindingPagesLimits } from '../../utils/multipageBinding';
 import {
+  coverPrintChoiceToSides,
+  isReadyLid,
+  sidesToCoverPrintChoice,
+  springTotalPages,
+  usesBlockSheets,
+} from '../../utils/boundProductPreset';
+import {
   defaultUvPrintState,
   getEffectiveUvPrintConfig,
   hasEnabledUvLayer,
@@ -420,6 +427,41 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       return next;
     });
   }, [simplified?.types, simplified?.typeConfigs, simplified?.pages, backendProductSchema, setSpecs]);
+
+  useEffect(() => {
+    const structure = backendProductSchema?.template?.simplified?.multiPageStructure;
+    if (!structure) return;
+    setSpecs((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      if (isReadyLid(structure)) {
+        const duplex = structure.innerBlock?.print?.sides_mode !== 'single';
+        if (duplex && prev.sides !== 2) {
+          next.sides = 2;
+          changed = true;
+        }
+      }
+      if (usesBlockSheets(structure)) {
+        const sheets = prev.notebook_sheets && prev.notebook_sheets > 0
+          ? prev.notebook_sheets
+          : Number(structure.notebook?.sheets) || 50;
+        const pages = springTotalPages(sheets, structure.cover?.page_count ?? 2);
+        if (prev.notebook_sheets !== sheets || prev.pages !== pages || prev.sides !== 2) {
+          next.notebook_sheets = sheets;
+          next.pages = pages;
+          next.sides = 2;
+          changed = true;
+        }
+        if (!prev.cover_print) {
+          const choice = sidesToCoverPrintChoice(structure.cover?.print?.sides_mode);
+          next.cover_print = choice;
+          next.cover_print_sides_mode = coverPrintChoiceToSides(choice);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [backendProductSchema, setSpecs]);
 
   // Выбор начального подтипа (тип материала): только при невалидном selectedTypeId, и не применяем один и тот же nextId повторно — иначе цикл смены типа.
   const lastAppliedTypeIdRef = useRef<number | null>(null);
