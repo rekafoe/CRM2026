@@ -1,7 +1,8 @@
 import { TelegramUserService, effectiveBotRole } from './telegramUserService';
 import { TelegramService } from './telegramService';
-import { getMiniappWebAppUrl } from '../utils/miniappWebAppUrl';
-import { buildTelegramActiveOrdersText } from './telegramOrderStatusService';
+import { getMiniappWebAppUrl, withMiniappOrder } from '../utils/miniappWebAppUrl';
+import { buildTelegramActiveOrdersText, listTelegramActiveOrders } from './telegramOrderStatusService';
+import { SupportService } from '../modules/support/supportService';
 
 export interface BotCommand {
   command: string;
@@ -148,7 +149,7 @@ export class TelegramBotCommands {
       }
 
       if (!text.startsWith('/')) {
-        return TelegramBotCommands.handleTextFallback(chatId, userId, text);
+        return TelegramBotCommands.handleClientFreeText(chatId, normalizedText);
       }
 
       const parts = text.trim().split(/\s+/);
@@ -180,6 +181,53 @@ export class TelegramBotCommands {
       console.error('Error in handleMessage:', error);
       return 'Произошла ошибка при обработке команды. Попробуйте позже.';
     }
+  }
+
+  static isClientFreeText(text: string): boolean {
+    const normalized = text.trim();
+    if (!normalized || normalized.startsWith('/')) return false;
+    if (normalized === TelegramBotCommands.STATUS_BUTTON_TEXT) return false;
+    if (normalized === TelegramBotCommands.PRINTCORE_APP_BUTTON_TEXT) return false;
+    return true;
+  }
+
+  /**
+   * Свободный текст клиента — входящее в чат поддержки. Команды и кнопка заказов сюда не попадают.
+   */
+  static async handleClientFreeText(chatId: string, text: string): Promise<string> {
+    if (!TelegramBotCommands.isClientFreeText(text)) {
+      return TelegramBotCommands.handleTextFallback(chatId, '', text);
+    }
+    try {
+      const user = await TelegramUserService.getUserByChatId(chatId);
+      if (!user) return 'Пользователь не найден.';
+      if (effectiveBotRole(user.role) !== 'client') {
+        return TelegramBotCommands.activeOrdersOrHint(chatId);
+      }
+      await SupportService.ingestTelegramChat(chatId, text);
+      return 'Сообщение передано менеджеру. Ответим в этом чате.';
+    } catch (error) {
+      console.error('Error in handleClientFreeText:', error);
+      return 'Не удалось передать сообщение. Попробуйте ещё раз.';
+    }
+  }
+
+  static async sendOrderOpenButtons(chatId: string): Promise<void> {
+    const base = getMiniappWebAppUrl();
+    if (!base) return;
+    const orders = await listTelegramActiveOrders(chatId, { limit: 8 });
+    const inline_keyboard = orders.flatMap((order) => {
+      const url = withMiniappOrder(base, order.id);
+      if (!url) return [];
+      const label = `Заказ ${order.number || `#${order.id}`}`.slice(0, 64);
+      return [[{ text: label, web_app: { url } }]];
+    });
+    if (inline_keyboard.length === 0) return;
+    await TelegramService.sendMessageWithKeyboard(
+      chatId,
+      'Открыть заказ во вкладке «Заказы»:',
+      { inline_keyboard },
+    );
   }
 
   static async handleTextFallback(chatId: string, userId: string, text?: string): Promise<string> {

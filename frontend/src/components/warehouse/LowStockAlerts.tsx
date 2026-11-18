@@ -10,7 +10,9 @@ interface LowStockAlert {
   materialName: string
   currentQuantity: number
   minQuantity: number
-  alertLevel: 'warning' | 'critical' | 'out_of_stock'
+  alertLevel: 'warning' | 'critical' | 'out_of_stock' | 'low'
+  unit?: string
+  warehouseLabel?: string
   created_at: string
   isResolved: boolean
   resolvedAt?: string
@@ -254,12 +256,18 @@ export const LowStockAlerts: React.FC = () => {
                 <div className="alert-quantities">
                   <div className="quantity-item">
                     <span className="quantity-label">Текущий остаток:</span>
-                    <span className="quantity-value">{alert.currentQuantity}</span>
+                    <span className="quantity-value">{alert.currentQuantity}{alert.unit ? ` ${alert.unit}` : ''}</span>
                   </div>
                   <div className="quantity-item">
                     <span className="quantity-label">Минимальный остаток:</span>
-                    <span className="quantity-value">{alert.minQuantity}</span>
+                    <span className="quantity-value">{alert.minQuantity}{alert.unit ? ` ${alert.unit}` : ''}</span>
                   </div>
+                  {alert.warehouseLabel && (
+                    <div className="quantity-item">
+                      <span className="quantity-label">Склад:</span>
+                      <span className="quantity-value">{alert.warehouseLabel}</span>
+                    </div>
+                  )}
                 </div>
 
                 {alert.isResolved && (

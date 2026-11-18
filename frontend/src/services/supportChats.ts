@@ -9,7 +9,7 @@ export interface OperatorConversation {
   customerPhone: string | null;
   topic: string;
   topicLabel: string;
-  channel: 'website' | 'staff';
+  channel: 'website' | 'telegram' | 'staff';
   orderRef: string | null;
   crmOrderId: number | null;
   crmOrderNumber: string | null;

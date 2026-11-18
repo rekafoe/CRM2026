@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { TelegramService } from '../services/telegramService';
 import { StockMonitoringService } from '../services/stockMonitoringService';
 import { AutoOrderService } from '../services/autoOrderService';
-import { MaterialService } from '../services/materialService';
 
 export class NotificationController {
   /**
@@ -97,22 +96,7 @@ export class NotificationController {
   static async getStockAlerts(req: Request, res: Response) {
     console.log('getStockAlerts called');
     try {
-      console.log('Calling MaterialService.getLowStockMaterials()...');
-      const materials = await MaterialService.getLowStockMaterials();
-      console.log(`Got ${materials.length} low stock materials:`, materials);
-      
-      // Преобразуем в формат StockAlert
-      const alerts = materials.map((material: any) => ({
-        id: material.id,
-        materialId: material.id,
-        materialName: material.name,
-        currentQuantity: material.quantity,
-        minQuantity: material.min_quantity,
-        alertLevel: material.quantity <= 0 ? 'out_of_stock' : 'low',
-        createdAt: new Date().toISOString(),
-        isResolved: false
-      }));
-      
+      const alerts = await StockMonitoringService.listAlerts();
       res.json({
         success: true,
         data: alerts

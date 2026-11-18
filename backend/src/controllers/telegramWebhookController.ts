@@ -149,6 +149,9 @@ export class TelegramWebhookController {
           const response = await TelegramBotCommands.handleMessage(chatId, from.id.toString(), text);
           if (response) {
             await this.sendMessageToUser(chatId, response);
+            if (response.includes('Активные заказы:')) {
+              await TelegramBotCommands.sendOrderOpenButtons(chatId);
+            }
           }
         } else if ((photo && photo.length > 0) || document) {
           await this.sendMiniappFlowHint(chatId);
@@ -161,6 +164,13 @@ export class TelegramWebhookController {
         // Отправляем приветственное сообщение с командами
         const welcomeMessage = await TelegramBotCommands.handleStart(chatId, from.id.toString());
         await this.sendMessageToUser(chatId, welcomeMessage);
+        if (welcomeMessage.includes('Активные заказы:')) {
+          await TelegramBotCommands.sendOrderOpenButtons(chatId);
+        }
+        if (text && TelegramBotCommands.isClientFreeText(text)) {
+          const ack = await TelegramBotCommands.handleClientFreeText(chatId, text);
+          if (ack) await this.sendMessageToUser(chatId, ack);
+        }
       }
 
       // Отправляем приветственное сообщение для новых пользователей

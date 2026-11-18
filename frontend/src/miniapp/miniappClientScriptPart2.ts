@@ -243,6 +243,11 @@ export const MINIAPP_CLIENT_PART2 = `
     main = $('miniapp-main');
     var tg = window.Telegram && window.Telegram.WebApp;
     if (tg) { try { tg.ready(); tg.expand(); } catch (ex) {} }
+    var launchOrderId = (typeof miniappLaunchOrderId === 'function') ? miniappLaunchOrderId() : null;
+    if (launchOrderId) {
+      out.view = 'order_detail';
+      out.orderDetailId = launchOrderId;
+    }
     var initData = (tg && tg.initData) ? tg.initData : '';
     if (!initData) {
       if (main) main.appendChild(rowHint('Откройте из Telegram (web_app). В браузере initData нет.'));
@@ -270,7 +275,8 @@ export const MINIAPP_CLIENT_PART2 = `
           out.me = null;
           out.err = (meResp.j && (meResp.j.error || meResp.j.message)) ? String(meResp.j.error || meResp.j.message) : ('HTTP ' + meResp.status);
         }
-        if (out.view === 'catalog' && !out.products) loadProducts();
+        if (out.view === 'order_detail' && out.orderDetailId && typeof loadOrderDetail === 'function') loadOrderDetail();
+        else if (out.view === 'catalog' && !out.products) loadProducts();
         render();
         if (out.token && !out._miniappOrdersPollInit) {
           out._miniappOrdersPollInit = true;

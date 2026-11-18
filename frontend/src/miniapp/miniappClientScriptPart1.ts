@@ -300,4 +300,16 @@ export const MINIAPP_CLIENT_PART1 = `
     w.appendChild(lab);
     form.appendChild(w);
   }
+  function miniappLaunchOrderId() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var raw = params.get('order') || params.get('startapp') || '';
+      if (!raw && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+        raw = window.Telegram.WebApp.initDataUnsafe.start_param || '';
+      }
+      var id = parseInt(String(raw).replace(/^order[_-]?/i, ''), 10);
+      if (id > 0) return id;
+    } catch (e) {}
+    return null;
+  }
 `;

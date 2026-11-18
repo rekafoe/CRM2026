@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { Database } from 'sqlite'
 import { getDb } from '../../config/database'
 import { UserInboxNotificationService } from '../../services/userInboxNotificationService'
+import { TelegramService } from '../../services/telegramService'
 import { WebsiteCustomer } from './supportCustomerAuth'
 import { SupportError } from './supportErrors'
 
@@ -187,6 +188,27 @@ function emptyToNull(value: string): string | null {
   return value ? value : null
 }
 
+const CUSTOMER_CHANNEL_SQL = `c.channel IN ('website', 'telegram')`
+
+export function operatorRoleLabel(role: string): string {
+  const value = role.trim().toLowerCase()
+  if (value === 'admin') return 'администратор'
+  if (value === 'manager') return 'менеджер'
+  return 'оператор'
+}
+
+/** Приписка только в Telegram. В body CRM имя не пишется. */
+export function formatTelegramOperatorReply(name: string, role: string, body: string): string {
+  const who = name.trim() || 'Сотрудник'
+  return `${who}, ${operatorRoleLabel(role)}:\n${body}`
+}
+
+function telegramChatIdOf(websiteUserId: string | null | undefined): string | null {
+  if (!websiteUserId || !websiteUserId.startsWith('tg:')) return null
+  const chatId = websiteUserId.slice(3).trim()
+  return /^-?\d+$/.test(chatId) ? chatId : null
+}
+
 function customerStatus(row: ConversationRow): 'open' | 'waiting' | 'closed' {
   if (row.status === 'closed') return 'closed'
   if (row.last_direction === 'out') return 'waiting'
@@ -227,7 +249,7 @@ function presentOperator(row: ConversationRow, staffId: number) {
     customerPhone: row.customer_phone,
     topic: row.topic,
     topicLabel: topicLabel(row.topic),
-    channel: 'website' as const,
+    channel: row.channel === 'telegram' ? 'telegram' as const : 'website' as const,
     orderRef: row.order_ref,
     crmOrderId: row.crm_order_id ?? null,
     crmOrderNumber: row.crm_order_number || null,
@@ -316,9 +338,9 @@ async function withTx<T>(work: (db: Database) => Promise<T>): Promise<T> {
 
 async function findRow(db: Database, publicIdValue: string, websiteUserId?: string): Promise<ConversationRow | undefined> {
   const params: Array<string> = [publicIdValue]
-  let sql = `${CONVERSATION_SELECT} WHERE c.public_id = ? AND c.channel = 'website'`
+  let sql = `${CONVERSATION_SELECT} WHERE c.public_id = ? AND ${CUSTOMER_CHANNEL_SQL}`
   if (websiteUserId) {
-    sql += ' AND c.website_user_id = ?'
+    sql += ` AND c.channel = 'website' AND c.website_user_id = ?`
     params.push(websiteUserId)
   }
   return db.get<ConversationRow>(sql, ...params)
@@ -332,7 +354,7 @@ async function requireRow(db: Database, publicIdValue: string, websiteUserId?: s
 
 function assertWebsiteChat(row: ConversationRow) {
   if (row.channel === 'staff') throw new SupportError(409, 'Это личная переписка')
-  if (row.channel !== 'website') throw new SupportError(404, 'Чат не найден')
+  if (row.channel !== 'website' && row.channel !== 'telegram') throw new SupportError(404, 'Чат не найден')
 }
 
 async function loadConversation(db: Database, publicIdValue: string): Promise<ConversationRow | undefined> {
@@ -516,6 +538,70 @@ async function notifyStaffMessage(peerId: number | null, staff: StaffActor, text
   } catch (error) {
     if (!missingSchema(error)) throw error
   }
+}
+
+async function loadTelegramProfile(chatId: string): Promise<{
+  name: string
+  email: string | null
+  phone: string | null
+  orderId: number | null
+  orderNumber: string | null
+}> {
+  let name = 'Клиент Telegram'
+  let email: string | null = null
+  let phone: string | null = null
+  let orderId: number | null = null
+  let orderNumber: string | null = null
+  try {
+    const db = await getDb()
+    const columns = await db.all<Array<{ name: string }>>(`PRAGMA table_info(telegram_users)`)
+    if (!columns.length) return { name, email, phone, orderId, orderNumber }
+    const names = new Set(columns.map((column) => column.name))
+    const user = await db.get<{
+      first_name: string | null
+      last_name: string | null
+      username: string | null
+      crm_customer_id: number | null
+    }>(
+      `SELECT first_name, last_name, username${names.has('crm_customer_id') ? ', crm_customer_id' : ''}
+       FROM telegram_users WHERE chat_id = ?`,
+      chatId,
+    )
+    const fromTelegram = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim() || user?.username
+    if (fromTelegram) name = fromTelegram
+    const crmId = user?.crm_customer_id != null && Number(user.crm_customer_id) > 0
+      ? Number(user.crm_customer_id)
+      : null
+    if (!crmId) return { name, email, phone, orderId, orderNumber }
+    const customer = await db.get<{
+      first_name: string | null
+      last_name: string | null
+      company_name: string | null
+      phone: string | null
+      email: string | null
+    }>(
+      `SELECT first_name, last_name, company_name, phone, email FROM customers WHERE id = ?`,
+      crmId,
+    )
+    if (customer) {
+      const person = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim()
+      const picked = (customer.company_name || person || '').trim()
+      if (picked) name = picked
+      email = customer.email || null
+      phone = customer.phone || null
+    }
+    const order = await db.get<{ id: number; number: string | null }>(
+      `SELECT id, number FROM orders WHERE customer_id = ? ORDER BY id DESC LIMIT 1`,
+      crmId,
+    )
+    if (order?.id) {
+      orderId = Number(order.id)
+      orderNumber = order.number != null ? String(order.number) : null
+    }
+  } catch (error) {
+    if (!missingSchema(error)) throw error
+  }
+  return { name, email, phone, orderId, orderNumber }
 }
 
 export class SupportService {
@@ -710,12 +796,12 @@ export class SupportService {
     if (!filter) throw new SupportError(400, 'Неизвестный фильтр')
     const db = await getDb()
     const where = filter === 'unassigned'
-      ? `c.channel = 'website' AND c.status != 'closed' AND c.assigned_user_id IS NULL`
+      ? `${CUSTOMER_CHANNEL_SQL} AND c.status != 'closed' AND c.assigned_user_id IS NULL`
       : filter === 'mine'
-        ? `c.channel = 'website' AND c.status != 'closed' AND c.assigned_user_id = ?`
+        ? `${CUSTOMER_CHANNEL_SQL} AND c.status != 'closed' AND c.assigned_user_id = ?`
         : filter === 'closed'
-          ? `c.channel = 'website' AND c.status = 'closed'`
-          : `c.channel = 'website' AND c.status != 'closed'`
+          ? `${CUSTOMER_CHANNEL_SQL} AND c.status = 'closed'`
+          : `${CUSTOMER_CHANNEL_SQL} AND c.status != 'closed'`
     const params = filter === 'mine' ? [staff.id] : []
     const rows = await db.all<ConversationRow[]>(
       `${CONVERSATION_SELECT} WHERE ${where} ORDER BY c.last_message_at DESC LIMIT 100`,
@@ -723,7 +809,7 @@ export class SupportService {
     )
     const count = await db.get<{ c: number }>(
       `SELECT COUNT(1) as c FROM support_conversations
-       WHERE channel = 'website' AND status != 'closed' AND assigned_user_id IS NULL`,
+       WHERE channel IN ('website', 'telegram') AND status != 'closed' AND assigned_user_id IS NULL`,
     )
     return {
       conversations: rows.map((row) => presentOperator(row, staff.id)),
@@ -901,6 +987,7 @@ export class SupportService {
         const row = await requireOperatorRow(db, publicIdValue, staff)
         return {
           staffMessage: true,
+          telegramChatId: null as string | null,
           peerId: row.staff_low_id === staff.id ? row.staff_high_id : row.staff_low_id,
           publicId: row.public_id,
           conversation: presentStaff(row, staff.id),
@@ -952,6 +1039,7 @@ export class SupportService {
       const row = await requireRow(db, publicIdValue)
       return {
         staffMessage: false,
+        telegramChatId: telegramChatIdOf(row.website_user_id),
         peerId: null as number | null,
         publicId: row.public_id,
         conversation: presentOperator(row, staff.id),
@@ -965,7 +1053,101 @@ export class SupportService {
       }
     })
     if (result.staffMessage) await notifyStaffMessage(result.peerId, staff, text, result.publicId)
+    if (result.telegramChatId) {
+      try {
+        await TelegramService.sendMessageToUser(
+          result.telegramChatId,
+          formatTelegramOperatorReply(staff.name, staff.role, text),
+        )
+      } catch (error) {
+        console.error('Telegram reply saved, delivery failed', error)
+      }
+    }
     return { conversation: result.conversation, message: result.message }
+  }
+
+  /**
+   * Свободный текст бота: один открытый диалог channel=telegram, ключ tg:<chat_id>.
+   */
+  static async ingestTelegramChat(chatId: string, textValue: unknown) {
+    const normalizedChatId = String(chatId).trim()
+    if (!/^-?\d+$/.test(normalizedChatId)) throw new SupportError(400, 'Некорректный чат')
+    const text = cleanMessage(textValue)
+    const key = `tg:${normalizedChatId}`
+    const profile = await loadTelegramProfile(normalizedChatId)
+    const createdAt = nowIso()
+
+    const saved = await withTx(async (db) => {
+      const existing = await db.get<{ id: number; public_id: string; status: string }>(
+        `SELECT id, public_id, status FROM support_conversations
+         WHERE channel = 'telegram' AND website_user_id = ?
+         ORDER BY datetime(last_message_at) DESC, id DESC
+         LIMIT 1`,
+        key,
+      )
+      if (existing) {
+        const reopened = existing.status === 'closed'
+        await db.run(
+          `UPDATE support_conversations
+           SET customer_name = ?, customer_email = ?, customer_phone = ?,
+               order_ref = COALESCE(order_ref, ?), crm_order_id = COALESCE(crm_order_id, ?),
+               status = 'open', closed_at = NULL, last_message_at = ?, last_message_preview = ?,
+               operator_unread = operator_unread + 1, updated_at = ?
+           WHERE id = ?`,
+          profile.name,
+          profile.email,
+          profile.phone,
+          profile.orderNumber,
+          profile.orderId,
+          createdAt,
+          preview(text),
+          createdAt,
+          existing.id,
+        )
+        await db.run(
+          `INSERT INTO support_messages (conversation_id, direction, body, created_at) VALUES (?, 'in', ?, ?)`,
+          existing.id,
+          text,
+          createdAt,
+        )
+        if (reopened) await insertEvent(db, existing.id, 'reopened', null)
+        return { publicId: existing.public_id, created: false }
+      }
+
+      const idValue = publicId()
+      const inserted = await db.run(
+        `INSERT INTO support_conversations (
+          public_id, channel, website_user_id, customer_name, customer_email, customer_phone,
+          topic, subject, order_ref, status, crm_order_id, last_message_at, last_message_preview,
+          customer_unread, operator_unread, created_at, updated_at
+        ) VALUES (?, 'telegram', ?, ?, ?, ?, 'other', 'Telegram', ?, 'open', ?, ?, ?, 0, 1, ?, ?)`,
+        idValue,
+        key,
+        profile.name,
+        profile.email,
+        profile.phone,
+        profile.orderNumber,
+        profile.orderId,
+        createdAt,
+        preview(text),
+        createdAt,
+        createdAt,
+      )
+      await db.run(
+        `INSERT INTO support_messages (conversation_id, direction, body, created_at) VALUES (?, 'in', ?, ?)`,
+        Number(inserted.lastID),
+        text,
+        createdAt,
+      )
+      await insertEvent(db, Number(inserted.lastID), 'opened', null, { channel: 'telegram' })
+      return { publicId: idValue, created: true }
+    })
+
+    const row = await loadConversation(await getDb(), saved.publicId)
+    if (!row) throw new SupportError(404, 'Чат не найден')
+    const linked = await rememberOrder(await getDb(), row)
+    await notifyCustomerWrote(linked, text, saved.created)
+    return { id: linked.public_id, created: saved.created }
   }
 
   static async countAttention(staff: StaffActor) {
@@ -974,7 +1156,7 @@ export class SupportService {
       `SELECT (
          SELECT COUNT(1)
          FROM support_conversations c
-         WHERE c.channel = 'website'
+         WHERE c.channel IN ('website', 'telegram')
            AND c.status != 'closed'
            AND (c.assigned_user_id IS NULL OR c.assigned_user_id = ?)
            AND (
