@@ -87,7 +87,7 @@ interface MaterialsSectionProps {
   /** УФ-планшет: размер изделия задаётся в UvPrintSection, материалы берём по первому размеру шаблона */
   uvFlatbed?: boolean;
   /** Блокнот: две складские бумаги вместо дерева типов. */
-  blockPaperChoice?: { whiteId: number; gridId: number } | null;
+  blockPaperChoice?: { options: Array<{ id: number; label: string }> } | null;
 }
 
 export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
@@ -582,6 +582,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   // Если сохранённый материал больше не разрешён, выбираем первый доступный SKU.
   // УФ «печать без материала» этот автовыбор отключает — иначе лист подставится молча.
   useEffect(() => {
+    // Чистые / клетка / точка задаются шаблоном блокнота, а не списком бумаги размера.
+    if (blockPaperChoice) return;
     if (printWithoutMaterial) {
       if (specs.material_id != null || specs.materialType) {
         updateSpecs({ material_id: undefined, materialType: undefined }, true);
@@ -617,6 +619,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [
     allowedMaterialsForSize,
     applyWarehouseMaterial,
+    blockPaperChoice,
     isSimplifiedProduct,
     materialSelectionTree,
     printWithoutMaterial,
@@ -663,27 +666,31 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   useEffect(() => {
     if (!blockPaperChoice) return
+    const allowed = new Set(blockPaperChoice.options.map((option) => option.id))
     const current = Number(specs.material_id)
-    if (current === blockPaperChoice.whiteId || current === blockPaperChoice.gridId) return
-    updateSpecs({ material_id: blockPaperChoice.whiteId }, true)
+    if (allowed.has(current)) return
+    const nextId = blockPaperChoice.options[0]?.id
+    if (nextId == null) return
+    updateSpecs({ material_id: nextId }, true)
   }, [blockPaperChoice, specs.material_id, updateSpecs])
 
   // Продукт без материалов (нет paperType в схеме и не упрощённый с размерами/материалами) — не показываем секцию
   const usesMaterials = hasField('paperType') || isSimplifiedProduct;
   if (blockPaperChoice && isSimplifiedProduct) {
-    const selected = Number(specs.material_id) === blockPaperChoice.gridId
-      ? blockPaperChoice.gridId
-      : blockPaperChoice.whiteId
+    const allowed = new Set(blockPaperChoice.options.map((option) => option.id))
+    const current = Number(specs.material_id)
+    const selected = allowed.has(current) ? current : blockPaperChoice.options[0]?.id
     return (
       <div className="param-group param-group--narrow">
         <label>Бумага блока <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
         <select
           className="form-control"
-          value={String(selected)}
+          value={selected != null ? String(selected) : ''}
           onChange={(e) => updateSpecs({ material_id: Number(e.target.value) }, true)}
         >
-          <option value={String(blockPaperChoice.whiteId)}>Белая</option>
-          <option value={String(blockPaperChoice.gridId)}>В клетку</option>
+          {blockPaperChoice.options.map((option) => (
+            <option key={option.id} value={String(option.id)}>{option.label}</option>
+          ))}
         </select>
       </div>
     )

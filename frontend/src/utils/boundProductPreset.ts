@@ -22,6 +22,7 @@ export type BoundStructure = {
     sheets?: number
     white_material_id?: number
     grid_material_id?: number
+    dot_material_id?: number
   }
   readyLid?: {
     cover_material_ids?: number[]
@@ -133,16 +134,43 @@ export function springSheetsOf(structure?: BoundStructure | null): number {
   return positiveInt(structure?.notebook?.sheets, SPRING_NOTEBOOK_DEFAULT_SHEETS)
 }
 
-export function paperChoiceOf(
-  structure?: BoundStructure | null,
-): { whiteId: number; gridId: number } | null {
+export type BlockPaperChoice = {
+  options: Array<{ id: number; label: string }>
+}
+
+/** Срочная — база. Стандартная — несрочная скидка, у карандаша срочная ровно вдвое. */
+export const SHEET_BLOCK_URGENT_MULTIPLIER = 1
+export const SHEET_BLOCK_STANDARD_MULTIPLIER = 0.5
+
+export function sheetBlockPriceTypeMultiplier(
+  priceTypeKey: string,
+  productMultipliers?: Record<string, number> | null,
+): number | undefined {
+  const key = String(priceTypeKey || '').trim().toLowerCase()
+  const custom = productMultipliers?.[key]
+  if (custom != null && Number.isFinite(Number(custom))) return Number(custom)
+  if (key === 'urgent') return SHEET_BLOCK_URGENT_MULTIPLIER
+  if (key === 'standard') return SHEET_BLOCK_STANDARD_MULTIPLIER
+  return undefined
+}
+
+export function paperChoiceOf(structure?: BoundStructure | null): BlockPaperChoice | null {
   if (!usesBlockSheets(structure)) return null
-  const whiteId = Number(structure?.notebook?.white_material_id)
-  const gridId = Number(structure?.notebook?.grid_material_id)
-  if (!Number.isFinite(whiteId) || whiteId <= 0) return null
-  if (!Number.isFinite(gridId) || gridId <= 0) return null
-  if (whiteId === gridId) return null
-  return { whiteId, gridId }
+  const candidates: Array<[string, unknown]> = [
+    ['Чистые', structure?.notebook?.white_material_id],
+    ['В клетку', structure?.notebook?.grid_material_id],
+    ['В точку', structure?.notebook?.dot_material_id],
+  ]
+  const options: BlockPaperChoice['options'] = []
+  const seen = new Set<number>()
+  for (const [label, raw] of candidates) {
+    const id = Number(raw)
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue
+    seen.add(id)
+    options.push({ id, label })
+  }
+  if (options.length < 2) return null
+  return { options }
 }
 
 /** Кашировка: бумага обложки клеится на картон. Только у печатной обложки «Своя бумага и печать». */
@@ -310,7 +338,7 @@ export type OperatorView = {
   showSheets: boolean
   showCoverPrint: boolean
   showReadyLid: boolean
-  paperChoice: { whiteId: number; gridId: number } | null
+  paperChoice: BlockPaperChoice | null
   hiddenLabels: string[]
 }
 

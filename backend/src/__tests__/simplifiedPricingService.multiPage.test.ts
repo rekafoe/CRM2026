@@ -897,6 +897,7 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       material_id: 12,
       cover_material_id: 11,
       notebook_sheets: 50,
+      priceType: 'urgent',
       ...extra,
     });
 
@@ -929,6 +930,30 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       expect((result.finishingDetails ?? []).map((row) => row.operation_type)).toEqual(['laminate', 'bind']);
       expect(result.finalPrice).toBe(39.45);
       expect(result.tier_prices?.[0]).toMatchObject({ min_qty: 1, total_price: 39.45 });
+    });
+
+    it('срочная цена — база, стандартная — скидка типа цены', async () => {
+      mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
+
+      const urgent = await SimplifiedPricingService.calculatePrice(1, notebookRequest() as any, 1);
+      const standard = await SimplifiedPricingService.calculatePrice(
+        1,
+        notebookRequest({ priceType: 'standard' }) as any,
+        1,
+      );
+
+      expect(urgent.finalPrice).toBe(39.45);
+      // 39.45 × 0.5 = 19.725, до копейки 19.73.
+      expect(standard.finalPrice).toBe(19.73);
+      expect(standard.breakdown?.bindingPrice).toBe(6.9);
+
+      templateConfigData.simplified.price_type_multipliers = { standard: 0.8, urgent: 1 };
+      const custom = await SimplifiedPricingService.calculatePrice(
+        1,
+        notebookRequest({ priceType: 'standard' }) as any,
+        1,
+      );
+      expect(custom.finalPrice).toBe(31.56);
     });
 
     it('печать обложки с двух сторон не убавляет листы: картонов по-прежнему два', async () => {

@@ -7,6 +7,7 @@ import {
   resolveCoverSheetRule,
   resolveMultipagePageSplit,
   resolveSheetBlock,
+  sheetBlockPriceTypeMultiplier,
 } from '../utils/multipagePagesConsistency';
 
 describe('computeMultipagePrintUnits', () => {
@@ -125,6 +126,14 @@ describe('листы обложки', () => {
     expect(
       computeCoverSheetsTotal({ rule: 'cards', quantity: 3, coverPages: 2, itemsPerSheet: 1, sidesMode: 'single' }),
     ).toBe(6);
+  });
+
+  it('блок листами: срочная ×1, стандартная ×0.5, свой множитель продукта важнее', () => {
+    expect(sheetBlockPriceTypeMultiplier('urgent')).toBe(1);
+    expect(sheetBlockPriceTypeMultiplier('standard')).toBe(0.5);
+    expect(sheetBlockPriceTypeMultiplier('online')).toBeUndefined();
+    expect(sheetBlockPriceTypeMultiplier('standard', { standard: 0.8 })).toBe(0.8);
+    expect(sheetBlockPriceTypeMultiplier(' urgent ')).toBe(1);
   });
 
   it('обычная обложка альбома считается как раньше', () => {

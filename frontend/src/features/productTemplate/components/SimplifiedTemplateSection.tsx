@@ -963,6 +963,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   bindingServices={bindingServices}
                   services={services}
                   selectedSize={selected ?? null}
+                  priceTypeMultipliers={value.price_type_multipliers}
+                  onPriceTypeMultipliers={(next) => {
+                    const base = latestValue.current
+                    const updated = { ...base, price_type_multipliers: next }
+                    latestValue.current = updated
+                    onChange(updated)
+                  }}
                 />
               </div>
             </div>

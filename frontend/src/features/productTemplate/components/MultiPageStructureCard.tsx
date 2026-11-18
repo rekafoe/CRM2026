@@ -104,6 +104,9 @@ type Props = {
   services?: ServiceRow[]
   /** Текущий размер — для кнопки «как у блока» */
   selectedSize?: SimplifiedSizeConfig | null
+  /** Множители типа цены продукта. Пустые «срочная» и «стандартная» у блокнота — ×1 и ×0.5. */
+  priceTypeMultipliers?: Record<string, number>
+  onPriceTypeMultipliers?: (next: Record<string, number>) => void
 }
 
 export const MultiPageStructureCard: React.FC<Props> = ({
@@ -117,6 +120,8 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   bindingServices,
   services = [],
   selectedSize,
+  priceTypeMultipliers,
+  onPriceTypeMultipliers,
 }) => {
   const innerBlock = structure.innerBlock || { pagesSource: 'parameter' as const }
   const cover = structure.cover || { mode: 'none' as const }
@@ -397,15 +402,15 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                   value={innerBlock.printed === false ? 'none' : 'duplex'}
                   onChange={(e) => patchInnerBlock({ printed: e.target.value !== 'none' })}
                 >
-                  <option value="none">Без печати: бумага белая или с линовкой</option>
+                  <option value="none">Без печати: чистые, в клетку или в точку</option>
                   <option value="duplex">Печатается с двух сторон</option>
                 </select>
               </FormField>
             </div>
             <div className="simplified-form-grid">
               <FormField
-                label="Бумага «белая»"
-                help="Необязательно. Если выбраны обе бумаги, оператор видит выбор «Белая / В клетку» вместо дерева материалов."
+                label="Бумага «Чистые»"
+                help="Офисная бумага. Если заданы хотя бы две разные бумаги, оператор выбирает их в калькуляторе, а не в дереве материалов."
               >
                 <select
                   className="form-select"
@@ -422,7 +427,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                   ))}
                 </select>
               </FormField>
-              <FormField label="Бумага «в клетку»">
+              <FormField label="Бумага «В клетку»">
                 <select
                   className="form-select"
                   value={structure.notebook?.grid_material_id ?? ''}
@@ -437,6 +442,64 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                     </option>
                   ))}
                 </select>
+              </FormField>
+              <FormField label="Бумага «В точку»">
+                <select
+                  className="form-select"
+                  value={structure.notebook?.dot_material_id ?? ''}
+                  onChange={(e) =>
+                    patchNotebook({ dot_material_id: e.target.value ? Number(e.target.value) : undefined })
+                  }
+                >
+                  <option value="">— Материал —</option>
+                  {allMaterials.map((material) => (
+                    <option key={material.id} value={material.id}>
+                      {material.name}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
+            <div className="simplified-form-grid">
+              <FormField
+                label="Срочная, множитель"
+                help="База расчёта. Пустое поле — ×1: сумма бумаги, печати и переплёта уже срочная цена. Справочник типов цен не меняется."
+              >
+                <input
+                  className="form-input form-input--compact"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="1"
+                  value={priceTypeMultipliers?.urgent ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.trim()
+                    const next = { ...(priceTypeMultipliers ?? {}) }
+                    if (raw === '') delete next.urgent
+                    else next.urgent = Number(raw)
+                    onPriceTypeMultipliers?.(next)
+                  }}
+                />
+              </FormField>
+              <FormField
+                label="Стандартная, несрочная"
+                help="Скидка типа цены. Пустое поле — ×0.5: у карандаша срочная ровно вдвое дороже несрочной."
+              >
+                <input
+                  className="form-input form-input--compact"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="0.5"
+                  value={priceTypeMultipliers?.standard ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.trim()
+                    const next = { ...(priceTypeMultipliers ?? {}) }
+                    if (raw === '') delete next.standard
+                    else next.standard = Number(raw)
+                    onPriceTypeMultipliers?.(next)
+                  }}
+                />
               </FormField>
             </div>
           </>

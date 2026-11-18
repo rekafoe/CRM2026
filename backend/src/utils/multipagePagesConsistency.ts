@@ -251,6 +251,12 @@ export type MultipageCoverMode = 'none' | 'self' | 'separate';
 export const TWO_PIECE_COVER_PAGES = 2;
 export const SHEET_BLOCK_DEFAULT_SHEETS = 50;
 export const SHEET_BLOCK_MAX_SHEETS = 500;
+/**
+ * Блокнот листами: рассчитанная сумма — срочная цена.
+ * Несрочная — тип «Стандартная», скидка. У карандаша срочная ровно вдвое.
+ */
+export const SHEET_BLOCK_URGENT_MULTIPLIER = 1;
+export const SHEET_BLOCK_STANDARD_MULTIPLIER = 0.5;
 
 function structureRecord(multiPageStructure: unknown): Record<string, unknown> | null {
   return isRecord(multiPageStructure) ? multiPageStructure : null;
@@ -258,6 +264,22 @@ function structureRecord(multiPageStructure: unknown): Record<string, unknown> |
 
 function isReadyLidStructure(structure: Record<string, unknown> | null): boolean {
   return structure?.coverChoice === 'ready';
+}
+
+/**
+ * Множитель типа цены для блока листами.
+ * Свой множитель продукта перекрывает умолчание. Для остальных типов цен — undefined, берётся справочник.
+ */
+export function sheetBlockPriceTypeMultiplier(
+  priceTypeKey: string,
+  productMultipliers?: Record<string, number> | null,
+): number | undefined {
+  const key = String(priceTypeKey || '').trim().toLowerCase();
+  const custom = productMultipliers?.[key];
+  if (custom != null && Number.isFinite(Number(custom))) return Number(custom);
+  if (key === 'urgent') return SHEET_BLOCK_URGENT_MULTIPLIER;
+  if (key === 'standard') return SHEET_BLOCK_STANDARD_MULTIPLIER;
+  return undefined;
 }
 
 /** Шаблон считает блок листами: оператор вводит листы, страницы выводит расчёт. */
