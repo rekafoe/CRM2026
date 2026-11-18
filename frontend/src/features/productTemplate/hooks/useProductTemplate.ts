@@ -86,6 +86,11 @@ export type MultiPageStructureConfig = {
     material_id?: number;
     /** @deprecated для ценообразования — используйте page_count; листов на изделие (legacy) */
     qty_per_item?: number;
+    /** Ламинация только листов обложки. Та же услуга в списке размера на блок не считается. */
+    lamination?: {
+      service_id?: number;
+      variant_id?: number;
+    };
   };
   binding?: {
     service_id?: number;

@@ -939,6 +939,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   paperTypes={paperTypes}
                   printTechs={printTechs}
                   bindingServices={bindingServices}
+                  services={services}
                   selectedSize={selected ?? null}
                 />
               </div>
