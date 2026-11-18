@@ -20,6 +20,7 @@ import { UserInboxNotificationService } from '../../../services/userInboxNotific
 import { buildReplacedItemParams } from '../services/replaceOrderItemParams'
 import { orderParamsDeclareUvPrintWithoutMaterial } from '../../pricing/uvPrintWithoutMaterial'
 import { websiteWaitingItemDeleteBlock } from '../services/websiteWaitingItemDelete'
+import { shouldShrinkPrepaymentOnItemDelete } from '../services/websiteWaitingItemDeletePolicy'
 
 function isMeterUnit(unitRaw: unknown): boolean {
   const unit = String(unitRaw || '').trim().toLowerCase();
@@ -721,7 +722,12 @@ export class OrderItemController {
         const newTotal = newAmounts.totalAmount
         const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
         const paymentMethod = paymentRow?.paymentMethod
-        if (paymentMethod === 'offline' && currentPrepayment > newTotal) {
+        if (shouldShrinkPrepaymentOnItemDelete({
+          paymentMethod,
+          prepaymentStatus: paymentRow?.prepaymentStatus,
+          prepaymentAmount: currentPrepayment,
+          newTotal,
+        })) {
           let hasPrepaymentUpdatedAt = false
           try {
             hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')

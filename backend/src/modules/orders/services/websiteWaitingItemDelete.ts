@@ -76,7 +76,6 @@ export async function websiteWaitingItemDeleteBlock(
   if (!order || order.source !== 'website') return null
   const statusId = Number(order.status)
   const waiting = await isWaitingStatusId(db, statusId)
-  if (!waiting) return null
   const issued = await orderIsIssued(db, orderId, statusId)
   return websiteWaitingDeleteReason({
     source: order.source,
