@@ -438,6 +438,71 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.selectedFinishing?.filter((row) => row.service_id === 77)).toHaveLength(1);
   });
 
+  it('не обнуляет второй distinct bind в finishing при configured multipage binding', async () => {
+    // CRM/website: multipageStructure.binding=77 (пружина) + finishing bind 88 (термоклей).
+    // Раньше bindAlreadyInFinishing вычитал 88 из otherFinishing, а bindingPrice брал только 77 → undercharge.
+    templateConfigData.simplified.sizes[0].finishing = [];
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      binding: { service_id: 77, units_per_item: 1 },
+    };
+    (PricingServiceRepository.listServiceTiers as jest.Mock).mockImplementation(async (serviceId: number) => {
+      if (serviceId === 88) {
+        return [{ id: 2, serviceId: 88, minQuantity: 1, rate: 2, isActive: true }];
+      }
+      return [];
+    });
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services') && query.includes('operation_type')) {
+          const id = Number(params?.[0]);
+          if (id === 77 || id === 88) return { id, operation_type: 'bind', is_active: 1 };
+          return { id, operation_type: 'laminate', is_active: 1 };
+        }
+        return null;
+      }),
+      all: jest.fn(async (query: string) => {
+        if (String(query).includes('FROM post_processing_services') && String(query).includes('id IN')) {
+          return [{
+            id: 88,
+            name: 'Термоклей',
+            operation_type: 'bind',
+            price_unit: 'per_item',
+            min_quantity: 1,
+            max_quantity: null,
+          }];
+        }
+        return [];
+      }),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 4 as any,
+        finishing: [{ service_id: 88, units_per_item: 1 }],
+      } as any,
+      100,
+    );
+
+    // print 4×100×2=800; finishing bind 88: 2×100=200; configured bind 77: 50
+    expect(result.breakdown?.otherFinishingPrice).toBe(200);
+    expect(result.breakdown?.bindingPrice).toBe(50);
+    expect(result.finalPrice).toBe(1050);
+    expect(result.finishingDetails?.some((d) => d.service_id === 88 && Number(d.priceForQuantity) === 200)).toBe(
+      true,
+    );
+  });
+
   it('не возвращает цену, если цитата переплёта упала', async () => {
     templateConfigData.simplified.multiPageStructure = {
       innerBlock: { pagesSource: 'parameter' },

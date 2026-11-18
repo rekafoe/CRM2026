@@ -2830,8 +2830,14 @@ export class SimplifiedPricingService {
       }
     }
 
+    // Configured multipage bind is billed only via BindingPricingService (same service_id
+    // already filtered out of finishing). Distinct bind rows still in finishingPrice are
+    // real extra work — must not be stripped when a configured quote exists, or the quote
+    // silently undercharges (and warehouse may still spend their materials).
     let bindingPrice = configuredBindingQuote ? configuredBindingQuote.total : bindAlreadyInFinishing;
-    let otherFinishingPrice = Math.max(0, finishingPrice - bindAlreadyInFinishing);
+    let otherFinishingPrice = configuredBindingQuote
+      ? finishingPrice
+      : Math.max(0, finishingPrice - bindAlreadyInFinishing);
 
     // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
     let subtotal = printPrice + materialPrice + otherFinishingPrice + bindingPrice + coverPrice;
