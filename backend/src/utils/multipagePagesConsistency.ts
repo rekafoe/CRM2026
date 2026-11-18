@@ -247,6 +247,106 @@ export function validateBindingPagesLimit(
 
 export type MultipageCoverMode = 'none' | 'self' | 'separate';
 
+/** Перед и зад: два картона на пружине, два листа бумаги при кашировке. */
+export const TWO_PIECE_COVER_PAGES = 2;
+export const SHEET_BLOCK_DEFAULT_SHEETS = 50;
+export const SHEET_BLOCK_MAX_SHEETS = 500;
+
+function structureRecord(multiPageStructure: unknown): Record<string, unknown> | null {
+  return isRecord(multiPageStructure) ? multiPageStructure : null;
+}
+
+function isReadyLidStructure(structure: Record<string, unknown> | null): boolean {
+  return structure?.coverChoice === 'ready';
+}
+
+/** Шаблон считает блок листами: оператор вводит листы, страницы выводит расчёт. */
+export function usesSheetBlock(multiPageStructure: unknown): boolean {
+  const structure = structureRecord(multiPageStructure);
+  if (!structure || isReadyLidStructure(structure)) return false;
+  const notebook = structure.notebook;
+  return isRecord(notebook) && notebook.use_sheets === true;
+}
+
+/** Бумага обложки кашируется на картон: печатная обложка «Своя бумага и печать» с галочкой. */
+export function coverIsWrapped(multiPageStructure: unknown): boolean {
+  const structure = structureRecord(multiPageStructure);
+  if (!structure || isReadyLidStructure(structure)) return false;
+  const cover = structure.cover;
+  return isRecord(cover) && cover.mode === 'separate' && cover.wrap === true;
+}
+
+export type SheetBlock = {
+  sheets: number;
+  blockPages: number;
+  coverPages: number;
+  totalPages: number;
+};
+
+/**
+ * Листы блока в страницы изделия. Лист печатается с двух сторон.
+ * 50 листов и два картона — 102 страницы, оператор это число не набирает.
+ */
+export function resolveSheetBlock(multiPageStructure: unknown, requestedSheets: unknown): SheetBlock | null {
+  if (!usesSheetBlock(multiPageStructure)) return null;
+  const structure = structureRecord(multiPageStructure);
+  const notebook = isRecord(structure?.notebook) ? structure.notebook : {};
+  const requested = Math.floor(Number(requestedSheets));
+  const fromTemplate = Math.floor(Number(notebook.sheets));
+  const sheets =
+    Number.isFinite(requested) && requested > 0
+      ? requested
+      : Number.isFinite(fromTemplate) && fromTemplate > 0
+        ? fromTemplate
+        : SHEET_BLOCK_DEFAULT_SHEETS;
+  if (sheets > SHEET_BLOCK_MAX_SHEETS) {
+    const err = new Error(`Листов блока: от 1 до ${SHEET_BLOCK_MAX_SHEETS}`) as Error & { status?: number };
+    err.status = 400;
+    throw err;
+  }
+  const coverPages = resolveCoverPageCount(multiPageStructure);
+  const blockPages = sheets * 2;
+  return { sheets, blockPages, coverPages, totalPages: blockPages + coverPages };
+}
+
+/**
+ * Как считать листы обложки.
+ * layout — страницы обложки раскладываются на лист, как страницы блока.
+ * cards — два картона, раскладка блока, листы считаются на весь тираж.
+ * wrap — два листа бумаги под кашировку, по одному на лист, без раскладки блока.
+ */
+export type CoverSheetRule = 'layout' | 'cards' | 'wrap';
+
+export function resolveCoverSheetRule(multiPageStructure: unknown): CoverSheetRule {
+  if (coverIsWrapped(multiPageStructure)) return 'wrap';
+  if (usesSheetBlock(multiPageStructure)) return 'cards';
+  return 'layout';
+}
+
+/** Сколько изделий на печатном листе обложки. При кашировке — одно. */
+export function coverLayoutPerSheet(rule: CoverSheetRule, itemsPerSheet: number): number {
+  if (rule === 'wrap') return 1;
+  return Math.max(1, Math.floor(Number(itemsPerSheet)) || 1);
+}
+
+/** Физические листы обложки на весь тираж. */
+export function computeCoverSheetsTotal(params: {
+  rule: CoverSheetRule;
+  quantity: number;
+  coverPages: number;
+  itemsPerSheet: number;
+  sidesMode?: string | null;
+}): number {
+  const qty = Math.max(1, Math.floor(Number(params.quantity)) || 1);
+  if (params.rule === 'wrap') return qty * TWO_PIECE_COVER_PAGES;
+  const perSheet = coverLayoutPerSheet(params.rule, params.itemsPerSheet);
+  if (params.rule === 'cards') {
+    return Math.max(1, Math.ceil((qty * TWO_PIECE_COVER_PAGES) / perSheet));
+  }
+  const coverPages = Math.max(1, Math.floor(Number(params.coverPages)) || 1);
+  return Math.max(1, qty * computeMultipageSheetsPerItem(coverPages, perSheet, params.sidesMode));
+}
+
 /** Сколько страниц альбома занимает обложка (входит в общее число страниц в калькуляторе). */
 export function resolveCoverPageCount(multiPageStructure: unknown): number {
   if (!multiPageStructure || typeof multiPageStructure !== 'object' || Array.isArray(multiPageStructure)) {
@@ -254,6 +354,7 @@ export function resolveCoverPageCount(multiPageStructure: unknown): number {
   }
   const cover = (multiPageStructure as Record<string, unknown>).cover as Record<string, unknown> | undefined;
   if (!cover || cover.mode === 'none') return 0;
+  if (usesSheetBlock(multiPageStructure) || coverIsWrapped(multiPageStructure)) return TWO_PIECE_COVER_PAGES;
   const raw = cover.page_count ?? cover.pageCount ?? cover.pages;
   if (raw != null && Number.isFinite(Number(raw)) && Number(raw) > 0) {
     return Math.floor(Number(raw));
@@ -345,13 +446,17 @@ export function computeMultipageCoverPrintUnits(params: {
   coverPages: number;
   itemsPerSheet: number;
   sidesMode?: string | null;
+  rule?: CoverSheetRule;
 }): number {
-  const qty = Math.max(1, Math.floor(Number(params.quantity)) || 1);
-  const coverPages = Math.max(1, Math.floor(Number(params.coverPages)) || 1);
-  const ips = Math.max(1, Math.floor(Number(params.itemsPerSheet)) || 1);
-  const coverSheetsPerItem = computeMultipageSheetsPerItem(coverPages, ips, params.sidesMode);
-  const coverSheetsTotal = Math.max(1, qty * coverSheetsPerItem);
-  return computeMultipagePrintUnits(coverSheetsTotal, ips);
+  const rule = params.rule ?? 'layout';
+  const coverSheetsTotal = computeCoverSheetsTotal({
+    rule,
+    quantity: params.quantity,
+    coverPages: params.coverPages,
+    itemsPerSheet: params.itemsPerSheet,
+    sidesMode: params.sidesMode,
+  });
+  return computeMultipagePrintUnits(coverSheetsTotal, coverLayoutPerSheet(rule, params.itemsPerSheet));
 }
 
 export function computeMultipageSheetsPerItem(

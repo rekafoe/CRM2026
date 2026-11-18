@@ -321,6 +321,11 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     specs.sides,
   ]);
 
+  // Неверный тираж не должен оставлять списание от прошлого успешного расчёта.
+  useEffect(() => {
+    if (!result) setMaterialCost(null);
+  }, [result]);
+
   // Когда с бэкенда пришёл новый расчёт — обновляем блок стоимости из result без повторного цикла по ссылке result
   useEffect(() => {
     if (!resultMaterialFingerprint || specs.quantity <= 0) return;

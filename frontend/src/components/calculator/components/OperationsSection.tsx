@@ -36,6 +36,8 @@ interface OperationsSectionProps {
   allowedOperationIds?: number[];
   /** Готовая крышка или ламинация только в шаблоне обложки: не предлагать плёнку оператору. */
   hideLamination?: boolean;
+  /** Услуги, которые шаблон уже считает сам (переплёт, ламинация обложки): галочка была бы пустой. */
+  hiddenOperationIds?: number[];
 }
 
 interface SelectedOperation {
@@ -138,7 +140,9 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   updateSpecs,
   allowedOperationIds,
   hideLamination = false,
+  hiddenOperationIds,
 }) => {
+  const hiddenKey = (hiddenOperationIds ?? []).join(',');
   const allowedSet = useMemo(() => {
     if (!Array.isArray(allowedOperationIds)) return null;
     return new Set(allowedOperationIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)));
@@ -150,16 +154,19 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     if (!backendProductSchema?.operations || !Array.isArray(backendProductSchema.operations)) {
       return [];
     }
-    const raw = hideLamination
-      ? backendProductSchema.operations.filter((op: Operation) => !isLaminationOperation(op))
-      : backendProductSchema.operations;
+    const hidden = new Set(hiddenKey ? hiddenKey.split(',').map(Number) : []);
+    const raw = backendProductSchema.operations.filter((op: Operation) => {
+      if (hideLamination && isLaminationOperation(op)) return false;
+      const oid = Number(op.operation_id ?? op.id);
+      return !hidden.has(oid);
+    });
     if (allowedSet === null) return raw;
     if (allowedSet.size === 0) return [];
     return raw.filter((op: Operation) => {
       const oid = op.operation_id ?? op.id;
       return oid != null && allowedSet.has(Number(oid));
     });
-  }, [backendProductSchema?.operations, allowedSet, hideLamination]);
+  }, [backendProductSchema?.operations, allowedSet, hideLamination, hiddenKey]);
 
   //  Состояние для вариантов услуг (типы и подтипы)
   const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map());

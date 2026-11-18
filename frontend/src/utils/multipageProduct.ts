@@ -83,8 +83,22 @@ export function ceilPagesToStep(
 
 export type MultipageCoverMode = 'none' | 'self' | 'separate';
 
-export function resolveCoverPageCount(structure?: { cover?: { mode?: string; page_count?: number } } | null): number {
+type CoverPagesStructure = {
+  coverChoice?: string;
+  notebook?: { use_sheets?: boolean };
+  cover?: { mode?: string; page_count?: number; wrap?: boolean };
+};
+
+/** Два картона на пружине или два листа под кашировку: обложка всегда 2 страницы. */
+function coverIsTwoPiece(structure: CoverPagesStructure): boolean {
+  if (structure.coverChoice === 'ready') return false;
+  if (structure.notebook?.use_sheets === true) return true;
+  return structure.cover?.mode === 'separate' && structure.cover.wrap === true;
+}
+
+export function resolveCoverPageCount(structure?: CoverPagesStructure | null): number {
   if (!structure?.cover || structure.cover.mode === 'none') return 0;
+  if (coverIsTwoPiece(structure)) return 2;
   const raw = structure.cover.page_count;
   if (raw != null && Number.isFinite(Number(raw)) && Number(raw) > 0) return Math.floor(Number(raw));
   return 4;
@@ -92,7 +106,7 @@ export function resolveCoverPageCount(structure?: { cover?: { mode?: string; pag
 
 export function resolveMultipagePageSplit(params: {
   pagesCount: number;
-  multiPageStructure?: { cover?: { mode?: string; page_count?: number } } | null;
+  multiPageStructure?: CoverPagesStructure | null;
   pagesFromParameter?: boolean;
 }) {
   const innerOnly = Math.max(1, Math.floor(Number(params.pagesCount)) || 1);
@@ -177,15 +191,15 @@ export function resolveMultipageMinQty(
     Number(minFromSize) === Number(itemsPerSheet);
 
   if (multipageLike) {
+    // Как на сервере: «шт/лист» и min_qty, совпавший с раскладкой, не поднимают тираж альбома.
+    // Первая строка печати с минимумом 1 (часто нулевая технология перед тарифом) — тоже не минимум заказа.
     if (coupledToOverride || coupledToLayout) {
-      return minFromTiers ?? 1;
+      return 1;
     }
-    // min_qty=2 от старой синхронизации с раскладкой, пока нет ответа API с itemsPerSheet
     if (
       minFromSize != null &&
       minFromSize > 1 &&
       overrideN == null &&
-      itemsPerSheet == null &&
       (minFromTiers == null || minFromTiers <= 1)
     ) {
       return 1;

@@ -87,6 +87,8 @@ export type MultiPageStructureConfig = {
   innerBlock?: {
     pagesSource?: 'parameter' | 'fixed';
     fixedPages?: number;
+    /** false — блок не печатается: бумага белая или с линовкой. Цена печати блока не считается. */
+    printed?: boolean;
     print?: MultiPageBlockPrintConfig;
     material_id?: number;
   };

@@ -23,6 +23,7 @@ import { MultiPagePagesTab } from './MultiPagePagesTab'
 import {
   computeMultipageSheetsPerItem,
   resolveBlockPagesForPrint,
+  resolveMultipageMinQty,
   resolveMultipagePageSplit,
 } from '../../../utils/multipageProduct'
 import './SimplifiedTemplateSection.css'
@@ -474,15 +475,22 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     layoutPreview?.noMat,
   ])
 
+  // Сборка шлёт несколько правок за одно действие. Каждая ложится на свежий шаблон,
+  // а не на снимок рендера: иначе последняя стирает предыдущие.
+  const latestValue = useRef(value)
+  latestValue.current = value
   const updateMultiPageStructure = useCallback((patch: Partial<NonNullable<SimplifiedConfig['multiPageStructure']>>) => {
-    onChange({
-      ...value,
+    const base = latestValue.current
+    const next = {
+      ...base,
       multiPageStructure: {
-        ...(value.multiPageStructure || {}),
+        ...(base.multiPageStructure || {}),
         ...patch,
       },
-    })
-  }, [onChange, value])
+    }
+    latestValue.current = next
+    onChange(next)
+  }, [onChange])
 
   const handleSelectType = useCallback(
     (typeId: ProductTypeId) => {
@@ -923,9 +931,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
               </div>
               <div className="simplified-card__content">
                 <p className="param-hint">
-                  Число листов задаётся в «Сборке». Сейчас {multiPageStructure.notebook?.sheets ?? 50} листов:
-                  блок печатается с двух сторон, обложка — 2 картона. Оператор в калькуляторе выбирает листы,
-                  а не вводит 102 страницы.
+                  Блок задан листами, поле «Страницы» в калькуляторе скрыто. Число листов по умолчанию —
+                  в «Сборке», сейчас {multiPageStructure.notebook?.sheets ?? 50}. Страницы изделия расчёт
+                  выводит сам: листы × 2 и два картона обложки.
                 </p>
               </div>
             </div>
@@ -955,7 +963,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   bindingServices={bindingServices}
                   services={services}
                   selectedSize={selected ?? null}
-                  onPagesPreset={updatePagesConfig}
                 />
               </div>
             </div>
@@ -1208,7 +1215,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                             printTechnology: quickTestPrintPreset?.technology,
                             printColorMode: quickTestPrintPreset?.color,
                             sides: quickTestPrintPreset?.sides as 1 | 2 | undefined,
-                            quantity: selected?.min_qty && Number(selected.min_qty) > 0 ? Number(selected.min_qty) : 1,
+                            quantity: selected
+                              ? resolveMultipageMinQty(selected, { multipageLike: showPagesConfig })
+                              : 1,
                             pages: showPagesConfig ? (pagesConfig.default ?? pagesConfig.options?.[0] ?? undefined) : undefined,
                           }}
                         />

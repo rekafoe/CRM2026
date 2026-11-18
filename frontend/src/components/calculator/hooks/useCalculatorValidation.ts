@@ -9,6 +9,7 @@ import {
   isSeparateCoverMode,
 } from '../../../utils/multipageCoverMaterials';
 import { hasEnabledUvLayer, isUvFlatbedProduct } from '../utils/uvPrintConfig';
+import { sheetBlockError, usesBlockSheets } from '../../../utils/boundProductPreset';
 import {
   bindingCalculatorIssue,
   bindingCalculatorIssueText,
@@ -153,8 +154,15 @@ function computeErrors(params: {
     }
   }
 
+  // Блок задан листами: поле «Страницы» скрыто, его границы к листам не относятся.
+  const sheetBlock = usesBlockSheets(simplified?.multiPageStructure);
+  if (sheetBlock) {
+    const sheetsError = sheetBlockError((specs as { notebook_sheets?: number }).notebook_sheets);
+    if (sheetsError) errors.notebook_sheets = sheetsError;
+  }
+
   const hasPagesPresets = Array.isArray(schemaPagesEnum) && schemaPagesEnum.length > 0;
-  const needsPages = isMultiPageProduct === true || hasPagesPresets;
+  const needsPages = !sheetBlock && (isMultiPageProduct === true || hasPagesPresets);
   const p = specs.pages != null ? Number(specs.pages) : NaN;
   const inPresetList = hasPagesPresets && Number.isFinite(p) && schemaPagesEnum!.includes(p);
   const canCustom =
