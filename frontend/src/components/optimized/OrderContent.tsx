@@ -7,8 +7,10 @@ interface OrderContentProps {
   order: Order;
   onLoadOrders: () => void;
   onEditOrderItem?: (orderId: number, item: Item) => void;
-  /** В режиме пула заказов: только просмотр, без редактирования/удаления/принтера */
+  /** В режиме пула заказов: без принтера и правки параметров */
   readOnly?: boolean;
+  /** Удаление строки при readOnly: заказ с сайта в статусе «Ожидает» без оплаты */
+  allowDelete?: boolean;
   /** Операторы за сегодня (для выбора исполнителя) */
   operatorsToday?: Array<{ id: number; name: string }>;
   assignableOnShift?: Array<{ id: number; name: string; department_id?: number | null }>;
@@ -22,6 +24,7 @@ export const OrderContent: React.FC<OrderContentProps> = ({
   onLoadOrders,
   onEditOrderItem,
   readOnly,
+  allowDelete,
   operatorsToday = [],
   assignableOnShift,
   assignableAll,
@@ -61,6 +64,7 @@ export const OrderContent: React.FC<OrderContentProps> = ({
               onUpdate={onLoadOrders}
               onEditParameters={onEditOrderItem}
               readOnly={readOnly}
+              allowDelete={allowDelete}
               operatorsToday={operatorsToday}
               assignableOnShift={assignableOnShift}
               assignableAll={assignableAll}

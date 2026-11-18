@@ -2362,6 +2362,31 @@
   color: var(--pc-text, #1c1b19);
 }
 
+.pool-passport__section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.pool-passport__section-row .pool-passport__section {
+  margin: 0;
+}
+
+.pool-passport__section-row .lg-btn {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+
+.pool-line-lock {
+  margin: 6px 0 8px;
+  color: var(--pc-muted, #6f6c66);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .pool-passport__section {
   margin: 4px 0 0;
   color: var(--pc-muted, #6f6c66);
