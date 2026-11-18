@@ -96,6 +96,9 @@ export type MultiPageStructureConfig = {
     page_count?: number;
     /** Бумага кашируется на картон: лист обложки не режется раскладкой блока. */
     wrap?: boolean;
+    /** Переплётный картон. Списание: 2 шт на изделие, перед и зад. */
+    board_material_ids?: number[];
+    board_material_id?: number;
     print?: MultiPageBlockPrintConfig;
     /** Разрешённые материалы обложки (отдельная обложка) */
     allowed_material_ids?: number[];

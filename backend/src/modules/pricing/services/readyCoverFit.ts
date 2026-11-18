@@ -1,6 +1,8 @@
 /** Готовая крышка: 2 штуки на изделие, канал подставляется один. */
 export const READY_LID_COVERS_PER_ITEM = 2
 export const READY_LID_CHANNELS_PER_ITEM = 1
+/** Печатная обложка на картоне: перед и зад, не готовая крышка. */
+export const WRAP_BOARDS_PER_ITEM = 2
 
 export type ChannelCandidate = {
   id: number

@@ -8,6 +8,8 @@ export const SPRING_NOTEBOOK_COVER_PAGES = 2
 export const SPRING_NOTEBOOK_DEFAULT_SHEETS = 50
 export const READY_LID_COVERS_PER_ITEM = 2
 export const READY_LID_CHANNELS_PER_ITEM = 1
+/** Печатная обложка на картоне: перед и зад. */
+export const WRAP_BOARDS_PER_ITEM = 2
 
 export type CoverChoice = 'printed' | 'ready'
 export type CoverPrintChoice = 'outside' | 'both'
@@ -36,8 +38,11 @@ export type BoundStructure = {
   cover?: {
     mode?: 'none' | 'self' | 'separate'
     page_count?: number
-    /** Бумага клеится на картон и не режется раскладкой блока. */
+    /** Бумага клеится на картон и не режется раскладкой блока. Печатная обложка, не готовая крышка. */
     wrap?: boolean
+    /** Переплётный картон. Списание: 2 шт на изделие. */
+    board_material_ids?: number[]
+    board_material_id?: number
     print?: {
       technology_code?: string
       color_mode?: 'color' | 'bw'
@@ -189,6 +194,8 @@ export function applyReadyCover(structure: BoundStructure | undefined): BoundStr
   delete cover.allowed_material_ids
   delete cover.material_id
   delete cover.wrap
+  delete cover.board_material_id
+  delete cover.board_material_ids
   const blockSides = structure?.innerBlock?.print?.sides_mode
   return {
     ...(structure ?? {}),

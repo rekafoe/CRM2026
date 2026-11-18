@@ -637,9 +637,26 @@ export const MultiPageStructureCard: React.FC<Props> = ({
             )}
             <p className="text-muted text-sm">
               {cover.wrap
-                ? 'Лист обложки не режется раскладкой блока: одна страница обложки занимает свой лист.'
-                : 'Без каширования обложка режется так же, как лист блока.'}
+                ? 'Это печатная обложка: бумагу печатают и ламинируют, затем накатывают на картон. Лист обложки не режется раскладкой блока. Со склада списываются 2 картона на изделие, перед и зад.'
+                : 'Без каширования обложка режется так же, как лист блока. Картон не списывается.'}
             </p>
+            {cover.wrap && (
+              <WarehouseMaterialsAllowedEditor
+                materials={allMaterials}
+                allowedIds={cover.board_material_ids ?? []}
+                onAllowedChange={(ids) =>
+                  patchCover({
+                    board_material_ids: ids,
+                    board_material_id:
+                      cover.board_material_id != null && ids.includes(Number(cover.board_material_id))
+                        ? cover.board_material_id
+                        : ids[0],
+                  })
+                }
+                title="Переплётный картон"
+                emptyMessage="Отметьте картон. Бумага выше — это то, что печатается."
+              />
+            )}
 
             <div className="simplified-form-grid">
               <FormField

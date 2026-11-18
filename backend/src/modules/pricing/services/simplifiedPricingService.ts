@@ -35,6 +35,7 @@ import {
   READY_LID_CHANNELS_PER_ITEM,
   READY_LID_COVERS_PER_ITEM,
   readyLidThicknessMm,
+  WRAP_BOARDS_PER_ITEM,
 } from './readyCoverFit';
 import {
   computeKnifePathMetersSheet,
@@ -489,8 +490,11 @@ interface SimplifiedConfig {
       material_id?: number;
       qty_per_item?: number;
       page_count?: number;
-      /** Бумага кашируется на картон, без раскладки блока. */
+      /** Бумага кашируется на картон, без раскладки блока. Это печатная обложка, не готовая крышка. */
       wrap?: boolean;
+      /** Переплётный картон. Списание: 2 шт на изделие, перед и зад. */
+      board_material_ids?: number[];
+      board_material_id?: number;
       /** Ламинация только листов обложки, не блока. */
       lamination?: {
         service_id?: number;
@@ -522,6 +526,8 @@ export class SimplifiedPricingService {
       /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
       base_material_id?: number;
       cover_material_id?: number;
+      /** Переплётный картон печатной обложки. Не готовая крышка. */
+      board_material_id?: number;
       /** Готовая крышка, выбранная клиентом. Канал сервер подставляет сам. */
       lid_material_id?: number;
       notebook_sheets?: number;
@@ -3029,6 +3035,50 @@ export class SimplifiedPricingService {
       }
     }
 
+    // Кашировка: бумага печатается и ламинируется как обложка, картон списывается отдельно.
+    let boardPerItem = 0;
+    const wrapOntoBoard =
+      usePagesMultiplier &&
+      !readyLidChoice &&
+      multiPageStructure?.cover?.mode === 'separate' &&
+      multiPageStructure.cover.wrap === true;
+    if (wrapOntoBoard) {
+      const boardIds = (multiPageStructure.cover?.board_material_ids ?? [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+      const requested = Number((normalizedConfig as { board_material_id?: number }).board_material_id);
+      const templateDefault = Number(multiPageStructure.cover?.board_material_id);
+      const listed = (id: number) => boardIds.length === 0 || boardIds.includes(id);
+      let boardId = 0;
+      if (requested > 0 && listed(requested)) boardId = requested;
+      else if (templateDefault > 0 && listed(templateDefault)) boardId = templateDefault;
+      else if (boardIds.length === 1) boardId = boardIds[0];
+      if (!(boardId > 0)) {
+        pricingWarnings.push('Переплётный картон не выбран, со склада он не спишется. Печать обложки на месте.');
+      } else {
+        const board = await db.get<{ name: string; sheet_price_single?: number | null }>(
+          'SELECT name, sheet_price_single FROM materials WHERE id = ? AND is_active = 1',
+          [boardId],
+        );
+        if (!board) {
+          pricingWarnings.push('Переплётный картон не найден на складе. Печать обложки на месте.');
+        } else {
+          const unit = includeMaterialCost ? Number(board.sheet_price_single ?? 0) : 0;
+          const safeUnit = Number.isFinite(unit) && unit > 0 ? unit : 0;
+          boardPerItem = safeUnit * WRAP_BOARDS_PER_ITEM;
+          const boardQty = WRAP_BOARDS_PER_ITEM * quantity;
+          coverPrice += boardPerItem * quantity;
+          const existingBoard = operationMaterials.find((row) => row.material_id === boardId);
+          if (existingBoard) existingBoard.quantity += boardQty;
+          else operationMaterials.push({
+            material_id: boardId,
+            material_name: board.name,
+            quantity: boardQty,
+          });
+        }
+      }
+    }
+
     // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
     let subtotal = printPrice + materialPrice + otherFinishingPrice + bindingPrice + coverPrice + readyLidPrice;
     let finalPrice = Math.round(subtotal * 100) / 100;
@@ -3205,7 +3255,8 @@ export class SimplifiedPricingService {
           tierCoverLamination = tierLam?.total ?? 0;
         }
         const tierReadyLid = readyLidPerItem * qtyForTier;
-        tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice + tierCoverLamination + tierReadyLid) * 100) / 100;
+        const tierBoard = boardPerItem * qtyForTier;
+        tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice + tierCoverLamination + tierReadyLid + tierBoard) * 100) / 100;
         tierRow.unit_price = qtyForTier > 0 ? Math.round((tierRow.total_price / qtyForTier) * 10000) / 10000 : tierRow.unit_price;
       }
     }

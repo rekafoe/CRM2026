@@ -731,5 +731,53 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.breakdown?.coverPrice).toBe(40);
     expect(result.finalPrice).toBe(2100);
   });
+
+  it('каширует бумагу на картон: 2 картона на изделие, печать обложки остаётся', async () => {
+    templateConfigData.simplified.include_material_cost = true;
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      cover: {
+        mode: 'separate',
+        wrap: true,
+        page_count: 4,
+        board_material_ids: [41],
+        print: { technology_code: 'laser_prof', color_mode: 'color', sides_mode: 'single' },
+      },
+    };
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (String(query).includes('sheet_price_single') && Number(params?.[0]) === 41) {
+          return { name: 'Картон переплётный', sheet_price_single: 1.5 };
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 10 as any,
+      } as any,
+      10,
+    );
+
+    // 6 листов блока × 10 × 2 BYN = 120. Обложка 4 × 10 × 2 = 80. Картон 2 × 10 × 1.5 = 30.
+    expect(result.breakdown?.innerBlockPrice).toBe(120);
+    expect(result.breakdown?.coverPrice).toBe(110);
+    expect(result.operationMaterials).toEqual([
+      { material_id: 41, material_name: 'Картон переплётный', quantity: 20 },
+    ]);
+    expect(result.finalPrice).toBe(230);
+  });
 });
 

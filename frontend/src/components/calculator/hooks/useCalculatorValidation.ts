@@ -141,6 +141,15 @@ function computeErrors(params: {
           errors.cover_material_id = 'Выберите бумагу обложки';
         }
       }
+      const boardIds = (coverCfg?.board_material_ids ?? [])
+        .map((id: number) => Number(id))
+        .filter((id: number) => Number.isFinite(id) && id > 0);
+      if (coverCfg?.wrap === true && boardIds.length > 1) {
+        const boardId = Number((specs as { board_material_id?: number }).board_material_id);
+        if (!boardIds.includes(boardId)) {
+          errors.board_material_id = 'Выберите переплётный картон';
+        }
+      }
     }
   }
 

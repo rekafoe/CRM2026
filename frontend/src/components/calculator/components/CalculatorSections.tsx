@@ -19,6 +19,7 @@ import {
 } from '../utils/uvPrintConfig';
 import { describeOperatorView, type BoundStructure } from '../../../utils/boundProductPreset';
 import { ReadyLidSection } from './ReadyLidSection';
+import { CoverBoardSection } from './CoverBoardSection';
 
 interface CalculatorSectionsProps {
   specs: ProductSpecs;
@@ -329,6 +330,14 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
               warehousePaperTypes={warehousePaperTypes}
               schemaMaterials={backendProductSchema?.materials}
               validationError={validationErrors.cover_material_id}
+            />
+          )}
+          {isMultiPageProduct && boundStructure?.cover?.wrap === true && !operatorView.hideCover && (
+            <CoverBoardSection
+              boardIds={(boundStructure.cover?.board_material_ids ?? []).map(Number)}
+              boardMaterialId={(specs as { board_material_id?: number }).board_material_id}
+              validationError={validationErrors.board_material_id}
+              onChange={(id) => updateSpecs({ board_material_id: id } as Partial<ProductSpecs>)}
             />
           )}
 

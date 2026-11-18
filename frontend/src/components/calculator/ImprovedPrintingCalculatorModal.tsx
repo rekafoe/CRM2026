@@ -459,6 +459,17 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           changed = true;
         }
       }
+      if (structure.cover?.wrap === true && structure.cover.mode === 'separate') {
+        const boardIds = (structure.cover.board_material_ids ?? [])
+          .map((id: number) => Number(id))
+          .filter((id: number) => Number.isFinite(id) && id > 0);
+        const current = Number(prev.board_material_id);
+        const fallback = Number(structure.cover.board_material_id) || boardIds[0];
+        if (boardIds.length > 0 && !boardIds.includes(current) && fallback > 0) {
+          next.board_material_id = fallback;
+          changed = true;
+        }
+      }
       return changed ? next : prev;
     });
   }, [backendProductSchema, setSpecs]);

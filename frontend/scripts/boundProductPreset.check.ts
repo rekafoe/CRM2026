@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  WRAP_BOARDS_PER_ITEM,
   applyReadyCover,
   applySheetBlock,
   coverPrintChoiceToSides,
@@ -33,11 +34,15 @@ assert.equal(springView.hidePrint, false)
 assert.equal(springView.hideLamination, false)
 assert.deepEqual(springView.hiddenLabels, ['поле «Страницы»'])
 
+assert.equal(WRAP_BOARDS_PER_ITEM, 2)
+
 const ready = applyReadyCover({
   cover: {
     mode: 'separate',
     page_count: 4,
     wrap: true,
+    board_material_id: 41,
+    board_material_ids: [41],
     print: { technology_code: 'digital', sides_mode: 'single' },
     lamination: { service_id: 9 },
   },
@@ -48,6 +53,8 @@ assert.equal(ready.cover?.mode, 'none')
 assert.equal(ready.cover?.print, undefined)
 assert.equal(ready.cover?.lamination, undefined)
 assert.equal(ready.cover?.wrap, undefined)
+assert.equal(ready.cover?.board_material_id, undefined)
+assert.equal(ready.cover?.board_material_ids, undefined)
 assert.equal(ready.binding?.service_id, 3)
 assert.equal(ready.innerBlock?.print?.sides_mode, 'duplex')
 
