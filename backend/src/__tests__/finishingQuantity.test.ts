@@ -1,4 +1,5 @@
 import {
+  applyTemplateFinishingUnits,
   enforceRequiredFinishing,
   flatFinishingUnits,
   getEffectiveFinishing,
@@ -77,6 +78,43 @@ describe('finishing quantity', () => {
         [{ service_id: 9, is_required: true, units_per_item: 2, quantity_scope: 'item' }],
       ),
     ).toEqual([{ service_id: 9, units_per_item: 2, quantity_scope: 'item' }]);
+  });
+
+
+  it('не даёт клиенту занизить units_per_item необязательной услуги ниже шаблона', () => {
+    expect(
+      applyTemplateFinishingUnits(
+        [
+          { service_id: 80, units_per_item: 0 },
+          { service_id: 81, units_per_item: 0.001 },
+          { service_id: 82, units_per_item: 3 },
+        ],
+        [
+          { service_id: 80, is_required: false, units_per_item: 1 },
+          { service_id: 81, units_per_item: 2 },
+          { service_id: 82, units_per_item: 1 },
+        ],
+      ),
+    ).toEqual([
+      { service_id: 80, units_per_item: 1 },
+      { service_id: 81, units_per_item: 2 },
+      { service_id: 82, units_per_item: 3 },
+    ]);
+  });
+
+  it('без нормы в шаблоне отбрасывает клиентский units_per_item:0', () => {
+    expect(
+      applyTemplateFinishingUnits([{ service_id: 80, units_per_item: 0 }], [{ service_id: 80 }]),
+    ).toEqual([{ service_id: 80 }]);
+  });
+
+  it('сохраняет явную нулевую норму шаблона', () => {
+    expect(
+      applyTemplateFinishingUnits(
+        [{ service_id: 80, units_per_item: 5 }],
+        [{ service_id: 80, units_per_item: 0 }],
+      ),
+    ).toEqual([{ service_id: 80, units_per_item: 0 }]);
   });
 
   it('берёт общие услуги типа, пока у размера нет своего списка', () => {

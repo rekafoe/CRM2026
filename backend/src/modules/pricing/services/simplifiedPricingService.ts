@@ -44,6 +44,7 @@ import {
 } from './finishingPerM2';
 import { finishingServiceDisplayName } from './finishingServiceCaption';
 import {
+  applyTemplateFinishingUnits,
   enforceRequiredFinishing,
   flatFinishingUnits,
   getEffectiveFinishing,
@@ -1687,7 +1688,8 @@ export class SimplifiedPricingService {
     }
 
     // Клиент (CRM/сайт) часто шлёт finishing: [{ service_id, variant_id }] без units_per_item —
-    // тогда берём норму «на изделие» из шаблона размера (как в админке продукта).
+    // тогда берём норму и quantity_scope из шаблона размера (как в админке продукта).
+    // units_per_item:0 / ниже шаблона на необязательных закрывает applyTemplateFinishingUnits ниже.
     if (
       normalizedConfig.finishing &&
       normalizedConfig.finishing.length > 0 &&
@@ -1738,6 +1740,12 @@ export class SimplifiedPricingService {
 
     // Обязательная услуга размера всегда в расчёте, с количеством из шаблона, даже если клиент её снял или прислал другое число.
     finishingToUse = enforceRequiredFinishing(
+      finishingToUse,
+      Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
+    );
+    // Необязательная отделка: клиентский units_per_item:0 / ниже шаблона не занижает счёт
+    // (public calculate / website quote-cart / recalculateOrderPrices).
+    finishingToUse = applyTemplateFinishingUnits(
       finishingToUse,
       Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
     );
