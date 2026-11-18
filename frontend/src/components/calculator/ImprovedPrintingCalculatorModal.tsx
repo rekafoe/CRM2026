@@ -445,7 +445,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         const sheets = prev.notebook_sheets && prev.notebook_sheets > 0
           ? prev.notebook_sheets
           : Number(structure.notebook?.sheets) || 50;
-        const pages = springTotalPages(sheets, structure.cover?.page_count ?? 2);
+        const pages = springTotalPages(sheets);
         if (prev.notebook_sheets !== sheets || prev.pages !== pages || prev.sides !== 2) {
           next.notebook_sheets = sheets;
           next.pages = pages;

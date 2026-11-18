@@ -13,6 +13,7 @@ import {
 } from './BindingVariantSelector';
 import { CustomPagesField } from './CustomPagesField';
 import {
+  SHEET_BLOCK_MAX_SHEETS,
   coverPrintChoiceToSides,
   springTotalPages,
   type CoverPrintChoice,
@@ -472,7 +473,8 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <input
               type="number"
               min={1}
-              className="form-control"
+              max={SHEET_BLOCK_MAX_SHEETS}
+              className={`form-control${validationErrors.notebook_sheets ? ' error' : ''}`}
               value={specs.notebook_sheets ?? ''}
               onChange={(e) => {
                 const sheets = Math.max(1, Math.floor(Number(e.target.value)) || 1)
@@ -483,7 +485,12 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 }, true)
               }}
             />
-            <p className="param-hint">Печать блока с двух сторон. Два картона обложки сюда не входят.</p>
+            <p className="param-hint">
+              Лист считается с двух сторон. Обложка — ещё два картона, в листы блока они не входят.
+            </p>
+            {validationErrors.notebook_sheets && (
+              <p className="param-error">{validationErrors.notebook_sheets}</p>
+            )}
           </div>
         )}
 

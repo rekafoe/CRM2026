@@ -6,6 +6,7 @@
 
 export const SPRING_NOTEBOOK_COVER_PAGES = 2
 export const SPRING_NOTEBOOK_DEFAULT_SHEETS = 50
+export const SHEET_BLOCK_MAX_SHEETS = 500
 export const READY_LID_COVERS_PER_ITEM = 2
 export const READY_LID_CHANNELS_PER_ITEM = 1
 /** Печатная обложка на картоне: перед и зад. */
@@ -71,15 +72,6 @@ export type ThicknessMaterial = {
   sheet_price_single?: number | null
 }
 
-export type PagesPreset = {
-  options: number[]
-  default: number
-  step: number
-  allowCustom: boolean
-  min: number
-  max: number
-}
-
 export function positiveInt(value: unknown, fallback: number): number {
   const n = Math.floor(Number(value))
   return Number.isFinite(n) && n > 0 ? n : fallback
@@ -137,16 +129,24 @@ export function paperChoiceOf(
   return { whiteId, gridId }
 }
 
-export function springPagesPreset(sheets: number): PagesPreset {
-  const total = springTotalPages(sheets)
-  return {
-    options: [total],
-    default: total,
-    step: 2,
-    allowCustom: true,
-    min: SPRING_NOTEBOOK_COVER_PAGES + 2,
-    max: 1002,
-  }
+/** Кашировка: бумага обложки клеится на картон. Только у печатной обложки «Своя бумага и печать». */
+export function coverIsWrapped(structure?: BoundStructure | null): boolean {
+  return !isReadyLid(structure) && structure?.cover?.mode === 'separate' && structure.cover.wrap === true
+}
+
+/**
+ * Перед и зад: два картона на пружине или два листа бумаги под кашировку.
+ * Число страниц обложки тогда не настраивается, это всегда 2.
+ */
+export function coverIsTwoPiece(structure?: BoundStructure | null): boolean {
+  return usesBlockSheets(structure) || coverIsWrapped(structure)
+}
+
+export function sheetBlockError(sheets: unknown): string | null {
+  const n = Number(sheets)
+  if (!Number.isFinite(n) || n < 1) return 'Укажите листы блока'
+  if (n > SHEET_BLOCK_MAX_SHEETS) return `Не более ${SHEET_BLOCK_MAX_SHEETS} листов`
+  return null
 }
 
 export function applySheetBlock(
@@ -186,16 +186,36 @@ export function applySheetBlock(
   }
 }
 
+function coverHasPrintSetup(cover: BoundStructure['cover']): boolean {
+  if (!cover) return false
+  return Boolean(
+    cover.print?.technology_code ||
+    (cover.allowed_material_ids?.length ?? 0) > 0 ||
+    cover.material_id != null ||
+    cover.lamination?.service_id != null ||
+    cover.wrap === true,
+  )
+}
+
+/**
+ * Возврат к печатной обложке. Бумага, печать, ламинация и картон остаются теми,
+ * что были до готовой крышки: расчёт их не читал, пока обложка была выключена.
+ */
+export function applyPrintedCover(structure: BoundStructure | undefined): BoundStructure {
+  const cover = structure?.cover
+  const mode = cover?.mode && cover.mode !== 'none'
+    ? cover.mode
+    : coverHasPrintSetup(cover) ? 'separate' : cover?.mode
+  return {
+    ...(structure ?? {}),
+    coverChoice: 'printed',
+    cover: { ...(cover ?? {}), ...(mode ? { mode } : {}) },
+  }
+}
+
+/** Готовая крышка выключает печатную обложку, но её настройки не стирает. */
 export function applyReadyCover(structure: BoundStructure | undefined): BoundStructure {
   const cover = { ...(structure?.cover ?? {}) }
-  delete cover.print
-  delete cover.lamination
-  delete cover.page_count
-  delete cover.allowed_material_ids
-  delete cover.material_id
-  delete cover.wrap
-  delete cover.board_material_id
-  delete cover.board_material_ids
   const blockSides = structure?.innerBlock?.print?.sides_mode
   return {
     ...(structure ?? {}),

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { FormField } from '../../../components/common'
 import { CoverMaterialsAllowedEditor } from '../../../components/multipage/CoverMaterialsAllowedEditor'
 import { WarehouseMaterialsAllowedEditor } from './WarehouseMaterialsAllowedEditor'
@@ -22,12 +22,17 @@ import { getServiceVariants } from '../../../services/pricing/api'
 import { finishingLeafOptions } from '../finishingVariantTree'
 import type { ServiceVariant } from '../../../types/pricing'
 import {
+  SHEET_BLOCK_MAX_SHEETS,
+  applyPrintedCover,
   applyReadyCover,
   applySheetBlock,
   coverChoiceOf,
+  coverIsTwoPiece,
+  coverIsWrapped,
   sidesToCoverPrintChoice,
-  springPagesPreset,
+  springBlockPages,
   springSheetsOf,
+  springTotalPages,
   usesBlockSheets,
   type BoundStructure,
 } from '../../../utils/boundProductPreset'
@@ -99,8 +104,6 @@ type Props = {
   services?: ServiceRow[]
   /** Текущий размер — для кнопки «как у блока» */
   selectedSize?: SimplifiedSizeConfig | null
-  /** Пресет страниц калькулятора: листы блока переводятся в pages без ручного 102. */
-  onPagesPreset?: (pages: ReturnType<typeof springPagesPreset>) => void
 }
 
 export const MultiPageStructureCard: React.FC<Props> = ({
@@ -114,7 +117,6 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   bindingServices,
   services = [],
   selectedSize,
-  onPagesPreset,
 }) => {
   const innerBlock = structure.innerBlock || { pagesSource: 'parameter' as const }
   const cover = structure.cover || { mode: 'none' as const }
@@ -122,6 +124,15 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   const coverPrint = cover.print || {}
   const coverLamination = cover.lamination || {}
   const [laminationLeaves, setLaminationLeaves] = useState<ReturnType<typeof finishingLeafOptions>>([])
+
+  // Два изменения подряд из одного обработчика считаются от свежей сборки, не от снимка рендера:
+  // иначе второе стирает первое.
+  const latest = useRef(structure)
+  latest.current = structure
+  const commit = (patch: Partial<MultiPageStructureConfig>) => {
+    latest.current = { ...latest.current, ...patch }
+    onChange(patch)
+  }
 
   useEffect(() => {
     const serviceId = Number(coverLamination.service_id)
@@ -162,24 +173,9 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   const supportsDuplex =
     selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
 
-  const applyBlockPrintToCover = () => {
-    const dp = selectedSize?.default_print
-    if (!dp?.technology_code) return
-    onChange({
-      cover: {
-        ...cover,
-        mode: cover.mode === 'none' ? 'separate' : cover.mode,
-        print: {
-          technology_code: dp.technology_code,
-          color_mode: dp.color_mode ?? 'color',
-          sides_mode: dp.sides_mode ?? 'single',
-        },
-      },
-    })
-  }
-
-  const patchCover = (patch: Partial<typeof cover>) => {
-    const next = { ...cover, ...patch }
+  const patchCover = (patch: Partial<NonNullable<MultiPageStructureConfig['cover']>>) => {
+    const current = latest.current.cover || { mode: 'none' as const }
+    const next = { ...current, ...patch }
     if (patch.mode === 'separate' && !(next.allowed_material_ids?.length)) {
       const pref = preferredMaterialIds
         .map(Number)
@@ -190,42 +186,67 @@ export const MultiPageStructureCard: React.FC<Props> = ({
         next.allowed_material_ids = [Number(next.material_id)]
       }
     }
-    onChange({ cover: next })
+    commit({ cover: next })
   }
 
-  const patchCoverPrint = (patch: Partial<typeof coverPrint>) => {
-    patchCover({ print: { ...coverPrint, ...patch } })
+  const patchCoverPrint = (patch: Partial<NonNullable<NonNullable<MultiPageStructureConfig['cover']>['print']>>) => {
+    patchCover({ print: { ...(latest.current.cover?.print ?? {}), ...patch } })
   }
 
-  const patchBinding = (patch: Partial<typeof binding>) => {
-    onChange({ binding: { ...binding, ...patch } })
+  const applyBlockPrintToCover = () => {
+    const dp = selectedSize?.default_print
+    if (!dp?.technology_code) return
+    const currentMode = latest.current.cover?.mode
+    patchCover({
+      mode: !currentMode || currentMode === 'none' ? 'separate' : currentMode,
+      print: {
+        technology_code: dp.technology_code,
+        color_mode: dp.color_mode ?? 'color',
+        // Стороны блока на обложку не переносятся: у блокнота блок двухсторонний, картон печатают снаружи.
+        sides_mode: latest.current.cover?.print?.sides_mode ?? 'single',
+      },
+    })
+  }
+
+  const patchBinding = (patch: Partial<NonNullable<MultiPageStructureConfig['binding']>>) => {
+    commit({ binding: { ...(latest.current.binding ?? {}), ...patch } })
+  }
+
+  const patchInnerBlock = (patch: Partial<NonNullable<MultiPageStructureConfig['innerBlock']>>) => {
+    commit({
+      innerBlock: {
+        ...(latest.current.innerBlock ?? { pagesSource: 'parameter' as const }),
+        ...patch,
+      },
+    })
+  }
+
+  const patchNotebook = (patch: Partial<NonNullable<MultiPageStructureConfig['notebook']>>) => {
+    commit({ notebook: { ...(latest.current.notebook ?? {}), ...patch } })
   }
 
   const coverChoice = coverChoiceOf(structure as BoundStructure)
   const useSheets = usesBlockSheets(structure as BoundStructure)
+  const wrapped = coverIsWrapped(structure as BoundStructure)
+  const twoPieceCover = coverIsTwoPiece(structure as BoundStructure)
   const springSheets = springSheetsOf(structure as BoundStructure)
   const setCoverChoice = (next: 'printed' | 'ready') => {
-    if (next === 'ready') {
-      onChange(applyReadyCover(structure as BoundStructure))
-      return
-    }
-    onChange({ ...structure, coverChoice: 'printed' })
+    commit(
+      next === 'ready'
+        ? applyReadyCover(latest.current as BoundStructure)
+        : applyPrintedCover(latest.current as BoundStructure),
+    )
   }
   const setUseSheets = (enabled: boolean) => {
     if (!enabled) {
-      onChange({
-        notebook: { ...(structure.notebook ?? {}), use_sheets: false },
-      })
+      patchNotebook({ use_sheets: false })
       return
     }
-    const applied = applySheetBlock(structure as BoundStructure, springSheets)
-    onChange(applied)
-    onPagesPreset?.(springPagesPreset(springSheetsOf(applied)))
+    commit(applySheetBlock(latest.current as BoundStructure, springSheetsOf(latest.current as BoundStructure)))
   }
   const setSpringSheets = (sheets: number) => {
-    const applied = applySheetBlock(structure as BoundStructure, sheets)
-    onChange(applied)
-    onPagesPreset?.(springPagesPreset(springSheetsOf(applied)))
+    const bounded = Math.min(SHEET_BLOCK_MAX_SHEETS, Math.max(1, Math.floor(Number(sheets)) || 1))
+    commit(applySheetBlock(latest.current as BoundStructure, bounded))
   }
 
   const bindingService = bindingServices.find((b) => b.id === binding.service_id)
@@ -263,7 +284,12 @@ export const MultiPageStructureCard: React.FC<Props> = ({
 
   return (
     <div className="multipage-structure">
-      {pagesHint && (
+      {useSheets ? (
+        <p className="text-muted text-sm multipage-structure__hint">
+          Сейчас: {springSheets} листов блока с двух сторон — {springBlockPages(springSheets)} страниц, обложка — 2.
+          В переплёт уходит {springTotalPages(springSheets)} страниц, оператор это число не вводит.
+        </p>
+      ) : pagesHint && (
         <p className="text-muted text-sm multipage-structure__hint">
           Пример: {pagesHint.totalPages} стр. всего
           {pagesHint.coverPages > 0 ? ` (${pagesHint.coverPages} обложка + ${pagesHint.blockPages} блок)` : ''}
@@ -276,8 +302,8 @@ export const MultiPageStructureCard: React.FC<Props> = ({
         <h4 className="multipage-structure__title">Обложка</h4>
         <div className="simplified-form-grid">
           <FormField
-            label="Обложка"
-            help="Печатная — пружина, 7БЦ, винты и любой другой переплёт. Готовая крышка — клиент выбирает заготовку, канал подставляется по толщине."
+            label="Какая обложка"
+            help="Печатается — пружина, скоба, клеевой блок, 7БЦ. Крышка готовая — заготовка со склада, клиент выбирает её, печати обложки нет."
           >
             <select
               className="form-select"
@@ -289,6 +315,48 @@ export const MultiPageStructureCard: React.FC<Props> = ({
             </select>
           </FormField>
         </div>
+        {coverChoice === 'ready' && (
+          <>
+            <p className="text-muted text-sm">
+              Клиент выбирает только крышку: цвет и формат в названии, например «Обложка metalbind чёрная A4».
+              Канал — другая позиция склада, подставляется по толщине блока. Списание: 2 крышки и 1 канал.
+              Печать, страницы обложки и ламинация в калькуляторе скрыты. Настройки печатной обложки
+              не стираются: при возврате к «Обложка печатается» они на месте.
+            </p>
+            <WarehouseMaterialsAllowedEditor
+              materials={allMaterials}
+              allowedIds={structure.readyLid?.cover_material_ids ?? []}
+              onAllowedChange={(ids) =>
+                commit({
+                  readyLid: {
+                    ...(latest.current.readyLid ?? {}),
+                    cover_material_ids: ids,
+                  },
+                })
+              }
+              title="Крышки, которые выбирает клиент"
+              emptyMessage="Отметьте готовые крышки. Канал здесь не отмечается."
+            />
+            <WarehouseMaterialsAllowedEditor
+              materials={allMaterials}
+              allowedIds={structure.readyLid?.channel_material_ids ?? []}
+              onAllowedChange={(ids) =>
+                commit({
+                  readyLid: {
+                    ...(latest.current.readyLid ?? {}),
+                    channel_material_ids: ids,
+                  },
+                })
+              }
+              title="Каналы по диапазону толщины"
+              emptyMessage="Отметьте каналы. На карточке канала нужен диапазон «от–до», мм."
+            />
+          </>
+        )}
+      </section>
+
+      <section className="multipage-structure__section">
+        <h4 className="multipage-structure__title">Блок</h4>
         {coverChoice === 'printed' && (
           <label className="text-sm">
             <input
@@ -300,32 +368,37 @@ export const MultiPageStructureCard: React.FC<Props> = ({
             Оператор вводит листы блока, не итог страниц
           </label>
         )}
-        {useSheets && (
+        {useSheets ? (
           <>
+            <p className="text-muted text-sm">
+              В калькуляторе вместо поля «Страницы» — «Листы блока». Лист считается с двух сторон.
+              Обложка — два картона, перед и зад.
+            </p>
             <div className="simplified-form-grid">
-              <FormField label="Листов блока" help="50 листов с двух сторон — 100 страниц блока и 2 картона. В калькулятор уходит 102, руками его не вводят.">
+              <FormField
+                label="Листов блока по умолчанию"
+                help={`С этим числом калькулятор открывается, оператор его меняет. От 1 до ${SHEET_BLOCK_MAX_SHEETS}.`}
+              >
                 <input
                   className="form-input form-input--compact"
                   type="number"
                   min={1}
+                  max={SHEET_BLOCK_MAX_SHEETS}
                   value={springSheets}
                   onChange={(e) => setSpringSheets(Number(e.target.value))}
                 />
               </FormField>
             </div>
             <div className="simplified-form-grid">
-              <FormField label="Бумага «белая»" help="Оператор выбирает белую или клетку. Оба материала уже должны быть на складе.">
+              <FormField
+                label="Бумага «белая»"
+                help="Необязательно. Если выбраны обе бумаги, оператор видит выбор «Белая / В клетку» вместо дерева материалов."
+              >
                 <select
                   className="form-select"
                   value={structure.notebook?.white_material_id ?? ''}
                   onChange={(e) =>
-                    onChange({
-                      notebook: {
-                        ...(structure.notebook ?? {}),
-                        use_sheets: true,
-                        white_material_id: e.target.value ? Number(e.target.value) : undefined,
-                      },
-                    })
+                    patchNotebook({ white_material_id: e.target.value ? Number(e.target.value) : undefined })
                   }
                 >
                   <option value="">— Материал —</option>
@@ -341,13 +414,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                   className="form-select"
                   value={structure.notebook?.grid_material_id ?? ''}
                   onChange={(e) =>
-                    onChange({
-                      notebook: {
-                        ...(structure.notebook ?? {}),
-                        use_sheets: true,
-                        grid_material_id: e.target.value ? Number(e.target.value) : undefined,
-                      },
-                    })
+                    patchNotebook({ grid_material_id: e.target.value ? Number(e.target.value) : undefined })
                   }
                 >
                   <option value="">— Материал —</option>
@@ -360,137 +427,78 @@ export const MultiPageStructureCard: React.FC<Props> = ({
               </FormField>
             </div>
           </>
-        )}
-        {coverChoice === 'ready' && (
-          <>
-            <p className="text-muted text-sm">
-              Клиент выбирает только крышку: цвет и формат в названии, например «Обложка metalbind чёрная A4».
-              Канал — другая позиция склада, подставляется по толщине блока. Списание: 2 крышки и 1 канал.
-              Печать, страницы обложки и ламинация в калькуляторе скрыты. УФ по крышке сюда не входит:
-              его можно включить позже в этом же шаблоне, продукт заново не создаётся.
-            </p>
-            <FormField
-              label="Печать блока"
-              help="Оператор её не видит. Двухсторонняя: два страницы на лист, когда толщина считается из страниц."
-            >
+        ) : (
+          <div className="simplified-form-grid">
+            <FormField label="Откуда брать число страниц">
               <select
                 className="form-select"
-                value={innerBlock.print?.sides_mode === 'single' ? 'single' : 'duplex'}
-                onChange={(e) =>
-                  onChange({
-                    innerBlock: {
-                      ...innerBlock,
-                      print: {
-                        ...(innerBlock.print ?? {}),
-                        sides_mode: e.target.value === 'single' ? 'single' : 'duplex',
-                      },
-                    },
-                  })
-                }
+                value={innerBlock.pagesSource || 'parameter'}
+                onChange={(e) => patchInnerBlock({ pagesSource: e.target.value as 'parameter' | 'fixed' })}
               >
-                <option value="duplex">Двухсторонняя</option>
-                <option value="single">Односторонняя</option>
+                <option value="parameter">Из калькулятора (поле «Страницы»)</option>
+                <option value="fixed">Всегда фиксированное</option>
               </select>
             </FormField>
-            <WarehouseMaterialsAllowedEditor
-              materials={allMaterials}
-              allowedIds={structure.readyLid?.cover_material_ids ?? []}
-              onAllowedChange={(ids) =>
-                onChange({
-                  readyLid: {
-                    ...(structure.readyLid ?? {}),
-                    cover_material_ids: ids,
-                  },
-                })
-              }
-              title="Крышки, которые выбирает клиент"
-              emptyMessage="Отметьте готовые крышки. Канал здесь не отмечается."
-            />
-            <WarehouseMaterialsAllowedEditor
-              materials={allMaterials}
-              allowedIds={structure.readyLid?.channel_material_ids ?? []}
-              onAllowedChange={(ids) =>
-                onChange({
-                  readyLid: {
-                    ...(structure.readyLid ?? {}),
-                    channel_material_ids: ids,
-                  },
-                })
-              }
-              title="Каналы по диапазону толщины"
-              emptyMessage="Отметьте каналы. На карточке канала нужен диапазон «от–до», мм."
-            />
-          </>
+            {innerBlock.pagesSource === 'fixed' && (
+              <FormField
+                label="Страниц блока"
+                help="Это страницы, не листы: 50 листов с двух сторон — 100 страниц. Обложка прибавляется сверху."
+              >
+                <input
+                  className="form-input form-input--compact"
+                  type="number"
+                  min={1}
+                  value={innerBlock.fixedPages ?? ''}
+                  onChange={(e) =>
+                    patchInnerBlock({ fixedPages: e.target.value ? Number(e.target.value) : undefined })
+                  }
+                />
+              </FormField>
+            )}
+            {coverChoice === 'ready' && (
+              <FormField
+                label="Печать блока"
+                help="Оператор её не видит. Двухсторонняя — две страницы на лист: от этого зависит толщина блока и канал."
+              >
+                <select
+                  className="form-select"
+                  value={innerBlock.print?.sides_mode === 'single' ? 'single' : 'duplex'}
+                  onChange={(e) =>
+                    patchInnerBlock({
+                      print: {
+                        ...(latest.current.innerBlock?.print ?? {}),
+                        sides_mode: e.target.value === 'single' ? 'single' : 'duplex',
+                      },
+                    })
+                  }
+                >
+                  <option value="duplex">Двухсторонняя</option>
+                  <option value="single">Односторонняя</option>
+                </select>
+              </FormField>
+            )}
+          </div>
         )}
-      </section>
-
-      <section className="multipage-structure__section">
-        <h4 className="multipage-structure__title">Внутренний блок</h4>
-        <div className="simplified-form-grid">
-          <FormField label="Откуда брать число страниц">
-            <select
-              className="form-select"
-              value={innerBlock.pagesSource || 'parameter'}
-              onChange={(e) =>
-                onChange({
-                  innerBlock: {
-                    ...innerBlock,
-                    pagesSource: e.target.value as 'parameter' | 'fixed',
-                  },
-                })
-              }
-            >
-              <option value="parameter">Из калькулятора (поле «Страницы»)</option>
-              <option value="fixed">Всегда фиксированное</option>
-            </select>
-          </FormField>
-          {innerBlock.pagesSource === 'fixed' && (
-            <FormField label="Страниц в изделии">
-              <input
-                className="form-input form-input--compact"
-                type="number"
-                min={1}
-                value={innerBlock.fixedPages ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    innerBlock: {
-                      ...innerBlock,
-                      fixedPages: e.target.value ? Number(e.target.value) : undefined,
-                    },
-                  })
-                }
-              />
-            </FormField>
-          )}
-        </div>
       </section>
 
       {coverChoice === 'printed' && (
       <section className="multipage-structure__section">
         <h4 className="multipage-structure__title">Печать обложки</h4>
         <div className="simplified-form-grid">
-          <FormField label="Режим обложки">
-            <select
-              className="form-select"
-              value={cover.mode || 'none'}
-              onChange={(e) => {
-                const mode = e.target.value as 'none' | 'self' | 'separate'
-                if (useSheets && mode !== 'separate') {
-                  onChange({
-                    notebook: { ...(structure.notebook ?? {}), use_sheets: false },
-                    cover: { ...cover, mode },
-                  })
-                  return
-                }
-                patchCover({ mode })
-              }}
-            >
-              <option value="none">Без отдельной обложки</option>
-              <option value="self">Та же бумага и печать, что у блока</option>
-              <option value="separate">Своя бумага и печать</option>
-            </select>
-          </FormField>
-          {cover.mode !== 'none' && !useSheets && (
+          {!useSheets && (
+            <FormField label="Режим обложки">
+              <select
+                className="form-select"
+                value={cover.mode || 'none'}
+                onChange={(e) => patchCover({ mode: e.target.value as 'none' | 'self' | 'separate' })}
+              >
+                <option value="none">Без отдельной обложки</option>
+                <option value="self">Та же бумага и печать, что у блока</option>
+                <option value="separate">Своя бумага и печать</option>
+              </select>
+            </FormField>
+          )}
+          {cover.mode !== 'none' && !twoPieceCover && (
             <FormField
               label="Страниц обложки"
               help="Входят в общее число страниц в калькуляторе. Пример: 28 стр. всего = 4 обложка + 24 блок."
@@ -509,12 +517,14 @@ export const MultiPageStructureCard: React.FC<Props> = ({
               />
             </FormField>
           )}
-          {useSheets && (
-            <FormField label="Страниц обложки" help="Два картона, перед и зад. Оператор это число не вводит.">
-              <input className="form-input form-input--compact" value="2" readOnly />
-            </FormField>
-          )}
         </div>
+        {twoPieceCover && (
+          <p className="text-muted text-sm">
+            {wrapped
+              ? 'Обложка — два листа бумаги и два картона, перед и зад. В числе страниц изделия это 2, поле не настраивается.'
+              : 'Обложка — два картона, перед и зад. В числе страниц изделия это 2, поле не настраивается.'}
+          </p>
+        )}
 
         {cover.mode === 'separate' && (
           <div className="multipage-structure__subsection">
@@ -524,21 +534,21 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                 className="el-button el-button--mini multipage-structure__copy-btn"
                 onClick={applyBlockPrintToCover}
               >
-                Скопировать печать с текущего размера
+                Скопировать технологию и цвет с текущего размера
               </button>
             )}
             <CoverMaterialsAllowedEditor
               allowedIds={coverAllowedIds}
-              onAllowedChange={(ids) =>
+              onAllowedChange={(ids) => {
+                const currentDefault = latest.current.cover?.material_id
                 patchCover({
                   allowed_material_ids: ids,
                   material_id:
-                    cover.material_id != null &&
-                    ids.includes(Number(cover.material_id))
-                      ? cover.material_id
+                    currentDefault != null && ids.includes(Number(currentDefault))
+                      ? currentDefault
                       : ids[0],
                 })
-              }
+              }}
               allMaterials={allMaterials}
               paperTypes={paperTypes}
               defaultMaterialId={cover.material_id}
@@ -624,40 +634,6 @@ export const MultiPageStructureCard: React.FC<Props> = ({
               </FormField>
             </div>
 
-            {cover.mode === 'separate' && (
-              <label className="text-sm">
-                <input
-                  type="checkbox"
-                  checked={cover.wrap === true}
-                  onChange={(e) => patchCover({ wrap: e.target.checked || undefined })}
-                />
-                {' '}
-                Бумага кашируется на картон
-              </label>
-            )}
-            <p className="text-muted text-sm">
-              {cover.wrap
-                ? 'Это печатная обложка: бумагу печатают и ламинируют, затем накатывают на картон. Лист обложки не режется раскладкой блока. Со склада списываются 2 картона на изделие, перед и зад.'
-                : 'Без каширования обложка режется так же, как лист блока. Картон не списывается.'}
-            </p>
-            {cover.wrap && (
-              <WarehouseMaterialsAllowedEditor
-                materials={allMaterials}
-                allowedIds={cover.board_material_ids ?? []}
-                onAllowedChange={(ids) =>
-                  patchCover({
-                    board_material_ids: ids,
-                    board_material_id:
-                      cover.board_material_id != null && ids.includes(Number(cover.board_material_id))
-                        ? cover.board_material_id
-                        : ids[0],
-                  })
-                }
-                title="Переплётный картон"
-                emptyMessage="Отметьте картон. Бумага выше — это то, что печатается."
-              />
-            )}
-
             <div className="simplified-form-grid">
               <FormField
                 label="Ламинация обложки"
@@ -691,7 +667,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                     onChange={(e) =>
                       patchCover({
                         lamination: {
-                          ...coverLamination,
+                          ...(latest.current.cover?.lamination ?? {}),
                           variant_id: e.target.value ? Number(e.target.value) : undefined,
                         },
                       })
@@ -707,6 +683,40 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                 </FormField>
               )}
             </div>
+
+            <h5 className="multipage-structure__title">Кашировка</h5>
+            <label className="text-sm">
+              <input
+                type="checkbox"
+                checked={cover.wrap === true}
+                onChange={(e) => patchCover({ wrap: e.target.checked || undefined })}
+              />
+              {' '}
+              Бумага кашируется на картон
+            </label>
+            <p className="text-muted text-sm">
+              {cover.wrap
+                ? 'На изделие: 2 листа бумаги, которые печатают и ламинируют, и 2 картона. Лист бумаги не режется раскладкой блока. Картон входит в цену по отпускной цене склада. Своей ставки у кашировки нет: наклейка сидит в ставке листа переплёта.'
+                : 'Без кашировки обложка режется раскладкой блока, картон не списывается.'}
+            </p>
+            {cover.wrap && (
+              <WarehouseMaterialsAllowedEditor
+                materials={allMaterials}
+                allowedIds={cover.board_material_ids ?? []}
+                onAllowedChange={(ids) => {
+                  const currentBoard = latest.current.cover?.board_material_id
+                  patchCover({
+                    board_material_ids: ids,
+                    board_material_id:
+                      currentBoard != null && ids.includes(Number(currentBoard))
+                        ? currentBoard
+                        : ids[0],
+                  })
+                }}
+                title="Переплётный картон"
+                emptyMessage="Отметьте картон. Бумага выше — это то, что печатается."
+              />
+            )}
           </div>
         )}
       </section>
