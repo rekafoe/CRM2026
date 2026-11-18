@@ -149,6 +149,43 @@ export function springPagesPreset(sheets: number): PagesPreset {
   }
 }
 
+type SheetNotebookState = {
+  multiPageStructure?: BoundStructure
+  pages?: Partial<PagesPreset>
+  typeConfigs?: Record<string, { pages?: Partial<PagesPreset> }>
+}
+
+/**
+ * Листы блока и пресет страниц пишутся одним объектом.
+ * Два отдельных onChange из одного render затирают use_sheets старым снимком.
+ */
+export function applySheetNotebookState<T extends SheetNotebookState>(
+  value: T,
+  applied: BoundStructure,
+  typeId?: string | number | null,
+): T {
+  const preset = springPagesPreset(springSheetsOf(applied))
+  const key = typeId != null && typeId !== '' ? String(typeId) : null
+  const currentPages = key != null
+    ? value.typeConfigs?.[key]?.pages
+    : value.pages
+  const pages: Partial<PagesPreset> = {
+    ...(currentPages ?? {}),
+    options: preset.options,
+    default: preset.default,
+    step: preset.step,
+    allowCustom: preset.allowCustom,
+    min: preset.min,
+    max: preset.max,
+  }
+  if (key != null) {
+    const typeConfigs = { ...(value.typeConfigs ?? {}) }
+    typeConfigs[key] = { ...(typeConfigs[key] ?? {}), pages }
+    return { ...value, multiPageStructure: applied, typeConfigs }
+  }
+  return { ...value, multiPageStructure: applied, pages }
+}
+
 export function applySheetBlock(
   structure: BoundStructure | undefined,
   sheets: number = SPRING_NOTEBOOK_DEFAULT_SHEETS,

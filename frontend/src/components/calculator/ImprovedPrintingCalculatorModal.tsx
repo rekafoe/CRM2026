@@ -424,6 +424,14 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         }
       }
 
+      const sheetStructure = backendProductSchema?.template?.simplified?.multiPageStructure;
+      if (usesBlockSheets(sheetStructure)) {
+        const sheets = Number(sheetStructure?.notebook?.sheets) || 50;
+        next.notebook_sheets = sheets;
+        next.pages = springTotalPages(sheets, sheetStructure?.cover?.page_count ?? 2);
+        next.sides = 2;
+      }
+
       return next;
     });
   }, [simplified?.types, simplified?.typeConfigs, simplified?.pages, backendProductSchema, setSpecs]);

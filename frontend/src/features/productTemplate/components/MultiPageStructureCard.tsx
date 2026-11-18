@@ -26,7 +26,6 @@ import {
   applySheetBlock,
   coverChoiceOf,
   sidesToCoverPrintChoice,
-  springPagesPreset,
   springSheetsOf,
   usesBlockSheets,
   type BoundStructure,
@@ -99,8 +98,8 @@ type Props = {
   services?: ServiceRow[]
   /** Текущий размер — для кнопки «как у блока» */
   selectedSize?: SimplifiedSizeConfig | null
-  /** Пресет страниц калькулятора: листы блока переводятся в pages без ручного 102. */
-  onPagesPreset?: (pages: ReturnType<typeof springPagesPreset>) => void
+  /** Листы и пресет страниц одним обновлением, чтобы use_sheets не затирался. */
+  onApplySheetNotebook?: (applied: BoundStructure) => void
 }
 
 export const MultiPageStructureCard: React.FC<Props> = ({
@@ -114,7 +113,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   bindingServices,
   services = [],
   selectedSize,
-  onPagesPreset,
+  onApplySheetNotebook,
 }) => {
   const innerBlock = structure.innerBlock || { pagesSource: 'parameter' as const }
   const cover = structure.cover || { mode: 'none' as const }
@@ -219,13 +218,13 @@ export const MultiPageStructureCard: React.FC<Props> = ({
       return
     }
     const applied = applySheetBlock(structure as BoundStructure, springSheets)
-    onChange(applied)
-    onPagesPreset?.(springPagesPreset(springSheetsOf(applied)))
+    if (onApplySheetNotebook) onApplySheetNotebook(applied)
+    else onChange(applied)
   }
   const setSpringSheets = (sheets: number) => {
     const applied = applySheetBlock(structure as BoundStructure, sheets)
-    onChange(applied)
-    onPagesPreset?.(springPagesPreset(springSheetsOf(applied)))
+    if (onApplySheetNotebook) onApplySheetNotebook(applied)
+    else onChange(applied)
   }
 
   const bindingService = bindingServices.find((b) => b.id === binding.service_id)
@@ -637,7 +636,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
             )}
             <p className="text-muted text-sm">
               {cover.wrap
-                ? 'Это печатная обложка: бумагу печатают и ламинируют, затем накатывают на картон. Лист обложки не режется раскладкой блока. Со склада списываются 2 картона на изделие, перед и зад.'
+                ? 'Печатная обложка: печать и ламинация бумаги, 2 картона по отпускной цене. Отдельной ставки кашировки нет, наклейка внутри ставки bind. Лист обложки не режется раскладкой блока.'
                 : 'Без каширования обложка режется так же, как лист блока. Картон не списывается.'}
             </p>
             {cover.wrap && (

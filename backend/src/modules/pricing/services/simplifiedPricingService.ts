@@ -77,7 +77,9 @@ import {
   computeMultipagePrintUnits,
   computeMultipageSheetsPerItem,
   resolveBlockPagesForPrint,
+  resolveCoverPageCount,
   resolveMultipagePageSplit,
+  resolveSheetNotebookSheets,
   usesMultipageSheetPricing,
   validateBindingPagesLimit,
   validateMultiPageCountForTemplate,
@@ -1214,8 +1216,24 @@ export class SimplifiedPricingService {
     const pagesFromParameter =
       multiPageStructure?.innerBlock?.pagesSource !== 'fixed' ||
       !(Number.isFinite(fixedPages) && fixedPages > 0);
-    const pagesCountRaw =
+    let pagesCountRaw =
       !pagesFromParameter && Number.isFinite(fixedPages) && fixedPages > 0 ? fixedPages : rawPagesCount;
+    // Листы блока: 50 двусторонних листов + обложка, даже если в pages пришло 50 или сторона осталась 1.
+    const notebookSheets = usePagesMultiplier && pagesFromParameter
+      ? resolveSheetNotebookSheets(
+          multiPageStructure,
+          (configuration as { notebook_sheets?: number }).notebook_sheets,
+        )
+      : null;
+    const sheetNotebook = notebookSheets != null;
+    if (sheetNotebook) {
+      const coverPages = resolveCoverPageCount(multiPageStructure);
+      pagesCountRaw = notebookSheets * 2 + coverPages;
+      normalizedConfig = {
+        ...normalizedConfig,
+        print_sides_mode: 'duplex',
+      };
+    }
     const pageSplit = usePagesMultiplier
       ? resolveMultipagePageSplit({
           pagesCount: pagesCountRaw,
@@ -1234,7 +1252,7 @@ export class SimplifiedPricingService {
       usePagesMultiplier && Number.isFinite(blockPagesForPrint) && blockPagesForPrint > 0
         ? blockPagesForPrint
         : 1;
-    if (usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0) {
+    if (usePagesMultiplier && !sheetNotebook && Number.isFinite(pagesCount) && pagesCount > 0) {
       validateMultiPageCountForTemplate(Math.floor(pagesCount), effectivePagesConfig, {
         isMultiPage: true,
       });
@@ -1442,11 +1460,19 @@ export class SimplifiedPricingService {
       });
     } else if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
       const techNorm = (s: string) => (s ?? '').trim().toLowerCase();
-      const printPriceConfig = selectedSize.print_prices.find(p =>
+      let printPriceConfig = selectedSize.print_prices.find(p =>
         techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
         (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
         (p.sides_mode ?? '').toLowerCase() === (pricingSidesMode ?? '').toLowerCase()
       );
+      // Листы блока всегда двусторонние. Нет отдельной строки duplex — ставка листа один раз, без ×2.
+      if (sheetNotebook && !duplexAsSingleX2 && !printPriceConfig) {
+        printPriceConfig = selectedSize.print_prices.find(p =>
+          techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
+          (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
+          (p.sides_mode ?? '').toLowerCase() === 'single'
+        );
+      }
 
       logger.info('Расчет цены печати', {
         print_technology: normalizedConfig.print_technology,
@@ -3870,7 +3896,7 @@ export class SimplifiedPricingService {
     const sidesMode =
       ctx.configuration.cover_print_sides_mode ||
       cover.print?.sides_mode ||
-      ctx.sidesMode ||
+      (cover.wrap === true ? 'single' : ctx.sidesMode) ||
       'duplex';
     const technologyCode =
       ctx.configuration.cover_print_technology ||

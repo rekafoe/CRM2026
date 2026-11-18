@@ -3,6 +3,7 @@ import {
   WRAP_BOARDS_PER_ITEM,
   applyReadyCover,
   applySheetBlock,
+  applySheetNotebookState,
   coverPrintChoiceToSides,
   describeOperatorView,
   pickChannel,
@@ -25,6 +26,19 @@ assert.equal(spring.cover?.page_count, 2)
 assert.equal(spring.cover?.print?.sides_mode, 'single')
 assert.equal(spring.innerBlock?.print?.sides_mode, 'duplex')
 assert.deepEqual(springPagesPreset(50).options, [102])
+
+const saved = applySheetNotebookState(
+  {
+    multiPageStructure: { coverChoice: 'printed' as const },
+    pages: { options: [16], default: 16 },
+    typeConfigs: { '7': { pages: { options: [16], default: 16 } } },
+  },
+  spring,
+  7,
+)
+assert.equal(saved.multiPageStructure?.notebook?.use_sheets, true)
+assert.equal(saved.typeConfigs?.['7']?.pages?.default, 102)
+assert.deepEqual(saved.typeConfigs?.['7']?.pages?.options, [102])
 
 const springView = describeOperatorView(spring)
 assert.equal(springView.showSheets, true)

@@ -248,6 +248,28 @@ export function validateBindingPagesLimit(
 export type MultipageCoverMode = 'none' | 'self' | 'separate';
 
 /** Сколько страниц альбома занимает обложка (входит в общее число страниц в калькуляторе). */
+/**
+ * Листы блока, если оператор вводит листы, а не итог страниц.
+ * null — обычный расчёт по полю pages.
+ */
+export function resolveSheetNotebookSheets(
+  multiPageStructure: unknown,
+  requestedSheets: unknown,
+): number | null {
+  if (!multiPageStructure || typeof multiPageStructure !== 'object' || Array.isArray(multiPageStructure)) {
+    return null;
+  }
+  const structure = multiPageStructure as Record<string, unknown>;
+  if (structure.coverChoice === 'ready') return null;
+  const notebook = structure.notebook as Record<string, unknown> | undefined;
+  if (!notebook || notebook.use_sheets !== true) return null;
+  const requested = Math.floor(Number(requestedSheets));
+  const template = Math.floor(Number(notebook.sheets));
+  if (Number.isFinite(requested) && requested > 0) return requested;
+  if (Number.isFinite(template) && template > 0) return template;
+  return 50;
+}
+
 export function resolveCoverPageCount(multiPageStructure: unknown): number {
   if (!multiPageStructure || typeof multiPageStructure !== 'object' || Array.isArray(multiPageStructure)) {
     return 0;

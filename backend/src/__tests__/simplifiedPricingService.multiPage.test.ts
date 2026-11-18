@@ -779,5 +779,129 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     ]);
     expect(result.finalPrice).toBe(230);
   });
+
+  it('50 листов с кашировкой: блок двусторонний, картон 2 шт, переплёт один раз', async () => {
+    templateConfigData.simplified.include_material_cost = true;
+    templateConfigData.simplified.sizes[0].print_prices = [
+      {
+        technology_code: 'laser_prof',
+        color_mode: 'color',
+        sides_mode: 'single',
+        tiers: [{ min_qty: 1, unit_price: 2 }],
+      },
+      {
+        technology_code: 'laser_prof',
+        color_mode: 'color',
+        sides_mode: 'duplex',
+        tiers: [{ min_qty: 1, unit_price: 2 }],
+      },
+    ];
+    templateConfigData.simplified.sizes[0].finishing = [{ service_id: 88, price_unit: 'per_sheet', units_per_item: 1 }];
+    templateConfigData.simplified.multiPageStructure = {
+      coverChoice: 'printed',
+      notebook: { use_sheets: true, sheets: 50 },
+      innerBlock: { pagesSource: 'parameter', print: { sides_mode: 'duplex' } },
+      cover: {
+        mode: 'separate',
+        wrap: true,
+        page_count: 2,
+        board_material_ids: [41],
+        print: { technology_code: 'laser_prof', color_mode: 'color', sides_mode: 'single' },
+        lamination: { service_id: 88 },
+      },
+      binding: { service_id: 77, units_per_item: 1 },
+    };
+    (PricingServiceRepository.listServiceTiers as jest.Mock).mockImplementation(async (serviceId: number) => {
+      if (serviceId === 88) return [{ id: 1, serviceId: 88, minQuantity: 1, rate: 3, isActive: true }];
+      return [];
+    });
+    mockedQuoteBinding.mockImplementation(async (request) => ({
+      serviceId: request.serviceId,
+      serviceName: 'Переплёт',
+      priceUnit: 'per_item',
+      unitPrice: 5,
+      units: request.quantity * (request.unitsPerItem ?? 1),
+      total: 5 * request.quantity * (request.unitsPerItem ?? 1),
+    }));
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services')) {
+          const id = Number(params?.[0]);
+          if (id === 77) return { id: 77, name: 'Переплёт', operation_type: 'bind', is_active: 1 };
+          if (id === 88) {
+            return {
+              id: 88,
+              name: 'Ламинация',
+              operation_type: 'laminate',
+              price_unit: 'per_sheet',
+              price: 3,
+              min_quantity: 1,
+              is_active: 1,
+            };
+          }
+        }
+        if (String(query).includes('sheet_price_single') && Number(params?.[0]) === 41) {
+          return { name: 'Картон переплётный', sheet_price_single: 1.5 };
+        }
+        return null;
+      }),
+      all: jest.fn(async (query: string) => {
+        if (String(query).includes('FROM post_processing_services') && String(query).includes('id IN')) {
+          return [{
+            id: 88,
+            name: 'Ламинация',
+            operation_type: 'laminate',
+            price_unit: 'per_sheet',
+            min_quantity: 1,
+            max_quantity: null,
+          }];
+        }
+        return [];
+      }),
+      run: jest.fn(),
+    } as any);
+
+    const request = {
+      size_id: 'a4',
+      print_technology: 'laser_prof',
+      print_color_mode: 'color' as const,
+      print_sides_mode: 'single' as const,
+      pages: 50,
+      notebook_sheets: 50,
+    };
+
+    const fixed = await SimplifiedPricingService.calculatePrice(1, request as any, 1);
+    // 50 листов duplex × 2 = 100. Обложка 2 × 2 = 4. Картон 2 × 1.5 = 3. Ламинация 2 × 3 = 6. Переплёт 5.
+    expect(fixed.breakdown?.innerBlockPrice).toBe(100);
+    expect(fixed.breakdown?.coverPrice).toBe(7);
+    expect(fixed.breakdown?.bindingPrice).toBe(5);
+    expect(fixed.operationMaterials).toEqual([
+      { material_id: 41, material_name: 'Картон переплётный', quantity: 2 },
+    ]);
+    const lamination = (fixed.finishingDetails ?? []).filter((row) => row.service_id === 88);
+    expect(lamination).toHaveLength(1);
+    expect(lamination[0].units_needed).toBe(2);
+    expect(lamination[0].priceForQuantity).toBe(6);
+    expect(mockedQuoteBinding).toHaveBeenCalledWith(
+      expect.objectContaining({ serviceId: 77, quantity: 1, unitsPerItem: 1 }),
+    );
+    expect(fixed.finalPrice).toBe(118);
+
+    templateConfigData.simplified.multiPageStructure.notebook.use_sheets = false;
+    const doubled = await SimplifiedPricingService.calculatePrice(
+      1,
+      { ...request, pages: 102, print_sides_mode: 'single' } as any,
+      1,
+    );
+    // Поле страниц 102 и сторона 1: блок 100 листов × 2 = 200. Лишние 50 листов.
+    expect(doubled.breakdown?.innerBlockPrice).toBe(200);
+    expect(doubled.breakdown?.coverPrice).toBe(7);
+    expect(doubled.operationMaterials?.[0]?.quantity).toBe(2);
+    expect(doubled.finalPrice).toBe(218);
+  });
 });
 

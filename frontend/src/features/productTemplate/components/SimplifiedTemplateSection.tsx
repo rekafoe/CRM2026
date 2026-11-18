@@ -19,6 +19,7 @@ import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
 import { computeItemsPerSheet } from './PrintSheetSection'
 import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
 import { MultiPageStructureCard } from './MultiPageStructureCard'
+import { applySheetNotebookState, type BoundStructure } from '../../../utils/boundProductPreset'
 import { MultiPagePagesTab } from './MultiPagePagesTab'
 import {
   computeMultipageSheetsPerItem,
@@ -484,6 +485,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     })
   }, [onChange, value])
 
+  const applySheetNotebook = useCallback((applied: BoundStructure) => {
+    onChange(applySheetNotebookState(value, applied, hasTypes ? selectedTypeId : null))
+  }, [onChange, value, hasTypes, selectedTypeId])
+
   const handleSelectType = useCallback(
     (typeId: ProductTypeId) => {
       setSelectedTypeId(typeId)
@@ -939,7 +944,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                 <div>
                   {headerWithHint(
                     'Сборка изделия',
-                    'Внутренний блок, обложка и переплёт. Другой переплёт — отдельный продукт в каталоге.',
+                    'Печатная обложка или готовая крышка, листы блока, кашировка. Переплёт — услуга bind.',
                   )}
                 </div>
               </div>
@@ -955,7 +960,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   bindingServices={bindingServices}
                   services={services}
                   selectedSize={selected ?? null}
-                  onPagesPreset={updatePagesConfig}
+                  onApplySheetNotebook={applySheetNotebook}
                 />
               </div>
             </div>
