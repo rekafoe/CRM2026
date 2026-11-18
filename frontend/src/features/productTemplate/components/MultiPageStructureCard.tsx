@@ -388,6 +388,19 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                   onChange={(e) => setSpringSheets(Number(e.target.value))}
                 />
               </FormField>
+              <FormField
+                label="Печать блока"
+                help="Без печати — в цене блока только бумага, оператор технологию печати не выбирает. С печатью — цена из двухсторонней строки печати размера."
+              >
+                <select
+                  className="form-select"
+                  value={innerBlock.printed === false ? 'none' : 'duplex'}
+                  onChange={(e) => patchInnerBlock({ printed: e.target.value !== 'none' })}
+                >
+                  <option value="none">Без печати: бумага белая или с линовкой</option>
+                  <option value="duplex">Печатается с двух сторон</option>
+                </select>
+              </FormField>
             </div>
             <div className="simplified-form-grid">
               <FormField

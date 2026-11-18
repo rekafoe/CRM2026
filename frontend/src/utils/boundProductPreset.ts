@@ -30,6 +30,8 @@ export type BoundStructure = {
   innerBlock?: {
     pagesSource?: 'parameter' | 'fixed'
     fixedPages?: number
+    /** false — блок не печатается: бумага белая или уже с линовкой. */
+    printed?: boolean
     print?: {
       technology_code?: string
       color_mode?: 'color' | 'bw'
@@ -113,6 +115,20 @@ export function usesBlockSheets(structure?: BoundStructure | null): boolean {
   return !isReadyLid(structure) && structure?.notebook?.use_sheets === true
 }
 
+/** Блок без печати: в цене остаётся только бумага блока. Действует при листах блока. */
+export function blockIsUnprinted(structure?: BoundStructure | null): boolean {
+  return usesBlockSheets(structure) && structure?.innerBlock?.printed === false
+}
+
+/** Услуги, которые шаблон уже включил сам: оператору их галочки не показывают. */
+export function templateServiceIds(structure?: BoundStructure | null): number[] {
+  const ids = [structure?.binding?.service_id]
+  if (!isReadyLid(structure) && structure?.cover?.mode === 'separate') {
+    ids.push(structure.cover.lamination?.service_id)
+  }
+  return ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+}
+
 export function springSheetsOf(structure?: BoundStructure | null): number {
   return positiveInt(structure?.notebook?.sheets, SPRING_NOTEBOOK_DEFAULT_SHEETS)
 }
@@ -169,6 +185,8 @@ export function applySheetBlock(
     innerBlock: {
       ...(structure?.innerBlock ?? {}),
       pagesSource: 'parameter',
+      // Блокнот по умолчанию без печати блока: бумага белая или с линовкой.
+      printed: structure?.innerBlock?.printed ?? false,
       print: {
         ...(structure?.innerBlock?.print ?? {}),
         sides_mode: 'duplex',
@@ -220,10 +238,6 @@ export function applyReadyCover(structure: BoundStructure | undefined): BoundStr
   return {
     ...(structure ?? {}),
     coverChoice: 'ready',
-    notebook: {
-      ...(structure?.notebook ?? {}),
-      use_sheets: false,
-    },
     innerBlock: {
       ...(structure?.innerBlock ?? {}),
       print: {
@@ -315,8 +329,9 @@ export function describeOperatorView(structure?: BoundStructure | null): Operato
     }
   }
   if (usesBlockSheets(structure)) {
+    const unprinted = blockIsUnprinted(structure)
     return {
-      hidePrint: false,
+      hidePrint: unprinted,
       hideCover: false,
       hideLamination: false,
       hidePages: true,
@@ -324,7 +339,7 @@ export function describeOperatorView(structure?: BoundStructure | null): Operato
       showCoverPrint: true,
       showReadyLid: false,
       paperChoice: paperChoiceOf(structure),
-      hiddenLabels: ['поле «Страницы»'],
+      hiddenLabels: unprinted ? ['поле «Страницы»', 'печать блока'] : ['поле «Страницы»'],
     }
   }
   return {

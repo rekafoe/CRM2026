@@ -476,6 +476,8 @@ interface SimplifiedConfig {
     innerBlock?: {
       pagesSource?: 'parameter' | 'fixed';
       fixedPages?: number;
+      /** false — блок не печатается: бумага белая или уже с линовкой. Бумага блока в цене остаётся. */
+      printed?: boolean;
       print?: {
         technology_code?: string;
         color_mode?: 'color' | 'bw';
@@ -1372,11 +1374,16 @@ export class SimplifiedPricingService {
         rule: coverSheetRule,
       });
     const coverPrintUnits = separateCoverForTier ? coverPrintUnitsFor(quantity, coverSidesForTier) : 0;
+    // Блок без печати в прогон не входит: ступень печати обложки выбирается по листам обложки.
+    const blockUnprinted = usePagesMultiplier && multiPageStructure?.innerBlock?.printed === false;
+    const tierUnitsWithCover = (blockUnits: number, coverUnits: number): number => {
+      if (coverUnits <= 0) return blockUnits;
+      return blockUnprinted ? coverUnits : blockUnits + coverUnits;
+    };
     /** Суммарный объём печати на одном прогоне (блок + обложка) — для выбора tier. */
-    const multipageTierPrintUnits =
-      usePagesMultiplier && coverPrintUnits > 0
-        ? multipagePrintUnits + coverPrintUnits
-        : multipagePrintUnits;
+    const multipageTierPrintUnits = usePagesMultiplier
+      ? tierUnitsWithCover(multipagePrintUnits, coverPrintUnits)
+      : multipagePrintUnits;
 
     const isDuplexModeSelected =
       normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
@@ -1392,7 +1399,9 @@ export class SimplifiedPricingService {
     let uvPrintDetails: UvFlatbedPricingResult | undefined;
     let rollWideM2Details: RollWideM2PricingResult | undefined;
 
-    if (isUvFlatbedMode) {
+    if (blockUnprinted) {
+      logger.info('Блок без печати: цена печати блока не считается', { productId });
+    } else if (isUvFlatbedMode) {
       const techCode = String(normalizedConfig.print_technology || 'uv').trim().toLowerCase() || 'uv';
       normalizedConfig.print_technology = techCode;
       const uvInput = (normalizedConfig as { uv_print?: UvPrintConfiguration }).uv_print;
@@ -2741,6 +2750,7 @@ export class SimplifiedPricingService {
         itemsPerSheet,
         sidesMode: normalizedConfig.print_sides_mode || 'single',
         tierPrintUnits: tierSheetsOverride ?? multipageTierPrintUnits,
+        warnings: pricingWarnings,
       });
       coverLaminationQuote = await quoteConfiguredCoverLamination(quantity);
       if (coverLaminationQuote && coverLaminationQuote.total > 0) {
@@ -2972,12 +2982,8 @@ export class SimplifiedPricingService {
       const pagesPerSheet = templateSides
         ? (templateSides === 'single' ? 1 : 2)
         : (normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back' ? 2 : 1);
-      const explicitSheets = multiPageStructure?.notebook?.use_sheets
-        ? Number((normalizedConfig as { notebook_sheets?: number }).notebook_sheets)
-        : 0;
-      const sheetCount = explicitSheets > 0
-        ? Math.floor(explicitSheets)
-        : blockSheetCount(pageSplit.innerPages, pagesPerSheet);
+      // У готовой крышки блок листами не задаётся: толщина считается из страниц.
+      const sheetCount = blockSheetCount(pageSplit.innerPages, pagesPerSheet);
       const thicknessCols = await getTableColumns('materials');
       const hasThickness = thicknessCols.has('sheet_thickness_mm') && thicknessCols.has('spine_thickness_mm');
       const hasChannelRange = thicknessCols.has('channel_min_mm') && thicknessCols.has('channel_max_mm');
@@ -3138,6 +3144,7 @@ export class SimplifiedPricingService {
     // 7.5. Цены по диапазонам тиража для выбранной конфигурации
     const tnTier = (s: string) => (s ?? '').trim().toLowerCase();
     const printPriceConfigForTiers =
+      !blockUnprinted &&
       normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode
         ? selectedSize.print_prices.find(
             (p: any) =>
@@ -3250,7 +3257,7 @@ export class SimplifiedPricingService {
             coverPages: pageSplit.coverPages,
             itemsPerSheet,
             sidesMode: normalizedConfig.print_sides_mode || 'single',
-            tierPrintUnits: tierBlockUnits + tierCoverUnitsOnly,
+            tierPrintUnits: tierUnitsWithCover(tierBlockUnits, tierCoverUnitsOnly),
           });
         }
 
@@ -3872,6 +3879,8 @@ export class SimplifiedPricingService {
     sidesMode: string;
     /** Объём для tier (блок + обложка); биллинг — по coverPrintUnits. */
     tierPrintUnits?: number;
+    /** Куда писать, что у печати обложки нет цены. Таблица тиражей его не передаёт. */
+    warnings?: string[];
   }): Promise<number> {
     const cover = ctx.multiPageStructure.cover;
     if (!cover || cover.mode !== 'separate' || ctx.coverPages < 1) return 0;
@@ -3921,6 +3930,12 @@ export class SimplifiedPricingService {
         if (tierPrice > 0) {
           printPrice = tierPrice * coverPrintUnits;
         }
+      }
+      if (!(printPrice > 0)) {
+        const sidesLabel = sidesMode === 'single' ? 'односторонняя' : 'двухсторонняя';
+        ctx.warnings?.push(
+          `Печать обложки посчитана как 0: в печати размера нет цены в строке «${technologyCode}, ${colorMode === 'bw' ? 'ч/б' : 'цвет'}, ${sidesLabel}».`,
+        );
       }
     }
 

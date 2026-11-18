@@ -17,7 +17,7 @@ import {
   isUvFlatbedProduct,
   type UvPrintState,
 } from '../utils/uvPrintConfig';
-import { describeOperatorView, type BoundStructure } from '../../../utils/boundProductPreset';
+import { describeOperatorView, templateServiceIds, type BoundStructure } from '../../../utils/boundProductPreset';
 import { ReadyLidSection } from './ReadyLidSection';
 import { CoverBoardSection } from './CoverBoardSection';
 
@@ -347,6 +347,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             updateSpecs={updateSpecs as any}
             allowedOperationIds={allowedOperationIds}
             hideLamination={operatorView.hideLamination}
+            hiddenOperationIds={isMultiPageProduct ? templateServiceIds(boundStructure) : undefined}
           />
         </div>
 

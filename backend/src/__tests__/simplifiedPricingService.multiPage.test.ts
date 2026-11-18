@@ -975,6 +975,46 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       expect(result.finalPrice).toBe(39.45);
     });
 
+    it('блок без печати: бумага в цене, печать блока нет, ступень обложки — по листам обложки', async () => {
+      mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
+      templateConfigData.simplified.multiPageStructure.innerBlock = { pagesSource: 'parameter', printed: false };
+      // Двухсторонняя строка с ценой: без флага блок стоил бы 50 листов × 2.
+      templateConfigData.simplified.sizes[0].print_prices[1].tiers = [{ min_qty: 1, unit_price: 2 }];
+
+      const result = await SimplifiedPricingService.calculatePrice(
+        1,
+        // Технологию печати оператор не выбирает: поле в калькуляторе скрыто.
+        notebookRequest({ print_technology: undefined, print_color_mode: undefined }) as any,
+        1,
+      );
+
+      expect(result.printPrice).toBe(0);
+      expect(result.breakdown?.innerBlockPrice).toBe(3.5);
+      // 50 непечатных листов блока тираж печати не поднимают: 2 листа обложки идут по первой ступени, 3.
+      // Обложка: 2 × 3 + бумага 2.4 + картон 5.
+      expect(result.breakdown?.coverPrice).toBe(13.4);
+      expect(result.finalPrice).toBe(42.7);
+      expect(result.tier_prices?.[0]).toMatchObject({ min_qty: 1, total_price: 42.7 });
+      expect(result.warnings ?? []).toEqual([]);
+    });
+
+    it('предупреждает, если у печати обложки нет цены', async () => {
+      mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
+      templateConfigData.simplified.multiPageStructure.innerBlock = { pagesSource: 'parameter', printed: false };
+
+      const result = await SimplifiedPricingService.calculatePrice(
+        1,
+        // «С двух сторон», а двухсторонняя строка печати размера пустая.
+        notebookRequest({ cover_print_sides_mode: 'duplex' }) as any,
+        1,
+      );
+
+      expect(result.breakdown?.coverPrice).toBe(7.4);
+      expect(result.warnings).toEqual([
+        'Печать обложки посчитана как 0: в печати размера нет цены в строке «laser_sheet, цвет, двухсторонняя».',
+      ]);
+    });
+
     it('отклоняет больше 500 листов блока', async () => {
       mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
 

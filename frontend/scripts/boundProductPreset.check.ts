@@ -8,10 +8,12 @@ import {
   pickChannel,
   readyLidThicknessMm,
   applyPrintedCover,
+  blockIsUnprinted,
   coverIsTwoPiece,
   sheetBlockError,
   springBlockPages,
   springTotalPages,
+  templateServiceIds,
   usesBlockSheets,
 } from '../src/utils/boundProductPreset.ts'
 import { resolveCoverPageCount, resolveMultipagePageSplit } from '../src/utils/multipageProduct.ts'
@@ -43,17 +45,37 @@ assert.deepEqual(
   { totalPages: 102, coverPages: 2, innerPages: 100, coverMode: 'separate' },
 )
 
+// Блокнот по умолчанию без печати блока: оператор технологию печати не выбирает.
+assert.equal(spring.innerBlock?.printed, false)
+assert.equal(blockIsUnprinted(spring), true)
 const springView = describeOperatorView(spring)
 assert.equal(springView.showSheets, true)
 assert.equal(springView.showCoverPrint, true)
 assert.equal(springView.hidePages, true)
-assert.equal(springView.hidePrint, false)
+assert.equal(springView.hidePrint, true)
 assert.equal(springView.hideLamination, false)
-assert.deepEqual(springView.hiddenLabels, ['поле «Страницы»'])
+assert.deepEqual(springView.hiddenLabels, ['поле «Страницы»', 'печать блока'])
+
+const printedBlock = applySheetBlock({ innerBlock: { printed: true } }, 50)
+assert.equal(printedBlock.innerBlock?.printed, true)
+assert.equal(describeOperatorView(printedBlock).hidePrint, false)
+assert.deepEqual(describeOperatorView(printedBlock).hiddenLabels, ['поле «Страницы»'])
+// Без листов блока флаг не действует: печать блока задаётся строками размера, как раньше.
+assert.equal(blockIsUnprinted({ innerBlock: { printed: false } }), false)
+
+assert.deepEqual(
+  templateServiceIds({
+    binding: { service_id: 28 },
+    cover: { mode: 'separate', lamination: { service_id: 8 } },
+  }),
+  [28, 8],
+)
+assert.deepEqual(templateServiceIds({ binding: {}, cover: { mode: 'none', lamination: { service_id: 8 } } }), [])
 
 assert.equal(WRAP_BOARDS_PER_ITEM, 2)
 
 const ready = applyReadyCover({
+  notebook: { use_sheets: true, sheets: 40 },
   cover: {
     mode: 'separate',
     page_count: 4,
@@ -72,6 +94,9 @@ assert.equal(ready.cover?.print?.technology_code, 'digital')
 assert.equal(ready.cover?.lamination?.service_id, 9)
 assert.equal(ready.cover?.board_material_id, 41)
 assert.equal(coverIsTwoPiece(ready), false)
+// Листы блока у готовой крышки не действуют, но галочка не сбрасывается.
+assert.equal(usesBlockSheets(ready), false)
+assert.equal(ready.notebook?.use_sheets, true)
 
 const back = applyPrintedCover(ready)
 assert.equal(back.coverChoice, 'printed')
@@ -80,6 +105,8 @@ assert.equal(back.cover?.wrap, true)
 assert.equal(back.cover?.page_count, 4)
 assert.equal(back.cover?.lamination?.service_id, 9)
 assert.deepEqual(back.cover?.board_material_ids, [41])
+assert.equal(usesBlockSheets(back), true)
+assert.equal(back.notebook?.sheets, 40)
 assert.equal(applyPrintedCover({ coverChoice: 'ready', cover: { mode: 'none' } }).cover?.mode, 'none')
 assert.equal(ready.binding?.service_id, 3)
 assert.equal(ready.innerBlock?.print?.sides_mode, 'duplex')

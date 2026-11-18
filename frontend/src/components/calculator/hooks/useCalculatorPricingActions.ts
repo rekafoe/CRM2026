@@ -10,7 +10,7 @@ import {
   serializeUvPrintForApi,
   type UvPrintState,
 } from '../utils/uvPrintConfig';
-import { isReadyLid } from '../../../utils/boundProductPreset';
+import { blockIsUnprinted, isReadyLid } from '../../../utils/boundProductPreset';
 
 interface BuildSummaryOptions {
   isCustomFormat: boolean;
@@ -248,8 +248,11 @@ export function useCalculatorPricingActions({
         }
 
         //  Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
-        const readyLid = isReadyLid(backendProductSchema?.template?.simplified?.multiPageStructure);
-        const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes) && !readyLid;
+        const boundStructure = backendProductSchema?.template?.simplified?.multiPageStructure;
+        const readyLid = isReadyLid(boundStructure);
+        // Готовая крышка и блок без печати: оператор технологию печати не выбирает.
+        const requiresPrint =
+          productRequiresPrint(backendProductSchema, effectiveSizes) && !readyLid && !blockIsUnprinted(boundStructure);
         const materialDrivenPrinting =
           backendProductSchema?.template?.simplified?.material_driven_printing === true;
         let resolvedPrintTechnology = printTechnology;
