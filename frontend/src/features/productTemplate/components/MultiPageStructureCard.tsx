@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { FormField } from '../../../components/common'
 import { CoverMaterialsAllowedEditor } from '../../../components/multipage/CoverMaterialsAllowedEditor'
 import {
@@ -16,7 +16,10 @@ import type {
   MultiPageStructureConfig,
   SimplifiedSizeConfig,
 } from '../hooks/useProductTemplate'
-import type { BindingServiceRow, BindingServiceVariant } from './SimplifiedTemplateSection'
+import type { BindingServiceRow, BindingServiceVariant, ServiceRow } from './SimplifiedTemplateSection'
+import { getServiceVariants } from '../../../services/pricing/api'
+import { finishingLeafOptions } from '../finishingVariantTree'
+import type { ServiceVariant } from '../../../types/pricing'
 
 type PrintTechRow = { code: string; name: string; supports_duplex?: number | boolean }
 
@@ -81,6 +84,8 @@ type Props = {
   }>
   printTechs: PrintTechRow[]
   bindingServices: BindingServiceRow[]
+  /** Услуги справочника — для ламинации только обложки */
+  services?: ServiceRow[]
   /** Текущий размер — для кнопки «как у блока» */
   selectedSize?: SimplifiedSizeConfig | null
 }
@@ -94,12 +99,43 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   paperTypes,
   printTechs,
   bindingServices,
+  services = [],
   selectedSize,
 }) => {
   const innerBlock = structure.innerBlock || { pagesSource: 'parameter' as const }
   const cover = structure.cover || { mode: 'none' as const }
   const binding = structure.binding || {}
   const coverPrint = cover.print || {}
+  const coverLamination = cover.lamination || {}
+  const [laminationLeaves, setLaminationLeaves] = useState<ReturnType<typeof finishingLeafOptions>>([])
+
+  useEffect(() => {
+    const serviceId = Number(coverLamination.service_id)
+    if (!Number.isFinite(serviceId) || serviceId <= 0) {
+      setLaminationLeaves([])
+      return
+    }
+    let cancelled = false
+    getServiceVariants(serviceId)
+      .then((list) => {
+        if (!cancelled) setLaminationLeaves(finishingLeafOptions(Array.isArray(list) ? list as ServiceVariant[] : []))
+      })
+      .catch(() => {
+        if (!cancelled) setLaminationLeaves([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [coverLamination.service_id])
+
+  const laminationServices = useMemo(() => {
+    return services.filter((service) => {
+      const operation = String(service.operation_type ?? service.operationType ?? service.type ?? '').toLowerCase()
+      const name = String(service.name ?? service.service_name ?? '').toLowerCase()
+      if (operation === 'bind' || operation === 'print' || operation === 'printing') return false
+      return operation === 'laminate' || operation === 'lamination' || name.includes('ламин') || name.includes('laminat')
+    })
+  }, [services])
 
   const coverAllowedIds = useMemo(
     () => (cover.allowed_material_ids ?? []).map(Number).filter((n) => Number.isFinite(n) && n > 0),
@@ -337,7 +373,10 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                 </select>
               </FormField>
 
-              <FormField label="Стороны обложки">
+              <FormField
+                label="Стороны обложки"
+                help="Односторонняя: печать с одной стороны листа, оборот без печати и без второй плёнки."
+              >
                 <select
                   className="form-select"
                   value={coverPrint.sides_mode || 'single'}
@@ -358,6 +397,56 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                   )}
                 </select>
               </FormField>
+            </div>
+
+            <div className="simplified-form-grid">
+              <FormField
+                label="Ламинация обложки"
+                help="Только листы обложки, одна плёнка на лист. Блок этой услугой не ламинируется."
+              >
+                <select
+                  className="form-select"
+                  value={coverLamination.service_id ?? ''}
+                  onChange={(e) =>
+                    patchCover({
+                      lamination: {
+                        service_id: e.target.value ? Number(e.target.value) : undefined,
+                        variant_id: undefined,
+                      },
+                    })
+                  }
+                >
+                  <option value="">— Без ламинации —</option>
+                  {laminationServices.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name || service.service_name || `Услуга #${service.id}`}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              {coverLamination.service_id != null && laminationLeaves.length > 0 && (
+                <FormField label="Плёнка">
+                  <select
+                    className="form-select"
+                    value={coverLamination.variant_id ?? ''}
+                    onChange={(e) =>
+                      patchCover({
+                        lamination: {
+                          ...coverLamination,
+                          variant_id: e.target.value ? Number(e.target.value) : undefined,
+                        },
+                      })
+                    }
+                  >
+                    <option value="">— Лист —</option>
+                    {laminationLeaves.map((leaf) => (
+                      <option key={leaf.id} value={leaf.id}>
+                        {leaf.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              )}
             </div>
           </div>
         )}

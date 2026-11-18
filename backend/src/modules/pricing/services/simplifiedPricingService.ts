@@ -27,6 +27,7 @@ import {
   BindingQuoteResult,
   resolveConfiguredBindingInput,
 } from './bindingPricingService';
+import { quoteCoverLamination, type CoverLaminationQuote } from './coverLamination';
 import {
   computeKnifePathMetersSheet,
   computeOptimizedRollFeedMeters,
@@ -469,6 +470,12 @@ interface SimplifiedConfig {
       allowed_material_ids?: number[];
       material_id?: number;
       qty_per_item?: number;
+      page_count?: number;
+      /** Ламинация только листов обложки, не блока. */
+      lamination?: {
+        service_id?: number;
+        variant_id?: number;
+      };
     };
     binding?: {
       service_id?: number;
@@ -1785,13 +1792,58 @@ export class SimplifiedPricingService {
       }
     }
 
+    const coverLamination =
+      usePagesMultiplier && multiPageStructure?.cover?.mode === 'separate'
+        ? multiPageStructure.cover.lamination
+        : undefined;
+    const coverLaminationServiceId = Number(coverLamination?.service_id);
+    const hasCoverLamination = Number.isFinite(coverLaminationServiceId) && coverLaminationServiceId > 0;
+
     let effectiveFinishingToUse = [...finishingToUse];
-    if (hasConfiguredBinding) {
-      // Переплет считаем отдельным контуром через BindingPricingService.
-      effectiveFinishingToUse = effectiveFinishingToUse.filter(
-        (item) => Number(item.service_id) !== configuredBindingServiceId
-      );
+    if (hasConfiguredBinding || hasCoverLamination) {
+      // Переплёт — BindingPricingService. Ламинация обложки — только листы обложки, не блок.
+      effectiveFinishingToUse = effectiveFinishingToUse.filter((item) => {
+        const sid = Number(item.service_id);
+        if (hasConfiguredBinding && sid === configuredBindingServiceId) return false;
+        if (hasCoverLamination && sid === coverLaminationServiceId) return false;
+        return true;
+      });
     }
+
+    const quoteConfiguredCoverLamination = async (qty: number): Promise<CoverLaminationQuote | null> => {
+      if (!hasCoverLamination || pageSplit.coverPages < 1) return null;
+      const coverSides =
+        (normalizedConfig as { cover_print_sides_mode?: string }).cover_print_sides_mode ||
+        multiPageStructure?.cover?.print?.sides_mode ||
+        'single';
+      const sheetsPerItem = computeMultipageSheetsPerItem(
+        pageSplit.coverPages,
+        itemsPerSheet,
+        coverSides,
+      );
+      const variantRaw = Number(coverLamination?.variant_id);
+      return quoteCoverLamination(db, {
+        serviceId: coverLaminationServiceId,
+        ...(Number.isFinite(variantRaw) && variantRaw > 0 ? { variantId: variantRaw } : {}),
+        orderQuantity: qty,
+        coverSheetsTotal: Math.max(0, qty * sheetsPerItem),
+        trimMm: {
+          width: Number(selectedSize.width_mm) || 0,
+          height: Number(selectedSize.height_mm) || 0,
+        },
+        bleedMm: resolvedBleedMm,
+        margins: {
+          edgeMm:
+            customMarginMm != null && Number.isFinite(Number(customMarginMm)) && Number(customMarginMm) > 0
+              ? Number(customMarginMm)
+              : 0,
+          gapMm:
+            customGapMm != null && Number.isFinite(Number(customGapMm)) && Number(customGapMm) >= 0
+              ? Number(customGapMm)
+              : 0,
+        },
+      });
+    };
 
     if (
       usePagesMultiplier &&
@@ -2626,6 +2678,7 @@ export class SimplifiedPricingService {
     // плёнку в operationMaterials → components без строки накатки в цене.
 
     let coverPrice = 0;
+    let coverLaminationQuote: CoverLaminationQuote | null = null;
     if (usePagesMultiplier && pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
       coverPrice = await this.calculateMultiPageCoverCost({
         db,
@@ -2640,6 +2693,22 @@ export class SimplifiedPricingService {
         sidesMode: normalizedConfig.print_sides_mode || 'single',
         tierPrintUnits: tierSheetsOverride ?? multipageTierPrintUnits,
       });
+      coverLaminationQuote = await quoteConfiguredCoverLamination(quantity);
+      if (coverLaminationQuote && coverLaminationQuote.total > 0) {
+        finishingDetails.push({
+          service_id: coverLaminationQuote.serviceId,
+          variant_id: coverLaminationQuote.variantId,
+          service_name: coverLaminationQuote.serviceName,
+          tier: { min_qty: 1, max_qty: undefined, price: coverLaminationQuote.unitPrice },
+          units_needed: coverLaminationQuote.units,
+          raw_units_needed: coverLaminationQuote.units,
+          ...(coverLaminationQuote.feedMeters != null ? { feed_meters: coverLaminationQuote.feedMeters } : {}),
+          priceForQuantity: coverLaminationQuote.total,
+          price_unit: coverLaminationQuote.priceUnit,
+          operation_type: 'laminate',
+        });
+        finishingPrice += coverLaminationQuote.total;
+      }
     }
 
     let configuredBindingQuote: BindingQuoteResult | null = null;
@@ -3009,7 +3078,12 @@ export class SimplifiedPricingService {
           });
           tierBindingPrice = tierBindingQuote.total;
         }
-        tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice) * 100) / 100;
+        let tierCoverLamination = 0;
+        if (hasCoverLamination) {
+          const tierLam = await quoteConfiguredCoverLamination(qtyForTier);
+          tierCoverLamination = tierLam?.total ?? 0;
+        }
+        tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice + tierCoverLamination) * 100) / 100;
         tierRow.unit_price = qtyForTier > 0 ? Math.round((tierRow.total_price / qtyForTier) * 10000) / 10000 : tierRow.unit_price;
       }
     }
