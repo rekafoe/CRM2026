@@ -191,15 +191,15 @@ export function resolveMultipageMinQty(
     Number(minFromSize) === Number(itemsPerSheet);
 
   if (multipageLike) {
+    // Как на сервере: «шт/лист» и min_qty, совпавший с раскладкой, не поднимают тираж альбома.
+    // Первая строка печати с минимумом 1 (часто нулевая технология перед тарифом) — тоже не минимум заказа.
     if (coupledToOverride || coupledToLayout) {
-      return minFromTiers ?? 1;
+      return 1;
     }
-    // min_qty=2 от старой синхронизации с раскладкой, пока нет ответа API с itemsPerSheet
     if (
       minFromSize != null &&
       minFromSize > 1 &&
       overrideN == null &&
-      itemsPerSheet == null &&
       (minFromTiers == null || minFromTiers <= 1)
     ) {
       return 1;

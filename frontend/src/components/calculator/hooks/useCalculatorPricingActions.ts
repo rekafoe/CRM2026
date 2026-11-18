@@ -257,14 +257,32 @@ export function useCalculatorPricingActions({
           backendProductSchema?.template?.simplified?.material_driven_printing === true;
         let resolvedPrintTechnology = printTechnology;
         let resolvedPrintColor = printColorMode;
-        if (readyLid && (!resolvedPrintTechnology || !resolvedPrintColor)) {
-          const size = Array.isArray(effectiveSizes)
-            ? effectiveSizes.find((row: { id?: unknown }) => String(row.id) === String(specs.size_id))
-            : undefined;
-          const rows = Array.isArray(size?.print_prices) ? size.print_prices : [];
-          if (rows.length === 1 && rows[0]?.technology_code) {
-            resolvedPrintTechnology = String(rows[0].technology_code);
-            resolvedPrintColor = rows[0].color_mode === 'bw' ? 'bw' : 'color';
+        const blockUnprinted = blockIsUnprinted(boundStructure);
+        // Селектор печати блока скрыт: технологию обложки берём из шаблона, иначе запрос уходит без тарифа.
+        if ((readyLid || blockUnprinted) && (!resolvedPrintTechnology || !resolvedPrintColor)) {
+          const coverPrint = boundStructure?.cover?.print as
+            | { technology_code?: string; color_mode?: string }
+            | undefined;
+          if (coverPrint?.technology_code) {
+            resolvedPrintTechnology = String(coverPrint.technology_code);
+            resolvedPrintColor = coverPrint.color_mode === 'bw' ? 'bw' : 'color';
+          } else {
+            const size = Array.isArray(effectiveSizes)
+              ? effectiveSizes.find((row: { id?: unknown }) => String(row.id) === String(specs.size_id))
+              : undefined;
+            const rows = (Array.isArray(size?.print_prices) ? size.print_prices : []) as Array<{
+              technology_code?: string;
+              color_mode?: string;
+              tiers?: Array<{ unit_price?: number }>;
+            }>;
+            const priced = rows.find((row) =>
+              (row.tiers ?? []).some((tier) => Number(tier.unit_price ?? 0) > 0),
+            );
+            const row = priced ?? (rows.length === 1 ? rows[0] : undefined);
+            if (row?.technology_code) {
+              resolvedPrintTechnology = String(row.technology_code);
+              resolvedPrintColor = row.color_mode === 'bw' ? 'bw' : 'color';
+            }
           }
         }
         if (uvFlatbed) {

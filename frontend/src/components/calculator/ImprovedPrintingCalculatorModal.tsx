@@ -30,7 +30,7 @@ import { useCalculatorPricingActions, productRequiresPrint } from './hooks/useCa
 import { useAutoCalculate } from './hooks/useAutoCalculate'; //  Автопересчет
 import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
-import { isMultipageLikeProduct, resolveCalculatorPagesBounds } from '../../utils/multipageProduct';
+import { isMultipageLikeProduct, resolveCalculatorPagesBounds, resolveMultipageMinQty } from '../../utils/multipageProduct';
 import { CalculatorSections } from './components/CalculatorSections';
 import { CustomProductForm } from './components/CustomProductForm';
 import { PostprintServicesForm } from './components/PostprintServicesForm';
@@ -43,6 +43,7 @@ import { buildOrderPayload } from './utils/orderPayloadBuilder';
 import { getServiceVariants } from '../../services/pricing/api';
 import { readBindingPagesLimits } from '../../utils/multipageBinding';
 import {
+  blockIsUnprinted,
   coverPrintChoiceToSides,
   isReadyLid,
   sidesToCoverPrintChoice,
@@ -302,7 +303,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       ? cfg?.sizes?.find((s: any) => s.id === initialSizeId)
       : cfg?.sizes?.[0];
     const firstSize = (targetSize ?? cfg?.sizes?.[0]) as SizeWithPrices | undefined;
-    const autoQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
+    const multipageLike = isMultipageLikeProduct({
+      simplifiedPages: simplified?.pages,
+      multiPageStructure: simplified?.multiPageStructure,
+    });
+    const autoQty = firstSize
+      ? resolveMultipageMinQty(firstSize, { multipageLike })
+      : 1;
 
     const opsSet = new Set<number>();
     const operationsFromInitial: Array<{ operationId: number; variantId?: number; subtype?: string; quantity?: number }> = [];
@@ -426,7 +433,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
       return next;
     });
-  }, [simplified?.types, simplified?.typeConfigs, simplified?.pages, backendProductSchema, setSpecs]);
+  }, [simplified?.types, simplified?.typeConfigs, simplified?.pages, simplified?.multiPageStructure, backendProductSchema, setSpecs]);
 
   useEffect(() => {
     const structure = backendProductSchema?.template?.simplified?.multiPageStructure;
@@ -711,6 +718,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   //  Автоматический пересчет при изменении параметров
   // Не запускаем, если продукт требует печать, но параметры печати ещё не выбраны (избегаем лишних вызовов и логов)
   const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes?.length ? effectiveSizes : undefined);
+  const boundForPrint = backendProductSchema?.template?.simplified?.multiPageStructure;
+  // Печать блока скрыта: обложку считает шаблон, селектор технологии не должен глушить пересчёт.
+  const printSelectorsHidden = isReadyLid(boundForPrint) || blockIsUnprinted(boundForPrint);
   const isUvFlatbed = isUvFlatbedProduct(
     backendProductSchema,
     hasProductTypes ? selectedTypeId : specs.typeId,
@@ -727,7 +737,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     selectedProduct,
     isValid,
     enabled: (userInteracted || !!editContext?.item) && selectedProduct?.id != null && !isStandaloneProduct
-      && (!requiresPrint || hasPrintParams),
+      && (printSelectorsHidden || !requiresPrint || hasPrintParams),
     onCalculate: calculateCost,
     debounceMs: 500,
     customFormat, //  Передаем кастомный формат для отслеживания изменений
@@ -738,6 +748,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   const instantCalculateRef = useRef(instantCalculate);
   instantCalculateRef.current = instantCalculate;
+
+  // Неверные листы или тираж не должны оставлять на экране цену предыдущего запроса.
+  useEffect(() => {
+    if (selectedProduct?.id && !isValid) {
+      setResult(null);
+    }
+  }, [isValid, selectedProduct?.id, setResult]);
   const prevCalcTriggerKeyRef = useRef('');
 
   const setCustomFormatWithInteraction = useCallback(

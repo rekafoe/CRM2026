@@ -23,6 +23,7 @@ import { MultiPagePagesTab } from './MultiPagePagesTab'
 import {
   computeMultipageSheetsPerItem,
   resolveBlockPagesForPrint,
+  resolveMultipageMinQty,
   resolveMultipagePageSplit,
 } from '../../../utils/multipageProduct'
 import './SimplifiedTemplateSection.css'
@@ -1214,7 +1215,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                             printTechnology: quickTestPrintPreset?.technology,
                             printColorMode: quickTestPrintPreset?.color,
                             sides: quickTestPrintPreset?.sides as 1 | 2 | undefined,
-                            quantity: selected?.min_qty && Number(selected.min_qty) > 0 ? Number(selected.min_qty) : 1,
+                            quantity: selected
+                              ? resolveMultipageMinQty(selected, { multipageLike: showPagesConfig })
+                              : 1,
                             pages: showPagesConfig ? (pagesConfig.default ?? pagesConfig.options?.[0] ?? undefined) : undefined,
                           }}
                         />

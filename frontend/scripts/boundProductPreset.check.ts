@@ -16,7 +16,7 @@ import {
   templateServiceIds,
   usesBlockSheets,
 } from '../src/utils/boundProductPreset.ts'
-import { resolveCoverPageCount, resolveMultipagePageSplit } from '../src/utils/multipageProduct.ts'
+import { resolveCoverPageCount, resolveMultipageMinQty, resolveMultipagePageSplit } from '../src/utils/multipageProduct.ts'
 
 assert.equal(springBlockPages(50), 100)
 assert.equal(springTotalPages(50), 102)
@@ -131,5 +131,27 @@ const channel = pickChannel(
   5.8,
 )
 assert.equal(channel?.id, 2)
+
+// A5 min 4 при первой строке печати от 1 и одном изделии на листе — не минимум заказа.
+assert.equal(
+  resolveMultipageMinQty(
+    {
+      min_qty: 4,
+      print_prices: [
+        { tiers: [{ min_qty: 1, unit_price: 0 }] },
+        { tiers: [{ min_qty: 4, unit_price: 3 }] },
+      ],
+    },
+    { multipageLike: true, itemsPerSheet: 1 },
+  ),
+  1,
+)
+assert.equal(
+  resolveMultipageMinQty(
+    { min_qty: 10, print_prices: [{ tiers: [{ min_qty: 10, unit_price: 2 }] }] },
+    { multipageLike: true, itemsPerSheet: 1 },
+  ),
+  10,
+)
 
 console.log('boundProductPreset.check ok')
