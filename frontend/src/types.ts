@@ -265,6 +265,10 @@ export interface Material {
   sheet_width?: number;
   sheet_height?: number;
   density?: number;
+  sheet_thickness_mm?: number | null;
+  spine_thickness_mm?: number | null;
+  channel_min_mm?: number | null;
+  channel_max_mm?: number | null;
   finish?: string;
 }
 

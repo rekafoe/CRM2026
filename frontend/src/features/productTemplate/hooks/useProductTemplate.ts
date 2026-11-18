@@ -70,6 +70,20 @@ export type SimplifiedRollM2Config = {
 }
 
 export type MultiPageStructureConfig = {
+  /** Печатная обложка или готовая крышка. Переплёт — отдельная услуга bind. */
+  coverChoice?: 'printed' | 'ready';
+  notebook?: {
+    /** Оператор вводит листы блока, а не итог страниц. */
+    use_sheets?: boolean;
+    /** Физические листы блока. 50 листов duplex = 100 страниц. */
+    sheets?: number;
+    white_material_id?: number;
+    grid_material_id?: number;
+  };
+  readyLid?: {
+    cover_material_ids?: number[];
+    channel_material_ids?: number[];
+  };
   innerBlock?: {
     pagesSource?: 'parameter' | 'fixed';
     fixedPages?: number;
@@ -80,6 +94,11 @@ export type MultiPageStructureConfig = {
     mode?: MultiPageCoverMode;
     /** Сколько страниц входит в общий тираж альбома (калькулятор «Страницы»). По умолчанию 4. */
     page_count?: number;
+    /** Бумага кашируется на картон: лист обложки не режется раскладкой блока. */
+    wrap?: boolean;
+    /** Переплётный картон. Списание: 2 шт на изделие, перед и зад. */
+    board_material_ids?: number[];
+    board_material_id?: number;
     print?: MultiPageBlockPrintConfig;
     /** Разрешённые материалы обложки (отдельная обложка) */
     allowed_material_ids?: number[];

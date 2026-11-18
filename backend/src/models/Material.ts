@@ -20,6 +20,10 @@ export interface Material {
   paper_type_id?: number; // Ссылка на тип бумаги
   paper_type_name?: string; // Название типа бумаги для отображения
   density?: number; // Плотность бумаги
+  sheet_thickness_mm?: number | null;
+  spine_thickness_mm?: number | null;
+  channel_min_mm?: number | null;
+  channel_max_mm?: number | null;
   // Новые поля для листовой продукции
   sheet_width?: number;
   sheet_height?: number;

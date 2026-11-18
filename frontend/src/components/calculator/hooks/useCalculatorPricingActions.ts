@@ -10,6 +10,7 @@ import {
   serializeUvPrintForApi,
   type UvPrintState,
 } from '../utils/uvPrintConfig';
+import { isReadyLid } from '../../../utils/boundProductPreset';
 
 interface BuildSummaryOptions {
   isCustomFormat: boolean;
@@ -247,9 +248,22 @@ export function useCalculatorPricingActions({
         }
 
         //  Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
-        const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes);
+        const readyLid = isReadyLid(backendProductSchema?.template?.simplified?.multiPageStructure);
+        const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes) && !readyLid;
         const materialDrivenPrinting =
           backendProductSchema?.template?.simplified?.material_driven_printing === true;
+        let resolvedPrintTechnology = printTechnology;
+        let resolvedPrintColor = printColorMode;
+        if (readyLid && (!resolvedPrintTechnology || !resolvedPrintColor)) {
+          const size = Array.isArray(effectiveSizes)
+            ? effectiveSizes.find((row: { id?: unknown }) => String(row.id) === String(specs.size_id))
+            : undefined;
+          const rows = Array.isArray(size?.print_prices) ? size.print_prices : [];
+          if (rows.length === 1 && rows[0]?.technology_code) {
+            resolvedPrintTechnology = String(rows[0].technology_code);
+            resolvedPrintColor = rows[0].color_mode === 'bw' ? 'bw' : 'color';
+          }
+        }
         if (uvFlatbed) {
           if (!trimSize) {
             if (!showToast) return;
@@ -262,11 +276,11 @@ export function useCalculatorPricingActions({
         } else if (
           requiresPrint
           && !materialDrivenPrinting
-          && (!printTechnology || !printColorMode)
+          && (!resolvedPrintTechnology || !resolvedPrintColor)
         ) {
           const missingParams = [];
-          if (!printTechnology) missingParams.push('технология печати');
-          if (!printColorMode) missingParams.push('режим цвета (чб/цвет)');
+          if (!resolvedPrintTechnology) missingParams.push('технология печати');
+          if (!resolvedPrintColor) missingParams.push('режим цвета (чб/цвет)');
           
           if (!showToast) {
             return;
@@ -438,10 +452,10 @@ export function useCalculatorPricingActions({
                 uv_print: serializeUvPrintForApi(uvPrintRaw),
               }
             : {
-                print_technology: printTechnology,
-                printTechnology,
-                print_color_mode: printColorMode,
-                printColorMode,
+                print_technology: resolvedPrintTechnology,
+                printTechnology: resolvedPrintTechnology,
+                print_color_mode: resolvedPrintColor,
+                printColorMode: resolvedPrintColor,
               }),
           //  Для упрощённых продуктов передаем size_id, material_id и base_material_id
           ...(specs.size_id ? { size_id: specs.size_id } : {}),

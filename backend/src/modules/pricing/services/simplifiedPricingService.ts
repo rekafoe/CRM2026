@@ -29,6 +29,15 @@ import {
 } from './bindingPricingService';
 import { quoteCoverLamination, type CoverLaminationQuote } from './coverLamination';
 import {
+  blockSheetCount,
+  formatMm,
+  pickChannel,
+  READY_LID_CHANNELS_PER_ITEM,
+  READY_LID_COVERS_PER_ITEM,
+  readyLidThicknessMm,
+  WRAP_BOARDS_PER_ITEM,
+} from './readyCoverFit';
+import {
   computeKnifePathMetersSheet,
   computeOptimizedRollFeedMeters,
   productPlotterRollFeedMeters,
@@ -267,6 +276,7 @@ export interface SimplifiedPricingResult {
   };
   breakdown?: {
     coverPrice: number;
+    readyLidPrice?: number;
     innerBlockPrice: number;
     bindingPrice: number;
     otherFinishingPrice: number;
@@ -449,6 +459,15 @@ interface SimplifiedConfig {
     step?: number;
   };
   multiPageStructure?: {
+    coverChoice?: 'printed' | 'ready';
+    notebook?: {
+      use_sheets?: boolean;
+      sheets?: number;
+    };
+    readyLid?: {
+      cover_material_ids?: number[];
+      channel_material_ids?: number[];
+    };
     innerBlock?: {
       pagesSource?: 'parameter' | 'fixed';
       fixedPages?: number;
@@ -471,6 +490,11 @@ interface SimplifiedConfig {
       material_id?: number;
       qty_per_item?: number;
       page_count?: number;
+      /** Бумага кашируется на картон, без раскладки блока. Это печатная обложка, не готовая крышка. */
+      wrap?: boolean;
+      /** Переплётный картон. Списание: 2 шт на изделие, перед и зад. */
+      board_material_ids?: number[];
+      board_material_id?: number;
       /** Ламинация только листов обложки, не блока. */
       lamination?: {
         service_id?: number;
@@ -502,6 +526,11 @@ export class SimplifiedPricingService {
       /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
       base_material_id?: number;
       cover_material_id?: number;
+      /** Переплётный картон печатной обложки. Не готовая крышка. */
+      board_material_id?: number;
+      /** Готовая крышка, выбранная клиентом. Канал сервер подставляет сам. */
+      lid_material_id?: number;
+      notebook_sheets?: number;
       cover_print_technology?: string;
       cover_print_color_mode?: 'color' | 'bw';
       cover_print_sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
@@ -1317,11 +1346,12 @@ export class SimplifiedPricingService {
       (normalizedConfig as { cover_print_sides_mode?: string }).cover_print_sides_mode ||
       multiPageStructure?.cover?.print?.sides_mode ||
       sidesMode;
+    const coverItemsPerSheet = multiPageStructure?.cover?.wrap === true ? 1 : itemsPerSheet;
     const coverPrintUnits = separateCoverForTier
       ? computeMultipageCoverPrintUnits({
           quantity,
           coverPages: pageSplit.coverPages,
-          itemsPerSheet,
+          itemsPerSheet: coverItemsPerSheet,
           sidesMode: coverSidesForTier,
         })
       : 0;
@@ -1818,7 +1848,7 @@ export class SimplifiedPricingService {
         'single';
       const sheetsPerItem = computeMultipageSheetsPerItem(
         pageSplit.coverPages,
-        itemsPerSheet,
+        multiPageStructure?.cover?.wrap === true ? 1 : itemsPerSheet,
         coverSides,
       );
       const variantRaw = Number(coverLamination?.variant_id);
@@ -2689,7 +2719,7 @@ export class SimplifiedPricingService {
         multiPageStructure,
         selectedTypeConfig: typeConfig ?? undefined,
         coverPages: pageSplit.coverPages,
-        itemsPerSheet,
+        itemsPerSheet: coverItemsPerSheet,
         sidesMode: normalizedConfig.print_sides_mode || 'single',
         tierPrintUnits: tierSheetsOverride ?? multipageTierPrintUnits,
       });
@@ -2908,8 +2938,149 @@ export class SimplifiedPricingService {
       ? finishingPrice
       : Math.max(0, finishingPrice - bindAlreadyInFinishing);
 
+    let readyLidPrice = 0;
+    let readyLidPerItem = 0;
+    const readyLidChoice = multiPageStructure?.coverChoice === 'ready';
+    if (usePagesMultiplier && readyLidChoice && includeMaterialCost) {
+      const lidId = Number((normalizedConfig as { lid_material_id?: number }).lid_material_id);
+      const coverIds = (multiPageStructure?.readyLid?.cover_material_ids ?? [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+      const channelIds = (multiPageStructure?.readyLid?.channel_material_ids ?? [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+      const templateSides = multiPageStructure?.innerBlock?.print?.sides_mode;
+      const pagesPerSheet = templateSides
+        ? (templateSides === 'single' ? 1 : 2)
+        : (normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back' ? 2 : 1);
+      const explicitSheets = multiPageStructure?.notebook?.use_sheets
+        ? Number((normalizedConfig as { notebook_sheets?: number }).notebook_sheets)
+        : 0;
+      const sheetCount = explicitSheets > 0
+        ? Math.floor(explicitSheets)
+        : blockSheetCount(pageSplit.innerPages, pagesPerSheet);
+      const thicknessCols = await getTableColumns('materials');
+      const hasThickness = thicknessCols.has('sheet_thickness_mm') && thicknessCols.has('spine_thickness_mm');
+      const hasChannelRange = thicknessCols.has('channel_min_mm') && thicknessCols.has('channel_max_mm');
+      if (!hasThickness) {
+        pricingWarnings.push('На складе нет поля эталонной толщины листа.');
+      } else if (!(lidId > 0) || (coverIds.length > 0 && !coverIds.includes(lidId))) {
+        pricingWarnings.push('Выберите крышку.');
+      } else {
+        const paperId = Number(normalizedConfig.material_id);
+        const paper = paperId > 0
+          ? await db.get<{ sheet_thickness_mm?: number | null }>(
+            'SELECT sheet_thickness_mm FROM materials WHERE id = ? AND is_active = 1',
+            [paperId],
+          )
+          : undefined;
+        const lid = await db.get<{ name: string; sheet_price_single?: number | null; spine_thickness_mm?: number | null }>(
+          'SELECT name, sheet_price_single, spine_thickness_mm FROM materials WHERE id = ? AND is_active = 1',
+          [lidId],
+        );
+        const caliper = Number(paper?.sheet_thickness_mm ?? 0);
+        const spine = Number(lid?.spine_thickness_mm ?? 0);
+        const totalMm = readyLidThicknessMm(sheetCount, caliper > 0 ? caliper : 0, spine > 0 ? spine : 0);
+        if (!(caliper > 0)) {
+          pricingWarnings.push('У бумаги блока нет эталонной толщины листа, канал не подобран. Цена крышки на месте.');
+        }
+        let channel: { id: number; name: string; sheet_price_single?: number | null; channel_min_mm: number; channel_max_mm: number } | null = null;
+        if (hasChannelRange && channelIds.length > 0 && totalMm > 0) {
+          const rows = await db.all<Array<{
+            id: number;
+            name: string;
+            sheet_price_single?: number | null;
+            channel_min_mm?: number | null;
+            channel_max_mm?: number | null;
+          }>>(
+            `SELECT id, name, sheet_price_single, channel_min_mm, channel_max_mm
+             FROM materials
+             WHERE is_active = 1 AND id IN (${channelIds.map(() => '?').join(',')})`,
+            channelIds,
+          );
+          channel = pickChannel(
+            rows.map((row) => ({
+              id: row.id,
+              name: row.name,
+              sheet_price_single: row.sheet_price_single,
+              channel_min_mm: Number(row.channel_min_mm),
+              channel_max_mm: Number(row.channel_max_mm),
+            })),
+            totalMm,
+          );
+        }
+        if (!channel && totalMm > 0) {
+          pricingWarnings.push(`Нет канала на ${formatMm(totalMm)} мм.`);
+        }
+        const coverUnit = Number(lid?.sheet_price_single ?? 0);
+        const channelUnit = Number(channel?.sheet_price_single ?? 0);
+        readyLidPerItem = coverUnit * READY_LID_COVERS_PER_ITEM + (channel ? channelUnit * READY_LID_CHANNELS_PER_ITEM : 0);
+        readyLidPrice = readyLidPerItem * quantity;
+        if (lid && coverUnit >= 0) {
+          const coverQty = READY_LID_COVERS_PER_ITEM * quantity;
+          const existingCover = operationMaterials.find((row) => row.material_id === lidId);
+          if (existingCover) existingCover.quantity += coverQty;
+          else operationMaterials.push({ material_id: lidId, material_name: lid.name, quantity: coverQty });
+        }
+        if (channel) {
+          const channelQty = READY_LID_CHANNELS_PER_ITEM * quantity;
+          const existingChannel = operationMaterials.find((row) => row.material_id === channel.id);
+          if (existingChannel) existingChannel.quantity += channelQty;
+          else operationMaterials.push({
+            material_id: channel.id,
+            material_name: channel.name,
+            quantity: channelQty,
+          });
+        }
+      }
+    }
+
+    // Кашировка: бумага печатается и ламинируется как обложка, картон списывается отдельно.
+    let boardPerItem = 0;
+    const wrapOntoBoard =
+      usePagesMultiplier &&
+      !readyLidChoice &&
+      multiPageStructure?.cover?.mode === 'separate' &&
+      multiPageStructure.cover.wrap === true;
+    if (wrapOntoBoard) {
+      const boardIds = (multiPageStructure.cover?.board_material_ids ?? [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+      const requested = Number((normalizedConfig as { board_material_id?: number }).board_material_id);
+      const templateDefault = Number(multiPageStructure.cover?.board_material_id);
+      const listed = (id: number) => boardIds.length === 0 || boardIds.includes(id);
+      let boardId = 0;
+      if (requested > 0 && listed(requested)) boardId = requested;
+      else if (templateDefault > 0 && listed(templateDefault)) boardId = templateDefault;
+      else if (boardIds.length === 1) boardId = boardIds[0];
+      if (!(boardId > 0)) {
+        pricingWarnings.push('Переплётный картон не выбран, со склада он не спишется. Печать обложки на месте.');
+      } else {
+        const board = await db.get<{ name: string; sheet_price_single?: number | null }>(
+          'SELECT name, sheet_price_single FROM materials WHERE id = ? AND is_active = 1',
+          [boardId],
+        );
+        if (!board) {
+          pricingWarnings.push('Переплётный картон не найден на складе. Печать обложки на месте.');
+        } else {
+          const unit = includeMaterialCost ? Number(board.sheet_price_single ?? 0) : 0;
+          const safeUnit = Number.isFinite(unit) && unit > 0 ? unit : 0;
+          boardPerItem = safeUnit * WRAP_BOARDS_PER_ITEM;
+          const boardQty = WRAP_BOARDS_PER_ITEM * quantity;
+          coverPrice += boardPerItem * quantity;
+          const existingBoard = operationMaterials.find((row) => row.material_id === boardId);
+          if (existingBoard) existingBoard.quantity += boardQty;
+          else operationMaterials.push({
+            material_id: boardId,
+            material_name: board.name,
+            quantity: boardQty,
+          });
+        }
+      }
+    }
+
     // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
-    let subtotal = printPrice + materialPrice + otherFinishingPrice + bindingPrice + coverPrice;
+    let subtotal = printPrice + materialPrice + otherFinishingPrice + bindingPrice + coverPrice + readyLidPrice;
     let finalPrice = Math.round(subtotal * 100) / 100;
     let pricePerUnit = quantity > 0 ? Math.round((finalPrice / quantity) * 100) / 100 : 0;
     
@@ -3050,7 +3221,7 @@ export class SimplifiedPricingService {
           const tierCoverUnitsOnly = computeMultipageCoverPrintUnits({
             quantity: qtyForTier,
             coverPages: pageSplit.coverPages,
-            itemsPerSheet,
+            itemsPerSheet: coverItemsPerSheet,
             sidesMode: tierCoverSides,
           });
           tierCoverPrice = await this.calculateMultiPageCoverCost({
@@ -3062,7 +3233,7 @@ export class SimplifiedPricingService {
             multiPageStructure,
             selectedTypeConfig: typeConfig ?? undefined,
             coverPages: pageSplit.coverPages,
-            itemsPerSheet,
+            itemsPerSheet: coverItemsPerSheet,
             sidesMode: normalizedConfig.print_sides_mode || 'single',
             tierPrintUnits: tierBlockUnits + tierCoverUnitsOnly,
           });
@@ -3083,7 +3254,9 @@ export class SimplifiedPricingService {
           const tierLam = await quoteConfiguredCoverLamination(qtyForTier);
           tierCoverLamination = tierLam?.total ?? 0;
         }
-        tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice + tierCoverLamination) * 100) / 100;
+        const tierReadyLid = readyLidPerItem * qtyForTier;
+        const tierBoard = boardPerItem * qtyForTier;
+        tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice + tierCoverLamination + tierReadyLid + tierBoard) * 100) / 100;
         tierRow.unit_price = qtyForTier > 0 ? Math.round((tierRow.total_price / qtyForTier) * 10000) / 10000 : tierRow.unit_price;
       }
     }
@@ -3181,6 +3354,7 @@ export class SimplifiedPricingService {
       printPrice *= priceTypeMult;
       materialPrice *= priceTypeMult;
       coverPrice *= priceTypeMult;
+      readyLidPrice *= priceTypeMult;
       const scaledBindingPrice = bindingPrice * priceTypeMult;
       const scaledOtherFinishingPrice = otherFinishingPrice * priceTypeMult;
       subtotal *= priceTypeMult;
@@ -3284,6 +3458,7 @@ export class SimplifiedPricingService {
         ? {
             breakdown: {
               coverPrice: Math.round(coverPrice * 100) / 100,
+              readyLidPrice: Math.round(readyLidPrice * 100) / 100,
               innerBlockPrice: Math.round((printPrice + materialPrice) * 100) / 100,
               bindingPrice: Math.round(bindingPrice * 100) / 100,
               otherFinishingPrice: Math.round(otherFinishingPrice * 100) / 100,
@@ -3707,13 +3882,14 @@ export class SimplifiedPricingService {
       ctx.configuration.print_color_mode ||
       'color';
     const coverMaterialId = resolveCoverMaterialIdForPricing(cover, ctx.configuration);
+    const layoutPerSheet = ctx.multiPageStructure.cover?.wrap === true ? 1 : Math.max(1, ctx.itemsPerSheet);
     const coverSheetsPerItem = computeMultipageSheetsPerItem(
       ctx.coverPages,
-      Math.max(1, ctx.itemsPerSheet),
+      layoutPerSheet,
       sidesMode,
     );
     const coverSheetsTotal = Math.max(1, ctx.quantity * coverSheetsPerItem);
-    const coverPrintUnits = computeMultipagePrintUnits(coverSheetsTotal, Math.max(1, ctx.itemsPerSheet));
+    const coverPrintUnits = computeMultipagePrintUnits(coverSheetsTotal, layoutPerSheet);
 
     let printPrice = 0;
     if (technologyCode) {

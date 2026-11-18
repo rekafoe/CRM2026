@@ -9,6 +9,7 @@ import {
   templateQuantityScopeForOperation,
   templateUnitsForOperation,
 } from '../utils/simplifiedConfig';
+import { isLaminationOperation } from '../../../utils/boundProductPreset';
 
 interface Operation {
   id?: number;
@@ -33,6 +34,8 @@ interface OperationsSectionProps {
   updateSpecs: (updates: Record<string, any>, instant?: boolean) => void;
   /** Если задан — показываем только операции с этими operation_id (подтип simplified) */
   allowedOperationIds?: number[];
+  /** Готовая крышка или ламинация только в шаблоне обложки: не предлагать плёнку оператору. */
+  hideLamination?: boolean;
 }
 
 interface SelectedOperation {
@@ -134,6 +137,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   specs,
   updateSpecs,
   allowedOperationIds,
+  hideLamination = false,
 }) => {
   const allowedSet = useMemo(() => {
     if (!Array.isArray(allowedOperationIds)) return null;
@@ -146,14 +150,16 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     if (!backendProductSchema?.operations || !Array.isArray(backendProductSchema.operations)) {
       return [];
     }
-    const raw = backendProductSchema.operations;
+    const raw = hideLamination
+      ? backendProductSchema.operations.filter((op: Operation) => !isLaminationOperation(op))
+      : backendProductSchema.operations;
     if (allowedSet === null) return raw;
     if (allowedSet.size === 0) return [];
     return raw.filter((op: Operation) => {
       const oid = op.operation_id ?? op.id;
       return oid != null && allowedSet.has(Number(oid));
     });
-  }, [backendProductSchema?.operations, allowedSet]);
+  }, [backendProductSchema?.operations, allowedSet, hideLamination]);
 
   //  Состояние для вариантов услуг (типы и подтипы)
   const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map());

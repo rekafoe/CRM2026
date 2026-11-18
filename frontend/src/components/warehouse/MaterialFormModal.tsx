@@ -75,6 +75,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     finish?: string;
     // поля, которые есть в форме, но могут отсутствовать в shared Material типе
     density?: number;
+    sheet_thickness_mm?: number | null;
+    spine_thickness_mm?: number | null;
+    channel_min_mm?: number | null;
+    channel_max_mm?: number | null;
     paper_type_id?: number;
     material_kind?: MaterialKind;
     material_type_id?: number;
@@ -104,6 +108,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     material_type_id: undefined,
     material_kind: 'consumable',
     density: undefined, //  Добавляем поле плотности
+    sheet_thickness_mm: undefined,
+    spine_thickness_mm: undefined,
+    channel_min_mm: undefined,
+    channel_max_mm: undefined,
     finish: '', //  Отделка (для ламинации)
     sheet_width: '',
     sheet_height: ''
@@ -313,6 +321,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         material_type_id: (material as any).material_type_id || undefined,
         material_kind: (material as any).material_kind || undefined,
         density: (material as any).density ?? undefined,
+        sheet_thickness_mm: (material as any).sheet_thickness_mm ?? undefined,
+        spine_thickness_mm: (material as any).spine_thickness_mm ?? undefined,
+        channel_min_mm: (material as any).channel_min_mm ?? undefined,
+        channel_max_mm: (material as any).channel_max_mm ?? undefined,
         finish: (material as any).finish || '',
         sheet_width: (material as any).sheet_width ?? '',
         sheet_height: (material as any).sheet_height ?? ''
@@ -339,6 +351,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         material_type_id: undefined,
         material_kind: 'consumable',
         density: undefined,
+        sheet_thickness_mm: undefined,
+        spine_thickness_mm: undefined,
+        channel_min_mm: undefined,
+        channel_max_mm: undefined,
         finish: '',
         sheet_width: '',
         sheet_height: ''
@@ -591,6 +607,72 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 </small>
               </div>
             </div>
+          )}
+
+          {!isLamination && (formData.paper_type_id || formData.density != null) && (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Эталон листа, мм</label>
+                <input
+                  type="number"
+                  value={numberInputValue(formData.sheet_thickness_mm)}
+                  onChange={(e) => handleChange('sheet_thickness_mm' as any, parseOptionalNumberInput(e.target.value))}
+                  placeholder="не задано"
+                  min="0"
+                  step="0.01"
+                />
+                <small className="form-hint">
+                  Только бумага блока. Пусто — обычный расчёт не меняется. Для канала: число листов × эталон.
+                </small>
+              </div>
+            </div>
+          )}
+          {!isLamination && !formData.paper_type_id && formData.density == null && (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Корешок крышки, мм</label>
+                  <input
+                    type="number"
+                    value={numberInputValue(formData.spine_thickness_mm)}
+                    onChange={(e) => handleChange('spine_thickness_mm' as any, parseOptionalNumberInput(e.target.value))}
+                    placeholder="не задано"
+                    min="0"
+                    step="0.01"
+                  />
+                  <small className="form-hint">
+                    Только готовая крышка. Часть под сшивку, не толщина лица. Пусто — в канал идёт только блок.
+                  </small>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Канал от, мм</label>
+                  <input
+                    type="number"
+                    value={numberInputValue(formData.channel_min_mm)}
+                    onChange={(e) => handleChange('channel_min_mm' as any, parseOptionalNumberInput(e.target.value))}
+                    placeholder="не задано"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Канал до, мм</label>
+                  <input
+                    type="number"
+                    value={numberInputValue(formData.channel_max_mm)}
+                    onChange={(e) => handleChange('channel_max_mm' as any, parseOptionalNumberInput(e.target.value))}
+                    placeholder="не задано"
+                    min="0"
+                    step="0.01"
+                  />
+                  <small className="form-hint">
+                    Оба поля пустые — это не канал. Расчёт других материалов от этого не зависит.
+                  </small>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Поля для ламинации */}
