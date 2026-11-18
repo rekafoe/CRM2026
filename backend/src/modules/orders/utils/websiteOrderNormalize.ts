@@ -122,6 +122,19 @@ export function sanitizeWebsiteItemParams(params: Record<string, unknown>): Reco
     next.components = stripClientReservationIds(next.components);
   }
 
+  // print_without_material — только CRM; с сайта иначе reprice/warehouse без носителя ($0).
+  delete next.print_without_material;
+  if (next.specifications && typeof next.specifications === 'object' && !Array.isArray(next.specifications)) {
+    const specs = { ...(next.specifications as Record<string, unknown>) };
+    delete specs.print_without_material;
+    next.specifications = specs;
+  }
+  if (next.configuration && typeof next.configuration === 'object' && !Array.isArray(next.configuration)) {
+    const nested = { ...(next.configuration as Record<string, unknown>) };
+    delete nested.print_without_material;
+    next.configuration = nested;
+  }
+
   const parameterSummary = sanitizeParameterSummary(next.parameterSummary, next);
   if (parameterSummary.length > 0) {
     next.parameterSummary = parameterSummary;
