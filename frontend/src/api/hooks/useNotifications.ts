@@ -9,7 +9,9 @@ export interface StockAlert {
   materialName: string;
   currentQuantity: number;
   minQuantity: number;
-  alertLevel: 'warning' | 'critical' | 'out_of_stock';
+  alertLevel: 'warning' | 'critical' | 'out_of_stock' | 'low';
+  unit?: string;
+  warehouseLabel?: string;
   created_at: string;
   isResolved: boolean;
   resolvedAt?: string;

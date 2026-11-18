@@ -6,11 +6,18 @@ import { up as linkOrders } from '../migrations/20261021200000_support_chat_orde
 import { up as staffThreads } from '../migrations/20261022140000_support_staff_threads'
 import { keysMatch, readSupportCustomer } from '../modules/support/supportCustomerAuth'
 import { SupportError } from '../modules/support/supportErrors'
-import { assertOperatorRole, SupportService } from '../modules/support/supportService'
+import { assertOperatorRole, formatTelegramOperatorReply, SupportService } from '../modules/support/supportService'
 import { assertSupportWriteAllowed, resetSupportWriteLimits } from '../modules/support/supportWriteLimit'
+import { TelegramService } from '../services/telegramService'
 
 jest.mock('../config/database', () => ({
   getDb: jest.fn(),
+}))
+
+jest.mock('../services/telegramService', () => ({
+  TelegramService: {
+    sendMessageToUser: jest.fn().mockResolvedValue(true),
+  },
 }))
 
 const anna = { id: 'user-anna', name: 'Анна Коваль', email: 'anna@example.com', phone: '+375291112233' }
@@ -382,6 +389,91 @@ describe('support chats', () => {
     const siteList = await SupportService.listForOperator(maria, 'open')
     expect(siteList.conversations.map((item) => item.id)).not.toContain(opened.conversation.id)
     expect(siteList.conversations.map((item) => item.id)).toContain(site.conversation.id)
+  })
+
+  it('keeps a telegram client in the same queue and replies from this bot', async () => {
+    await db.exec(`
+      CREATE TABLE telegram_users (
+        chat_id TEXT PRIMARY KEY,
+        first_name TEXT,
+        last_name TEXT,
+        username TEXT,
+        crm_customer_id INTEGER
+      );
+      CREATE TABLE customers (
+        id INTEGER PRIMARY KEY,
+        first_name TEXT,
+        last_name TEXT,
+        company_name TEXT,
+        phone TEXT,
+        email TEXT
+      );
+      CREATE TABLE orders (
+        id INTEGER PRIMARY KEY,
+        number TEXT,
+        customer_id INTEGER,
+        customerPhone TEXT
+      );
+      INSERT INTO telegram_users (chat_id, first_name, crm_customer_id) VALUES ('555', 'Аня', 9);
+      INSERT INTO customers (id, first_name, last_name, phone, email) VALUES (9, 'Анна', 'Коваль', '+375291112233', 'anna@example.com');
+      INSERT INTO orders (id, number, customer_id, customerPhone) VALUES (42, 'TG-0042', 9, '+375291112233');
+    `)
+    ;(TelegramService.sendMessageToUser as jest.Mock).mockClear()
+
+    const opened = await SupportService.ingestTelegramChat('555', 'Где мой тираж?')
+    const again = await SupportService.ingestTelegramChat('555', 'Уже вечер')
+    expect(again.id).toBe(opened.id)
+
+    const stored = await db.get<{ channel: string; website_user_id: string; customer_name: string; crm_order_id: number }>(
+      `SELECT channel, website_user_id, customer_name, crm_order_id FROM support_conversations WHERE public_id = ?`,
+      opened.id,
+    )
+    expect(stored).toMatchObject({
+      channel: 'telegram',
+      website_user_id: 'tg:555',
+      customer_name: 'Анна Коваль',
+      crm_order_id: 42,
+    })
+    const messages = await db.all<Array<{ direction: string; body: string }>>(
+      `SELECT direction, body FROM support_messages ORDER BY id`,
+    )
+    expect(messages.map((item) => item.body)).toEqual(['Где мой тираж?', 'Уже вечер'])
+
+    const queue = await SupportService.listForOperator(maria, 'open')
+    expect(queue.conversations.find((item) => item.id === opened.id)?.channel).toBe('telegram')
+    expect(await SupportService.countAttention(maria)).toEqual({ count: 1 })
+
+    const site = await SupportService.listForCustomer(anna)
+    expect(site.conversations).toHaveLength(0)
+
+    const sent = await SupportService.addOperatorMessage(maria, opened.id, 'Тираж на столе')
+    expect(sent.message.text).toBe('Тираж на столе')
+    const savedBody = await db.get<{ body: string }>(
+      `SELECT body FROM support_messages WHERE direction = 'out' ORDER BY id DESC LIMIT 1`,
+    )
+    expect(savedBody?.body).toBe('Тираж на столе')
+    expect(TelegramService.sendMessageToUser).toHaveBeenCalledWith(
+      '555',
+      formatTelegramOperatorReply('Мария', 'manager', 'Тираж на столе'),
+    )
+    expect(formatTelegramOperatorReply('Мария', 'manager', 'Тираж на столе')).toBe('Мария, менеджер:\nТираж на столе')
+
+    await SupportService.close(maria, opened.id)
+    const reopened = await SupportService.ingestTelegramChat('555', 'Можно забрать?')
+    expect(reopened.id).toBe(opened.id)
+    const status = await db.get<{ status: string }>(
+      `SELECT status FROM support_conversations WHERE public_id = ?`,
+      opened.id,
+    )
+    expect(status?.status).toBe('open')
+    await SupportService.release(maria, opened.id)
+
+    const operatorReply = await SupportService.addOperatorMessage(ivan, opened.id, 'Да, до семи')
+    expect(operatorReply.message.text).toBe('Да, до семи')
+    expect(TelegramService.sendMessageToUser).toHaveBeenCalledWith(
+      '555',
+      'Иван, оператор:\nДа, до семи',
+    )
   })
 
   it('accepts only the support key and a signed customer', () => {

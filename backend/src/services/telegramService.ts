@@ -426,6 +426,30 @@ export class TelegramService {
   }
 
   /**
+   * Дайджест остатков менеджерам и админам с notification_preferences.low_stock.
+   */
+  static async sendLowStockDigest(message: string): Promise<{ sent: number; failed: number }> {
+    if (!this.isEnabled() || !this.isNetworkAvailable()) {
+      return { sent: 0, failed: 0 };
+    }
+    const recipients = await TelegramUserService.listLowStockRecipients();
+    let sent = 0;
+    let failed = 0;
+    for (const user of recipients) {
+      try {
+        const success = await this.sendMessageToUser(user.chat_id, message);
+        if (success) sent++;
+        else failed++;
+      } catch (error) {
+        failed++;
+        console.error(`Error sending low stock digest to ${user.chat_id}:`, error);
+      }
+    }
+    console.log(`Low stock digest: ${sent} sent, ${failed} failed, recipients ${recipients.length}`);
+    return { sent, failed };
+  }
+
+  /**
    * Отправка уведомления о низких остатках активным пользователям
    */
   static async sendLowStockToUsers(notification: LowStockNotification): Promise<{ sent: number; failed: number }> {

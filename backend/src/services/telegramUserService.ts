@@ -129,6 +129,34 @@ export class TelegramUserService {
   }
 
   /**
+   * Дайджест остатков: только менеджеры и админы с low_stock.
+   * Не все, кто писал боту, и не пользователи CRM без chat_id.
+   */
+  static async listLowStockRecipients(): Promise<TelegramUser[]> {
+    const db = await getDb();
+    const users = await db.all(`
+      SELECT
+        id, chat_id, username, first_name, last_name,
+        is_active, role, notifications_enabled, notification_preferences,
+        created_at, updated_at
+      FROM telegram_users
+      WHERE COALESCE(is_active, 0) = 1
+        AND COALESCE(notifications_enabled, 0) = 1
+        AND lower(trim(COALESCE(role, ''))) IN ('manager', 'admin')
+      ORDER BY created_at DESC
+    `);
+
+    return (users || [])
+      .map((user: any) => ({
+        ...user,
+        is_active: !!user.is_active,
+        notifications_enabled: !!user.notifications_enabled,
+        notification_preferences: safeParseNotificationPreferences(user.notification_preferences),
+      }))
+      .filter((user: TelegramUser) => user.notification_preferences.low_stock && !!user.chat_id);
+  }
+
+  /**
    * Получение пользователей по роли
    */
   static async getUsersByRole(role: string): Promise<TelegramUser[]> {

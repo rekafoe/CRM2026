@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { UserNotificationService } from '../services/userNotificationService';
+import { StockMonitoringService } from '../../../services/stockMonitoringService';
 import { logger } from '../../../utils/logger';
-import { starMarkdownToHtml } from '../../../utils/telegramText';
 
 export class UserNotificationController {
   /**
@@ -152,23 +152,17 @@ export class UserNotificationController {
   }
 
   /**
-   * Отправка уведомления о низких остатках (только админам)
+   * Свежий дайджест остатков менеджерам и админам с low_stock.
+   * Числа из тела запроса не используются.
    */
-  static async sendLowStockAlert(req: Request, res: Response) {
+  static async sendLowStockAlert(_req: Request, res: Response) {
     try {
-      const { materialName, currentQuantity, minStock, supplierName } = req.body;
-      
-      const sentCount = await UserNotificationService.sendLowStockAlert(
-        materialName,
-        currentQuantity,
-        minStock,
-        supplierName
-      );
-      
+      const result = await StockMonitoringService.broadcastFreshDigest();
       res.json({
         success: true,
-        message: `Уведомление о низких остатках отправлено ${sentCount} админам`,
-        sentCount
+        message: `Дайджест остатков отправлен ${result.sent} менеджерам и админам`,
+        sentCount: result.sent,
+        count: result.count
       });
     } catch (error: any) {
       logger.error('Error sending low stock alert', error);
@@ -314,65 +308,16 @@ export class UserNotificationController {
   }
 
   /**
-   * Отправка уведомления о материалах с низкими остатками всем пользователям бота
+   * Тот же свежий дайджест, что и у планировщика. Не getUpdates и не числа из формы.
    */
-  static async sendLowStockToBotUsers(req: Request, res: Response) {
+  static async sendLowStockToBotUsers(_req: Request, res: Response) {
     try {
-      const { materialName, currentQuantity, minStock, supplierName } = req.body;
-      
-      const botUsers = await UserNotificationService.getBotUsers();
-      let sentCount = 0;
-
-      logger.info(`Sending low stock notification to ${botUsers.length} bot users`);
-
-      const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
-      if (!token) {
-        return res.status(503).json({
-          success: false,
-          message: 'TELEGRAM_BOT_TOKEN не задан, рассылка в Telegram невозможна'
-        });
-      }
-
-      for (const user of botUsers) {
-        try {
-          const message = `*Низкий остаток материала*\n\n` +
-                         `*Материал:* ${materialName}\n` +
-                         `*Текущий остаток:* ${currentQuantity}\n` +
-                         `*Минимальный уровень:* ${minStock}\n` +
-                         (supplierName ? `*Поставщик:* ${supplierName}\n` : '') +
-                         `\n *Рекомендация:* Необходимо пополнить запас`;
-          
-          const url = `https://api.telegram.org/bot${token}/sendMessage`;
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              chat_id: user.chat_id,
-              text: starMarkdownToHtml(message),
-              parse_mode: 'HTML'
-            })
-          });
-
-          const result = await response.json();
-          
-          if (result.ok) {
-            sentCount++;
-            logger.debug(`Low stock notification sent to ${user.first_name} (@${user.username || 'no_username'})`);
-          } else {
-            logger.warn(`Failed to send to ${user.first_name}`, result);
-          }
-        } catch (error) {
-          logger.error(`Error sending to ${user.first_name}`, error);
-        }
-      }
-
+      const result = await StockMonitoringService.broadcastFreshDigest();
       res.json({
         success: true,
-        message: `Уведомление о низких остатках отправлено ${sentCount}/${botUsers.length} пользователям бота`,
-        sentCount,
-        totalUsers: botUsers.length
+        message: `Дайджест остатков отправлен ${result.sent} менеджерам и админам`,
+        sentCount: result.sent,
+        count: result.count
       });
     } catch (error: any) {
       logger.error('Error sending low stock to bot users', error);

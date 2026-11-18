@@ -54,6 +54,20 @@ function formatListTime(value: string): string {
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(date);
 }
 
+function channelMark(chat: OperatorConversation): string {
+  if (chat.channel === 'staff') return 'Команда';
+  if (chat.channel === 'telegram') return 'Telegram';
+  return 'Сайт';
+}
+
+function queueSubtitle(chat: OperatorConversation): string {
+  if (chat.channel === 'staff') return 'Команда';
+  if (chat.channel === 'telegram') {
+    return chat.orderRef ? `Telegram · ${chat.orderRef}` : 'Telegram';
+  }
+  return `${chat.topicLabel}${chat.orderRef ? ` · ${chat.orderRef}` : ''}`;
+}
+
 function assignment(chat: OperatorConversation): { text: string; tone: string } {
   if (chat.channel === 'staff') {
     if (chat.operatorUnread > 0) return { text: 'Новое', tone: '' };
@@ -281,7 +295,7 @@ export const ChatsPage: React.FC = () => {
     <AdminPageLayout
       className="chats-page"
       title="Чаты"
-      description={mode === 'team' ? 'Связь · переписка команды' : 'Связь · канал «Сайт»'}
+      description={mode === 'team' ? 'Связь · переписка команды' : 'Связь · сайт и Telegram'}
       icon={<AppIcon name="bell" size="sm" />}
       onBack={() => navigate(me?.role === 'admin' ? '/adminpanel' : '/')}
       headerExtra={(
@@ -347,7 +361,7 @@ export const ChatsPage: React.FC = () => {
                         <span className="chats-name">{chat.customerName}</span>
                         <span className="chats-time">{formatListTime(chat.lastMessageAt)}</span>
                       </span>
-                      <span className="chats-sub">{chat.channel === 'staff' ? 'Команда' : `${chat.topicLabel}${chat.orderRef ? ` · ${chat.orderRef}` : ''}`}</span>
+                      <span className="chats-sub">{queueSubtitle(chat)}</span>
                       <span className="chats-preview">{chat.lastMessagePreview || (chat.channel === 'staff' ? 'Диалог открыт' : 'Новое обращение')}</span>
                       <span className="chats-foot">
                         <span className={`chats-state ${label.tone}`}>{label.text}</span>
@@ -459,7 +473,7 @@ export const ChatsPage: React.FC = () => {
                 <div>
                   <h2>{selected.customerName}</h2>
                   <div className="chats-chips">
-                    <span className="chats-chip"><span className="chats-dot" />{selected.channel === 'staff' ? 'Команда' : 'Сайт'}</span>
+                    <span className="chats-chip"><span className="chats-dot" />{channelMark(selected)}</span>
                     {selected.channel !== 'staff' && selected.orderRef && <span className="chats-chip">Заказ {selected.orderRef}</span>}
                     {selected.crmOrderId && (
                       <Link className="chats-chip chats-chip-link" to={`/?orderId=${selected.crmOrderId}`}>
