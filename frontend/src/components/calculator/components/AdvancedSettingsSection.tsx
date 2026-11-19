@@ -18,6 +18,8 @@ interface Props {
   subtypeIdForPriceTypes?: number | null;
   /** Страницы уже в ParamsSection (multi_page / simplified.pages) */
   hidePagesField?: boolean;
+  /** Срок задаёт тип цены, отдельный список не нужен. */
+  hideLeadTime?: boolean;
 }
 
 export const AdvancedSettingsSection: React.FC<Props> = ({
@@ -26,6 +28,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
   backendProductSchema,
   subtypeIdForPriceTypes = null,
   hidePagesField = false,
+  hideLeadTime = false,
 }) => {
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
 
@@ -123,6 +126,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
           </select>
         </div>
 
+        {!hideLeadTime && (
         <div className="param-group param-group--narrow">
           <label>Срок изготовления</label>
           <select
@@ -141,6 +145,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
             <option value={7}>7 дней</option>
           </select>
         </div>
+        )}
 
         {!hidePagesField &&
           Array.isArray((backendProductSchema?.fields || []).find((f: any) => f.name === 'pages')?.enum) && (

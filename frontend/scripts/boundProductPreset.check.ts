@@ -57,12 +57,27 @@ assert.equal(springView.showCoverPrint, true)
 assert.equal(springView.hidePages, true)
 assert.equal(springView.hidePrint, true)
 assert.equal(springView.hideLamination, true)
-assert.deepEqual(springView.hiddenLabels, ['поле «Страницы»', 'печать блока'])
+assert.equal(springView.hideCoverMaterials, true)
+assert.equal(springView.hideLeadTime, true)
+assert.deepEqual(springView.hiddenLabels, [
+  'поле «Страницы»',
+  'печать блока',
+  'бумага обложки',
+  'картон кашировки',
+  'срок изготовления',
+])
 
 const printedBlock = applySheetBlock({ innerBlock: { printed: true } }, 50)
 assert.equal(printedBlock.innerBlock?.printed, true)
 assert.equal(describeOperatorView(printedBlock).hidePrint, false)
-assert.deepEqual(describeOperatorView(printedBlock).hiddenLabels, ['поле «Страницы»'])
+assert.equal(describeOperatorView(printedBlock).hideCoverMaterials, true)
+assert.equal(describeOperatorView(printedBlock).hideLeadTime, true)
+assert.deepEqual(describeOperatorView(printedBlock).hiddenLabels, [
+  'поле «Страницы»',
+  'бумага обложки',
+  'картон кашировки',
+  'срок изготовления',
+])
 // Без листов блока флаг не действует: печать блока задаётся строками размера, как раньше.
 assert.equal(blockIsUnprinted({ innerBlock: { printed: false } }), false)
 const clearedSheets = clearSheetBlock({
@@ -169,11 +184,15 @@ const papers = paperChoiceOf({
 })
 assert.deepEqual(papers?.options.map((option) => option.label), ['Чистые', 'В клетку', 'В точку'])
 assert.deepEqual(papers?.options.map((option) => option.id), [12, 20, 21])
-assert.equal(
-  paperChoiceOf({ notebook: { use_sheets: true, white_material_id: 12, grid_material_id: 12 } }),
-  null,
+assert.deepEqual(
+  paperChoiceOf({ notebook: { use_sheets: true, white_material_id: 12, grid_material_id: 12 } })?.options,
+  [{ id: 12, label: 'Чистые' }],
 )
-assert.equal(paperChoiceOf({ notebook: { use_sheets: true, white_material_id: 12 } }), null)
+assert.deepEqual(
+  paperChoiceOf({ notebook: { use_sheets: true, white_material_id: 12 } })?.options,
+  [{ id: 12, label: 'Чистые' }],
+)
+assert.equal(paperChoiceOf({ notebook: { use_sheets: true } }), null)
 assert.equal(sheetBlockPriceTypeMultiplier('urgent'), 1)
 assert.equal(sheetBlockPriceTypeMultiplier('standard'), 0.5)
 assert.equal(sheetBlockPriceTypeMultiplier('standard', { standard: 0.8 }), 0.8)
