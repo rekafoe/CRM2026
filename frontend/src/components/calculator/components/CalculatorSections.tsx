@@ -321,7 +321,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
         />
 
         <div className={isMultiPageProduct ? 'calculator-extra-row' : undefined}>
-          {isMultiPageProduct && !operatorView.hideCover && (
+          {isMultiPageProduct && !operatorView.hideCover && !operatorView.hideCoverMaterials && (
             <CoverMaterialsSection
               coverConfig={
                 (backendProductSchema?.template?.simplified as { multiPageStructure?: { cover?: unknown } } | undefined)
@@ -334,7 +334,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
               validationError={validationErrors.cover_material_id}
             />
           )}
-          {isMultiPageProduct && boundStructure?.cover?.wrap === true && !operatorView.hideCover && (
+          {isMultiPageProduct && boundStructure?.cover?.wrap === true && !operatorView.hideCover && !operatorView.hideCoverMaterials && (
             <CoverBoardSection
               boardIds={(boundStructure.cover?.board_material_ids ?? []).map(Number)}
               boardMaterialId={(specs as { board_material_id?: number }).board_material_id}
@@ -363,6 +363,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             Boolean(effectivePages?.options?.length) ||
             Boolean(backendProductSchema?.fields?.some((f: { name?: string }) => f.name === 'pages'))
           }
+          hideLeadTime={operatorView.hideLeadTime}
         />
       </div>
     </div>

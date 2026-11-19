@@ -51,6 +51,10 @@ import {
   usesBlockSheets,
 } from '../../utils/boundProductPreset';
 import {
+  getCoverAllowedMaterialIds,
+  pickDefaultCoverMaterialId,
+} from '../../utils/multipageCoverMaterials';
+import {
   defaultUvPrintState,
   getEffectiveUvPrintConfig,
   hasEnabledUvLayer,
@@ -474,6 +478,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         const fallback = Number(structure.cover.board_material_id) || boardIds[0];
         if (boardIds.length > 0 && !boardIds.includes(current) && fallback > 0) {
           next.board_material_id = fallback;
+          changed = true;
+        }
+      }
+      if (usesBlockSheets(structure) && structure.cover?.mode === 'separate') {
+        const allowed = getCoverAllowedMaterialIds(structure.cover);
+        const current = Number(prev.cover_material_id);
+        const fallback = pickDefaultCoverMaterialId(structure.cover);
+        if (allowed.length > 0 && !allowed.includes(current) && fallback != null) {
+          next.cover_material_id = fallback;
           changed = true;
         }
       }

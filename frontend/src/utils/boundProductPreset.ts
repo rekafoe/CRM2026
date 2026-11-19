@@ -166,7 +166,7 @@ export function paperChoiceOf(structure?: BoundStructure | null): BlockPaperChoi
     seen.add(id)
     options.push({ id, label })
   }
-  if (options.length < 2) return null
+  if (options.length < 1) return null
   return { options }
 }
 
@@ -351,6 +351,10 @@ export type OperatorView = {
   showCoverPrint: boolean
   showReadyLid: boolean
   paperChoice: BlockPaperChoice | null
+  /** Бумага обложки и картон кашировки заданы в шаблоне, в калькуляторе их нет. */
+  hideCoverMaterials: boolean
+  /** Срок изготовления не выбирают: его задаёт тип цены. */
+  hideLeadTime: boolean
   hiddenLabels: string[]
 }
 
@@ -365,6 +369,8 @@ export function describeOperatorView(structure?: BoundStructure | null): Operato
       showCoverPrint: false,
       showReadyLid: true,
       paperChoice: null,
+      hideCoverMaterials: false,
+      hideLeadTime: false,
       hiddenLabels: ['печать', 'страницы обложки', 'ламинация'],
     }
   }
@@ -380,7 +386,11 @@ export function describeOperatorView(structure?: BoundStructure | null): Operato
       showCoverPrint: true,
       showReadyLid: false,
       paperChoice: paperChoiceOf(structure),
-      hiddenLabels: unprinted ? ['поле «Страницы»', 'печать блока'] : ['поле «Страницы»'],
+      hideCoverMaterials: true,
+      hideLeadTime: true,
+      hiddenLabels: unprinted
+        ? ['поле «Страницы»', 'печать блока', 'бумага обложки', 'картон кашировки', 'срок изготовления']
+        : ['поле «Страницы»', 'бумага обложки', 'картон кашировки', 'срок изготовления'],
     }
   }
   return {
@@ -392,6 +402,8 @@ export function describeOperatorView(structure?: BoundStructure | null): Operato
     showCoverPrint: false,
     showReadyLid: false,
     paperChoice: null,
+    hideCoverMaterials: false,
+    hideLeadTime: false,
     hiddenLabels: [],
   }
 }
