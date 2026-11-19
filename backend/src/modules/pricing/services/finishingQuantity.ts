@@ -144,3 +144,59 @@ export function enforceRequiredFinishing<T extends FinishingRow>(
 
   return next;
 }
+
+/**
+ * Необязательная (и любая выбранная) отделка: client units_per_item ≤ 0 не биллит услугу как $0.
+ * Public calculate / website reprice оставляли service_id в finishing при units=0 → silent undercharge.
+ * Норма шаблона > 0 подставляется; явный 0 в шаблоне сохраняем; без нормы — убираем поле (сработает ?? 1).
+ * Положительные значения ниже шаблона не трогаем: CRM quantity spinner (per_cut / per_hour) может снизить норму.
+ */
+export function applyTemplateFinishingUnits<T extends FinishingRow>(
+  chosen: T[] | null | undefined,
+  template: Array<FinishingRow> | null | undefined,
+): T[] {
+  const rows = Array.isArray(chosen) ? chosen : [];
+  const tmplByKey = new Map<string, FinishingRow>();
+  if (Array.isArray(template)) {
+    for (const row of template) {
+      const sid = Number(row.service_id);
+      if (!Number.isFinite(sid)) continue;
+      const vid = variantIdOf(row.variant_id);
+      if (vid != null) tmplByKey.set(`${sid}:${vid}`, row);
+      if (!tmplByKey.has(String(sid))) tmplByKey.set(String(sid), row);
+    }
+  }
+
+  return rows.map((f) => {
+    const sid = Number(f.service_id);
+    const vid = variantIdOf(f.variant_id);
+    const key = vid != null ? `${sid}:${vid}` : String(sid);
+    const tmpl = tmplByKey.get(key) ?? tmplByKey.get(String(sid));
+    const tmplUnits = templateUnits(tmpl?.units_per_item);
+    const raw = f.units_per_item as unknown;
+    const clientMissing =
+      raw === undefined || raw === null || (typeof raw === 'string' && String(raw).trim() === '');
+    const clientUnits = Number(raw);
+    const clientFinite = !clientMissing && Number.isFinite(clientUnits);
+    const next = { ...f } as T & { units_per_item?: number };
+
+    // Клиент прислал норму > 0 — оставляем (в т.ч. ниже шаблона).
+    if (clientFinite && clientUnits > 0) return next;
+
+    if (tmplUnits != null && tmplUnits > 0) {
+      next.units_per_item = tmplUnits;
+      return next;
+    }
+
+    if (tmplUnits === 0) {
+      next.units_per_item = 0;
+      return next;
+    }
+
+    // Нет нормы в шаблоне и клиентский ≤0 / битый: не биллим как бесплатную выбранную услугу.
+    if (!clientFinite || clientUnits <= 0) {
+      delete next.units_per_item;
+    }
+    return next;
+  });
+}

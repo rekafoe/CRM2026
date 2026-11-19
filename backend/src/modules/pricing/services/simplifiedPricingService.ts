@@ -54,6 +54,7 @@ import {
 } from './finishingPerM2';
 import { finishingServiceDisplayName } from './finishingServiceCaption';
 import {
+  applyTemplateFinishingUnits,
   enforceRequiredFinishing,
   flatFinishingUnits,
   getEffectiveFinishing,
@@ -1801,6 +1802,12 @@ export class SimplifiedPricingService {
 
     // Обязательная услуга размера всегда в расчёте, с количеством из шаблона, даже если клиент её снял или прислал другое число.
     finishingToUse = enforceRequiredFinishing(
+      finishingToUse,
+      Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
+    );
+    // Необязательная отделка: client units_per_item ≤ 0 не оставляет услугу выбранной за $0
+    // (public calculate / website quote-cart / recalculateOrderPrices).
+    finishingToUse = applyTemplateFinishingUnits(
       finishingToUse,
       Array.isArray(selectedSize.finishing) ? selectedSize.finishing : [],
     );
