@@ -26,6 +26,7 @@ import {
   applyPrintedCover,
   applyReadyCover,
   applySheetBlock,
+  clearSheetBlock,
   coverChoiceOf,
   coverIsTwoPiece,
   coverIsWrapped,
@@ -244,7 +245,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   }
   const setUseSheets = (enabled: boolean) => {
     if (!enabled) {
-      patchNotebook({ use_sheets: false })
+      commit(clearSheetBlock(latest.current as BoundStructure))
       return
     }
     commit(applySheetBlock(latest.current as BoundStructure, springSheetsOf(latest.current as BoundStructure)))

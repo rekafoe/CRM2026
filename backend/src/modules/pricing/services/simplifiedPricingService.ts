@@ -85,6 +85,7 @@ import {
   resolveBlockPagesForPrint,
   resolveMultipagePageSplit,
   usesMultipageSheetPricing,
+  usesSheetBlock,
   validateBindingPagesLimit,
   validateMultiPageCountForTemplate,
   resolveEffectiveSimplifiedPages,
@@ -1375,8 +1376,12 @@ export class SimplifiedPricingService {
         rule: coverSheetRule,
       });
     const coverPrintUnits = separateCoverForTier ? coverPrintUnitsFor(quantity, coverSidesForTier) : 0;
-    // Блок без печати в прогон не входит: ступень печати обложки выбирается по листам обложки.
-    const blockUnprinted = usePagesMultiplier && multiPageStructure?.innerBlock?.printed === false;
+    // Блок без печати — только у режима «листы блока». Иначе sticky printed:false после снятия
+    // галочки use_sheets обнулял печать обычного multi_page (CRM при этом снова показывает селекторы).
+    const blockUnprinted =
+      usePagesMultiplier &&
+      usesSheetBlock(multiPageStructure) &&
+      multiPageStructure?.innerBlock?.printed === false;
     const tierUnitsWithCover = (blockUnits: number, coverUnits: number): number => {
       if (coverUnits <= 0) return blockUnits;
       return blockUnprinted ? coverUnits : blockUnits + coverUnits;

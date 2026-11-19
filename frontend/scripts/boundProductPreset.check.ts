@@ -3,6 +3,7 @@ import {
   WRAP_BOARDS_PER_ITEM,
   applyReadyCover,
   applySheetBlock,
+  clearSheetBlock,
   coverPrintChoiceToSides,
   describeOperatorView,
   pickChannel,
@@ -64,6 +65,13 @@ assert.equal(describeOperatorView(printedBlock).hidePrint, false)
 assert.deepEqual(describeOperatorView(printedBlock).hiddenLabels, ['поле «Страницы»'])
 // Без листов блока флаг не действует: печать блока задаётся строками размера, как раньше.
 assert.equal(blockIsUnprinted({ innerBlock: { printed: false } }), false)
+const clearedSheets = clearSheetBlock({
+  notebook: { use_sheets: true, sheets: 50 },
+  innerBlock: { printed: false, pagesSource: 'parameter' },
+})
+assert.equal(clearedSheets.notebook?.use_sheets, false)
+assert.equal(clearedSheets.innerBlock?.printed, undefined)
+assert.equal(blockIsUnprinted(clearedSheets), false)
 
 assert.deepEqual(
   templateServiceIds({

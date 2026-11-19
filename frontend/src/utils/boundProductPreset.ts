@@ -232,6 +232,21 @@ export function applySheetBlock(
   }
 }
 
+/**
+ * Снять «листы блока»: use_sheets=false и убрать sticky printed:false,
+ * иначе бэкенд без usesSheetBlock-гейта мог обнулить печать обычного multi_page.
+ */
+export function clearSheetBlock(structure: BoundStructure | undefined): BoundStructure {
+  const notebook = { ...(structure?.notebook ?? {}), use_sheets: false }
+  const inner = { ...(structure?.innerBlock ?? {}) }
+  delete inner.printed
+  return {
+    ...(structure ?? {}),
+    notebook,
+    innerBlock: inner,
+  }
+}
+
 function coverHasPrintSetup(cover: BoundStructure['cover']): boolean {
   if (!cover) return false
   return Boolean(

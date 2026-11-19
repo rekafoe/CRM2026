@@ -1062,6 +1062,54 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
 
       expect(result.layout?.sheetsNeeded).toBe(20);
     });
+
+    it('sticky printed:false без use_sheets не обнуляет печать обычного multi_page', async () => {
+      // Сценарий после снятия «листы блока»: use_sheets=false, а printed:false остался от applySheetBlock.
+      templateConfigData.simplified.include_material_cost = false;
+      templateConfigData.simplified.pages = { options: [], min: 4, max: 200, step: 2 };
+      templateConfigData.simplified.multiPageStructure = {
+        coverChoice: 'printed',
+        notebook: { use_sheets: false, sheets: 50 },
+        innerBlock: { pagesSource: 'parameter', printed: false },
+        cover: { mode: 'none' },
+      };
+      templateConfigData.simplified.sizes = [
+        {
+          id: 'a4',
+          label: 'A4',
+          width_mm: 210,
+          height_mm: 297,
+          print_prices: [
+            {
+              technology_code: 'laser_prof',
+              color_mode: 'color',
+              sides_mode: 'single',
+              tiers: [{ min_qty: 1, unit_price: 2 }],
+            },
+          ],
+          material_prices: [],
+          finishing: [],
+        },
+      ];
+      (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layoutMock(1));
+      (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layoutMock(1));
+
+      const result = await SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'a4',
+          print_technology: 'laser_prof',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+          pages: 10,
+        } as any,
+        10,
+      );
+
+      // 10 стр. × 10 шт × 2 BYN — печать блока на месте, несмотря на sticky printed:false.
+      expect(result.printPrice).toBe(200);
+      expect(result.finalPrice).toBe(200);
+    });
   });
 });
 
