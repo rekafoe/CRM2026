@@ -2972,13 +2972,17 @@ export class SimplifiedPricingService {
     let readyLidPerItem = 0;
     const readyLidChoice = multiPageStructure?.coverChoice === 'ready';
     if (usePagesMultiplier && readyLidChoice && includeMaterialCost) {
-      const lidId = Number((normalizedConfig as { lid_material_id?: number }).lid_material_id);
+      const requestedLid = Number((normalizedConfig as { lid_material_id?: number }).lid_material_id);
       const coverIds = (multiPageStructure?.readyLid?.cover_material_ids ?? [])
         .map((id) => Number(id))
         .filter((id) => Number.isFinite(id) && id > 0);
       const channelIds = (multiPageStructure?.readyLid?.channel_material_ids ?? [])
         .map((id) => Number(id))
         .filter((id) => Number.isFinite(id) && id > 0);
+      const lidListed = (id: number) => coverIds.length === 0 || coverIds.includes(id);
+      let lidId = 0;
+      if (requestedLid > 0 && lidListed(requestedLid)) lidId = requestedLid;
+      else if (coverIds.length === 1) lidId = coverIds[0];
       const templateSides = multiPageStructure?.innerBlock?.print?.sides_mode;
       const pagesPerSheet = templateSides
         ? (templateSides === 'single' ? 1 : 2)
@@ -2990,8 +2994,11 @@ export class SimplifiedPricingService {
       const hasChannelRange = thicknessCols.has('channel_min_mm') && thicknessCols.has('channel_max_mm');
       if (!hasThickness) {
         pricingWarnings.push('На складе нет поля эталонной толщины листа.');
-      } else if (!(lidId > 0) || (coverIds.length > 0 && !coverIds.includes(lidId))) {
-        pricingWarnings.push('Выберите крышку.');
+      } else if (!(lidId > 0)) {
+        // Public calculate / website reprice раньше оставляли readyLidPrice=0 с warning → undercharge.
+        const err: any = new Error('Выберите крышку');
+        err.status = 400;
+        throw err;
       } else {
         const paperId = Number(normalizedConfig.material_id);
         const paper = paperId > 0
@@ -3004,8 +3011,13 @@ export class SimplifiedPricingService {
           'SELECT name, sheet_price_single, spine_thickness_mm FROM materials WHERE id = ? AND is_active = 1',
           [lidId],
         );
+        if (!lid) {
+          const err: any = new Error('Крышка не найдена на складе');
+          err.status = 400;
+          throw err;
+        }
         const caliper = Number(paper?.sheet_thickness_mm ?? 0);
-        const spine = Number(lid?.spine_thickness_mm ?? 0);
+        const spine = Number(lid.spine_thickness_mm ?? 0);
         const totalMm = readyLidThicknessMm(sheetCount, caliper > 0 ? caliper : 0, spine > 0 ? spine : 0);
         if (!(caliper > 0)) {
           pricingWarnings.push('У бумаги блока нет эталонной толщины листа, канал не подобран. Цена крышки на месте.');
@@ -3038,11 +3050,11 @@ export class SimplifiedPricingService {
         if (!channel && totalMm > 0) {
           pricingWarnings.push(`Нет канала на ${formatMm(totalMm)} мм.`);
         }
-        const coverUnit = Number(lid?.sheet_price_single ?? 0);
+        const coverUnit = Number(lid.sheet_price_single ?? 0);
         const channelUnit = Number(channel?.sheet_price_single ?? 0);
         readyLidPerItem = coverUnit * READY_LID_COVERS_PER_ITEM + (channel ? channelUnit * READY_LID_CHANNELS_PER_ITEM : 0);
         readyLidPrice = readyLidPerItem * quantity;
-        if (lid && coverUnit >= 0) {
+        if (coverUnit >= 0) {
           const coverQty = READY_LID_COVERS_PER_ITEM * quantity;
           const existingCover = operationMaterials.find((row) => row.material_id === lidId);
           if (existingCover) existingCover.quantity += coverQty;
@@ -3080,29 +3092,32 @@ export class SimplifiedPricingService {
       else if (templateDefault > 0 && listed(templateDefault)) boardId = templateDefault;
       else if (boardIds.length === 1) boardId = boardIds[0];
       if (!(boardId > 0)) {
-        pricingWarnings.push('Переплётный картон не выбран, со склада он не спишется. Печать обложки на месте.');
-      } else {
-        const board = await db.get<{ name: string; sheet_price_single?: number | null }>(
-          'SELECT name, sheet_price_single FROM materials WHERE id = ? AND is_active = 1',
-          [boardId],
-        );
-        if (!board) {
-          pricingWarnings.push('Переплётный картон не найден на складе. Печать обложки на месте.');
-        } else {
-          const unit = includeMaterialCost ? Number(board.sheet_price_single ?? 0) : 0;
-          const safeUnit = Number.isFinite(unit) && unit > 0 ? unit : 0;
-          boardPerItem = safeUnit * WRAP_BOARDS_PER_ITEM;
-          const boardQty = WRAP_BOARDS_PER_ITEM * quantity;
-          coverPrice += boardPerItem * quantity;
-          const existingBoard = operationMaterials.find((row) => row.material_id === boardId);
-          if (existingBoard) existingBoard.quantity += boardQty;
-          else operationMaterials.push({
-            material_id: boardId,
-            material_name: board.name,
-            quantity: boardQty,
-          });
-        }
+        // Public calculate иначе оставлял картон $0 с warning при wrap и нескольких board ids.
+        const err: any = new Error('Выберите переплётный картон');
+        err.status = 400;
+        throw err;
       }
+      const board = await db.get<{ name: string; sheet_price_single?: number | null }>(
+        'SELECT name, sheet_price_single FROM materials WHERE id = ? AND is_active = 1',
+        [boardId],
+      );
+      if (!board) {
+        const err: any = new Error('Переплётный картон не найден на складе');
+        err.status = 400;
+        throw err;
+      }
+      const unit = includeMaterialCost ? Number(board.sheet_price_single ?? 0) : 0;
+      const safeUnit = Number.isFinite(unit) && unit > 0 ? unit : 0;
+      boardPerItem = safeUnit * WRAP_BOARDS_PER_ITEM;
+      const boardQty = WRAP_BOARDS_PER_ITEM * quantity;
+      coverPrice += boardPerItem * quantity;
+      const existingBoard = operationMaterials.find((row) => row.material_id === boardId);
+      if (existingBoard) existingBoard.quantity += boardQty;
+      else operationMaterials.push({
+        material_id: boardId,
+        material_name: board.name,
+        quantity: boardQty,
+      });
     }
 
     // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
