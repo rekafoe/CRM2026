@@ -80,6 +80,7 @@ import {
   coverLayoutPerSheet,
   resolveCoverSheetRule,
   resolveSheetBlock,
+  sheetBlockPriceTypeMultiplier,
   type CoverSheetRule,
   resolveBlockPagesForPrint,
   resolveMultipagePageSplit,
@@ -3367,10 +3368,17 @@ export class SimplifiedPricingService {
       'standard'
     ).trim().toLowerCase() || 'standard';
     const productMultiplier = simplifiedConfig.price_type_multipliers?.[priceTypeKey];
-    const priceTypeMult =
+    const configuredMultiplier =
       productMultiplier != null && Number.isFinite(Number(productMultiplier))
         ? Number(productMultiplier)
-        : await PriceTypeService.getMultiplier(priceTypeKey);
+        : undefined;
+    const sheetMultiplier = sheetBlock
+      ? sheetBlockPriceTypeMultiplier(priceTypeKey, simplifiedConfig.price_type_multipliers)
+      : undefined;
+    const priceTypeMult =
+      configuredMultiplier ??
+      sheetMultiplier ??
+      (await PriceTypeService.getMultiplier(priceTypeKey));
     if (priceTypeMult !== 1) {
       logger.info('Применяем множитель типа цены', { priceTypeKey, multiplier: priceTypeMult });
       printPrice *= priceTypeMult;

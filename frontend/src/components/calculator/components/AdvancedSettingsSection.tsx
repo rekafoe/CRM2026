@@ -3,6 +3,7 @@ import { getProductionDaysByPriceType, getProductionTimeLabelFromDays } from '..
 import { getPriceTypes } from '../../../services/pricing';
 import type { PriceType } from '../../../types/pricing';
 import { getEffectiveAllowedPriceTypes } from '../utils/simplifiedConfig';
+import { sheetBlockPriceTypeMultiplier, usesBlockSheets } from '../../../utils/boundProductPreset';
 
 const formatMultiplier = (m: number) => {
   if (m >= 1) return `×${m} (+${((m - 1) * 100).toFixed(0)}%)`;
@@ -67,13 +68,21 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
 
   const priceTypeOptions = useMemo(() => {
     const byKey = new Map(priceTypes.map((pt) => [pt.key, pt]));
+    const simplified = backendProductSchema?.template?.simplified;
+    const sheetBlock = usesBlockSheets(simplified?.multiPageStructure);
+    const productMultipliers = simplified?.price_type_multipliers as Record<string, number> | undefined;
     return allowedKeys
       .map((key) => {
         const pt = byKey.get(key);
-        return pt ? { key: pt.key, label: `${pt.name} (${formatMultiplier(pt.multiplier)})` } : { key, label: key };
+        if (!pt) return { key, label: key };
+        const custom = productMultipliers?.[key];
+        const configured = custom != null && Number.isFinite(Number(custom)) ? Number(custom) : undefined;
+        const sheetDefault = sheetBlock ? sheetBlockPriceTypeMultiplier(key, productMultipliers) : undefined;
+        const multiplier = configured ?? sheetDefault ?? pt.multiplier;
+        return { key: pt.key, label: `${pt.name} (${formatMultiplier(multiplier)})` };
       })
       .filter((o) => o);
-  }, [priceTypes, allowedKeys]);
+  }, [priceTypes, allowedKeys, backendProductSchema?.template?.simplified]);
 
   const currentPriceType = specs.priceType ?? '';
   const isValidPriceType = allowedKeys.length > 0 && allowedKeys.includes(currentPriceType);

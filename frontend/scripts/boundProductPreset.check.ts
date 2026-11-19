@@ -9,6 +9,8 @@ import {
   readyLidThicknessMm,
   applyPrintedCover,
   blockIsUnprinted,
+  paperChoiceOf,
+  sheetBlockPriceTypeMultiplier,
   coverIsTwoPiece,
   sheetBlockError,
   springBlockPages,
@@ -153,5 +155,20 @@ assert.equal(
   ),
   10,
 )
+
+const papers = paperChoiceOf({
+  notebook: { use_sheets: true, white_material_id: 12, grid_material_id: 20, dot_material_id: 21 },
+})
+assert.deepEqual(papers?.options.map((option) => option.label), ['Чистые', 'В клетку', 'В точку'])
+assert.deepEqual(papers?.options.map((option) => option.id), [12, 20, 21])
+assert.equal(
+  paperChoiceOf({ notebook: { use_sheets: true, white_material_id: 12, grid_material_id: 12 } }),
+  null,
+)
+assert.equal(paperChoiceOf({ notebook: { use_sheets: true, white_material_id: 12 } }), null)
+assert.equal(sheetBlockPriceTypeMultiplier('urgent'), 1)
+assert.equal(sheetBlockPriceTypeMultiplier('standard'), 0.5)
+assert.equal(sheetBlockPriceTypeMultiplier('standard', { standard: 0.8 }), 0.8)
+assert.equal(sheetBlockPriceTypeMultiplier('promo'), undefined)
 
 console.log('boundProductPreset.check ok')

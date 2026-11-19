@@ -79,6 +79,7 @@ export type MultiPageStructureConfig = {
     sheets?: number;
     white_material_id?: number;
     grid_material_id?: number;
+    dot_material_id?: number;
   };
   readyLid?: {
     cover_material_ids?: number[];
@@ -306,6 +307,11 @@ export type SimplifiedConfig = {
   uv_print?: SimplifiedUvPrintConfig;
   /** ШФП рулон (legacy без типов продукта) */
   roll_m2?: SimplifiedRollM2Config;
+  /**
+   * Множитель типа цены только этого продукта. Справочник price_types не меняется.
+   * У блокнота листами пустые «срочная» и «стандартная» значат ×1 и ×0.5.
+   */
+  price_type_multipliers?: Record<string, number>;
 }
 
 function toTypeConfigKey(id: ProductTypeId): string {

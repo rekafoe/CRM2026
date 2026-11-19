@@ -1017,17 +1017,21 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         next = { ...next, format: availableFormats[0] };
         changed = true;
       }
+      const sheetNotebook = usesBlockSheets(
+        backendProductSchema?.template?.simplified?.multiPageStructure,
+      );
+      const basePriceType = sheetNotebook ? 'urgent' : 'standard';
       const needDefaults =
         !next.sides || next.sides !== 1 ||
         next.lamination !== 'none' ||
-        next.priceType !== 'standard' ||
+        next.priceType !== basePriceType ||
         next.customerType !== 'regular';
       if (needDefaults) {
         next = {
           ...next,
           sides: next.sides || 1,
           lamination: next.lamination || 'none',
-          priceType: 'standard',
+          priceType: basePriceType,
           customerType: 'regular',
         };
         changed = true;
