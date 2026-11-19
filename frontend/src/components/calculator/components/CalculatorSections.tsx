@@ -195,6 +195,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
               pages: (specs as any).pages,
               notebook_sheets: (specs as any).notebook_sheets,
               cover_print: (specs as any).cover_print,
+              cover_lamination_service_id: (specs as any).cover_lamination_service_id,
+              cover_lamination_variant_id: (specs as any).cover_lamination_variant_id,
             } satisfies ParamsSectionSpecs
           }
           availableFormats={availableFormats}

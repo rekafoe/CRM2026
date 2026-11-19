@@ -932,6 +932,35 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       expect(result.tier_prices?.[0]).toMatchObject({ min_qty: 1, total_price: 39.45 });
     });
 
+    it('калькулятор без плёнки не берёт ламинацию из шаблона', async () => {
+      mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
+
+      const result = await SimplifiedPricingService.calculatePrice(
+        1,
+        notebookRequest({ cover_lamination_service_id: 0 }) as any,
+        1,
+      );
+
+      expect((result.finishingDetails ?? []).map((row) => row.service_id)).toEqual([77]);
+      // 39.45 минус ламинация 12.
+      expect(result.finalPrice).toBe(27.45);
+    });
+
+    it('плёнка, выбранная в калькуляторе, ламинирует только обложку', async () => {
+      mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
+
+      const result = await SimplifiedPricingService.calculatePrice(
+        1,
+        notebookRequest({ cover_lamination_service_id: 8, cover_lamination_variant_id: 4 }) as any,
+        1,
+      );
+
+      const lamination = (result.finishingDetails ?? []).find((row) => row.service_id === 8);
+      expect(lamination?.units_needed).toBe(2);
+      expect(lamination?.priceForQuantity).toBe(12);
+      expect(result.finalPrice).toBe(39.45);
+    });
+
     it('срочная цена — база, стандартная — скидка типа цены', async () => {
       mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
 

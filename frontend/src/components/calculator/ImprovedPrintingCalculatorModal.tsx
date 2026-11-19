@@ -1021,11 +1021,14 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         backendProductSchema?.template?.simplified?.multiPageStructure,
       );
       const basePriceType = sheetNotebook ? 'urgent' : 'standard';
+      const needCoverLaminationDefault =
+        sheetNotebook && (next as { cover_lamination_service_id?: unknown }).cover_lamination_service_id == null;
       const needDefaults =
         !next.sides || next.sides !== 1 ||
         next.lamination !== 'none' ||
         next.priceType !== basePriceType ||
-        next.customerType !== 'regular';
+        next.customerType !== 'regular' ||
+        needCoverLaminationDefault;
       if (needDefaults) {
         next = {
           ...next,
@@ -1033,6 +1036,12 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           lamination: next.lamination || 'none',
           priceType: basePriceType,
           customerType: 'regular',
+          ...(sheetNotebook
+            ? {
+                cover_lamination_service_id:
+                  (next as { cover_lamination_service_id?: number | null }).cover_lamination_service_id ?? 0,
+              }
+            : {}),
         };
         changed = true;
       }
