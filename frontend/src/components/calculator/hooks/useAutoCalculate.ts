@@ -22,6 +22,8 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     pages: specs.pages ?? null,
     notebook_sheets: specs.notebook_sheets ?? null,
     cover_print_sides_mode: specs.cover_print_sides_mode ?? null,
+    cover_lamination_service_id: specs.cover_lamination_service_id ?? null,
+    cover_lamination_variant_id: specs.cover_lamination_variant_id ?? null,
     binding_variant_id: specs.binding_variant_id ?? null,
     board_material_id: specs.board_material_id ?? null,
     material_id: specs.material_id, //  ID материала тоже важен

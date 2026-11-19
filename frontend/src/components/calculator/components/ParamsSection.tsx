@@ -11,6 +11,7 @@ import {
   bindingCalculatorIssue,
   formatBindingProductPagesHint,
 } from './BindingVariantSelector';
+import { CoverLaminationField } from './CoverLaminationField';
 import { CustomPagesField } from './CustomPagesField';
 import {
   SHEET_BLOCK_MAX_SHEETS,
@@ -28,6 +29,8 @@ export interface ParamsSectionSpecs {
   pages?: number | null;
   notebook_sheets?: number | null;
   cover_print?: CoverPrintChoice | null;
+  cover_lamination_service_id?: number | null;
+  cover_lamination_variant_id?: number | null;
 }
 
 interface ParamsSectionProps {
@@ -512,6 +515,22 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               <option value="both">С двух сторон</option>
             </select>
           </div>
+        )}
+
+        {showCoverPrint && (
+          <CoverLaminationField
+            serviceId={specs.cover_lamination_service_id}
+            variantId={specs.cover_lamination_variant_id}
+            onChange={(serviceId, variantId) =>
+              updateSpecs(
+                {
+                  cover_lamination_service_id: serviceId,
+                  cover_lamination_variant_id: variantId ?? null,
+                },
+                true,
+              )
+            }
+          />
         )}
 
         {/* Стороны печати */}

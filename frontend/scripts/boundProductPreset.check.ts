@@ -56,7 +56,7 @@ assert.equal(springView.showSheets, true)
 assert.equal(springView.showCoverPrint, true)
 assert.equal(springView.hidePages, true)
 assert.equal(springView.hidePrint, true)
-assert.equal(springView.hideLamination, false)
+assert.equal(springView.hideLamination, true)
 assert.deepEqual(springView.hiddenLabels, ['поле «Страницы»', 'печать блока'])
 
 const printedBlock = applySheetBlock({ innerBlock: { printed: true } }, 50)
@@ -78,7 +78,7 @@ assert.deepEqual(
     binding: { service_id: 28 },
     cover: { mode: 'separate', lamination: { service_id: 8 } },
   }),
-  [28, 8],
+  [28],
 )
 assert.deepEqual(templateServiceIds({ binding: {}, cover: { mode: 'none', lamination: { service_id: 8 } } }), [])
 

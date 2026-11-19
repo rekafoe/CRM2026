@@ -1854,20 +1854,48 @@ export class SimplifiedPricingService {
       }
     }
 
-    const coverLamination =
-      usePagesMultiplier && multiPageStructure?.cover?.mode === 'separate'
-        ? multiPageStructure.cover.lamination
-        : undefined;
-    const coverLaminationServiceId = Number(coverLamination?.service_id);
-    const hasCoverLamination = Number.isFinite(coverLaminationServiceId) && coverLaminationServiceId > 0;
+    const coverAcceptsLamination =
+      usePagesMultiplier &&
+      multiPageStructure?.cover?.mode === 'separate' &&
+      multiPageStructure?.coverChoice !== 'ready';
+    const templateCoverLamination = coverAcceptsLamination
+      ? multiPageStructure?.cover?.lamination
+      : undefined;
+    const requestedCoverLamRaw = (configuration as { cover_lamination_service_id?: unknown }).cover_lamination_service_id;
+    const requestChoosesCoverLamination =
+      requestedCoverLamRaw !== undefined &&
+      requestedCoverLamRaw !== null &&
+      String(requestedCoverLamRaw).trim() !== '';
+    const requestedCoverLamId = Number(requestedCoverLamRaw);
+    const templateCoverLamId = Number(templateCoverLamination?.service_id);
+    // Калькулятор присылает 0, когда плёнка не выбрана: шаблон тогда цену не добавляет.
+    // Поле не пришло — старые клиенты по-прежнему берут услугу из шаблона.
+    const coverLaminationServiceId = !coverAcceptsLamination
+      ? 0
+      : requestChoosesCoverLamination
+        ? (Number.isFinite(requestedCoverLamId) && requestedCoverLamId > 0 ? requestedCoverLamId : 0)
+        : (Number.isFinite(templateCoverLamId) && templateCoverLamId > 0 ? templateCoverLamId : 0);
+    const requestedCoverLamVariant = Number(
+      (configuration as { cover_lamination_variant_id?: unknown }).cover_lamination_variant_id,
+    );
+    const templateCoverLamVariant = Number(templateCoverLamination?.variant_id);
+    const coverLaminationVariantId = requestChoosesCoverLamination
+      ? requestedCoverLamVariant
+      : templateCoverLamVariant;
+    const hasCoverLamination = coverLaminationServiceId > 0;
+    const coverLamIdsToDrop = new Set<number>();
+    if (hasCoverLamination) coverLamIdsToDrop.add(coverLaminationServiceId);
+    if (coverAcceptsLamination && Number.isFinite(templateCoverLamId) && templateCoverLamId > 0) {
+      coverLamIdsToDrop.add(templateCoverLamId);
+    }
 
     let effectiveFinishingToUse = [...finishingToUse];
-    if (hasConfiguredBinding || hasCoverLamination) {
-      // Переплёт — BindingPricingService. Ламинация обложки — только листы обложки, не блок.
+    if (hasConfiguredBinding || coverLamIdsToDrop.size > 0) {
+      // Переплёт — BindingPricingService. Плёнка обложки не считается на листы блока.
       effectiveFinishingToUse = effectiveFinishingToUse.filter((item) => {
         const sid = Number(item.service_id);
         if (hasConfiguredBinding && sid === configuredBindingServiceId) return false;
-        if (hasCoverLamination && sid === coverLaminationServiceId) return false;
+        if (coverLamIdsToDrop.has(sid)) return false;
         return true;
       });
     }
@@ -1885,10 +1913,11 @@ export class SimplifiedPricingService {
         itemsPerSheet,
         sidesMode: coverSides,
       });
-      const variantRaw = Number(coverLamination?.variant_id);
       return quoteCoverLamination(db, {
         serviceId: coverLaminationServiceId,
-        ...(Number.isFinite(variantRaw) && variantRaw > 0 ? { variantId: variantRaw } : {}),
+        ...(Number.isFinite(coverLaminationVariantId) && coverLaminationVariantId > 0
+          ? { variantId: coverLaminationVariantId }
+          : {}),
         orderQuantity: qty,
         coverSheetsTotal,
         trimMm: {

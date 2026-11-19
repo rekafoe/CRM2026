@@ -714,7 +714,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
             <div className="simplified-form-grid">
               <FormField
                 label="Ламинация обложки"
-                help="Только листы обложки, одна плёнка на лист. Блок этой услугой не ламинируется."
+                help="По умолчанию без ламинации. Этот список в заказ сам не попадает: в калькуляторе плёнку включают отдельно, и пока её нет, в цене её нет."
               >
                 <select
                   className="form-select"

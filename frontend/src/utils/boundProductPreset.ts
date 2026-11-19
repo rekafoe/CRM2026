@@ -121,12 +121,9 @@ export function blockIsUnprinted(structure?: BoundStructure | null): boolean {
   return usesBlockSheets(structure) && structure?.innerBlock?.printed === false
 }
 
-/** Услуги, которые шаблон уже включил сам: оператору их галочки не показывают. */
+/** Переплёт шаблон уже включил сам: оператору его галочку не показывают. Ламинация обложки — опция калькулятора. */
 export function templateServiceIds(structure?: BoundStructure | null): number[] {
   const ids = [structure?.binding?.service_id]
-  if (!isReadyLid(structure) && structure?.cover?.mode === 'separate') {
-    ids.push(structure.cover.lamination?.service_id)
-  }
   return ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
 }
 
@@ -376,7 +373,8 @@ export function describeOperatorView(structure?: BoundStructure | null): Operato
     return {
       hidePrint: unprinted,
       hideCover: false,
-      hideLamination: false,
+      // Галочка ламинации в операциях скрыта: плёнку включают отдельным списком обложки.
+      hideLamination: true,
       hidePages: true,
       showSheets: true,
       showCoverPrint: true,
