@@ -1,4 +1,5 @@
 import {
+  applyTemplateFinishingUnits,
   enforceRequiredFinishing,
   flatFinishingUnits,
   getEffectiveFinishing,
@@ -87,5 +88,41 @@ describe('finishing quantity', () => {
     expect(getEffectiveFinishing({ common_finishing: common }, { use_own_finishing: true, finishing: own })).toEqual(own);
     expect(getEffectiveFinishing({ common_finishing: common }, { use_own_finishing: false, finishing: own })).toEqual(common);
     expect(getEffectiveFinishing(null, { finishing: own })).toEqual(own);
+  });
+
+  it('не даёт клиенту units_per_item≤0 на необязательной услуге (норма шаблона)', () => {
+    expect(
+      applyTemplateFinishingUnits(
+        [
+          { service_id: 80, units_per_item: 0 },
+          { service_id: 81, units_per_item: -1 },
+          { service_id: 82, units_per_item: 3 },
+        ],
+        [
+          { service_id: 80, is_required: false, units_per_item: 1 },
+          { service_id: 81, units_per_item: 2 },
+          { service_id: 82, units_per_item: 1 },
+        ],
+      ),
+    ).toEqual([
+      { service_id: 80, units_per_item: 1 },
+      { service_id: 81, units_per_item: 2 },
+      { service_id: 82, units_per_item: 3 },
+    ]);
+  });
+
+  it('при ≤0 без нормы в шаблоне убирает поле; дробь ниже шаблона не поднимает', () => {
+    expect(
+      applyTemplateFinishingUnits(
+        [
+          { service_id: 80, units_per_item: 0 },
+          { service_id: 81, units_per_item: 0.5 },
+        ],
+        [{ service_id: 81, units_per_item: 2 }],
+      ),
+    ).toEqual([
+      { service_id: 80 },
+      { service_id: 81, units_per_item: 0.5 },
+    ]);
   });
 });
