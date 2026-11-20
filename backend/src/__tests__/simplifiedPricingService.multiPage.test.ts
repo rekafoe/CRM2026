@@ -732,6 +732,145 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.finalPrice).toBe(2100);
   });
 
+  it('публичный cover_lamination_service_id:0 не снимает шаблонную плёнку вне блокнота', async () => {
+    templateConfigData.simplified.sizes[0].width_mm = 148;
+    templateConfigData.simplified.sizes[0].height_mm = 210;
+    templateConfigData.simplified.sizes[0].finishing = [{ service_id: 88, price_unit: 'per_sheet', units_per_item: 1 }];
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      cover: {
+        mode: 'separate',
+        page_count: 2,
+        print: { technology_code: 'laser_prof', color_mode: 'color', sides_mode: 'single' },
+        lamination: { service_id: 88 },
+      },
+    };
+    (PricingServiceRepository.listServiceTiers as jest.Mock).mockImplementation(async (serviceId: number) => {
+      if (serviceId === 88) return [{ id: 1, serviceId: 88, minQuantity: 1, rate: 3, isActive: true }];
+      return [];
+    });
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services')) {
+          const id = Number(params?.[0]);
+          if (id === 88) {
+            return {
+              id: 88,
+              name: 'Ламинация',
+              operation_type: 'laminate',
+              price_unit: 'per_sheet',
+              price: 3,
+              min_quantity: 1,
+              is_active: 1,
+            };
+          }
+          return null;
+        }
+        return null;
+      }),
+      all: jest.fn(async () => []),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 102 as any,
+        cover_lamination_service_id: 0,
+      } as any,
+      10,
+    );
+
+    const lamination = (result.finishingDetails ?? []).filter((row) => row.service_id === 88);
+    expect(lamination).toHaveLength(1);
+    expect(lamination[0].units_needed).toBe(20);
+    expect(lamination[0].priceForQuantity).toBe(60);
+    expect(result.finalPrice).toBe(2100);
+  });
+
+  it('публичный cover_lamination_service_id не ужимает finishing до обложки без шаблонной плёнки', async () => {
+    templateConfigData.simplified.sizes[0].width_mm = 148;
+    templateConfigData.simplified.sizes[0].height_mm = 210;
+    templateConfigData.simplified.sizes[0].finishing = [{ service_id: 88, price_unit: 'per_sheet', units_per_item: 1 }];
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      cover: {
+        mode: 'separate',
+        page_count: 2,
+        print: { technology_code: 'laser_prof', color_mode: 'color', sides_mode: 'single' },
+      },
+    };
+    (PricingServiceRepository.listServiceTiers as jest.Mock).mockImplementation(async (serviceId: number) => {
+      if (serviceId === 88) return [{ id: 1, serviceId: 88, minQuantity: 1, rate: 3, isActive: true }];
+      return [];
+    });
+    mockedGetDb.mockResolvedValue({
+      get: jest.fn(async (query: string, params?: unknown[]) => {
+        if (query.includes('FROM products WHERE id = ?')) return productRow;
+        if (query.includes('FROM product_template_configs')) {
+          return { config_data: JSON.stringify(templateConfigData) };
+        }
+        if (query.includes('FROM post_processing_services')) {
+          const id = Number(params?.[0]);
+          if (id === 88) {
+            return {
+              id: 88,
+              name: 'Ламинация',
+              operation_type: 'laminate',
+              price_unit: 'per_sheet',
+              price: 3,
+              min_quantity: 1,
+              is_active: 1,
+            };
+          }
+          return null;
+        }
+        return null;
+      }),
+      all: jest.fn(async (query: string) => {
+        if (String(query).includes('FROM post_processing_services') && String(query).includes('id IN')) {
+          return [{
+            id: 88,
+            name: 'Ламинация',
+            operation_type: 'laminate',
+            price_unit: 'per_sheet',
+            min_quantity: 1,
+            max_quantity: null,
+          }];
+        }
+        return [];
+      }),
+      run: jest.fn(),
+    } as any);
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 102 as any,
+        cover_lamination_service_id: 88,
+      } as any,
+      10,
+    );
+
+    // Без notebook use_sheets клиентский id игнорируется: finishing остаётся на листы блока (1000), не обложку (20).
+    const lamination = (result.finishingDetails ?? []).filter((row) => row.service_id === 88);
+    expect(lamination).toHaveLength(1);
+    expect(lamination[0].units_needed).toBe(1000);
+    expect(lamination[0].priceForQuantity).toBe(3000);
+  });
+
   it('каширует бумагу на картон: 2 картона на изделие, печать обложки остаётся', async () => {
     templateConfigData.simplified.include_material_cost = true;
     templateConfigData.simplified.multiPageStructure = {

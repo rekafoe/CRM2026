@@ -1862,14 +1862,19 @@ export class SimplifiedPricingService {
       ? multiPageStructure?.cover?.lamination
       : undefined;
     const requestedCoverLamRaw = (configuration as { cover_lamination_service_id?: unknown }).cover_lamination_service_id;
+    // Выбор плёнки из калькулятора — только блокнот листами (CRM UI). Иначе публичный
+    // /pricing/calculate мог прислать 0 (снять шаблонную плёнку) или чужой service_id
+    // (ужать finishing до листов обложки).
+    const honorClientCoverLamination = usesSheetBlock(multiPageStructure);
     const requestChoosesCoverLamination =
+      honorClientCoverLamination &&
       requestedCoverLamRaw !== undefined &&
       requestedCoverLamRaw !== null &&
       String(requestedCoverLamRaw).trim() !== '';
     const requestedCoverLamId = Number(requestedCoverLamRaw);
     const templateCoverLamId = Number(templateCoverLamination?.service_id);
-    // Калькулятор присылает 0, когда плёнка не выбрана: шаблон тогда цену не добавляет.
-    // Поле не пришло — старые клиенты по-прежнему берут услугу из шаблона.
+    // Калькулятор блокнота присылает 0, когда плёнка не выбрана: шаблон тогда цену не добавляет.
+    // Поле не пришло / не блокнот — берём услугу из шаблона.
     const coverLaminationServiceId = !coverAcceptsLamination
       ? 0
       : requestChoosesCoverLamination
