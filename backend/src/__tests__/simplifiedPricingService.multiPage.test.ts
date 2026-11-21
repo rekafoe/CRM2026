@@ -857,6 +857,7 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       const materials: Record<number, { name: string; sheet_price_single: number }> = {
         11: { name: 'Полуматовая бумага 350', sheet_price_single: 1.2 },
         12: { name: 'Офисная A4 80', sheet_price_single: 0.07 },
+        15: { name: 'Клетка A4 80', sheet_price_single: 0.09 },
         41: { name: 'Картон переплётный', sheet_price_single: BOARD_PRICE },
       };
       mockedGetDb.mockResolvedValue({
@@ -983,6 +984,25 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
         1,
       );
       expect(custom.finalPrice).toBe(31.56);
+    });
+
+    it('бумага «В клетку» вне allowlist размера тарифицируется, не $0', async () => {
+      mountNotebook({ wrap: true, board_material_ids: [41], board_material_id: 41 });
+      templateConfigData.simplified.multiPageStructure.notebook = {
+        ...templateConfigData.simplified.multiPageStructure.notebook,
+        white_material_id: 12,
+        grid_material_id: 15,
+      };
+
+      const result = await SimplifiedPricingService.calculatePrice(
+        1,
+        notebookRequest({ material_id: 15 }) as any,
+        1,
+      );
+
+      // Размер по-прежнему [12]; без объединения paper ids материал 15 молча давал $0.
+      expect(result.breakdown?.innerBlockPrice).toBe(4.5);
+      expect(result.finalPrice).toBe(40.45);
     });
 
     it('печать обложки с двух сторон не убавляет листы: картонов по-прежнему два', async () => {

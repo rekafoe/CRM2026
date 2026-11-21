@@ -81,6 +81,7 @@ import {
   resolveCoverSheetRule,
   resolveSheetBlock,
   sheetBlockPriceTypeMultiplier,
+  expandAllowedMaterialsForSheetBlock,
   type CoverSheetRule,
   resolveBlockPagesForPrint,
   resolveMultipagePageSplit,
@@ -822,9 +823,15 @@ export class SimplifiedPricingService {
         ? itemsPerSheetOverrideRaw
         : undefined;
 
-    const effectiveAllowedMaterialIds = typeConfig
+    const sizeAllowedMaterialIds = typeConfig
       ? getEffectiveAllowedMaterialIds(typeConfig, selectedSize)
       : (selectedSize.allowed_material_ids ?? []);
+    // Бумага «Чистые/клетка/точка» задаётся в notebook.*, не в allowlist размера.
+    // Без объединения калькулятор шлёт grid/dot id → silent materialPrice $0.
+    const effectiveAllowedMaterialIds = expandAllowedMaterialsForSheetBlock(
+      sizeAllowedMaterialIds,
+      multiPageStructure,
+    );
     let resolvedMaterialPrint: MaterialPrintResolution | undefined;
     if (simplifiedConfig.material_driven_printing === true && !uvPrintWithoutMaterial) {
       if (!normalizedConfig.material_id) {

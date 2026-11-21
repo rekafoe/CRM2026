@@ -290,6 +290,46 @@ export function usesSheetBlock(multiPageStructure: unknown): boolean {
   return isRecord(notebook) && notebook.use_sheets === true;
 }
 
+/**
+ * Бумага блока «Чистые / В клетку / В точку» из шаблона.
+ * Калькулятор шлёт эти id как material_id; они часто не входят в allowed_material_ids размера.
+ */
+export function sheetBlockPaperMaterialIds(multiPageStructure: unknown): number[] {
+  if (!usesSheetBlock(multiPageStructure)) return [];
+  const structure = structureRecord(multiPageStructure);
+  const notebook = structure?.notebook;
+  if (!isRecord(notebook)) return [];
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const key of ['white_material_id', 'grid_material_id', 'dot_material_id'] as const) {
+    const id = Number(notebook[key]);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/** Allowlist размера ∪ бумаги блокнота — иначе выбор «В клетку» вне размера даёт materialPrice $0. */
+export function expandAllowedMaterialsForSheetBlock(
+  allowedMaterialIds: number[] | null | undefined,
+  multiPageStructure: unknown,
+): number[] {
+  const base = Array.isArray(allowedMaterialIds)
+    ? allowedMaterialIds.map(Number).filter((id) => Number.isFinite(id) && id > 0)
+    : [];
+  const paperIds = sheetBlockPaperMaterialIds(multiPageStructure);
+  if (paperIds.length === 0) return base;
+  const seen = new Set<number>(base);
+  const merged = [...base];
+  for (const id of paperIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    merged.push(id);
+  }
+  return merged;
+}
+
 /** Бумага обложки кашируется на картон: печатная обложка «Своя бумага и печать» с галочкой. */
 export function coverIsWrapped(multiPageStructure: unknown): boolean {
   const structure = structureRecord(multiPageStructure);
