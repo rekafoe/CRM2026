@@ -8,6 +8,8 @@ import {
   resolveMultipagePageSplit,
   resolveSheetBlock,
   sheetBlockPriceTypeMultiplier,
+  sheetBlockPaperMaterialIds,
+  expandAllowedMaterialsForSheetBlock,
 } from '../utils/multipagePagesConsistency';
 
 describe('computeMultipagePrintUnits', () => {
@@ -134,6 +136,20 @@ describe('листы обложки', () => {
     expect(sheetBlockPriceTypeMultiplier('online')).toBeUndefined();
     expect(sheetBlockPriceTypeMultiplier('standard', { standard: 0.8 })).toBe(0.8);
     expect(sheetBlockPriceTypeMultiplier(' urgent ')).toBe(1);
+  });
+
+  it('бумага Чистые/клетка/точка попадает в allowlist размера', () => {
+    const notebook = {
+      use_sheets: true,
+      white_material_id: 12,
+      grid_material_id: 15,
+      dot_material_id: 16,
+    };
+    expect(sheetBlockPaperMaterialIds({ notebook, coverChoice: 'printed' })).toEqual([12, 15, 16]);
+    expect(expandAllowedMaterialsForSheetBlock([12], { notebook, coverChoice: 'printed' })).toEqual([
+      12, 15, 16,
+    ]);
+    expect(expandAllowedMaterialsForSheetBlock([12], { notebook: { use_sheets: false } })).toEqual([12]);
   });
 
   it('обычная обложка альбома считается как раньше', () => {
