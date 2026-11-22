@@ -398,6 +398,10 @@ export class OrderController {
    * POST /api/orders/from-website/confirm-prepayment
    * POST /api/orders/from-website/:orderId/confirm-prepayment
    * Webhook BePaid на сайте: зафиксировать оплату только после successful.
+   *
+   * Не SET-затирает уже зачтённый bank/paid (как CRM BePaid webhook):
+   * при открытом paymentUrl — accumulate, иначе max(existing, amount).
+   * Failed не обнуляет collected. Только source=website; soft-cancel игнор.
    */
   static async confirmWebsiteOrderPrepayment(req: Request, res: Response) {
     const body = (req.body ?? {}) as {
@@ -418,27 +422,62 @@ export class OrderController {
     const orderIdFromPath =
       Number.isFinite(orderIdParam) && orderIdParam > 0 ? Math.trunc(orderIdParam) : null
 
+    type ConfirmPayRow = {
+      id: number
+      source?: string | null
+      number?: string | null
+      prepaymentAmount?: number | string | null
+      prepaymentStatus?: string | null
+      paymentUrl?: string | null
+      paymentId?: string | null
+      is_cancelled?: number | null
+    }
+
     const db = await getDb()
+    let hasIsCancelled = false
+    try {
+      hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+    } catch {
+      hasIsCancelled = false
+    }
+    const selectCols = hasIsCancelled
+      ? `SELECT id, source, number, prepaymentAmount, prepaymentStatus, paymentUrl, paymentId,
+                COALESCE(is_cancelled, 0) as is_cancelled FROM orders`
+      : `SELECT id, source, number, prepaymentAmount, prepaymentStatus, paymentUrl, paymentId,
+                0 as is_cancelled FROM orders`
+
     let row = orderIdFromPath
-      ? await db.get<{ id: number; source?: string | null; number?: string | null }>(
-          'SELECT id, source, number FROM orders WHERE id = ?',
-          orderIdFromPath
-        )
+      ? await db.get<ConfirmPayRow>(`${selectCols} WHERE id = ?`, orderIdFromPath)
       : undefined
 
     if (!row && orderNumber) {
-      row = await db.get<{ id: number; source?: string | null; number?: string | null }>(
-        'SELECT id, source, number FROM orders WHERE number = ?',
-        orderNumber
-      )
+      row = await db.get<ConfirmPayRow>(`${selectCols} WHERE number = ?`, orderNumber)
     }
 
     if (!row) {
       res.status(404).json({ error: 'Заказ не найден' })
       return
     }
+    if (row.source !== 'website') {
+      res.status(403).json({ error: 'Подтверждение предоплаты доступно только для заказов с сайта' })
+      return
+    }
+    if (Number(row.is_cancelled) === 1) {
+      logger.warn('confirmWebsiteOrderPrepayment: ignore soft-cancelled order', {
+        orderId: row.id,
+        paymentId,
+        paymentStatus,
+      })
+      res.json({ ok: true, skipped: true, reason: 'cancelled' })
+      return
+    }
 
     const orderId = row.id
+    const existingPrepay = Number(row.prepaymentAmount ?? 0)
+    const statusLower = String(row.prepaymentStatus ?? '').toLowerCase()
+    const alreadyCollected =
+      statusLower === 'paid' || statusLower === 'successful' || statusLower === 'bank'
+    const hasOpenCheckout = Boolean(String(row.paymentUrl || '').trim())
 
     let hasPrepaymentUpdatedAt = false
     try {
@@ -450,17 +489,24 @@ export class OrderController {
     const isSuccessful = paymentStatus === 'successful' || paymentStatus === 'paid'
 
     if (isSuccessful) {
-      const amount = rawAmount > 0 ? rawAmount : 0
-      if (amount <= 0) {
+      const incoming = rawAmount > 0 ? rawAmount : 0
+      if (incoming <= 0) {
         res.status(400).json({ error: 'amount обязателен при successful' })
         return
       }
+      // Mirror CRM BePaid webhook: never SET-wipe collected bank/paid without open checkout.
+      const amount =
+        alreadyCollected && hasOpenCheckout
+          ? Math.round((existingPrepay + incoming) * 100) / 100
+          : alreadyCollected && !hasOpenCheckout
+            ? Math.max(existingPrepay, incoming)
+            : incoming
       const updateSql = hasPrepaymentUpdatedAt
         ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
-           paymentUrl = NULL, paymentId = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
+           paymentUrl = NULL, paymentId = COALESCE(?, paymentId), prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
            WHERE id = ?`
         : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
-           paymentUrl = NULL, paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+           paymentUrl = NULL, paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(updateSql, amount, paymentId, orderId)
       const updated = await db.get('SELECT * FROM orders WHERE id = ?', orderId)
       res.json({ ok: true, order: OrderService.toApiOrder({ ...(updated as Record<string, unknown>), items: [] }) })
@@ -468,11 +514,16 @@ export class OrderController {
     }
 
     if (paymentStatus === 'failed') {
+      // Не обнуляем уже зачтённый bank/paid неуспешной попыткой BePaid на сайте.
+      if (alreadyCollected) {
+        res.json({ ok: true, skipped: true, reason: 'already_collected', paymentStatus: 'failed' })
+        return
+      }
       const updateSql = hasPrepaymentUpdatedAt
-        ? `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
-           paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
-        : `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
-           paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+        ? `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
+           paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
+        : `UPDATE orders SET prepaymentStatus = 'failed', paymentMethod = 'online',
+           paymentId = COALESCE(?, paymentId), updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(updateSql, paymentId, orderId)
       res.json({ ok: true, skipped: false, paymentStatus: 'failed' })
       return
