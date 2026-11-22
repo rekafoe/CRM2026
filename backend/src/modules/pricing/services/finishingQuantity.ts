@@ -144,3 +144,37 @@ export function enforceRequiredFinishing<T extends FinishingRow>(
 
   return next;
 }
+
+/**
+ * quantity_scope только из шаблона продукта.
+ * Клиентский run на per_item (public calculate / website reprice) иначе
+ * оставляет норму один раз на тираж → silent undercharge.
+ */
+export function applyTemplateFinishingQuantityScope<T extends FinishingRow>(
+  chosen: T[] | null | undefined,
+  template: Array<FinishingRow> | null | undefined,
+): T[] {
+  const rows = Array.isArray(chosen) ? chosen : [];
+  const tmplByKey = new Map<string, FinishingRow>();
+  if (Array.isArray(template)) {
+    for (const row of template) {
+      const sid = Number(row.service_id);
+      if (!Number.isFinite(sid)) continue;
+      const vid = variantIdOf(row.variant_id);
+      if (vid != null) tmplByKey.set(`${sid}:${vid}`, row);
+      if (!tmplByKey.has(String(sid))) tmplByKey.set(String(sid), row);
+    }
+  }
+
+  return rows.map((f) => {
+    const sid = Number(f.service_id);
+    const vid = variantIdOf(f.variant_id);
+    const key = vid != null ? `${sid}:${vid}` : String(sid);
+    const tmpl = tmplByKey.get(key) ?? tmplByKey.get(String(sid));
+    const quantityScope = readFinishingQuantityScope(tmpl?.quantity_scope);
+    const next = { ...f } as T & { quantity_scope?: FinishingQuantityScope };
+    delete next.quantity_scope;
+    if (quantityScope) next.quantity_scope = quantityScope;
+    return next;
+  });
+}
