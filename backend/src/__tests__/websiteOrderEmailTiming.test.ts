@@ -139,15 +139,18 @@ async function insertOrder(options: {
   readyDate?: string
   priceType?: string
   cancelled?: boolean
+  email?: string | null
 }): Promise<void> {
   const created = options.createdAt ?? new Date().toISOString()
+  const email = options.email === undefined ? 'client@example.com' : options.email
   await testDb.run(
     `INSERT INTO orders (id, number, status, source, customerName, customerEmail, created_at, is_cancelled)
-     VALUES (?, ?, ?, ?, 'Анна', 'client@example.com', ?, ?)`,
+     VALUES (?, ?, ?, ?, 'Анна', ?, ?, ?)`,
     options.id,
     `N-${options.id}`,
     options.status,
     options.source ?? 'website',
+    email,
     created,
     options.cancelled ? 1 : 0,
   )
@@ -300,6 +303,68 @@ describe('website order email timing', () => {
     })).toBe('skipped')
     const job = await testDb.get<{ status: string }>(`SELECT status FROM mail_jobs`)
     expect(job?.status).toBe('sent')
+  })
+
+  it('повторно ставит письмо, если прошлое упало и кулдаун прошёл', async () => {
+    const now = Date.now()
+    await insertOrder({
+      id: 20,
+      status: 11,
+      priceType: 'online',
+      readyDate: new Date(now + 12 * HOUR).toISOString(),
+    })
+    await testDb.run(
+      `INSERT INTO mail_jobs (job_type, to_email, subject, status, idempotency_key, attempts, last_error, updated_at)
+       VALUES ('transactional', 'client@example.com', 'готов', 'failed', 'website-ready-reminder:20', 5, 'SMTP timeout', datetime('now', '-31 minutes'))`,
+    )
+    expect(await processWebsiteReadyReminders(20, now)).toBe(1)
+    const job = await testDb.get<{ status: string; attempts: number }>(
+      `SELECT status, attempts FROM mail_jobs WHERE idempotency_key = 'website-ready-reminder:20'`,
+    )
+    expect(job?.status).toBe('pending')
+    expect(job?.attempts).toBe(0)
+  })
+
+  it('не ставит письмо повторно, пока кулдаун после падения не прошёл', async () => {
+    const now = Date.now()
+    await insertOrder({
+      id: 21,
+      status: 11,
+      priceType: 'online',
+      readyDate: new Date(now + 12 * HOUR).toISOString(),
+    })
+    await testDb.run(
+      `INSERT INTO mail_jobs (job_type, to_email, subject, status, idempotency_key, attempts, last_error, updated_at)
+       VALUES ('transactional', 'client@example.com', 'готов', 'failed', 'website-ready-reminder:21', 5, 'SMTP timeout', datetime('now', '-5 minutes'))`,
+    )
+    expect(await processWebsiteReadyReminders(20, now)).toBe(0)
+    const job = await testDb.get<{ status: string }>(
+      `SELECT status FROM mail_jobs WHERE idempotency_key = 'website-ready-reminder:21'`,
+    )
+    expect(job?.status).toBe('failed')
+  })
+
+  it('заказы без email не забивают слоты сканера', async () => {
+    const now = Date.now()
+    for (let i = 0; i < 40; i++) {
+      await insertOrder({
+        id: 100 + i,
+        status: 11,
+        email: null,
+        priceType: 'online',
+        readyDate: new Date(now + 12 * HOUR).toISOString(),
+      })
+    }
+    await insertOrder({
+      id: 200,
+      status: 11,
+      priceType: 'online',
+      readyDate: new Date(now + 12 * HOUR).toISOString(),
+    })
+    expect(await processWebsiteReadyReminders(40, now)).toBe(1)
+    const jobs = await testDb.all<{ idempotency_key: string }[]>(`SELECT idempotency_key FROM mail_jobs`)
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0]?.idempotency_key).toBe('website-ready-reminder:200')
   })
 
   it('«выполнен» и «передан в ПВЗ» письмо о готовности не ставят', async () => {

@@ -1696,6 +1696,16 @@ export class OrderService {
           await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [targetStatus, id])
         }
 
+        const statusNames = await this.getAllStatuses().catch(() => [] as Array<{ id: number; name: string }>)
+        const statusLabel = (sid: number) => statusNames.find((s) => Number(s.id) === sid)?.name ?? `#${sid}`
+        await this.recordOrderActivity(db, {
+          orderId: id,
+          eventType: 'status_change',
+          message: `Статус: «${statusLabel(oldStatusId)}» → «${statusLabel(targetStatus)}»`,
+          userId: userId ?? null,
+          meta: { old_status_id: oldStatusId, new_status_id: targetStatus },
+        })
+
         // Если статус "Принят в работу", подтверждаем резервы по заказу
         const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
         if (inWorkId != null && targetStatus === Number(inWorkId)) {
@@ -2349,9 +2359,18 @@ export class OrderService {
       ...params
     )
     const n = targetStatus;
+    const bulkStatusNames = await this.getAllStatuses().catch(() => [] as Array<{ id: number; name: string }>)
+    const bulkStatusLabel = (sid: number) => bulkStatusNames.find((s) => Number(s.id) === sid)?.name ?? `#${sid}`
     for (const row of before) {
       const old = Number(row.status);
       if (old !== n) {
+        await this.recordOrderActivity(db, {
+          orderId: row.id,
+          eventType: 'status_change',
+          message: `Статус: «${bulkStatusLabel(old)}» → «${bulkStatusLabel(n)}»`,
+          userId: userId ?? null,
+          meta: { old_status_id: old, new_status_id: n, bulk: true },
+        });
         void tryEnqueueOrderStatusEmail({
           orderId: row.id,
           oldStatusId: old,

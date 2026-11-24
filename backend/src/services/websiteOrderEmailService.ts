@@ -125,6 +125,14 @@ async function selectReadyCandidates(
     ? 'AND COALESCE(o.is_cancelled, 0) = 0'
     : ''
   const readySql = `(s.code = 'picked_up' OR s.name = 'Получен в ПВЗ')`
+  // Без email письмо не поставить — такие заказы не должны занимать слоты сканера.
+  const emailSql = `AND (TRIM(COALESCE(o.customerEmail, '')) <> '' OR TRIM(COALESCE(c.email, '')) <> '')`
+  // Упавшие (failed) письма не считаем: заказ с failed-письмом снова попадает в сканер.
+  const notExistsSql = `AND NOT EXISTS (
+        SELECT 1 FROM mail_jobs mj
+        WHERE mj.idempotency_key = 'website-ready-reminder:' || o.id
+          AND mj.status IN ('pending', 'sending', 'sent')
+      )`
   const sql = `
     SELECT o.id,
            ${createdExpr} as created_at,
@@ -132,14 +140,13 @@ async function selectReadyCandidates(
            s.code as status_code
     FROM orders o
     INNER JOIN order_statuses s ON s.id = o.status
+    LEFT JOIN customers c ON c.id = o.customer_id
     WHERE o.source = 'website'
       ${cancelledSql}
       AND ${readySql}
       AND ${createdExpr} >= datetime('now', '-${SCAN_DAYS} days')
-      AND NOT EXISTS (
-        SELECT 1 FROM mail_jobs mj
-        WHERE mj.idempotency_key = 'website-ready-reminder:' || o.id
-      )
+      ${emailSql}
+      ${notExistsSql}
     ORDER BY o.id
     LIMIT ?`
   try {
@@ -155,14 +162,13 @@ async function selectReadyCandidates(
              NULL as status_code
       FROM orders o
       INNER JOIN order_statuses s ON s.id = o.status
+      LEFT JOIN customers c ON c.id = o.customer_id
       WHERE o.source = 'website'
         ${cancelledSql}
         AND s.name = 'Получен в ПВЗ'
         AND ${createdExpr} >= datetime('now', '-${SCAN_DAYS} days')
-        AND NOT EXISTS (
-          SELECT 1 FROM mail_jobs mj
-          WHERE mj.idempotency_key = 'website-ready-reminder:' || o.id
-        )
+        ${emailSql}
+        ${notExistsSql}
       ORDER BY o.id
       LIMIT ?`
     const rows = await db.all<ReadyCandidate[]>(fallback, limit)
@@ -234,6 +240,31 @@ async function stillReadyForReminder(
   }
 }
 
+/** Пауза перед повторной постановкой письма, упавшего с ошибкой отправки. */
+const FAILED_REMINDER_RETRY_COOLDOWN_MIN = 30
+
+/**
+ * Упавшее (failed) письмо не должно блокировать заказ навсегда: удаляем failed-запись,
+ * чтобы enqueueMail поставил письмо заново. Кулдаун — чтобы недоставляемый адрес
+ * не долбил SMTP на каждом тике сканера.
+ */
+async function deleteRetryableFailedReminder(
+  db: Awaited<ReturnType<typeof getDb>>,
+  orderId: number,
+): Promise<void> {
+  try {
+    await db.run(
+      `DELETE FROM mail_jobs
+       WHERE idempotency_key = ?
+         AND status = 'failed'
+         AND updated_at <= datetime('now', '-${FAILED_REMINDER_RETRY_COOLDOWN_MIN} minutes')`,
+      websiteReadyReminderKey(orderId),
+    )
+  } catch (e) {
+    logger.debug('Website ready reminder: failed job cleanup skipped', { error: e, orderId })
+  }
+}
+
 async function queuePickedUpReadyEmail(
   db: Awaited<ReturnType<typeof getDb>>,
   orderId: number,
@@ -253,6 +284,7 @@ async function queuePickedUpReadyEmail(
   })
   const sendAtMs = websiteReadyReminderSendAtMs(readyMs, nowMs)
   if (sendAtMs == null) return 'skipped'
+  await deleteRetryableFailedReminder(db, orderId)
   const result = await enqueueOrderEmailBySlug({
     orderId,
     templateSlug: READY_TEMPLATE_SLUG,
