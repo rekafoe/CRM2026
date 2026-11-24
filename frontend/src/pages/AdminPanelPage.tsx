@@ -128,6 +128,7 @@ const ADMIN_GROUPS: Array<{ id: AdminGroupId; title: string; hint: string; icon:
     hint: 'Заказы, деньги, доставка',
     icon: 'briefcase',
     links: [
+      { title: 'Задачи команды', description: 'Внутренние задачи отделов без привязки к заказам.', to: '/tasks', icon: 'check' },
       { title: 'Отчеты', description: 'Аналитика, выручка и дневные отчёты.', to: '/adminpanel/reports', icon: 'chart' },
       { title: 'Расходы', description: 'Операционные расходы по департаментам.', to: '/adminpanel/expenses', icon: 'receipt' },
       { title: 'Проценты', description: 'Начисления сотрудников, часы и аналитика.', to: '/adminpanel/earnings', icon: 'briefcase' },

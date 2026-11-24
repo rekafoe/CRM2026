@@ -67,6 +67,9 @@ const LazyKnowledgeProposalPage = React.lazy(() =>
 const LazyDesignTemplatesPage = React.lazy(() =>
   import('./pages/admin/DesignTemplatesPage').then((m) => ({ default: m.DesignTemplatesPage }))
 );
+const LazyTasksPage = React.lazy(() =>
+  import('./features/tasks/TasksPage').then((m) => ({ default: m.TasksPage }))
+);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(APP_CONFIG.storage.token) : null;
@@ -149,6 +152,7 @@ root.render(
             }
           />
           <Route path="/order-pool" element={<RequireAuth><OrderPoolPageWrapper /></RequireAuth>} />
+          <Route path="/tasks" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyTasksPage /></React.Suspense></RequireAuth>} />
           <Route path="/knowledge" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeCatalogPage /></React.Suspense></RequireAuth>} />
           <Route path="/knowledge/new" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeEditorPage /></React.Suspense></RequireAuth>} />
           <Route path="/knowledge/articles/:id" element={<RequireAuth><React.Suspense fallback={<LoadingFallback />}><LazyKnowledgeArticlePage /></React.Suspense></RequireAuth>} />

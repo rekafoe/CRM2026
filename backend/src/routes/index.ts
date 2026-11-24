@@ -45,6 +45,7 @@ import { knowledgeBaseRoutes } from '../modules/knowledge-base'
 import postalCarriersRoutes from './postalCarriers'
 import supportCustomerRoutes from './supportCustomer'
 import supportChatsRoutes from './supportChats'
+import { taskRoutes } from '../modules/tasks'
 
 const router = Router()
 
@@ -92,6 +93,7 @@ router.use('/public-editor', publicEditorRoutes)
 router.use('/knowledge', knowledgeBaseRoutes)
 router.use('/support', supportCustomerRoutes)
 router.use('/chats', supportChatsRoutes)
+router.use('/tasks', taskRoutes)
 router.use('/products/:productId/subtype-designs', subtypeDesignsRoutes)
 
 console.log('Routes setup complete')

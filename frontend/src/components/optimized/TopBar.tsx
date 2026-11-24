@@ -160,6 +160,17 @@ export const TopBar: React.FC<TopBarProps> = ({
       <nav className="pc-topbar__nav" aria-label="Разделы">
         <button
           type="button"
+          className={navClass(sectionActive('/tasks'))}
+          onClick={() => navigate('/tasks')}
+          title="Внутренние задачи команды"
+          aria-label="Внутренние задачи команды"
+          aria-current={sectionActive('/tasks') ? 'page' : undefined}
+        >
+          <AppIcon name="check" size="sm" />
+          <span>Задачи</span>
+        </button>
+        <button
+          type="button"
           className={navClass(sectionActive('/order-pool'))}
           onClick={onShowOrderPool}
           title="Пул заказов"
