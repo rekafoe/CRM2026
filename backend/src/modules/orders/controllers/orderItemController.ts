@@ -694,7 +694,7 @@ export class OrderItemController {
               c.unit
             )
             if (returnQty > 0) {
-              await MaterialTransactionService.return({
+              await MaterialTransactionService.addInTransaction(db, {
                 materialId: c.materialId,
                 quantity: returnQty,
                 reason: 'order delete item',
