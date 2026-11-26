@@ -365,3 +365,16 @@ h2.section-head, h3.section-head { margin-top: 0; }
   .ipc-catalog-card__footer { min-height: 82px; padding: 12px 12px 13px; }
   .ipc-catalog-card__arrow { width: 28px; height: 28px; }
 }
+.ipc-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 18px;
+}
+.ipc-order-files-note {
+  display: block;
+  margin: 12px 0 0;
+  color: var(--ipc-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}

@@ -6,6 +6,8 @@ import {
   listMiniappOrders,
 } from '../services/miniappOrderService';
 import { getMiniappOrderFileForDownload } from '../services/miniappOrderFileDownloadService';
+import { createMiniappPaymentLink } from '../services/miniappClientCommandService';
+import { BePaidCheckoutError } from '../services/bepaidCheckoutService';
 import { buildAttachmentContentDisposition } from '../utils/httpContentDisposition';
 
 function miniChatId(req: Request): string | null {
@@ -54,6 +56,41 @@ export class MiniappOrderController {
       res.setHeader('Content-Type', result.mime);
     }
     res.send(result.buffer);
+  }
+
+  static async paymentLink(req: Request, res: Response) {
+    const chatId = miniChatId(req);
+    if (!chatId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const orderId = parseInt(String(req.params.orderId), 10);
+    if (!Number.isFinite(orderId) || orderId < 1) {
+      res.status(400).json({ error: 'Invalid orderId' });
+      return;
+    }
+    try {
+      const paymentUrl = await createMiniappPaymentLink(chatId, orderId);
+      res.json({ paymentUrl });
+    } catch (error: any) {
+      if (error?.code === 'MINIAPP_ORDER_NOT_FOUND') {
+        res.status(404).json({ error: 'Заказ не найден' });
+        return;
+      }
+      if (error?.code === 'MINIAPP_ORDER_PAID') {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      if (error?.code === 'MINIAPP_PAYMENT_AMOUNT_INVALID') {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      if (error instanceof BePaidCheckoutError) {
+        res.status(error.httpStatus).json({ error: error.message });
+        return;
+      }
+      throw error;
+    }
   }
 
   static async getOne(req: Request, res: Response) {

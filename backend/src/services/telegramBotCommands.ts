@@ -1,6 +1,12 @@
 import { TelegramUserService, effectiveBotRole } from './telegramUserService';
 import { TelegramService } from './telegramService';
-import { getMiniappWebAppUrl, withMiniappOrder } from '../utils/miniappWebAppUrl';
+import { getMiniappWebAppUrl, withMiniappOrder, withMiniappRepeat } from '../utils/miniappWebAppUrl';
+import {
+  buildPickupBranchesText,
+  createMiniappPaymentLink,
+  findOwnedMiniappOrder,
+  formatOwnedOrderStatus,
+} from './miniappClientCommandService';
 import { buildTelegramActiveOrdersText, listTelegramActiveOrders } from './telegramOrderStatusService';
 import { SupportService } from '../modules/support/supportService';
 
@@ -43,6 +49,42 @@ export class TelegramBotCommands {
       description: 'Открыть PrintCore App',
       roles: ['client', 'manager', 'admin'],
       handler: TelegramBotCommands.handleMiniappWebView
+    },
+    {
+      command: '/orders',
+      description: 'Показать активные заказы',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handleOrdersCommand
+    },
+    {
+      command: '/track',
+      description: 'Статус заказа: /track <номер>',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handleTrackCommand
+    },
+    {
+      command: '/pay',
+      description: 'Оплатить заказ: /pay <номер>',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handlePayCommand
+    },
+    {
+      command: '/reorder',
+      description: 'Повторить заказ: /reorder <номер>',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handleReorderCommand
+    },
+    {
+      command: '/support',
+      description: 'Написать в поддержку',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handleSupportCommand
+    },
+    {
+      command: '/pickup',
+      description: 'Адреса самовывоза',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handlePickupCommand
     }
   ];
 
@@ -210,6 +252,67 @@ export class TelegramBotCommands {
       console.error('Error in handleClientFreeText:', error);
       return 'Не удалось передать сообщение. Попробуйте ещё раз.';
     }
+  }
+
+  static async handleOrdersCommand(chatId: string): Promise<string> {
+    return TelegramBotCommands.activeOrdersOrHint(chatId);
+  }
+
+  static async handleTrackCommand(chatId: string, _userId: string, args?: string[]): Promise<string> {
+    const reference = args?.[0];
+    if (!reference) return 'Укажите номер заказа: /track MAP-123 или /track 123.';
+    const order = await findOwnedMiniappOrder(chatId, reference);
+    if (!order) return 'Заказ не найден или принадлежит другому пользователю.';
+    await TelegramBotCommands.sendOrderLinkButton(chatId, order.id);
+    return formatOwnedOrderStatus(order);
+  }
+
+  static async handlePayCommand(chatId: string, _userId: string, args?: string[]): Promise<string> {
+    const reference = args?.[0];
+    if (!reference) return 'Укажите номер заказа: /pay MAP-123 или /pay 123.';
+    const order = await findOwnedMiniappOrder(chatId, reference);
+    if (!order) return 'Заказ не найден или принадлежит другому пользователю.';
+    try {
+      const paymentUrl = await createMiniappPaymentLink(chatId, order.id);
+      return `Оплата ${order.number || `заказа #${order.id}`}:\n${paymentUrl}`;
+    } catch (error: any) {
+      if (error?.code === 'MINIAPP_ORDER_PAID') return 'Этот заказ уже оплачен.';
+      console.error('Mini App payment command failed:', error?.message || error);
+      return error?.message || 'Не удалось сформировать ссылку на оплату. Попробуйте позже.';
+    }
+  }
+
+  static async handleReorderCommand(chatId: string, _userId: string, args?: string[]): Promise<string> {
+    const reference = args?.[0];
+    if (!reference) return 'Укажите номер заказа: /reorder MAP-123 или /reorder 123.';
+    const order = await findOwnedMiniappOrder(chatId, reference);
+    if (!order) return 'Заказ не найден или принадлежит другому пользователю.';
+    const base = getMiniappWebAppUrl();
+    if (!base) return 'PrintCore App не настроен: задайте MINIAPP_WEBAPP_URL.';
+    const url = withMiniappRepeat(base, order.id);
+    if (!url) return 'Не удалось сформировать ссылку на повтор заказа.';
+    await TelegramService.sendMessageWithKeyboard(chatId, 'Повторить заказ с теми же параметрами:', {
+      inline_keyboard: [[{ text: 'Повторить в PrintCore App', web_app: { url } }]],
+    });
+    return 'Откройте приложение, проверьте параметры и оформите новый заказ.';
+  }
+
+  static async handleSupportCommand(chatId: string): Promise<string> {
+    return TelegramBotCommands.handleClientFreeText(chatId, 'Нужна помощь оператора');
+  }
+
+  static async handlePickupCommand(): Promise<string> {
+    return buildPickupBranchesText();
+  }
+
+  private static async sendOrderLinkButton(chatId: string, orderId: number): Promise<void> {
+    const base = getMiniappWebAppUrl();
+    if (!base) return;
+    const url = withMiniappOrder(base, orderId);
+    if (!url) return;
+    await TelegramService.sendMessageWithKeyboard(chatId, 'Открыть заказ в PrintCore App:', {
+      inline_keyboard: [[{ text: 'Открыть заказ', web_app: { url } }]],
+    });
   }
 
   static async sendOrderOpenButtons(chatId: string): Promise<void> {

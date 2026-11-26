@@ -13,6 +13,7 @@ router.get('/me', asyncHandler(MiniappAuthController.me));
 router.post('/orders/draft', asyncHandler(MiniappCheckoutController.createDraft));
 router.get('/orders', asyncHandler(MiniappOrderController.list));
 router.post('/orders/:orderId/finalize', asyncHandler(MiniappCheckoutController.finalize));
+router.post('/orders/:orderId/payment-link', asyncHandler(MiniappOrderController.paymentLink));
 router.get(
   '/orders/:orderId/files/:fileId',
   asyncHandler(MiniappOrderController.downloadFile)

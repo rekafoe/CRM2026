@@ -20,3 +20,16 @@ export function withMiniappOrder(base: string, orderId: number): string | null {
     return null;
   }
 }
+
+/** Кнопка повтора: миниапп открывает корзину с параметрами исходного заказа. */
+export function withMiniappRepeat(base: string, orderId: number): string | null {
+  const raw = base.trim();
+  if (!raw || !Number.isInteger(orderId) || orderId <= 0) return null;
+  try {
+    const url = new URL(raw);
+    url.searchParams.set('repeat', String(orderId));
+    return url.toString();
+  } catch {
+    return null;
+  }
+}

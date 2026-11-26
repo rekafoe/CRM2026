@@ -29,6 +29,35 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
     if (b < 1048576) return (Math.round(b / 102.4) / 10) + ' KB';
     return (Math.round(b / 10485.76) / 10) + ' MB';
   }
+  function repeatCurrentOrderFromDetail() {
+    var d = out.orderDetailData;
+    if (!d || !d.order || !Array.isArray(d.items)) return;
+    if (typeof clearDraftCheckoutState === 'function') clearDraftCheckoutState();
+    out.cart = d.items.map(function (it) {
+      var params = {};
+      try { params = it.params ? JSON.parse(JSON.stringify(it.params)) : {}; } catch (e) { params = {}; }
+      var productId = Number(params.productId || it.type);
+      var productName = params.productName || params.description || it.type || 'Товар';
+      return {
+        k: 'repeat-' + it.id,
+        pid: productId,
+        name: productName,
+        price: Number(it.price) || 0,
+        qty: Math.max(1, Number(it.quantity) || 1),
+        type: String(productId || it.type),
+        params: params,
+        components: Array.isArray(params.components) ? params.components : undefined
+      };
+    });
+    out.checkoutFileByK = null;
+    out.checkoutDesignHelp = false;
+    out.repeatOrderId = null;
+    out.orderDetailId = null;
+    out.orderDetailData = null;
+    out.orderDetailErr = null;
+    out.orderFileMsg = null;
+    out.view = 'cart';
+  }
   function loadOrderDetail(silent) {
     if (!out.token || !out.orderDetailId) return;
     var isSilent = !!silent;
@@ -50,6 +79,9 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
         }
         out.orderDetailData = x.j;
         out.orderDetailErr = null;
+        if (out.repeatOrderId && out.orderDetailData && out.orderDetailData.order && Number(out.orderDetailData.order.id) === Number(out.repeatOrderId)) {
+          repeatCurrentOrderFromDetail();
+        }
         render();
       })
       .catch(function (err) {
@@ -60,6 +92,36 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
         }
         render();
       });
+  }
+  function createOrderPaymentLink(orderId) {
+    if (!out.token || !orderId || out.orderPaymentLoading) return;
+    out.orderPaymentLoading = true;
+    out.orderFileMsg = null;
+    render();
+    miniappRequestJson('/api/miniapp/orders/' + orderId + '/payment-link', {
+      method: 'POST',
+      headers: { Accept: 'application/json' }
+    })
+      .then(function (x) {
+        out.orderPaymentLoading = false;
+        if (!x.ok || !x.j || !x.j.paymentUrl) {
+          out.orderFileMsg = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Не удалось сформировать ссылку на оплату';
+          render();
+          return;
+        }
+        var paymentUrl = String(x.j.paymentUrl);
+        var tg = window.Telegram && window.Telegram.WebApp;
+        if (tg && typeof tg.openLink === 'function') tg.openLink(paymentUrl);
+        else window.location.href = paymentUrl;
+      })
+      .catch(function (err) {
+        out.orderPaymentLoading = false;
+        out.orderFileMsg = (err && err.message) || String(err);
+        render();
+      });
+  }
+  function orderIsSettled(order) {
+    return ['paid', 'successful', 'bank'].includes(String(order.prepaymentStatus || '').toLowerCase());
   }
   function renderOrderDetail() {
     var box = h('div', '', 'section');
@@ -104,6 +166,22 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
     if (ord.notes) sumInner.appendChild(h('p', 'Комментарий: ' + esc(ord.notes), 'line'));
     sumPanel.appendChild(sumInner);
     box.appendChild(sumPanel);
+    var orderActions = h('div', '', 'ipc-order-actions');
+    var repeatButton = h('button', 'Повторить заказ', 'small');
+    repeatButton.type = 'button';
+    repeatButton.onclick = function () {
+      out.repeatOrderId = ord.id;
+      repeatCurrentOrderFromDetail();
+    };
+    orderActions.appendChild(repeatButton);
+    if (!orderIsSettled(ord)) {
+      var payButton = h('button', out.orderPaymentLoading ? 'Формируем ссылку…' : 'Оплатить заказ', 'primary');
+      payButton.type = 'button';
+      if (out.orderPaymentLoading) payButton.disabled = true;
+      payButton.onclick = function () { createOrderPaymentLink(ord.id); };
+      orderActions.appendChild(payButton);
+    }
+    box.appendChild(orderActions);
     box.appendChild(h('h3', 'Позиции', 'ipc-subhead'));
     var items = d.items && d.items.length ? d.items : [];
     if (items.length === 0) {

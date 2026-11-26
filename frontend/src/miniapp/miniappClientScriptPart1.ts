@@ -15,7 +15,8 @@ export const MINIAPP_CLIENT_PART1 = `
     calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null, calcQuotesByType: null,
     calcForm: { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false },
     orderDetailId: null, orderDetailData: null, orderDetailErr: null, orderDetailLoading: false,
-    orderFileMsg: null, orderUploadLoading: false,
+    repeatOrderId: null,
+    orderFileMsg: null, orderUploadLoading: false, orderPaymentLoading: false,
     postCheckoutNotice: null,
     checkoutFileByK: null,
     /** Нет макета — нужна помощь с дизайном (не требовать файлы; сводка как «только печать»). */
@@ -356,6 +357,14 @@ export const MINIAPP_CLIENT_PART1 = `
         raw = window.Telegram.WebApp.initDataUnsafe.start_param || '';
       }
       var id = parseInt(String(raw).replace(/^order[_-]?/i, ''), 10);
+      if (id > 0) return id;
+    } catch (e) {}
+    return null;
+  }
+  function miniappLaunchRepeatOrderId() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var id = parseInt(String(params.get('repeat') || ''), 10);
       if (id > 0) return id;
     } catch (e) {}
     return null;

@@ -244,7 +244,12 @@ export const MINIAPP_CLIENT_PART2 = `
     var tg = window.Telegram && window.Telegram.WebApp;
     if (tg) { try { tg.ready(); tg.expand(); } catch (ex) {} }
     var launchOrderId = (typeof miniappLaunchOrderId === 'function') ? miniappLaunchOrderId() : null;
-    if (launchOrderId) {
+    var repeatOrderId = (typeof miniappLaunchRepeatOrderId === 'function') ? miniappLaunchRepeatOrderId() : null;
+    if (repeatOrderId) {
+      out.view = 'order_detail';
+      out.orderDetailId = repeatOrderId;
+      out.repeatOrderId = repeatOrderId;
+    } else if (launchOrderId) {
       out.view = 'order_detail';
       out.orderDetailId = launchOrderId;
     }
