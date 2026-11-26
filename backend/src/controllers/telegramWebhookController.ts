@@ -93,7 +93,7 @@ export class TelegramWebhookController {
 
       // Обрабатываем callback query (нажатие на кнопки)
       if (update.callback_query) {
-        await this.handleCallbackQuery(update.callback_query);
+        await TelegramWebhookController.handleCallbackQuery(update.callback_query);
         return res.json({ success: true, message: 'Callback query processed' });
       }
 
@@ -113,7 +113,7 @@ export class TelegramWebhookController {
       }
 
       // Автоматически добавляем или обновляем пользователя
-      await this.handleUserMessage(from, chat, text, photo, document);
+      await TelegramWebhookController.handleUserMessage(from, chat, text, photo, document);
 
       res.json({ success: true, message: 'Webhook processed successfully' });
     } catch (error: any) {
@@ -141,35 +141,35 @@ export class TelegramWebhookController {
       
       if (existingUser) {
         console.log(`Updating existing user: ${from.first_name} (${chatId})`);
-        await this.updateUserInfo(existingUser, from, chat);
+        await TelegramWebhookController.updateUserInfo(existingUser, from, chat);
         console.log(`Updated existing user: ${from.first_name} (${chatId})`);
 
         if (text && String(text).trim() !== '') {
           console.log(`Processing text input: ${text}`);
           const response = await TelegramBotCommands.handleMessage(chatId, from.id.toString(), text);
           if (response) {
-            await this.sendMessageToUser(chatId, response);
+            await TelegramWebhookController.sendMessageToUser(chatId, response);
             if (response.includes('Активные заказы:')) {
               await TelegramBotCommands.sendOrderOpenButtons(chatId);
             }
           }
         } else if ((photo && photo.length > 0) || document) {
-          await this.sendMiniappFlowHint(chatId);
+          await TelegramWebhookController.sendMiniappFlowHint(chatId);
         }
       } else {
         // Создаем нового пользователя
-        await this.createNewUser(from, chat);
+        await TelegramWebhookController.createNewUser(from, chat);
         console.log(`Created new user: ${from.first_name} (${chatId})`);
         
         // Отправляем приветственное сообщение с командами
         const welcomeMessage = await TelegramBotCommands.handleStart(chatId, from.id.toString());
-        await this.sendMessageToUser(chatId, welcomeMessage);
+        await TelegramWebhookController.sendMessageToUser(chatId, welcomeMessage);
         if (welcomeMessage.includes('Активные заказы:')) {
           await TelegramBotCommands.sendOrderOpenButtons(chatId);
         }
         if (text && TelegramBotCommands.isClientFreeText(text)) {
           const ack = await TelegramBotCommands.handleClientFreeText(chatId, text);
-          if (ack) await this.sendMessageToUser(chatId, ack);
+          if (ack) await TelegramWebhookController.sendMessageToUser(chatId, ack);
         }
       }
 
@@ -189,12 +189,12 @@ export class TelegramWebhookController {
           console.log(`Welcome message enabled: ${welcomeEnabled}`);
           
           if (welcomeEnabled === 'true') {
-            await this.sendWelcomeMessage(chatId, from.first_name);
+            await TelegramWebhookController.sendWelcomeMessage(chatId, from.first_name);
           }
         } catch (error) {
           console.error('Error getting welcome_message_enabled:', error);
           // Отправляем приветствие по умолчанию
-          await this.sendWelcomeMessage(chatId, from.first_name);
+          await TelegramWebhookController.sendWelcomeMessage(chatId, from.first_name);
         }
       }
 
@@ -356,7 +356,7 @@ export class TelegramWebhookController {
 
 Используйте /start, /help или /miniapp.`;
 
-      await this.sendMessageToUser(chatId, welcomeMessage);
+      await TelegramWebhookController.sendMessageToUser(chatId, welcomeMessage);
     } catch (error) {
       console.error('Error sending welcome message:', error);
     }
@@ -504,14 +504,14 @@ export class TelegramWebhookController {
       }
 
       await TelegramService.answerCallbackQuery(id, 'Сценарий перенесён в PrintCore App');
-      await this.sendMiniappFlowHint(chatId);
+      await TelegramWebhookController.sendMiniappFlowHint(chatId);
     } catch (error) {
       console.error('Error handling callback query:', error);
     }
   }
 
   private static async sendMiniappFlowHint(chatId: string) {
-    await this.sendMessageToUser(
+    await TelegramWebhookController.sendMessageToUser(
       chatId,
       'Основной клиентский сценарий перенесён в PrintCore App. Для новых действий используйте /miniapp.'
     );

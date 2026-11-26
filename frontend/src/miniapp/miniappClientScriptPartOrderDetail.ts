@@ -148,65 +148,7 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
       box.appendChild(flPanel);
     }
     if (out.orderFileMsg) box.appendChild(h('p', esc(out.orderFileMsg), out.orderFileMsg.indexOf('прикреп') >= 0 || out.orderFileMsg.indexOf('успе') >= 0 ? 'okmsg' : 'hint'));
-    var form = document.createElement('form');
-    form.className = 'form ipc-card';
-    form.onsubmit = function (e) {
-      e.preventDefault();
-      if (!out.token || !out.orderDetailId) return false;
-      var fileInp = form.querySelector('input[type=file]');
-      if (!fileInp || !fileInp.files || !fileInp.files[0]) {
-        out.orderFileMsg = 'Выберите файл';
-        render();
-        return false;
-      }
-      var fd = new FormData();
-      fd.append('file', fileInp.files[0]);
-      var sel = form.querySelector('select[name=orderItemId]');
-      if (sel && sel.value) fd.append('orderItemId', sel.value);
-      out.orderUploadLoading = true;
-      out.orderFileMsg = null;
-      render();
-      miniappRequestJson('/api/miniapp/orders/' + out.orderDetailId + '/files', { method: 'POST', headers: {}, body: fd })
-        .then(function (x) {
-          out.orderUploadLoading = false;
-          if (!x.ok) {
-            out.orderFileMsg = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Не удалось прикрепить';
-            render();
-            return;
-          }
-          out.orderFileMsg = 'Файл прикреплён';
-          fileInp.value = '';
-          loadOrderDetail();
-        })
-        .catch(function (err) {
-          out.orderUploadLoading = false;
-          out.orderFileMsg = (err && err.message) || String(err);
-          render();
-        });
-      return false;
-    };
-    var fileEl = document.createElement('input');
-    fileEl.type = 'file';
-    fileEl.name = 'file';
-    addField(form, 'Файл', fileEl);
-    var sel2 = document.createElement('select');
-    sel2.name = 'orderItemId';
-    sel2.innerHTML = '<option value="">Весь заказ (не к позиции)</option>';
-    for (var j = 0; j < items.length; j++) {
-      (function (it) {
-        var o = document.createElement('option');
-        o.value = String(it.id);
-        o.textContent = 'Позиция #' + it.id + ' — ' + String(it.type).substring(0, 40);
-        sel2.appendChild(o);
-      })(items[j]);
-    }
-    addField(form, 'Привязка', sel2);
-    var upBtn = h('button', out.orderUploadLoading ? 'Отправка…' : 'Прикрепить файл', 'primary');
-    upBtn.type = 'submit';
-    if (out.orderUploadLoading) upBtn.disabled = true;
-    form.appendChild(upBtn);
-    box.appendChild(h('h3', 'Прикрепить файл', 'ipc-subhead'));
-    box.appendChild(form);
+    box.appendChild(h('p', 'После оформления добавлять файлы нельзя. Состав заказа и уже прикреплённые макеты доступны для просмотра и скачивания.', 'hint ipc-order-files-note'));
     return box;
   }
 `;

@@ -556,26 +556,49 @@ export const MINIAPP_CLIENT_PART_CALC = `
       out.calcErr = null;
     }
     out.calcLoading = true;
+    out.calcQuotesByType = null;
     render();
     var body = buildCalcPayload();
     var bodySig = stableCalcPayloadSignature(body);
     var requestSeq = ++_calcRequestSeq;
     out.calcRequestSignature = bodySig;
-    miniappRequestJson('/api/products/' + out.calcPid + '/calculate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(body)
-    })
-      .then(function (x) {
+    var priceTypes = calcAllowedPriceTypes();
+    if (!priceTypes.length) priceTypes = [{ key: body.priceType || '', label: '' }];
+    Promise.all(priceTypes.map(function (pt) {
+      var quoteBody = Object.assign({}, body);
+      if (pt.key) quoteBody.priceType = pt.key;
+      return miniappRequestJson('/api/products/' + out.calcPid + '/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(quoteBody)
+      }).then(function (x) { return { key: pt.key, response: x }; });
+    }))
+      .then(function (results) {
         if (requestSeq !== _calcRequestSeq) return;
         out.calcLoading = false;
-        if (!x.ok || !x.j) { out.calcErr = 'Ошибка цены'; render(); return; }
-        if (x.j.success && x.j.data) {
-          out.calcResult = x.j.data;
+        out.calcQuotesByType = {};
+        var selectedError = '';
+        results.forEach(function (result) {
+          var x = result.response;
+          if (x.ok && x.j && x.j.success && x.j.data) {
+            out.calcQuotesByType[result.key] = x.j.data;
+          } else {
+            out.calcQuotesByType[result.key] = null;
+            if (result.key === String(body.priceType || '')) {
+              selectedError = x.j && (x.j.message || x.j.error)
+                ? String(x.j.message || x.j.error)
+                : 'Расчёт неудачен';
+            }
+          }
+        });
+        var selected = out.calcQuotesByType[String(body.priceType || '')];
+        if (selected) {
+          out.calcResult = selected;
           out.calcResultSignature = bodySig;
           out.calcErr = null;
-        } else
-          { out.calcErr = (x.j.message || x.j.error) ? String(x.j.message || x.j.error) : 'Расчёт неудачен'; }
+        } else {
+          out.calcErr = selectedError || 'Ошибка цены';
+        }
         render();
       })
       .catch(function (e) {
@@ -747,6 +770,89 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.calcEditCartKey = null;
     out._pendingCalcRestore = null;
     render();
+  }
+  function calcPriceTypeQuoteTotal(result) {
+    if (!result) return null;
+    var raw = result.totalCost != null ? result.totalCost : result.finalPrice;
+    var total = Number(raw);
+    return isFinite(total) && total > 0 ? total : null;
+  }
+  function calcPriceTypeTurnaround(label) {
+    if (label === 'Срочно') return '1–3 ч';
+    if (label === 'Промо') return 'до 48 ч';
+    if (label === 'Стандарт') return '48 ч';
+    return '';
+  }
+  function calcPriceTypePerk(label) {
+    if (label === 'Срочно') return 'Специалист проверит макет';
+    if (label === 'Промо') return 'Без проверки макета';
+    if (label === 'Стандарт') return 'Без наценки за срочность';
+    return '';
+  }
+  function renderCalcPriceTypeCards(pts) {
+    var field = h('div', '', 'field ipc-field--price-type ipc-price-types');
+    field.appendChild(h('div', 'Срок и цена', 'ipc-price-type__fieldtitle'));
+    var grid = h('div', '', 'ipc-price-type-grid');
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-label', 'Срок и цена');
+    var totals = {};
+    var minTotal = null;
+    var maxTotal = null;
+    pts.forEach(function (pt) {
+      var result = out.calcQuotesByType && out.calcQuotesByType[pt.key];
+      var total = calcPriceTypeQuoteTotal(result);
+      totals[pt.key] = total;
+      if (total != null) {
+        if (minTotal == null || total < minTotal) minTotal = total;
+        if (maxTotal == null || total > maxTotal) maxTotal = total;
+      }
+    });
+    var saving = minTotal != null && maxTotal != null && maxTotal > minTotal
+      ? Math.round((maxTotal - minTotal) * 100) / 100
+      : 0;
+    pts.forEach(function (pt) {
+      var on = String(pt.key) === String(out.calcForm.priceType || '');
+      var total = totals[pt.key];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ipc-price-type-card' + (on ? ' ipc-price-type-card--on' : '');
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      if (total == null && !on && !out.calcLoading) b.disabled = true;
+      var head = h('span', '', 'ipc-price-type-card__head');
+      head.appendChild(h('span', esc(pt.label), 'ipc-price-type-card__name'));
+      var term = calcPriceTypeTurnaround(pt.label);
+      if (term) head.appendChild(h('span', esc(term), 'ipc-price-type-card__term'));
+      b.appendChild(head);
+      var totalEl = h('span', '', 'ipc-price-type-card__total');
+      totalEl.innerHTML = total != null
+        ? ipcCalcMoneyHtml(total)
+        : '<span class="ipc-price-type-card__pending">' + (out.calcLoading ? 'считаем…' : 'недоступно') + '</span>';
+      b.appendChild(totalEl);
+      if (saving > 0 && total === minTotal) {
+        var badge = h('span', '', 'ipc-price-type-card__badge ipc-price-type-card__badge--saving');
+        badge.innerHTML = 'Выгода ' + ipcCalcMoneyHtml(saving);
+        b.appendChild(badge);
+      } else if (pt.label === 'Срочно' && pts.length > 1) {
+        b.appendChild(h('span', 'Быстрее', 'ipc-price-type-card__badge'));
+      }
+      var perk = calcPriceTypePerk(pt.label);
+      if (perk) b.appendChild(h('span', esc(perk), 'ipc-price-type-card__perk'));
+      b.onclick = function () {
+        out.calcForm.priceType = pt.key;
+        render();
+        scheduleCalcRun();
+      };
+      grid.appendChild(b);
+    });
+    field.appendChild(grid);
+    for (var hci = 0; hci < pts.length; hci++) {
+      if (String(pts[hci].key) === String(out.calcForm.priceType || '') && pts[hci].description) {
+        field.appendChild(h('p', esc(pts[hci].description), 'hint ipc-price-type__hint ipc-price-type-card__summary'));
+        break;
+      }
+    }
+    return field;
   }
   function renderCalculator() {
     var box = h('div', '', 'section ipc-calculator');
@@ -951,35 +1057,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
       }
       if (!ptpOk && pts[0]) out.calcForm.priceType = pts[0].key;
       if (pts.length > 1) {
-        var ptField = h('div', '', 'field ipc-field--price-type');
-        ptField.appendChild(h('div', 'Тип цены', 'ipc-price-type__fieldtitle'));
-        var ptRow = h('div', '', 'ipc-price-type__btns');
-        for (var pti = 0; pti < pts.length; pti++) {
-          (function (pt) {
-            var on = String(pt.key) === String(out.calcForm.priceType || '');
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'ipc-price-type__btn' + (on ? ' ipc-price-type__btn--on' : '');
-            b.setAttribute('aria-pressed', on ? 'true' : 'false');
-            b.textContent = pt.label;
-            b.onclick = function () {
-              out.calcForm.priceType = pt.key;
-              render();
-              scheduleCalcRun();
-            };
-            ptRow.appendChild(b);
-          })(pts[pti]);
-        }
-        ptField.appendChild(ptRow);
-        var curPh = '';
-        for (var hci = 0; hci < pts.length; hci++) {
-          if (String(pts[hci].key) === String(out.calcForm.priceType || '')) {
-            curPh = pts[hci].description || '';
-            break;
-          }
-        }
-        if (curPh) ptField.appendChild(h('p', esc(curPh), 'hint ipc-price-type__hint'));
-        form.appendChild(ptField);
+        form.appendChild(renderCalcPriceTypeCards(pts));
         var accF = h('div', '', 'field ipc-field--price-type-help');
         accF.appendChild(buildPriceTypeHelpAccordion());
         form.appendChild(accF);

@@ -221,10 +221,16 @@ export async function attachFileToMiniappOrder(
 
   const db = await getDb();
   const hasExpiredAt = await hasColumn('orders', 'miniapp_expired_at');
+  const hasCheckoutState = await hasColumn('orders', 'miniapp_checkout_state');
   const order = (await db.get(
-    `SELECT id, telegram_chat_id${hasExpiredAt ? ', miniapp_expired_at' : ''} FROM orders WHERE id = ?`,
+    `SELECT id, telegram_chat_id${hasExpiredAt ? ', miniapp_expired_at' : ''}${hasCheckoutState ? ', miniapp_checkout_state' : ''} FROM orders WHERE id = ?`,
     [orderId]
-  )) as { id: number; telegram_chat_id?: string | null; miniapp_expired_at?: string | null } | undefined;
+  )) as {
+    id: number;
+    telegram_chat_id?: string | null;
+    miniapp_expired_at?: string | null;
+    miniapp_checkout_state?: string | null;
+  } | undefined;
 
   if (!order) {
     return { ok: false, status: 404, message: 'Заказ не найден' };
@@ -234,6 +240,9 @@ export async function attachFileToMiniappOrder(
   }
   if (order.miniapp_expired_at) {
     return { ok: false, status: 410, message: 'Срок этого черновика истёк. Создайте новый заказ.' };
+  }
+  if (hasCheckoutState && order.miniapp_checkout_state !== MINIAPP_CHECKOUT_STATE_DRAFT) {
+    return { ok: false, status: 409, message: 'Заказ уже оформлен. Добавлять файлы после оформления нельзя.' };
   }
 
   let itemFk: number | null = null;

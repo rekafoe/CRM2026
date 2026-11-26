@@ -92,7 +92,7 @@
     draftItemIds: null,
     draftOrderNumber: null,
     draftUploadedItemIds: null,
-    calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null,
+    calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null, calcQuotesByType: null,
     calcForm: { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false },
     orderDetailId: null, orderDetailData: null, orderDetailErr: null, orderDetailLoading: false,
     orderFileMsg: null, orderUploadLoading: false,
@@ -285,6 +285,13 @@
     box.appendChild(prPanel);
     return box;
   }
+  function catalogCategoryDisplayName(name) {
+    if (name === 'Печать фото') return 'Фотопечать';
+    if (name === 'Широкоформатная печать') return 'Широкоформат';
+    if (name === 'Наклейки') return 'Наклейки, стикеры';
+    if (name === 'Сувенирная продукция') return 'Сувениры';
+    return name;
+  }
   function renderCatalog() {
     var box = h('div', '', 'section');
     if (out.productErr) box.appendChild(rowHint(out.productErr));
@@ -308,11 +315,11 @@
     if (out.catalogCategory !== 'all' && !categoryCounts[out.catalogCategory]) out.catalogCategory = 'all';
     box.appendChild(h('div', 'Каталог', 'section-head'));
     box.appendChild(h('p', 'Полиграфия, фото, наклейки, сувениры и широкоформатная печать.', 'hint ipc-catalog-lead'));
-    var tabs = h('div', '', 'ipc-catalog-categories');
-    tabs.setAttribute('aria-label', 'Категории каталога');
+    var tabs = $('miniapp-catalog-topbar');
+    tabs.innerHTML = '';
     function addCategoryButton(id, label, count) {
       var active = out.catalogCategory === id;
-      var b = h('button', esc(label) + ' <span>' + count + '</span>', 'ipc-catalog-category' + (active ? ' ipc-catalog-category--on' : ''));
+      var b = h('button', esc(catalogCategoryDisplayName(label)) + ' <span>' + count + '</span>', 'ipc-catalog-category' + (active ? ' ipc-catalog-category--on' : ''));
       b.type = 'button';
       b.setAttribute('aria-pressed', active ? 'true' : 'false');
       b.onclick = function () { out.catalogCategory = id; render(); };
@@ -322,7 +329,6 @@
     for (var ti = 0; ti < categories.length; ti++) {
       addCategoryButton(categories[ti].id, categories[ti].name, categoryCounts[categories[ti].id]);
     }
-    box.appendChild(tabs);
     var products = [];
     for (var pi = 0; pi < out.products.length; pi++) {
       if (out.catalogCategory === 'all' || String(out.products[pi].category_id || 'other') === out.catalogCategory) {
@@ -332,11 +338,11 @@
     var grid = h('div', '', 'catalog-grid ipc-catalog-grid');
     for (var i = 0; i < products.length; i++) {
       (function (p) {
-        var row = h('div', '', 'card ipc-card ipc-catalog-card');
-        row.appendChild(h('div', esc(p.category_name || 'Полиграфия'), 'ipc-catalog-card__category'));
-        row.appendChild(h('div', esc(p.name || 'Товар'), 'card-title ipc-catalog-card__title'));
+        var row = h('button', '', 'card ipc-card ipc-catalog-card');
+        row.type = 'button';
+        row.onclick = function () { addToCart(p); };
         var imgSrc = productCardImageSrc(p);
-        var media = h('div', '', 'ipc-catalog-card__media' + (imgSrc ? '' : ' ipc-catalog-card__media--empty'));
+        var media = h('span', '', 'ipc-catalog-card__media' + (imgSrc ? '' : ' ipc-catalog-card__media--empty'));
         if (imgSrc) {
           var im = document.createElement('img');
           im.className = 'ipc-catalog-card__img';
@@ -345,19 +351,18 @@
           im.src = imgSrc;
           media.appendChild(im);
         } else {
-          media.appendChild(h('span', 'PrintCore', 'ipc-catalog-card__placeholder'));
+          media.appendChild(h('span', 'Нет превью', 'ipc-catalog-card__placeholder'));
         }
         row.appendChild(media);
-        var blurb = shortProductDescription(p);
-        if (blurb) row.appendChild(h('div', esc(blurb), 'ipc-catalog-card__desc'));
+        var footer = h('span', '', 'ipc-catalog-card__footer');
+        footer.appendChild(h('span', esc(p.name || 'Товар'), 'ipc-catalog-card__title'));
+        var meta = h('span', '', 'ipc-catalog-card__meta-row');
         var price = Number(p.min_price) > 0
-          ? 'от <span class="ipc-catalog-card__price-amount">' + esc(p.min_price) + bynSpanHtml() + '</span>'
-          : 'цена по запросу';
-        row.appendChild(h('div', price, 'card-price ipc-catalog-card__price'));
-        var btn = h('button', isSimplifiedProduct(p) ? 'Заказать' : 'В корзину', 'primary ipc-catalog-card__btn');
-        btn.type = 'button';
-        btn.onclick = function () { addToCart(p); };
-        row.appendChild(btn);
+          ? '<span class="ipc-catalog-card__price">от ' + esc(p.min_price) + bynSpanHtml() + '</span>'
+          : '<span class="ipc-catalog-card__cta">Заказать</span>';
+        meta.innerHTML = price + '<span class="ipc-catalog-card__arrow" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg></span>';
+        footer.appendChild(meta);
+        row.appendChild(footer);
         grid.appendChild(row);
       })(products[i]);
     }
@@ -537,9 +542,71 @@
     }
     card.appendChild(wrap);
   }
+  function ipcCalcChecklistRows() {
+    var rows = [];
+    if (out.calcName) rows.push({ label: 'Продукт', value: String(out.calcName) });
+    var types = calcTypes();
+    for (var ti = 0; ti < types.length; ti++) {
+      if (String(types[ti].id) === String(out.calcForm.typeId)) {
+        if (types[ti].name) rows.push({ label: 'Тип / вариант', value: String(types[ti].name) });
+        break;
+      }
+    }
+    var size = calcSelectedSize();
+    if (size && size.label) rows.push({ label: 'Размер', value: String(size.label) });
+    var materials = calcMaterials();
+    for (var mi = 0; mi < materials.length; mi++) {
+      if (String(materials[mi].id) === String(out.calcForm.matId)) {
+        if (materials[mi].name) rows.push({ label: 'Материал', value: String(materials[mi].name) });
+        break;
+      }
+    }
+    var print = parsePrintKey();
+    if (print.color) rows.push({ label: 'Тип печати', value: printColorModeLabel(print.color) });
+    if (print.sides) rows.push({ label: 'Стороны печати', value: printSidesModeLabel(print.sides) });
+    var priceTypes = calcAllowedPriceTypes();
+    for (var pi = 0; pi < priceTypes.length; pi++) {
+      if (String(priceTypes[pi].key) === String(out.calcForm.priceType)) {
+        rows.push({ label: 'Срок и цена', value: String(priceTypes[pi].label) });
+        break;
+      }
+    }
+    rows.push({ label: 'Тираж', value: String(out.calcForm.qty) + ' шт.' });
+    if (typeof miniappFinishingOptions === 'function') {
+      var selected = out.calcForm.finishingSelection || {};
+      var operations = miniappFinishingOptions().filter(function (opt) { return !!selected[opt.key]; });
+      if (operations.length) {
+        rows.push({
+          label: 'Операции',
+          value: operations.map(function (opt) { return opt.variantLabel || opt.name; }).join(', ')
+        });
+      }
+    }
+    if (out.checkoutDesignHelp) {
+      rows.push({ label: 'Макет', value: 'Нужна помощь с разработкой' });
+    } else if (out.calcStagedLayout && out.calcStagedLayout.name) {
+      rows.push({ label: 'Макет', value: String(out.calcStagedLayout.name) });
+    }
+    return rows;
+  }
+  function appendCalcChecklistUI(card) {
+    var rows = ipcCalcChecklistRows();
+    if (!rows.length) return;
+    var box = h('div', '', 'ipc-calc-checklist');
+    box.appendChild(h('div', 'Проверьте заказ', 'ipc-calc-checklist__title'));
+    for (var i = 0; i < rows.length; i++) {
+      var row = h('div', '', 'ipc-calc-checklist__row');
+      row.appendChild(h('span', esc(rows[i].label), 'ipc-calc-checklist__label'));
+      row.appendChild(h('span', esc(rows[i].value), 'ipc-calc-checklist__value'));
+      box.appendChild(row);
+    }
+    card.appendChild(box);
+    card.appendChild(h('hr', '', 'ipc-calc-card__sep'));
+  }
   function appendCalcResultSummaryUI(container, r) {
     if (!container || !r) return;
     var card = h('div', '', 'ipc-calc-card');
+    appendCalcChecklistUI(card);
     var lineTop = h('div', '', 'ipc-calc-card__line');
     lineTop.appendChild(h('div', 'Стоимость', 'ipc-calc-card__label'));
     var valLg = h('div', '', 'ipc-calc-card__value--lg');
@@ -561,8 +628,6 @@
         : '—';
     lineSub.appendChild(valSub);
     card.appendChild(lineSub);
-
-    appendCalcBreakdownUI(card, r);
 
     if (Array.isArray(r.priceTiers) && r.priceTiers.length > 0) {
       card.appendChild(h('hr', '', 'ipc-calc-card__sep'));
@@ -738,65 +803,7 @@
       box.appendChild(flPanel);
     }
     if (out.orderFileMsg) box.appendChild(h('p', esc(out.orderFileMsg), out.orderFileMsg.indexOf('прикреп') >= 0 || out.orderFileMsg.indexOf('успе') >= 0 ? 'okmsg' : 'hint'));
-    var form = document.createElement('form');
-    form.className = 'form ipc-card';
-    form.onsubmit = function (e) {
-      e.preventDefault();
-      if (!out.token || !out.orderDetailId) return false;
-      var fileInp = form.querySelector('input[type=file]');
-      if (!fileInp || !fileInp.files || !fileInp.files[0]) {
-        out.orderFileMsg = 'Выберите файл';
-        render();
-        return false;
-      }
-      var fd = new FormData();
-      fd.append('file', fileInp.files[0]);
-      var sel = form.querySelector('select[name=orderItemId]');
-      if (sel && sel.value) fd.append('orderItemId', sel.value);
-      out.orderUploadLoading = true;
-      out.orderFileMsg = null;
-      render();
-      miniappRequestJson('/api/miniapp/orders/' + out.orderDetailId + '/files', { method: 'POST', headers: {}, body: fd })
-        .then(function (x) {
-          out.orderUploadLoading = false;
-          if (!x.ok) {
-            out.orderFileMsg = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Не удалось прикрепить';
-            render();
-            return;
-          }
-          out.orderFileMsg = 'Файл прикреплён';
-          fileInp.value = '';
-          loadOrderDetail();
-        })
-        .catch(function (err) {
-          out.orderUploadLoading = false;
-          out.orderFileMsg = (err && err.message) || String(err);
-          render();
-        });
-      return false;
-    };
-    var fileEl = document.createElement('input');
-    fileEl.type = 'file';
-    fileEl.name = 'file';
-    addField(form, 'Файл', fileEl);
-    var sel2 = document.createElement('select');
-    sel2.name = 'orderItemId';
-    sel2.innerHTML = '<option value="">Весь заказ (не к позиции)</option>';
-    for (var j = 0; j < items.length; j++) {
-      (function (it) {
-        var o = document.createElement('option');
-        o.value = String(it.id);
-        o.textContent = 'Позиция #' + it.id + ' — ' + String(it.type).substring(0, 40);
-        sel2.appendChild(o);
-      })(items[j]);
-    }
-    addField(form, 'Привязка', sel2);
-    var upBtn = h('button', out.orderUploadLoading ? 'Отправка…' : 'Прикрепить файл', 'primary');
-    upBtn.type = 'submit';
-    if (out.orderUploadLoading) upBtn.disabled = true;
-    form.appendChild(upBtn);
-    box.appendChild(h('h3', 'Прикрепить файл', 'ipc-subhead'));
-    box.appendChild(form);
+    box.appendChild(h('p', 'После оформления добавлять файлы нельзя. Состав заказа и уже прикреплённые макеты доступны для просмотра и скачивания.', 'hint ipc-order-files-note'));
     return box;
   }
 `,p=`
@@ -1024,6 +1031,8 @@
   }
   var _miniappPrevView = '';
   function render() {
+    var catalogTopbar = $('miniapp-catalog-topbar');
+    if (catalogTopbar) catalogTopbar.hidden = out.view !== 'catalog';
     setNav();
     var viewChanged = _miniappPrevView !== out.view;
     _miniappPrevView = out.view;
@@ -1306,7 +1315,7 @@
         render();
       });
   }
-`,d=`
+`,s=`
   function buildPriceTypeHelpAccordion() {
     var det = document.createElement('details');
     det.className = 'ipc-price-diff-accordion';
@@ -1320,7 +1329,7 @@
     det.appendChild(wrap);
     return det;
   }
-`,s=`
+`,d=`
 <div class="ipc-price-diff-accordion__section">
   <h3 class="ipc-price-diff-accordion__h3">Срочно</h3>
   <p class="ipc-price-diff-accordion__lead"><strong>В услуги «Срочно» включено:</strong></p>
@@ -1906,26 +1915,49 @@
       out.calcErr = null;
     }
     out.calcLoading = true;
+    out.calcQuotesByType = null;
     render();
     var body = buildCalcPayload();
     var bodySig = stableCalcPayloadSignature(body);
     var requestSeq = ++_calcRequestSeq;
     out.calcRequestSignature = bodySig;
-    miniappRequestJson('/api/products/' + out.calcPid + '/calculate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(body)
-    })
-      .then(function (x) {
+    var priceTypes = calcAllowedPriceTypes();
+    if (!priceTypes.length) priceTypes = [{ key: body.priceType || '', label: '' }];
+    Promise.all(priceTypes.map(function (pt) {
+      var quoteBody = Object.assign({}, body);
+      if (pt.key) quoteBody.priceType = pt.key;
+      return miniappRequestJson('/api/products/' + out.calcPid + '/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(quoteBody)
+      }).then(function (x) { return { key: pt.key, response: x }; });
+    }))
+      .then(function (results) {
         if (requestSeq !== _calcRequestSeq) return;
         out.calcLoading = false;
-        if (!x.ok || !x.j) { out.calcErr = 'Ошибка цены'; render(); return; }
-        if (x.j.success && x.j.data) {
-          out.calcResult = x.j.data;
+        out.calcQuotesByType = {};
+        var selectedError = '';
+        results.forEach(function (result) {
+          var x = result.response;
+          if (x.ok && x.j && x.j.success && x.j.data) {
+            out.calcQuotesByType[result.key] = x.j.data;
+          } else {
+            out.calcQuotesByType[result.key] = null;
+            if (result.key === String(body.priceType || '')) {
+              selectedError = x.j && (x.j.message || x.j.error)
+                ? String(x.j.message || x.j.error)
+                : 'Расчёт неудачен';
+            }
+          }
+        });
+        var selected = out.calcQuotesByType[String(body.priceType || '')];
+        if (selected) {
+          out.calcResult = selected;
           out.calcResultSignature = bodySig;
           out.calcErr = null;
-        } else
-          { out.calcErr = (x.j.message || x.j.error) ? String(x.j.message || x.j.error) : 'Расчёт неудачен'; }
+        } else {
+          out.calcErr = selectedError || 'Ошибка цены';
+        }
         render();
       })
       .catch(function (e) {
@@ -2097,6 +2129,89 @@
     out.calcEditCartKey = null;
     out._pendingCalcRestore = null;
     render();
+  }
+  function calcPriceTypeQuoteTotal(result) {
+    if (!result) return null;
+    var raw = result.totalCost != null ? result.totalCost : result.finalPrice;
+    var total = Number(raw);
+    return isFinite(total) && total > 0 ? total : null;
+  }
+  function calcPriceTypeTurnaround(label) {
+    if (label === 'Срочно') return '1–3 ч';
+    if (label === 'Промо') return 'до 48 ч';
+    if (label === 'Стандарт') return '48 ч';
+    return '';
+  }
+  function calcPriceTypePerk(label) {
+    if (label === 'Срочно') return 'Специалист проверит макет';
+    if (label === 'Промо') return 'Без проверки макета';
+    if (label === 'Стандарт') return 'Без наценки за срочность';
+    return '';
+  }
+  function renderCalcPriceTypeCards(pts) {
+    var field = h('div', '', 'field ipc-field--price-type ipc-price-types');
+    field.appendChild(h('div', 'Срок и цена', 'ipc-price-type__fieldtitle'));
+    var grid = h('div', '', 'ipc-price-type-grid');
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-label', 'Срок и цена');
+    var totals = {};
+    var minTotal = null;
+    var maxTotal = null;
+    pts.forEach(function (pt) {
+      var result = out.calcQuotesByType && out.calcQuotesByType[pt.key];
+      var total = calcPriceTypeQuoteTotal(result);
+      totals[pt.key] = total;
+      if (total != null) {
+        if (minTotal == null || total < minTotal) minTotal = total;
+        if (maxTotal == null || total > maxTotal) maxTotal = total;
+      }
+    });
+    var saving = minTotal != null && maxTotal != null && maxTotal > minTotal
+      ? Math.round((maxTotal - minTotal) * 100) / 100
+      : 0;
+    pts.forEach(function (pt) {
+      var on = String(pt.key) === String(out.calcForm.priceType || '');
+      var total = totals[pt.key];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ipc-price-type-card' + (on ? ' ipc-price-type-card--on' : '');
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      if (total == null && !on && !out.calcLoading) b.disabled = true;
+      var head = h('span', '', 'ipc-price-type-card__head');
+      head.appendChild(h('span', esc(pt.label), 'ipc-price-type-card__name'));
+      var term = calcPriceTypeTurnaround(pt.label);
+      if (term) head.appendChild(h('span', esc(term), 'ipc-price-type-card__term'));
+      b.appendChild(head);
+      var totalEl = h('span', '', 'ipc-price-type-card__total');
+      totalEl.innerHTML = total != null
+        ? ipcCalcMoneyHtml(total)
+        : '<span class="ipc-price-type-card__pending">' + (out.calcLoading ? 'считаем…' : 'недоступно') + '</span>';
+      b.appendChild(totalEl);
+      if (saving > 0 && total === minTotal) {
+        var badge = h('span', '', 'ipc-price-type-card__badge ipc-price-type-card__badge--saving');
+        badge.innerHTML = 'Выгода ' + ipcCalcMoneyHtml(saving);
+        b.appendChild(badge);
+      } else if (pt.label === 'Срочно' && pts.length > 1) {
+        b.appendChild(h('span', 'Быстрее', 'ipc-price-type-card__badge'));
+      }
+      var perk = calcPriceTypePerk(pt.label);
+      if (perk) b.appendChild(h('span', esc(perk), 'ipc-price-type-card__perk'));
+      b.onclick = function () {
+        out.calcForm.priceType = pt.key;
+        render();
+        scheduleCalcRun();
+      };
+      grid.appendChild(b);
+    });
+    field.appendChild(grid);
+    for (var hci = 0; hci < pts.length; hci++) {
+      if (String(pts[hci].key) === String(out.calcForm.priceType || '') && pts[hci].description) {
+        field.appendChild(h('p', esc(pts[hci].description), 'hint ipc-price-type__hint ipc-price-type-card__summary'));
+        break;
+      }
+    }
+    return field;
   }
   function renderCalculator() {
     var box = h('div', '', 'section ipc-calculator');
@@ -2301,35 +2416,7 @@
       }
       if (!ptpOk && pts[0]) out.calcForm.priceType = pts[0].key;
       if (pts.length > 1) {
-        var ptField = h('div', '', 'field ipc-field--price-type');
-        ptField.appendChild(h('div', 'Тип цены', 'ipc-price-type__fieldtitle'));
-        var ptRow = h('div', '', 'ipc-price-type__btns');
-        for (var pti = 0; pti < pts.length; pti++) {
-          (function (pt) {
-            var on = String(pt.key) === String(out.calcForm.priceType || '');
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'ipc-price-type__btn' + (on ? ' ipc-price-type__btn--on' : '');
-            b.setAttribute('aria-pressed', on ? 'true' : 'false');
-            b.textContent = pt.label;
-            b.onclick = function () {
-              out.calcForm.priceType = pt.key;
-              render();
-              scheduleCalcRun();
-            };
-            ptRow.appendChild(b);
-          })(pts[pti]);
-        }
-        ptField.appendChild(ptRow);
-        var curPh = '';
-        for (var hci = 0; hci < pts.length; hci++) {
-          if (String(pts[hci].key) === String(out.calcForm.priceType || '')) {
-            curPh = pts[hci].description || '';
-            break;
-          }
-        }
-        if (curPh) ptField.appendChild(h('p', esc(curPh), 'hint ipc-price-type__hint'));
-        form.appendChild(ptField);
+        form.appendChild(renderCalcPriceTypeCards(pts));
         var accF = h('div', '', 'field ipc-field--price-type-help');
         accF.appendChild(buildPriceTypeHelpAccordion());
         form.appendChild(accF);
@@ -2659,8 +2746,8 @@
     field.appendChild(wrap);
     form.appendChild(field);
   }
-`;function h(){const e=window.__MINIAPP_CONFIG__||{},v=JSON.stringify(String(e.apiBase||"").replace(/\/+$/,"")),g=e.catalogCategoryId!=null&&Number.isFinite(Number(e.catalogCategoryId))&&Number(e.catalogCategoryId)>=1?String(Math.floor(Number(e.catalogCategoryId))):"null",y=JSON.stringify(e.priceTypeHelpHtml||s);return`(function () {
+`;function h(){const e=window.__MINIAPP_CONFIG__||{},v=JSON.stringify(String(e.apiBase||"").replace(/\/+$/,"")),g=e.catalogCategoryId!=null&&Number.isFinite(Number(e.catalogCategoryId))&&Number(e.catalogCategoryId)>=1?String(Math.floor(Number(e.catalogCategoryId))):"null",y=JSON.stringify(e.priceTypeHelpHtml||d);return`(function () {
   var API_BASE = `+v+`;
   var CATALOG_CATEGORY_ID = `+g+`;
   var MINIAPP_PRICE_TYPE_HELP_INNER = `+y+`;
-`+o+t+m+f+d+l+c+u+p}new Function(h())()})();
+`+o+t+m+f+s+l+c+u+p}new Function(h())()})();

@@ -81,6 +81,7 @@ export function renderMiniappIndexHtml(
         </div>
       </div>
     </header>
+    <nav id="miniapp-catalog-topbar" class="ipc-catalog-topbar" aria-label="Категории каталога" hidden></nav>
     <div id="miniapp-main"></div>
   </div>
   <div id="miniapp-nav" class="miniapp-nav" aria-label="Навигация"></div>

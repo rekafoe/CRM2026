@@ -100,9 +100,71 @@ export const MINIAPP_CLIENT_PART_CALC_SUMMARY = `
     }
     card.appendChild(wrap);
   }
+  function ipcCalcChecklistRows() {
+    var rows = [];
+    if (out.calcName) rows.push({ label: 'Продукт', value: String(out.calcName) });
+    var types = calcTypes();
+    for (var ti = 0; ti < types.length; ti++) {
+      if (String(types[ti].id) === String(out.calcForm.typeId)) {
+        if (types[ti].name) rows.push({ label: 'Тип / вариант', value: String(types[ti].name) });
+        break;
+      }
+    }
+    var size = calcSelectedSize();
+    if (size && size.label) rows.push({ label: 'Размер', value: String(size.label) });
+    var materials = calcMaterials();
+    for (var mi = 0; mi < materials.length; mi++) {
+      if (String(materials[mi].id) === String(out.calcForm.matId)) {
+        if (materials[mi].name) rows.push({ label: 'Материал', value: String(materials[mi].name) });
+        break;
+      }
+    }
+    var print = parsePrintKey();
+    if (print.color) rows.push({ label: 'Тип печати', value: printColorModeLabel(print.color) });
+    if (print.sides) rows.push({ label: 'Стороны печати', value: printSidesModeLabel(print.sides) });
+    var priceTypes = calcAllowedPriceTypes();
+    for (var pi = 0; pi < priceTypes.length; pi++) {
+      if (String(priceTypes[pi].key) === String(out.calcForm.priceType)) {
+        rows.push({ label: 'Срок и цена', value: String(priceTypes[pi].label) });
+        break;
+      }
+    }
+    rows.push({ label: 'Тираж', value: String(out.calcForm.qty) + ' шт.' });
+    if (typeof miniappFinishingOptions === 'function') {
+      var selected = out.calcForm.finishingSelection || {};
+      var operations = miniappFinishingOptions().filter(function (opt) { return !!selected[opt.key]; });
+      if (operations.length) {
+        rows.push({
+          label: 'Операции',
+          value: operations.map(function (opt) { return opt.variantLabel || opt.name; }).join(', ')
+        });
+      }
+    }
+    if (out.checkoutDesignHelp) {
+      rows.push({ label: 'Макет', value: 'Нужна помощь с разработкой' });
+    } else if (out.calcStagedLayout && out.calcStagedLayout.name) {
+      rows.push({ label: 'Макет', value: String(out.calcStagedLayout.name) });
+    }
+    return rows;
+  }
+  function appendCalcChecklistUI(card) {
+    var rows = ipcCalcChecklistRows();
+    if (!rows.length) return;
+    var box = h('div', '', 'ipc-calc-checklist');
+    box.appendChild(h('div', 'Проверьте заказ', 'ipc-calc-checklist__title'));
+    for (var i = 0; i < rows.length; i++) {
+      var row = h('div', '', 'ipc-calc-checklist__row');
+      row.appendChild(h('span', esc(rows[i].label), 'ipc-calc-checklist__label'));
+      row.appendChild(h('span', esc(rows[i].value), 'ipc-calc-checklist__value'));
+      box.appendChild(row);
+    }
+    card.appendChild(box);
+    card.appendChild(h('hr', '', 'ipc-calc-card__sep'));
+  }
   function appendCalcResultSummaryUI(container, r) {
     if (!container || !r) return;
     var card = h('div', '', 'ipc-calc-card');
+    appendCalcChecklistUI(card);
     var lineTop = h('div', '', 'ipc-calc-card__line');
     lineTop.appendChild(h('div', 'Стоимость', 'ipc-calc-card__label'));
     var valLg = h('div', '', 'ipc-calc-card__value--lg');
@@ -124,8 +186,6 @@ export const MINIAPP_CLIENT_PART_CALC_SUMMARY = `
         : '—';
     lineSub.appendChild(valSub);
     card.appendChild(lineSub);
-
-    appendCalcBreakdownUI(card, r);
 
     if (Array.isArray(r.priceTiers) && r.priceTiers.length > 0) {
       card.appendChild(h('hr', '', 'ipc-calc-card__sep'));

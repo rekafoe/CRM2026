@@ -223,6 +223,8 @@ export const MINIAPP_CLIENT_PART2 = `
   }
   var _miniappPrevView = '';
   function render() {
+    var catalogTopbar = $('miniapp-catalog-topbar');
+    if (catalogTopbar) catalogTopbar.hidden = out.view !== 'catalog';
     setNav();
     var viewChanged = _miniappPrevView !== out.view;
     _miniappPrevView = out.view;
