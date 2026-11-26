@@ -3,8 +3,10 @@ import { bynIconInlineSpanHtmlForMiniapp } from './byn';
 export const MINIAPP_CLIENT_PART1 = `
   var out = {
     token: null, me: null, products: null, productErr: null, orders: null, ordersErr: null,
+    catalogCategory: null,
     cart: [], view: 'catalog', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
     checkoutLoading: false,
+    checkoutIdempotencyKey: null,
     finalizeLoading: false,
     draftOrderId: null,
     draftItemIds: null,
@@ -44,6 +46,7 @@ export const MINIAPP_CLIENT_PART1 = `
     out.draftItemIds = null;
     out.draftOrderNumber = null;
     out.draftUploadedItemIds = null;
+    out.checkoutIdempotencyKey = null;
     out.finalizeLoading = false;
   }
   function setNav() {
@@ -207,36 +210,76 @@ export const MINIAPP_CLIENT_PART1 = `
     if (out.productErr) box.appendChild(rowHint(out.productErr));
     if (!out.products) { box.appendChild(rowHint('Загрузка каталога…')); return box; }
     if (out.products.length === 0) { box.appendChild(h('p', 'Нет товаров для сайта (forSite).', 'hint ipc-empty')); return box; }
+    if (out.catalogCategory == null) {
+      out.catalogCategory = typeof CATALOG_CATEGORY_ID === 'number' && CATALOG_CATEGORY_ID > 0 ? String(CATALOG_CATEGORY_ID) : 'all';
+    }
+    var categories = [];
+    var categoryCounts = {};
+    for (var ci = 0; ci < out.products.length; ci++) {
+      var cp = out.products[ci];
+      var categoryId = String(cp.category_id || 'other');
+      if (!categoryCounts[categoryId]) {
+        categoryCounts[categoryId] = 0;
+        categories.push({ id: categoryId, name: cp.category_name || 'Другие товары' });
+      }
+      categoryCounts[categoryId] += 1;
+    }
+    categories.sort(function (a, b) { return a.name.localeCompare(b.name, 'ru'); });
+    if (out.catalogCategory !== 'all' && !categoryCounts[out.catalogCategory]) out.catalogCategory = 'all';
     box.appendChild(h('div', 'Каталог', 'section-head'));
+    box.appendChild(h('p', 'Полиграфия, фото, наклейки, сувениры и широкоформатная печать.', 'hint ipc-catalog-lead'));
+    var tabs = h('div', '', 'ipc-catalog-categories');
+    tabs.setAttribute('aria-label', 'Категории каталога');
+    function addCategoryButton(id, label, count) {
+      var active = out.catalogCategory === id;
+      var b = h('button', esc(label) + ' <span>' + count + '</span>', 'ipc-catalog-category' + (active ? ' ipc-catalog-category--on' : ''));
+      b.type = 'button';
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      b.onclick = function () { out.catalogCategory = id; render(); };
+      tabs.appendChild(b);
+    }
+    addCategoryButton('all', 'Все', out.products.length);
+    for (var ti = 0; ti < categories.length; ti++) {
+      addCategoryButton(categories[ti].id, categories[ti].name, categoryCounts[categories[ti].id]);
+    }
+    box.appendChild(tabs);
+    var products = [];
+    for (var pi = 0; pi < out.products.length; pi++) {
+      if (out.catalogCategory === 'all' || String(out.products[pi].category_id || 'other') === out.catalogCategory) {
+        products.push(out.products[pi]);
+      }
+    }
     var grid = h('div', '', 'catalog-grid ipc-catalog-grid');
-    for (var i = 0; i < out.products.length; i++) {
+    for (var i = 0; i < products.length; i++) {
       (function (p) {
         var row = h('div', '', 'card ipc-card ipc-catalog-card');
+        row.appendChild(h('div', esc(p.category_name || 'Полиграфия'), 'ipc-catalog-card__category'));
         row.appendChild(h('div', esc(p.name || 'Товар'), 'card-title ipc-catalog-card__title'));
         var imgSrc = productCardImageSrc(p);
         var media = h('div', '', 'ipc-catalog-card__media' + (imgSrc ? '' : ' ipc-catalog-card__media--empty'));
         if (imgSrc) {
           var im = document.createElement('img');
           im.className = 'ipc-catalog-card__img';
-          im.alt = '';
+          im.alt = String(p.name || 'Товар');
           im.loading = 'lazy';
           im.src = imgSrc;
           media.appendChild(im);
+        } else {
+          media.appendChild(h('span', 'PrintCore', 'ipc-catalog-card__placeholder'));
         }
         row.appendChild(media);
         var blurb = shortProductDescription(p);
         if (blurb) row.appendChild(h('div', esc(blurb), 'ipc-catalog-card__desc'));
-        var price =
-          p.min_price != null && p.min_price !== ''
-            ? 'от <span class="ipc-catalog-card__price-amount">' + esc(p.min_price) + bynSpanHtml() + '</span>'
-            : 'цена по запросу';
+        var price = Number(p.min_price) > 0
+          ? 'от <span class="ipc-catalog-card__price-amount">' + esc(p.min_price) + bynSpanHtml() + '</span>'
+          : 'цена по запросу';
         row.appendChild(h('div', price, 'card-price ipc-catalog-card__price'));
         var btn = h('button', isSimplifiedProduct(p) ? 'Заказать' : 'В корзину', 'primary ipc-catalog-card__btn');
         btn.type = 'button';
         btn.onclick = function () { addToCart(p); };
         row.appendChild(btn);
         grid.appendChild(row);
-      })(out.products[i]);
+      })(products[i]);
     }
     box.appendChild(grid);
     return box;

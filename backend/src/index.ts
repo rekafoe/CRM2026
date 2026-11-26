@@ -20,6 +20,7 @@ import { AutoOrderService } from './services/autoOrderService'
 import { UserNotificationService } from './services/userNotificationService'
 import { EarningsService } from './services/earningsService'
 import { startOrderFilesCleanup } from './services/orderFilesCleanupService'
+import { startMiniappDraftCleanup } from './services/miniappDraftCleanupService'
 import { startEditorDraftsCleanup } from './services/editorDraftOwnerService'
 import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
@@ -278,6 +279,12 @@ async function startServer() {
       intervalMs: parseInt(process.env.ORDER_FILES_CLEANUP_INTERVAL_HOURS || '24', 10) * 60 * 60 * 1000,
     }
     startOrderFilesCleanup(orderFilesCleanupConfig)
+
+    startMiniappDraftCleanup({
+      enabled: process.env.MINIAPP_DRAFT_CLEANUP_ENABLED !== 'false',
+      intervalMs: parseInt(process.env.MINIAPP_DRAFT_CLEANUP_INTERVAL_MINUTES || '60', 10) * 60 * 1000,
+      retentionHours: parseInt(process.env.MINIAPP_DRAFT_RETENTION_HOURS || '72', 10),
+    })
 
     const editorDraftsCleanupConfig = {
       enabled: process.env.EDITOR_DRAFTS_CLEANUP_ENABLED !== 'false',

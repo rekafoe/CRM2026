@@ -749,7 +749,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     render();
   }
   function renderCalculator() {
-    var box = h('div', '', 'section');
+    var box = h('div', '', 'section ipc-calculator');
     box.appendChild(h('div', esc(out.calcName || 'Калькулятор'), 'section-head'));
     var back = h('button', out.calcEditCartKey ? '← Корзина' : '← Каталог', 'small');
     back.type = 'button';
@@ -771,7 +771,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (out.calcLoading && out.calcSchema) box.appendChild(rowHint('Считаем…'));
     var simp = calcSimp();
     if (!simp) { if (!out.calcErr) box.appendChild(rowHint('Нет данных.')); return box; }
-    var form = h('form', '', 'form');
+    var form = h('form', '', 'form ipc-calculator-form');
     form.onsubmit = function (e) { e.preventDefault(); return false; };
     var types = calcTypes();
     if (types.length > 0) {
@@ -1035,7 +1035,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     layIn.onchange = function () { out.calcStagedLayout = (this.files && this.files[0]) ? this.files[0] : null; };
     addField(form, 'Макет к этой позиции (необяз., после расчёта — «В корзину»)', layIn);
     form.appendChild(h('p', 'Цена обновляется автоматически при смене параметров. Макет уйдёт в заказ с привязкой к позиции.', 'hint'));
-    var calcPanel = h('div', '', 'ipc-panel');
+    var calcPanel = h('div', '', 'ipc-panel ipc-calculator__parameters');
     var calcInner = h('div', '', 'ipc-detail-block');
     calcInner.appendChild(form);
     calcPanel.appendChild(calcInner);
@@ -1053,7 +1053,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
       if (!isFreshPrice) addB.textContent = out.calcLoading ? 'Обновляем цену…' : 'Цена устарела';
       addB.onclick = function () { calcAddToCart(); };
       resBox.appendChild(addB);
-      var resPanel = h('div', '', 'ipc-panel');
+      var resPanel = h('div', '', 'ipc-panel ipc-calculator__result');
       var resInner = h('div', '', 'ipc-detail-block');
       resInner.appendChild(resBox);
       resPanel.appendChild(resInner);

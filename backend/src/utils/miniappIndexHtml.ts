@@ -66,7 +66,7 @@ export function renderMiniappIndexHtml(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Ваша онлайн-типография</title>
+  <title>PrintCore — онлайн-типография</title>
   <link rel="stylesheet" href="/miniapp-assets/miniapp.css${assetQuery}" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -76,7 +76,8 @@ export function renderMiniappIndexHtml(
       <div class="ipc-pm-header__left">
         ${logo}
         <div>
-          <h1 class="ipc-pm-header__title">Ваша онлайн-типография</h1>
+          <h1 class="ipc-pm-header__title">PrintCore</h1>
+          <p class="ipc-pm-header__sub">Печать и дизайн — в несколько шагов</p>
         </div>
       </div>
     </header>

@@ -1,3 +1,4 @@
+import '../styles/fonts.css';
 import './miniappShellStyles.css';
 import './miniappShellStylesMap.css';
 import './miniappCalcSummaryStyles.css';
@@ -9,8 +10,8 @@ import { MINIAPP_CLIENT_PART2 } from './miniappClientScriptPart2';
 import { MINIAPP_CLIENT_PART2_CHECKOUT } from './miniappClientScriptPart2Checkout';
 import { MINIAPP_CLIENT_PART_PRICE_TYPE_HELP } from './miniappClientScriptPartPriceTypeHelp';
 import { MINIAPP_PRICE_TYPE_HELP_INNER_HTML } from './priceTypeHelpInnerHtml';
-import { MINIAPP_CLIENT_PART_CALC } from '../../../backend/src/utils/miniapp/miniappClientScriptPartCalc';
-import { MINIAPP_CLIENT_PART_CALC_OPERATIONS } from '../../../backend/src/utils/miniapp/miniappClientScriptPartCalcOperations';
+import { MINIAPP_CLIENT_PART_CALC } from '../../../backend/src/utils/miniapp/miniappClientScriptPartCalc.ts';
+import { MINIAPP_CLIENT_PART_CALC_OPERATIONS } from '../../../backend/src/utils/miniapp/miniappClientScriptPartCalcOperations.ts';
 
 declare global {
   interface Window {

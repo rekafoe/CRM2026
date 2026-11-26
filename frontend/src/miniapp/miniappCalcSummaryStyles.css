@@ -28,7 +28,7 @@
   text-align: right;
   font-size: 1.4rem;
   font-weight: 700;
-  color: #0d9488;
+  color: var(--ipc-accent);
   line-height: 1.2;
 }
 .ipc-calc-card__value--lg .ipc-byn { font-size: 1em; }
@@ -142,12 +142,12 @@
   transition: background 0.15s, color 0.15s;
 }
 .ipc-price-type__btn:focus-visible {
-  outline: 2px solid var(--tg-theme-link-color, #00a8c0);
+  outline: 2px solid var(--tg-theme-link-color, var(--ipc-accent));
   outline-offset: 2px;
 }
 .ipc-price-type__btn--on {
   color: #fff;
-  background: #00b5cc;
+  background: var(--ipc-accent);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .ipc-price-type__hint {
@@ -234,4 +234,216 @@
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.ipc-calculator {
+  max-width: 760px;
+  margin: 0 auto;
+  color: var(--ipc-text);
+}
+.ipc-calculator > .section-head {
+  margin: 4px 0 12px;
+  font-size: 24px;
+  font-weight: 750;
+}
+.ipc-calculator > .small {
+  min-height: 36px;
+  margin: 0 0 12px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ipc-muted);
+}
+.ipc-calculator__parameters,
+.ipc-calculator__result {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.ipc-calculator__parameters > .ipc-detail-block,
+.ipc-calculator__result > .ipc-detail-block {
+  padding: 0;
+}
+.ipc-calculator-form {
+  counter-reset: ipc-calculator-step;
+}
+.ipc-calculator-form > .field {
+  position: relative;
+  margin: 0;
+  padding: 18px 0 22px 38px;
+  border-bottom: 1px solid var(--ipc-border);
+  counter-increment: ipc-calculator-step;
+}
+.ipc-calculator-form > .field:first-child {
+  border-top: 1px solid var(--ipc-border);
+}
+.ipc-calculator-form > .field::before {
+  position: absolute;
+  top: 22px;
+  left: 0;
+  color: var(--ipc-accent-warm);
+  font-family: 'PC UI Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  content: counter(ipc-calculator-step, decimal-leading-zero);
+}
+.ipc-calculator-form .field > label,
+.ipc-calculator-form .ipc-price-type__fieldtitle {
+  margin: 0;
+  color: var(--ipc-muted);
+  font-family: 'PC UI Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ipc-calculator-form .form input,
+.ipc-calculator-form input,
+.ipc-calculator-form select,
+.ipc-calculator-form textarea {
+  min-height: 40px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--ipc-border);
+  border-radius: 8px;
+  background: var(--ipc-surface);
+  color: var(--ipc-text);
+  font-family: 'PC UI Sans', system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.ipc-calculator-form input:focus,
+.ipc-calculator-form select:focus,
+.ipc-calculator-form textarea:focus {
+  border-color: var(--ipc-accent);
+  outline: 2px solid var(--ipc-accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.ipc-calculator-form input[type='file'] {
+  padding: 9px;
+  border-style: dashed;
+  background: var(--ipc-surface);
+}
+.ipc-calculator-form .ipc-design-help {
+  color: var(--ipc-text);
+  font-family: 'PC UI Sans', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.ipc-calculator-form .ipc-design-help input[type='checkbox'] {
+  min-height: 22px;
+  margin: 0;
+  accent-color: var(--ipc-accent);
+}
+.ipc-calculator-form > .hint {
+  margin: 12px 0 16px 38px;
+  color: var(--ipc-muted);
+  font-size: 13px;
+}
+.ipc-calculator-form .ipc-price-type__btns,
+.ipc-calculator-form .ipc-ops-list {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.ipc-calculator-form .ipc-price-type__btn,
+.ipc-calculator-form .ipc-op-variant {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--ipc-border);
+  border-radius: 8px;
+  background: var(--ipc-surface);
+  color: var(--ipc-text);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none;
+}
+.ipc-calculator-form .ipc-price-type__btn--on,
+.ipc-calculator-form .ipc-op-variant--on {
+  border-color: var(--ipc-accent);
+  background: var(--ipc-accent);
+  color: #ffffff;
+}
+.ipc-calculator-form .ipc-price-type__btn:focus-visible,
+.ipc-calculator-form .ipc-op-variant:focus-visible {
+  outline: 2px solid var(--ipc-accent);
+  outline-offset: 2px;
+}
+.ipc-calculator-form .ipc-op-group,
+.ipc-calculator-form .ipc-op-option {
+  padding: 12px 0;
+  border: 0;
+  background: transparent;
+}
+.ipc-calculator-form .ipc-op-group__title {
+  color: var(--ipc-text);
+  font-size: 14px;
+}
+.ipc-calc-summary {
+  margin: 20px 0 0;
+}
+.ipc-calc-card {
+  padding: 20px;
+  border: 1px solid var(--ipc-border);
+  border-radius: 10px;
+  background: var(--ipc-surface);
+}
+.ipc-calc-card__label,
+.ipc-calc-card__label--sub,
+.ipc-calc-card__value--sub,
+.ipc-calc-breakdown__meta,
+.ipc-calc-breakdown__group-title,
+.ipc-calc-tiers {
+  color: var(--ipc-muted);
+}
+.ipc-calc-card__value--lg {
+  color: var(--ipc-accent);
+  font-family: 'PC UI Display', 'PC UI Sans', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 750;
+}
+.ipc-calc-breakdown__title,
+.ipc-calc-breakdown__label,
+.ipc-calc-breakdown__value {
+  color: var(--ipc-text);
+}
+.ipc-calc-breakdown__group {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ipc-surface-subtle);
+}
+.ipc-calc-breakdown__row + .ipc-calc-breakdown__row {
+  border-color: var(--ipc-border);
+}
+.ipc-calc-card__sep,
+.ipc-price-diff-accordion__sep {
+  background: var(--ipc-border);
+}
+.ipc-calc-summary > .primary {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 16px;
+}
+.ipc-price-type__hint,
+.ipc-price-diff-accordion__footer,
+.ipc-price-diff-accordion__note {
+  color: var(--ipc-muted);
+}
+.ipc-price-diff-accordion {
+  border-color: var(--ipc-border);
+  border-radius: 10px;
+  background: var(--ipc-surface);
+}
+.ipc-price-diff-accordion__note {
+  background: var(--ipc-surface-subtle);
+}
+.ipc-price-diff-accordion__promo-link {
+  color: var(--ipc-accent-warm);
 }

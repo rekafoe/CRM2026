@@ -119,6 +119,7 @@ export const MINIAPP_CLIENT_PART2 = `
     form.className = 'form';
     form.setAttribute('novalidate', 'novalidate');
     form.onsubmit = function (e) { e.preventDefault(); doCheckout(this); return false; };
+    form.oninput = function () { if (!out.draftOrderId) out.checkoutIdempotencyKey = null; };
     var isLeg = out.checkoutType === 'legal';
     var sel = document.createElement('select');
     sel.name = 'cust-type';
@@ -197,9 +198,6 @@ export const MINIAPP_CLIENT_PART2 = `
   function loadProducts() {
     out.productErr = null;
     var listPath = '/api/products?forSite=1&withMinPrice=1';
-    if (typeof CATALOG_CATEGORY_ID === 'number' && CATALOG_CATEGORY_ID > 0) {
-      listPath = '/api/products/category/' + CATALOG_CATEGORY_ID + '?forSite=1&withMinPrice=1';
-    }
     miniappRequest(listPath, { headers: { Accept: 'application/json' }, auth: false, retry401: false })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) { out.products = Array.isArray(data) ? data : []; render(); })

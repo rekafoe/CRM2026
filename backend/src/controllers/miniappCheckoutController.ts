@@ -16,11 +16,14 @@ export class MiniappCheckoutController {
       return;
     }
     try {
-      const result = await createMiniappDraft(m.telegramUserId, req.body as MiniappCheckoutBody);
-      res.status(201).json({
+      const result = await createMiniappDraft(m.telegramUserId, req.body as MiniappCheckoutBody, {
+        idempotencyKey: req.get('Idempotency-Key'),
+      });
+      res.status(result.replayed ? 200 : 201).json({
         order: result.order,
         itemIds: result.itemIds ?? [],
-        message: 'Черновик создан',
+        replayed: result.replayed,
+        message: result.replayed ? 'Возвращён ранее созданный черновик' : 'Черновик создан',
       });
     } catch (e) {
       const mapped = mapMiniappCheckoutErrorToHttp(e);

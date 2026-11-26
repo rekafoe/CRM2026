@@ -168,9 +168,106 @@ h2.section-head, h3.section-head { margin-top: 0; }
   cursor: pointer;
 }
 .ipc-op-variant--on {
-  border-color: rgba(0, 181, 204, 0.72);
-  background: #00b5cc;
+  border-color: var(--ipc-accent);
+  background: var(--ipc-accent);
   color: #fff;
 }
 .ipc-checkout-design-note, .ipc-checkout-design-hint { line-height: 1.45; }
 .ipc-checkout-validate { color: #b91c1c; font-weight: 500; }
+
+.ipc-catalog-lead {
+  margin: -6px 0 14px;
+  max-width: 560px;
+}
+.ipc-catalog-categories {
+  display: flex;
+  gap: 7px;
+  margin: 0 -16px 16px;
+  padding: 2px 16px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ipc-catalog-categories::-webkit-scrollbar { display: none; }
+.ipc-catalog-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid var(--ipc-sep, var(--ipc-border));
+  border-radius: 8px;
+  background: var(--ipc-surface);
+  color: var(--ipc-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ipc-catalog-category > span {
+  color: var(--ipc-muted);
+  font-family: 'PC UI Mono', ui-monospace, monospace;
+  font-size: 10px;
+}
+.ipc-catalog-category--on {
+  border-color: var(--ipc-accent);
+  background: var(--ipc-accent-soft);
+  color: var(--ipc-accent);
+}
+.ipc-catalog-card.card.ipc-card {
+  min-height: 322px;
+  aspect-ratio: auto;
+  padding: 13px;
+}
+.ipc-catalog-card:hover {
+  border-color: var(--ipc-accent);
+  box-shadow: 0 5px 18px rgba(20, 22, 25, 0.09);
+}
+.ipc-catalog-card__category {
+  margin-bottom: 5px;
+  overflow: hidden;
+  color: var(--ipc-accent);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ipc-catalog-card__title {
+  font-family: 'PC UI Display', 'PC UI Sans', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+.ipc-catalog-card__media {
+  flex: 0 0 132px;
+  height: 132px;
+  margin: 8px 0;
+  border-radius: 8px;
+  background: var(--tg-theme-bg-color, #f6f5f2);
+}
+.ipc-catalog-card__media--empty {
+  flex-basis: 70px;
+  height: 70px;
+  min-height: 70px;
+}
+.ipc-catalog-card__placeholder {
+  color: var(--ipc-muted);
+  font-family: 'PC UI Display', 'PC UI Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ipc-catalog-card .card-price {
+  color: var(--ipc-text);
+  font-size: 13px;
+}
+.ipc-catalog-card__btn {
+  min-height: 38px;
+  margin-top: 9px;
+}
+@media (max-width: 360px) {
+  .ipc-catalog-card.card.ipc-card { min-height: 306px; }
+  .ipc-catalog-card__media { flex-basis: 118px; height: 118px; }
+}

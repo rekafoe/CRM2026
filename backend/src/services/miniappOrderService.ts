@@ -35,9 +35,11 @@ export async function listMiniappOrders(
   const limit = Math.min(Math.max(1, options?.limit ?? 50), 200);
   const db = await getDb();
   const hasCheckoutState = await hasColumn('orders', 'miniapp_checkout_state');
+  const hasExpiredAt = await hasColumn('orders', 'miniapp_expired_at');
   const finalizedWhere = hasCheckoutState
     ? ` AND COALESCE(o.miniapp_checkout_state, '') != '${MINIAPP_CHECKOUT_STATE_DRAFT}'`
     : '';
+  const expiredWhere = hasExpiredAt ? ' AND o.miniapp_expired_at IS NULL' : '';
 
   const rows = (await db.all(
     `SELECT
@@ -54,7 +56,7 @@ export async function listMiniappOrders(
        (SELECT COUNT(*) FROM items i WHERE i.orderId = o.id) AS items_count
      FROM orders o
      WHERE o.telegram_chat_id = ?
-     ${finalizedWhere}
+     ${finalizedWhere}${expiredWhere}
      ORDER BY datetime(COALESCE(o.createdAt, o.created_at)) DESC, o.id DESC
      LIMIT ?`,
     [telegramChatId, limit]
@@ -125,9 +127,11 @@ export async function getMiniappOrderDetail(
   }
   const db = await getDb();
   const hasCheckoutState = await hasColumn('orders', 'miniapp_checkout_state');
+  const hasExpiredAt = await hasColumn('orders', 'miniapp_expired_at');
   const finalizedWhere = hasCheckoutState
     ? ` AND COALESCE(o.miniapp_checkout_state, '') != '${MINIAPP_CHECKOUT_STATE_DRAFT}'`
     : '';
+  const expiredWhere = hasExpiredAt ? ' AND o.miniapp_expired_at IS NULL' : '';
 
   const o = (await db.get(
     `SELECT
@@ -143,7 +147,7 @@ export async function getMiniappOrderDetail(
        o.notes,
        (SELECT COUNT(*) FROM items i WHERE i.orderId = o.id) AS items_count
      FROM orders o
-     WHERE o.id = ? AND o.telegram_chat_id = ?${finalizedWhere}`,
+     WHERE o.id = ? AND o.telegram_chat_id = ?${finalizedWhere}${expiredWhere}`,
     [orderId, telegramChatId]
   )) as any;
 
@@ -216,16 +220,20 @@ export async function attachFileToMiniappOrder(
   }
 
   const db = await getDb();
+  const hasExpiredAt = await hasColumn('orders', 'miniapp_expired_at');
   const order = (await db.get(
-    'SELECT id, telegram_chat_id FROM orders WHERE id = ?',
+    `SELECT id, telegram_chat_id${hasExpiredAt ? ', miniapp_expired_at' : ''} FROM orders WHERE id = ?`,
     [orderId]
-  )) as { id: number; telegram_chat_id?: string | null } | undefined;
+  )) as { id: number; telegram_chat_id?: string | null; miniapp_expired_at?: string | null } | undefined;
 
   if (!order) {
     return { ok: false, status: 404, message: 'Заказ не найден' };
   }
   if (String(order.telegram_chat_id || '') !== String(telegramChatId)) {
     return { ok: false, status: 403, message: 'Нет доступа к этому заказу' };
+  }
+  if (order.miniapp_expired_at) {
+    return { ok: false, status: 410, message: 'Срок этого черновика истёк. Создайте новый заказ.' };
   }
 
   let itemFk: number | null = null;

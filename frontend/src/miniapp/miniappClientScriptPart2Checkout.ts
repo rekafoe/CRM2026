@@ -102,6 +102,17 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
       finalizeCheckoutDraft(orderId, orderNumber);
     });
   }
+  function ensureCheckoutIdempotencyKey() {
+    if (out.checkoutIdempotencyKey) return out.checkoutIdempotencyKey;
+    var randomPart = '';
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      randomPart = window.crypto.randomUUID();
+    } else {
+      randomPart = String(Date.now()) + '-' + String(Math.random()).slice(2) + '-' + String(Math.random()).slice(2);
+    }
+    out.checkoutIdempotencyKey = 'miniapp-' + randomPart;
+    return out.checkoutIdempotencyKey;
+  }
   function doCheckout(formNode) {
     if (!out.token) { out.checkoutMsg = 'Нет сессии'; _miniappScrollTop(); render(); return; }
     if (out.cart.length === 0) { out.checkoutMsg = 'Корзина пуста'; _miniappScrollTop(); render(); return; }
@@ -161,7 +172,11 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
     };
     miniappRequestJson('/api/miniapp/orders/draft', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Idempotency-Key': ensureCheckoutIdempotencyKey()
+      },
       body: JSON.stringify(body)
     })
       .then(function (x) {

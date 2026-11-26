@@ -18,6 +18,10 @@ import {
   MINIAPP_CHECKOUT_STATE_DRAFT,
   MINIAPP_CHECKOUT_STATE_FINALIZED,
 } from '../utils/miniappCheckoutState';
+import {
+  miniappRequestHash,
+  normalizeMiniappIdempotencyKey,
+} from '../utils/miniappCheckoutIdempotency';
 
 export type MiniappCustomerBody =
   | {
@@ -312,15 +316,51 @@ async function getOwnedMiniappOrderRow(telegramChatId: string, orderId: number) 
     notes?: string | null;
     miniapp_checkout_state?: string | null;
     miniapp_design_help_requested?: number | null;
+    miniapp_expired_at?: string | null;
   }>(
-    `SELECT id, number, notes, miniapp_checkout_state, miniapp_design_help_requested
+    `SELECT id, number, notes, miniapp_checkout_state, miniapp_design_help_requested, miniapp_expired_at
      FROM orders
      WHERE id = ? AND telegram_chat_id = ?`,
     [orderId, telegramChatId]
   );
 }
 
-export async function createMiniappDraft(telegramChatId: string, body: MiniappCheckoutBody) {
+async function getMiniappDraftReplay(telegramChatId: string, idempotencyKey: string, requestHash: string) {
+  const db = await getDb()
+  const order = await db.get<{ id: number; miniapp_request_hash?: string | null }>(
+    `SELECT * FROM orders
+     WHERE telegram_chat_id = ? AND miniapp_idempotency_key = ? AND source = 'mini_app'`,
+    [telegramChatId, idempotencyKey],
+  )
+  if (!order) return null
+  if (order.miniapp_request_hash !== requestHash) {
+    const error = new Error('Этот Idempotency-Key уже использован для другого состава заказа')
+    ;(error as { code?: string }).code = 'MINIAPP_IDEMPOTENCY_CONFLICT'
+    throw error
+  }
+  const itemRows = await db.all<Array<{ id: number }>>(
+    'SELECT id FROM items WHERE orderId = ? ORDER BY id ASC',
+    [order.id],
+  )
+  return {
+    order,
+    itemIds: itemRows.map((row) => Number(row.id)),
+    replayed: true,
+  }
+}
+
+export async function createMiniappDraft(
+  telegramChatId: string,
+  body: MiniappCheckoutBody,
+  options?: { idempotencyKey?: unknown },
+) {
+  const idempotencyKey = normalizeMiniappIdempotencyKey(options?.idempotencyKey)
+  const requestHash = idempotencyKey ? miniappRequestHash(body) : null
+  if (idempotencyKey && requestHash) {
+    const replay = await getMiniappDraftReplay(telegramChatId, idempotencyKey, requestHash)
+    if (replay) return replay
+  }
+
   const prepared = await prepareMiniappCheckoutContext(telegramChatId, body);
   const editorDraftPrepared = await prepareWebsiteItemsWithEditorDrafts(prepared.normalized);
   const result = await OrderService.createOrderWithItems({
@@ -337,12 +377,34 @@ export async function createMiniappDraft(telegramChatId: string, body: MiniappCh
     items: editorDraftPrepared.items,
   });
 
+  if (idempotencyKey && requestHash) {
+    const db = await getDb()
+    try {
+      await db.run(
+        `UPDATE orders
+         SET miniapp_idempotency_key = ?, miniapp_request_hash = ?
+         WHERE id = ? AND source = 'mini_app' AND miniapp_checkout_state = 'draft'`,
+        [idempotencyKey, requestHash, result.order.id],
+      )
+    } catch (error: any) {
+      if (!String(error?.message || '').includes('UNIQUE constraint failed')) throw error
+      const replay = await getMiniappDraftReplay(telegramChatId, idempotencyKey, requestHash)
+      if (!replay) throw error
+      await db.run(
+        `UPDATE orders SET miniapp_expired_at = datetime('now')
+         WHERE id = ? AND source = 'mini_app' AND miniapp_checkout_state = 'draft'`,
+        [result.order.id],
+      )
+      return replay
+    }
+  }
+
   if (prepared.orderNotes) {
     await OrderService.updateOrderNotes(result.order.id, prepared.orderNotes, undefined);
   }
 
   setLastWebsiteOrderAt(Date.now());
-  return result;
+  return { ...result, replayed: false };
 }
 
 export async function finalizeMiniappDraft(telegramChatId: string, orderId: number) {
@@ -357,11 +419,19 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
     (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_FOUND';
     throw err;
   }
+  if (String(draftOrder.miniapp_checkout_state || '') === MINIAPP_CHECKOUT_STATE_FINALIZED) {
+    return {
+      order: { id: draftOrder.id, number: draftOrder.number },
+      deductionResult: null,
+      alreadyFinalized: true,
+    }
+  }
   if (
-    draftOrder.miniapp_checkout_state &&
-    String(draftOrder.miniapp_checkout_state) !== MINIAPP_CHECKOUT_STATE_DRAFT
+    draftOrder.miniapp_expired_at ||
+    (draftOrder.miniapp_checkout_state &&
+      String(draftOrder.miniapp_checkout_state) !== MINIAPP_CHECKOUT_STATE_DRAFT)
   ) {
-    const err = new Error('Этот заказ уже оформлен');
+    const err = new Error('Этот черновик больше нельзя финализировать');
     (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_DRAFT';
     throw err;
   }
@@ -463,6 +533,9 @@ export function mapMiniappCheckoutErrorToHttp(
   switch (c) {
     case 'MINIAPP_ORDER_NOT_FOUND':
       return { status: 404, body: { error: e.message, message: e.message } };
+    case 'MINIAPP_IDEMPOTENCY_CONFLICT':
+      return { status: 409, body: { error: e.message, message: e.message } };
+    case 'MINIAPP_IDEMPOTENCY_KEY_INVALID':
     case 'MINIAPP_PHONE_REQUIRED':
     case 'MINIAPP_NAME_REQUIRED':
     case 'MINIAPP_COMPANY_REQUIRED':

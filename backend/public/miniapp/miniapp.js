@@ -1,4 +1,4 @@
-(function(){"use strict";const b="",_="",S="",t=`
+(function(){"use strict";const b="",_="",C="",S="",t=`
   var _miniappAuthPromise = null;
   function getMiniappInitData() {
     var tg = window.Telegram && window.Telegram.WebApp;
@@ -80,11 +80,13 @@
   function miniappRequestJson(path, opts) {
     return miniappRequest(path, opts).then(function (r) { return miniappJsonResponse(r); });
   }
-`,r="1180 1800 1700 1700",i="M1667.66 2690.24c104.12,-0.5 365.38,-11.13 446.39,13.35 279.36,84.42 271.48,429.66 3.79,511.73 -79.56,24.4 -348.11,15.54 -450.15,13.76l0.08 -187.68 369.98 -0.3 0.16 -161.4 -370.58 -1.29 0.33 -188.17zm0.07 -604.24l653.99 -0.69 0.16 -161.09 -816.93 -0.07 -0.13 954.21 -208.72 0.15 0.43 162.65 208.15 0.76 0.21 349.18c111.37,-0.52 222.85,-0.05 334.23,-0.05 106.15,0 220.5,8.88 316.14,-17.04 379.05,-102.75 447.95,-590.61 110.72,-780.65 -82.93,-46.74 -155.85,-65.71 -268.51,-65.55 -109.25,0.16 -219.85,1.61 -329.7,-0.15l-0.04 -441.66z",n=()=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r}" fill="none" aria-hidden="true" focusable="false"><path d="${i}" fill="currentColor"/></svg>`.replace(/\s+/g," ");function a(){return' <span class="ipc-byn" role="img" aria-label="бел. руб.">'+n()+"</span>"}const o=`
+`,r="1180 1800 1700 1700",i="M1667.66 2690.24c104.12,-0.5 365.38,-11.13 446.39,13.35 279.36,84.42 271.48,429.66 3.79,511.73 -79.56,24.4 -348.11,15.54 -450.15,13.76l0.08 -187.68 369.98 -0.3 0.16 -161.4 -370.58 -1.29 0.33 -188.17zm0.07 -604.24l653.99 -0.69 0.16 -161.09 -816.93 -0.07 -0.13 954.21 -208.72 0.15 0.43 162.65 208.15 0.76 0.21 349.18c111.37,-0.52 222.85,-0.05 334.23,-0.05 106.15,0 220.5,8.88 316.14,-17.04 379.05,-102.75 447.95,-590.61 110.72,-780.65 -82.93,-46.74 -155.85,-65.71 -268.51,-65.55 -109.25,0.16 -219.85,1.61 -329.7,-0.15l-0.04 -441.66z",a=()=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r}" fill="none" aria-hidden="true" focusable="false"><path d="${i}" fill="currentColor"/></svg>`.replace(/\s+/g," ");function n(){return' <span class="ipc-byn" role="img" aria-label="бел. руб.">'+a()+"</span>"}const o=`
   var out = {
     token: null, me: null, products: null, productErr: null, orders: null, ordersErr: null,
+    catalogCategory: null,
     cart: [], view: 'catalog', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
     checkoutLoading: false,
+    checkoutIdempotencyKey: null,
     finalizeLoading: false,
     draftOrderId: null,
     draftItemIds: null,
@@ -111,7 +113,7 @@
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   function bynSpanHtml() {
-    return ${JSON.stringify(a())};
+    return ${JSON.stringify(n())};
   }
   function h(tag, inner, cl) {
     var e = document.createElement(tag);
@@ -124,6 +126,7 @@
     out.draftItemIds = null;
     out.draftOrderNumber = null;
     out.draftUploadedItemIds = null;
+    out.checkoutIdempotencyKey = null;
     out.finalizeLoading = false;
   }
   function setNav() {
@@ -287,36 +290,76 @@
     if (out.productErr) box.appendChild(rowHint(out.productErr));
     if (!out.products) { box.appendChild(rowHint('Загрузка каталога…')); return box; }
     if (out.products.length === 0) { box.appendChild(h('p', 'Нет товаров для сайта (forSite).', 'hint ipc-empty')); return box; }
+    if (out.catalogCategory == null) {
+      out.catalogCategory = typeof CATALOG_CATEGORY_ID === 'number' && CATALOG_CATEGORY_ID > 0 ? String(CATALOG_CATEGORY_ID) : 'all';
+    }
+    var categories = [];
+    var categoryCounts = {};
+    for (var ci = 0; ci < out.products.length; ci++) {
+      var cp = out.products[ci];
+      var categoryId = String(cp.category_id || 'other');
+      if (!categoryCounts[categoryId]) {
+        categoryCounts[categoryId] = 0;
+        categories.push({ id: categoryId, name: cp.category_name || 'Другие товары' });
+      }
+      categoryCounts[categoryId] += 1;
+    }
+    categories.sort(function (a, b) { return a.name.localeCompare(b.name, 'ru'); });
+    if (out.catalogCategory !== 'all' && !categoryCounts[out.catalogCategory]) out.catalogCategory = 'all';
     box.appendChild(h('div', 'Каталог', 'section-head'));
+    box.appendChild(h('p', 'Полиграфия, фото, наклейки, сувениры и широкоформатная печать.', 'hint ipc-catalog-lead'));
+    var tabs = h('div', '', 'ipc-catalog-categories');
+    tabs.setAttribute('aria-label', 'Категории каталога');
+    function addCategoryButton(id, label, count) {
+      var active = out.catalogCategory === id;
+      var b = h('button', esc(label) + ' <span>' + count + '</span>', 'ipc-catalog-category' + (active ? ' ipc-catalog-category--on' : ''));
+      b.type = 'button';
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      b.onclick = function () { out.catalogCategory = id; render(); };
+      tabs.appendChild(b);
+    }
+    addCategoryButton('all', 'Все', out.products.length);
+    for (var ti = 0; ti < categories.length; ti++) {
+      addCategoryButton(categories[ti].id, categories[ti].name, categoryCounts[categories[ti].id]);
+    }
+    box.appendChild(tabs);
+    var products = [];
+    for (var pi = 0; pi < out.products.length; pi++) {
+      if (out.catalogCategory === 'all' || String(out.products[pi].category_id || 'other') === out.catalogCategory) {
+        products.push(out.products[pi]);
+      }
+    }
     var grid = h('div', '', 'catalog-grid ipc-catalog-grid');
-    for (var i = 0; i < out.products.length; i++) {
+    for (var i = 0; i < products.length; i++) {
       (function (p) {
         var row = h('div', '', 'card ipc-card ipc-catalog-card');
+        row.appendChild(h('div', esc(p.category_name || 'Полиграфия'), 'ipc-catalog-card__category'));
         row.appendChild(h('div', esc(p.name || 'Товар'), 'card-title ipc-catalog-card__title'));
         var imgSrc = productCardImageSrc(p);
         var media = h('div', '', 'ipc-catalog-card__media' + (imgSrc ? '' : ' ipc-catalog-card__media--empty'));
         if (imgSrc) {
           var im = document.createElement('img');
           im.className = 'ipc-catalog-card__img';
-          im.alt = '';
+          im.alt = String(p.name || 'Товар');
           im.loading = 'lazy';
           im.src = imgSrc;
           media.appendChild(im);
+        } else {
+          media.appendChild(h('span', 'PrintCore', 'ipc-catalog-card__placeholder'));
         }
         row.appendChild(media);
         var blurb = shortProductDescription(p);
         if (blurb) row.appendChild(h('div', esc(blurb), 'ipc-catalog-card__desc'));
-        var price =
-          p.min_price != null && p.min_price !== ''
-            ? 'от <span class="ipc-catalog-card__price-amount">' + esc(p.min_price) + bynSpanHtml() + '</span>'
-            : 'цена по запросу';
+        var price = Number(p.min_price) > 0
+          ? 'от <span class="ipc-catalog-card__price-amount">' + esc(p.min_price) + bynSpanHtml() + '</span>'
+          : 'цена по запросу';
         row.appendChild(h('div', price, 'card-price ipc-catalog-card__price'));
         var btn = h('button', isSimplifiedProduct(p) ? 'Заказать' : 'В корзину', 'primary ipc-catalog-card__btn');
         btn.type = 'button';
         btn.onclick = function () { addToCart(p); };
         row.appendChild(btn);
         grid.appendChild(row);
-      })(out.products[i]);
+      })(products[i]);
     }
     box.appendChild(grid);
     return box;
@@ -379,6 +422,18 @@
     lab.appendChild(el);
     w.appendChild(lab);
     form.appendChild(w);
+  }
+  function miniappLaunchOrderId() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var raw = params.get('order') || params.get('startapp') || '';
+      if (!raw && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+        raw = window.Telegram.WebApp.initDataUnsafe.start_param || '';
+      }
+      var id = parseInt(String(raw).replace(/^order[_-]?/i, ''), 10);
+      if (id > 0) return id;
+    } catch (e) {}
+    return null;
   }
 `,l=`
   function ipcCalcMoneyHtml(value) {
@@ -865,6 +920,7 @@
     form.className = 'form';
     form.setAttribute('novalidate', 'novalidate');
     form.onsubmit = function (e) { e.preventDefault(); doCheckout(this); return false; };
+    form.oninput = function () { if (!out.draftOrderId) out.checkoutIdempotencyKey = null; };
     var isLeg = out.checkoutType === 'legal';
     var sel = document.createElement('select');
     sel.name = 'cust-type';
@@ -943,9 +999,6 @@
   function loadProducts() {
     out.productErr = null;
     var listPath = '/api/products?forSite=1&withMinPrice=1';
-    if (typeof CATALOG_CATEGORY_ID === 'number' && CATALOG_CATEGORY_ID > 0) {
-      listPath = '/api/products/category/' + CATALOG_CATEGORY_ID + '?forSite=1&withMinPrice=1';
-    }
     miniappRequest(listPath, { headers: { Accept: 'application/json' }, auth: false, retry401: false })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) { out.products = Array.isArray(data) ? data : []; render(); })
@@ -989,6 +1042,11 @@
     main = $('miniapp-main');
     var tg = window.Telegram && window.Telegram.WebApp;
     if (tg) { try { tg.ready(); tg.expand(); } catch (ex) {} }
+    var launchOrderId = (typeof miniappLaunchOrderId === 'function') ? miniappLaunchOrderId() : null;
+    if (launchOrderId) {
+      out.view = 'order_detail';
+      out.orderDetailId = launchOrderId;
+    }
     var initData = (tg && tg.initData) ? tg.initData : '';
     if (!initData) {
       if (main) main.appendChild(rowHint('Откройте из Telegram (web_app). В браузере initData нет.'));
@@ -1016,7 +1074,8 @@
           out.me = null;
           out.err = (meResp.j && (meResp.j.error || meResp.j.message)) ? String(meResp.j.error || meResp.j.message) : ('HTTP ' + meResp.status);
         }
-        if (out.view === 'catalog' && !out.products) loadProducts();
+        if (out.view === 'order_detail' && out.orderDetailId && typeof loadOrderDetail === 'function') loadOrderDetail();
+        else if (out.view === 'catalog' && !out.products) loadProducts();
         render();
         if (out.token && !out._miniappOrdersPollInit) {
           out._miniappOrdersPollInit = true;
@@ -1138,6 +1197,17 @@
       finalizeCheckoutDraft(orderId, orderNumber);
     });
   }
+  function ensureCheckoutIdempotencyKey() {
+    if (out.checkoutIdempotencyKey) return out.checkoutIdempotencyKey;
+    var randomPart = '';
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      randomPart = window.crypto.randomUUID();
+    } else {
+      randomPart = String(Date.now()) + '-' + String(Math.random()).slice(2) + '-' + String(Math.random()).slice(2);
+    }
+    out.checkoutIdempotencyKey = 'miniapp-' + randomPart;
+    return out.checkoutIdempotencyKey;
+  }
   function doCheckout(formNode) {
     if (!out.token) { out.checkoutMsg = 'Нет сессии'; _miniappScrollTop(); render(); return; }
     if (out.cart.length === 0) { out.checkoutMsg = 'Корзина пуста'; _miniappScrollTop(); render(); return; }
@@ -1197,7 +1267,11 @@
     };
     miniappRequestJson('/api/miniapp/orders/draft', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Idempotency-Key': ensureCheckoutIdempotencyKey()
+      },
       body: JSON.stringify(body)
     })
       .then(function (x) {
@@ -2025,7 +2099,7 @@
     render();
   }
   function renderCalculator() {
-    var box = h('div', '', 'section');
+    var box = h('div', '', 'section ipc-calculator');
     box.appendChild(h('div', esc(out.calcName || 'Калькулятор'), 'section-head'));
     var back = h('button', out.calcEditCartKey ? '← Корзина' : '← Каталог', 'small');
     back.type = 'button';
@@ -2047,7 +2121,7 @@
     if (out.calcLoading && out.calcSchema) box.appendChild(rowHint('Считаем…'));
     var simp = calcSimp();
     if (!simp) { if (!out.calcErr) box.appendChild(rowHint('Нет данных.')); return box; }
-    var form = h('form', '', 'form');
+    var form = h('form', '', 'form ipc-calculator-form');
     form.onsubmit = function (e) { e.preventDefault(); return false; };
     var types = calcTypes();
     if (types.length > 0) {
@@ -2311,7 +2385,7 @@
     layIn.onchange = function () { out.calcStagedLayout = (this.files && this.files[0]) ? this.files[0] : null; };
     addField(form, 'Макет к этой позиции (необяз., после расчёта — «В корзину»)', layIn);
     form.appendChild(h('p', 'Цена обновляется автоматически при смене параметров. Макет уйдёт в заказ с привязкой к позиции.', 'hint'));
-    var calcPanel = h('div', '', 'ipc-panel');
+    var calcPanel = h('div', '', 'ipc-panel ipc-calculator__parameters');
     var calcInner = h('div', '', 'ipc-detail-block');
     calcInner.appendChild(form);
     calcPanel.appendChild(calcInner);
@@ -2329,7 +2403,7 @@
       if (!isFreshPrice) addB.textContent = out.calcLoading ? 'Обновляем цену…' : 'Цена устарела';
       addB.onclick = function () { calcAddToCart(); };
       resBox.appendChild(addB);
-      var resPanel = h('div', '', 'ipc-panel');
+      var resPanel = h('div', '', 'ipc-panel ipc-calculator__result');
       var resInner = h('div', '', 'ipc-detail-block');
       resInner.appendChild(resBox);
       resPanel.appendChild(resInner);

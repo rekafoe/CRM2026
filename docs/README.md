@@ -39,6 +39,7 @@ npm run dev  # Запуск на порту 5173
 
 - [📋 Order Management](./order-management.md) - Управление заказами
 - [🤖 Telegram Bot](./telegram-bot.md) - Telegram бот для заказов
+- [📱 Mini App](./miniapp.md) - API, checkout и план улучшений Telegram Mini App
 - [🧮 Calculator](./calculator.md) - Калькулятор печати
 - [💰 Ценообразование](./pricing-architecture.md) - Канон: simplified + `/api/pricing/calculate`
 - [📐 Раскладка и дозаливка](./dynamic-layout-bleed.md) - Лист материала, `bleed_mm`, произвольный trim
